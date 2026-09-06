@@ -1223,8 +1223,10 @@
 }
 
 .agent-settings-field textarea {
+  field-sizing: content;
   min-height: 88px;
-  resize: none;
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 .agent-settings-field input::placeholder,

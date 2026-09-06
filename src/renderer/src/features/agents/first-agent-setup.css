@@ -149,8 +149,10 @@
 }
 
 .first-agent-fields .ui-textarea {
+  field-sizing: content;
   min-height: 64px;
-  resize: none;
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 .ui-button.first-agent-submit {
