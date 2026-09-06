@@ -89,10 +89,10 @@ so a red mobile, site-router, team-client or remote typecheck let the deploy thr
 `bun run test:desktop -- <path>` runs one desktop file. Need something wider? Ask for it. Permission
 covers the one command named — not another one, not a build, not a packaged app.
 
-`bun run format` is the one fast command to leave alone: it is `biome check --write .`, so it
-rewrites files your task never touched and puts them in your diff. Fix what you changed with
-`biome check --write <paths>`, or let the pre-commit hook's `bun run check:staged` do it over the
-staged set.
+`bun run format` is the one fast command to leave alone: it is
+`biome check --write --max-diagnostics=none .`, so it rewrites files your task never touched and
+puts them in your diff. Fix what you changed with `biome check --write <paths>`, or let the
+pre-commit hook's `bun run check:staged` do it over the staged set.
 
 ## Hit every surface
 

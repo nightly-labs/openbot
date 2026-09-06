@@ -130,7 +130,7 @@
     "typecheck:remote": "bun run --cwd remote/api typecheck",
     "typecheck": "bun run --parallel 'typecheck:*'",
     "lint": "biome check --max-diagnostics=none .",
-    "format": "biome check --write .",
+    "format": "biome check --write --max-diagnostics=none .",
     "check:staged": "biome check --write --staged --files-ignore-unknown=true --no-errors-on-unmatched",
     "test": "bun run test:desktop && bun run test:api && bun run test:sites && bun run test:remote",
     "test:desktop": "vitest run",
