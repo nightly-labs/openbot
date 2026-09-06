@@ -15,7 +15,13 @@
 
 .reachable-from-markup {
   display: grid;
+  /* A file extension has a class's shape. Reading declarations from selector preludes is what
+     keeps `.webp` out of the report; a scan of the whole file would demand a rule for it. */
+  background-image: url("panel-sprite.webp");
 }
+
+/* A comment naming .commented-out-class, whose markup and rule are both long gone. Naming a
+   class is not declaring one, so this must not be reported either. */
 
 /* Named only by the HTML entry point beside it. */
 .reachable-from-html {

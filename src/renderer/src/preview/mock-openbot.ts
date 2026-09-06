@@ -762,6 +762,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           throw new Error("This local agent was installed from a different marketplace agent.");
         }
         const previousRoutineIds = existing?.marketplaceSource?.routineIds ?? [];
+        const previousSkillIds = existing?.marketplaceSource?.skillIds ?? [];
         const target =
           existing ??
           createAgentSummary({
@@ -800,9 +801,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           ? agents.map((candidate) => (candidate.id === agent.id ? agent : candidate))
           : [...agents, agent];
         if (!existing) queues.set(agent.id, emptyQueue(agent.id));
-        installedSkills.set(
-          agent.id,
-          detail.skills.map((skill) => ({
+        // Reinstalling drops only the skills this listing installed and has since dropped. A
+        // skill the user installed themselves is not the marketplace's to remove.
+        const listingSkillIds = new Set(detail.skills.map((skill) => skill.skillId));
+        const kept = readInstalledSkills(agent.id).filter(
+          (skill) => !listingSkillIds.has(skill.skillId) && !previousSkillIds.includes(skill.skillId),
+        );
+        installedSkills.set(agent.id, [
+          ...detail.skills.map((skill) => ({
             skillId: skill.skillId,
             slug: skill.slug,
             name: skill.name,
@@ -810,7 +816,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
             availableVersion: skill.version,
             state: "installed" as const,
           })),
-        );
+          ...kept,
+        ]);
         routines.set(agent.id, [
           ...created,
           ...(routines.get(agent.id) ?? []).filter((routine) => !previousRoutineIds.includes(routine.id)),

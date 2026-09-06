@@ -78,6 +78,31 @@ const CLASS_FAMILY_PREFIX = /[`\s]([a-zA-Z][a-zA-Z0-9_-]*-)\$\{/gu;
  * and `apps/auth-api` renders the preview shell. So the CLI passes `src` and `apps` whole,
  * rather than a list of the three directories that happen to do it today.
  */
+/**
+ * The class names a stylesheet declares, read from selector preludes alone. A bare `.name` scan
+ * over the whole file cannot tell a selector from `url("sprite.svg")` or from a comment naming a
+ * rule that was deleted, and either one fails the check for a class nothing ever declared.
+ */
+function declaredClasses(source: string): Set<string> {
+  const names = new Set<string>();
+  const withoutComments = source.replaceAll(/\/\*.*?\*\//gsu, " ");
+  let start = 0;
+  for (let index = 0; index < withoutComments.length; index += 1) {
+    const char = withoutComments[index];
+    // A prelude ends at its block. `;` and `}` end a declaration or a block instead, so
+    // whatever was collecting is a value or the tail of a rule and never a selector.
+    if (char === "{") {
+      for (const match of withoutComments.slice(start, index).matchAll(/\.(-?[a-zA-Z][a-zA-Z0-9_-]*)/gu)) {
+        names.add(match[1]);
+      }
+      start = index + 1;
+    } else if (char === "}" || char === ";") {
+      start = index + 1;
+    }
+  }
+  return names;
+}
+
 export function checkUiFoundation(
   rendererRoot: string,
   labelRoot: string,
@@ -180,9 +205,7 @@ export function checkUiFoundation(
     }
   }
   for (const path of styleSheets) {
-    const declared = new Set(
-      [...readFileSync(path, "utf8").matchAll(/\.(-?[a-zA-Z][a-zA-Z0-9_-]*)/gu)].map((match) => match[1]),
-    );
+    const declared = declaredClasses(readFileSync(path, "utf8"));
     for (const name of [...declared].sort()) {
       if (named.has(name)) continue;
       if (families.some((prefix) => name.startsWith(prefix) && name.length > prefix.length)) continue;
