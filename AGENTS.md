@@ -175,16 +175,18 @@ something else.
 
 ## Where the rest of this lives
 
-Five directories carry rules this file used to hold. Each is loaded when you open a file under it,
+Seven directories carry rules this file used to hold. Each is loaded when you open a file under it,
 and each says what its own boundary costs and how to wait in its tests.
 
 | File | What it owns |
 | --- | --- |
 | `src/renderer/AGENTS.md` | the prerelease SolidJS stack, one store per concern, component reuse, the palette |
 | `src/main/AGENTS.md` | the renderer-to-main trust boundary, and where an IPC endpoint is registered |
+| `src/main/ipc/AGENTS.md` | the four ways to bind a handler, and the steps to add an endpoint |
 | `src/backend/AGENTS.md` | the user's SQLite: irreversible migrations, and the two database build paths |
-| `packages/contracts/AGENTS.md` | the Team API wire protocol, and the one channel list with its three mirrors |
+| `packages/contracts/AGENTS.md` | the Team API wire protocol, and the one channel list with its manifest and two mirrors |
 | `apps/auth-api/AGENTS.md` | the account Worker, and why its D1 migrations must survive a deploy race |
+| `apps/mobile/AGENTS.md` | the Expo app, and the build and simulator commands that need explicit permission |
 
 Read the one for the directory you are changing before you change it. `docs/ARCHITECTURE.md`
 "Change rules" says where a change belongs when it is not obvious.
