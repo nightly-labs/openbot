@@ -49,7 +49,7 @@ decoder spends its allocations on.
 | every declared channel belongs to a group | the `IpcEndpoints` declaration in `ipc-endpoints.ts` (`TS2344`) |
 | every request endpoint has exactly one handler | `GroupHandlers` (`TS2741` / `TS2353`) |
 | every group has a registrar | `registerIpcGroups` at `src/main/index.ts` (`TS2741`) |
-| no handler binds a channel outside the manifest | both entry points in `define-ipc-group.ts` read `IPC_ENDPOINTS` and take a group *name* |
+| no handler binds a channel outside the manifest | both entry points here read `IPC_ENDPOINTS` and take a group *name*; `ipc-channel-coverage.test.ts` keeps the wrappers unreachable elsewhere |
 | a payload is decoded before the handler sees it | no constructor pairs one with a raw `unknown` |
 | no channel is in two groups | `ipc-channel-coverage.test.ts` |
 | the preload invokes exactly the request endpoints | `ipc-channel-coverage.test.ts` |

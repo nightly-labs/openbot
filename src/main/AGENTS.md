@@ -26,9 +26,11 @@ Three things run at module scope in `index.ts` — `app.setPath`, `app.enableSan
 by a test that has not mocked `electron`, and why the coverage test below reads sources instead.
 
 - `handleTrusted` / `handleTrustedWithEvent` from `./trusted-ipc` are the only registration
-  primitives, and `./ipc/define-ipc-group.ts` is the only caller of them. `ipc-channel-coverage.test.ts`
-  fails on the *name* `ipcMain` anywhere else in `src/main`, because an aliased import would register
-  an endpoint with no sender check that no scan can see.
+  primitives, and `./ipc/define-ipc-group.ts` is the only caller of them.
+  `ipc-channel-coverage.test.ts` fails on the *name* `ipcMain` anywhere else in `src/main`, because
+  an aliased import would register an endpoint with no sender check that no scan can see, and on
+  either wrapper's name anywhere else, because both take a `string` channel — a direct call is a
+  privileged handler on a channel no group declares.
 - Parse every argument, and the type checker holds you to it. A handler with a payload is bound with
   `payloadHandler(decode, handler)`, and there is no constructor that pairs a payload with a raw
   `unknown`, because `(input: unknown) => Result` is not assignable to the no-payload `() => Result`
