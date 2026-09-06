@@ -43,7 +43,7 @@ bun run doctor               # diagnose dependency and config issues
 bunx expo install --fix      # fix incompatible package versions
 ```
 
-Both are scoped to this app: `lint` is `biome check src` and `typecheck` runs `codegen` before `tsc`. See "Execution and verification limits" above for when to run them, and `AGENTS.md` "CI owns the minutes-long suites" for the repository-wide commands worth avoiding and why.
+Both are scoped to this app: `lint` is `biome check --max-diagnostics=none src` and `typecheck` runs `codegen` before `tsc`. See "Execution and verification limits" above for when to run them, and `AGENTS.md` "CI owns the minutes-long suites" for the repository-wide commands worth avoiding and why.
 
 ## Navigation & Routing
 
