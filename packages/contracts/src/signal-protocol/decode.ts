@@ -66,7 +66,7 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
         channel: channel(value.channel),
         candidate: identifier(value.candidate),
         sdpMid: value.sdpMid === null ? null : identifier(value.sdpMid),
-        sdpMLineIndex: value.sdpMLineIndex === null ? null : integer(value.sdpMLineIndex),
+        sdpMLineIndex: value.sdpMLineIndex === null ? null : mLineIndex(value.sdpMLineIndex),
       };
     case "ice-restart":
       return { type: kind, version, connectionId: identifier(value.connectionId), channel: channel(value.channel) };
@@ -108,10 +108,21 @@ function integer(value: unknown): number {
 // An expiry at or before the epoch dates a session that cannot exist, and it does not stop at this
 // peer: the renderer forwards it to the main process, whose bridge schema requires a positive
 // integer and parses inside the port listener, so a zero arrives there as a throw rather than a
-// refused frame. `sdpMLineIndex` keeps plain `integer` -- zero is the first m-line.
+// refused frame.
 function timestamp(value: unknown): number {
   const candidate = integer(value);
   if (candidate <= 0) invalid();
+  return candidate;
+}
+
+// Zero is the first m-line, so this bound is `< 0` rather than the timestamp's `<= 0`. The Signal
+// service takes `nonnegative` on the way in, and a negative index is the malformed known payload
+// that has the furthest to travel before anything notices: it decodes, reaches `addIceCandidate`,
+// and the browser's refusal arrives as a WebRTC failure a reconnect is allowed to retry past. The
+// two ends disagreeing about the wire is a `protocol_error`, and it is only one here.
+function mLineIndex(value: unknown): number {
+  const candidate = integer(value);
+  if (candidate < 0) invalid();
   return candidate;
 }
 
