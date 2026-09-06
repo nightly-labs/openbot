@@ -11,6 +11,7 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_CAPABILITIES_HEADER } from "@openbot/contracts/team-protocol/v1";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { decodeAgentModelOptions } from "./remote-agent-decoding";
 import { RemoteServerClient } from "./remote-server-client";
 import { RemoteServerConnections } from "./remote-server-connections";
 import {
@@ -403,6 +404,49 @@ describe("WebRTC request decoding", () => {
 
     await expect(client.probeRemoteDesktop(server)).rejects.toThrow("could not safely use");
     expect(connections.statusFor("host")).toMatchObject({ state: "error", issue: { code: "protocol_error" } });
+  });
+
+  // A malformed member of a known payload is a `protocol_error`, not a shorter list: the client would
+  // otherwise present a menu the host never offered with nothing recording the disagreement. The
+  // consequence is deliberately severe -- `ensureCompatibility` rethrows the recorded issue for every
+  // later call without asking the host again, so this takes agents, browser and remote desktop
+  // offline together until an explicit reconnect -- which is why `isAgentModel` treats an id as an
+  // opaque token rather than a closed list. `claude-fable-5-1[1m]` reached here only because that
+  // charset had no square brackets; `ipc.test.ts` pins the guard that keeps it out.
+  it("refuses a model list a host cannot have meant", async () => {
+    const server = storedHttpsServer("host", { transport: "webrtc-v2", apiUrl: "webrtc://host" });
+    const connections = new RemoteServerConnections({
+      appVersion: null,
+      onChanged: () => undefined,
+      onReconnectSuspended: () => undefined,
+    });
+    const usable = {
+      provider: "claude",
+      id: "claude-sonnet-5",
+      name: "Sonnet",
+      description: "Balanced Claude model.",
+      defaultReasoningEffort: "high",
+      supportedReasoningEfforts: ["high"],
+    };
+    const client = new RemoteServerClient({
+      appVersion: "0.4.0",
+      servers: { require: () => server, token: () => "token" },
+      connections,
+      transport: {
+        request: async (_hostId, path) => {
+          if (path === TEAM_API_ROUTES.compatibility) {
+            return { appVersion: "0.4.0", protocol: { minimum: 2, maximum: 2 }, capabilities: [] };
+          }
+          return [usable, { ...usable, id: "a model from a newer host" }];
+        },
+        requestResponse: async () => {
+          throw new Error("unused");
+        },
+      },
+    });
+
+    await expect(client.request("host", TEAM_API_ROUTES.agents.models, decodeAgentModelOptions)).rejects.toThrow();
+    expect(connections.statusFor("host")).toMatchObject({ issue: { code: "protocol_error" } });
   });
 });
 

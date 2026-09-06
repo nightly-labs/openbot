@@ -155,7 +155,10 @@ describe("RemoteTeamDirectoryClient", () => {
         const path = new URL(input.toString()).pathname;
         paths.push(path);
         if (path === "/v2/remote/sessions/") {
-          return Response.json({ sessionId: "session-1", expiresAt: Date.now() + 60_000 }, { status: 201 });
+          return Response.json(
+            { sessionId: "session-1", hostId: HOST_ID, expiresAt: Date.now() + 60_000 },
+            { status: 201 },
+          );
         }
         if (path.endsWith("/ticket")) return Response.json({ error: "host offline" }, { status: 503 });
         return new Response(null, { status: 204 });
@@ -177,7 +180,10 @@ describe("RemoteTeamDirectoryClient", () => {
       fetch: async (input) => {
         const path = new URL(input.toString()).pathname;
         if (path === "/v2/remote/sessions/") {
-          return Response.json({ sessionId: "session-1", expiresAt: Date.now() + 60_000 }, { status: 201 });
+          return Response.json(
+            { sessionId: "session-1", hostId: HOST_ID, expiresAt: Date.now() + 60_000 },
+            { status: 201 },
+          );
         }
         return Response.json({
           signalUrl: "ws://192.168.1.143:3101/v1/signal",

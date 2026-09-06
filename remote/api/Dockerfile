@@ -15,6 +15,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /app/remote/api/node_modules ./remote/api/node_modules
+# Source, not just the manifest: workspace packages here ship as raw TypeScript, so the symlink
+# `node_modules/@openbot/contracts` carries over from the install stage resolves into a directory
+# with nothing in it to import. The image would build and the container would die on first
+# import - `scripts/dependency-catalog.test.ts` is what notices, because no CI job builds this.
+COPY packages/contracts ./packages/contracts
 COPY remote/api ./remote/api
 USER bun
 WORKDIR /app/remote/api

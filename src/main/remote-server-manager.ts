@@ -384,6 +384,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   async connectDevelopmentServer(input: DevelopmentRemoteServerConnection): Promise<ServerSummary> {
+    // A published dev host answers over WebRTC, and that membership belongs to an account the
+    // control plane keeps across restarts. The technical member this connection carries does not:
+    // publishing reconciles it away, so adopting an HTTP entry over the WebRTC one -- same host, so
+    // same id -- would replace a working server with one the host answers 401 to. The host role
+    // writes the file either way; which of the two connections wins is decided here.
+    const adopted = this.#store.find(input.serverId);
+    if (adopted?.transport === "webrtc-v2") return requiredServerSummary(this.list(), input.serverId);
     const verifiedIdentity = await this.#client.verifyIdentity(input.apiUrl, input.serverId, input.fingerprint);
     if (verifiedIdentity.publicKey !== input.publicKey || verifiedIdentity.serverName !== input.serverName) {
       throw new Error("The local development server identity changed.");
@@ -516,6 +523,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         this.#connections.setState(serverId, "connecting");
         this.#emitChanged();
         await this.#webrtcTransport.connect(serverId);
+        // The `connected` handler is what turns that "connecting" back into "online", and a host
+        // that was already connected raises no such event -- the session it would announce is the
+        // one still running. Retrying a host whose channel had never actually dropped therefore
+        // left it reading as reconnecting until it next went offline for real.
+        if (this.#connections.stateFor(serverId) === "connecting" && this.#webrtcTransport.isConnected(serverId)) {
+          this.#connections.markConnected(serverId);
+          this.#emitChanged();
+        }
         return requiredServerSummary(this.list(), serverId);
       }
       await this.#client.ensureCompatibility(server, true);
@@ -927,7 +942,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   async #syncWebRtcHosts(): Promise<void> {
     const transport = this.#webrtcTransport;
     if (!transport) return;
-    const { servers, removedHostIds, pinnedKeys } = reconcileWebRtcHosts({
+    const { servers, removedHostIds, staleTransportHostIds, pinnedKeys } = reconcileWebRtcHosts({
       hosts: await transport.listHosts(),
       servers: this.#store.servers,
       preservedIdentities: this.#store.preservedIdentities,
@@ -941,6 +956,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       await transport.disconnect(serverId).catch(() => undefined);
       this.#clearServerConnectionState(serverId);
     }
+    // Before the store changes, because after it `ensure` answers for the new entry: it branches on
+    // the transport it finds and starts the WebRTC one beside an HTTPS controller it never aborts,
+    // so both would deliver the same events and the socket for an entry that no longer exists could
+    // still mark a healthy host offline. No `disconnect` -- see `staleTransportHostIds`.
+    for (const serverId of staleTransportHostIds) this.#clearServerConnectionState(serverId);
     await this.#store.replaceServers(servers);
   }
 

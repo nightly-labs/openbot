@@ -130,6 +130,37 @@ describe("remote connection recovery", () => {
     recovery.dispose();
   });
 
+  // Ten seconds apart, five times, then every two minutes, for as long as the app is open -- all of
+  // it asking a service that would answer with the same unreadable frame.
+  it("stops retrying a failure a retry cannot fix, and tries once when the app comes back", async () => {
+    vi.useFakeTimers();
+    let attempts = 0;
+    const messages: Array<string | null> = [];
+    const recovery = createRemoteConnectionRecovery(
+      async () => {
+        attempts += 1;
+      },
+      () => {},
+      (status) => messages.push(remoteRecoveryMessage(status)),
+    );
+    recovery.setActive(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(attempts).toBe(1);
+
+    recovery.suspend(new Error("Signal returned an invalid message."));
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect(attempts).toBe(1);
+    expect(messages.at(-1)).toBe("Update OpenBot Mobile or the desktop app before connecting.");
+
+    // The desktop the user left to update is the reason the frame was unreadable, so returning to
+    // the app is the way out of this state.
+    recovery.setActive(false);
+    recovery.setActive(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(attempts).toBe(2);
+    recovery.dispose();
+  });
+
   it("does not overlap connection attempts and ignores a disposed server", async () => {
     vi.useFakeTimers();
     let resolve = () => {};

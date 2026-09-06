@@ -1,6 +1,7 @@
+import type { SignalServerMessage } from "@openbot/contracts/signal-protocol/messages";
 import { TEAM_PROTOCOL_V2_CHANNELS } from "@openbot/contracts/team-protocol/v2";
 import { afterEach, expect, it, type Mock, vi } from "vitest";
-import type { BridgeCommand, SignalMessage } from "./team-webrtc";
+import type { BridgeCommand } from "./team-webrtc";
 
 // The previously untested boundary is the hidden renderer's actual MessagePort
 // routing: each authenticated Signal connection must own a separate RTC peer.
@@ -10,6 +11,7 @@ interface PostedMessage {
   hostId?: string;
   commandId?: string;
   channel?: string;
+  code?: string;
   data?: string | ArrayBuffer;
 }
 
@@ -29,8 +31,12 @@ class SignalSocket extends EventTarget {
     super();
     SignalSocket.instances.push(this);
   }
-  message(data: SignalMessage): void {
-    this.dispatchEvent(new MessageEvent("message", { data: JSON.stringify(data) }));
+  message(data: SignalServerMessage): void {
+    this.raw(JSON.stringify(data));
+  }
+  // What a service that is not this protocol sends, which `SignalServerMessage` cannot describe.
+  raw(data: string): void {
+    this.dispatchEvent(new MessageEvent("message", { data }));
   }
 }
 
@@ -76,8 +82,7 @@ afterEach(() => {
   PeerConnection.instances.length = 0;
 });
 
-it("routes two phones independently and disconnects or resumes only the addressed session", async () => {
-  vi.useFakeTimers();
+async function startBridge() {
   vi.resetModules();
   const port: TestPort = {
     postMessage: vi.fn<(message: PostedMessage) => void>(),
@@ -103,6 +108,12 @@ it("routes two phones independently and disconnects or resumes only the addresse
       expect(posted("command-complete").some((message) => message.commandId === commandId)).toBe(true),
     );
   };
+  return { posted, command };
+}
+
+it("routes two phones independently and disconnects or resumes only the addressed session", async () => {
+  vi.useFakeTimers();
+  const { posted, command } = await startBridge();
   await command({
     type: "connect",
     peerId: "host-1",
@@ -131,6 +142,7 @@ it("routes two phones independently and disconnects or resumes only the addresse
       membershipId: "same-membership",
       role: "owner",
       sessionExpiresAt: 8_640_000_000_000,
+      resumed: false,
     });
   await vi.waitFor(() => expect(posted("incoming-peer")).toHaveLength(2));
   const [first, second] = posted("incoming-peer");
@@ -199,10 +211,39 @@ it("routes two phones independently and disconnects or resumes only the addresse
     membershipId: "same-membership",
     role: "owner",
     sessionExpiresAt: 8_640_000_000_000,
+    resumed: false,
   });
   await vi.waitFor(() => expect(posted("incoming-peer")).toHaveLength(4));
   expect(PeerConnection.instances).toHaveLength(3);
   expect(rtc2.close).not.toHaveBeenCalled();
   expect(posted("incoming-peer").at(-1)?.peerId).not.toBe(second?.peerId);
   await command({ type: "close", peerId: "all" });
+});
+
+// The Signal wire is where a frame this build cannot read means the two ends disagree, not that the
+// network dropped something. Reporting it as a WebRTC failure left the socket open and the code
+// reading as retryable, so the peer stayed on a connection whose next frame builds on the one it
+// could not use, and reconnected into the same service to be sent the same bytes again.
+it("stops a peer that Signal sends a frame it cannot read", async () => {
+  vi.useFakeTimers();
+  const { posted, command } = await startBridge();
+  await command({
+    type: "connect",
+    peerId: "client-1",
+    peer: "client",
+    signalUrl: "wss://signal.example.test",
+    token: "test",
+    iceTransportPolicy: "all",
+  });
+  const signal = SignalSocket.instances[0];
+  if (!signal) throw new Error("No Signal socket.");
+  signal.dispatchEvent(new Event("open"));
+
+  // A known frame type carrying a resume token no session could have.
+  signal.raw(JSON.stringify({ type: "ready", version: 1, connectionId: null, resumeToken: "", iceServers: [] }));
+
+  await vi.waitFor(() => expect(posted("peer-error")).toHaveLength(1));
+  expect(posted("peer-error")[0]).toMatchObject({ peerId: "client-1", code: "protocol_error" });
+  expect(posted("peer-disconnected")).toHaveLength(1);
+  expect(signal.close).toHaveBeenCalled();
 });

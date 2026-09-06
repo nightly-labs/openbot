@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
-import { HostService } from "./host-service";
+import { DEVELOPMENT_REMOTE_CLIENT_USERNAME, HostService } from "./host-service";
 import { createAgents, createBrowser, createMailbox, unimplemented } from "./team-api-server-test-harness";
 import { TeamStore } from "./team-store";
 
@@ -43,6 +43,8 @@ async function createHostService(
   signIn: (user: CentralAuthUser | null) => Promise<void>;
   /** Holds the team file, so a test can make the store's write fail. */
   root: string;
+  /** The host's own team file, for what the service does not expose -- a session token's member. */
+  store: TeamStore;
   /** Announces an account the way the renderer is told, before the queued switch is applied. */
   announce: (user: CentralAuthUser) => void;
 }> {
@@ -78,6 +80,7 @@ async function createHostService(
   return {
     service,
     root,
+    store,
     announce: (user) => {
       signedIn = user;
     },
@@ -385,6 +388,35 @@ describe("HostService account binding", () => {
     expect(registrations).toEqual([]);
     // Nor may what was created stay readable: the owner's address is in there.
     expect(() => service.listMembers()).toThrow("The team server is not configured.");
+  });
+
+  it("hands the development client a working session after the directory disabled it", async () => {
+    const { service, signIn, store } = await createHostService({
+      registerRemoteHost: () => Promise.resolve(),
+      listRemoteMembers: async () => [
+        {
+          membershipId: "membership-owner",
+          email: first.email,
+          name: first.name,
+          avatarUrl: null,
+          role: "owner",
+          status: "active",
+          createdAt: 1_000,
+        },
+      ],
+    });
+    await signIn(first);
+    await service.configure({ serverName: "Studio Mac" });
+    await service.startDevelopmentLocal();
+    await service.createDevelopmentConnection();
+
+    // What publishing this host does to it: the control plane becomes the whole membership, and the
+    // technical development client -- password-only, owned by no account -- is not in that list.
+    await service.listMembers();
+
+    const reconnected = await service.createDevelopmentConnection();
+    expect(store.authenticate(reconnected.sessionToken)?.username).toBe(DEVELOPMENT_REMOTE_CLIENT_USERNAME);
+    await service.stop(false);
   });
 
   it("reports the account's own server again after signing out and back in", async () => {

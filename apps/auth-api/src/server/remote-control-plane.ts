@@ -1,16 +1,21 @@
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import {
+  REMOTE_TICKET_AUDIENCE,
+  REMOTE_TICKET_PROTOCOL_VERSION,
+  type RemoteMemberRole,
+  type RemoteTicketClaims,
+} from "@openbot/contracts/signal-protocol/ticket";
 import { importJWK, type JWK, SignJWT } from "jose";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import type { AuthUser, WorkerBindings } from "./types";
 
-const TICKET_AUDIENCE = "openbot-remote";
 const TICKET_TTL_SECONDS = 180;
 const LEGACY_SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u;
 const AUTH_EVENT_RETRY_MS = 60_000;
 const MAX_OUTSTANDING_INVITES_PER_HOST = 50;
 
-export type RemoteMemberRole = "owner" | "admin" | "member";
+export type { RemoteMemberRole };
 
 export class RemoteControlPlaneError extends Error {
   constructor(
@@ -47,15 +52,13 @@ interface RemoteSessionRow extends RemoteMembershipRow {
   auth_epoch: number;
 }
 
-export interface RemoteResumeClaims {
-  sessionId: string;
-  hostId: string;
-  userId: string;
-  membershipId: string;
-  role: "host" | RemoteMemberRole;
-  authEpoch: number;
-  sessionExpiresAt: number;
-}
+// What a resume token has to prove it still stands for. The Signal service holds the token; this
+// is the subset of the ticket it hands back for re-validation, derived so a claim renamed in the
+// contract cannot be silently dropped from the check.
+export type RemoteResumeClaims = Pick<
+  RemoteTicketClaims,
+  "sessionId" | "hostId" | "userId" | "membershipId" | "role" | "authEpoch" | "sessionExpiresAt"
+>;
 
 interface RemoteInviteRow {
   invite_id: string;
@@ -121,6 +124,8 @@ export class RemoteTicketSigner {
   }): Promise<{ ticket: string; expiresAt: number }> {
     const issuedAt = Math.floor(input.now / 1_000);
     const expiresAt = Math.min(issuedAt + TICKET_TTL_SECONDS, Math.floor(input.sessionExpiresAt / 1_000));
+    // `aud`, `jti`, `iat` and `exp` are set by the builder below, so they are the four claims this
+    // literal leaves out - the `satisfies` covers the rest against what the two verifiers read.
     const ticket = await new SignJWT({
       sessionId: input.sessionId,
       hostId: input.hostId,
@@ -128,16 +133,16 @@ export class RemoteTicketSigner {
       membershipId: input.membershipId,
       role: input.role,
       authEpoch: input.authEpoch,
-      protocolMinimum: 2,
-      protocolMaximum: 2,
+      protocolMinimum: REMOTE_TICKET_PROTOCOL_VERSION,
+      protocolMaximum: REMOTE_TICKET_PROTOCOL_VERSION,
       sessionExpiresAt: Math.floor(input.sessionExpiresAt / 1_000),
       ...(input.clientPublicKey ? { clientPublicKey: input.clientPublicKey } : {}),
-    })
+    } satisfies Omit<RemoteTicketClaims, "aud" | "jti" | "iat" | "exp">)
       .setProtectedHeader({ alg: "ES256", typ: "JWT", kid: this.#keyId })
       .setJti(crypto.randomUUID())
       .setIssuedAt(issuedAt)
       .setExpirationTime(expiresAt)
-      .setAudience(TICKET_AUDIENCE)
+      .setAudience(REMOTE_TICKET_AUDIENCE)
       .sign(await this.#key);
     return { ticket, expiresAt: expiresAt * 1_000 };
   }

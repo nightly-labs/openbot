@@ -116,6 +116,15 @@ export function decodeAccountUsageFromHost(value: unknown): AccountUsage {
   return value;
 }
 
+// Fails closed on a member, not just on the array: `packages/contracts/AGENTS.md` makes a malformed
+// known payload a `protocol_error`, and a list this build silently shortens is the shape that rule
+// exists to forbid -- the host and the client would disagree about what was offered with nothing
+// saying so. What made `claude-fable-5-1[1m]` take a whole server offline was not this guard but
+// `isAgentModel` having no square brackets in its character set, so a legitimate id read as
+// malformed; widening the set is the fix, and a model id is deliberately an opaque token there
+// rather than a closed list for exactly this reason. An id that still fails it is a host sending
+// something no version of this protocol allows, and a new provider or reasoning effort is an
+// additive change the contract routes through capability negotiation instead.
 export function decodeAgentModelOptions(value: unknown): AgentModelOption[] {
   if (!Array.isArray(value) || !value.every(isAgentModelOption)) {
     throw new Error("Invalid remote agent models.");

@@ -543,6 +543,12 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.getStatus();
   }
 
+  // Where this host's Team API listens on this machine, which is not what `#status.apiUrl` reports:
+  // that is how a member reaches the host, and for a published one it is the Signal service.
+  #localApiUrl(): string | null {
+    return this.#api.port === null ? null : `http://localhost:${this.#api.port}`;
+  }
+
   async createDevelopmentConnection(): Promise<{
     serverId: string;
     serverName: string;
@@ -553,13 +559,23 @@ export class HostService extends EventEmitter<HostEvents> {
     sessionToken: string;
   }> {
     const identity = this.#options.store.getIdentity();
-    if (!identity || !this.#status.apiUrl) throw new Error("The local development host is not ready.");
+    const apiUrl = this.#localApiUrl();
+    if (!identity || !apiUrl) throw new Error("The local development host is not ready.");
     const username = DEVELOPMENT_REMOTE_CLIENT_USERNAME;
     const password = "openbot-local-development-client";
     let authenticated: AuthenticatedMember;
     try {
       authenticated = await this.#options.store.login(username, password);
     } catch {
+      // Publishing this host reconciles its members against the control plane, and the technical
+      // client is never in that list -- it is password-only, owned by no account -- so the
+      // reconciliation disables it. `login` skips a disabled member and `acceptInvite` refuses a
+      // username that already exists, so once the developer had published the host, every later
+      // `bun run dev:test-client` died at startup with "This username is already in use." and only
+      // editing the profile by hand brought it back. Replacing the member is what makes publishing
+      // a state the dev stack can leave: it is a fixture, and nothing outside this file reads it.
+      const existing = this.#options.store.listMembers().find((member) => member.username === username);
+      if (existing && existing.role !== "owner") await this.#options.store.removeMember(existing.id);
       const invite = await this.#options.store.createInvite("member");
       authenticated = await this.#options.store.acceptInvite(invite.token, username, password);
     }
@@ -567,7 +583,7 @@ export class HostService extends EventEmitter<HostEvents> {
     return {
       serverId: identity.serverId,
       serverName: identity.serverName,
-      apiUrl: this.#status.apiUrl,
+      apiUrl,
       fingerprint: identity.fingerprint,
       publicKey: identity.publicKey,
       username,
@@ -852,11 +868,17 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#assertStillActiveHost(identity.serverId);
       return result;
     }
-    if (!this.#status.apiUrl) throw new Error("Make this OpenBot public before creating an invite.");
+    // This branch mints a link to this machine's own Team API, so it asks the server where it
+    // listens rather than reading the status. They are the same URL for a host that is private or
+    // local-development, and for a published one the status carries the Signal service's `ws://`
+    // address -- which `createInviteUrl` rejects, so a developer who had published this host could
+    // not create an invite at all.
+    const localApiUrl = this.#localApiUrl();
+    if (!localApiUrl) throw new Error("Make this OpenBot public before creating an invite.");
     const invite = await this.#options.store.createInvite(input.role, input.email);
     const inviteUrl = createInviteUrl(
       {
-        apiUrl: this.#status.apiUrl,
+        apiUrl: localApiUrl,
         serverId: identity.serverId,
         fingerprint: identity.fingerprint,
         token: invite.token,
