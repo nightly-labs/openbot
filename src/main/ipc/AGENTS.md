@@ -1,7 +1,7 @@
 # `src/main/ipc`
 
 One file per domain, each exporting a `*IpcHandlers` function that returns its handlers. Nothing
-here registers anything: `index.ts` spreads all sixteen into `registerIpcGroups`, which walks
+here registers anything: `index.ts` spreads them all into `registerIpcGroups`, which walks
 `IPC_ENDPOINTS` and binds each request endpoint to the handler under its own name.
 
 ## Adding an endpoint
@@ -49,13 +49,14 @@ decoder spends its allocations on.
 | every declared channel belongs to a group | the `IpcEndpoints` declaration in `ipc-endpoints.ts` (`TS2344`) |
 | every request endpoint has exactly one handler | `GroupHandlers` (`TS2741` / `TS2353`) |
 | every group has a registrar | `registerIpcGroups` at `src/main/index.ts` (`TS2741`) |
+| no handler binds a channel outside the manifest | both entry points in `define-ipc-group.ts` read `IPC_ENDPOINTS` and take a group *name* |
 | a payload is decoded before the handler sees it | no constructor pairs one with a raw `unknown` |
 | no channel is in two groups | `ipc-channel-coverage.test.ts` |
 | the preload invokes exactly the request endpoints | `ipc-channel-coverage.test.ts` |
 | the sender check runs first | `trusted-ipc.test.ts`, `define-ipc-group.test.ts` |
 
-Prefer breaking the type over adding a test. Six of these seven cost nothing to run and name the
-thing that is wrong; the two that read source text exist only where no type reaches.
+Prefer breaking the type over adding a test. Most of these cost nothing to run and name the thing
+that is wrong; the ones that read source text exist only where no type reaches.
 
 ## Routing
 

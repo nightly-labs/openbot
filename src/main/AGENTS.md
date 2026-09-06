@@ -11,7 +11,7 @@ A renderer-to-main endpoint is **declared in `packages/contracts`** — a wire v
 `ipc-channels.ts` and an entry in a group in `ipc-endpoints.ts` — and **implemented in
 `src/main/ipc/`, one file per domain**, never inline in `index.ts`. A module there exports one
 `*IpcHandlers` function that *returns* its handlers keyed by endpoint name rather than registering
-them; `registerIpcHandlers` in `index.ts` wires dependencies, spreads all sixteen into
+them; `registerIpcHandlers` in `index.ts` wires dependencies, spreads them all into
 `registerIpcGroups`, and does nothing else. `team-handlers.ts` is the shape to copy — a
 `*IpcDependencies` interface, object destructuring in the signature, a
 `Pick<IpcGroupHandlers, …>` return type, no imports from `index.ts`.

@@ -86,12 +86,18 @@ function bindGroup(group: IpcEndpointGroup, handlers: Readonly<Record<string, Bo
 }
 
 /**
- * Registers one group. The overload is what a caller sees; the wider implementation signature is
- * what lets the body index the handler object by name without asserting past the checker.
+ * Registers one group, named rather than passed: a caller cannot hand this a group it made up, so no
+ * channel outside `IPC_ENDPOINTS` can reach `ipcMain.handle` through here. The overload is what a
+ * caller sees; the wider implementation signature is what lets the body index the manifest and the
+ * handler object by name without asserting past the checker.
  */
-export function registerIpcGroup<Group extends IpcEndpointGroup>(group: Group, handlers: GroupHandlers<Group>): void;
-export function registerIpcGroup(group: IpcEndpointGroup, handlers: Readonly<Record<string, BoundHandler>>): void {
-  bindGroup(group, handlers);
+export function registerIpcGroup<Name extends keyof IpcEndpoints>(
+  name: Name,
+  handlers: GroupHandlers<IpcEndpoints[Name]>,
+): void;
+export function registerIpcGroup(name: string, handlers: Readonly<Record<string, BoundHandler>>): void {
+  const groups: Readonly<Record<string, IpcEndpointGroup>> = IPC_ENDPOINTS;
+  bindGroup(groups[name], handlers);
 }
 
 /**

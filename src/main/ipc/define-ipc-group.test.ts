@@ -20,11 +20,15 @@ vi.mock("electron", () => ({
 const TRUSTED_EVENT = { senderFrame: { url: "openbot-app://app/index.html" } };
 const UNTRUSTED_EVENT = { senderFrame: { url: "https://evil.example/index.html" } };
 
-const GROUP = {
-  read: { kind: "request", channel: "test:read" },
-  write: { kind: "request", channel: "test:write" },
-  changed: { kind: "event", channel: "test:changed" },
-} as const;
+// `voice` is the group under test because it is the smallest with all three shapes: a request that
+// takes nothing, a request that takes a payload, and an event the main process only ever sends.
+function registerVoice(transcribe: (text: string) => unknown): void {
+  registerIpcGroup("voice", {
+    getModelStatus: handler(() => "status"),
+    prepareModel: handler(() => "prepared"),
+    transcribe: payloadHandler((value) => String(value), transcribe),
+  });
+}
 
 // The type checker owns which endpoints a group has to be given a handler for; what it cannot show
 // is what `registerIpcGroup` then does with them. Two things have to hold, and neither is visible in
@@ -32,28 +36,20 @@ const GROUP = {
 // does not step around the sender check that every handler used to be registered behind directly.
 describe("IPC group registration", () => {
   it("registers each request endpoint on the channel it declares, and no event", () => {
-    registerIpcGroup(GROUP, {
-      read: handler(() => "read"),
-      write: payloadHandler(
-        (value) => String(value),
-        (text) => `wrote ${text}`,
-      ),
-    });
+    registerVoice((text) => `heard ${text}`);
 
-    expect(registrations.get("test:read")?.(TRUSTED_EVENT)).toBe("read");
-    expect(registrations.get("test:write")?.(TRUSTED_EVENT, "a note")).toBe("wrote a note");
-    expect(registrations.has("test:changed")).toBe(false);
+    expect(registrations.get("voice:get-model-status")?.(TRUSTED_EVENT)).toBe("status");
+    expect(registrations.get("voice:transcribe")?.(TRUSTED_EVENT, "a note")).toBe("heard a note");
+    expect(registrations.has("voice:model-status")).toBe(false);
   });
 
   it("keeps a bound handler behind the sender check", () => {
     let handled = 0;
-    registerIpcGroup({ reject: { kind: "request", channel: "test:reject" } } as const, {
-      reject: handler(() => {
-        handled += 1;
-      }),
+    registerVoice((): void => {
+      handled += 1;
     });
 
-    expect(() => registrations.get("test:reject")?.(UNTRUSTED_EVENT)).toThrow(
+    expect(() => registrations.get("voice:transcribe")?.(UNTRUSTED_EVENT, "a note")).toThrow(
       "Rejected IPC request from an untrusted renderer.",
     );
     expect(handled).toBe(0);
