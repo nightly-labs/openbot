@@ -270,12 +270,12 @@ export type IpcEndpoints = typeof IPC_ENDPOINTS;
 type ChannelsOf<Group extends IpcEndpointGroup> = Group[keyof Group]["channel"];
 
 /** Every channel some group declares, request or event. */
-export type GroupedChannel = {
+type GroupedChannel = {
   [Group in keyof IpcEndpoints]: ChannelsOf<IpcEndpoints[Group]>;
 }[keyof IpcEndpoints];
 
 /** Every channel `IPC_CHANNELS` declares. */
-export type DeclaredChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
+type DeclaredChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
 
 // The two sets have to be equal, and the type checker is what says so, at no runtime cost. A channel
 // added to `IPC_CHANNELS` and left out of every group fails this with the channel named in the
@@ -291,4 +291,8 @@ type SameChannels<Left, Right> = [Left] extends [Right]
 
 type RequireTrue<Value extends true> = Value;
 
+// Exported because `noUnusedLocals` deletes an assertion nobody names: a private alias that no other
+// type references is `TS6196`, and every way to reference one from the exports this file already has
+// either makes `IpcEndpoints` circular or resolves it to the failure object, turning one named
+// diagnostic into a cascade across `src/main`. Nothing imports this, and nothing should.
 export type ChannelCoverage = RequireTrue<SameChannels<GroupedChannel, DeclaredChannel>>;
