@@ -7,45 +7,51 @@ renderer do with it".
 
 ## Where an IPC endpoint goes
 
-A renderer-to-main endpoint is **declared in `packages/contracts`** and **registered in
-`src/main/ipc/`, one file per domain** — never inline in `index.ts`. `registerIpcHandlers` there is
-a dispatcher and nothing else: it wires dependencies and calls one `register*IpcHandlers` per
-domain, so a reviewer can read a domain's whole surface in one file instead of finding it
-interleaved with window and lifecycle code. `register-team-handlers.ts` is the shape to copy — a
-`*IpcDependencies` interface, object destructuring in the signature, no imports from `index.ts`.
+A renderer-to-main endpoint is **declared in `packages/contracts`** — a wire value in
+`ipc-channels.ts` and an entry in a group in `ipc-endpoints.ts` — and **implemented in
+`src/main/ipc/`, one file per domain**, never inline in `index.ts`. A module there exports one
+`*IpcHandlers` function that *returns* its handlers keyed by endpoint name rather than registering
+them; `registerIpcHandlers` in `index.ts` wires dependencies, spreads them all into
+`registerIpcGroups`, and does nothing else. `team-handlers.ts` is the shape to copy — a
+`*IpcDependencies` interface, object destructuring in the signature, a
+`Pick<IpcGroupHandlers, …>` return type, no imports from `index.ts`.
+
+That return type is what makes the main side exhaustive without a test. Miss an endpoint and it is
+`TS2741` naming the endpoint; add one the group never declared and it is `TS2353`; leave a whole
+group with no registrar behind it and `registerIpcGroups` in `index.ts` is `TS2741` naming the
+group. `ipc/AGENTS.md` has the four ways to bind a handler.
 
 Three things run at module scope in `index.ts` — `app.setPath`, `app.enableSandbox`,
 `protocol.registerSchemesAsPrivileged` — which is why nothing in the main process can be imported
 by a test that has not mocked `electron`, and why the coverage test below reads sources instead.
 
 - `handleTrusted` / `handleTrustedWithEvent` from `./trusted-ipc` are the only registration
-  primitives. `ipc-channel-coverage.test.ts` fails on the *name* `ipcMain` anywhere else in
-  `src/main`, because an aliased import would register an endpoint with no sender check that no
-  scan can see.
-- Parse every argument, and the type checker holds you to it. A channel with a payload takes the
-  decoder as the middle argument — `handleTrusted(channel, decode, handler)` — and the two overloads
-  leave a handler that declares a parameter no way to typecheck without one, because
-  `(input: unknown) => Result` is not assignable to the no-payload `() => Result`. `./ipc/validation.ts`
+  primitives, and `./ipc/define-ipc-group.ts` is the only caller of them.
+  `ipc-channel-coverage.test.ts` fails on the *name* `ipcMain` anywhere else in `src/main`, because
+  an aliased import would register an endpoint with no sender check that no scan can see, and on
+  either wrapper's name anywhere else, because both take a `string` channel — a direct call is a
+  privileged handler on a channel no group declares.
+- Parse every argument, and the type checker holds you to it. A handler with a payload is bound with
+  `payloadHandler(decode, handler)`, and there is no constructor that pairs a payload with a raw
+  `unknown`, because `(input: unknown) => Result` is not assignable to the no-payload `() => Result`
+  that `handler()` takes. `./ipc/validation.ts`
   has the primitives (`requireString`, `stringPayload`, `optionalPayload`, `nullishPayload`,
   `isObject`) and the `*-inputs.ts` files hold the per-domain parsers. Decoding runs *after* the
   sender check, so an untrusted frame never reaches a parser.
-- Never write a channel name as a string literal. Every reference goes through `IPC_CHANNELS`, and
-  the coverage test rejects a channel argument that is not a direct `IPC_CHANNELS.x` reference —
-  a literal or a variable would hide the endpoint from every assertion in that file.
+- Never write a channel name as a string literal. A handler never names a channel at all — the group
+  does — and the remaining references, all `sendToRenderer` calls, go through `IPC_CHANNELS`. The
+  coverage test rejects a channel argument that is not a direct `IPC_CHANNELS.x` reference: a literal
+  or a variable would hide the endpoint from every assertion in that file.
 - Sending to the renderer goes through `sendToRenderer` in `./renderer-ipc.ts`, which drops the
   message on a destroyed or still-loading window rather than throwing into the emitter.
 
-A domain module that is never called from `registerIpcHandlers` would otherwise be invisible: the
-coverage scan reads sources, so an orphaned file still looks registered while every channel in it
-rejects at runtime. `tsc` catches only half of it — deleting the call alone is `TS6133`, because the
-call site is the import's only use, but deleting the import along with it compiles, and so does a
-new registrar nobody wired up. "Calls every registrar under `src/main/ipc` exactly once from the
-dispatcher" in `ipc-channel-coverage.test.ts` is the other half. Do not silence a `TS6133` here by
-deleting the import; that turns the loud failure into the quiet one.
+A domain module the dispatcher never calls used to be invisible, and a test scanned for it. It is
+now the return type's job: the module's groups are missing from the `registerIpcGroups` argument, so
+deleting the spread and its import together is `TS2741` rather than a clean compile.
 
-Adding a channel touches four files in one change: the contract, `src/main/ipc/`,
-`src/preload/index.ts`, and `src/renderer/src/preview/mock-openbot.ts`. See
-`packages/contracts/AGENTS.md` for what enforces which pair.
+Adding a channel touches five files in one change: `ipc-channels.ts`, `ipc-endpoints.ts`,
+`src/main/ipc/`, `src/preload/index.ts`, and `src/renderer/src/preview/mock-openbot.ts`. Only the
+preload has no type behind it. See `packages/contracts/AGENTS.md` for what enforces which pair.
 
 ## The boundary is a Non-negotiable
 
@@ -114,7 +120,7 @@ things that used to live in it now have their own file, and none of them should 
 | `main-window-state.ts` | reading, resolving and debounce-writing the window's saved position |
 | `session-configuration.ts` | the renderer CSP, the permission handlers, the attachment/avatar/logo protocols |
 | `renderer-forwarders.ts` | the eleven service events relayed to the renderer |
-| `ipc/register-*-handlers.ts` | every IPC endpoint, one file per domain |
+| `ipc/*-handlers.ts` | every IPC endpoint, one file per domain |
 
 A dependency that may not exist yet when one of these is wired is passed from `index.ts` as a
 **function** - `getAgentService: () => AgentService | null` - and read on every call, because most of
