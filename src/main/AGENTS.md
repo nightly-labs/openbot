@@ -112,23 +112,44 @@ not import `electron` in the first place.
 
 ## Size
 
-`index.ts` is the dispatcher plus window and lifecycle code and should not grow handlers again. Four
-things that used to live in it now have their own file, and none of them should come back:
+`index.ts` is the dispatcher plus lifecycle code and should not grow service construction again.
+Eight things that used to live in it now have their own file, and none of them should come back:
 
 | File | What it owns |
 | --- | --- |
+| `application-services.ts` | building every service in dependency order, and nothing else |
+| `main-window.ts` | every `BrowserWindow`, the renderer URLs, the application menu, the bounds recorder |
 | `main-window-state.ts` | reading, resolving and debounce-writing the window's saved position |
-| `session-configuration.ts` | the renderer CSP, the permission handlers, the attachment/avatar/logo protocols |
+| `teardown-registry.ts` | the shutdown sequence, declared at construction rather than restated |
+| `development-remote-bootstrap.ts` | the dev-only `OPENBOT_DEV_REMOTE_ROLE` account and connection |
+| `session-configuration.ts` | the renderer CSP and bundle protocol, the permission handlers, the attachment/avatar/logo protocols |
 | `renderer-forwarders.ts` | the eleven service events relayed to the renderer |
 | `ipc/*-handlers.ts` | every IPC endpoint, one file per domain |
 
-A dependency that may not exist yet when one of these is wired is passed from `index.ts` as a
-**function** - `getAgentService: () => AgentService | null` - and read on every call, because most of
-them are constructed during `app.whenReady()` before the services they reach are assigned, and a
-captured `null` never recovers. A service that is already constructed is passed as the value:
-`configureServerLogoProtocols` takes `remoteServers: RemoteServerManager`, and the IPC registrars
-take their stores directly. Which of the two a dependency needs is the one thing here `tsc` cannot
-decide for you - `() => X | null` and `X | null` both type-check at every call site.
+`createApplicationServices` is **one function on purpose**, not a sequence of stages. A service
+assigned to a `const` and passed to a non-null parameter type-checks only through control-flow
+narrowing inside a single function body; cutting it into sub-stages would put a 15-field parameter
+object between every pair and bring back the ordering hazard below. It also *only constructs* — the
+event wiring, `registerIpcHandlers`, `loadRenderer` and `app.on("activate")` stay in `index.ts`,
+because a composition root that also wires ends up with a parameter list larger than its return
+value, which is a service locator with the dependency direction inverted.
+
+Each service registers its own teardown step next to its construction, with an explicit ordinal.
+The order is declared rather than inferred because shutdown here is largely *construction* order,
+not its reverse: the browser host closes before the picture-in-picture window that holds it, and the
+provider runtimes stop before the agent service that owns them.
+
+A dependency wired at module scope, before `app.whenReady()`, is passed as a **function** -
+`getAgentService: () => AgentService | null` - and read on every call, because nothing is
+constructed yet and a captured `null` never recovers. `renderer-forwarders.ts` and `main-window.ts`
+are the two that qualify, and they now read one handle each rather than eleven. Anything wired from
+*inside* `application-services.ts` takes the value: `configureAttachmentProtocol` and
+`configureServerLogoProtocols` both take `remoteServers: RemoteServerManager`, and the IPC
+registrars take their stores directly. Which of the two a dependency needs is the one thing here
+`tsc` cannot decide for you - `() => X | null` and `X | null` both type-check at every call site.
+The same trap has a second form inside the composition root: a constructor argument wants the
+window that exists now, while a callback that fires later must re-read `getMainWindow()`, or it goes
+stale the first time macOS closes and rebuilds the window.
 
 `remote-server-manager.ts` used to be the outlier at 2828 lines. It is now the composition root of a
 flat `remote-server-*` / `remote-*-decoding` family, and each of those files has exactly one reason

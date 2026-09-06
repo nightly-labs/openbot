@@ -3,13 +3,15 @@
  * the entry point because every one of them is the same three lines around a different channel, and
  * because they are the part of the entry point most likely to be edited by two agents at once.
  *
- * Every dependency is a **function**, never a nullable value. Most of these are subscribed before
- * the service they read exists, so `getHostService()` and `hostService` behave differently at run
- * time - and `() => HostService | null` and `HostService | null` both type-check at every call site,
- * so `tsc` cannot tell you which one you passed. A function-typed field makes the wrong one an error.
+ * Every dependency is a **function**, never a nullable value. These are built at module scope, before
+ * `app.whenReady()` has constructed anything, so `getHostService()` and `hostService` behave
+ * differently at run time - and `() => HostService | null` and `HostService | null` both type-check
+ * at every call site, so `tsc` cannot tell you which one you passed. A function-typed field makes
+ * the wrong one an error. Each of them now reads one `ApplicationServices` handle rather than its
+ * own module-scope `let`.
  *
- * `showMainWindow` is injected for a second reason: importing it from the entry point would be an
- * import cycle, which Biome rejects, and is forbidden by `src/main/AGENTS.md`.
+ * `showMainWindow` is injected rather than imported so that this module stays reachable from a test
+ * without pulling in `main-window.ts` and, through it, the whole window and menu surface.
  */
 
 import {
