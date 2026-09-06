@@ -4,6 +4,7 @@ import { accessSync } from "node:fs";
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { type BundledLibrary, bundledLibraryLicenses, bundleMacDynamicLibraries } from "./mac-runtime-dylibs";
 import { createRemoteDesktopSourceManifest, loadNativeRuntimeLock } from "./native-runtime-lock";
 
 const platform = process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "win32" : null;
@@ -65,13 +66,23 @@ try {
     join(outputRoot, `streamer${executableSuffix}`),
   );
   await cp(join(moonlightSource, "dist"), join(outputRoot, "static"), { recursive: true });
-  if (platform === "darwin") signMacRuntime(outputRoot);
+  let bundledLibraries: BundledLibrary[] = [];
+  if (platform === "darwin") {
+    const bundled = bundleMacRuntimeDependencies(outputRoot);
+    bundledLibraries = bundled.libraries;
+    // Before signing, not after: rewriting a load command invalidates the signature over it.
+    signMacRuntime(outputRoot, bundled.signTargets);
+  }
 
   const licenses = resolve("build/remote-desktop-runtime/licenses");
   await mkdir(licenses, { recursive: true });
   await Promise.all([
     cp(join(sunshineSource, "LICENSE"), join(licenses, "Sunshine-GPL-3.0.txt")),
     cp(join(moonlightSource, "LICENSE"), join(licenses, "moonlight-web-stream-GPL-3.0.txt")),
+    // The copies the runtime now carries are OpenBot's to redistribute, so their notices ship with
+    // them. Taken from the tree that was linked against, so the notice is the one for the binary in
+    // the archive rather than whatever the formula says today.
+    ...bundledLibraryLicenses(bundledLibraries).map(({ file, source }) => cp(source, join(licenses, file))),
     writeFile(
       resolve("build/remote-desktop-runtime/source-manifest.json"),
       `${JSON.stringify(createRemoteDesktopSourceManifest(lock), null, 2)}\n`,
@@ -284,12 +295,31 @@ function auditNpmDependencies(source: string): void {
   execFileSync("npm", ["audit", "--audit-level=high"], { cwd: source, stdio: "inherit" });
 }
 
-function signMacRuntime(root: string): void {
+// CMake links Sunshine against Homebrew's miniupnpc and OpenSSL by absolute path, so the binary that
+// runs on the build runner cannot start on a Mac without those formulae -- and nothing downstream
+// would say so: the app reports remote control as available, the session opens, and no frame ever
+// arrives. `verify-remote-desktop-runtime.ts` fails the build if any of this is left behind.
+function bundleMacRuntimeDependencies(root: string): { libraries: BundledLibrary[]; signTargets: string[] } {
+  const app = join(root, "Sunshine.app", "Contents");
+  // The app bundle signs `--deep`, so its own copies need no separate pass. The two loose
+  // executables do, which is why only their libraries come back as signing targets. Both sets need
+  // their licences, so both are returned.
+  const inBundle = bundleMacDynamicLibraries(join(app, "MacOS", "Sunshine"), join(app, "Frameworks"));
+  const besideExecutables = ["web-server", "streamer"].flatMap((executable) =>
+    bundleMacDynamicLibraries(join(root, executable), join(root, "lib")),
+  );
+  return {
+    libraries: [...inBundle, ...besideExecutables],
+    signTargets: besideExecutables.map((library) => library.path),
+  };
+}
+
+function signMacRuntime(root: string, bundledLibraries: string[] = []): void {
   execFileSync("codesign", ["--force", "--deep", "--sign", "-", join(root, "Sunshine.app")], {
     stdio: "inherit",
   });
-  for (const executable of ["web-server", "streamer"]) {
-    execFileSync("codesign", ["--force", "--sign", "-", join(root, executable)], { stdio: "inherit" });
+  for (const target of [...new Set(bundledLibraries), ...["web-server", "streamer"].map((name) => join(root, name))]) {
+    execFileSync("codesign", ["--force", "--sign", "-", target], { stdio: "inherit" });
   }
 }
 

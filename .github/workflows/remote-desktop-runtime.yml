@@ -9,6 +9,7 @@ on:
       - "scripts/build-remote-desktop-runtime.ts"
       - "scripts/create-remote-desktop-release-manifest.ts"
       - "scripts/install-remote-desktop-runtime.ts"
+      - "scripts/mac-runtime-dylibs.ts"
       - "scripts/native-runtime-lock.ts"
       - "scripts/package-remote-desktop-runtime.ts"
       - "scripts/pin-remote-desktop-runtime.ts"
@@ -24,6 +25,7 @@ on:
       - "scripts/build-remote-desktop-runtime.ts"
       - "scripts/create-remote-desktop-release-manifest.ts"
       - "scripts/install-remote-desktop-runtime.ts"
+      - "scripts/mac-runtime-dylibs.ts"
       - "scripts/native-runtime-lock.ts"
       - "scripts/package-remote-desktop-runtime.ts"
       - "scripts/pin-remote-desktop-runtime.ts"
@@ -74,7 +76,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           changed="$(git diff --name-only "$BASE_SHA" "$GITHUB_SHA")"
-          if printf '%s\n' "$changed" | grep -Eq '^(\.github/workflows/remote-desktop-runtime\.yml|scripts/build-remote-desktop-runtime\.ts|scripts/create-remote-desktop-release-manifest\.ts|scripts/native-runtime-lock\.ts|scripts/package-remote-desktop-runtime\.ts|scripts/remote-desktop-runtime-release\.ts)$'; then
+          if printf '%s\n' "$changed" | grep -Eq '^(\.github/workflows/remote-desktop-runtime\.yml|scripts/build-remote-desktop-runtime\.ts|scripts/create-remote-desktop-release-manifest\.ts|scripts/mac-runtime-dylibs\.ts|scripts/native-runtime-lock\.ts|scripts/package-remote-desktop-runtime\.ts|scripts/remote-desktop-runtime-release\.ts)$'; then
             current="$(jq -r '.remoteDesktop.recipeVersion' native-runtime.lock.json)"
             base="$(git show "$BASE_SHA:native-runtime.lock.json" 2>/dev/null | jq -r '.remoteDesktop.recipeVersion // 0' || echo 0)"
             if (( current <= base )); then
@@ -436,7 +438,12 @@ jobs:
   pin:
     name: Open runtime lock PR
     needs: [prepare, publish, verify-published]
-    if: needs.publish.result == 'success' && needs.verify-published.result == 'success'
+    # Only from main, because the pin is computed against the checked-out lock: `pinRemoteDesktopRuntime`
+    # derives the input digest from the recipe it finds on disk and refuses a manifest that does not
+    # match it. Dispatched from a branch that changes the recipe -- the one case where publishing before
+    # merging is the point -- this job checks out main, whose digest is still the old one, and throws.
+    # Folding the pin into the branch is a manual step there -- `docs/RELEASING.md` has the sequence.
+    if: github.ref == 'refs/heads/main' && needs.publish.result == 'success' && needs.verify-published.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -466,6 +473,10 @@ jobs:
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             --pattern remote-desktop-runtime-manifest.json --dir "$RUNNER_TEMP/runtime-manifest"
           bun scripts/pin-remote-desktop-runtime.ts "$RUNNER_TEMP/runtime-manifest/remote-desktop-runtime-manifest.json"
+          # `JSON.stringify` puts every array on its own lines and Biome collapses the short ones, so
+          # the pin lands unformatted. A commit is made here with no hook to catch that, and the lock
+          # PR would open with `lint` already red.
+          bunx biome check --write native-runtime.lock.json
           changed="$(git diff --name-only)"
           if [[ -z "$changed" ]]; then
             echo "The runtime lock already pins this immutable release."
