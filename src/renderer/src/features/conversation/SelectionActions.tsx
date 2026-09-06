@@ -3,6 +3,7 @@ import { Portal } from "@solidjs/web";
 import type { Element as SolidElement } from "solid-js";
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { Button, Input } from "../../components/ui";
+import { clamp } from "../../components/ui/utils";
 
 const MESSAGE_TEXT_SELECTOR = ".message-copy[data-selection-message-id]";
 const INTERACTIVE_SELECTOR =
@@ -599,10 +600,6 @@ function rectValue(rect: DOMRect): SelectionRect {
     width: rect.width,
     height: rect.height,
   };
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value));
 }
 
 function SelectionIcon(props: { children: SolidElement }) {

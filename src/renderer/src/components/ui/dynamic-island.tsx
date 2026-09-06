@@ -1,7 +1,7 @@
 import type { DynamicIslandNotchSize } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, onCleanup, onSettled, Show, untrack } from "solid-js";
-import { cx, prefersReducedMotion } from "./utils";
+import { cx, mix, prefersReducedMotion } from "./utils";
 
 export type DynamicIslandViewState = "compact" | "expanded";
 export type DynamicIslandHoverBehavior = "none" | "grow" | "expand";
@@ -879,10 +879,6 @@ function springKeyframes(spring: Spring, frame: (progress: number) => Keyframe):
     const progress = index === sampleCount ? 1 : rawProgress / finalProgress;
     return { ...frame(progress), offset };
   });
-}
-
-function mix(start: number, end: number, progress: number): number {
-  return start + (end - start) * progress;
 }
 
 function resizeSpring(

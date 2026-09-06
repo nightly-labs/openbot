@@ -14,7 +14,7 @@ import { createEffect, createMemo, createSignal, createStore, For, onSettled, Sh
 import { normalizeAvatarFile } from "../../avatar-image";
 import { AVATAR_HUE_OPTIONS, avatarCandidateSeeds, avatarHueSwatch } from "../../bloub-avatar";
 import { PanelResizer, readPanelWidth, savePanelWidth } from "../../components/PanelResizer";
-import { ProviderModelPicker } from "../../components/ProviderModelPicker";
+import { ProviderModelPicker, reasoningLabel } from "../../components/ProviderModelPicker";
 import {
   Button,
   ChevronRight,
@@ -840,9 +840,4 @@ function sameRuntimeSettings(current: AgentRuntimeSettings, settings: AgentRunti
     current.model === settings.model &&
     current.reasoningEffort === settings.reasoningEffort
   );
-}
-
-function reasoningLabel(effort: AgentReasoningEffort): string {
-  if (effort === "xhigh") return "Extra high";
-  return `${effort.slice(0, 1).toUpperCase()}${effort.slice(1)}`;
 }

@@ -42,3 +42,22 @@ export function truncateMiddle(value: string, maxLength: number): string {
 export function prefersReducedMotion(): boolean {
   return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
+
+/**
+ * Whether the pointer is coarse and hoverless - a touch screen. Sibling of
+ * `prefersReducedMotion` on purpose: both are one-line media-query reads, and splitting
+ * them across two modules is how the second one gets copied by someone who found the first.
+ */
+export function usesTouchLayout(): boolean {
+  return window.matchMedia?.("(hover: none), (pointer: coarse)").matches ?? false;
+}
+
+/** Constrains `value` to the inclusive range. */
+export function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+/** Linear interpolation from `start` to `end`, for a `progress` an animation drives from 0 to 1. */
+export function mix(start: number, end: number, progress: number): number {
+  return start + (end - start) * progress;
+}

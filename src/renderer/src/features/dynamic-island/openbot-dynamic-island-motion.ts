@@ -1,4 +1,5 @@
 import type { DynamicIslandPresentation } from "@openbot/contracts/ipc";
+import { mix } from "../../components/ui/utils";
 
 const MODE_SWAP_EXIT_DURATION = 160;
 const MODE_SWAP_STATIC_DURATION = 240;
@@ -233,21 +234,21 @@ function modeSwapEntranceKeyframes(
   spatialOffset: ModeSwapPoint,
 ): Keyframe[] {
   return modeSwapSpringKeyframes((progress) => ({
-    opacity: mixModeSwapValue(startOpacity, 1, progress),
+    opacity: mix(startOpacity, 1, progress),
     transform: preserveSpatialPosition
       ? "none"
       : modeSwapTransform(
           {
-            x: mixModeSwapValue(spatialOffset.x, 0, progress),
-            y: mixModeSwapValue(spatialOffset.y, 0, progress),
+            x: mix(spatialOffset.x, 0, progress),
+            y: mix(spatialOffset.y, 0, progress),
           },
-          mixModeSwapValue(startScale, 1, progress),
+          mix(startScale, 1, progress),
         ),
   }));
 }
 
 function modeSwapBlurEntranceKeyframes(startBlur: number): Keyframe[] {
-  return modeSwapSpringKeyframes((progress) => ({ filter: `blur(${mixModeSwapValue(startBlur, 0, progress)}px)` }));
+  return modeSwapSpringKeyframes((progress) => ({ filter: `blur(${mix(startBlur, 0, progress)}px)` }));
 }
 
 function modeSwapSpringKeyframes(frame: (progress: number) => Keyframe): Keyframe[] {
@@ -263,10 +264,6 @@ function modeSwapSpringKeyframes(frame: (progress: number) => Keyframe): Keyfram
 function criticalModeSwapSpringProgress(offset: number): number {
   const phase = 2 * Math.PI * offset;
   return 1 - Math.exp(-phase) * (1 + phase);
-}
-
-function mixModeSwapValue(start: number, end: number, progress: number): number {
-  return start + (end - start) * progress;
 }
 
 function modeLayerAnchor(layer: HTMLElement): ModeSwapPoint | undefined {

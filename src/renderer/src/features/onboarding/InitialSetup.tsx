@@ -1,7 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentProviderId,
-  AgentProviderState,
   AgentStatus,
   AppSetupState,
   DesktopPlatform,
@@ -14,6 +13,7 @@ import { Button, Dialog, Textarea } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
 import { InvitePreviewCard } from "../servers/JoinServerDialog";
+import { fallbackProviderState } from "./onboarding-provider-state";
 
 interface InitialSetupProps {
   reviewing?: boolean;
@@ -382,8 +382,4 @@ function providerName(provider: AgentProviderId | null): "Claude" | "Codex" | "G
   if (provider === "claude") return "Claude";
   if (provider === "grok") return "Grok";
   return "Codex";
-}
-
-function fallbackProviderState(status: AgentStatus): AgentProviderState {
-  return status.phase === "starting" || status.phase === "restarting" ? "checking" : "error";
 }

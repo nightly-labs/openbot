@@ -1,5 +1,6 @@
 import { Portal } from "@solidjs/web";
 import { createSignal, onSettled } from "solid-js";
+import { clamp } from "../../components/ui/utils";
 
 const TOOLTIP_GAP = 8;
 const TOOLTIP_VIEWPORT_MARGIN = 8;
@@ -96,8 +97,4 @@ export function AnchoredTooltip(props: { id: string; anchor: HTMLElement; conten
       </span>
     </Portal>
   );
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value));
 }
