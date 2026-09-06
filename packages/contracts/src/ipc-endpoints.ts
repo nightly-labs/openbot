@@ -265,14 +265,12 @@ export const IPC_ENDPOINTS = {
   },
 } as const;
 
-export type IpcEndpoints = typeof IPC_ENDPOINTS;
-
 type ChannelsOf<Group extends IpcEndpointGroup> = Group[keyof Group]["channel"];
 
 /** Every channel some group declares, request or event. */
 type GroupedChannel = {
-  [Group in keyof IpcEndpoints]: ChannelsOf<IpcEndpoints[Group]>;
-}[keyof IpcEndpoints];
+  [Group in keyof typeof IPC_ENDPOINTS]: ChannelsOf<(typeof IPC_ENDPOINTS)[Group]>;
+}[keyof typeof IPC_ENDPOINTS];
 
 /** Every channel `IPC_CHANNELS` declares. */
 type DeclaredChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -289,10 +287,13 @@ type SameChannels<Left, Right> = [Left] extends [Right]
     : { channelsMissingFromEveryGroup: Exclude<Right, Left> }
   : { channelsNoChannelListDeclares: Exclude<Left, Right> };
 
-type RequireTrue<Value extends true> = Value;
+// `Coverage` carries no members — `Record<never, Coverage>` is `{}`, so the intersection is the
+// manifest and nothing else. The constraint is the whole assertion: it is checked where the argument
+// is written, one line down, and `IpcEndpoints` still resolves to the manifest when it fails — one diagnostic naming the channel, rather than every registrar in
+// `src/main` breaking at once against an `IpcEndpoints` that had become the failure object. Carrying
+// it here rather than in an alias of its own is also what keeps it off the package surface: an
+// assertion is referenced by nothing by construction, so a private alias would be `TS6196` under
+// `noUnusedLocals` and an exported one would be API that means nothing to an importer.
+type CoveredEndpoints<Coverage extends true> = typeof IPC_ENDPOINTS & Record<never, Coverage>;
 
-// Exported because `noUnusedLocals` deletes an assertion nobody names: a private alias that no other
-// type references is `TS6196`, and every way to reference one from the exports this file already has
-// either makes `IpcEndpoints` circular or resolves it to the failure object, turning one named
-// diagnostic into a cascade across `src/main`. Nothing imports this, and nothing should.
-export type ChannelCoverage = RequireTrue<SameChannels<GroupedChannel, DeclaredChannel>>;
+export type IpcEndpoints = CoveredEndpoints<SameChannels<GroupedChannel, DeclaredChannel>>;
