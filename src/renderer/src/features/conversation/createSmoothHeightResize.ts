@@ -1,4 +1,5 @@
 import { onCleanup, onSettled } from "solid-js";
+import { prefersReducedMotion } from "../../components/ui/utils";
 
 interface SmoothHeightResizeOptions {
   container: () => HTMLElement | undefined;
@@ -60,10 +61,6 @@ export function createSmoothHeightResize(options: SmoothHeightResizeOptions): vo
   });
 
   onCleanup(cancelAnimation);
-}
-
-function prefersReducedMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
 
 function resizeDuration(): number {

@@ -1,7 +1,7 @@
 import type { DynamicIslandNotchSize } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, onCleanup, onSettled, Show, untrack } from "solid-js";
-import { cx } from "./utils";
+import { cx, mix, prefersReducedMotion } from "./utils";
 
 export type DynamicIslandViewState = "compact" | "expanded";
 export type DynamicIslandHoverBehavior = "none" | "grow" | "expand";
@@ -881,10 +881,6 @@ function springKeyframes(spring: Spring, frame: (progress: number) => Keyframe):
   });
 }
 
-function mix(start: number, end: number, progress: number): number {
-  return start + (end - start) * progress;
-}
-
 function resizeSpring(
   container: HTMLElement,
   start: { width: number; height: number },
@@ -1084,10 +1080,6 @@ function animateIslandBlur(targets: HTMLElement[], endBlur: number, options: Isl
 
 function captureIslandBlurs(targets: HTMLElement[]): Map<HTMLElement, number> {
   return new Map(targets.map((target) => [target, computedBlur(getComputedStyle(target).filter)]));
-}
-
-function prefersReducedMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
 
 function computedScale(transform: string): number {

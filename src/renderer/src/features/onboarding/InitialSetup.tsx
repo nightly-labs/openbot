@@ -1,7 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentProviderId,
-  AgentProviderState,
   AgentStatus,
   AppSetupState,
   DesktopPlatform,
@@ -11,8 +10,10 @@ import type {
 import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from "solid-js";
 import { ProviderPicker, type ProviderPickerOption } from "../../components/ProviderPicker";
 import { Button, Dialog, Textarea } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
 import { InvitePreviewCard } from "../servers/JoinServerDialog";
+import { fallbackProviderState } from "./onboarding-provider-state";
 
 interface InitialSetupProps {
   reviewing?: boolean;
@@ -381,12 +382,4 @@ function providerName(provider: AgentProviderId | null): "Claude" | "Codex" | "G
   if (provider === "claude") return "Claude";
   if (provider === "grok") return "Grok";
   return "Codex";
-}
-
-function fallbackProviderState(status: AgentStatus): AgentProviderState {
-  return status.phase === "starting" || status.phase === "restarting" ? "checking" : "error";
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }

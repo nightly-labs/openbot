@@ -26,6 +26,7 @@ import {
   TriangleAlert,
   toast,
 } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 
 export interface ComputerUseMacSetupProps {
   platform: DesktopPlatform;
@@ -257,8 +258,4 @@ function PermissionGroup(props: {
       </For>
     </ItemGroup>
   );
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }

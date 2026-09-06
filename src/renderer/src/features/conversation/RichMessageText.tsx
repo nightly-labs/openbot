@@ -3,6 +3,7 @@ import type { AttachmentSummary, InstalledSkill } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createUniqueId, For, onCleanup, Show } from "solid-js";
 import { Button, Puzzle } from "../../components/ui";
+import { usesTouchLayout } from "../../components/ui/utils";
 import type { AgentProfile, MessageCitation } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
@@ -286,10 +287,6 @@ export function MessageLink(props: {
       {props.children}
     </a>
   );
-}
-
-function usesTouchLayout(): boolean {
-  return window.matchMedia?.("(hover: none), (pointer: coarse)").matches ?? false;
 }
 
 interface RichMessagePart {

@@ -6,6 +6,7 @@ import { Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, Show } from "solid-js";
 import { createStaticAvatarSvg } from "../../bloub-avatar";
 import { Listbox, Puzzle } from "../../components/ui";
+import { usesTouchLayout } from "../../components/ui/utils";
 import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
@@ -687,10 +688,6 @@ function createAttachmentToken(attachment: DraftAttachment, actions: AttachmentT
     actions.open(attachment, usesTouchLayout());
   });
   return token;
-}
-
-function usesTouchLayout(): boolean {
-  return window.matchMedia?.("(hover: none), (pointer: coarse)").matches ?? false;
 }
 
 function createMentionToken(agent: AgentProfile): HTMLSpanElement {
