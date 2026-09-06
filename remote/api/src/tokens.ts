@@ -18,6 +18,7 @@ import {
   REMOTE_TICKET_AUDIENCE,
   REMOTE_TICKET_PROTOCOL_VERSION,
   type RemoteTicketClaims,
+  SIGNAL_TURN_CREDENTIAL_TTL_SECONDS,
 } from "./protocol";
 
 // The resume token is this service's own, minted and verified here and never seen by the account
@@ -26,7 +27,6 @@ const RESUME_AUDIENCE = "openbot-remote-resume";
 export const RESUME_TTL_SECONDS = 10 * 60;
 const MAXIMUM_STALE_RESUME_SECONDS = 24 * 60 * 60;
 const MAXIMUM_TRUSTED_RESUME_TOKENS = 100_000;
-const TURN_TTL_SECONDS = 60 * 60;
 const jwksSchema = z.object({ keys: z.array(z.object({ kty: z.string() }).loose()).min(1) });
 const remoteTicketClaimsSchema = z.object({
   aud: z.literal(REMOTE_TICKET_AUDIENCE),
@@ -205,7 +205,7 @@ export class RemoteTokenService {
   }
 
   iceServers(claims: RemoteTicketClaims, nowSeconds = Math.floor(Date.now() / 1_000)): IceServer[] {
-    const expiration = Math.min(claims.sessionExpiresAt, nowSeconds + TURN_TTL_SECONDS);
+    const expiration = Math.min(claims.sessionExpiresAt, nowSeconds + SIGNAL_TURN_CREDENTIAL_TTL_SECONDS);
     if (expiration <= nowSeconds) throw new Error("The remote session has expired.");
     const username = `${expiration}:${claims.sessionId}`;
     const credential = createHmac("sha1", this.#turnSecret).update(username).digest("base64");

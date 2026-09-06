@@ -30,6 +30,19 @@ export type SignalProtocolVersion = typeof SIGNAL_PROTOCOL_VERSION;
 // Signal rejects a frame larger than this before it parses it.
 export const SIGNAL_MESSAGE_BYTES_LIMIT = 64 * 1024;
 
+// How long the TURN credentials Signal hands out stay usable. `remote/api` mints them for exactly
+// this, capped by the session's own expiry.
+export const SIGNAL_TURN_CREDENTIAL_TTL_SECONDS = 60 * 60;
+
+// When a connected peer should ask for replacements: three quarters of the way through, leaving a
+// quarter of an hour to retry a refresh that throws or lands on a socket that is reconnecting.
+// Derived from the TTL rather than restated beside it because the service and both clients each
+// held their own copy of this relationship and nothing linked them - shortening the service's TTL
+// would have left both peers refreshing on the old schedule with credentials that had already
+// expired, and a peer only notices that when it needs the relay, so the connection would have kept
+// working for everyone except the users behind a symmetric NAT.
+export const SIGNAL_TURN_REFRESH_INTERVAL_MS = Math.floor(SIGNAL_TURN_CREDENTIAL_TTL_SECONDS * 0.75) * 1_000;
+
 // Which side of the relay a socket is. Only a host may set `multiplex`.
 export type SignalPeer = "host" | "client";
 

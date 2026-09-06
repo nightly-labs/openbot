@@ -22,6 +22,7 @@ export {
   SIGNAL_ERROR_CODES,
   SIGNAL_MESSAGE_BYTES_LIMIT,
   SIGNAL_PROTOCOL_VERSION,
+  SIGNAL_TURN_CREDENTIAL_TTL_SECONDS,
 } from "@openbot/contracts/signal-protocol/messages";
 export type { RemoteMemberRole, RemoteRole, RemoteTicketClaims } from "@openbot/contracts/signal-protocol/ticket";
 export {

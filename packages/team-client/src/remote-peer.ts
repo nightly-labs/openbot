@@ -1,7 +1,11 @@
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
-import { SIGNAL_PROTOCOL_VERSION, type SignalClientMessage } from "@openbot/contracts/signal-protocol/messages";
+import {
+  SIGNAL_PROTOCOL_VERSION,
+  SIGNAL_TURN_REFRESH_INTERVAL_MS,
+  type SignalClientMessage,
+} from "@openbot/contracts/signal-protocol/messages";
 import {
   decodeTeamProtocolV2AuthFrame,
   decodeTeamProtocolV2CurrentEvent,
@@ -706,7 +710,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         }
       }
       scheduleTurnRefresh(state);
-    }, 45 * 60_000);
+    }, SIGNAL_TURN_REFRESH_INTERVAL_MS);
   }
 
   function failPeer(state: PeerState, error: unknown, actions: ActionsRef): void {

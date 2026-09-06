@@ -2,6 +2,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
 import {
   SIGNAL_PROTOCOL_VERSION,
+  SIGNAL_TURN_REFRESH_INTERVAL_MS,
   type SignalClientMessage,
   type SignalServerMessage,
 } from "@openbot/contracts/signal-protocol/messages";
@@ -560,7 +561,7 @@ function scheduleTurnRefresh(state: PeerState): void {
     } catch {
       scheduleTurnRefresh(state);
     }
-  }, 45 * 60_000);
+  }, SIGNAL_TURN_REFRESH_INTERVAL_MS);
 }
 
 function disconnect(peerId: string): void {
