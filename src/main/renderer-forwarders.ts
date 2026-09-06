@@ -26,7 +26,7 @@ import type { AgentService } from "../backend/agent-service";
 import { notificationForAgentEvent } from "./agent-notifications";
 import type { HostAnalytics } from "./analytics";
 import type { HostService } from "./host-service";
-import { withLocalHostSummary } from "./ipc/register-team-handlers";
+import { withLocalHostSummary } from "./ipc/team-handlers";
 import type { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
 

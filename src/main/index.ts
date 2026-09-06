@@ -13,22 +13,23 @@ import {
   readDevelopmentRemoteDebuggingPort,
   shouldAutoStartHost,
 } from "./development-profile";
-import { registerAccountIpcHandlers } from "./ipc/register-account-handlers";
-import { registerAgentIpcHandlers } from "./ipc/register-agent-handlers";
-import { registerAppIpcHandlers } from "./ipc/register-app-handlers";
-import { registerAttachmentIpcHandlers } from "./ipc/register-attachment-handlers";
-import { registerBrowserIpcHandlers } from "./ipc/register-browser-handlers";
-import { registerComputerUseIpcHandlers } from "./ipc/register-computer-use-handlers";
-import { registerDynamicIslandIpcHandlers } from "./ipc/register-dynamic-island-handlers";
-import { registerHostedSiteIpcHandlers } from "./ipc/register-hosted-site-handlers";
-import { registerMarketplaceAgentIpcHandlers } from "./ipc/register-marketplace-agent-handlers";
-import { registerMemoryIpcHandlers } from "./ipc/register-memory-handlers";
-import { registerProviderIpcHandlers } from "./ipc/register-provider-handlers";
-import { registerRoutineIpcHandlers } from "./ipc/register-routine-handlers";
-import { registerSkillIpcHandlers } from "./ipc/register-skill-handlers";
-import { registerTeamIpcHandlers } from "./ipc/register-team-handlers";
-import { registerUpdateIpcHandlers } from "./ipc/register-update-handlers";
-import { registerVoiceIpcHandlers } from "./ipc/register-voice-handlers";
+import { accountIpcHandlers } from "./ipc/account-handlers";
+import { agentIpcHandlers } from "./ipc/agent-handlers";
+import { appIpcHandlers } from "./ipc/app-handlers";
+import { attachmentIpcHandlers } from "./ipc/attachment-handlers";
+import { browserIpcHandlers } from "./ipc/browser-handlers";
+import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
+import { registerIpcGroups } from "./ipc/define-ipc-group";
+import { dynamicIslandIpcHandlers } from "./ipc/dynamic-island-handlers";
+import { hostedSiteIpcHandlers } from "./ipc/hosted-site-handlers";
+import { marketplaceAgentIpcHandlers } from "./ipc/marketplace-agent-handlers";
+import { memoryIpcHandlers } from "./ipc/memory-handlers";
+import { providerIpcHandlers } from "./ipc/provider-handlers";
+import { routineIpcHandlers } from "./ipc/routine-handlers";
+import { skillIpcHandlers } from "./ipc/skill-handlers";
+import { teamIpcHandlers } from "./ipc/team-handlers";
+import { updateIpcHandlers } from "./ipc/update-handlers";
+import { voiceIpcHandlers } from "./ipc/voice-handlers";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
   configureApplicationMenu,
@@ -264,49 +265,52 @@ function registerIpcHandlers({
   computerUseMacSetup,
   analytics,
 }: ApplicationServices): void {
-  // Every renderer-to-main endpoint is registered by one of these, one file per
-  // domain under ./ipc. Nothing is registered inline here: this is the trust
-  // boundary, and a reviewer should be able to read a domain's whole surface in
-  // one file rather than find it interleaved with window and lifecycle code.
+  // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
+  // Nothing is bound inline here: this is the trust boundary, and a reviewer should be able to read
+  // a domain's whole surface in one file rather than find it interleaved with window and lifecycle
+  // code. `registerIpcGroups` takes one entry per group in `IPC_ENDPOINTS`, so a group no registrar
+  // covers - or a registrar that stops covering one - fails to compile here, naming the group.
   const getMainWindow = () => windowHolder.current;
 
-  registerAppIpcHandlers({
-    service,
-    mailbox,
-    browser,
-    updater,
-    setupFile,
-    analyticsPreferenceFile,
-    initializeAgent: () => agentInitialization.start(),
-    appVariant,
-    getMainWindow,
-    setAnalyticsTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
+  registerIpcGroups({
+    ...appIpcHandlers({
+      service,
+      mailbox,
+      browser,
+      updater,
+      setupFile,
+      analyticsPreferenceFile,
+      initializeAgent: () => agentInitialization.start(),
+      appVariant,
+      getMainWindow,
+      setAnalyticsTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
+    }),
+    ...dynamicIslandIpcHandlers({ dynamicIsland }),
+    ...computerUseIpcHandlers({ computerUseMacSetup }),
+    ...providerIpcHandlers({ service, providerRuntimes }),
+    ...voiceIpcHandlers({ voice }),
+    ...accountIpcHandlers({ centralAuth, host }),
+    ...skillIpcHandlers({ skills, getMainWindow }),
+    ...hostedSiteIpcHandlers({ hostedSites, getMainWindow }),
+    ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
+    ...updateIpcHandlers({ updater, updatePreferenceFile }),
+    ...teamIpcHandlers({
+      host,
+      remoteDesktop,
+      remoteServers,
+      takePendingInvite: () => {
+        inviteReceiverReady = true;
+        const inviteUrl = pendingInviteUrl;
+        pendingInviteUrl = null;
+        return inviteUrl;
+      },
+    }),
+    ...memoryIpcHandlers({ service, remoteServers }),
+    ...routineIpcHandlers({ service, remoteServers }),
+    ...attachmentIpcHandlers({ service, mailbox, remoteServers, getMainWindow }),
+    ...agentIpcHandlers({ service, sidebarLayout, host, remoteServers, skills }),
+    ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers }),
   });
-  registerDynamicIslandIpcHandlers({ dynamicIsland });
-  registerComputerUseIpcHandlers({ computerUseMacSetup });
-  registerProviderIpcHandlers({ service, providerRuntimes });
-  registerVoiceIpcHandlers({ voice });
-  registerAccountIpcHandlers({ centralAuth, host });
-  registerSkillIpcHandlers({ skills, getMainWindow });
-  registerHostedSiteIpcHandlers({ hostedSites, getMainWindow });
-  registerMarketplaceAgentIpcHandlers({ marketplaceAgents });
-  registerUpdateIpcHandlers({ updater, updatePreferenceFile });
-  registerTeamIpcHandlers({
-    host,
-    remoteDesktop,
-    remoteServers,
-    takePendingInvite: () => {
-      inviteReceiverReady = true;
-      const inviteUrl = pendingInviteUrl;
-      pendingInviteUrl = null;
-      return inviteUrl;
-    },
-  });
-  registerMemoryIpcHandlers({ service, remoteServers });
-  registerRoutineIpcHandlers({ service, remoteServers });
-  registerAttachmentIpcHandlers({ service, mailbox, remoteServers, getMainWindow });
-  registerAgentIpcHandlers({ service, sidebarLayout, host, remoteServers, skills });
-  registerBrowserIpcHandlers({ browserPictureInPicture, browser, remoteServers });
 }
 
 /** `null` for every state but a signed-in one, matching what the two principal trackers store. */
