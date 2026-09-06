@@ -83,7 +83,13 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
   const listedById = new Map(listed.map((server) => [server.id, server]));
   const seen = new Set<string>();
   const servers = input.servers.flatMap((server) => {
-    if (server.transport !== "webrtc-v2") return input.keepOtherTransports ? [{ ...server }] : [];
+    if (server.transport !== "webrtc-v2") {
+      // Development only, and only for a host the directory does not list. A listed one is this
+      // same host reached over WebRTC -- keeping the stored entry as well as appending the listing
+      // below would put one id in the list twice, and every lookup by id then answers whichever
+      // copy it reached first.
+      return input.keepOtherTransports && !listedById.has(server.id) ? [{ ...server }] : [];
+    }
     const refreshed = listedById.get(server.id);
     if (!refreshed) return [];
     seen.add(server.id);

@@ -134,6 +134,20 @@ describe("reconcileWebRtcHosts", () => {
     ]);
   });
 
+  // A developer reaches their own host over HTTPS and then publishes it, and the directory lists it
+  // under that same id. Two entries with one id is a list the app cannot act on: disconnecting or
+  // forgetting the server leaves the other copy behind.
+  it("lists a host once when it is both stored over HTTPS and published over WebRTC", () => {
+    const result = reconcile({
+      hosts: [listedHost("host")],
+      servers: [storedHost("host", { apiUrl: "https://api.example.com", transport: undefined })],
+      keepOtherTransports: true,
+    });
+
+    expect(result.servers.map((server) => server.id)).toEqual(["host"]);
+    expect(result.servers[0]).toMatchObject({ apiUrl: "webrtc://host", transport: "webrtc-v2" });
+  });
+
   it("refreshes the name and role the directory reports for a host already stored", () => {
     const result = reconcile({
       hosts: [listedHost("host", { name: "Renamed", role: "admin", logoKey: "logo-2" })],
