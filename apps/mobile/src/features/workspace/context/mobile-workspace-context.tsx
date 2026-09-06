@@ -628,8 +628,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           directory={directory}
           onConnectionUpdate={(update) => {
             if (activeServerId === update.hostId && recovery.current) {
-              if (update.state === "offline")
-                recovery.current.offline(new Error(update.message ?? "The desktop went offline."));
+              if (update.state === "offline") {
+                const failure = new Error(update.message ?? "The desktop went offline.");
+                // `protocol_error` is the peer saying a reconnect would be sent the same frame it
+                // could not read. Handing that to `offline` retries it every ten seconds, five
+                // times, then every two minutes, for as long as the app is open.
+                if (update.code === "protocol_error") recovery.current.suspend(failure);
+                else recovery.current.offline(failure);
+              }
               if (update.resync) recovery.current.refresh();
               return;
             }

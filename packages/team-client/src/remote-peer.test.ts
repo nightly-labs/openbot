@@ -227,6 +227,21 @@ describe("browser remote peer recovery", () => {
     await network.runtime.dispose();
   });
 
+  // The peer stops itself either way, but the consumer decides whether to reconnect, and mobile
+  // hands every plain offline update to `recovery.offline`. A frame Signal would send again is the
+  // one failure that must not go back into that loop.
+  it("reports a frame it cannot read as a protocol error rather than a lost connection", async () => {
+    const network = await setupNetwork();
+    await network.connect();
+    const offline = deferred();
+    network.onOffline = () => offline.resolve();
+    // A known frame type carrying a resume token no session could have.
+    network.socket().receive({ type: "ready", version: 1, connectionId: null, resumeToken: "", iceServers: [] });
+    await offline.promise;
+    expect(network.updates.at(-1)).toMatchObject({ state: "offline", code: "protocol_error" });
+    await network.runtime.dispose();
+  });
+
   it("reports event-buffer loss so the workspace can reload cached conversations", async () => {
     const network = await setupNetwork();
     await network.connect();

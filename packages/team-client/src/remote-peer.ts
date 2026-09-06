@@ -5,6 +5,7 @@ import {
   SIGNAL_PROTOCOL_VERSION,
   SIGNAL_TURN_REFRESH_INTERVAL_MS,
   type SignalClientMessage,
+  type SignalServerMessage,
 } from "@openbot/contracts/signal-protocol/messages";
 import {
   decodeTeamProtocolV2AuthFrame,
@@ -84,6 +85,12 @@ export interface RemoteTeamConnectionUpdate {
   hostId: string;
   state: "connecting" | "online" | "offline";
   message: string | null;
+  /**
+   * Set when no reconnect can fix this failure, because the two ends disagree about the wire rather
+   * than about whether there is one. A consumer that retries every offline update has to be told
+   * the difference, or it retries into the same frame forever.
+   */
+  code?: "protocol_error";
   resync?: boolean;
 }
 
@@ -300,14 +307,26 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     };
     socket.onmessage = (event) => {
       if (!isString(event.data)) return;
-      try {
-        const message = JSON.parse(event.data);
-        state.signalChain = state.signalChain
-          .then(() => handleSignal(state, message, actions))
-          .catch((error) => failPeer(state, error, actions));
-      } catch (error) {
-        failPeer(state, error, actions);
-      }
+      const data = event.data;
+      state.signalChain = state.signalChain
+        .then(async () => {
+          if (state.closed || peer !== state) return;
+          let message: SignalServerMessage | null;
+          try {
+            message = decodeSignalServerMessage(JSON.parse(data));
+          } catch (error) {
+            // Where the two ends stop agreeing about the wire, and the service would send the same
+            // bytes to the reconnect this would otherwise ask for. `protocol_error` is what lets a
+            // consumer stop instead: every other failure here is a connection that a retry can fix,
+            // and a caller cannot tell them apart from an `offline` update alone.
+            return failPeer(state, error, actions, "protocol_error");
+          }
+          // A frame type this build does not know is a newer Signal service, not a broken connection.
+          if (message) await handleSignal(state, message, actions);
+        })
+        // Only what handling a frame this peer did read can throw -- an ICE or SDP operation the
+        // browser refused, or a host that said it went away. Those are connections failing.
+        .catch((error) => failPeer(state, error, actions));
     };
     socket.onerror = () => socket.close();
     socket.onclose = () => {
@@ -318,11 +337,8 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     };
   }
 
-  async function handleSignal(state: PeerState, value: unknown, actions: ActionsRef): Promise<void> {
+  async function handleSignal(state: PeerState, message: SignalServerMessage, actions: ActionsRef): Promise<void> {
     if (state.closed || peer !== state) return;
-    const message = decodeSignalServerMessage(value);
-    // A frame type this build does not know is a newer Signal service, not a broken connection.
-    if (!message) return;
     if (message.type === "error") throw new Error(message.message);
     if (message.type === "ready") {
       state.resumeToken = message.resumeToken;
@@ -713,11 +729,16 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     }, SIGNAL_TURN_REFRESH_INTERVAL_MS);
   }
 
-  function failPeer(state: PeerState, error: unknown, actions: ActionsRef): void {
+  function failPeer(state: PeerState, error: unknown, actions: ActionsRef, code?: "protocol_error"): void {
     if (state.closed || peer !== state) return;
     const message = error instanceof Error ? error.message : "The WebRTC connection failed.";
     rejectConnection(state, new Error(message));
-    void actions.current.onConnectionUpdate({ hostId: state.hostId, state: "offline", message });
+    void actions.current.onConnectionUpdate({
+      hostId: state.hostId,
+      state: "offline",
+      message,
+      ...(code ? { code } : {}),
+    });
     void closePeer(actions.current.endSession);
   }
 
