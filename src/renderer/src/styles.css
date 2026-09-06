@@ -18,6 +18,8 @@
 @import "./features/servers/join-server-dialog.css";
 @import "./features/conversation/conversation.css";
 @import "./features/settings/settings-modal.css";
+@import "./features/settings/settings-mobile-connect.css";
+@import "./features/settings/settings-hosted-sites.css";
 @import "./features/computer-use/computer-use.css";
 @import "./features/servers/server-settings-modal.css";
 @import "./features/settings/skills-marketplace.css";
