@@ -721,6 +721,36 @@ describe("remote connection failures", () => {
     expect(fixture.server(hostId)).toMatchObject({ state: "offline" });
   });
 
+  // A retry has to leave a working host reading as working. `connect` on a channel that never
+  // dropped announces nothing -- there is no new session to announce -- so nothing else clears the
+  // "connecting" the retry itself just set, and the host read as reconnecting for as long as it
+  // stayed up.
+  it("puts a WebRTC host that was already connected back to online after a retry", async () => {
+    const hostId = "00000000-0000-4000-8000-0000000000fe";
+    const transport = fakeWebRtcTransport([
+      {
+        hostId,
+        name: "Host",
+        logoKey: null,
+        devicePublicKey: null,
+        authEpoch: 1,
+        membershipId: "member-1",
+        role: "member",
+      },
+    ]);
+    vi.spyOn(transport, "connect").mockResolvedValue(undefined);
+    vi.spyOn(transport, "isConnected").mockReturnValue(true);
+    const fixture = await createRemoteManager({
+      servers: [storedHttpsServer(hostId, { transport: "webrtc-v2", apiUrl: `webrtc://${hostId}` })],
+      appVersion: "0.4.0",
+      managerOptions: { webrtcTransport: transport },
+    });
+
+    await fixture.manager.retryConnection(hostId);
+
+    expect(fixture.server(hostId)).toMatchObject({ state: "online" });
+  });
+
   // Signing in ends with the desktop probe, whose rejection `login` deliberately swallows -- the
   // credentials are already on disk. Swallowing the rejection must not swallow what it recorded: the
   // stream restart lifts the suspension and opening the socket clears the issue, so whichever of the

@@ -211,6 +211,9 @@ describe("TeamWebRtcClientTransport", () => {
     expect(bridge.send).not.toHaveBeenCalledWith("host-1", "events", expect.any(String));
     authentication.confirmNext();
     await initialConnection;
+    // What a caller asks before it decides whether the `connected` event it is waiting on is ever
+    // coming: `connect` resolves on a channel that was already up without announcing anything.
+    expect(transport.isConnected("host-1")).toBe(true);
     bridge.emit("data", "host-1", "events", JSON.stringify({ version: 2, type: "event-reset", nextSequence: 2_001 }));
     bridge.emit(
       "data",
@@ -228,6 +231,7 @@ describe("TeamWebRtcClientTransport", () => {
       }),
     );
     bridge.emit("disconnected", "host-1");
+    expect(transport.isConnected("host-1")).toBe(false);
     const reconnection = transport.connect("host-1");
     await vi.waitFor(() => expect(authentication.pendingConfirmations).toHaveLength(1));
     authentication.confirmNext();

@@ -198,6 +198,15 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     return this.#ensureConnected(hostId);
   }
 
+  /**
+   * Whether the data channel to this host is up and authenticated. `connect` resolves either way,
+   * and only the first of the two announces itself with a `connected` event, so a caller that has
+   * to reconcile its own state with the transport's needs to be able to ask.
+   */
+  isConnected(hostId: string): boolean {
+    return this.#active.get(hostId)?.connected === true;
+  }
+
   async request(
     hostId: string,
     path: string,

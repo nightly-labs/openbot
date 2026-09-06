@@ -516,6 +516,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         this.#connections.setState(serverId, "connecting");
         this.#emitChanged();
         await this.#webrtcTransport.connect(serverId);
+        // The `connected` handler is what turns that "connecting" back into "online", and a host
+        // that was already connected raises no such event -- the session it would announce is the
+        // one still running. Retrying a host whose channel had never actually dropped therefore
+        // left it reading as reconnecting until it next went offline for real.
+        if (this.#connections.stateFor(serverId) === "connecting" && this.#webrtcTransport.isConnected(serverId)) {
+          this.#connections.markConnected(serverId);
+          this.#emitChanged();
+        }
         return requiredServerSummary(this.list(), serverId);
       }
       await this.#client.ensureCompatibility(server, true);
