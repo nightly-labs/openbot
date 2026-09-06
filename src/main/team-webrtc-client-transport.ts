@@ -34,6 +34,9 @@ import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
 
 export const TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS = 10 * 60_000 + 30_000;
 
+/** Node clamps a longer `setTimeout` to one millisecond, and says so on stderr. */
+const MAXIMUM_TIMER_DELAY_MILLISECONDS = 2_147_483_647;
+
 interface TeamWebRtcClientTransportEvents {
   connected: [hostId: string];
   disconnected: [hostId: string];
@@ -460,11 +463,23 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   #scheduleExpiration(hostId: string, active: ActiveHost): void {
     if (active.expirationTimer) clearTimeout(active.expirationTimer);
     if (!active.expiresAt) return;
-    const delay = Math.max(0, active.expiresAt - Date.now() - 30_000);
-    active.expirationTimer = setTimeout(() => {
-      active.expirationTimer = null;
-      if (this.#active.get(hostId) === active) void this.disconnect(hostId).catch(() => undefined);
-    }, delay);
+    const remaining = Math.max(0, active.expiresAt - Date.now() - 30_000);
+    // Wait in bounded steps, exactly as the host schedules its half of the same session in
+    // `#scheduleSessionExpiration`. An account session is persistent -- the control plane answers
+    // `startSession` with `PERSISTENT_SESSION_EXPIRES_AT`, the largest date JavaScript has -- so the
+    // delay is a quarter of a million years and overflows Node's signed 32-bit timer range. Node
+    // resolves that by firing in one millisecond, which disconnected the client roughly as fast as
+    // it finished authenticating: the channel closed under the first request, and the caller waited
+    // out the full ten-minute request timeout for a frame that had nowhere to go.
+    active.expirationTimer = setTimeout(
+      () => {
+        active.expirationTimer = null;
+        if (this.#active.get(hostId) !== active) return;
+        if (remaining > MAXIMUM_TIMER_DELAY_MILLISECONDS) this.#scheduleExpiration(hostId, active);
+        else void this.disconnect(hostId).catch(() => undefined);
+      },
+      Math.min(remaining, MAXIMUM_TIMER_DELAY_MILLISECONDS),
+    );
     active.expirationTimer.unref?.();
   }
 

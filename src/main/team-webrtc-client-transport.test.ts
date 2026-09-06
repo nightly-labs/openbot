@@ -93,7 +93,10 @@ function mockAuthenticatedSend(bridge: TeamWebRtcBridge, automaticallyConfirm = 
 
 // The control-plane half of the options is the same in every test and says nothing about any of
 // them. Only the bridge and the session calls differ, so they stay at the call site.
-function createTransport(bridge: TeamWebRtcBridge): TeamWebRtcClientTransport {
+function createTransport(
+  bridge: TeamWebRtcBridge,
+  overrides: Partial<ConstructorParameters<typeof TeamWebRtcClientTransport>[0]> = {},
+): TeamWebRtcClientTransport {
   return new TeamWebRtcClientTransport({
     bridge,
     listHosts: async () => [listedHost],
@@ -124,6 +127,7 @@ function createTransport(bridge: TeamWebRtcBridge): TeamWebRtcClientTransport {
     controlPlaneUrl: "https://api.example.test",
     downloadHostLogo: async () => ({ bytes: new Uint8Array(), mimeType: "image/png" }),
     transferDirectory: join(tmpdir(), "openbot-webrtc-client-test"),
+    ...overrides,
   });
 }
 
@@ -257,6 +261,33 @@ describe("TeamWebRtcClientTransport", () => {
     await malformedRejection;
     expect(protocolError).toHaveBeenCalledWith("host-1", "protocol_error", expect.any(String));
     await vi.waitFor(() => expect(bridge.disconnect).toHaveBeenCalledWith("host-1"));
+    await transport.stop();
+  });
+
+  it("stays connected on a session that expires further out than a timer can be set", async () => {
+    const bridge = new TeamWebRtcBridge();
+    vi.spyOn(bridge, "connect").mockImplementation(async ({ peerId }) => {
+      queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
+    });
+    const disconnectBridge = vi.spyOn(bridge, "disconnect").mockResolvedValue();
+    mockAuthenticatedSend(bridge);
+    // What the control plane answers `startSession` with for every account session: the largest date
+    // JavaScript has. Scheduling the expiry for it directly overflows the timer range, and Node
+    // resolves an overflow by firing in a millisecond -- so the session that never expires used to
+    // be the one that hung up the moment it authenticated.
+    const transport = createTransport(bridge, {
+      startSession: async () => ({ sessionId: "session-1", hostId: "host-1", expiresAt: 8_640_000_000_000_000 }),
+    });
+    await transport.listHosts();
+    transport.pinHostKey("host-1", hostKeys.publicKey);
+    vi.useFakeTimers();
+    try {
+      await transport.connect("host-1");
+      await vi.advanceTimersByTimeAsync(5);
+      expect(disconnectBridge).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
     await transport.stop();
   });
 
