@@ -9,12 +9,87 @@
 // whether it can run.
 
 import { execFileSync } from "node:child_process";
-import { chmodSync, copyFileSync, mkdirSync, realpathSync } from "node:fs";
-import { basename, dirname, join, relative } from "node:path";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, realpathSync } from "node:fs";
+import { basename, dirname, join, relative, resolve } from "node:path";
 
 // The prefixes every macOS install carries, and so the only absolute load paths allowed to survive
 // into a shipped binary.
 const SYSTEM_LIBRARY_PREFIXES = ["/usr/lib/", "/System/"];
+
+/**
+ * Every non-system library allowed into the shipped runtime, and the licence its redistribution
+ * requires. Bundling is what creates that obligation: until the runtime carried its own copies these
+ * libraries stayed on the machine that linked them and OpenBot redistributed nothing. miniupnpc is
+ * BSD-3-Clause and OpenSSL 3 is Apache-2.0, and both ask for the notice to travel with the binary.
+ *
+ * Keyed by the name before the version, because a Homebrew bump moves `libssl.3.dylib` to a new
+ * number without changing the terms. An unlisted library fails the build: shipping one whose licence
+ * nobody has read is the outcome this table exists to prevent, and silence is how it would happen.
+ */
+const REDISTRIBUTED_LIBRARIES: Readonly<Record<string, { readonly formula: string; readonly license: string }>> = {
+  libminiupnpc: { formula: "miniupnpc", license: "miniupnpc-BSD-3-Clause.txt" },
+  libssl: { formula: "openssl@3", license: "openssl-Apache-2.0.txt" },
+  libcrypto: { formula: "openssl@3", license: "openssl-Apache-2.0.txt" },
+};
+
+// Homebrew writes one of these at the root of a formula's installed tree.
+const LICENSE_FILE_NAMES = ["LICENSE", "LICENSE.txt", "COPYING", "COPYING.txt"];
+
+/** A library copied into the runtime, and where it came from. */
+export interface BundledLibrary {
+  /** File name inside the runtime, such as `libssl.3.dylib`. */
+  readonly name: string;
+  /** Absolute path of the copy the runtime ships. */
+  readonly path: string;
+  /** The file it was copied from, resolved through symlinks. */
+  readonly origin: string;
+}
+
+/** The licence file a bundled library must ship beside, or `null` when it is not one we may ship. */
+export function bundledLibraryLicense(name: string): { readonly formula: string; readonly license: string } | null {
+  return REDISTRIBUTED_LIBRARIES[name.split(".")[0] ?? ""] ?? null;
+}
+
+/**
+ * The licence files a set of bundled libraries obliges the distribution to carry, deduplicated --
+ * `libssl` and `libcrypto` are one formula and one notice. Throws on a library missing from
+ * `REDISTRIBUTED_LIBRARIES`, or present there with no licence file on disk to copy.
+ */
+export function bundledLibraryLicenses(libraries: readonly BundledLibrary[]): { file: string; source: string }[] {
+  const licenses = new Map<string, string>();
+  for (const library of libraries) {
+    const entry = bundledLibraryLicense(library.name);
+    if (!entry) {
+      throw new Error(
+        `${library.name} would ship in the runtime with no licence recorded for it. Add it to REDISTRIBUTED_LIBRARIES with the terms its redistribution requires, or stop bundling it.`,
+      );
+    }
+    if (!licenses.has(entry.license)) licenses.set(entry.license, findLicenseFile(library.origin, entry.formula));
+  }
+  return [...licenses].map(([file, source]) => ({ file, source })).sort((a, b) => a.file.localeCompare(b.file));
+}
+
+/**
+ * Homebrew installs a formula's licence at the root of its versioned tree, one level above `lib`, so
+ * this walks up from the library. Bounded, and the directory has to be inside the formula it claims:
+ * a file found further up belongs to the prefix rather than the package, and shipping the wrong
+ * notice is worse than failing the build.
+ */
+function findLicenseFile(origin: string, formula: string): string {
+  let directory = dirname(origin);
+  for (let depth = 0; depth < 3; depth += 1) {
+    if (directory.includes(`/${formula}/`)) {
+      for (const name of LICENSE_FILE_NAMES) {
+        const candidate = join(directory, name);
+        if (existsSync(candidate)) return candidate;
+      }
+    }
+    const parent = resolve(directory, "..");
+    if (parent === directory) break;
+    directory = parent;
+  }
+  throw new Error(`No licence file accompanies ${formula} at ${origin}, so its notice cannot ship with the runtime.`);
+}
 
 /** True for a load path that resolves on any Mac, or relative to whoever loads it. */
 export function isPortableLoadPath(path: string): boolean {
@@ -45,9 +120,9 @@ function readMachOInstallName(binary: string): string | null {
  * command at the copy, transitively. Idempotent: a run over an already-bundled tree finds only
  * portable load paths and changes nothing.
  */
-export function bundleMacDynamicLibraries(executable: string, frameworks: string): string[] {
+export function bundleMacDynamicLibraries(executable: string, frameworks: string): BundledLibrary[] {
   const fromExecutable = `@executable_path/${relative(dirname(executable), frameworks)}`;
-  const bundled = new Set<string>();
+  const bundled = new Map<string, BundledLibrary>();
   const pending = [executable];
   while (pending.length > 0) {
     const target = pending.pop();
@@ -57,11 +132,12 @@ export function bundleMacDynamicLibraries(executable: string, frameworks: string
       const name = basename(load);
       const destination = join(frameworks, name);
       if (!bundled.has(name)) {
-        bundled.add(name);
+        const origin = realpathSync(load);
+        bundled.set(name, { name, path: destination, origin });
         // Created here rather than up front: a binary that needs nothing must not leave an empty
         // directory in the shipped tree.
         mkdirSync(frameworks, { recursive: true });
-        copyFileSync(realpathSync(load), destination);
+        copyFileSync(origin, destination);
         // Homebrew ships its libraries read-only, and `install_name_tool` rewrites in place.
         chmodSync(destination, 0o755);
         // A copy keeps the id it was installed under, which would send anything linking it straight
@@ -73,5 +149,5 @@ export function bundleMacDynamicLibraries(executable: string, frameworks: string
       execFileSync("install_name_tool", ["-change", load, replacement, target]);
     }
   }
-  return [...bundled].sort();
+  return [...bundled.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
