@@ -77,7 +77,7 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "lint": "biome check src",
+    "lint": "biome check --max-diagnostics=none src",
     "codegen": "expo customize tsconfig.json && uniwind generate-artifacts --css ./global.css --dts ./src/uniwind-types.d.ts",
     "typecheck": "bun run codegen && tsc --noEmit",
     "doctor": "bunx expo-doctor@latest"

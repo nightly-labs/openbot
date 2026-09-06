@@ -33,9 +33,12 @@ version and the `.env.keys` `.worktreeinclude` carries across.
 Before you call a task done, run the narrowest test for what you touched, then `bun run lint` and
 `bun run typecheck` — plus `bun run check:ui` if you touched `src/renderer`, which scans the whole
 renderer in 60 ms. All three read more than you changed on purpose and none is expensive: `lint` is
-`biome check .` across every file in about six seconds, `typecheck` is eleven `tsc` projects in about
-four. The wide typecheck is the more useful one — a change in `packages/contracts` surfaces as an
-error in `src/renderer` or `src/main`, which a single `tsc -p` on the project you edited never sees.
+`biome check --max-diagnostics=none .` across every file in about six seconds, `typecheck` is eleven
+`tsc` projects in about four. The wide typecheck is the more useful one — a change in
+`packages/contracts` surfaces as an error in `src/renderer` or `src/main`, which a single `tsc -p`
+on the project you edited never sees. The `lint` flag is load-bearing: Biome caps a report at 20
+diagnostics by default, and it prints the honest total but not the findings past the cap, so a
+cleanup pass without it costs one full-repo run per 20.
 
 `bun run typecheck` is `typecheck:*`, and `typecheck:mobile` is in that glob, so `apps/mobile` is
 checked with everything else — it depends on `@openbot/brand`, `@openbot/contracts` and
@@ -86,10 +89,10 @@ so a red mobile, site-router, team-client or remote typecheck let the deploy thr
 `bun run test:desktop -- <path>` runs one desktop file. Need something wider? Ask for it. Permission
 covers the one command named — not another one, not a build, not a packaged app.
 
-`bun run format` is the one fast command to leave alone: it is `biome check --write .`, so it
-rewrites files your task never touched and puts them in your diff. Fix what you changed with
-`biome check --write <paths>`, or let the pre-commit hook's `bun run check:staged` do it over the
-staged set.
+`bun run format` is the one fast command to leave alone: it is
+`biome check --write --max-diagnostics=none .`, so it rewrites files your task never touched and
+puts them in your diff. Fix what you changed with `biome check --write <paths>`, or let the
+pre-commit hook's `bun run check:staged` do it over the staged set.
 
 ## Hit every surface
 
