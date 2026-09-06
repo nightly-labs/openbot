@@ -10,11 +10,13 @@ import type {
   MobileConnectedDevice,
   MobileConnectTicket,
 } from "@openbot/contracts/ipc";
+import { createMobileConnectUrl, type MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import {
-  createMobileConnectUrl,
-  isMobileConnectDevelopmentHost,
-  type MobileConnectHostBinding,
-} from "@openbot/contracts/mobile-connect";
+  decodeRemoteSession,
+  decodeRemoteSessionTicket,
+  type RemoteSession,
+  type RemoteSessionTicket,
+} from "@openbot/contracts/remote-control-plane";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import {
   REMOTE_TICKET_AUDIENCE,
@@ -87,11 +89,9 @@ export interface RegisteredRemoteHost {
   machineToken: string | null;
 }
 
-export interface RemoteConnectionBootstrap {
-  ticket: string;
-  expiresAt: number;
-  signalUrl: string;
-}
+// The account API answers the same shape for a host credential and for a member session, so both
+// paths below decode it with the one function in `@openbot/contracts/remote-control-plane`.
+export type RemoteConnectionBootstrap = RemoteSessionTicket;
 
 // The claims this host reads off a client's ticket, derived from the contract the account API mints
 // against. `clientPublicKey` is optional there because a host ticket carries none; a client that
@@ -324,11 +324,11 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     return this.#request(
       `/v2/remote/hosts/${encodeURIComponent(hostId)}/ticket`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
-      decodeRemoteConnectionBootstrap,
+      decodeRemoteSessionTicket,
     );
   }
 
-  async startRemoteSession(hostId: string): Promise<{ sessionId: string; hostId: string; expiresAt: number }> {
+  async startRemoteSession(hostId: string): Promise<RemoteSession> {
     return this.#authorizedRequest(
       "/v2/remote/sessions/",
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hostId }) },
@@ -348,7 +348,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clientPublicKey }),
       },
-      decodeRemoteConnectionBootstrap,
+      decodeRemoteSessionTicket,
     );
   }
 
@@ -1109,26 +1109,6 @@ function decodeRegisteredRemoteHost(value: unknown): RegisteredRemoteHost {
     membershipId: requiredString(record, "membershipId"),
     authEpoch: record.authEpoch,
     machineToken: record.machineToken === null ? null : requiredString(record, "machineToken"),
-  };
-}
-
-function decodeRemoteConnectionBootstrap(value: unknown): RemoteConnectionBootstrap {
-  const record = decodeRecord(value, "remote connection bootstrap");
-  if (!isNumber(record.expiresAt)) throw new Error("Invalid remote ticket expiration.");
-  const signalUrl = requiredString(record, "signalUrl");
-  const signal = new URL(signalUrl);
-  if (signal.protocol !== "wss:" && !(signal.protocol === "ws:" && isMobileConnectDevelopmentHost(signal.hostname)))
-    throw new Error("Invalid Remote Signal URL.");
-  return { ticket: requiredString(record, "ticket"), expiresAt: record.expiresAt, signalUrl };
-}
-
-function decodeRemoteSession(value: unknown): { sessionId: string; hostId: string; expiresAt: number } {
-  const record = decodeRecord(value, "remote session");
-  if (!isNumber(record.expiresAt)) throw new Error("Invalid remote session expiration.");
-  return {
-    sessionId: requiredString(record, "sessionId"),
-    hostId: requiredString(record, "hostId"),
-    expiresAt: record.expiresAt,
   };
 }
 
