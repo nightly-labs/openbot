@@ -231,6 +231,7 @@
       "name": "@openbot/remote-api",
       "version": "0.0.0",
       "dependencies": {
+        "@openbot/contracts": "workspace:*",
         "elysia": "1.4.30",
         "jose": "catalog:",
         "zod": "catalog:",

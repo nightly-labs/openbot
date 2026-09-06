@@ -1,6 +1,7 @@
+import type { SignalServerMessage } from "@openbot/contracts/signal-protocol/messages";
 import { TEAM_PROTOCOL_V2_CHANNELS } from "@openbot/contracts/team-protocol/v2";
 import { afterEach, expect, it, type Mock, vi } from "vitest";
-import type { BridgeCommand, SignalMessage } from "./team-webrtc";
+import type { BridgeCommand } from "./team-webrtc";
 
 // The previously untested boundary is the hidden renderer's actual MessagePort
 // routing: each authenticated Signal connection must own a separate RTC peer.
@@ -29,7 +30,7 @@ class SignalSocket extends EventTarget {
     super();
     SignalSocket.instances.push(this);
   }
-  message(data: SignalMessage): void {
+  message(data: SignalServerMessage): void {
     this.dispatchEvent(new MessageEvent("message", { data: JSON.stringify(data) }));
   }
 }
@@ -131,6 +132,7 @@ it("routes two phones independently and disconnects or resumes only the addresse
       membershipId: "same-membership",
       role: "owner",
       sessionExpiresAt: 8_640_000_000_000,
+      resumed: false,
     });
   await vi.waitFor(() => expect(posted("incoming-peer")).toHaveLength(2));
   const [first, second] = posted("incoming-peer");
@@ -199,6 +201,7 @@ it("routes two phones independently and disconnects or resumes only the addresse
     membershipId: "same-membership",
     role: "owner",
     sessionExpiresAt: 8_640_000_000_000,
+    resumed: false,
   });
   await vi.waitFor(() => expect(posted("incoming-peer")).toHaveLength(4));
   expect(PeerConnection.instances).toHaveLength(3);

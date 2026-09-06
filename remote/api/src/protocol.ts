@@ -1,79 +1,33 @@
-export const SIGNAL_PROTOCOL_VERSION = 1 as const;
-export const SIGNAL_MESSAGE_BYTES_LIMIT = 64 * 1024;
+// The Signal protocol's server half: the shapes come from `@openbot/contracts/signal-protocol`, and
+// what stays here is the validation of untrusted *client* input - byte limits, identifier patterns
+// and a closed discriminated union that a client-side decoder has no reason to carry. The other
+// direction is `@openbot/contracts/signal-protocol/decode`, which is what a peer runs over this
+// service's output. One validator per trust direction, on purpose.
+//
+// The re-exports below are what the rest of this workspace imports, so moving the types out did not
+// churn `signal-service.ts` or `tokens.ts`.
 
-export type RemoteRole = "host" | "owner" | "admin" | "member";
-export type SignalChannel = "team" | "remote-desktop";
+import type { SignalClientMessage, SignalServerMessage } from "@openbot/contracts/signal-protocol/messages";
+import { z } from "zod";
 
-export interface RemoteTicketClaims {
-  aud: "openbot-remote";
-  jti: string;
-  sessionId: string;
-  hostId: string;
-  userId: string;
-  membershipId: string;
-  role: RemoteRole;
-  authEpoch: number;
-  protocolMinimum: number;
-  protocolMaximum: number;
-  sessionExpiresAt: number;
-  clientPublicKey?: string;
-  iat: number;
-  exp: number;
-}
-
-export type SignalClientMessage =
-  | { type: "hello"; version: 1; peer: "host" | "client"; token: string; multiplex?: boolean }
-  | { type: "offer" | "answer"; version: 1; connectionId: string; channel: SignalChannel; sdp: string }
-  | {
-      type: "ice-candidate";
-      version: 1;
-      connectionId: string;
-      channel: SignalChannel;
-      candidate: string;
-      sdpMid: string | null;
-      sdpMLineIndex: number | null;
-    }
-  | { type: "ice-restart"; version: 1; connectionId: string; channel: SignalChannel }
-  | { type: "turn-refresh"; version: 1; connectionId: string | null }
-  | { type: "disconnect"; version: 1; connectionId: string };
-
-export type SignalServerMessage =
-  | {
-      type: "ready";
-      version: 1;
-      connectionId: string | null;
-      resumeToken: string;
-      iceServers: IceServer[];
-    }
-  | {
-      type: "peer-ready";
-      version: 1;
-      connectionId: string;
-      sessionId: string;
-      userId: string;
-      membershipId: string;
-      role: Exclude<RemoteRole, "host">;
-      sessionExpiresAt: number;
-      resumed: boolean;
-    }
-  | Exclude<SignalClientMessage, { type: "hello"; version: 1; peer: "host" | "client"; token: string }>
-  | { type: "error"; version: 1; code: SignalErrorCode; message: string; connectionId?: string };
-
-export interface IceServer {
-  urls: string | string[];
-  username?: string;
-  credential?: string;
-}
-
-export type SignalErrorCode =
-  | "authentication_required"
-  | "invalid_message"
-  | "host_unavailable"
-  | "host_busy"
-  | "permission_denied"
-  | "rate_limited"
-  | "session_revoked"
-  | "protocol_error";
+export type {
+  IceServer,
+  SignalChannel,
+  SignalClientMessage,
+  SignalErrorCode,
+  SignalRelayMessage,
+  SignalServerMessage,
+} from "@openbot/contracts/signal-protocol/messages";
+export {
+  SIGNAL_ERROR_CODES,
+  SIGNAL_MESSAGE_BYTES_LIMIT,
+  SIGNAL_PROTOCOL_VERSION,
+} from "@openbot/contracts/signal-protocol/messages";
+export type { RemoteMemberRole, RemoteRole, RemoteTicketClaims } from "@openbot/contracts/signal-protocol/ticket";
+export {
+  REMOTE_TICKET_AUDIENCE,
+  REMOTE_TICKET_PROTOCOL_VERSION,
+} from "@openbot/contracts/signal-protocol/ticket";
 
 const identifierSchema = z
   .string()
@@ -130,7 +84,7 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     version: z.literal(1),
     connectionId: identifierSchema,
   }),
-]);
+]) satisfies z.ZodType<SignalClientMessage>;
 
 export function decodeSignalClientMessage(value: unknown): SignalClientMessage {
   const envelope = z.object({ type: z.string() }).safeParse(value);
@@ -143,5 +97,3 @@ export function decodeSignalClientMessage(value: unknown): SignalClientMessage {
 export function encodeSignalServerMessage(message: SignalServerMessage): string {
   return JSON.stringify(message);
 }
-
-import { z } from "zod";

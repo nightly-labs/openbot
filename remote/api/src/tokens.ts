@@ -13,9 +13,15 @@ import {
 } from "jose";
 import { z } from "zod";
 import type { RemoteApiConfig } from "./config";
-import type { IceServer, RemoteTicketClaims } from "./protocol";
+import {
+  type IceServer,
+  REMOTE_TICKET_AUDIENCE,
+  REMOTE_TICKET_PROTOCOL_VERSION,
+  type RemoteTicketClaims,
+} from "./protocol";
 
-const TICKET_AUDIENCE = "openbot-remote";
+// The resume token is this service's own, minted and verified here and never seen by the account
+// API, so its audience stays local while the ticket's comes from the shared contract.
 const RESUME_AUDIENCE = "openbot-remote-resume";
 export const RESUME_TTL_SECONDS = 10 * 60;
 const MAXIMUM_STALE_RESUME_SECONDS = 24 * 60 * 60;
@@ -23,7 +29,7 @@ const MAXIMUM_TRUSTED_RESUME_TOKENS = 100_000;
 const TURN_TTL_SECONDS = 60 * 60;
 const jwksSchema = z.object({ keys: z.array(z.object({ kty: z.string() }).loose()).min(1) });
 const remoteTicketClaimsSchema = z.object({
-  aud: z.literal(TICKET_AUDIENCE),
+  aud: z.literal(REMOTE_TICKET_AUDIENCE),
   jti: z.string().min(1).max(256),
   sessionId: z.string().min(1).max(256),
   hostId: z.string().min(1).max(256),
@@ -90,7 +96,7 @@ export class RemoteTokenService {
 
   async verifyTicket(token: string, now = new Date()): Promise<RemoteTicketClaims> {
     const { payload } = await jwtVerify(token, this.#ticketKey, {
-      audience: TICKET_AUDIENCE,
+      audience: REMOTE_TICKET_AUDIENCE,
       algorithms: ["ES256"],
       currentDate: now,
     });
@@ -110,7 +116,7 @@ export class RemoteTokenService {
         algorithms: ["HS256"],
         currentDate: now,
       });
-      const claims = decodeTicketClaims({ ...payload, aud: TICKET_AUDIENCE }, now);
+      const claims = decodeTicketClaims({ ...payload, aud: REMOTE_TICKET_AUDIENCE }, now);
       if (this.#trustedResumeTokens.has(claims.jti)) return claims;
       if (!(await this.#validateResumeClaims(claims))) throw new Error("The remote session is not active.");
       this.#trustResumeToken(claims);
@@ -192,7 +198,7 @@ export class RemoteTokenService {
       algorithms: ["HS256"],
       currentDate: new Date((expiresAt - 1) * 1_000),
     });
-    const claims = decodeTicketClaims({ ...payload, aud: TICKET_AUDIENCE }, now);
+    const claims = decodeTicketClaims({ ...payload, aud: REMOTE_TICKET_AUDIENCE }, now);
     if (claims.iat > nowSeconds || claims.exp <= claims.iat)
       throw new Error("The resume token timestamps are invalid.");
     return claims;
@@ -244,7 +250,12 @@ function parseJwks(value: string): JSONWebKeySet {
 function decodeTicketClaims(value: unknown, now: Date): RemoteTicketClaims {
   const claims = remoteTicketClaimsSchema.parse(value);
   if (claims.protocolMinimum > claims.protocolMaximum) throw new Error("Invalid protocol range.");
-  if (claims.protocolMinimum > 2 || claims.protocolMaximum < 2) throw new Error("Unsupported protocol range.");
+  if (
+    claims.protocolMinimum > REMOTE_TICKET_PROTOCOL_VERSION ||
+    claims.protocolMaximum < REMOTE_TICKET_PROTOCOL_VERSION
+  ) {
+    throw new Error("Unsupported protocol range.");
+  }
   if (claims.sessionExpiresAt <= Math.floor(now.getTime() / 1_000)) throw new Error("The remote session expired.");
   return claims;
 }

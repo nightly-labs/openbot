@@ -16,6 +16,11 @@ import {
   type MobileConnectHostBinding,
 } from "@openbot/contracts/mobile-connect";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import {
+  REMOTE_TICKET_AUDIENCE,
+  type RemoteMemberRole,
+  type RemoteTicketClaims,
+} from "@openbot/contracts/signal-protocol/ticket";
 import { createLocalJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
 
@@ -88,16 +93,16 @@ export interface RemoteConnectionBootstrap {
   signalUrl: string;
 }
 
-export interface VerifiedRemoteSessionTicket {
-  sessionId: string;
-  hostId: string;
-  userId: string;
-  membershipId: string;
-  role: "owner" | "admin" | "member";
-  authEpoch: number;
-  sessionExpiresAt: number;
+// The claims this host reads off a client's ticket, derived from the contract the account API mints
+// against. `clientPublicKey` is optional there because a host ticket carries none; a client that
+// reached this check without one is rejected below, so it is required here.
+export type VerifiedRemoteSessionTicket = Pick<
+  RemoteTicketClaims,
+  "sessionId" | "hostId" | "userId" | "membershipId" | "authEpoch" | "sessionExpiresAt"
+> & {
+  role: RemoteMemberRole;
   clientPublicKey: string;
-}
+};
 
 export interface RemoteHostSummary {
   hostId: string;
@@ -352,7 +357,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       if (!this.#remoteTicketJwks) this.#remoteTicketJwks = this.#fetchRemoteTicketJwks();
       const jwks = await this.#remoteTicketJwks;
       return jwtVerify(ticket, createLocalJWKSet(jwks), {
-        audience: "openbot-remote",
+        audience: REMOTE_TICKET_AUDIENCE,
         algorithms: ["ES256"],
       });
     };

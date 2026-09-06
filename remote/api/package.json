@@ -11,6 +11,7 @@
     "check": "bun run typecheck && bun run test"
   },
   "dependencies": {
+    "@openbot/contracts": "workspace:*",
     "elysia": "1.4.30",
     "jose": "catalog:",
     "zod": "catalog:"
