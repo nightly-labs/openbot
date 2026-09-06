@@ -543,6 +543,12 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.getStatus();
   }
 
+  // Where this host's Team API listens on this machine, which is not what `#status.apiUrl` reports:
+  // that is how a member reaches the host, and for a published one it is the Signal service.
+  #localApiUrl(): string | null {
+    return this.#api.port === null ? null : `http://localhost:${this.#api.port}`;
+  }
+
   async createDevelopmentConnection(): Promise<{
     serverId: string;
     serverName: string;
@@ -553,7 +559,8 @@ export class HostService extends EventEmitter<HostEvents> {
     sessionToken: string;
   }> {
     const identity = this.#options.store.getIdentity();
-    if (!identity || !this.#status.apiUrl) throw new Error("The local development host is not ready.");
+    const apiUrl = this.#localApiUrl();
+    if (!identity || !apiUrl) throw new Error("The local development host is not ready.");
     const username = DEVELOPMENT_REMOTE_CLIENT_USERNAME;
     const password = "openbot-local-development-client";
     let authenticated: AuthenticatedMember;
@@ -576,7 +583,7 @@ export class HostService extends EventEmitter<HostEvents> {
     return {
       serverId: identity.serverId,
       serverName: identity.serverName,
-      apiUrl: this.#status.apiUrl,
+      apiUrl,
       fingerprint: identity.fingerprint,
       publicKey: identity.publicKey,
       username,
@@ -861,11 +868,17 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#assertStillActiveHost(identity.serverId);
       return result;
     }
-    if (!this.#status.apiUrl) throw new Error("Make this OpenBot public before creating an invite.");
+    // This branch mints a link to this machine's own Team API, so it asks the server where it
+    // listens rather than reading the status. They are the same URL for a host that is private or
+    // local-development, and for a published one the status carries the Signal service's `ws://`
+    // address -- which `createInviteUrl` rejects, so a developer who had published this host could
+    // not create an invite at all.
+    const localApiUrl = this.#localApiUrl();
+    if (!localApiUrl) throw new Error("Make this OpenBot public before creating an invite.");
     const invite = await this.#options.store.createInvite(input.role, input.email);
     const inviteUrl = createInviteUrl(
       {
-        apiUrl: this.#status.apiUrl,
+        apiUrl: localApiUrl,
         serverId: identity.serverId,
         fingerprint: identity.fingerprint,
         token: invite.token,
