@@ -19,7 +19,7 @@ them; `registerIpcHandlers` in `index.ts` wires dependencies, spreads all sixtee
 That return type is what makes the main side exhaustive without a test. Miss an endpoint and it is
 `TS2741` naming the endpoint; add one the group never declared and it is `TS2353`; leave a whole
 group with no registrar behind it and `registerIpcGroups` in `index.ts` is `TS2741` naming the
-group. `ipc/AGENTS.md` has the five ways to bind a handler.
+group. `ipc/AGENTS.md` has the four ways to bind a handler.
 
 Three things run at module scope in `index.ts` — `app.setPath`, `app.enableSandbox`,
 `protocol.registerSchemesAsPrivileged` — which is why nothing in the main process can be imported
