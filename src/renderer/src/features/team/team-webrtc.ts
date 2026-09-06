@@ -165,10 +165,17 @@ function connectSignal(state: PeerState): void {
     state.signalChain = state.signalChain
       .then(async () => {
         if (state.closed || state.socket !== socket) return;
-        const message = decodeSignalServerMessage(JSON.parse(event.data));
+        let message: SignalServerMessage | null;
+        try {
+          message = decodeSignalServerMessage(JSON.parse(event.data));
+        } catch (error) {
+          return failSignalProtocol(state, error);
+        }
         // A frame type this build does not know is a newer Signal service, not a broken connection.
         if (message) await handleSignal(state, message);
       })
+      // Only what handling a frame this peer did read can throw -- an ICE or SDP operation the
+      // browser refused. That is a connection failing, which a reconnect can still fix.
       .catch((error) => failPeer(state, error));
   });
   socket.addEventListener("close", (event) => {
@@ -598,6 +605,24 @@ function disconnectPeerConnection(state: PeerState): void {
   state.channels = {};
   for (const decoder of Object.values(state.payloadDecoders)) decoder?.reset();
   state.payloadDecoders = {};
+}
+
+// A malformed known frame is where the two ends stop agreeing about the wire, so it is a
+// `protocol_error` rather than a WebRTC failure and the connection does not survive it: this frame
+// was meant to set state the next one builds on, and the service would send the same bytes to a
+// reconnect. `classifyTransportError` suspends reconnection for this code and leaves the server
+// `incompatible`, which is the honest report -- `webrtc_error` reads as `network_unavailable` and
+// retries forever. `disconnect` closes the socket and clears the reconnect timer, and only posts
+// `peer-disconnected` for a child peer; the peer that owns a socket is never one.
+function failSignalProtocol(state: PeerState, error: unknown): void {
+  post({
+    type: "peer-error",
+    peerId: state.id,
+    code: "protocol_error",
+    message: error instanceof Error ? error.message : "Signal sent a frame this peer cannot read.",
+  });
+  disconnect(state.id);
+  post({ type: "peer-disconnected", peerId: state.id });
 }
 
 function failPeer(state: PeerState, error: unknown): void {
