@@ -8,7 +8,13 @@
  *   bridge and the agent service below it, leaving provider CLIs running after the app had quit.
  * - **A step registered after `runAll` still runs.** Construction keeps going after `before-quit`
  *   fires, so a service built during the teardown would otherwise leak a listening socket or a
- *   child process. Its step is chained onto the run in progress instead of being dropped.
+ *   child process. Its step joins the run in progress instead of being dropped: while the drain is
+ *   working it is spliced into the steps still to come, in ordinal position, so a service that
+ *   finishes building mid-shutdown is still torn down in sequence. It can only be placed among the
+ *   steps that remain - an ordinal whose slot has already passed goes next rather than in the past.
+ *   A step registered after `runAll` has returned is genuinely best-effort: nothing awaits it, and
+ *   `app.quit()` can end the process first. Closing that last gap needs construction itself to
+ *   abort on `before-quit`, which it does not do today.
  *
  * Steps declare an **order** rather than running last-in-first-out. Shutdown here is largely
  * *construction* order and not its reverse: the browser host is destroyed before the
@@ -30,6 +36,8 @@ interface TeardownStep {
 export class TeardownRegistry {
   readonly #reportError: (name: string, error: unknown) => void;
   #steps: TeardownStep[] = [];
+  /** The sorted steps a drain in progress has not reached yet. Late pushes are spliced into it. */
+  #pending: TeardownStep[] | null = null;
   #closed = false;
   #tail: Promise<void> = Promise.resolve();
 
@@ -40,11 +48,17 @@ export class TeardownRegistry {
   /** `order` is the position in the shutdown sequence, not the position in this call sequence. */
   push(order: number, name: string, run: () => PromiseLike<unknown> | unknown): void {
     const step = { order, name, run };
-    if (this.#closed) {
-      this.#tail = this.#tail.then(() => this.#runStep(step));
+    if (!this.#closed) {
+      this.#steps.push(step);
       return;
     }
-    this.#steps.push(step);
+    const pending = this.#pending;
+    if (pending) {
+      const at = pending.findIndex((queued) => queued.order > order);
+      pending.splice(at === -1 ? pending.length : at, 0, step);
+      return;
+    }
+    this.#tail = this.#tail.then(() => this.#runStep(step));
   }
 
   /** Idempotent: a second call awaits the first run rather than starting another. */
@@ -64,9 +78,12 @@ export class TeardownRegistry {
   }
 
   async #drain(): Promise<void> {
-    const steps = [...this.#steps].sort((left, right) => left.order - right.order);
+    const pending = [...this.#steps].sort((left, right) => left.order - right.order);
     this.#steps = [];
-    for (const step of steps) await this.#runStep(step);
+    this.#pending = pending;
+    // `shift` rather than iteration: `push` splices into this same array while the loop awaits.
+    for (let step = pending.shift(); step; step = pending.shift()) await this.#runStep(step);
+    this.#pending = null;
   }
 
   async #runStep(step: TeardownStep): Promise<void> {

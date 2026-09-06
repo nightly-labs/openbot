@@ -41,17 +41,19 @@ describe("TeardownRegistry", () => {
     expect(stop).toHaveBeenCalledOnce();
   });
 
-  it("runs a step registered after shutdown has begun", async () => {
+  it("gives a step registered after shutdown has begun its declared position", async () => {
     const stopped: string[] = [];
     const registry = new TeardownRegistry({ reportError: () => undefined });
 
-    registry.push(10, "host", () => {
-      stopped.push("host");
-      // Construction is not aborted by a quit, so a service can finish building here.
+    registry.push(10, "browser", () => {
+      stopped.push("browser");
+      // Construction is not aborted by a quit, so a service can finish building here. It belongs
+      // ahead of the steps the drain has not reached, not appended after all of them.
       registry.push(20, "remote servers", () => void stopped.push("remote servers"));
     });
+    registry.push(30, "agents", () => void stopped.push("agents"));
     await registry.runAll();
 
-    expect(stopped).toEqual(["host", "remote servers"]);
+    expect(stopped).toEqual(["browser", "remote servers", "agents"]);
   });
 });

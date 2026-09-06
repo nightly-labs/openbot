@@ -169,6 +169,12 @@ export interface ApplicationServices {
   computerUseMacSetup: ComputerUseMacSetupWindowController;
   analytics: HostAnalytics;
   teamStore: TeamStore;
+  /**
+   * The account state this function read part-way through, and bound the local host to. The
+   * entry point compares it against the current state to find an account that settled after
+   * that read, while `forwardCentralAuth` still had no services to apply it to.
+   */
+  appliedAccount: CentralAuthState;
   /** Left un-awaited on purpose: the account settles in the background while the app opens. */
   centralAuthInitialization: Promise<CentralAuthState>;
 }
@@ -555,6 +561,7 @@ export async function createApplicationServices({
     computerUseMacSetup,
     analytics,
     teamStore,
+    appliedAccount: signedInState,
     centralAuthInitialization,
   };
 }

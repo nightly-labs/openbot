@@ -309,6 +309,11 @@ function registerIpcHandlers({
   registerBrowserIpcHandlers({ browserPictureInPicture, browser, remoteServers });
 }
 
+/** `null` for every state but a signed-in one, matching what the two principal trackers store. */
+function centralAuthPrincipalId(state: CentralAuthState): string | null {
+  return state.status === "signed_in" ? state.user.id : null;
+}
+
 function forwardCentralAuth(state: CentralAuthState): void {
   if (state.status === "signed_in") {
     if (activeAnalyticsPrincipalId && activeAnalyticsPrincipalId !== state.user.id) services?.analytics.clear();
@@ -478,6 +483,22 @@ if (!hasSingleInstanceLock) {
         prepareForUpdateInstall,
       });
       services = built;
+      // `forwardCentralAuth` reaches the host, the remote servers and analytics only through
+      // `services`, so every account change announced during construction was dropped.
+      // `createApplicationServices` bound the local host to the one state it read and attributed the
+      // queued analytics to it, so adopt that as the active principal; then apply the current state
+      // if the account moved on after that read - a sign-in settling while `remoteServers.initialize()`
+      // awaits would otherwise leave the previous account's host selected, with nothing to replay it.
+      const appliedAccount = built.appliedAccount;
+      activeAnalyticsPrincipalId = centralAuthPrincipalId(appliedAccount);
+      activeRemotePrincipalId = centralAuthPrincipalId(appliedAccount);
+      const currentAccount = built.centralAuth.getState();
+      if (
+        currentAccount.status !== appliedAccount.status ||
+        centralAuthPrincipalId(currentAccount) !== centralAuthPrincipalId(appliedAccount)
+      ) {
+        forwardCentralAuth(currentAccount);
+      }
       const { service, sidebarLayout, host, remoteDesktop, remoteServers, updater, dynamicIsland, teamStore } = built;
 
       service.on("event", (event) => forwardAgentEvent("local", event));
