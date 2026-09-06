@@ -45,6 +45,7 @@ import type {
   RespondToPromptInput,
   Routine,
   RoutineRun,
+  RoutineSchedule,
   SendDirectMessageInput,
   SendMessageInput,
   ServerSummary,
@@ -417,6 +418,36 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return installedSkills.get(agentId) ?? [];
   }
 
+  function createRoutineRecord(input: {
+    agentId: string;
+    name: string;
+    instruction: string;
+    active: boolean;
+    timezone: string;
+    schedule: RoutineSchedule;
+  }): Routine {
+    const now = new Date().toISOString();
+    const routineId = crypto.randomUUID();
+    return {
+      id: routineId,
+      agentId: input.agentId,
+      name: input.name.trim(),
+      instruction: input.instruction.trim(),
+      active: input.active,
+      timezone: input.timezone,
+      trigger: {
+        id: crypto.randomUUID(),
+        routineId,
+        schedule: input.schedule,
+        nextRunAt: new Date(Date.now() + 3_600_000).toISOString(),
+        createdAt: now,
+        updatedAt: now,
+      },
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
   const api: OpenBotDesktopApi = {
     getAppInfo: async () => clone(appInfo),
     getSetupState: async () => clone(setupState),
@@ -720,10 +751,38 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         marketplaceAgentSubmissions = [submission, ...marketplaceAgentSubmissions];
         return clone(submission);
       },
-      install: async ({ listingId }) => {
+      install: async ({ listingId, agentId, timezone }) => {
         const detail = STORY_MARKETPLACE_AGENT_DETAILS[listingId];
         if (!detail) throw new Error("Agent not found");
-        const agent = createAgentSummary({
+        // Installing over an existing agent updates it in place, the way the real service does:
+        // a second install of the same listing has to change the agent, not add a second copy.
+        const existing = agentId ? agents.find((candidate) => candidate.id === agentId) : undefined;
+        if (agentId && !existing) throw new Error("The installed agent no longer exists.");
+        if (existing && existing.marketplaceSource?.listingId !== detail.id) {
+          throw new Error("This local agent was installed from a different marketplace agent.");
+        }
+        const previousRoutineIds = existing?.marketplaceSource?.routineIds ?? [];
+        const target =
+          existing ??
+          createAgentSummary({
+            name: detail.name,
+            title: detail.title,
+            description: detail.description,
+            avatarSeed: detail.avatarSeed,
+            avatarHue: detail.avatarHue,
+          });
+        const created = detail.routines.map((routine) =>
+          createRoutineRecord({
+            agentId: target.id,
+            name: routine.name,
+            instruction: routine.instruction,
+            active: routine.active,
+            timezone,
+            schedule: routine.schedule,
+          }),
+        );
+        const agent: AgentSummary = {
+          ...target,
           name: detail.name,
           title: detail.title,
           description: detail.description,
@@ -734,11 +793,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
             versionId: detail.versionId,
             version: detail.version,
             skillIds: detail.skills.map((skill) => skill.skillId),
-            routineIds: detail.routines.map((_, index) => `${detail.id}-routine-${index}`),
+            routineIds: created.map((routine) => routine.id),
           },
-        });
-        agents = [...agents, agent];
-        queues.set(agent.id, emptyQueue(agent.id));
+        };
+        agents = existing
+          ? agents.map((candidate) => (candidate.id === agent.id ? agent : candidate))
+          : [...agents, agent];
+        if (!existing) queues.set(agent.id, emptyQueue(agent.id));
         installedSkills.set(
           agent.id,
           detail.skills.map((skill) => ({
@@ -750,7 +811,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
             state: "installed" as const,
           })),
         );
+        routines.set(agent.id, [
+          ...created,
+          ...(routines.get(agent.id) ?? []).filter((routine) => !previousRoutineIds.includes(routine.id)),
+        ]);
         emitAgentEvent({ type: "agents-changed", agents });
+        emitAgentEvent({ type: "routines-changed", agentId: agent.id });
         return clone({ agent });
       },
     },
@@ -921,26 +987,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       listRoutines: async (agentId) => clone(routines.get(agentId) ?? []),
       createRoutine: async (input) => {
-        const now = new Date().toISOString();
-        const routineId = crypto.randomUUID();
-        const routine: Routine = {
-          id: routineId,
-          agentId: input.agentId,
-          name: input.name.trim(),
-          instruction: input.instruction.trim(),
-          active: input.active,
-          timezone: input.timezone,
-          trigger: {
-            id: crypto.randomUUID(),
-            routineId,
-            schedule: input.schedule,
-            nextRunAt: new Date(Date.now() + 3_600_000).toISOString(),
-            createdAt: now,
-            updatedAt: now,
-          },
-          createdAt: now,
-          updatedAt: now,
-        };
+        const routine = createRoutineRecord(input);
         routines.set(input.agentId, [routine, ...(routines.get(input.agentId) ?? [])]);
         emitAgentEvent({ type: "routines-changed", agentId: input.agentId });
         return clone(routine);
