@@ -38,6 +38,7 @@ import {
   OctagonX,
   Spinner,
 } from "../../components/ui";
+import { prefersReducedMotion } from "../../components/ui/utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import {
   animateModeLayers,
@@ -49,7 +50,6 @@ import {
   type ModeSwapSize,
   modeSourceAnchors,
   modeSwapElementSize,
-  prefersReducedMotion,
   primeCompactModeLayerPositions,
   restoreModeTransitionFocus,
   waitForAnimations,

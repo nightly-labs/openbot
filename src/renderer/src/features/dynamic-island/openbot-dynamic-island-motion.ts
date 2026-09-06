@@ -198,10 +198,6 @@ export function waitForAnimations(animations: Animation[]): Promise<undefined[]>
   return Promise.all(animations.map((animation) => animation.finished.then(() => undefined).catch(() => undefined)));
 }
 
-export function prefersReducedMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-}
-
 function modeSwapEnterDuration(
   expanded: boolean,
   geometryChanged: boolean,

@@ -9,6 +9,7 @@ import {
   MousePointer2,
   TriangleAlert,
 } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 
 const PERMISSION_COPY: Record<MacPermissionId, { title: string; icon: typeof Monitor }> = {
   "screen-recording": { title: "Screen Recording", icon: Monitor },
@@ -142,8 +143,4 @@ export function ComputerUseSetupSurface() {
       </footer>
     </main>
   );
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }
