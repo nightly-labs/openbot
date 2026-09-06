@@ -107,18 +107,18 @@
       "sourceMode": "openbot-fork",
       "repository": "https://github.com/NorbertBodziony/Sunshine.git",
       "version": "v2026.516.143833",
-      "commit": "f54b1b91d4ecfec83e81dde24de8b90369fc8ff5",
+      "commit": "cde2ca692b9002c2d0a5418c6e077eba02e6c483",
       "upstream": {
         "repository": "https://github.com/LizardByte/Sunshine.git",
         "commit": "14ffa6fdaa53f7b51512be2b3d24f3939695403c"
       },
-      "sourceArchive": "https://github.com/NorbertBodziony/Sunshine/archive/f54b1b91d4ecfec83e81dde24de8b90369fc8ff5.tar.gz",
-      "sourceSha256": "377763178a29f42223d08179ec0df5960324cdf3429749f1010877d9d5d0b248",
+      "sourceArchive": "https://github.com/NorbertBodziony/Sunshine/archive/cde2ca692b9002c2d0a5418c6e077eba02e6c483.tar.gz",
+      "sourceSha256": "55a5df4a75f8c7eb4d7b77dbc6d4312b9f647bbb043b11852d2e9032dce13cc3",
       "license": "GPL-3.0",
       "licenseSha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
       "patch": {
         "path": "vendor/remote-desktop/patches/sunshine-v2026.516.143833-openbot.patch",
-        "sha256": "54aa2942ef0060d8fde6f64943a0371cb131fa81b7e96009916782dc2c735abc"
+        "sha256": "ba2d7bba1f17f1d5f8c054edd3de8a60a7a3f890205f7db1a67d6d3829c4deec"
       },
       "overrides": [],
       "submodules": {
