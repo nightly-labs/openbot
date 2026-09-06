@@ -59,8 +59,9 @@ single most expensive edit available in this directory.
 The split is also enforced by path. `biome.json` gives `src/main`, `src/backend` and `src/preload` a
 `noRestrictedImports` group rejecting `**/renderer/**`, and the renderer the mirror of it, so the
 first import across the boundary fails `bun run lint` with the reason rather than passing review as
-a convenience. `src/main` importing `src/backend` is the one direction left open, and 38 files use
-it. Share a type through `packages/contracts` instead of reaching for the module.
+a convenience. `src/main` importing `src/backend` is the one direction left open, and the handler
+registrations and the Team API server use it. Share a type through `packages/contracts` instead of
+reaching for the module.
 
 ## Waiting in a main-process test
 
