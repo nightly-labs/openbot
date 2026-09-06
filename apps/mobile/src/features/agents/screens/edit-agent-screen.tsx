@@ -1,3 +1,4 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useState } from "react";
@@ -51,11 +52,16 @@ export function EditAgentScreen() {
             autoCapitalize="words"
             autoFocus
             label="Name"
-            maxLength={80}
+            maxLength={INPUT_LIMITS.agentName}
             value={name}
             onChangeText={setName}
           />
-          <SheetFormField label="Role" maxLength={240} value={description} onChangeText={setDescription} />
+          <SheetFormField
+            label="Instructions"
+            maxLength={INPUT_LIMITS.agentDescription}
+            value={description}
+            onChangeText={setDescription}
+          />
           {error ? (
             <Typography.Paragraph align="center" className="text-danger">
               {error}

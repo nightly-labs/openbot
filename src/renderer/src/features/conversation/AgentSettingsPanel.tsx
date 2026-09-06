@@ -663,11 +663,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             />
           </label>
           <label class="agent-settings-field agent-settings-description">
-            <span>Description</span>
+            <span>Instructions</span>
             <Textarea
               rows="4"
               value={draft.fields.description}
-              aria-label="Agent description"
+              aria-label="Agent instructions"
               placeholder="What this agent is for"
               maxlength={INPUT_LIMITS.agentDescription}
               onValueChange={(value) =>
