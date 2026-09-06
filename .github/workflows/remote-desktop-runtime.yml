@@ -473,6 +473,10 @@ jobs:
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             --pattern remote-desktop-runtime-manifest.json --dir "$RUNNER_TEMP/runtime-manifest"
           bun scripts/pin-remote-desktop-runtime.ts "$RUNNER_TEMP/runtime-manifest/remote-desktop-runtime-manifest.json"
+          # `JSON.stringify` puts every array on its own lines and Biome collapses the short ones, so
+          # the pin lands unformatted. A commit is made here with no hook to catch that, and the lock
+          # PR would open with `lint` already red.
+          bunx biome check --write native-runtime.lock.json
           changed="$(git diff --name-only)"
           if [[ -z "$changed" ]]; then
             echo "The runtime lock already pins this immutable release."
