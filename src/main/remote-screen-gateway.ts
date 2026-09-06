@@ -53,6 +53,8 @@ export interface RemoteScreenRuntime {
   start(): Promise<SunshineMoonlightRuntimeState>;
   selectDisplay(displayId: string): Promise<void>;
   stop(): Promise<void>;
+  // Optional: only the real runtime reads the operating system's answer.
+  screenCaptureDenied?(): boolean;
 }
 
 export interface RemoteScreenAuditEvent {
@@ -140,6 +142,16 @@ export class RemoteScreenGateway {
       throw new RemoteScreenError(503, "host_unavailable", "The Sunshine and Moonlight Web runtime is not installed.");
     }
     await this.#ensureRuntime();
+    // The runtime starts and answers either way, so this is the only place the refusal can become a
+    // failure the member sees. Without it the session is created, the stream never starts, and the
+    // viewer sits at "connecting" until the member gives up.
+    if (this.#runtime?.screenCaptureDenied?.()) {
+      throw new RemoteScreenError(
+        503,
+        "host_permissions_required",
+        "The host has not allowed OpenBot to record its screen. Grant screen recording on the host, then try again.",
+      );
+    }
     const id = randomUUID();
     const usedStreamerSlots = new Set([...this.#sessions.values()].map((session) => session.streamerSlot));
     const streamerSlot = [1, 2, 3, 4].find((slot) => !usedStreamerSlots.has(slot));

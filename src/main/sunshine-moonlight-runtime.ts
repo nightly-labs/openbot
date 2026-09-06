@@ -14,6 +14,13 @@ const MOONLIGHT_USER_HEADER = "X-OpenBot-Remote-User";
 const MOONLIGHT_STREAMER_SLOTS = 4;
 const SUNSHINE_HTTPS_PORT = 47_990;
 const SUNSHINE_HTTP_PORT = 47_989;
+// Sunshine keeps running when the operating system refuses it screen capture: it prints this, fails
+// to find a display or an encoder, and then serves its API normally. Nothing else distinguishes a
+// host that will never produce a frame from one that is about to, so watching its own output is what
+// turns a member's session hanging at "connecting" into an error naming what the host owner must do.
+const SUNSHINE_SCREEN_CAPTURE_DENIED = "No screen capture permission";
+// Enough of the previous chunk to keep the marker findable when a read splits it.
+const SUNSHINE_DIAGNOSTIC_OVERLAP = SUNSHINE_SCREEN_CAPTURE_DENIED.length;
 const localAddressSchema = z.object({ address: z.string(), family: z.string(), port: z.number().int() });
 const moonlightHostSchema = z.object({
   host_id: z.number().int(),
@@ -75,6 +82,8 @@ export class SunshineMoonlightRuntime {
   #iceServer: Server | null = null;
   #iceToken = "";
   #state: SunshineMoonlightRuntimeState | null = null;
+  #screenCaptureDenied = false;
+  #sunshineDiagnosticTail = "";
   #selectedDisplayId: string | null = null;
   #starting: Promise<SunshineMoonlightRuntimeState> | null = null;
 
@@ -85,6 +94,11 @@ export class SunshineMoonlightRuntime {
 
   get state(): SunshineMoonlightRuntimeState | null {
     return this.#state ? { ...this.#state } : null;
+  }
+
+  /** Whether Sunshine has said, since it was last started, that it may not record this screen. */
+  screenCaptureDenied(): boolean {
+    return this.#screenCaptureDenied;
   }
 
   async start(): Promise<SunshineMoonlightRuntimeState> {
@@ -244,6 +258,10 @@ export class SunshineMoonlightRuntime {
   }
 
   async #startSunshine(): Promise<void> {
+    // A restart is how a newly granted permission takes effect, so the verdict is this process's
+    // alone -- carrying the previous one over would keep reporting a grant the user has already made.
+    this.#screenCaptureDenied = false;
+    this.#sunshineDiagnosticTail = "";
     this.#sunshine = this.#spawn(this.#options.paths.sunshine, [join(this.#options.stateDirectory, "sunshine.conf")], {
       cwd: dirname(this.#options.paths.sunshine),
       stdio: ["ignore", "pipe", "pipe"],
@@ -434,7 +452,17 @@ export class SunshineMoonlightRuntime {
 
   #pipeDiagnostics(process: ChildProcess, source: "sunshine" | "moonlight"): void {
     for (const stream of [process.stdout, process.stderr]) {
-      stream?.on("data", (chunk) => this.#options.onDiagnostic?.(source, chunk.toString("utf8")));
+      stream?.on("data", (chunk) => {
+        const message = chunk.toString("utf8");
+        if (
+          source === "sunshine" &&
+          `${this.#sunshineDiagnosticTail}${message}`.includes(SUNSHINE_SCREEN_CAPTURE_DENIED)
+        ) {
+          this.#screenCaptureDenied = true;
+        }
+        if (source === "sunshine") this.#sunshineDiagnosticTail = message.slice(-SUNSHINE_DIAGNOSTIC_OVERLAP);
+        this.#options.onDiagnostic?.(source, message);
+      });
     }
   }
 }

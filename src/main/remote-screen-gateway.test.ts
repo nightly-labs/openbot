@@ -66,6 +66,16 @@ describe("RemoteScreenGateway", () => {
     await close();
   });
 
+  it("refuses a session the host may not record, instead of opening one that never shows a frame", async () => {
+    const gateway = createGateway({ screenCaptureDenied: true });
+
+    await expect(createSession(gateway, "https://remote.example")).rejects.toMatchObject({
+      status: 503,
+      code: "host_permissions_required",
+    });
+    expect(gateway.list()).toEqual([]);
+  });
+
   it("limits the host to four active sessions", async () => {
     const gateway = createGateway();
     for (let index = 0; index < 4; index += 1) await createSession(gateway, "https://remote.example");
@@ -285,7 +295,12 @@ describe("RemoteScreenGateway", () => {
 });
 
 function createGateway(
-  options: { now?: () => number; runtimeBaseUrl?: string; selectDisplay?: (displayId: string) => Promise<void> } = {},
+  options: {
+    now?: () => number;
+    runtimeBaseUrl?: string;
+    selectDisplay?: (displayId: string) => Promise<void>;
+    screenCaptureDenied?: boolean;
+  } = {},
 ): RemoteScreenGateway {
   return new RemoteScreenGateway({
     platform: "darwin",
@@ -297,7 +312,7 @@ function createGateway(
     getIceServers: async () => [{ urls: "stun:127.0.0.1:3478" }],
     ...(options.now ? { now: options.now } : {}),
     createRuntime: () => {
-      const runtime = new FakeRuntime(options.runtimeBaseUrl, options.selectDisplay);
+      const runtime = new FakeRuntime(options.runtimeBaseUrl, options.selectDisplay, options.screenCaptureDenied);
       runtimes.push(runtime);
       return runtime;
     },
@@ -326,7 +341,12 @@ class FakeRuntime implements RemoteScreenRuntime {
   constructor(
     private readonly baseUrl = "http://127.0.0.1:9",
     private readonly selectDisplayHandler?: (displayId: string) => Promise<void>,
+    private readonly denied = false,
   ) {}
+
+  screenCaptureDenied() {
+    return this.denied;
+  }
 
   async start() {
     return {
