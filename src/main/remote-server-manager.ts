@@ -942,7 +942,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   async #syncWebRtcHosts(): Promise<void> {
     const transport = this.#webrtcTransport;
     if (!transport) return;
-    const { servers, removedHostIds, pinnedKeys } = reconcileWebRtcHosts({
+    const { servers, removedHostIds, staleTransportHostIds, pinnedKeys } = reconcileWebRtcHosts({
       hosts: await transport.listHosts(),
       servers: this.#store.servers,
       preservedIdentities: this.#store.preservedIdentities,
@@ -956,6 +956,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       await transport.disconnect(serverId).catch(() => undefined);
       this.#clearServerConnectionState(serverId);
     }
+    // Before the store changes, because after it `ensure` answers for the new entry: it branches on
+    // the transport it finds and starts the WebRTC one beside an HTTPS controller it never aborts,
+    // so both would deliver the same events and the socket for an entry that no longer exists could
+    // still mark a healthy host offline. No `disconnect` -- see `staleTransportHostIds`.
+    for (const serverId of staleTransportHostIds) this.#clearServerConnectionState(serverId);
     await this.#store.replaceServers(servers);
   }
 

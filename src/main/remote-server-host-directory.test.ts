@@ -128,7 +128,9 @@ describe("reconcileWebRtcHosts", () => {
   it("treats the directory as the whole answer unless development invites are allowed", () => {
     const https = storedHost("https-server", { apiUrl: "https://api.example.com", transport: undefined });
 
-    expect(reconcile({ servers: [https] }).servers).toEqual([]);
+    const dropped = reconcile({ servers: [https] });
+    expect(dropped.servers).toEqual([]);
+    expect(dropped.staleTransportHostIds).toEqual(["https-server"]);
     expect(reconcile({ servers: [https], keepOtherTransports: true }).servers.map((server) => server.id)).toEqual([
       "https-server",
     ]);
@@ -136,7 +138,9 @@ describe("reconcileWebRtcHosts", () => {
 
   // A developer reaches their own host over HTTPS and then publishes it, and the directory lists it
   // under that same id. Two entries with one id is a list the app cannot act on: disconnecting or
-  // forgetting the server leaves the other copy behind.
+  // forgetting the server leaves the other copy behind. The id surviving is what makes the report
+  // load-bearing -- the HTTPS event stream this entry opened outlives it otherwise, and the caller
+  // has nothing else to notice it by.
   it("lists a host once when it is both stored over HTTPS and published over WebRTC", () => {
     const result = reconcile({
       hosts: [listedHost("host")],
@@ -146,6 +150,8 @@ describe("reconcileWebRtcHosts", () => {
 
     expect(result.servers.map((server) => server.id)).toEqual(["host"]);
     expect(result.servers[0]).toMatchObject({ apiUrl: "webrtc://host", transport: "webrtc-v2" });
+    expect(result.staleTransportHostIds).toEqual(["host"]);
+    expect(result.removedHostIds).toEqual([]);
   });
 
   it("refreshes the name and role the directory reports for a host already stored", () => {
