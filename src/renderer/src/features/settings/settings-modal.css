@@ -61,10 +61,6 @@
   padding: var(--openbot-space-6) var(--openbot-space-4);
 }
 
-.settings-modal-label {
-  padding-inline: var(--openbot-space-2);
-}
-
 .settings-modal-nav {
   display: grid;
   gap: var(--openbot-space-1);
@@ -222,11 +218,6 @@
   display: none;
 }
 
-.settings-modal-group {
-  display: grid;
-  gap: var(--openbot-space-2);
-}
-
 .settings-modal-card:is(.ui-card, .ui-item-group) {
   width: 100%;
   display: grid;
@@ -274,12 +265,6 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--openbot-space-4);
-}
-
-.settings-modal-row-copy {
-  min-width: 0;
-  display: grid;
-  gap: var(--openbot-space-1);
 }
 
 .settings-modal-row-title {
@@ -719,10 +704,6 @@
     border-right: 0;
     border-bottom: 1px solid var(--openbot-border);
     padding: var(--openbot-space-3);
-  }
-
-  .settings-modal-label {
-    display: none;
   }
 
   .settings-modal-nav {

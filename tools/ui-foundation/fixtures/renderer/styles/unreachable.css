@@ -1,0 +1,33 @@
+/* The dead-rule scan, in one file because it reports once per class rather than once per
+   file. Two of these are unreachable and appear in the expected report; the rest are the
+   neighbours it must leave alone, each reached a different way. Their names are spelled
+   nowhere else in this tree - a fixture that mentions a class in a comment makes it
+   reachable, since the scan reads words rather than markup. */
+.unreachable-panel {
+  display: grid;
+}
+
+/* Named by a template-literal id in Reachable.tsx. An id has the same shape as a class
+   family, so honouring a prefix outside a class-building region would spare this. */
+.identifier-panel {
+  display: grid;
+}
+
+.reachable-from-markup {
+  display: grid;
+}
+
+/* Named only by the HTML entry point beside it. */
+.reachable-from-html {
+  display: grid;
+}
+
+/* Covered by `reachable-family-${state}` inside a multi-line class array. */
+.reachable-family-hover {
+  opacity: 1;
+}
+
+/* Covered by the same shape inside a cx() call, which is the other opener. */
+.reachable-from-cx-active {
+  opacity: 1;
+}

@@ -54,6 +54,15 @@ describe("ui foundation check", () => {
         "components/branches/InlineFontSize.tsx: font-size, radius and transition in an inline style must use tokens",
         "components/branches/InlineTransition.tsx: font-size, radius and transition in an inline style must use tokens",
         "components/branches/InlineTransitionDuration.tsx: font-size, radius and transition in an inline style must use tokens",
+        // The dead-rule scan reports once per class, so its whole branch set lives in one
+        // stylesheet. Two lines, and five neighbours that produce none: one named by a plain
+        // class attribute, one named only by preview/preview.html, one covered by a family
+        // prefix inside a multi-line class array, one covered by the same shape inside a
+        // cx() call, and .identifier-panel, which is spared by neither - the template
+        // literal that would cover it is an id, so a prefix taken outside a class-building
+        // region would silently spare every identifier-* rule in the tree.
+        "styles/unreachable.css: .identifier-panel is not reachable from any markup; delete the rule",
+        "styles/unreachable.css: .unreachable-panel is not reachable from any markup; delete the rule",
         budget("hand-rolled composite ARIA roles", 9),
         // Six, one per value form the pattern names: a hex, a named colour, an hsl(), an
         // rgba() and an hsla() in styles/legacy.css, and an rgb() in preview/preview.css.
@@ -99,6 +108,22 @@ describe("ui foundation check", () => {
 
     expect(failures).toEqual([]);
     expect(manualCompositeCount).toBe(0);
+  });
+
+  it("reads markup outside the walked tree for reachability", () => {
+    // The walked root holds the stylesheets; the reachable roots hold the markup that can
+    // name a class, and in the repository they are `src` and `apps` rather than the renderer
+    // alone - src/main injects a class into the picture-in-picture window and apps/auth-api
+    // renders the preview shell. Point reachability at the tree next door and every class in
+    // this one goes dark, including the five the other test proves are reached.
+    const { failures } = checkUiFoundation(fixtureRenderer, fixtureRenderer, [cleanRenderer]);
+
+    expect(failures).toContain(
+      "styles/unreachable.css: .reachable-from-markup is not reachable from any markup; delete the rule",
+    );
+    expect(failures).toContain(
+      "styles/unreachable.css: .reachable-from-html is not reachable from any markup; delete the rule",
+    );
   });
 
   it("labels a failure with a path relative to the root it is given", () => {
