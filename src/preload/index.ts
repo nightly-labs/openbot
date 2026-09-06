@@ -327,13 +327,15 @@ function decodeAccountUsageFromMain(value: unknown): AccountUsage {
   return value;
 }
 
-// Drops what it cannot represent for the same reason as `decodeAgentModelOptions` in the main
-// process, and it is the local half of the same failure: the models the main process lists come from
-// the same provider CLIs, so one id outside `isAgentModel` used to empty this app's own model picker
-// with "Invalid agent model response." rather than hide the single model behind it.
+// Fails closed on a member for the same reason as `decodeAgentModelOptions` in the main process, and
+// it is the local half of the same payload: `isAgentModel` gaining square brackets is what stopped a
+// provider CLI's `claude-fable-5-1[1m]` from emptying this app's own model picker, not a decoder
+// willing to hand the renderer a list shorter than the one the main process sent.
 function decodeAgentModels(value: unknown): AgentModelOption[] {
-  if (!Array.isArray(value)) throw new Error("Invalid agent model response.");
-  return value.filter(isAgentModelOption);
+  if (!Array.isArray(value) || !value.every(isAgentModelOption)) {
+    throw new Error("Invalid agent model response.");
+  }
+  return value;
 }
 
 function decodeAgent(value: unknown): AgentSummary {

@@ -15,11 +15,13 @@ export type AvatarHue = (typeof AVATAR_HUES)[number];
 // 1M-context Fable variant as `claude-fable-5-1[1m]`, and every id this guard sees was minted by a
 // CLI OpenBot does not control. Without them the model was unselectable and, worse, unlistable --
 // `isAgentModelOption` refuses the option, and the list decoders on both the IPC and the Team API
-// side used to refuse the whole array with it, so one such id emptied the model picker locally and
-// took a remote server offline entirely. The set still keeps an id a single opaque token: no
-// whitespace, quotes, control characters or path separators beyond the `/` a provider prefix uses,
-// and nothing downstream builds a filesystem path or a URL out of one -- `/v1/agents/models` takes
-// no model parameter.
+// side fail closed on the whole array with it, so one such id emptied the model picker locally and
+// took a remote server offline entirely. Failing closed is what the contract asks of a malformed
+// known payload and it stays, which leaves this charset as the only thing between a legitimate CLI
+// id and a bricked server -- so an id is a single opaque token here rather than a list of the models
+// this build happens to know: no whitespace, quotes, control characters or path separators beyond
+// the `/` a provider prefix uses, and nothing downstream builds a filesystem path or a URL out of
+// one -- `/v1/agents/models` takes no model parameter.
 export function isAgentModel(value: unknown): value is AgentModelId {
   return isString(value) && value.length > 0 && value.length <= 160 && /^[A-Za-z0-9][A-Za-z0-9._:/[\]-]*$/.test(value);
 }

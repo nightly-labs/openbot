@@ -406,14 +406,14 @@ describe("WebRTC request decoding", () => {
     expect(connections.statusFor("host")).toMatchObject({ state: "error", issue: { code: "protocol_error" } });
   });
 
-  // The one payload that must not fail closed. Model ids are minted by provider CLIs neither end
-  // controls, so a host on a newer CLI can always list an option this build cannot represent --
-  // `claude-fable-5-1[1m]` was the first. Refusing the array over it recorded a `protocol_error`, and
-  // `ensureCompatibility` rethrows a recorded one for every later call without asking the host again:
-  // one unusable model id took agents, browser and remote desktop offline together until an explicit
-  // reconnect. An option that fails the guard could never have been selected, so keeping the rest
-  // costs the user nothing.
-  it("keeps the models it understands when a host lists one it does not", async () => {
+  // A malformed member of a known payload is a `protocol_error`, not a shorter list: the client would
+  // otherwise present a menu the host never offered with nothing recording the disagreement. The
+  // consequence is deliberately severe -- `ensureCompatibility` rethrows the recorded issue for every
+  // later call without asking the host again, so this takes agents, browser and remote desktop
+  // offline together until an explicit reconnect -- which is why `isAgentModel` treats an id as an
+  // opaque token rather than a closed list. `claude-fable-5-1[1m]` reached here only because that
+  // charset had no square brackets; `ipc.test.ts` pins the guard that keeps it out.
+  it("refuses a model list a host cannot have meant", async () => {
     const server = storedHttpsServer("host", { transport: "webrtc-v2", apiUrl: "webrtc://host" });
     const connections = new RemoteServerConnections({
       appVersion: null,
@@ -445,9 +445,8 @@ describe("WebRTC request decoding", () => {
       },
     });
 
-    const models = await client.request("host", TEAM_API_ROUTES.agents.models, decodeAgentModelOptions);
-    expect(models.map((model) => model.id)).toEqual(["claude-sonnet-5"]);
-    expect(connections.statusFor("host").issue).toBeNull();
+    await expect(client.request("host", TEAM_API_ROUTES.agents.models, decodeAgentModelOptions)).rejects.toThrow();
+    expect(connections.statusFor("host")).toMatchObject({ issue: { code: "protocol_error" } });
   });
 });
 
