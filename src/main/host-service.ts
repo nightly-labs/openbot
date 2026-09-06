@@ -560,6 +560,15 @@ export class HostService extends EventEmitter<HostEvents> {
     try {
       authenticated = await this.#options.store.login(username, password);
     } catch {
+      // Publishing this host reconciles its members against the control plane, and the technical
+      // client is never in that list -- it is password-only, owned by no account -- so the
+      // reconciliation disables it. `login` skips a disabled member and `acceptInvite` refuses a
+      // username that already exists, so once the developer had published the host, every later
+      // `bun run dev:test-client` died at startup with "This username is already in use." and only
+      // editing the profile by hand brought it back. Replacing the member is what makes publishing
+      // a state the dev stack can leave: it is a fixture, and nothing outside this file reads it.
+      const existing = this.#options.store.listMembers().find((member) => member.username === username);
+      if (existing && existing.role !== "owner") await this.#options.store.removeMember(existing.id);
       const invite = await this.#options.store.createInvite("member");
       authenticated = await this.#options.store.acceptInvite(invite.token, username, password);
     }
