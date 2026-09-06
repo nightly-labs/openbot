@@ -6,7 +6,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./ed25519": "./src/ed25519.ts",
-    "./remote-peer": "./src/remote-peer.ts"
+    "./remote-directory": "./src/remote-directory.ts",
+    "./remote-peer": "./src/remote-peer.ts",
+    "./remote-recovery": "./src/remote-recovery.ts",
+    "./request-id": "./src/request-id.ts",
+    "./webrtc-framing": "./src/webrtc-framing.ts",
+    "./workspace-preferences": "./src/workspace-preferences.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"

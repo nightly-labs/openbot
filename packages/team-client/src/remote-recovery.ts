@@ -5,7 +5,7 @@ export const REMOTE_RETRY_LIMIT = 5;
 export const REMOTE_RETRY_COOLDOWN_MS = 120_000;
 
 export interface RemoteRecoveryStatus {
-  phase: "connecting" | "waiting" | "cooldown" | "online";
+  phase: "connecting" | "waiting" | "cooldown" | "online" | "suspended";
   attempt: number;
   remainingSeconds: number;
 }
@@ -45,6 +45,7 @@ const SAFE_CONNECTION_ERRORS = new Set([
   "The host sent data before authentication.",
   "The host event stream has a gap.",
   "The host returned a malformed event.",
+  "Signal returned an invalid message.",
   "The saved chat preferences could not be read.",
   "The desktop request timed out.",
   "The remote session is invalid.",
@@ -69,6 +70,8 @@ export function remoteConnectionFailure(stage: RemoteConnectionStage, error: unk
 export function remoteRecoveryMessage(status: RemoteRecoveryStatus, failure?: string | null): string | null {
   if (status.phase === "online") return null;
   const detail = failure ? `\n${failure}` : "";
+  // No countdown, because nothing is scheduled. Retrying is what this phase exists to stop.
+  if (status.phase === "suspended") return `Update OpenBot Mobile or the desktop app before connecting.${detail}`;
   if (status.phase === "cooldown") {
     const minutes = Math.floor(status.remainingSeconds / 60);
     const seconds = String(status.remainingSeconds % 60).padStart(2, "0");
@@ -90,6 +93,7 @@ export function createRemoteConnectionRecovery(
   let active = false;
   let disposed = false;
   let running = false;
+  let suspended = false;
   let retryRequested = false;
   let refreshRequested = false;
   let attempt = 0;
@@ -102,7 +106,7 @@ export function createRemoteConnectionRecovery(
   }
 
   function scheduleRetry() {
-    if (disposed) return;
+    if (disposed || suspended) return;
     retryAt ??= Date.now() + (attempt >= REMOTE_RETRY_LIMIT ? REMOTE_RETRY_COOLDOWN_MS : REMOTE_RETRY_INTERVAL_MS);
     if (!active) return;
     const remaining = Math.max(0, retryAt - Date.now());
@@ -131,7 +135,7 @@ export function createRemoteConnectionRecovery(
   }
 
   async function run() {
-    if (!active || disposed || running) return;
+    if (!active || disposed || running || suspended) return;
     cancelTimer();
     running = true;
     retryRequested = false;
@@ -161,6 +165,11 @@ export function createRemoteConnectionRecovery(
       active = value;
       cancelTimer();
       if (active) {
+        // Coming back to the app is this phone's version of the explicit refresh the desktop asks
+        // for after a protocol error, and it is the exit a user reaches without knowing there is
+        // one: the desktop they left to update is the reason the frame was unreadable. One attempt
+        // per return, not a loop.
+        suspended = false;
         if (running) refreshRequested = true;
         else if (retryAt !== null) scheduleRetry();
         else void run();
@@ -172,7 +181,23 @@ export function createRemoteConnectionRecovery(
       retryRequested = true;
       scheduleRetry();
     },
+    /**
+     * A failure no retry can fix: the two ends disagree about the wire, so the next attempt is told
+     * the same thing. Stops the loop rather than joining it -- `offline` would schedule five
+     * attempts ten seconds apart and then one every two minutes, for as long as the app is open.
+     * Reversible: `refresh`, returning to the foreground, and switching servers each clear it.
+     */
+    suspend(error?: unknown) {
+      if (disposed) return;
+      suspended = true;
+      retryRequested = false;
+      retryAt = null;
+      cancelTimer();
+      if (error !== undefined) onError(error);
+      onStatus({ phase: "suspended", attempt: 0, remainingSeconds: 0 });
+    },
     refresh() {
+      suspended = false;
       if (running) refreshRequested = true;
       else if (retryAt !== null) scheduleRetry();
       else void run();

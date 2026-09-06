@@ -1,4 +1,5 @@
 import type { AvatarImageInput } from "./ipc-agents";
+import type { IceServer } from "./signal-protocol/messages";
 
 // The id every IPC payload carries for "this computer" rather than a remote team server. It is a
 // wire value the main process, the preload bridge and the renderer all compare against, so it lives
@@ -369,11 +370,10 @@ export interface RemoteDesktopDisplay {
   primary: boolean;
 }
 
-export interface RemoteDesktopIceServer {
-  urls: string | string[];
-  username?: string;
-  credential?: string;
-}
+// The ICE servers the Signal service hands a peer, forwarded to the renderer unchanged. It is the
+// same shape by construction rather than by coincidence: this is the IPC-side name for it, kept
+// because it is what every `remoteDesktop:*` payload already spells.
+export type RemoteDesktopIceServer = IceServer;
 
 export interface RemoteDesktopCapabilities {
   ready: boolean;

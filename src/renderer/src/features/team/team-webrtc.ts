@@ -1,6 +1,12 @@
 import { isString } from "@openbot/contracts/runtime-values";
+import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
+import {
+  SIGNAL_PROTOCOL_VERSION,
+  SIGNAL_TURN_REFRESH_INTERVAL_MS,
+  type SignalClientMessage,
+  type SignalServerMessage,
+} from "@openbot/contracts/signal-protocol/messages";
 import { TEAM_PROTOCOL_V2_CHANNELS } from "@openbot/contracts/team-protocol/v2";
-import { z } from "zod";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./team-webrtc-framing";
 
 export interface BridgeCommand {
@@ -14,48 +20,6 @@ export interface BridgeCommand {
   channel?: "rpc" | "events" | "files" | "desktop";
   data?: string | ArrayBuffer;
 }
-
-const iceServerSchema = z.object({
-  urls: z.union([z.string(), z.array(z.string())]),
-  username: z.string().optional(),
-  credential: z.string().optional(),
-});
-const signalMessageSchema = z
-  .object({
-    type: z.string(),
-    version: z.literal(1),
-    connectionId: z.string().nullable().optional(),
-    channel: z.enum(["team", "remote-desktop"]).optional(),
-    sdp: z.string().optional(),
-    candidate: z.string().optional(),
-    sdpMid: z.string().nullable().optional(),
-    sdpMLineIndex: z.number().nullable().optional(),
-    resumeToken: z.string().optional(),
-    iceServers: z.array(iceServerSchema).optional(),
-    code: z.string().optional(),
-    message: z.string().optional(),
-    sessionId: z.string().optional(),
-    userId: z.string().optional(),
-    membershipId: z.string().optional(),
-    role: z.enum(["owner", "admin", "member"]).optional(),
-    sessionExpiresAt: z.number().int().positive().optional(),
-    resumed: z.boolean().optional(),
-  })
-  .loose();
-export type SignalMessage = z.infer<typeof signalMessageSchema>;
-
-type SignalClientMessage =
-  | { type: "offer" | "answer"; version: 1; connectionId: string; channel: "team"; sdp: string }
-  | {
-      type: "ice-candidate";
-      version: 1;
-      connectionId: string;
-      channel: "team";
-      candidate: string;
-      sdpMid: string | null;
-      sdpMLineIndex: number | null;
-    }
-  | { type: "turn-refresh"; version: 1; connectionId: string | null };
 
 interface MainBridgeMessage {
   type: string;
@@ -187,23 +151,31 @@ function connectSignal(state: PeerState): void {
   state.socket = socket;
   socket.addEventListener("open", () => {
     state.reconnectAttempt = 0;
-    socket.send(
-      JSON.stringify({
-        type: "hello",
-        version: 1,
-        peer: state.role,
-        token: state.resumeToken ?? state.token,
-        ...(state.role === "host" ? { multiplex: true } : {}),
-      }),
-    );
+    const hello: SignalClientMessage = {
+      type: "hello",
+      version: SIGNAL_PROTOCOL_VERSION,
+      peer: state.role,
+      token: state.resumeToken ?? state.token,
+      ...(state.role === "host" ? { multiplex: true } : {}),
+    };
+    socket.send(JSON.stringify(hello));
   });
   socket.addEventListener("message", (event) => {
     if (!isString(event.data)) return;
     state.signalChain = state.signalChain
       .then(async () => {
         if (state.closed || state.socket !== socket) return;
-        await handleSignal(state, signalMessageSchema.parse(JSON.parse(event.data)));
+        let message: SignalServerMessage | null;
+        try {
+          message = decodeSignalServerMessage(JSON.parse(event.data));
+        } catch (error) {
+          return failSignalProtocol(state, error);
+        }
+        // A frame type this build does not know is a newer Signal service, not a broken connection.
+        if (message) await handleSignal(state, message);
       })
+      // Only what handling a frame this peer did read can throw -- an ICE or SDP operation the
+      // browser refused. That is a connection failing, which a reconnect can still fix.
       .catch((error) => failPeer(state, error));
   });
   socket.addEventListener("close", (event) => {
@@ -219,13 +191,13 @@ function connectSignal(state: PeerState): void {
   socket.addEventListener("error", () => socket.close());
 }
 
-async function handleSignal(state: PeerState, message: SignalMessage): Promise<void> {
+async function handleSignal(state: PeerState, message: SignalServerMessage): Promise<void> {
   if (message.type === "error") {
     post({
       type: "peer-error",
       peerId: state.id,
-      code: message.code ?? "signal_error",
-      message: message.message ?? "Signal failed.",
+      code: message.code,
+      message: message.message,
     });
     if (
       message.code === "session_revoked" ||
@@ -240,11 +212,13 @@ async function handleSignal(state: PeerState, message: SignalMessage): Promise<v
   }
   if (message.type === "ready") {
     const shouldRestartWithRefreshedTurn = Boolean(
-      message.iceServers && state.role === "client" && state.connectionId && state.peerConnection,
+      state.role === "client" && state.connectionId && state.peerConnection,
     );
-    state.resumeToken = message.resumeToken ?? state.resumeToken;
+    state.resumeToken = message.resumeToken;
+    // Null on the `ready` that answers a TURN refresh: new credentials for the connection already
+    // open, not a new connection.
     state.connectionId = message.connectionId ?? state.connectionId;
-    state.iceServers = message.iceServers ?? state.iceServers;
+    state.iceServers = message.iceServers;
     for (const client of state.clients.values()) {
       client.iceServers = state.iceServers;
       client.peerConnection?.setConfiguration({
@@ -275,7 +249,7 @@ async function handleSignal(state: PeerState, message: SignalMessage): Promise<v
       await connection.setLocalDescription(offer);
       sendSignal(state, {
         type: "offer",
-        version: 1,
+        version: SIGNAL_PROTOCOL_VERSION,
         connectionId: state.connectionId,
         channel: "team",
         sdp: requiredDescriptionSdp(offer),
@@ -283,7 +257,7 @@ async function handleSignal(state: PeerState, message: SignalMessage): Promise<v
     }
     return;
   }
-  if (message.type === "peer-ready" && state.role === "host" && message.connectionId && message.sessionId) {
+  if (message.type === "peer-ready" && state.role === "host") {
     let client = state.clients.get(message.sessionId);
     if (client && !message.resumed) {
       disconnect(client.id);
@@ -350,28 +324,37 @@ async function handleSignal(state: PeerState, message: SignalMessage): Promise<v
     post({ type: "peer-disconnected", peerId: state.id });
     return;
   }
-  if (message.channel !== "team" || !message.connectionId || message.connectionId !== state.connectionId) return;
-  if (message.type === "offer" && message.sdp) {
+  // Everything left is a relayed negotiation frame, and only the team channel's is this peer's.
+  if (
+    message.type !== "offer" &&
+    message.type !== "answer" &&
+    message.type !== "ice-candidate" &&
+    message.type !== "ice-restart"
+  ) {
+    return;
+  }
+  if (message.channel !== "team" || message.connectionId !== state.connectionId) return;
+  if (message.type === "offer") {
     const connection = state.peerConnection ?? createPeerConnection(state, state.iceServers);
     await connection.setRemoteDescription({ type: "offer", sdp: message.sdp });
     const answer = await connection.createAnswer();
     await connection.setLocalDescription(answer);
     sendSignal(state, {
       type: "answer",
-      version: 1,
+      version: SIGNAL_PROTOCOL_VERSION,
       connectionId: message.connectionId,
       channel: "team",
       sdp: requiredDescriptionSdp(answer),
     });
-  } else if (message.type === "answer" && message.sdp) {
+  } else if (message.type === "answer") {
     await state.peerConnection?.setRemoteDescription({ type: "answer", sdp: message.sdp });
-  } else if (message.type === "ice-candidate" && message.candidate) {
+  } else if (message.type === "ice-candidate") {
     await state.peerConnection?.addIceCandidate({
       candidate: message.candidate,
-      sdpMid: message.sdpMid ?? null,
-      sdpMLineIndex: message.sdpMLineIndex ?? null,
+      sdpMid: message.sdpMid,
+      sdpMLineIndex: message.sdpMLineIndex,
     });
-  } else if (message.type === "ice-restart") {
+  } else {
     await restartIce(state);
   }
 }
@@ -387,7 +370,7 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
     if (!event.candidate || !state.connectionId) return;
     sendSignal(state, {
       type: "ice-candidate",
-      version: 1,
+      version: SIGNAL_PROTOCOL_VERSION,
       connectionId: state.connectionId,
       channel: "team",
       candidate: event.candidate.candidate,
@@ -510,7 +493,7 @@ async function restartIce(state: PeerState): Promise<void> {
   await connection.setLocalDescription(offer);
   sendSignal(state, {
     type: "offer",
-    version: 1,
+    version: SIGNAL_PROTOCOL_VERSION,
     connectionId: state.connectionId,
     channel: "team",
     sdp: requiredDescriptionSdp(offer),
@@ -581,11 +564,11 @@ function scheduleTurnRefresh(state: PeerState): void {
     state.turnRefreshTimer = null;
     if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return scheduleTurnRefresh(state);
     try {
-      sendSignal(state, { type: "turn-refresh", version: 1, connectionId: state.connectionId });
+      sendSignal(state, { type: "turn-refresh", version: SIGNAL_PROTOCOL_VERSION, connectionId: state.connectionId });
     } catch {
       scheduleTurnRefresh(state);
     }
-  }, 45 * 60_000);
+  }, SIGNAL_TURN_REFRESH_INTERVAL_MS);
 }
 
 function disconnect(peerId: string): void {
@@ -609,7 +592,12 @@ function disconnect(peerId: string): void {
 function disconnectPeerConnection(state: PeerState): void {
   const socket = (state.signalHost ?? state).socket;
   if (state.connectionId && socket?.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ type: "disconnect", version: 1, connectionId: state.connectionId }));
+    const message: SignalClientMessage = {
+      type: "disconnect",
+      version: SIGNAL_PROTOCOL_VERSION,
+      connectionId: state.connectionId,
+    };
+    socket.send(JSON.stringify(message));
   }
   state.peerConnection?.close();
   state.peerConnection = null;
@@ -617,6 +605,24 @@ function disconnectPeerConnection(state: PeerState): void {
   state.channels = {};
   for (const decoder of Object.values(state.payloadDecoders)) decoder?.reset();
   state.payloadDecoders = {};
+}
+
+// A malformed known frame is where the two ends stop agreeing about the wire, so it is a
+// `protocol_error` rather than a WebRTC failure and the connection does not survive it: this frame
+// was meant to set state the next one builds on, and the service would send the same bytes to a
+// reconnect. `classifyTransportError` suspends reconnection for this code and leaves the server
+// `incompatible`, which is the honest report -- `webrtc_error` reads as `network_unavailable` and
+// retries forever. `disconnect` closes the socket and clears the reconnect timer, and only posts
+// `peer-disconnected` for a child peer; the peer that owns a socket is never one.
+function failSignalProtocol(state: PeerState, error: unknown): void {
+  post({
+    type: "peer-error",
+    peerId: state.id,
+    code: "protocol_error",
+    message: error instanceof Error ? error.message : "Signal sent a frame this peer cannot read.",
+  });
+  disconnect(state.id);
+  post({ type: "peer-disconnected", peerId: state.id });
 }
 
 function failPeer(state: PeerState, error: unknown): void {

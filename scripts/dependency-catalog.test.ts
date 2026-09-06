@@ -162,6 +162,43 @@ describe("remote API Dockerfile", () => {
 
     expect(missing).toEqual([]);
   });
+
+  // A manifest is what the *install* needs. What the running container needs is the code, and these
+  // packages have no build step - every `exports` entry in them points at a raw `./src/*.ts`. So the
+  // symlink `node_modules/@openbot/contracts` that carries over from the install stage resolves into
+  // a directory holding one package.json and nothing to import: the image builds, the install
+  // succeeds, and the service dies on its first import at startup. The assertion above cannot see
+  // that - contracts' manifest has been copied since long before anything depended on it.
+  //
+  // Scoped to what `@openbot/remote-api` itself reaches, not to what the root manifest names: bun
+  // needs the others on disk to resolve the pruned install, but nothing imports them at runtime.
+  it("copies the source of every workspace the running service imports", () => {
+    const directoryOf = new Map(
+      workspaces.map((directory) => [readManifest(`${directory}/package.json`).name, directory]),
+    );
+    const required = new Set<string>();
+    const pending: unknown[] = ["@openbot/remote-api"];
+    while (pending.length > 0) {
+      const name = pending.pop();
+      if (!isString(name) || required.has(name)) continue;
+      required.add(name);
+      const directory = directoryOf.get(name);
+      if (isString(directory)) pending.push(...workspaceDependencies(`${directory}/package.json`));
+    }
+
+    // Only the last stage ships. The install stage copies manifests the runtime image never sees,
+    // and `COPY --from=` moves build output rather than repository source, so neither counts here.
+    const dockerfile = readFileSync(join(repositoryRoot, "remote/api/Dockerfile"), "utf8");
+    const runtimeStage = dockerfile.split(/^FROM .*$/gmu).at(-1) ?? "";
+    const copied = [...runtimeStage.matchAll(/^COPY (?!--from=)(\S+) /gmu)].map((match) => match[1]);
+    const missing = [...required]
+      .map((name) => directoryOf.get(name))
+      .filter(isString)
+      .filter((directory) => !copied.some((source) => source === directory || directory.startsWith(`${source}/`)))
+      .sort();
+
+    expect(missing).toEqual([]);
+  });
 });
 
 // Every field, not just `dependencies`, even though the image installs with

@@ -190,6 +190,7 @@ const ROUTE_METHODS: Record<string, string> = {
   "agent.conversation": "GET",
   "agent.conversationPage": "GET",
   "agent.conversationRead": "POST",
+  "agent.conversationUnread": "POST",
   "agent.messages": "POST",
   "agent.reactions": "POST",
   "agent.interrupt": "POST",
@@ -243,6 +244,9 @@ const ROUTES_WITHOUT_A_CLASSIFIED_JSON_BODY = new Set([
   // that calls either anyway is answered 500 rather than a protocol error - see the PR body.
   "agent.duplicate",
   "agent.usage",
+  // Same reason, one adapter deeper: v3 rewrites this to the `read` path before the v1 codec sees a
+  // body, so v1 classifies `conversation/read` and never this spelling.
+  "agent.conversationUnread",
 ]);
 
 const ROUTE_SAMPLE_IDS = ["route-sample", "route-sample-other"];

@@ -725,6 +725,24 @@ describe("renderer-to-main boundary guards", () => {
     expect(isAgentModelOption({ ...model, supportedReasoningEfforts: ["low", "extreme"] })).toBe(false);
   });
 
+  // The same argument one field over. Every model id is minted by a provider CLI, not by OpenBot, and
+  // the Claude CLI reports its 1M-context Fable variant as `claude-fable-5-1[1m]`. Both list decoders
+  // read this guard, so a charset without square brackets did not just hide that one model — it
+  // emptied the local picker and took a remote server offline for every route.
+  it("accepts a model id in the bracketed form a provider CLI reports", () => {
+    const model = {
+      provider: "claude",
+      id: "claude-fable-5-1[1m]",
+      name: "Fable",
+      description: "Claude model discovered from the local CLI.",
+      defaultReasoningEffort: "high",
+      supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+    };
+    expect(isAgentModelOption(model)).toBe(true);
+    expect(isAgentModelOption({ ...model, id: "claude fable 5" })).toBe(false);
+    expect(isAgentModelOption({ ...model, id: "" })).toBe(false);
+  });
+
   // A model name is a CLI's `displayName`, which nothing bounds, and the released Team v1 adapter
   // accepts 160 — so anything shorter here rejects a whole model list a shipped peer may send.
   it("accepts a model name up to the length the released protocol allows", () => {
