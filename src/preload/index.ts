@@ -327,11 +327,13 @@ function decodeAccountUsageFromMain(value: unknown): AccountUsage {
   return value;
 }
 
+// Drops what it cannot represent for the same reason as `decodeAgentModelOptions` in the main
+// process, and it is the local half of the same failure: the models the main process lists come from
+// the same provider CLIs, so one id outside `isAgentModel` used to empty this app's own model picker
+// with "Invalid agent model response." rather than hide the single model behind it.
 function decodeAgentModels(value: unknown): AgentModelOption[] {
-  if (!Array.isArray(value) || !value.every(isAgentModelOption)) {
-    throw new Error("Invalid agent model response.");
-  }
-  return value;
+  if (!Array.isArray(value)) throw new Error("Invalid agent model response.");
+  return value.filter(isAgentModelOption);
 }
 
 function decodeAgent(value: unknown): AgentSummary {

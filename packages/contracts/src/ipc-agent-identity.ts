@@ -11,8 +11,17 @@ export type AgentReasoningEffort = (typeof AGENT_REASONING_EFFORTS)[number];
 export const AVATAR_HUES = [0, 30, 55, 100, 150, 185, 215, 245, 280, 320] as const;
 export type AvatarHue = (typeof AVATAR_HUES)[number];
 
+// Square brackets are in the set because a provider CLI puts them there: the Claude CLI reports its
+// 1M-context Fable variant as `claude-fable-5-1[1m]`, and every id this guard sees was minted by a
+// CLI OpenBot does not control. Without them the model was unselectable and, worse, unlistable --
+// `isAgentModelOption` refuses the option, and the list decoders on both the IPC and the Team API
+// side used to refuse the whole array with it, so one such id emptied the model picker locally and
+// took a remote server offline entirely. The set still keeps an id a single opaque token: no
+// whitespace, quotes, control characters or path separators beyond the `/` a provider prefix uses,
+// and nothing downstream builds a filesystem path or a URL out of one -- `/v1/agents/models` takes
+// no model parameter.
 export function isAgentModel(value: unknown): value is AgentModelId {
-  return isString(value) && value.length > 0 && value.length <= 160 && /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/.test(value);
+  return isString(value) && value.length > 0 && value.length <= 160 && /^[A-Za-z0-9][A-Za-z0-9._:/[\]-]*$/.test(value);
 }
 
 export function isClaudeModel(model: AgentModelId): boolean {

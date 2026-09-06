@@ -11,6 +11,7 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_CAPABILITIES_HEADER } from "@openbot/contracts/team-protocol/v1";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { decodeAgentModelOptions } from "./remote-agent-decoding";
 import { RemoteServerClient } from "./remote-server-client";
 import { RemoteServerConnections } from "./remote-server-connections";
 import {
@@ -403,6 +404,50 @@ describe("WebRTC request decoding", () => {
 
     await expect(client.probeRemoteDesktop(server)).rejects.toThrow("could not safely use");
     expect(connections.statusFor("host")).toMatchObject({ state: "error", issue: { code: "protocol_error" } });
+  });
+
+  // The one payload that must not fail closed. Model ids are minted by provider CLIs neither end
+  // controls, so a host on a newer CLI can always list an option this build cannot represent --
+  // `claude-fable-5-1[1m]` was the first. Refusing the array over it recorded a `protocol_error`, and
+  // `ensureCompatibility` rethrows a recorded one for every later call without asking the host again:
+  // one unusable model id took agents, browser and remote desktop offline together until an explicit
+  // reconnect. An option that fails the guard could never have been selected, so keeping the rest
+  // costs the user nothing.
+  it("keeps the models it understands when a host lists one it does not", async () => {
+    const server = storedHttpsServer("host", { transport: "webrtc-v2", apiUrl: "webrtc://host" });
+    const connections = new RemoteServerConnections({
+      appVersion: null,
+      onChanged: () => undefined,
+      onReconnectSuspended: () => undefined,
+    });
+    const usable = {
+      provider: "claude",
+      id: "claude-sonnet-5",
+      name: "Sonnet",
+      description: "Balanced Claude model.",
+      defaultReasoningEffort: "high",
+      supportedReasoningEfforts: ["high"],
+    };
+    const client = new RemoteServerClient({
+      appVersion: "0.4.0",
+      servers: { require: () => server, token: () => "token" },
+      connections,
+      transport: {
+        request: async (_hostId, path) => {
+          if (path === TEAM_API_ROUTES.compatibility) {
+            return { appVersion: "0.4.0", protocol: { minimum: 2, maximum: 2 }, capabilities: [] };
+          }
+          return [usable, { ...usable, id: "a model from a newer host" }];
+        },
+        requestResponse: async () => {
+          throw new Error("unused");
+        },
+      },
+    });
+
+    const models = await client.request("host", TEAM_API_ROUTES.agents.models, decodeAgentModelOptions);
+    expect(models.map((model) => model.id)).toEqual(["claude-sonnet-5"]);
+    expect(connections.statusFor("host").issue).toBeNull();
   });
 });
 

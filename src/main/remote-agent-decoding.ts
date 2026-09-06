@@ -116,11 +116,18 @@ export function decodeAccountUsageFromHost(value: unknown): AccountUsage {
   return value;
 }
 
+// The one list here that keeps what it can instead of refusing the lot. A model list is a menu, and
+// its ids come from provider CLIs neither end controls, so a host on a newer CLI can always offer an
+// option this build has no way to represent -- `claude-fable-5-1[1m]` was the first, and only because
+// `isAgentModel` had no square brackets. That is a missing menu item, not a host talking nonsense,
+// and treating it as nonsense cost far more than the item: `ensureCompatibility` records the
+// `protocol_error` and then rethrows it for every later call without touching the network, so one
+// unusable id took the whole server offline -- agents, browser, desktop -- until an explicit
+// reconnect. An entry that fails the guard could not have been selected anyway, so dropping it loses
+// nothing the user could have used. A payload that is not a list at all is still nonsense.
 export function decodeAgentModelOptions(value: unknown): AgentModelOption[] {
-  if (!Array.isArray(value) || !value.every(isAgentModelOption)) {
-    throw new Error("Invalid remote agent models.");
-  }
-  return value;
+  if (!Array.isArray(value)) throw new Error("Invalid remote agent models.");
+  return value.filter(isAgentModelOption);
 }
 
 export function decodeAgentSummaries(value: unknown): AgentSummary[] {
