@@ -38,7 +38,7 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
         userId: identifier(value.userId),
         membershipId: identifier(value.membershipId),
         role: memberRole(value.role),
-        sessionExpiresAt: integer(value.sessionExpiresAt),
+        sessionExpiresAt: timestamp(value.sessionExpiresAt),
         resumed: flag(value.resumed),
       };
     case "error":
@@ -103,6 +103,16 @@ function identifier(value: unknown): string {
 function integer(value: unknown): number {
   if (!isNumber(value) || !Number.isInteger(value)) invalid();
   return value;
+}
+
+// An expiry at or before the epoch dates a session that cannot exist, and it does not stop at this
+// peer: the renderer forwards it to the main process, whose bridge schema requires a positive
+// integer and parses inside the port listener, so a zero arrives there as a throw rather than a
+// refused frame. `sdpMLineIndex` keeps plain `integer` -- zero is the first m-line.
+function timestamp(value: unknown): number {
+  const candidate = integer(value);
+  if (candidate <= 0) invalid();
+  return candidate;
 }
 
 function flag(value: unknown): boolean {
