@@ -9,6 +9,7 @@ on:
       - "scripts/build-remote-desktop-runtime.ts"
       - "scripts/create-remote-desktop-release-manifest.ts"
       - "scripts/install-remote-desktop-runtime.ts"
+      - "scripts/mac-runtime-dylibs.ts"
       - "scripts/native-runtime-lock.ts"
       - "scripts/package-remote-desktop-runtime.ts"
       - "scripts/pin-remote-desktop-runtime.ts"
@@ -24,6 +25,7 @@ on:
       - "scripts/build-remote-desktop-runtime.ts"
       - "scripts/create-remote-desktop-release-manifest.ts"
       - "scripts/install-remote-desktop-runtime.ts"
+      - "scripts/mac-runtime-dylibs.ts"
       - "scripts/native-runtime-lock.ts"
       - "scripts/package-remote-desktop-runtime.ts"
       - "scripts/pin-remote-desktop-runtime.ts"
@@ -74,7 +76,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           changed="$(git diff --name-only "$BASE_SHA" "$GITHUB_SHA")"
-          if printf '%s\n' "$changed" | grep -Eq '^(\.github/workflows/remote-desktop-runtime\.yml|scripts/build-remote-desktop-runtime\.ts|scripts/create-remote-desktop-release-manifest\.ts|scripts/native-runtime-lock\.ts|scripts/package-remote-desktop-runtime\.ts|scripts/remote-desktop-runtime-release\.ts)$'; then
+          if printf '%s\n' "$changed" | grep -Eq '^(\.github/workflows/remote-desktop-runtime\.yml|scripts/build-remote-desktop-runtime\.ts|scripts/create-remote-desktop-release-manifest\.ts|scripts/mac-runtime-dylibs\.ts|scripts/native-runtime-lock\.ts|scripts/package-remote-desktop-runtime\.ts|scripts/remote-desktop-runtime-release\.ts)$'; then
             current="$(jq -r '.remoteDesktop.recipeVersion' native-runtime.lock.json)"
             base="$(git show "$BASE_SHA:native-runtime.lock.json" 2>/dev/null | jq -r '.remoteDesktop.recipeVersion // 0' || echo 0)"
             if (( current <= base )); then
