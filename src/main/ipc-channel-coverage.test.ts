@@ -14,7 +14,8 @@
 //     renderer rather than for IPC_ENDPOINTS, so nothing pairs a method with an endpoint;
 //   - an event is sent from wherever it happens, by any number of call sites, so "every event
 //     channel has a sender" is a property of the source and not of a type;
-//   - the sender check, and the rule that keeps every registration behind it.
+//   - the sender check, the rule that keeps every registration behind it, and the rule that
+//     keeps the wrappers themselves reachable only from the binder.
 //
 // Verification is static because neither side can be imported: src/main/index.ts calls
 // app.setPath, app.enableSandbox and protocol.registerSchemesAsPrivileged at module scope and
@@ -70,6 +71,14 @@ const preloadSources = [PRELOAD_MODULE];
 
 // The one module allowed to touch ipcMain, because it is the sender check.
 const TRUSTED_IPC_MODULE = "src/main/trusted-ipc.ts";
+
+// The one module allowed to name the wrappers, because it is the only one that reads a channel out
+// of the manifest to hand them.
+const BINDER_MODULE = "src/main/ipc/define-ipc-group.ts";
+
+// The wrappers by name. The scan reads names rather than the import path because readSource strips
+// string literals, and a name has to appear to be imported, called, or aliased at all.
+const TRUSTED_WRAPPERS = /\bhandleTrusted(?:WithEvent)?\b/;
 
 // The parameter both wrappers take and pass straight to ipcMain.
 const WRAPPER_CHANNEL_PARAMETER = "channel";
@@ -209,6 +218,26 @@ describe("IPC channel coverage", () => {
       .sort();
 
     expect(raw).toEqual([]);
+  });
+
+  // The wrappers take a `string` channel, because ipcMain does. That is the last way a privileged
+  // handler can exist outside IPC_ENDPOINTS: `handleTrusted("undeclared:channel", …)` compiles, gets
+  // the sender check, and belongs to no group, so neither the coverage assertion in
+  // packages/contracts nor anything above notices it. Keeping the call site in one module is what
+  // closes it - `registerIpcGroup` and `registerIpcGroups` are both handed a group name and read the
+  // channel out of the manifest, so a channel the manifest does not declare has no way in.
+  it("calls the trusted wrappers only from the endpoint binder", () => {
+    // The list below is empty when the rule holds and empty when the pattern stops matching, so the
+    // binder naming them is the fixture that tells the two apart.
+    expect(TRUSTED_WRAPPERS.test(readSource(BINDER_MODULE))).toBe(true);
+
+    const callers = mainSources
+      .filter((file) => file !== BINDER_MODULE && file !== TRUSTED_IPC_MODULE)
+      .filter((file) => TRUSTED_WRAPPERS.test(readSource(file)))
+      .map((file) => `${file} names a trusted wrapper`)
+      .sort();
+
+    expect(callers).toEqual([]);
   });
 
   // Exempting the wrapper module is what makes the assertion above possible, and
