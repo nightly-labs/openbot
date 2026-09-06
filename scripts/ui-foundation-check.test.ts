@@ -57,8 +57,8 @@ describe("ui foundation check", () => {
         // The dead-rule scan reports once per class, so its whole branch set lives in one
         // stylesheet. Two lines, and five neighbours that produce none: one named by a plain
         // class attribute, one named only by preview/preview.html, one covered by a family
-        // prefix inside a multi-line class array, one covered by the same shape inside a
-        // cx() call, and .identifier-panel, which is spared by neither - the template
+        // prefix inside a multi-line class array, and .identifier-panel, which is spared by
+        // neither - the template
         // literal that would cover it is an id, so a prefix taken outside a class-building
         // region would silently spare every identifier-* rule in the tree.
         "styles/unreachable.css: .identifier-panel is not reachable from any markup; delete the rule",

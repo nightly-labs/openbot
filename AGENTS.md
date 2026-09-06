@@ -32,7 +32,8 @@ version and the `.env.keys` `.worktreeinclude` carries across.
 
 Before you call a task done, run the narrowest test for what you touched, then `bun run lint` and
 `bun run typecheck` — plus `bun run check:ui` if you touched `src/renderer`, which scans the whole
-renderer in 60 ms. All three read more than you changed on purpose and none is expensive: `lint` is
+renderer, and `src` and `apps` for the markup that can name a class, in under 200 ms. All three
+read more than you changed on purpose and none is expensive: `lint` is
 `biome check --max-diagnostics=none .` across every file in about six seconds, `typecheck` is eleven
 `tsc` projects in about four. The wide typecheck is the more useful one — a change in
 `packages/contracts` surfaces as an error in `src/renderer` or `src/main`, which a single `tsc -p`
@@ -242,7 +243,14 @@ read the product tree from a test file — so `check:ui` carries that half inste
 at the five the renderer has today. It is a budget rather than a ban because three of the five are
 read by play functions in `src/renderer/stories`, which is sanctioned: a sixth hook has to replace
 one of those, and an accessible role and name is the only other way in. All of it stays available in
-`src/renderer/stories`, where it belongs. Around
+`src/renderer/stories`, where it belongs.
+
+`check:ui` also owns the one renderer surface no compiler reads at all. A CSS rule whose class no
+component, story or HTML entry point names is dead and silent about it, which is how 1,400 lines of
+styling for markup that no longer exists accumulated; the scan reports each such class by name. A
+class a `prefix-${value}` template builds still counts as named, but only where that template sits
+inside a `class={…}` — an `id` built the same way has the same shape, and honouring it there would
+spare every rule sharing that prefix. Around
 focus only `document.activeElement` is rejected: it asserts against the document instead of the
 element the test already holds, and fails with "expected null" rather than naming the control.
 `toHaveFocus()` is encouraged.

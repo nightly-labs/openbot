@@ -26,8 +26,3 @@
 .reachable-family-hover {
   opacity: 1;
 }
-
-/* Covered by the same shape inside a cx() call, which is the other opener. */
-.reachable-from-cx-active {
-  opacity: 1;
-}

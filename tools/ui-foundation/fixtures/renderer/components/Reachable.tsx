@@ -4,10 +4,6 @@
 // and token budgets, and without a reference each would turn up as a dead rule and bury the
 // two lines that scan is actually asserting.
 
-function cx(...classes: string[]): string {
-  return classes.join(" ");
-}
-
 export function Reachable(props: { index: number; state: string }) {
   return (
     <section
@@ -20,7 +16,6 @@ export function Reachable(props: { index: number; state: string }) {
           `reachable-family-${props.state}`,
         ]}
       />
-      <div class={cx("reachable-from-markup", `reachable-from-cx-${props.state}`)} />
     </section>
   );
 }

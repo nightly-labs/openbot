@@ -25,43 +25,37 @@ export interface UiFoundationReport {
 }
 
 /**
- * Every stretch of source that builds a class string: the `class` prop and the `cx()` helper
- * the renderer uses 78 times. Matched by balancing the bracket rather than by
- * reading a line, because the renderer's array form spans several:
+ * Every stretch of source that builds a class string, matched by balancing the brace rather
+ * than by reading a line, because the renderer's array form spans several:
  *
  *     class={[
  *       "remote-desktop-workspace",
  *       `remote-desktop-workspace-${props.platform}`,
  *     ]}
+ *
+ * One opener, because this renderer has one. `className` and the `classList={{…}}` prop are
+ * React and Solid idioms it uses zero times, and the `cx()` helper it uses 78 times is inside
+ * a `class={…}` on all 78 - an opener for it widens no region and no fixture can hold it to
+ * account.
  */
 function classRegions(source: string): string[] {
   const regions: string[] = [];
-  for (const [opener, open, close] of CLASS_REGION_OPENERS) {
-    opener.lastIndex = 0;
-    let match: RegExpExecArray | null = opener.exec(source);
-    while (match !== null) {
-      let depth = 1;
-      let index = match.index + match[0].length;
-      while (index < source.length && depth > 0) {
-        if (source[index] === open) depth += 1;
-        else if (source[index] === close) depth -= 1;
-        index += 1;
-      }
-      regions.push(source.slice(match.index, index));
-      opener.lastIndex = index;
-      match = opener.exec(source);
+  const opener = /class\s*=\s*\{/gu;
+  let match: RegExpExecArray | null = opener.exec(source);
+  while (match !== null) {
+    let depth = 1;
+    let index = match.index + match[0].length;
+    while (index < source.length && depth > 0) {
+      if (source[index] === "{") depth += 1;
+      else if (source[index] === "}") depth -= 1;
+      index += 1;
     }
+    regions.push(source.slice(match.index, index));
+    opener.lastIndex = index;
+    match = opener.exec(source);
   }
   return regions;
 }
-
-// Two spellings, because those are the two this renderer has. `className` and the
-// `classList={{…}}` prop are React and Solid idioms it uses zero times, and an opener that
-// matches nothing is an opener no fixture can hold to account.
-const CLASS_REGION_OPENERS: ReadonlyArray<readonly [RegExp, string, string]> = [
-  [/class\s*=\s*\{/gu, "{", "}"],
-  [/\bcx\(/gu, "(", ")"],
-];
 
 // The prefix of a class family does not have to open the literal:
 // `agent-row-agent-status agent-row-agent-status-${kind}` puts it after a space, so this
