@@ -21,7 +21,7 @@ mock — so the cost of a change is paid by code you cannot edit.
   update-direction tests, and clear UI text.
 - Malformed known payloads fail closed as `protocol_error`. Unknown optional events are ignored.
 
-## One channel list, four hand-written mirrors
+## One channel list, three hand-written mirrors
 
 `src/ipc-channels.ts` declares every channel. Three files mirror it by hand:
 

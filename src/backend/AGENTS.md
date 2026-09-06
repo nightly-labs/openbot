@@ -65,12 +65,13 @@ wrong.
 
 `mailbox-store.ts` is the largest file in this directory, at about 1,700 lines.
 
-The two that used to be larger are both worth copying. `agent-service.ts` was split into eight
-controllers; `openbot-database.ts` was split into nine under `database/`, leaving a ~300-line facade
-that had to keep its class name, instance identity, constructor signature and public surface because
-callers reach past it into `connection` and `dispatch`. The shape in both: one class per file,
-kebab-case, `<Name>Options` + `<Name>`, `readonly #` fields, a constructor that only assigns, and a
-doc comment saying what the class **owns** and that it never imports the facade. No barrel file.
+The two that used to be larger are both worth copying. `agent-service.ts` was split into one
+controller per concern, each injected into the service; `openbot-database.ts` was split into nine
+under `database/`, leaving a ~300-line facade that had to keep its class name, instance identity,
+constructor signature and public surface because callers reach past it into `connection` and
+`dispatch`. The shape in both: one class per file, kebab-case, `<Name>Options` + `<Name>`,
+`readonly #` fields, a constructor that only assigns, and a doc comment saying what the class
+**owns** and that it never imports the facade. No barrel file.
 
 Two rules those controllers depend on and a reader cannot infer. They hold the core object and read
 `.connection` at each use — a cached handle survives `initialize()` and then silently addresses a
