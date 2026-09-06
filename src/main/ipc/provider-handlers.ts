@@ -17,15 +17,13 @@ export function providerIpcHandlers({
 }: ProviderIpcDependencies): Pick<IpcGroupHandlers, "providers" | "providerRuntimes"> {
   return {
     providers: {
-      connectChatGPT: handler(() =>
-        service.connectChatGPT(async (value) => {
+      connectProvider: payloadHandler(parseProviderId, (provider) =>
+        service.connectProvider(provider, async (value) => {
           const url = new URL(value);
           if (url.protocol !== "https:") throw new Error("Only HTTPS ChatGPT login links can open in the browser.");
           await shell.openExternal(url.toString());
         }),
       ),
-      connectClaude: handler(() => service.connectClaude()),
-      connectGrok: handler(() => service.connectGrok()),
       refreshAgentProviders: handler(() => service.refreshProviders()),
     },
     providerRuntimes: {

@@ -366,9 +366,7 @@ export interface OpenBotDesktopApi {
   revealComputerUseHelper: () => Promise<void>;
   closeComputerUsePermissionSetup: () => Promise<void>;
   openExternal: (destination: ExternalDestination) => Promise<void>;
-  connectChatGPT: () => Promise<AgentStatus>;
-  connectClaude: () => Promise<AgentStatus>;
-  connectGrok: () => Promise<AgentStatus>;
+  connectProvider: (provider: AgentProviderId) => Promise<AgentStatus>;
   refreshAgentProviders: () => Promise<AgentStatus>;
   providerRuntimes: ProviderRuntimesDesktopApi;
   openUrl: (url: string) => Promise<void>;

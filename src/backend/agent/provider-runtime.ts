@@ -11,14 +11,7 @@ import { isReasoningEffort } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
-import {
-  type AgentCliInfo,
-  CodexCliError,
-  type CodexCliInfo,
-  resolveClaudeCli,
-  resolveCodexCli,
-  resolveGrokCli,
-} from "./../cli";
+import { type AgentCliInfo, CodexCliError, type CodexCliInfo, resolveCodexCli } from "./../cli";
 import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
@@ -30,7 +23,7 @@ import {
   getArray,
   isRecord,
 } from "./../protocol";
-import { BUILT_IN_PROVIDER_DRIVERS, requireProviderDriver } from "./../provider-drivers";
+import { BUILT_IN_PROVIDER_DRIVERS, type CliLoginCommand, requireProviderDriver } from "./../provider-drivers";
 import { normalizeAccountUsage } from "./account-usage";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
@@ -42,8 +35,6 @@ import {
 import { cleanModelName, providerForAgent, providerLabel } from "./thread-items";
 
 const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
-const CLAUDE_LOGIN_TIMEOUT_MS = 10 * 60_000;
-const GROK_LOGIN_TIMEOUT_MS = 10 * 60_000;
 
 interface PendingCodexLogin {
   client: AgentClient;
@@ -53,7 +44,8 @@ interface PendingCodexLogin {
   completing: boolean;
 }
 
-interface PendingClaudeLogin {
+/** A sign-in that is a CLI process the user completes in a browser the CLI opened. */
+interface PendingCliLogin {
   child: ChildProcess;
   cli: AgentCliInfo;
   task: Promise<void> | null;
@@ -175,9 +167,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #requestTimeoutMs: number;
   readonly #clientFactory: AgentClientFactory | null;
-  readonly #bundledCodexExecutable: string | null | undefined;
-  readonly #bundledClaudeExecutable: string | null | undefined;
-  readonly #bundledGrokExecutable: string | null | undefined;
+  readonly #bundledExecutables: ReadonlyMap<AgentProvider, string | null | undefined>;
   readonly #clients = new Map<AgentProvider, AgentClient>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
   readonly #accounts = new Map<AgentProvider, AccountReadResult["account"]>();
@@ -186,8 +176,7 @@ export class ProviderRuntime implements ProviderPort {
   #status: AgentStatus = structuredClone(INITIAL_STATUS);
   #providerRefresh: Promise<AgentStatus> | null = null;
   #codexLogin: PendingCodexLogin | null = null;
-  #claudeLogin: PendingClaudeLogin | null = null;
-  #grokLogin: PendingClaudeLogin | null = null;
+  readonly #cliLogins = new Map<AgentProvider, PendingCliLogin>();
   #providerActivation = Promise.resolve();
   #preferredProvider: AgentProvider;
   #restartAttempts = 0;
@@ -213,9 +202,11 @@ export class ProviderRuntime implements ProviderPort {
     this.#requestTimeoutMs = options.requestTimeoutMs;
     this.#preferredProvider = options.preferredProvider;
     this.#clientFactory = options.clientFactory;
-    this.#bundledCodexExecutable = options.bundledCodexExecutable;
-    this.#bundledClaudeExecutable = options.bundledClaudeExecutable;
-    this.#bundledGrokExecutable = options.bundledGrokExecutable;
+    this.#bundledExecutables = new Map([
+      ["codex", options.bundledCodexExecutable],
+      ["claude", options.bundledClaudeExecutable],
+      ["grok", options.bundledGrokExecutable],
+    ]);
   }
 
   status(): AgentStatus {
@@ -315,42 +306,25 @@ export class ProviderRuntime implements ProviderPort {
     return this.status();
   }
 
-  async connectChatGPT(openExternal: (url: string) => Promise<void>): Promise<AgentStatus> {
-    const start = this.#providerStarts.get("codex");
+  /**
+   * Signs the user in to one provider. `openExternal` is only reached by Codex, whose login
+   * hands back a URL; the other two open their own browser window from the CLI they spawn.
+   */
+  async connectProvider(provider: AgentProvider, openExternal: (url: string) => Promise<void>): Promise<AgentStatus> {
+    const start = this.#providerStarts.get(provider);
     if (start) await start;
-    if (start && this.#clients.has("codex") && this.#accounts.has("codex")) return this.status();
+    if (start && this.#clients.has(provider) && this.#accounts.has(provider)) return this.status();
     if (this.#providerRefresh || (!start && ["starting", "restarting"].includes(this.#status.phase))) {
       return Promise.resolve(this.status());
     }
-    return this.#runProviderConnectionCommand("codex", async () => {
-      await this.#cancelCodexLogin(null);
-      return this.#startCodexLogin(openExternal);
-    });
-  }
-
-  async connectClaude(): Promise<AgentStatus> {
-    const start = this.#providerStarts.get("claude");
-    if (start) await start;
-    if (start && this.#clients.has("claude") && this.#accounts.has("claude")) return this.status();
-    if (this.#providerRefresh || (!start && ["starting", "restarting"].includes(this.#status.phase))) {
-      return Promise.resolve(this.status());
-    }
-    return this.#runProviderConnectionCommand("claude", async () => {
-      await this.#cancelClaudeLogin(null);
-      return this.#startClaudeLogin();
-    });
-  }
-
-  async connectGrok(): Promise<AgentStatus> {
-    const start = this.#providerStarts.get("grok");
-    if (start) await start;
-    if (start && this.#clients.has("grok") && this.#accounts.has("grok")) return this.status();
-    if (this.#providerRefresh || (!start && ["starting", "restarting"].includes(this.#status.phase))) {
-      return Promise.resolve(this.status());
-    }
-    return this.#runProviderConnectionCommand("grok", async () => {
-      await this.#cancelGrokLogin(null);
-      return this.#startGrokLogin();
+    const cliLogin = requireProviderDriver(provider).cliLogin;
+    return this.#runProviderConnectionCommand(provider, async () => {
+      if (!cliLogin) {
+        await this.#cancelCodexLogin(null);
+        return this.#startCodexLogin(openExternal);
+      }
+      await this.#cancelCliLogin(provider, null);
+      return this.#startCliLogin(provider, cliLogin);
     });
   }
 
@@ -404,13 +378,12 @@ export class ProviderRuntime implements ProviderPort {
     this.#restartTimer = null;
     const pendingLogin = this.#codexLogin;
     this.#codexLogin = null;
-    const claudeLogin = this.#claudeLogin;
-    this.#claudeLogin = null;
-    const grokLogin = this.#grokLogin;
-    this.#grokLogin = null;
+    const cliLogins = [...this.#cliLogins.values()];
+    this.#cliLogins.clear();
     this.#providerConnectionCommands.clear();
-    if (claudeLogin?.child.exitCode === null) claudeLogin.child.kill("SIGTERM");
-    if (grokLogin?.child.exitCode === null) grokLogin.child.kill("SIGTERM");
+    for (const login of cliLogins) {
+      if (login.child.exitCode === null) login.child.kill("SIGTERM");
+    }
     if (pendingLogin) clearTimeout(pendingLogin.timer);
     const clients = [...this.#clients.values(), ...(pendingLogin ? [pendingLogin.client] : [])];
     this.#clients.clear();
@@ -444,17 +417,15 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   async #refreshProviders(): Promise<AgentStatus> {
-    await Promise.all([
-      this.#runProviderConnectionCommand("codex", () => this.#settleCodexLoginForRefresh()),
-      this.#runProviderConnectionCommand("claude", async () => {
-        await this.#cancelClaudeLogin(null);
-        return this.status();
-      }),
-      this.#runProviderConnectionCommand("grok", async () => {
-        await this.#cancelGrokLogin(null);
-        return this.status();
-      }),
-    ]);
+    await Promise.all(
+      BUILT_IN_PROVIDER_DRIVERS.map((driver) =>
+        this.#runProviderConnectionCommand(driver.id, async () => {
+          if (!driver.cliLogin) return this.#settleCodexLoginForRefresh();
+          await this.#cancelCliLogin(driver.id, null);
+          return this.status();
+        }),
+      ),
+    );
 
     const activeClients = [...this.#clients];
     if (activeClients.length > 0) {
@@ -700,133 +671,69 @@ export class ProviderRuntime implements ProviderPort {
     });
   }
 
-  async #startClaudeLogin(): Promise<AgentStatus> {
+  async #startCliLogin(provider: AgentProvider, command: CliLoginCommand): Promise<AgentStatus> {
     let cli: AgentCliInfo | null = null;
-    this.#setProviderConnectionState("claude", "connecting");
+    this.#setProviderConnectionState(provider, "connecting");
 
     try {
-      cli = await resolveClaudeCli({ bundledExecutable: this.#bundledClaudeExecutable });
-      const child = spawn(cli.executable, ["auth", "login", "--claudeai"], {
+      cli = await requireProviderDriver(provider).resolveCli({
+        bundledExecutable: this.#bundledExecutables.get(provider),
+      });
+      const child = spawn(cli.executable, [...command.argv], {
         cwd: process.cwd(),
-        env: {
-          ...process.env,
-          ...(cli.source === "managed" ? { DISABLE_AUTOUPDATER: "1" } : {}),
-        },
+        env: { ...process.env, ...command.env(cli) },
         stdio: "ignore",
         shell: false,
         windowsHide: process.platform === "win32",
       });
-      const pending: PendingClaudeLogin = { child, cli, task: null };
-      this.#claudeLogin = pending;
-      pending.task = waitForSuccessfulProcess(child, CLAUDE_LOGIN_TIMEOUT_MS)
-        .then(() => this.#completeClaudeLogin(pending))
-        .catch((error) => this.#failClaudeLogin(pending, error));
+      const pending: PendingCliLogin = { child, cli, task: null };
+      this.#cliLogins.set(provider, pending);
+      pending.task = waitForSuccessfulProcess(child, command.timeoutMs)
+        .then(() => this.#completeCliLogin(provider, pending))
+        .catch((error) => this.#failCliLogin(provider, pending, error));
       return this.status();
     } catch (error) {
-      this.#setProviderConnectionFailure("claude", error, cli?.version);
+      this.#setProviderConnectionFailure(provider, error, cli?.version);
       throw error;
     }
   }
 
-  async #completeClaudeLogin(pending: PendingClaudeLogin): Promise<void> {
-    if (this.#claudeLogin !== pending) return;
+  async #completeCliLogin(provider: AgentProvider, pending: PendingCliLogin): Promise<void> {
+    if (this.#cliLogins.get(provider) !== pending) return;
     try {
-      const candidate = await this.#createAuthenticatedProviderClient("claude", pending.cli);
-      if (this.#claudeLogin !== pending) {
+      const candidate = await this.#createAuthenticatedProviderClient(provider, pending.cli);
+      if (this.#cliLogins.get(provider) !== pending) {
         await candidate.client.stop().catch(() => undefined);
         return;
       }
       await this.#activateProviderClient(
-        "claude",
+        provider,
         candidate.client,
         pending.cli,
         candidate.account,
-        () => this.#claudeLogin === pending,
+        () => this.#cliLogins.get(provider) === pending,
       );
-      if (this.#claudeLogin === pending) this.#claudeLogin = null;
+      if (this.#cliLogins.get(provider) === pending) this.#cliLogins.delete(provider);
     } catch (error) {
-      await this.#failClaudeLogin(pending, error);
+      await this.#failCliLogin(provider, pending, error);
     }
   }
 
-  async #failClaudeLogin(pending: PendingClaudeLogin, error: unknown): Promise<void> {
-    if (this.#claudeLogin !== pending) return;
-    this.#claudeLogin = null;
+  async #failCliLogin(provider: AgentProvider, pending: PendingCliLogin, error: unknown): Promise<void> {
+    if (this.#cliLogins.get(provider) !== pending) return;
+    this.#cliLogins.delete(provider);
     if (pending.child.exitCode === null) pending.child.kill("SIGTERM");
-    this.#setProviderConnectionFailure("claude", error, pending.cli.version);
+    this.#setProviderConnectionFailure(provider, error, pending.cli.version);
   }
 
-  async #cancelClaudeLogin(message: string | null): Promise<void> {
-    const pending = this.#claudeLogin;
+  async #cancelCliLogin(provider: AgentProvider, message: string | null): Promise<void> {
+    const pending = this.#cliLogins.get(provider);
     if (!pending) return;
-    this.#claudeLogin = null;
+    this.#cliLogins.delete(provider);
     if (pending.child.exitCode === null) pending.child.kill("SIGTERM");
     await pending.task?.catch(() => undefined);
-    if (message) this.#setProviderConnectionFailure("claude", new Error(message), pending.cli.version);
-    else this.#clearProviderConnectionState("claude");
-  }
-
-  async #startGrokLogin(): Promise<AgentStatus> {
-    let cli: AgentCliInfo | null = null;
-    this.#setProviderConnectionState("grok", "connecting");
-
-    try {
-      cli = await resolveGrokCli({ bundledExecutable: this.#bundledGrokExecutable });
-      const child = spawn(cli.executable, ["--no-auto-update", "login"], {
-        cwd: process.cwd(),
-        env: { ...process.env, GROK_OAUTH2_REFERRER: "openbot" },
-        stdio: "ignore",
-        shell: false,
-        windowsHide: process.platform === "win32",
-      });
-      const pending: PendingClaudeLogin = { child, cli, task: null };
-      this.#grokLogin = pending;
-      pending.task = waitForSuccessfulProcess(child, GROK_LOGIN_TIMEOUT_MS)
-        .then(() => this.#completeGrokLogin(pending))
-        .catch((error) => this.#failGrokLogin(pending, error));
-      return this.status();
-    } catch (error) {
-      this.#setProviderConnectionFailure("grok", error, cli?.version);
-      throw error;
-    }
-  }
-
-  async #completeGrokLogin(pending: PendingClaudeLogin): Promise<void> {
-    if (this.#grokLogin !== pending) return;
-    try {
-      const candidate = await this.#createAuthenticatedProviderClient("grok", pending.cli);
-      if (this.#grokLogin !== pending) {
-        await candidate.client.stop().catch(() => undefined);
-        return;
-      }
-      await this.#activateProviderClient(
-        "grok",
-        candidate.client,
-        pending.cli,
-        candidate.account,
-        () => this.#grokLogin === pending,
-      );
-      if (this.#grokLogin === pending) this.#grokLogin = null;
-    } catch (error) {
-      await this.#failGrokLogin(pending, error);
-    }
-  }
-
-  async #failGrokLogin(pending: PendingClaudeLogin, error: unknown): Promise<void> {
-    if (this.#grokLogin !== pending) return;
-    this.#grokLogin = null;
-    if (pending.child.exitCode === null) pending.child.kill("SIGTERM");
-    this.#setProviderConnectionFailure("grok", error, pending.cli.version);
-  }
-
-  async #cancelGrokLogin(message: string | null): Promise<void> {
-    const pending = this.#grokLogin;
-    if (!pending) return;
-    this.#grokLogin = null;
-    if (pending.child.exitCode === null) pending.child.kill("SIGTERM");
-    await pending.task?.catch(() => undefined);
-    if (message) this.#setProviderConnectionFailure("grok", new Error(message), pending.cli.version);
-    else this.#clearProviderConnectionState("grok");
+    if (message) this.#setProviderConnectionFailure(provider, new Error(message), pending.cli.version);
+    else this.#clearProviderConnectionState(provider);
   }
 
   async #startCodexLogin(openExternal: (url: string) => Promise<void>): Promise<AgentStatus> {
@@ -835,7 +742,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#setProviderConnectionState("codex", "connecting");
 
     try {
-      cli = await resolveCodexCli({ bundledExecutable: this.#bundledCodexExecutable });
+      cli = await resolveCodexCli({ bundledExecutable: this.#bundledExecutables.get("codex") });
       client = this.#clientFactory
         ? this.#clientFactory("codex", cli)
         : new CodexAppServerClient(cli.executable, this.#requestTimeoutMs);
@@ -991,12 +898,7 @@ export class ProviderRuntime implements ProviderPort {
         let client: AgentClient | null = null;
         let cli: AgentCliInfo | null = null;
         try {
-          cli =
-            provider === "codex"
-              ? await resolveCodexCli({ bundledExecutable: this.#bundledCodexExecutable })
-              : provider === "claude"
-                ? await resolveClaudeCli({ bundledExecutable: this.#bundledClaudeExecutable })
-                : await resolveGrokCli({ bundledExecutable: this.#bundledGrokExecutable });
+          cli = await driver.resolveCli({ bundledExecutable: this.#bundledExecutables.get(provider) });
           client = this.#clientFactory
             ? this.#clientFactory(provider, cli)
             : driver.createClient(cli, this.#requestTimeoutMs);

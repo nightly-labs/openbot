@@ -52,15 +52,18 @@ describe("OpenBot connected desktop shell", () => {
       fullAccess: true,
     };
     vi.mocked(window.openbot.agent.getStatus).mockResolvedValueOnce(disconnectedStatus);
-    const bothConnecting: AgentStatus = {
-      ...disconnectedStatus,
-      providers: disconnectedStatus.providers?.map((provider) => ({
-        ...provider,
-        connectionState: "connecting" as const,
-      })),
-    };
-    vi.mocked(window.openbot.connectChatGPT).mockResolvedValue(bothConnecting);
-    vi.mocked(window.openbot.connectClaude).mockResolvedValue(bothConnecting);
+    // One channel for all three, so the mock has to remember which providers it has already been
+    // asked for: each call marks its own provider connecting and leaves the earlier ones connecting.
+    const connecting = new Set<string>();
+    vi.mocked(window.openbot.connectProvider).mockImplementation(async (provider) => {
+      connecting.add(provider);
+      return {
+        ...disconnectedStatus,
+        providers: disconnectedStatus.providers?.map((entry) =>
+          connecting.has(entry.id) ? { ...entry, connectionState: "connecting" as const } : entry,
+        ),
+      };
+    });
     vi.mocked(window.openbot.refreshAgentProviders).mockResolvedValueOnce({
       ...disconnectedStatus,
       phase: "ready",
@@ -79,14 +82,14 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
 
     await fireEvent.click(await screen.findByRole("button", { name: "Connect Grok" }));
-    expect(window.openbot.connectGrok).toHaveBeenCalledTimes(1);
+    expect(window.openbot.connectProvider).toHaveBeenCalledWith("grok");
     expect(screen.getByRole("button", { name: "Restart Grok" })).toBeEnabled();
     await fireEvent.click(screen.getByRole("button", { name: "Connect ChatGPT" }));
-    await fireEvent.click(screen.getByRole("button", { name: "Restart Claude" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Connect Claude" }));
     expect(screen.getByRole("button", { name: "Restart ChatGPT" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Restart Claude" })).toBeEnabled();
-    expect(window.openbot.connectChatGPT).toHaveBeenCalledTimes(1);
-    expect(window.openbot.connectClaude).toHaveBeenCalledTimes(1);
+    expect(window.openbot.connectProvider).toHaveBeenCalledWith("codex");
+    expect(window.openbot.connectProvider).toHaveBeenCalledWith("claude");
     expect(trackAnalytics).toHaveBeenCalledWith("provider_action", {
       provider: "codex",
       action: "connect_started",
@@ -99,7 +102,7 @@ describe("OpenBot connected desktop shell", () => {
     });
 
     await fireEvent.click(screen.getByRole("button", { name: "Restart ChatGPT" }));
-    expect(window.openbot.connectChatGPT).toHaveBeenCalledTimes(2);
+    expect(window.openbot.connectProvider).toHaveBeenCalledTimes(4);
     emitAgentEvent?.({
       type: "status",
       status: {
@@ -193,7 +196,7 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
     const connectChatGPT = screen.getByRole("button", { name: "Connect ChatGPT" });
     await fireEvent.click(connectChatGPT);
-    expect(window.openbot.connectChatGPT).toHaveBeenCalledTimes(1);
+    expect(window.openbot.connectProvider).toHaveBeenCalledWith("codex");
     expect(screen.getByRole("button", { name: "Restart ChatGPT" })).toBeEnabled();
   });
 
@@ -243,7 +246,7 @@ describe("OpenBot connected desktop shell", () => {
       message: "Install a provider.",
       fullAccess: true,
     });
-    vi.mocked(window.openbot.connectChatGPT).mockRejectedValueOnce(new Error("Raw IPC failure"));
+    vi.mocked(window.openbot.connectProvider).mockRejectedValueOnce(new Error("Raw IPC failure"));
     render(() => <App />);
 
     await fireEvent.click(await screen.findByRole("button", { name: "Connect ChatGPT" }));

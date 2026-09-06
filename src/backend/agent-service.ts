@@ -717,16 +717,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.refreshProvider(provider);
   }
 
-  connectChatGPT(openExternal: (url: string) => Promise<void>): Promise<AgentStatus> {
-    return this.#providers.connectChatGPT(openExternal);
-  }
-
-  connectClaude(): Promise<AgentStatus> {
-    return this.#providers.connectClaude();
-  }
-
-  connectGrok(): Promise<AgentStatus> {
-    return this.#providers.connectGrok();
+  connectProvider(provider: AgentProvider, openExternal: (url: string) => Promise<void>): Promise<AgentStatus> {
+    return this.#providers.connectProvider(provider, openExternal);
   }
 
   async stop(): Promise<void> {

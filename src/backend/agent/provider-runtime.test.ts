@@ -109,7 +109,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(service.getStatus().providers).toContainEqual(
       expect.objectContaining({ id: "codex", state: "sign-in-required" }),
     );
-    const connecting = await service.connectChatGPT(openExternal);
+    const connecting = await service.connectProvider("codex", openExternal);
 
     expect(connecting.providers).toContainEqual(
       expect.objectContaining({
@@ -131,7 +131,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       },
     });
 
-    await service.connectChatGPT(openExternal);
+    await service.connectProvider("codex", openExternal);
     expect(openExternal).toHaveBeenCalledTimes(2);
     expect(codexClients).toHaveLength(3);
     expect(codexClients[1]?.requests).toContainEqual({
@@ -155,39 +155,36 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   });
 
   it.each([
-    { target: "claude", connect: "connectClaude", pathVariable: "OPENBOT_CLAUDE_PATH", createCli: createFakeClaude },
-    { target: "grok", connect: "connectGrok", pathVariable: "OPENBOT_GROK_PATH", createCli: createFakeGrok },
-  ] as const)(
-    "connects $target through the bundled CLI login command",
-    async ({ target, connect, pathVariable, createCli }) => {
-      process.env[pathVariable] = await createCli(root);
-      const { store, mailbox } = stores(root);
-      let clients = 0;
-      service = new AgentService(store, mailbox, fakeBrowser(), 30_000, target, (provider) => {
-        const authenticated = provider === target ? clients > 0 : true;
-        if (provider === target) clients += 1;
-        return new FakeAgentClient(provider, "DONE", true, authenticated);
-      });
-      await service.initialize();
+    { target: "claude", pathVariable: "OPENBOT_CLAUDE_PATH", createCli: createFakeClaude },
+    { target: "grok", pathVariable: "OPENBOT_GROK_PATH", createCli: createFakeGrok },
+  ] as const)("connects $target through the bundled CLI login command", async ({ target, pathVariable, createCli }) => {
+    process.env[pathVariable] = await createCli(root);
+    const { store, mailbox } = stores(root);
+    let clients = 0;
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, target, (provider) => {
+      const authenticated = provider === target ? clients > 0 : true;
+      if (provider === target) clients += 1;
+      return new FakeAgentClient(provider, "DONE", true, authenticated);
+    });
+    await service.initialize();
 
-      expect(service.getStatus().providers).toContainEqual(
-        expect.objectContaining({ id: target, state: "sign-in-required" }),
-      );
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: target, state: "sign-in-required" }),
+    );
 
-      const connecting = await service[connect]();
+    const connecting = await service.connectProvider(target, async () => undefined);
 
-      expect(connecting.providers).toContainEqual(
-        expect.objectContaining({ id: target, state: "sign-in-required", connectionState: "connecting" }),
-      );
-      await waitFor(() => clients === 2);
-      await waitFor(
-        () => service?.getStatus().providers?.find((provider) => provider.id === target)?.state === "available",
-      );
-      expect(service.getStatus().providers).toContainEqual(
-        expect.objectContaining({ id: target, state: "available", email: `${target}@example.com` }),
-      );
-    },
-  );
+    expect(connecting.providers).toContainEqual(
+      expect.objectContaining({ id: target, state: "sign-in-required", connectionState: "connecting" }),
+    );
+    await waitFor(() => clients === 2);
+    await waitFor(
+      () => service?.getStatus().providers?.find((provider) => provider.id === target)?.state === "available",
+    );
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: target, state: "available", email: `${target}@example.com` }),
+    );
+  });
 
   it("restores the connect action when the login page cannot open", async () => {
     const { store, mailbox } = stores(root);
@@ -201,9 +198,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
     await service.initialize();
 
-    await expect(service.connectChatGPT(async () => Promise.reject(new Error("browser failed")))).rejects.toThrow(
-      "could not open",
-    );
+    await expect(
+      service.connectProvider("codex", async () => Promise.reject(new Error("browser failed"))),
+    ).rejects.toThrow("could not open");
     expect(service.getStatus().providers).toContainEqual(
       expect.objectContaining({ id: "codex", state: "sign-in-required" }),
     );
@@ -219,7 +216,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     });
     await service.initialize();
     vi.useFakeTimers();
-    await service.connectChatGPT(async () => undefined);
+    await service.connectProvider("codex", async () => undefined);
 
     await vi.advanceTimersByTimeAsync(10 * 60_000);
 
@@ -249,7 +246,10 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     });
     await service.initialize();
 
-    await Promise.all([service.connectChatGPT(async () => undefined), service.connectClaude()]);
+    await Promise.all([
+      service.connectProvider("codex", async () => undefined),
+      service.connectProvider("claude", async () => undefined),
+    ]);
     expect(service.getStatus().providers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: "codex", connectionState: "connecting" }),
@@ -258,7 +258,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
     await waitFor(async () => (await readTextOrEmpty(claudeLoginLog)).includes("started"));
 
-    await service.connectClaude();
+    await service.connectProvider("claude", async () => undefined);
     await waitFor(async () => {
       const log = await readTextOrEmpty(claudeLoginLog);
       return log.match(/^started$/gmu)?.length === 2 && log.includes("stopped");
@@ -304,7 +304,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     await service.initialize();
     const activeClient = codexClients[0];
 
-    await service.connectChatGPT(async () => undefined);
+    await service.connectProvider("codex", async () => undefined);
     expect(service.getStatus().providers).toContainEqual(
       expect.objectContaining({ id: "codex", state: "available", connectionState: "connecting" }),
     );
@@ -315,7 +315,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       expect.objectContaining({ id: "codex", state: "available", message: expect.stringContaining("not completed") }),
     );
 
-    await service.connectChatGPT(async () => undefined);
+    await service.connectProvider("codex", async () => undefined);
     codexClients[2]?.completeLogin(true);
     await waitFor(
       () =>

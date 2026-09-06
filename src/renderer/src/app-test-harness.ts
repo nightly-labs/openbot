@@ -1,5 +1,7 @@
 import type {
   AgentEvent,
+  AgentProviderId,
+  AgentStatus,
   AgentSummary,
   AttachmentImportEvent,
   BrowserPictureInPictureEvent,
@@ -30,6 +32,46 @@ function installAnalyticsSpies(): void {
   vi.spyOn(desktopAnalytics, "scope").mockImplementation(() => ({ track: trackScopedAnalytics }));
   vi.spyOn(desktopAnalytics, "anonymousScope").mockImplementation(() => ({ track: trackScopedAnalytics }));
 }
+const CONNECTING_STATUS: Record<AgentProviderId, AgentStatus> = {
+  codex: {
+    phase: "blocked",
+    cliVersion: "0.149.1",
+    auth: { kind: "unknown" },
+    providers: [
+      { id: "codex", state: "sign-in-required", connectionState: "connecting", version: "0.149.1", message: null },
+      { id: "claude", state: "sign-in-required", version: "2.1.246", message: null },
+    ],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  },
+  claude: {
+    phase: "blocked",
+    cliVersion: "2.1.246",
+    auth: { kind: "unknown" },
+    providers: [
+      { id: "codex", state: "sign-in-required", version: "0.149.1", message: null },
+      { id: "claude", state: "sign-in-required", connectionState: "connecting", version: "2.1.246", message: null },
+    ],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  },
+  grok: {
+    phase: "blocked",
+    cliVersion: "1.0.5",
+    auth: { kind: "unknown" },
+    providers: [
+      { id: "codex", state: "sign-in-required", version: "0.149.1", message: null },
+      { id: "claude", state: "sign-in-required", version: "2.1.246", message: null },
+      { id: "grok", state: "sign-in-required", connectionState: "connecting", version: "1.0.5", message: null },
+    ],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  },
+};
+
 const defaultMatchMedia = window.matchMedia;
 
 export let emitAgentEvent: ((event: AgentEvent) => void) | undefined;
@@ -385,61 +427,9 @@ export function installOpenbotStub(): void {
       revealComputerUseHelper: vi.fn().mockResolvedValue(undefined),
       closeComputerUsePermissionSetup: vi.fn().mockResolvedValue(undefined),
       openExternal: vi.fn().mockResolvedValue(undefined),
-      connectChatGPT: vi.fn().mockResolvedValue({
-        phase: "blocked",
-        cliVersion: "0.149.1",
-        auth: { kind: "unknown" },
-        providers: [
-          {
-            id: "codex",
-            state: "sign-in-required",
-            connectionState: "connecting",
-            version: "0.149.1",
-            message: null,
-          },
-          { id: "claude", state: "sign-in-required", version: "2.1.246", message: null },
-        ],
-        capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
-        message: null,
-        fullAccess: true,
-      }),
-      connectClaude: vi.fn().mockResolvedValue({
-        phase: "blocked",
-        cliVersion: "2.1.246",
-        auth: { kind: "unknown" },
-        providers: [
-          { id: "codex", state: "sign-in-required", version: "0.149.1", message: null },
-          {
-            id: "claude",
-            state: "sign-in-required",
-            connectionState: "connecting",
-            version: "2.1.246",
-            message: null,
-          },
-        ],
-        capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
-        message: null,
-        fullAccess: true,
-      }),
-      connectGrok: vi.fn().mockResolvedValue({
-        phase: "blocked",
-        cliVersion: "1.0.5",
-        auth: { kind: "unknown" },
-        providers: [
-          { id: "codex", state: "sign-in-required", version: "0.149.1", message: null },
-          { id: "claude", state: "sign-in-required", version: "2.1.246", message: null },
-          {
-            id: "grok",
-            state: "sign-in-required",
-            connectionState: "connecting",
-            version: "1.0.5",
-            message: null,
-          },
-        ],
-        capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
-        message: null,
-        fullAccess: true,
-      }),
+      // One channel, so the mock has to answer for whichever provider the caller names:
+      // each response marks that provider connecting and reports its own CLI version.
+      connectProvider: vi.fn(async (provider: AgentProviderId) => CONNECTING_STATUS[provider]),
       refreshAgentProviders: vi.fn().mockResolvedValue({
         phase: "ready",
         cliVersion: "0.144.1",

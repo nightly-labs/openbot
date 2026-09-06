@@ -436,9 +436,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     revealComputerUseHelper: async () => undefined,
     closeComputerUsePermissionSetup: async () => undefined,
     openExternal: async () => undefined,
-    connectChatGPT: async () => clone(agentStatus),
-    connectClaude: async () => clone(agentStatus),
-    connectGrok: async () => clone(agentStatus),
+    connectProvider: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
     providerRuntimes: {
       getStatus: async () => ({

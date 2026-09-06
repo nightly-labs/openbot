@@ -203,9 +203,7 @@ function AppSettings(props: AccountProps) {
     providerRuntimeDownloadsAvailable,
     downloadProviderRuntime,
     cancelProviderRuntimeDownload,
-    connectChatGPT,
-    connectClaude,
-    connectGrok,
+    connectProvider,
   } = useProviders();
   /** Provider downloads are the local machine's business, never a remote host's. */
   const localProviderDownloads = createMemo(
@@ -234,12 +232,7 @@ function AppSettings(props: AccountProps) {
         providerRuntimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
         onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
         onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
-        onConnectProvider={
-          localProviderDownloads()
-            ? (provider) =>
-                provider === "codex" ? connectChatGPT() : provider === "claude" ? connectClaude() : connectGrok()
-            : undefined
-        }
+        onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
         hostedSitesApi={window.openbot.hostedSites}
         restoreFocusTarget={appSettingsRestoreTarget()}
       />

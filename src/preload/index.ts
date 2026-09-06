@@ -749,9 +749,7 @@ const openbotApi: OpenBotDesktopApi = {
   closeComputerUsePermissionSetup: () =>
     ipcRenderer.invoke(IPC_CHANNELS.computerUseCloseMacPermissionSetup).then(decodeVoid),
   openExternal: (destination) => ipcRenderer.invoke(IPC_CHANNELS.openExternal, destination),
-  connectChatGPT: () => ipcRenderer.invoke(IPC_CHANNELS.connectChatGPT),
-  connectClaude: () => ipcRenderer.invoke(IPC_CHANNELS.connectClaude),
-  connectGrok: () => ipcRenderer.invoke(IPC_CHANNELS.connectGrok),
+  connectProvider: (provider) => ipcRenderer.invoke(IPC_CHANNELS.connectProvider, provider),
   refreshAgentProviders: () => ipcRenderer.invoke(IPC_CHANNELS.refreshAgentProviders),
   providerRuntimes: {
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.providerRuntimesGetStatus).then(decodeProviderRuntimeSnapshot),

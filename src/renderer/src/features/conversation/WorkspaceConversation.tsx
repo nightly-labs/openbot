@@ -36,9 +36,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     providerRuntimeDownloadsAvailable,
     downloadProviderRuntime,
     cancelProviderRuntimeDownload,
-    connectChatGPT,
-    connectClaude,
-    connectGrok,
+    connectProvider,
   } = useProviders();
   const { agentStatus, agentList, activeAgent, modelOptions, settingsRequest, updateAgent, setAgentAvatar } =
     useAgents();
@@ -110,12 +108,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       providerRuntimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
       onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
       onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
-      onConnectProvider={
-        localProviderDownloads()
-          ? (provider) =>
-              provider === "codex" ? connectChatGPT() : provider === "claude" ? connectClaude() : connectGrok()
-          : undefined
-      }
+      onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
       agent={activeAgent()}
       agents={agentList()}
       availableRoutineIds={activeRoutineIds()}
