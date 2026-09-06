@@ -46,9 +46,7 @@ export const IPC_ENDPOINTS = {
     exportDiagnostics: request(IPC_CHANNELS.maintenanceExportDiagnostics),
   },
   providers: {
-    connectChatGPT: request(IPC_CHANNELS.connectChatGPT),
-    connectClaude: request(IPC_CHANNELS.connectClaude),
-    connectGrok: request(IPC_CHANNELS.connectGrok),
+    connectProvider: request(IPC_CHANNELS.connectProvider),
     refreshAgentProviders: request(IPC_CHANNELS.refreshAgentProviders),
   },
   providerRuntimes: {

@@ -5,6 +5,9 @@ import { createOpenBotLogger } from "@openbot/logging";
 
 function filesUnder(directory: string): string[] {
   return readdirSync(directory).flatMap((entry) => {
+    // The reachable roots below are whole workspaces, and every one of them symlinks a
+    // node_modules that statSync follows straight into the hoisted install.
+    if (entry === "node_modules") return [];
     const path = resolve(directory, entry);
     return statSync(path).isDirectory() ? filesUnder(path) : [path];
   });
@@ -22,6 +25,44 @@ export interface UiFoundationReport {
 }
 
 /**
+ * Every stretch of source that builds a class string, matched by balancing the brace rather
+ * than by reading a line, because the renderer's array form spans several:
+ *
+ *     class={[
+ *       "remote-desktop-workspace",
+ *       `remote-desktop-workspace-${props.platform}`,
+ *     ]}
+ *
+ * One opener, because this renderer has one. `className` and the `classList={{…}}` prop are
+ * React and Solid idioms it uses zero times, and the `cx()` helper it uses 78 times is inside
+ * a `class={…}` on all 78 - an opener for it widens no region and no fixture can hold it to
+ * account.
+ */
+function classRegions(source: string): string[] {
+  const regions: string[] = [];
+  const opener = /class\s*=\s*\{/gu;
+  let match: RegExpExecArray | null = opener.exec(source);
+  while (match !== null) {
+    let depth = 1;
+    let index = match.index + match[0].length;
+    while (index < source.length && depth > 0) {
+      if (source[index] === "{") depth += 1;
+      else if (source[index] === "}") depth -= 1;
+      index += 1;
+    }
+    regions.push(source.slice(match.index, index));
+    opener.lastIndex = index;
+    match = opener.exec(source);
+  }
+  return regions;
+}
+
+// The prefix of a class family does not have to open the literal:
+// `agent-row-agent-status agent-row-agent-status-${kind}` puts it after a space, so this
+// anchors on the backtick or the whitespace that starts the class name instead.
+const CLASS_FAMILY_PREFIX = /[`\s]([a-zA-Z][a-zA-Z0-9_-]*-)\$\{/gu;
+
+/**
  * Reads a renderer tree and reports every design-system violation in it. Paths in
  * `failures` are relative to `labelRoot`, which the CLI sets to the repository root
  * so a message can be pasted straight into an editor.
@@ -29,8 +70,44 @@ export interface UiFoundationReport {
  * Takes its roots as arguments rather than resolving them, so the fixture trees in
  * `tools/ui-foundation/fixtures` can prove each check still matches something. Two
  * of these checks silently matched nothing for months.
+ *
+ * `reachableRoots` is where markup that can name a class lives, and it is wider than
+ * `rendererRoot` in both directions. The renderer's four `.html` entry points and its
+ * `stories/` tree sit beside `src/` rather than inside it, and a class can be named from
+ * outside the renderer altogether: `src/main` injects one into a picture-in-picture window
+ * and `apps/auth-api` renders the preview shell. So the CLI passes `src` and `apps` whole,
+ * rather than a list of the three directories that happen to do it today.
  */
-export function checkUiFoundation(rendererRoot: string, labelRoot: string): UiFoundationReport {
+/**
+ * The class names a stylesheet declares, read from selector preludes alone. A bare `.name` scan
+ * over the whole file cannot tell a selector from `url("sprite.svg")` or from a comment naming a
+ * rule that was deleted, and either one fails the check for a class nothing ever declared.
+ */
+function declaredClasses(source: string): Set<string> {
+  const names = new Set<string>();
+  const withoutComments = source.replaceAll(/\/\*.*?\*\//gsu, " ");
+  let start = 0;
+  for (let index = 0; index < withoutComments.length; index += 1) {
+    const char = withoutComments[index];
+    // A prelude ends at its block. `;` and `}` end a declaration or a block instead, so
+    // whatever was collecting is a value or the tail of a rule and never a selector.
+    if (char === "{") {
+      for (const match of withoutComments.slice(start, index).matchAll(/\.(-?[a-zA-Z][a-zA-Z0-9_-]*)/gu)) {
+        names.add(match[1]);
+      }
+      start = index + 1;
+    } else if (char === "}" || char === ";") {
+      start = index + 1;
+    }
+  }
+  return names;
+}
+
+export function checkUiFoundation(
+  rendererRoot: string,
+  labelRoot: string,
+  reachableRoots: readonly string[] = [rendererRoot],
+): UiFoundationReport {
   const uiRoot = resolve(rendererRoot, "components/ui");
   // Compared with a separator appended, or components/ui-kit and components/uiLegacy read
   // as being inside the design system and every check below skips them silently.
@@ -109,10 +186,32 @@ export function checkUiFoundation(rendererRoot: string, labelRoot: string): UiFo
   // to the components it dresses would have left the budget the same silent way.
   // The whole renderer tree is the scope, so a new stylesheet is covered by
   // existing there rather than by being listed.
-  const legacyStyles = filesUnder(rendererRoot)
-    .filter((path) => path.endsWith(".css"))
-    .map((path) => readFileSync(path, "utf8"))
-    .join("\n");
+  const styleSheets = filesUnder(rendererRoot).filter((path) => path.endsWith(".css"));
+  const legacyStyles = styleSheets.map((path) => readFileSync(path, "utf8")).join("\n");
+
+  // CSS is the one renderer surface no compiler reads, so a rule outlives the markup it
+  // dressed in silence. A class counts as reachable when its name appears as a word in any
+  // component, story or HTML entry point, or when a `prefix-${value}` family covers it. The
+  // family prefixes are taken from class-building regions alone: `id={`remote-${index}`}` has
+  // the same shape as a class family, and honouring it there would hide every `remote-*` rule.
+  const markup = reachableRoots.flatMap(filesUnder).filter((path) => /\.(?:tsx?|html)$/u.test(path));
+  const named = new Set<string>();
+  const families: string[] = [];
+  for (const path of markup) {
+    const source = readFileSync(path, "utf8");
+    for (const word of source.matchAll(/[a-zA-Z][a-zA-Z0-9_-]*/gu)) named.add(word[0]);
+    for (const region of classRegions(source)) {
+      for (const prefix of region.matchAll(CLASS_FAMILY_PREFIX)) families.push(prefix[1]);
+    }
+  }
+  for (const path of styleSheets) {
+    const declared = declaredClasses(readFileSync(path, "utf8"));
+    for (const name of [...declared].sort()) {
+      if (named.has(name)) continue;
+      if (families.some((prefix) => name.startsWith(prefix) && name.length > prefix.length)) continue;
+      failures.push(`${relative(labelRoot, path)}: .${name} is not reachable from any markup; delete the rule`);
+    }
+  }
   const colorLiteralCount =
     matches(legacyStyles, /#[\da-f]{3,8}|rgba?\([^)]*\)|hsla?\([^)]*\)/giu) +
     matches(legacyStyles, /(?<![-\w])(?:white|black|red|blue|green|yellow|purple|orange|gray|grey|pink)(?![-\w])/giu);
@@ -150,7 +249,10 @@ export function checkUiFoundation(rendererRoot: string, labelRoot: string): UiFo
 if (import.meta.main) {
   const logger = createOpenBotLogger("ui-foundation-check");
   const projectRoot = fileURLToPath(new URL("..", import.meta.url));
-  const { failures, manualCompositeCount } = checkUiFoundation(resolve(projectRoot, "src/renderer/src"), projectRoot);
+  const { failures, manualCompositeCount } = checkUiFoundation(resolve(projectRoot, "src/renderer/src"), projectRoot, [
+    resolve(projectRoot, "src"),
+    resolve(projectRoot, "apps"),
+  ]);
 
   if (failures.length > 0) {
     logger.error(`UI foundation check failed:\n- ${failures.join("\n- ")}`);

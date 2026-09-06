@@ -757,21 +757,6 @@
   height: 100%;
 }
 
-.ui-select-label {
-  padding: var(--openbot-space-1-5) var(--openbot-space-2);
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  font-weight: var(--openbot-weight-medium);
-  line-height: var(--openbot-leading-xs);
-}
-
-.ui-select-separator {
-  height: 1px;
-  margin: var(--openbot-space-1) calc(var(--openbot-space-1) * -1);
-  border: 0;
-  background: var(--openbot-border);
-}
-
 @keyframes ui-select-content-in {
   from {
     opacity: 0;

@@ -880,7 +880,6 @@
 }
 
 .browser-tab:hover,
-.browser-tab-active,
 .browser-tab[data-selected] {
   background: var(--openbot-border);
   color: var(--openbot-white);
@@ -898,7 +897,6 @@
   color: var(--openbot-accent-text);
 }
 
-.browser-tab-controlled .browser-tab-active,
 .browser-tab-controlled .browser-tab[data-selected] {
   background: var(--openbot-accent-soft);
   box-shadow:
@@ -1036,14 +1034,6 @@
 
 .browser-address-bar input:focus-visible {
   outline: none;
-}
-
-.browser-menu-dots {
-  display: block;
-  margin-top: -5px;
-  letter-spacing: 1px;
-  font-size: var(--openbot-text-md);
-  line-height: 13px;
 }
 
 .browser-surface {
@@ -1330,19 +1320,6 @@
   padding: 12px 15px 28px;
 }
 
-.agent-routines-list-header {
-  display: flex;
-  min-height: 28px;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
-
-.agent-routines-list-header > span {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-}
-
 .agent-routines-list,
 .agent-routine-run-list {
   display: grid;
@@ -1399,10 +1376,7 @@
   font-size: var(--openbot-text-sm);
 }
 
-.agent-routine-editor-back > svg,
-.agent-routine-action-buttons svg,
-.agent-routine-add-trigger > svg,
-.agent-routine-trigger-heading button svg {
+.agent-routine-action-buttons svg {
   width: 15px;
   height: 15px;
 }
@@ -1435,42 +1409,6 @@
   }
 }
 
-.agent-routine-add-trigger {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  margin-top: 12px;
-  border: 1px solid var(--openbot-border-strong);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-control);
-  padding: 9px 11px;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-md);
-  font-weight: 600;
-}
-
-.agent-routine-add-trigger:hover:not(:disabled) {
-  background: var(--openbot-bg-control-hover);
-}
-
-.agent-routine-editor-back {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: -3px 0 14px;
-  border: 0;
-  background: transparent;
-  padding: 4px 2px;
-  color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-sm);
-}
-
-.agent-routine-editor-back:hover {
-  color: var(--openbot-text-primary);
-}
-
 .agent-routine-editor-actions {
   display: grid;
   gap: 11px;
@@ -1482,7 +1420,6 @@
 .agent-routine-active-toggle,
 .agent-routine-action-buttons,
 .agent-routine-inline-fields,
-.agent-routine-trigger-heading,
 .agent-routine-run-row {
   display: flex;
   align-items: center;
@@ -1529,58 +1466,11 @@
   color: var(--openbot-text-primary);
 }
 
-.agent-routine-action-buttons .agent-routine-delete,
-.agent-routine-action-buttons .agent-routine-delete-confirm {
-  color: var(--openbot-danger);
-}
-
 .agent-routine-when,
 .agent-routine-history {
   margin-top: 24px;
 }
 
-.agent-routine-triggers {
-  display: grid;
-  gap: 10px;
-  margin-top: 11px;
-}
-
-.agent-routine-trigger-editor {
-  display: grid;
-  gap: 10px;
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
-  background: var(--openbot-bg-surface);
-  padding: 10px;
-}
-
-.agent-routine-trigger-heading {
-  gap: 7px;
-}
-
-.agent-routine-trigger-heading > .agent-routine-select {
-  min-width: 0;
-  flex: 1;
-}
-
-.agent-routine-trigger-heading button {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 0;
-  border-radius: var(--openbot-radius-sm);
-  background: transparent;
-  color: var(--openbot-text-muted);
-}
-
-.agent-routine-trigger-heading button:hover {
-  background: var(--openbot-bg-control-hover);
-  color: var(--openbot-danger);
-}
-
-.agent-routine-trigger-editor label,
 .agent-routine-field {
   display: grid;
   min-width: 0;
@@ -1631,32 +1521,6 @@
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-xs);
   font-style: normal;
-}
-
-.agent-routine-run-status {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-muted);
-}
-
-.agent-routine-run-status-running,
-.agent-routine-run-status-queued {
-  background: var(--openbot-accent);
-}
-
-.agent-routine-run-status-needs-attention {
-  background: var(--openbot-warning);
-}
-
-.agent-routine-run-status-succeeded {
-  background: var(--openbot-success);
-}
-
-.agent-routine-run-status-failed,
-.agent-routine-run-status-interrupted,
-.agent-routine-run-status-cancelled {
-  background: var(--openbot-danger);
 }
 
 .agent-routines-overlay {
@@ -2449,136 +2313,6 @@
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-xs);
   line-height: 15px;
-}
-
-.agent-picker-root {
-  position: relative;
-  z-index: 12;
-  display: flex;
-  width: 100%;
-  height: 38px;
-  align-items: center;
-}
-
-.agent-recipient-field {
-  display: flex;
-  width: 100%;
-  height: 38px;
-  align-items: center;
-  gap: 4px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
-  line-height: 18px;
-}
-
-.agent-recipient-field > span {
-  flex: 0 0 auto;
-  padding-left: 4px;
-}
-
-.agent-recipient-field input {
-  min-width: 0;
-  height: 100%;
-  flex: 1;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--openbot-text-primary);
-  caret-color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-md);
-}
-
-.agent-recipient-field input::placeholder {
-  color: var(--openbot-text-muted);
-}
-
-.agent-recipient-field input:focus-visible {
-  outline: 0;
-  box-shadow: none;
-}
-
-.agent-picker-menu {
-  position: absolute;
-  right: 0;
-  left: 0;
-  max-height: min(282px, calc(100vh - 144px));
-  overflow-y: auto;
-  border: 0.5px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
-  background: var(--openbot-bg-control);
-  padding: 6px;
-  box-shadow:
-    0 16px 38px var(--openbot-shadow-popover-ambient),
-    0 2px 8px var(--openbot-shadow-popover-ambient);
-  transform-origin: top center;
-  animation: agent-picker-in var(--openbot-duration-normal) cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  scrollbar-width: none;
-}
-
-.agent-picker-menu::-webkit-scrollbar {
-  display: none;
-}
-
-.agent-picker-option {
-  display: flex;
-  width: 100%;
-  height: 37px;
-  align-items: center;
-  gap: 10px;
-  border: 0;
-  border-radius: var(--openbot-radius-md);
-  background: transparent;
-  padding: 4px 9px;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-md);
-  line-height: 18px;
-  text-align: left;
-  transition:
-    background var(--openbot-duration-hover) ease,
-    color var(--openbot-duration-hover) ease,
-    opacity var(--openbot-duration-hover) ease;
-}
-
-.agent-picker-option:hover {
-  background: var(--openbot-hover);
-  color: var(--openbot-white);
-}
-
-.agent-picker-option-active {
-  background: var(--openbot-hover);
-  color: var(--openbot-white);
-}
-
-.agent-picker-option:disabled {
-  cursor: wait;
-  opacity: 0.55;
-}
-
-.agent-picker-option .agent-avatar {
-  --agent-avatar-optical-offset: -2px;
-
-  width: 24px;
-  height: 24px;
-}
-
-.agent-picker-create {
-  margin-bottom: 1px;
-}
-
-.agent-picker-plus {
-  display: grid;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-hover);
-  color: var(--openbot-text-secondary);
-}
-
-.agent-picker-plus svg {
-  width: 14px;
-  height: 14px;
 }
 
 .conversation-title {
@@ -5762,8 +5496,7 @@ button.chat-action-target:active,
   }
 }
 
-.message-status,
-.done-label {
+.message-status {
   display: block;
   color: var(--openbot-text-muted);
   font-family: inherit;
@@ -5777,11 +5510,6 @@ button.chat-action-target:active,
 
 [data-slot="bubble"][data-author="user"] .message-status {
   color: var(--openbot-bg-overlay);
-}
-
-.done-label {
-  flex: 0 0 auto;
-  margin-left: 12px;
 }
 
 .attachment-file-visual {
@@ -5807,13 +5535,6 @@ button.chat-action-target:active,
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.45;
-}
-
-.file-icon {
-  width: 17px;
-  height: 17px;
-  flex: 0 0 auto;
-  color: var(--openbot-text-secondary);
 }
 
 .choice-card {
@@ -5853,7 +5574,6 @@ button.chat-action-target:active,
   line-height: 17px;
 }
 
-.choice-dismiss,
 .media-close {
   display: grid;
   width: 22px;
@@ -5866,7 +5586,6 @@ button.chat-action-target:active,
   color: var(--openbot-text-muted);
 }
 
-.choice-dismiss:hover,
 .media-close:hover {
   background: var(--openbot-border);
   color: var(--openbot-white);
@@ -7207,12 +6926,10 @@ button.chat-action-target:active,
   .agent-activity-entry,
   .agent-activity-content,
   .agent-activity-avatar,
-  .agent-activity-dots i,
   .agent-row-thinking-dots i,
   .agent-row-agent-status-responded,
   .agent-row-agent-status-unread,
   .agent-settings-panel,
-  .agent-picker-menu,
   .thinking-summary,
   .thinking-chevron,
   .thinking-panel {
@@ -7294,28 +7011,6 @@ button.chat-action-target:active,
   background: color-mix(in srgb, var(--danger) 10%, transparent);
   color: var(--openbot-danger);
   font-size: var(--openbot-text-xs);
-}
-
-.onboarding-message {
-  display: grid;
-  width: 100%;
-  max-width: 560px;
-  gap: 12px;
-  margin-top: 0;
-  padding-top: 4px;
-}
-
-.onboarding-model-picker {
-  width: max-content;
-}
-
-.onboarding-model-picker .provider-model-popover {
-  right: auto;
-  left: 0;
-}
-
-.onboarding-specialty-step {
-  width: 100%;
 }
 
 .agent-setup-card {
@@ -8221,12 +7916,6 @@ button.chat-action-target:active,
   line-height: 16px;
 }
 
-.approval-card-empty {
-  margin: 0;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-}
-
 @keyframes approval-card-in {
   from {
     opacity: 0;
@@ -8370,18 +8059,6 @@ button.chat-action-target:active,
   color: var(--openbot-accent-hover);
 }
 
-.remote-text-button-danger:hover:not(:disabled),
-.remote-remove-confirmation button.danger {
-  color: var(--openbot-danger);
-}
-
-.remote-remove-confirmation,
-.remote-remove-confirmation button.danger {
-  background: var(--openbot-danger-soft);
-}
-
-.remote-primary-button:active:not(:disabled),
-.remote-secondary-button:active:not(:disabled),
 .voice-button:active,
 .voice-button-active:active {
   transform: scale(0.97);

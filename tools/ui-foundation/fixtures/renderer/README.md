@@ -16,6 +16,13 @@ includes it. Treat every file as data read by the test.
 `components/ui-kit` is not a typo: it is the neighbour that proves skipping the design system
 compares a path prefix against a separator rather than against `components/ui` alone.
 
+`styles/unreachable.css` and its neighbours are the one check here that reports per class rather than
+per file, so every branch of it fits in a single stylesheet: the classes that must be reported, and
+beside them one reached from a class attribute, one reached only from `preview/preview.html`, and one
+reached only by a `prefix-${value}` family inside a multi-line class array. Their names appear nowhere
+else in this tree on purpose — the scan reads words, so naming a class in a comment would make it
+reachable and quietly retire the branch.
+
 Adding a check to the script means adding the file that trips it here, beside the neighbour it must
 ignore. If the check reports once per file rather than once per occurrence, that neighbour cannot live
 here — the violation would account for the failure either way — so it goes in `../renderer-clean`.

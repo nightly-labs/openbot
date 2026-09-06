@@ -716,12 +716,6 @@
   color: var(--openbot-text-dim);
 }
 
-.setup-remote-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
 .setup-remote-note {
   margin: -2px 1px 0;
   color: var(--openbot-text-muted);
@@ -1081,10 +1075,6 @@
     height: 42px;
   }
 
-  .setup-remote-fields {
-    grid-template-columns: 1fr;
-  }
-
   .initial-setup-account {
     max-width: 55vw;
   }
@@ -1287,10 +1277,6 @@ body,
 .agent-settings-panel,
 .browser-panel,
 .remote-desktop-workspace,
-.remote-admin-nav,
-.remote-admin-list > div,
-.remote-status-card,
-.remote-session-list article,
 .provider-picker-list {
   border-color: var(--openbot-border);
 }
@@ -1302,8 +1288,6 @@ body,
 .agent-settings-field input,
 .agent-settings-field textarea,
 .agent-settings-field select,
-.remote-field input,
-.remote-field textarea,
 .setup-remote-form input,
 .setup-remote-form textarea,
 .account-login-form input {
@@ -1319,8 +1303,6 @@ body,
 .agent-settings-field input:focus,
 .agent-settings-field textarea:focus,
 .agent-settings-field select:focus,
-.remote-field input:focus,
-.remote-field textarea:focus,
 .setup-remote-form input:focus,
 .setup-remote-form textarea:focus,
 .account-login-form input:focus {
@@ -1334,8 +1316,6 @@ body,
 .direct-composer textarea::placeholder,
 .agent-settings-field input::placeholder,
 .agent-settings-field textarea::placeholder,
-.remote-field input::placeholder,
-.remote-field textarea::placeholder,
 .setup-remote-form input::placeholder,
 .setup-remote-form textarea::placeholder,
 .account-login-form input::placeholder {
@@ -1344,11 +1324,7 @@ body,
 
 .provider-picker-option-selected,
 .provider-model-option-selected,
-.remote-admin-nav-button.active,
-.remote-invite-tabs button.active,
-.settings-switch-on,
-.browser-tab-controlled .browser-tab,
-.browser-tab-controlled .browser-tab-active {
+.browser-tab-controlled .browser-tab {
   border-color: var(--openbot-border-focus);
   background: var(--openbot-accent-soft);
   color: var(--openbot-text-primary);
@@ -1357,9 +1333,7 @@ body,
 .choice-options,
 .choice-option,
 .provider-picker-option,
-.provider-model-option,
-.remote-role-select select,
-.remote-role-badge {
+.provider-model-option {
   border-color: var(--openbot-border);
   background: var(--openbot-bg-control);
   color: var(--openbot-text-secondary);
@@ -1378,8 +1352,7 @@ body,
 .voice-button,
 .voice-button-active,
 .initial-setup-save,
-.account-login-primary,
-.remote-primary-button {
+.account-login-primary {
   background: var(--openbot-surface-light);
   color: var(--openbot-text-on-light);
 }
@@ -1387,14 +1360,12 @@ body,
 .voice-button:hover,
 .voice-button-active:hover,
 .initial-setup-save:hover:not(:disabled),
-.account-login-primary:hover:not(:disabled),
-.remote-primary-button:hover:not(:disabled) {
+.account-login-primary:hover:not(:disabled) {
   background: var(--openbot-text-primary);
   color: var(--openbot-text-on-light);
 }
 
 .remote-desktop-overlay > button,
-.remote-secondary-button,
 .agent-setup-card button,
 .remote-desktop-overlay > button:hover {
   border-color: var(--openbot-border-strong);
@@ -1403,7 +1374,6 @@ body,
 }
 
 .remote-desktop-overlay > button:hover,
-.remote-secondary-button:hover:not(:disabled),
 .agent-setup-card button:hover {
   background: var(--openbot-bg-control-active);
 }
@@ -1411,7 +1381,6 @@ body,
 .account-login-error,
 .initial-setup-error,
 .composer-error,
-.remote-dialog-error,
 .account-popover-error {
   border-color: var(--openbot-danger-soft);
   background: var(--openbot-danger-soft);
@@ -1420,8 +1389,6 @@ body,
 
 .setup-route-button,
 .setup-route-icon,
-.remote-field input,
-.remote-field textarea,
 .setup-remote-form input,
 .setup-remote-form textarea {
   border-color: var(--openbot-border);
@@ -1435,16 +1402,12 @@ body,
 }
 
 .setup-route-icon-local i,
-.provider-picker-status-available i,
-.remote-admin-status-pill.online,
-.remote-status-card i.online,
-.remote-session-phase-connected {
+.provider-picker-status-available i {
   color: var(--openbot-success);
 }
 
 .account-login-development-code,
 .provider-picker-status-sign-in-required i,
-.provider-picker-status-outdated i,
-.remote-session-phase-error {
+.provider-picker-status-outdated i {
   color: var(--openbot-warning);
 }

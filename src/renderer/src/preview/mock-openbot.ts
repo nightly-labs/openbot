@@ -5,6 +5,7 @@ import type {
   AgentMemory,
   AgentModelOption,
   AgentStatus,
+  AgentSubmission,
   AgentSummary,
   AnalyticsPreference,
   AppInfo,
@@ -28,7 +29,9 @@ import type {
   DirectTypingRealtimeEvent,
   DynamicIslandPreference,
   DynamicIslandPresentation,
+  HostedSiteSummary,
   HostStatus,
+  InstalledSkill,
   InviteSummary,
   JoinServerInput,
   OpenAttachmentInput,
@@ -42,6 +45,7 @@ import type {
   RespondToPromptInput,
   Routine,
   RoutineRun,
+  RoutineSchedule,
   SendDirectMessageInput,
   SendMessageInput,
   ServerSummary,
@@ -49,6 +53,7 @@ import type {
   SetMessageReactionInput,
   SetTeamTypingInput,
   SidebarLayoutSnapshot,
+  SkillSubmission,
   SteerQueuedMessageInput,
   TeamInviteSummary,
   TeamMemberSummary,
@@ -67,6 +72,7 @@ import {
 import browserTakeoverPreviewUrl from "../../stories/assets/browser-takeover-preview.svg";
 import {
   STORY_AGENT_STATUS,
+  STORY_AGENT_SUBMISSIONS,
   STORY_AGENT_SUMMARIES,
   STORY_APP_INFO,
   STORY_BROWSER_CONTROL,
@@ -74,12 +80,20 @@ import {
   STORY_DIRECT_SNAPSHOTS,
   STORY_DIRECT_THREADS,
   STORY_HOST_STATUS,
+  STORY_HOSTED_SITES,
+  STORY_INSTALLED_SKILLS,
   STORY_INVITES,
+  STORY_MARKETPLACE_AGENT_DETAILS,
+  STORY_MARKETPLACE_AGENTS,
+  STORY_MARKETPLACE_SKILL_DETAILS,
+  STORY_MARKETPLACE_SKILLS,
   STORY_MODELS,
   STORY_PRESENCE,
   STORY_REMOTE_DESKTOP_SESSION,
   STORY_SERVERS,
   STORY_SESSIONS,
+  STORY_SKILL_PACKAGE_PREVIEW,
+  STORY_SKILL_SUBMISSIONS,
   STORY_SNAPSHOTS,
   STORY_TEAM_MEMBERS,
   STORY_UPDATE_STATUS,
@@ -223,6 +237,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const usageTarget = agents[0];
   const usageTargetKey = usageTarget ? `${usageTarget.provider}:${usageTarget.model}` : null;
   let agentCounter = agents.length;
+  const marketplaceSkills = clone(STORY_MARKETPLACE_SKILLS);
+  let skillSubmissions = clone(STORY_SKILL_SUBMISSIONS);
+  const installedSkills = new Map(Object.entries(clone(STORY_INSTALLED_SKILLS)));
+  let hostedSites = clone(STORY_HOSTED_SITES);
+  let marketplaceAgentSubmissions = clone(STORY_AGENT_SUBMISSIONS);
   let messageCounter = 10;
   let directMessageCounter = 10;
 
@@ -387,6 +406,45 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       avatarSeed: input.avatarSeed ?? id,
       avatarHue: input.avatarHue ?? null,
       avatarUrl: input.avatarUrl ?? null,
+      ...(input.marketplaceSource ? { marketplaceSource: input.marketplaceSource } : {}),
+    };
+  }
+
+  function matchesQuery(text: string, query: string | undefined): boolean {
+    return !query || text.toLowerCase().includes(query.toLowerCase());
+  }
+
+  function readInstalledSkills(agentId: string): InstalledSkill[] {
+    return installedSkills.get(agentId) ?? [];
+  }
+
+  function createRoutineRecord(input: {
+    agentId: string;
+    name: string;
+    instruction: string;
+    active: boolean;
+    timezone: string;
+    schedule: RoutineSchedule;
+  }): Routine {
+    const now = new Date().toISOString();
+    const routineId = crypto.randomUUID();
+    return {
+      id: routineId,
+      agentId: input.agentId,
+      name: input.name.trim(),
+      instruction: input.instruction.trim(),
+      active: input.active,
+      timezone: input.timezone,
+      trigger: {
+        id: crypto.randomUUID(),
+        routineId,
+        schedule: input.schedule,
+        nextRunAt: new Date(Date.now() + 3_600_000).toISOString(),
+        createdAt: now,
+        updatedAt: now,
+      },
+      createdAt: now,
+      updatedAt: now,
     };
   }
 
@@ -436,9 +494,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     revealComputerUseHelper: async () => undefined,
     closeComputerUsePermissionSetup: async () => undefined,
     openExternal: async () => undefined,
-    connectChatGPT: async () => clone(agentStatus),
-    connectClaude: async () => clone(agentStatus),
-    connectGrok: async () => clone(agentStatus),
+    connectProvider: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
     providerRuntimes: {
       getStatus: async () => ({
@@ -535,46 +591,240 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     skills: {
-      list: async () => ({ skills: [], nextCursor: null }),
-      get: async () => {
-        throw new Error("Skill not found");
+      list: async (query) => {
+        const matches = marketplaceSkills.filter(
+          (skill) =>
+            matchesQuery(`${skill.name} ${skill.description}`, query?.query) &&
+            (!query?.category || skill.category === query.category) &&
+            (query?.featured !== true || skill.featured),
+        );
+        return clone({ skills: matches, nextCursor: null });
       },
-      listMine: async () => [],
-      choosePackage: async () => null,
-      submit: async () => {
-        throw new Error("Skill submission is unavailable in preview mode.");
+      get: async (skillId) => {
+        const detail = STORY_MARKETPLACE_SKILL_DETAILS[skillId];
+        if (!detail) throw new Error("Skill not found");
+        return clone(detail);
       },
-      listInstalled: async () => [],
-      install: async () => {
-        throw new Error("Skill installation is unavailable in preview mode.");
+      listMine: async () => clone(skillSubmissions),
+      choosePackage: async () => clone(STORY_SKILL_PACKAGE_PREVIEW),
+      submit: async (input) => {
+        const preview = STORY_SKILL_PACKAGE_PREVIEW;
+        const submission: SkillSubmission = {
+          id: `submission-${preview.slug}-${skillSubmissions.length + 1}`,
+          skillId: input.skillId ?? `skill-${preview.slug}`,
+          slug: preview.slug,
+          name: preview.name,
+          description: preview.description,
+          category: input.category,
+          version: 1,
+          status: "pending",
+          rejectionNote: null,
+          iconUrl: null,
+          createdAt: new Date().toISOString(),
+        };
+        skillSubmissions = [submission, ...skillSubmissions];
+        return clone(submission);
       },
-      uninstall: async () => undefined,
+      listInstalled: async (agentId) => clone(readInstalledSkills(agentId)),
+      install: async ({ agentId, skillId }) => {
+        const skill = marketplaceSkills.find((candidate) => candidate.id === skillId);
+        if (!skill) throw new Error("Skill not found");
+        const installed: InstalledSkill = {
+          skillId: skill.id,
+          slug: skill.slug,
+          name: skill.name,
+          installedVersion: skill.version,
+          availableVersion: skill.version,
+          state: "installed",
+        };
+        installedSkills.set(agentId, [
+          ...readInstalledSkills(agentId).filter((item) => item.skillId !== skillId),
+          installed,
+        ]);
+        return clone(installed);
+      },
+      uninstall: async ({ agentId, skillId }) => {
+        installedSkills.set(
+          agentId,
+          readInstalledSkills(agentId).filter((item) => item.skillId !== skillId),
+        );
+      },
     },
     hostedSites: {
-      list: async () => [],
-      chooseDirectory: async () => null,
-      publish: async () => {
-        throw new Error("Site hosting is unavailable in preview mode.");
+      list: async () => clone(hostedSites),
+      chooseDirectory: async () => "/mock/OpenBot/Sites/launch-notes",
+      publish: async (input) => {
+        const hostname = `${input.title.toLowerCase().replaceAll(/[^a-z0-9]+/gu, "-")}.openbot.site`;
+        const site: HostedSiteSummary = {
+          id: `site-${hostedSites.length + 1}`,
+          hostname,
+          url: `https://${hostname}`,
+          title: input.title,
+          description: input.description,
+          framework: "vanilla",
+          status: "active",
+          fileCount: 12,
+          size: 786_432,
+          expiresAt: null,
+          updatedAt: new Date().toISOString(),
+        };
+        hostedSites = [site, ...hostedSites];
+        return clone(site);
       },
-      replace: async () => {
-        throw new Error("Site hosting is unavailable in preview mode.");
+      replace: async (input) => {
+        const existing = hostedSites.find((site) => site.id === input.siteId);
+        if (!existing) throw new Error("Site not found");
+        const replaced: HostedSiteSummary = {
+          ...existing,
+          title: input.title,
+          description: input.description,
+          updatedAt: new Date().toISOString(),
+        };
+        hostedSites = hostedSites.map((site) => (site.id === input.siteId ? replaced : site));
+        return clone(replaced);
       },
-      delete: async () => undefined,
+      delete: async ({ siteId }) => {
+        hostedSites = hostedSites.filter((site) => site.id !== siteId);
+      },
     },
     marketplaceAgents: {
-      list: async () => ({ agents: [], nextCursor: null }),
-      get: async () => {
-        throw new Error("Agent not found");
+      list: async (query) => {
+        const matches = STORY_MARKETPLACE_AGENTS.filter(
+          (agent) =>
+            matchesQuery(`${agent.name} ${agent.title} ${agent.description}`, query?.query) &&
+            (query?.featured !== true || agent.featured),
+        );
+        return clone({ agents: matches, nextCursor: null });
       },
-      listMine: async () => [],
-      preview: async () => {
-        throw new Error("Agent publishing is unavailable in preview mode.");
+      get: async (listingId) => {
+        const detail = STORY_MARKETPLACE_AGENT_DETAILS[listingId];
+        if (!detail) throw new Error("Agent not found");
+        return clone(detail);
       },
-      submit: async () => {
-        throw new Error("Agent publishing is unavailable in preview mode.");
+      listMine: async () => clone(marketplaceAgentSubmissions),
+      preview: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return clone({
+          agentId: agent.id,
+          name: agent.name,
+          title: agent.title,
+          description: agent.description,
+          avatarSeed: agent.avatarSeed,
+          avatarHue: agent.avatarHue,
+          avatarUrl: agent.avatarUrl,
+          skills: readInstalledSkills(agent.id).map((skill) => ({
+            skillId: skill.skillId,
+            versionId: `${skill.skillId}-v${skill.installedVersion}`,
+            slug: skill.slug,
+            name: skill.name,
+            version: skill.installedVersion,
+          })),
+          routines: (routines.get(agent.id) ?? []).map((routine) => ({
+            name: routine.name,
+            instruction: routine.instruction,
+            active: routine.active,
+            schedule: routine.trigger.schedule,
+          })),
+        });
       },
-      install: async () => {
-        throw new Error("Agent installation is unavailable in preview mode.");
+      submit: async (input) => {
+        const agent = agents.find((candidate) => candidate.id === input.agentId);
+        if (!agent) throw new Error("Agent not found");
+        const submission: AgentSubmission = {
+          id: `agent-submission-${agent.id}-${marketplaceAgentSubmissions.length + 1}`,
+          listingId: input.listingId ?? `listing-${agent.id}`,
+          name: agent.name,
+          title: agent.title,
+          description: agent.description,
+          version: 1,
+          status: "pending",
+          rejectionNote: null,
+          avatarSeed: agent.avatarSeed,
+          avatarHue: agent.avatarHue,
+          avatarUrl: agent.avatarUrl,
+          skillCount: readInstalledSkills(agent.id).length,
+          routineCount: (routines.get(agent.id) ?? []).length,
+          activeRoutineCount: (routines.get(agent.id) ?? []).filter((routine) => routine.active).length,
+          createdAt: new Date().toISOString(),
+        };
+        marketplaceAgentSubmissions = [submission, ...marketplaceAgentSubmissions];
+        return clone(submission);
+      },
+      install: async ({ listingId, agentId, timezone }) => {
+        const detail = STORY_MARKETPLACE_AGENT_DETAILS[listingId];
+        if (!detail) throw new Error("Agent not found");
+        // Installing over an existing agent updates it in place, the way the real service does:
+        // a second install of the same listing has to change the agent, not add a second copy.
+        const existing = agentId ? agents.find((candidate) => candidate.id === agentId) : undefined;
+        if (agentId && !existing) throw new Error("The installed agent no longer exists.");
+        if (existing && existing.marketplaceSource?.listingId !== detail.id) {
+          throw new Error("This local agent was installed from a different marketplace agent.");
+        }
+        const previousRoutineIds = existing?.marketplaceSource?.routineIds ?? [];
+        const previousSkillIds = existing?.marketplaceSource?.skillIds ?? [];
+        const target =
+          existing ??
+          createAgentSummary({
+            name: detail.name,
+            title: detail.title,
+            description: detail.description,
+            avatarSeed: detail.avatarSeed,
+            avatarHue: detail.avatarHue,
+          });
+        const created = detail.routines.map((routine) =>
+          createRoutineRecord({
+            agentId: target.id,
+            name: routine.name,
+            instruction: routine.instruction,
+            active: routine.active,
+            timezone,
+            schedule: routine.schedule,
+          }),
+        );
+        const agent: AgentSummary = {
+          ...target,
+          name: detail.name,
+          title: detail.title,
+          description: detail.description,
+          avatarSeed: detail.avatarSeed,
+          avatarHue: detail.avatarHue,
+          marketplaceSource: {
+            listingId: detail.id,
+            versionId: detail.versionId,
+            version: detail.version,
+            skillIds: detail.skills.map((skill) => skill.skillId),
+            routineIds: created.map((routine) => routine.id),
+          },
+        };
+        agents = existing
+          ? agents.map((candidate) => (candidate.id === agent.id ? agent : candidate))
+          : [...agents, agent];
+        if (!existing) queues.set(agent.id, emptyQueue(agent.id));
+        // Reinstalling drops only the skills this listing installed and has since dropped. A
+        // skill the user installed themselves is not the marketplace's to remove.
+        const listingSkillIds = new Set(detail.skills.map((skill) => skill.skillId));
+        const kept = readInstalledSkills(agent.id).filter(
+          (skill) => !listingSkillIds.has(skill.skillId) && !previousSkillIds.includes(skill.skillId),
+        );
+        installedSkills.set(agent.id, [
+          ...detail.skills.map((skill) => ({
+            skillId: skill.skillId,
+            slug: skill.slug,
+            name: skill.name,
+            installedVersion: skill.version,
+            availableVersion: skill.version,
+            state: "installed" as const,
+          })),
+          ...kept,
+        ]);
+        routines.set(agent.id, [
+          ...created,
+          ...(routines.get(agent.id) ?? []).filter((routine) => !previousRoutineIds.includes(routine.id)),
+        ]);
+        emitAgentEvent({ type: "agents-changed", agents });
+        emitAgentEvent({ type: "routines-changed", agentId: agent.id });
+        return clone({ agent });
       },
     },
     agent: {
@@ -585,7 +835,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       listModels: async () => clone(models),
       listAgents: async () => clone(agents),
-      listInstalledSkills: async () => [],
+      listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
       getSidebarLayout: async () => clone(sidebarLayout),
       mutateSidebarLayout: async (action) => {
         sidebarLayout = applySidebarLayoutAction(sidebarLayout, action);
@@ -744,26 +994,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       listRoutines: async (agentId) => clone(routines.get(agentId) ?? []),
       createRoutine: async (input) => {
-        const now = new Date().toISOString();
-        const routineId = crypto.randomUUID();
-        const routine: Routine = {
-          id: routineId,
-          agentId: input.agentId,
-          name: input.name.trim(),
-          instruction: input.instruction.trim(),
-          active: input.active,
-          timezone: input.timezone,
-          trigger: {
-            id: crypto.randomUUID(),
-            routineId,
-            schedule: input.schedule,
-            nextRunAt: new Date(Date.now() + 3_600_000).toISOString(),
-            createdAt: now,
-            updatedAt: now,
-          },
-          createdAt: now,
-          updatedAt: now,
-        };
+        const routine = createRoutineRecord(input);
         routines.set(input.agentId, [routine, ...(routines.get(input.agentId) ?? [])]);
         emitAgentEvent({ type: "routines-changed", agentId: input.agentId });
         return clone(routine);

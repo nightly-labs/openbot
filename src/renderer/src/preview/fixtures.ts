@@ -2,6 +2,7 @@ import type {
   AccountUsage,
   AgentModelOption,
   AgentStatus,
+  AgentSubmission,
   AgentSummary,
   AttachmentSummary,
   BrowserControlState,
@@ -10,9 +11,19 @@ import type {
   ConversationSnapshot,
   DirectConversationSnapshot,
   DirectThreadSummary,
+  HostedSiteSummary,
   HostStatus,
+  InstalledSkill,
+  MarketplaceAgentDetail,
+  MarketplaceAgentRoutine,
+  MarketplaceAgentSkill,
+  MarketplaceAgentSummary,
+  MarketplaceSkillDetail,
+  MarketplaceSkillSummary,
   RemoteDesktopSession,
   ServerSummary,
+  SkillPackagePreview,
+  SkillSubmission,
   TeamInviteSummary,
   TeamMemberSummary,
   TeamPresenceSnapshot,
@@ -503,3 +514,422 @@ export const STORY_APP_INFO = {
   platform: "darwin" as const,
   variant: "production" as const,
 };
+
+/**
+ * The marketplace surfaces. Storybook and the preview both reach the modal through
+ * `mock-openbot.ts`, so an empty list here reads as "the marketplace is empty" rather than "the
+ * preview never wired this up" — which is what the three stubs it replaced looked like.
+ */
+export const STORY_MARKETPLACE_SKILLS: MarketplaceSkillSummary[] = [
+  {
+    id: "skill-release-notes",
+    slug: "release-notes",
+    name: "Release notes",
+    description: "Turns a range of commits into a changelog a reader outside the team can follow.",
+    category: "documents",
+    creatorName: "OpenBot",
+    version: 4,
+    installs: 1_284,
+    featured: true,
+    iconUrl: null,
+    updatedAt: "2026-08-17T09:12:00.000Z",
+  },
+  {
+    id: "skill-sql-review",
+    slug: "sql-review",
+    name: "SQL review",
+    description: "Reads a migration and reports the queries it makes slower, with the plan for each.",
+    category: "data-analytics",
+    creatorName: "Marta Nowak",
+    version: 2,
+    installs: 862,
+    featured: true,
+    iconUrl: null,
+    updatedAt: "2026-08-15T14:40:00.000Z",
+  },
+  {
+    id: "skill-design-audit",
+    slug: "design-audit",
+    name: "Design audit",
+    description: "Checks a screen against the design system and lists the tokens it steps outside.",
+    category: "design",
+    creatorName: "Studio Kappa",
+    version: 7,
+    installs: 517,
+    featured: false,
+    iconUrl: null,
+    updatedAt: "2026-08-11T11:05:00.000Z",
+  },
+  {
+    id: "skill-inbox-triage",
+    slug: "inbox-triage",
+    name: "Inbox triage",
+    description: "Sorts a morning inbox into what needs a reply today and what can wait.",
+    category: "productivity",
+    creatorName: "Jules Fournier",
+    version: 1,
+    installs: 344,
+    featured: false,
+    iconUrl: null,
+    updatedAt: "2026-08-09T07:30:00.000Z",
+  },
+  {
+    id: "skill-source-check",
+    slug: "source-check",
+    name: "Source check",
+    description: "Follows every citation in a draft and flags the ones that do not say what is claimed.",
+    category: "research",
+    creatorName: "OpenBot",
+    version: 3,
+    installs: 209,
+    featured: false,
+    iconUrl: null,
+    updatedAt: "2026-08-04T16:20:00.000Z",
+  },
+  {
+    id: "skill-nightly-backup",
+    slug: "nightly-backup",
+    name: "Nightly backup",
+    description: "Copies a workspace to an external volume and reports what changed since last night.",
+    category: "automation",
+    creatorName: "Ravi Menon",
+    version: 5,
+    installs: 156,
+    featured: false,
+    iconUrl: null,
+    updatedAt: "2026-07-28T22:00:00.000Z",
+  },
+];
+
+const STORY_SKILL_INSTRUCTIONS: Record<string, string> = {
+  "skill-release-notes":
+    "Read the commits in the given range. Group them by what a reader would notice, not by\ndirectory. Drop anything a user cannot see. Write one line per change in the past tense.",
+  "skill-sql-review":
+    "Read the migration and the queries in the same change. For each query the migration touches,\nreport the plan before and after and name the index that would keep it fast.",
+  "skill-design-audit":
+    "Compare every colour, spacing and radius in the screen against the design tokens. List each\nvalue that is not a token, with the token that is closest to it.",
+  "skill-inbox-triage":
+    "Sort the inbox into reply today, reply this week, and no reply needed. Say in one line why\neach message landed where it did.",
+  "skill-source-check":
+    "Open every citation. Quote the sentence that supports the claim, or say the source does not\nsupport it.",
+  "skill-nightly-backup":
+    "Copy the workspace to the configured volume. Report the files added, changed and removed\nsince the previous run, and the total time taken.",
+};
+
+export const STORY_MARKETPLACE_SKILL_DETAILS: Record<string, MarketplaceSkillDetail> = Object.fromEntries(
+  STORY_MARKETPLACE_SKILLS.map((skill) => [
+    skill.id,
+    {
+      ...skill,
+      versionId: `${skill.id}-v${skill.version}`,
+      bundleSha256: `${skill.slug.replaceAll("-", "")}00112233445566778899aabbccddeeff00112233445566778899aabbcc`.slice(
+        0,
+        64,
+      ),
+      files: ["SKILL.md", "README.md", `scripts/${skill.slug}.ts`],
+      instructions: STORY_SKILL_INSTRUCTIONS[skill.id] ?? "",
+    },
+  ]),
+);
+
+export const STORY_INSTALLED_SKILLS: Record<string, InstalledSkill[]> = {
+  chief: [
+    {
+      skillId: "skill-release-notes",
+      slug: "release-notes",
+      name: "Release notes",
+      installedVersion: 4,
+      availableVersion: 4,
+      state: "installed",
+    },
+    {
+      skillId: "skill-inbox-triage",
+      slug: "inbox-triage",
+      name: "Inbox triage",
+      installedVersion: 1,
+      availableVersion: 1,
+      state: "modified",
+    },
+  ],
+  research: [
+    {
+      skillId: "skill-source-check",
+      slug: "source-check",
+      name: "Source check",
+      installedVersion: 2,
+      availableVersion: 3,
+      state: "update-available",
+    },
+  ],
+};
+
+export const STORY_SKILL_SUBMISSIONS: SkillSubmission[] = [
+  {
+    id: "submission-standup",
+    skillId: "skill-standup-digest",
+    slug: "standup-digest",
+    name: "Standup digest",
+    description: "Collects yesterday's activity into the three lines a standup actually needs.",
+    category: "productivity",
+    version: 1,
+    status: "pending",
+    rejectionNote: null,
+    iconUrl: null,
+    createdAt: "2026-08-18T08:15:00.000Z",
+  },
+  {
+    id: "submission-source-check",
+    skillId: "skill-source-check",
+    slug: "source-check",
+    name: "Source check",
+    description: "Follows every citation in a draft and flags the ones that do not say what is claimed.",
+    category: "research",
+    version: 3,
+    status: "approved",
+    rejectionNote: null,
+    iconUrl: null,
+    createdAt: "2026-08-04T16:20:00.000Z",
+  },
+  {
+    id: "submission-mail-merge",
+    skillId: "skill-mail-merge",
+    slug: "mail-merge",
+    name: "Mail merge",
+    description: "Fills a template from a spreadsheet and sends the result to each row.",
+    category: "automation",
+    version: 1,
+    status: "rejected",
+    rejectionNote: "Sends mail without a confirmation step. Add one and resubmit.",
+    iconUrl: null,
+    createdAt: "2026-07-30T12:00:00.000Z",
+  },
+];
+
+export const STORY_SKILL_PACKAGE_PREVIEW: SkillPackagePreview = {
+  draftId: "draft-standup-digest",
+  name: "Standup digest",
+  description: "Collects yesterday's activity into the three lines a standup actually needs.",
+  slug: "standup-digest",
+  files: ["SKILL.md", "README.md", "scripts/digest.ts"],
+  size: 18_432,
+};
+
+export const STORY_MARKETPLACE_AGENTS: MarketplaceAgentSummary[] = [
+  {
+    id: "listing-release-manager",
+    name: "Release Manager",
+    title: "Ships the release",
+    description: "Cuts the tag, writes the notes, and watches the rollout until it is green.",
+    creatorName: "OpenBot",
+    version: 6,
+    installs: 731,
+    featured: true,
+    avatarSeed: "release-manager",
+    avatarHue: 30,
+    avatarUrl: null,
+    skillCount: 2,
+    routineCount: 2,
+    activeRoutineCount: 1,
+    updatedAt: "2026-08-16T10:45:00.000Z",
+  },
+  {
+    id: "listing-desk-researcher",
+    name: "Desk Researcher",
+    title: "Reads so you do not have to",
+    description: "Turns a question into a brief with sources you can check in an afternoon.",
+    creatorName: "Marta Nowak",
+    version: 3,
+    installs: 488,
+    featured: true,
+    avatarSeed: "desk-researcher",
+    avatarHue: 215,
+    avatarUrl: null,
+    skillCount: 1,
+    routineCount: 1,
+    activeRoutineCount: 1,
+    updatedAt: "2026-08-12T13:10:00.000Z",
+  },
+  {
+    id: "listing-ops-watch",
+    name: "Ops Watch",
+    title: "Keeps an eye on the stack",
+    description: "Checks the backups ran, the certificates are current, and the disks have room.",
+    creatorName: "Ravi Menon",
+    version: 2,
+    installs: 173,
+    featured: false,
+    avatarSeed: "ops-watch",
+    avatarHue: 320,
+    avatarUrl: null,
+    skillCount: 1,
+    routineCount: 3,
+    activeRoutineCount: 3,
+    updatedAt: "2026-08-02T06:00:00.000Z",
+  },
+];
+
+const STORY_MARKETPLACE_AGENT_CONTENTS: Record<
+  string,
+  { skills: MarketplaceAgentSkill[]; routines: MarketplaceAgentRoutine[] }
+> = {
+  "listing-release-manager": {
+    skills: [
+      {
+        skillId: "skill-release-notes",
+        versionId: "skill-release-notes-v4",
+        slug: "release-notes",
+        name: "Release notes",
+        version: 4,
+      },
+      {
+        skillId: "skill-sql-review",
+        versionId: "skill-sql-review-v2",
+        slug: "sql-review",
+        name: "SQL review",
+        version: 2,
+      },
+    ],
+    routines: [
+      {
+        name: "Draft the release notes",
+        instruction: "Summarise everything merged since the last tag and post the draft in the thread.",
+        active: true,
+        schedule: { kind: "weekly", weekday: 4, time: "16:00" },
+      },
+      {
+        name: "Watch the rollout",
+        instruction: "Check the release job every hour on release day and report the first failure.",
+        active: false,
+        schedule: { kind: "daily", time: "09:00" },
+      },
+    ],
+  },
+  "listing-desk-researcher": {
+    skills: [
+      {
+        skillId: "skill-source-check",
+        versionId: "skill-source-check-v3",
+        slug: "source-check",
+        name: "Source check",
+        version: 3,
+      },
+    ],
+    routines: [
+      {
+        name: "Morning reading list",
+        instruction: "Collect what changed overnight in the areas I follow and rank it by relevance.",
+        active: true,
+        schedule: { kind: "daily", time: "07:30" },
+      },
+    ],
+  },
+  "listing-ops-watch": {
+    skills: [
+      {
+        skillId: "skill-nightly-backup",
+        versionId: "skill-nightly-backup-v5",
+        slug: "nightly-backup",
+        name: "Nightly backup",
+        version: 5,
+      },
+    ],
+    routines: [
+      {
+        name: "Backup check",
+        instruction: "Confirm last night's backup completed and report the size delta.",
+        active: true,
+        schedule: { kind: "daily", time: "08:00" },
+      },
+      {
+        name: "Certificate expiry",
+        instruction: "List certificates expiring within thirty days.",
+        active: true,
+        schedule: { kind: "weekly", weekday: 1, time: "08:15" },
+      },
+      {
+        name: "Disk headroom",
+        instruction: "Report any volume above eighty percent used.",
+        active: true,
+        schedule: { kind: "daily", time: "08:30" },
+      },
+    ],
+  },
+};
+
+export const STORY_MARKETPLACE_AGENT_DETAILS: Record<string, MarketplaceAgentDetail> = Object.fromEntries(
+  STORY_MARKETPLACE_AGENTS.map((agent) => [
+    agent.id,
+    {
+      ...agent,
+      versionId: `${agent.id}-v${agent.version}`,
+      skills: STORY_MARKETPLACE_AGENT_CONTENTS[agent.id]?.skills ?? [],
+      routines: STORY_MARKETPLACE_AGENT_CONTENTS[agent.id]?.routines ?? [],
+    },
+  ]),
+);
+
+export const STORY_AGENT_SUBMISSIONS: AgentSubmission[] = [
+  {
+    id: "agent-submission-chief",
+    listingId: "listing-chief-of-staff",
+    name: "Chief",
+    title: "Chief of staff",
+    description: "Coordinates projects, priorities, and next steps across the workspace.",
+    version: 2,
+    status: "pending",
+    rejectionNote: null,
+    avatarSeed: "chief",
+    avatarHue: 245,
+    avatarUrl: null,
+    skillCount: 2,
+    routineCount: 1,
+    activeRoutineCount: 1,
+    createdAt: "2026-08-18T09:00:00.000Z",
+  },
+  {
+    id: "agent-submission-ops",
+    listingId: "listing-ops-watch",
+    name: "Ops Watch",
+    title: "Keeps an eye on the stack",
+    description: "Checks the backups ran, the certificates are current, and the disks have room.",
+    version: 2,
+    status: "approved",
+    rejectionNote: null,
+    avatarSeed: "ops-watch",
+    avatarHue: 320,
+    avatarUrl: null,
+    skillCount: 1,
+    routineCount: 3,
+    activeRoutineCount: 3,
+    createdAt: "2026-08-02T06:00:00.000Z",
+  },
+];
+
+export const STORY_HOSTED_SITES: HostedSiteSummary[] = [
+  {
+    id: "site-launch-notes",
+    hostname: "launch-notes.openbot.site",
+    url: "https://launch-notes.openbot.site",
+    title: "Launch notes",
+    description: "The public changelog for the 0.2 release.",
+    framework: "astro",
+    status: "active",
+    fileCount: 42,
+    size: 3_145_728,
+    expiresAt: null,
+    updatedAt: "2026-08-18T18:30:00.000Z",
+  },
+  {
+    id: "site-design-review",
+    hostname: "design-review.openbot.site",
+    url: "https://design-review.openbot.site",
+    title: "Design review",
+    description: "A one-page mockup shared with the design studio.",
+    framework: "vanilla",
+    status: "active",
+    fileCount: 8,
+    size: 512_000,
+    expiresAt: "2026-09-18T18:30:00.000Z",
+    updatedAt: "2026-08-14T12:00:00.000Z",
+  },
+];

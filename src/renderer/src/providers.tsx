@@ -70,9 +70,8 @@ const Providers = createSimpleContext({
     }
 
     function openProviderSignInGuide(provider: AgentProviderId): Promise<void> {
-      if (provider === "codex") return connectChatGPT();
       if (provider === "claude") return window.openbot.openExternal("claude-sign-in");
-      return connectGrok();
+      return connectProvider(provider);
     }
 
     /** Revisioned, because the pushed event and the awaited call can land out of order. */
@@ -129,25 +128,13 @@ const Providers = createSimpleContext({
       });
     }
 
-    async function connectChatGPT(): Promise<void> {
-      return connectProvider("codex", window.openbot.connectChatGPT);
-    }
-
-    async function connectClaude(): Promise<void> {
-      return connectProvider("claude", window.openbot.connectClaude);
-    }
-
-    async function connectGrok(): Promise<void> {
-      return connectProvider("grok", window.openbot.connectGrok);
-    }
-
-    async function connectProvider(provider: AgentProviderId, connect: () => Promise<AgentStatus>): Promise<void> {
+    async function connectProvider(provider: AgentProviderId): Promise<void> {
       if (refreshingProviders()) return;
       const analytics = desktopAnalytics.scope();
       pendingProviderConnections.set(provider, analytics);
       analytics.track("provider_action", { provider, action: "connect_started", result: "succeeded" });
       try {
-        const status = await connect();
+        const status = await window.openbot.connectProvider(provider);
         flush(() => applyAgentStatus(status));
       } catch (error) {
         pendingProviderConnections.delete(provider);
@@ -204,9 +191,7 @@ const Providers = createSimpleContext({
       refreshingProviders,
       applyAgentStatus,
       applyProviderRuntimeSnapshot,
-      connectChatGPT,
-      connectClaude,
-      connectGrok,
+      connectProvider,
       downloadProviderRuntime,
       cancelProviderRuntimeDownload,
       openProviderInstallGuide,

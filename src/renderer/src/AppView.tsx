@@ -40,9 +40,7 @@ export function AppAccessGate() {
     downloadProviderRuntime,
     cancelProviderRuntimeDownload,
     refreshingProviders,
-    connectChatGPT,
-    connectClaude,
-    connectGrok,
+    connectProvider,
     openProviderInstallGuide,
     openProviderSignInGuide,
     refreshAgentProviders,
@@ -90,13 +88,7 @@ export function AppAccessGate() {
                       onCancelProviderDownload={
                         providerRuntimeDownloadsAvailable() ? cancelProviderRuntimeDownload : undefined
                       }
-                      onConnectProvider={(provider) =>
-                        provider === "codex"
-                          ? connectChatGPT()
-                          : provider === "claude"
-                            ? connectClaude()
-                            : connectGrok()
-                      }
+                      onConnectProvider={connectProvider}
                       onInstallProvider={providerRuntimeDownloadsAvailable() ? undefined : openProviderInstallGuide}
                       onSignInProvider={providerRuntimeDownloadsAvailable() ? undefined : openProviderSignInGuide}
                       onRefreshProviders={providerRuntimeDownloadsAvailable() ? undefined : refreshAgentProviders}

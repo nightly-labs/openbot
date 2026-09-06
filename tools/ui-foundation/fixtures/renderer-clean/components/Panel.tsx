@@ -1,10 +1,11 @@
 // A feature component that breaks nothing: a shared primitive instead of a native control,
-// palette tokens instead of literals, and a role the composite ratchet does not count.
+// palette tokens instead of literals, a role the composite ratchet does not count, and the
+// one class styles.css declares, so the dead-rule scan has nothing to report here either.
 import { Dialog } from "./ui/complex";
 
 export function Panel() {
   return (
-    <section role="group" style={{ color: "var(--openbot-text)", transition: "var(--openbot-transition)" }}>
+    <section class="panel" role="group" style={{ color: "var(--openbot-text)", transition: "var(--openbot-transition)" }}>
       <Dialog />
     </section>
   );
