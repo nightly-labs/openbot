@@ -63,10 +63,10 @@ it walks the workspace dependency graph and asserts a manifest is copied for eac
 
 `remote/scripts` rides along in that same project. `check.ts` and `update.ts` are Bun scripts
 using `Bun.spawn` and `import.meta.dir`, and no `tsconfig` reached them: `tsconfig.node.json` stops
-at the root `scripts/**` and pins `"types": ["node"]`, which is why all thirty root scripts use the
-`Bun` global exactly zero times. Adding `@types/bun` at the root would have made Bun globals
-resolvable repo-wide, including in `src/main`, which runs under Node. Instead `remote/api` already
-had the Bun-typed project the scripts needed, so its `include` carries `../scripts/*.ts` and
+at the root `scripts/**` and pins `"types": ["node"]`, which is why no root script uses the `Bun`
+global at all. Adding `@types/bun` at the root would have made Bun globals resolvable repo-wide,
+including in `src/main`, which runs under Node. Instead `remote/api` already had the Bun-typed
+project the scripts needed, so its `include` carries `../scripts/*.ts` and
 `typecheck:remote` covers both. `update.ts` drains and force-recreates the live coturn container, so
 it is worth a checker.
 
