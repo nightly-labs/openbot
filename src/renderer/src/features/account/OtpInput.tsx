@@ -1,6 +1,7 @@
 import { ONE_TIME_CODE_ALPHABET, ONE_TIME_CODE_LENGTH } from "@openbot/contracts/validation";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
 import { Input } from "../../components/ui";
+import { prefersReducedMotion } from "../../components/ui/utils";
 
 export type OtpInputStatus = "idle" | "verifying" | "error" | "success";
 
@@ -57,7 +58,7 @@ export function OtpInput(props: OtpInputProps) {
   createEffect(
     () => status(),
     (nextStatus, previousStatus) => {
-      if (nextStatus !== "error" || previousStatus === "error" || shouldReduceMotion() || !slotsElement) return;
+      if (nextStatus !== "error" || previousStatus === "error" || prefersReducedMotion() || !slotsElement) return;
       slotsElement.animate?.(
         [
           { transform: "translateX(0)" },
@@ -296,8 +297,4 @@ function toSlots(value: string): string[] {
 function firstEmptySlot(slots: string[]): number {
   const index = slots.findIndex((character) => !character);
   return index === -1 ? ONE_TIME_CODE_LENGTH - 1 : index;
-}
-
-function shouldReduceMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }

@@ -1,6 +1,5 @@
 import type {
   AgentProviderId,
-  AgentProviderState,
   AgentStatus,
   AppSetupState,
   AvatarHue,
@@ -10,9 +9,11 @@ import type {
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { ProviderPicker, type ProviderPickerOption } from "../../components/ProviderPicker";
 import { Button } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
 import { PlusIcon } from "../conversation/ConversationIcons";
+import { fallbackProviderState } from "./onboarding-provider-state";
 
 export interface OnboardingFlowProps {
   state: AppSetupState;
@@ -539,14 +540,6 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
       </div>
     </main>
   );
-}
-
-function fallbackProviderState(status: AgentStatus): AgentProviderState {
-  return status.phase === "starting" || status.phase === "restarting" ? "checking" : "error";
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }
 
 function createOnboardingAvatarVariants(): OnboardingAvatarVariants {

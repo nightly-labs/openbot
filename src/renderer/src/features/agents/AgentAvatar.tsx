@@ -2,6 +2,7 @@ import { type Block, BloubBot, defaultCycle, makeBlock, POSES, type StateId } fr
 import type { AvatarHue } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { type AvatarMotion, bloubAvatarProfile, type SupportedAvatarSilhouetteId } from "../../bloub-avatar";
+import { prefersReducedMotion } from "../../components/ui/utils";
 import type { AgentProfile } from "../../data";
 
 const DEFAULT_CYCLE: Block[] = defaultCycle().blocks;
@@ -175,8 +176,4 @@ function offsetCycle(blocks: Block[], offset: number): Block[] {
   const start = ((Math.trunc(offset) % blocks.length) + blocks.length) % blocks.length;
   if (start === 0) return blocks;
   return [...blocks.slice(start), ...blocks.slice(0, start)];
-}
-
-function prefersReducedMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }

@@ -3,6 +3,7 @@ import type { InstalledSkill, QueueDelivery } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack } from "solid-js";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
 import { Button } from "../../components/ui";
+import { prefersReducedMotion } from "../../components/ui/utils";
 import type { AgentProfile } from "../../data";
 import { AnchoredTooltip } from "./AnchoredTooltip";
 import { fileBadge } from "./AttachmentCards";
@@ -96,7 +97,7 @@ export function QueuePanel(props: QueuePanelProps) {
 
       setHiddenEditingId(null);
       setEditingExitId(editingId);
-      if (reducedMotion()) {
+      if (prefersReducedMotion()) {
         setHiddenEditingId(editingId);
         setEditingExitId(null);
         return;
@@ -144,7 +145,7 @@ export function QueuePanel(props: QueuePanelProps) {
           });
           continue;
         }
-        if (reducedMotion()) continue;
+        if (prefersReducedMotion()) continue;
         retainedExits.push({ delivery, index });
         if (externalRemovalTimers.has(delivery.id)) continue;
         setRemovingIds((ids) => new Set([...ids, delivery.id]));
@@ -201,10 +202,6 @@ export function QueuePanel(props: QueuePanelProps) {
       callback();
     }, delay);
     animationTimers.add(timer);
-  }
-
-  function reducedMotion(): boolean {
-    return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   }
 
   function dragStep(deliveryId: string): number {
@@ -337,7 +334,7 @@ export function QueuePanel(props: QueuePanelProps) {
   function requestCancel(deliveryId: string) {
     if (removingIds().has(deliveryId)) return;
     setRemovingIds((current) => new Set([...current, deliveryId]));
-    scheduleAnimationCleanup(() => props.onCancel(deliveryId), reducedMotion() ? 0 : 200);
+    scheduleAnimationCleanup(() => props.onCancel(deliveryId), prefersReducedMotion() ? 0 : 200);
   }
 
   function messagePreview(delivery: QueueDelivery): string {

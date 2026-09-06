@@ -4,6 +4,7 @@ import { createEffect, createSignal, For, onCleanup, onSettled, Show } from "sol
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
 import { createScrollFades } from "../../components/createScrollFades";
 import { Button, CirclePause, Clock3, Dialog, Input, Plus, Switch, Textarea } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 import { BackIcon, SettingsForwardIcon } from "./ConversationIcons";
 import { RoutineRunHistory } from "./RoutineRunHistory";
 import { RoutineScheduleEditor } from "./RoutineScheduleEditor";
@@ -67,7 +68,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       if (selected?.id && !next.some((routine) => routine.id === selected.id)) closeEditor();
     } catch (caught) {
       setRoutinesLoaded(false);
-      setError(messageForError(caught, "Could not load routines."));
+      setError(errorMessage(caught, "Could not load routines."));
     } finally {
       setLoading(false);
     }
@@ -83,7 +84,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         }),
       );
     } catch (caught) {
-      setError(messageForError(caught, "Could not load run history."));
+      setError(errorMessage(caught, "Could not load run history."));
     }
   }
 
@@ -277,7 +278,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       trackRoutineAction(analytics, action, current.schedule, startedAt, "succeeded");
     } catch (caught) {
       trackRoutineAction(analytics, action, current.schedule, startedAt, "failed");
-      setError(messageForError(caught, "Could not save this routine."));
+      setError(errorMessage(caught, "Could not save this routine."));
     } finally {
       setSaving(false);
     }
@@ -305,7 +306,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       trackRoutineAction(analytics, "delete", current.schedule, startedAt, "succeeded");
     } catch (caught) {
       trackRoutineAction(analytics, "delete", current.schedule, startedAt, "failed");
-      setError(messageForError(caught, "Could not delete this routine."));
+      setError(errorMessage(caught, "Could not delete this routine."));
     }
   }
 
@@ -325,7 +326,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       await loadRuns(current.id);
     } catch (caught) {
       trackRoutineAction(analytics, "test", current.schedule, startedAt, "failed");
-      setError(messageForError(caught, "Could not start the test run."));
+      setError(errorMessage(caught, "Could not start the test run."));
     } finally {
       setTesting(false);
     }
@@ -545,9 +546,6 @@ function validDraft(draft: RoutineDraft): boolean {
 
 function isBlankNewDraft(draft: RoutineDraft): boolean {
   return draft.id === null && !draft.name.trim() && !draft.instruction.trim();
-}
-function messageForError(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }
 
 function trackRoutineAction(

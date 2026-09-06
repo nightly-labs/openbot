@@ -38,6 +38,7 @@ import {
   OctagonX,
   Spinner,
 } from "../../components/ui";
+import { prefersReducedMotion } from "../../components/ui/utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import {
   animateModeLayers,
@@ -49,7 +50,6 @@ import {
   type ModeSwapSize,
   modeSourceAnchors,
   modeSwapElementSize,
-  prefersReducedMotion,
   primeCompactModeLayerPositions,
   restoreModeTransitionFocus,
   waitForAnimations,
@@ -1055,7 +1055,7 @@ function QuestionContent(props: {
       return;
     }
     questionAnimations = exitAnimations;
-    await waitForQuestionAnimations(questionAnimations);
+    await waitForAnimations(questionAnimations);
     if (questionDisposed || transitionVersion !== questionTransitionVersion) return;
     setQuestionHidden(elements);
     cancelQuestionAnimations();
@@ -1064,7 +1064,7 @@ function QuestionContent(props: {
     await nextAnimationFrame();
     if (questionDisposed || transitionVersion !== questionTransitionVersion) return;
     questionAnimations = animateQuestionElements(elements, "enter") ?? [];
-    await waitForQuestionAnimations(questionAnimations);
+    await waitForAnimations(questionAnimations);
     if (questionDisposed || transitionVersion !== questionTransitionVersion) return;
     clearQuestionHidden(elements);
     cancelQuestionAnimations();
@@ -1220,7 +1220,7 @@ function QuestionProgress(props: { current: number; total: number }): JSX.Elemen
         ),
       ];
 
-      void waitForQuestionAnimations(animations).then(() => {
+      void waitForAnimations(animations).then(() => {
         if (version !== transitionVersion) return;
         cancelTransition();
       });
@@ -1273,10 +1273,6 @@ function animateQuestionElements(elements: HTMLElement[], phase: QuestionSwapPha
     );
   }
   return animations;
-}
-
-function waitForQuestionAnimations(animations: Animation[]): Promise<undefined[]> {
-  return Promise.all(animations.map((animation) => animation.finished.then(() => undefined).catch(() => undefined)));
 }
 
 function setQuestionHidden(elements: HTMLElement[]): void {

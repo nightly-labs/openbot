@@ -18,6 +18,8 @@ import {
   Text,
   X,
 } from "../../components/ui";
+import { prefersReducedMotion } from "../../components/ui/utils";
+import { errorMessage } from "../../error-message";
 
 interface JoinServerDialogProps {
   inviteUrl: string;
@@ -391,17 +393,9 @@ function shakeDuration(): number {
   return motionDuration("--shake-dur-a", 80) * 2 + motionDuration("--shake-dur-b", 60) * 2;
 }
 
-function prefersReducedMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-}
-
 function formatInviteDate(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? "Unknown"
     : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
-}
-
-function errorMessage(cause: unknown, fallback: string): string {
-  return cause instanceof Error ? cause.message : fallback;
 }

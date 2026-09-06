@@ -2,6 +2,7 @@ import type { AttachmentSummary, InstalledSkill, MessageReaction } from "@openbo
 import { MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { Button, DropdownMenu } from "../../components/ui";
+import { prefersReducedMotion } from "../../components/ui/utils";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { AttachmentCards } from "./AttachmentCards";
 import { CodeBlock } from "./CodeBlock";
@@ -27,10 +28,6 @@ function nextStreamingText(current: string, target: string, streaming: boolean):
   return streaming ? current : target;
 }
 
-function prefersReducedStreamingMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-}
-
 function streamingTextGapMs(): number {
   const value = getComputedStyle(document.documentElement).getPropertyValue("--stream-gap").trim();
   if (!value) return STREAMING_TEXT_GAP_FALLBACK_MS;
@@ -45,7 +42,7 @@ function createStreamingBody(message: () => AgentMessage) {
     initialMessage.author === "agent" &&
     initialMessage.streaming === true &&
     initialMessage.animate === true &&
-    !prefersReducedStreamingMotion();
+    !prefersReducedMotion();
   let targetBody = initialMessage.body;
   let targetStreaming = initialMessage.author === "agent" && initialMessage.streaming === true;
   const [body, setBody] = createSignal(animateInitialText ? "" : initialMessage.body);
@@ -103,7 +100,7 @@ function createStreamingBody(message: () => AgentMessage) {
         keepHeightSmoothingActive();
       }
       const current = untrack(body);
-      if (prefersReducedStreamingMotion() || !nextBody.startsWith(current) || (!streaming && !smoothingActive)) {
+      if (prefersReducedMotion() || !nextBody.startsWith(current) || (!streaming && !smoothingActive)) {
         clearRevealTimer();
         setAnimateTail(false);
         setBody(nextBody);
