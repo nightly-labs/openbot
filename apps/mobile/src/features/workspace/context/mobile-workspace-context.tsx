@@ -9,6 +9,7 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import {
   createRemoteConnectionRecovery,
@@ -212,19 +213,19 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       await client.connect(server.id, server.publicKey);
       if (currentGeneration !== loadGeneration.current) return;
       connectionStage.current = "compatibility";
-      const compatibility = await request("GET", "/v1/compatibility", decodeTeamProtocolSupportV1);
+      const compatibility = await request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV1);
       if (currentGeneration !== loadGeneration.current) return;
       if (compatibility.protocol.minimum > TEAM_PROTOCOL_V3 || compatibility.protocol.maximum < TEAM_PROTOCOL_V3) {
         throw new Error("Update OpenBot Mobile or the desktop app before connecting.");
       }
       serverCapabilities.current.set(server.id, compatibility.capabilities);
       connectionStage.current = "agents";
-      const summaries = await request("GET", "/v1/agents", decodeAgentSummaries);
+      const summaries = await request("GET", TEAM_API_ROUTES.agents.all, decodeAgentSummaries);
       if (currentGeneration !== loadGeneration.current) return;
       replaceServerAgents(server.id, summaries);
       const readSequence = ++readRefreshSequence.current;
       connectionStage.current = "reads";
-      const reads = await request("GET", "/v1/agents/conversation-reads", decodeConversationReads);
+      const reads = await request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads);
       if (currentGeneration !== loadGeneration.current) return;
       if (readSequence === readRefreshSequence.current) {
         setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads));
@@ -233,7 +234,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       await resyncRemoteConversations({
         agentIds: summaries.map((agent) => agent.id),
         cached: conversationsRef.current,
-        load: (agentId) => request("GET", `/v1/agents/${encodeURIComponent(agentId)}/conversation`, decodeConversation),
+        load: (agentId) => request("GET", TEAM_API_ROUTES.agent.conversation(agentId), decodeConversation),
         apply: (snapshot) => setConversations((current) => storeNewestSnapshot(current, snapshot)),
         isCurrent: () => currentGeneration === loadGeneration.current,
       });
@@ -308,11 +309,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const loadConversation = useCallback(
     async (agentId: string) => {
       const generation = loadGeneration.current;
-      const snapshot = await request(
-        "GET",
-        `/v1/agents/${encodeURIComponent(agentId)}/conversation`,
-        decodeConversation,
-      );
+      const snapshot = await request("GET", TEAM_API_ROUTES.agent.conversation(agentId), decodeConversation);
       if (generation === loadGeneration.current) setConversations((current) => storeNewestSnapshot(current, snapshot));
       return snapshot;
     },
@@ -322,7 +319,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const refreshConversationReads = useCallback(async () => {
     const sequence = ++readRefreshSequence.current;
     const generation = loadGeneration.current;
-    const reads = await request("GET", "/v1/agents/conversation-reads", decodeConversationReads);
+    const reads = await request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads);
     if (sequence !== readRefreshSequence.current || generation !== loadGeneration.current) return;
     setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads));
   }, [request]);
@@ -421,7 +418,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           if (throughMessageId === undefined) return;
           const reads = await request(
             "POST",
-            `/v1/agents/${encodeURIComponent(agentId)}/conversation/${visibleMessageId === null ? "unread" : "read"}`,
+            visibleMessageId === null
+              ? TEAM_API_ROUTES.agent.conversationUnread(agentId)
+              : TEAM_API_ROUTES.agent.conversationRead(agentId),
             (value) => decodeConversationReads({ [agentId]: value }),
             visibleMessageId === null ? {} : { throughMessageId },
           );
@@ -517,7 +516,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         void refreshHosts().catch(() => undefined);
       },
       createAgent: async (input: CreateAgentInput) => {
-        const created = await request("POST", "/v1/agents", decodeAgent, {
+        const created = await request("POST", TEAM_API_ROUTES.agents.all, decodeAgent, {
           name: input.name,
           description: input.description,
           avatarSeed: input.avatarSeed,
@@ -532,7 +531,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       updateAgent: async (input: UpdateAgentInput) => {
         const updated = await request(
           "PATCH",
-          `/v1/agents/${encodeURIComponent(input.agentId)}`,
+          TEAM_API_ROUTES.agent.one(input.agentId),
           decodeAgent,
           updateAgentPayload(input),
         );
@@ -541,16 +540,16 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         );
       },
       deleteAgent: async (agentId) => {
-        await request("DELETE", `/v1/agents/${encodeURIComponent(agentId)}`, ignoreResponse);
+        await request("DELETE", TEAM_API_ROUTES.agent.one(agentId), ignoreResponse);
       },
       duplicateAgent: async (agentId) => {
-        await request("POST", `/v1/agents/${encodeURIComponent(agentId)}/duplicate`, ignoreResponse, {
+        await request("POST", TEAM_API_ROUTES.agent.duplicate(agentId), ignoreResponse, {
           operationId: Crypto.randomUUID(),
         });
       },
       loadConversation,
       sendMessage: async (agentId, text) => {
-        await request("POST", `/v1/agents/${encodeURIComponent(agentId)}/messages`, ignoreResponse, {
+        await request("POST", TEAM_API_ROUTES.agent.messages(agentId), ignoreResponse, {
           text,
           attachmentDraftIds: [],
           replyToMessageId: null,

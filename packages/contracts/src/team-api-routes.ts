@@ -129,6 +129,9 @@ export const TEAM_API_ROUTES = {
     conversation: (agentId: string) => `/v1/agents/${segment(agentId)}/conversation`,
     conversationPage: (agentId: string) => `/v1/agents/${segment(agentId)}/conversation-page`,
     conversationRead: (agentId: string) => `/v1/agents/${segment(agentId)}/conversation/read`,
+    // Protocol v3 only. The v3 adapter rewrites this to the `read` path before handing the body to
+    // the v1 codec, so v1 never classifies it - see `v3-adapter.ts`.
+    conversationUnread: (agentId: string) => `/v1/agents/${segment(agentId)}/conversation/unread`,
     messages: (agentId: string) => `/v1/agents/${segment(agentId)}/messages`,
     reactions: (agentId: string) => `/v1/agents/${segment(agentId)}/reactions`,
     interrupt: (agentId: string) => `/v1/agents/${segment(agentId)}/interrupt`,
