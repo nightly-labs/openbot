@@ -10,11 +10,13 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import {
   createRemoteConnectionRecovery,
   createWorkspacePreferences,
-  decodeTeamProtocolSupportV1,
   mergeRemoteUnreadIds,
   type RemoteConnectionStage,
   RemoteTeamDirectoryClient,
@@ -23,8 +25,6 @@ import {
   remoteConnectionFailure,
   remoteRecoveryMessage,
   resyncRemoteConversations,
-  TEAM_CONVERSATION_UNREAD_CAPABILITY,
-  TEAM_PROTOCOL_V3,
 } from "@openbot/team-client";
 import { fetch } from "expo/fetch";
 import * as Crypto from "expo-crypto";

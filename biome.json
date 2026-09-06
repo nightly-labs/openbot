@@ -99,6 +99,21 @@
     },
     {
       "includes": [
+        "packages/contracts/src/**/*.ts",
+        "packages/team-client/src/**/*.ts",
+        "!packages/contracts/src/**/*.test.ts",
+        "!packages/team-client/src/**/*.test.ts"
+      ],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noNodejsModules": "error"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
         "src/**/*.ts",
         "src/**/*.tsx",
         "scripts/**/*.ts",
