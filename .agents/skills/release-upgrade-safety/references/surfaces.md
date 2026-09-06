@@ -12,20 +12,20 @@ any of them before an upgrade. A renamed constant means the old file is never re
 | File | Constant | Version handling |
 | --- | --- | --- |
 | `openbot.db` | `DatabaseCore` in `src/backend/database/database-core.ts` | `schema_migrations`, gate A |
-| `openbot-setup-v2.json` | `SETUP_FILE`, `src/main/index.ts` | `src/main/setup-store.ts` accepts only `version === 2`, silent default otherwise |
-| `openbot-analytics-preference-v1.json` | `ANALYTICS_PREFERENCE_FILE`, `src/main/index.ts` | `src/main/analytics-preference-store.ts` |
-| `openbot-update-preference-v1.json` | `UPDATE_PREFERENCE_FILE`, `src/main/index.ts` | `src/main/update-preference-store.ts` |
-| `openbot-dynamic-island-preference-v1.json` | `DYNAMIC_ISLAND_PREFERENCE_FILE`, `src/main/index.ts` | `src/main/dynamic-island-preference-store.ts` reads `version` 1 and 2 forward into 3 |
+| `openbot-setup-v2.json` | `SETUP_FILE`, `src/main/application-services.ts` | `src/main/setup-store.ts` accepts only `version === 2`, silent default otherwise |
+| `openbot-analytics-preference-v1.json` | `ANALYTICS_PREFERENCE_FILE`, `src/main/application-services.ts` | `src/main/analytics-preference-store.ts` |
+| `openbot-update-preference-v1.json` | `UPDATE_PREFERENCE_FILE`, `src/main/application-services.ts` | `src/main/update-preference-store.ts` |
+| `openbot-dynamic-island-preference-v1.json` | `DYNAMIC_ISLAND_PREFERENCE_FILE`, `src/main/application-services.ts` | `src/main/dynamic-island-preference-store.ts` reads `version` 1 and 2 forward into 3 |
 | `openbot-main-window-state-v1.json` | `MAIN_WINDOW_STATE_FILE`, `src/main/index.ts` | `src/main/main-window-state.ts` accepts only `version === 1` |
-| `openbot-browser-state-v1.json` | `BROWSER_STATE_FILE`, `src/main/index.ts` | `BrowserHost` in `src/backend/browser-host.ts` |
-| `openbot-sidebar-layout-v1.json` | `SIDEBAR_LAYOUT_FILE`, `src/main/index.ts` | `src/backend/sidebar-layout-store.ts` |
-| `openbot-team-server-v1.json` | `TEAM_FILE`, `src/main/index.ts` | frozen as the last pre-accounts build left it |
-| `openbot-team-server-v2.json` | `TEAM_FILE_V2`, `src/main/index.ts` | `src/main/team-store.ts`; both files coexist so a downgrade still finds its host |
-| `openbot-remote-servers-v1.json` | `REMOTE_SERVERS_FILE`, `src/main/index.ts` | `src/main/remote-server-stored-shape.ts` reads v1/v2 as v3, preserves unreadable entries, refuses unknown versions |
-| `openbot-central-auth-v1.bin` | `CENTRAL_AUTH_FILE`, `src/main/index.ts` | `safeStorage`-encrypted; `src/main/central-auth-manager.ts` **throws** on anything but `version === 2` and `#initialize` catches that into `#clearStoredSession()`, so a bad shape signs the user out; undecryptable if `appId` or the signing identity changes |
-| `openbot-remote-desktop-credential-v1.json` | `LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE`, `src/main/index.ts` | legacy, still read |
-| `openbot-remote-desktop-runtime-v1.json` | `REMOTE_DESKTOP_RUNTIME_SECRET_FILE`, `src/main/index.ts` | `safeStorage`-encrypted; `src/main/remote-desktop-secret-store.ts` accepts only `version: 1` |
-| `openbot-dev-remote-connection-v1.json` | `DEVELOPMENT_REMOTE_CONNECTION_FILE`, `src/main/index.ts` | development only |
+| `openbot-browser-state-v1.json` | `BROWSER_STATE_FILE`, `src/main/application-services.ts` | `BrowserHost` in `src/backend/browser-host.ts` |
+| `openbot-sidebar-layout-v1.json` | `SIDEBAR_LAYOUT_FILE`, `src/main/application-services.ts` | `src/backend/sidebar-layout-store.ts` |
+| `openbot-team-server-v1.json` | `TEAM_FILE`, `src/main/application-services.ts` | frozen as the last pre-accounts build left it |
+| `openbot-team-server-v2.json` | `TEAM_FILE_V2`, `src/main/application-services.ts` | `src/main/team-store.ts`; both files coexist so a downgrade still finds its host |
+| `openbot-remote-servers-v1.json` | `REMOTE_SERVERS_FILE`, `src/main/application-services.ts` | `src/main/remote-server-stored-shape.ts` reads v1/v2 as v3, preserves unreadable entries, refuses unknown versions |
+| `openbot-central-auth-v1.bin` | `CENTRAL_AUTH_FILE`, `src/main/application-services.ts` | `safeStorage`-encrypted; `src/main/central-auth-manager.ts` **throws** on anything but `version === 2` and `#initialize` catches that into `#clearStoredSession()`, so a bad shape signs the user out; undecryptable if `appId` or the signing identity changes |
+| `openbot-remote-desktop-credential-v1.json` | `LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE`, `src/main/application-services.ts` | legacy, still read |
+| `openbot-remote-desktop-runtime-v1.json` | `REMOTE_DESKTOP_RUNTIME_SECRET_FILE`, `src/main/application-services.ts` | `safeStorage`-encrypted; `src/main/remote-desktop-secret-store.ts` accepts only `version: 1` |
+| `openbot-dev-remote-connection-v1.json` | `DEVELOPMENT_REMOTE_CONNECTION_FILE`, `src/main/development-remote-bootstrap.ts` | development only |
 | `bots.json` | `LEGACY_AGENTS_STATE_FILE`, `src/backend/agent-store.ts` | permanent name; imported once under command id `legacy-import:bots:v1` |
 | `mailbox.json` | `src/backend/mailbox-store.ts` | permanent name |
 | `sunshine-credentials.json`, `sunshine-state.json`, `sunshine-apps.json`, `moonlight-config.json`, `moonlight-data.json` | `src/main/sunshine-moonlight-runtime.ts` | written by the vendored runtimes, not by OpenBot |

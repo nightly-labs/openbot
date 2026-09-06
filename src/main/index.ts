@@ -1,42 +1,10 @@
-import { existsSync } from "node:fs";
-import { readFile, rm, writeFile } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
-import { extname, isAbsolute, join, relative, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
-import { type CentralAuthState, IPC_CHANNELS, LOCAL_SERVER_ID, type MacPermissionId } from "@openbot/contracts/ipc";
+import { type CentralAuthState, IPC_CHANNELS } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import {
-  app,
-  BrowserWindow,
-  type Display,
-  dialog,
-  Menu,
-  powerMonitor,
-  protocol,
-  type Rectangle,
-  safeStorage,
-  screen,
-  session,
-  shell,
-} from "electron";
-import electronUpdater from "electron-updater";
-import { z } from "zod";
-import { AgentService } from "../backend/agent-service";
-import { AgentStore } from "../backend/agent-store";
-import { BrowserHost } from "../backend/browser-host";
-import { isCloseBrowserTabShortcut, isSelectAllShortcut, isToggleDevToolsShortcut } from "../backend/browser-shortcuts";
-import { MailboxStore } from "../backend/mailbox-store";
-import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
-import { TeamChatStore } from "../backend/team-chat-store";
-import { AgentInitializationGate } from "./agent-initialization";
-import { AgentMarketplaceService } from "./agent-marketplace-service";
-import { HostAnalytics } from "./analytics";
-import { readAnalyticsPreference } from "./analytics-preference-store";
+import { app, type BrowserWindow, dialog, powerMonitor, protocol, screen } from "electron";
 import { readAppVariant, resolveAppIconPath } from "./app-icon";
-import { BrowserPictureInPicture } from "./browser-picture-in-picture";
-import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
-import { ComputerUseMacSetupService } from "./computer-use-mac-setup";
-import { ComputerUseMacSetupWindowController } from "./computer-use-mac-setup-window";
+import { type ApplicationServices, createApplicationServices } from "./application-services";
 import { guardDevelopmentOutput } from "./development-output";
 import {
   developmentUserDataName,
@@ -44,12 +12,7 @@ import {
   readDevelopmentProfile,
   readDevelopmentRemoteDebuggingPort,
   shouldAutoStartHost,
-  shouldShowDevelopmentWindow,
 } from "./development-profile";
-import { performDynamicIslandCriticalAction } from "./dynamic-island-actions";
-import { DynamicIslandWindowController, dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
-import { DEVELOPMENT_REMOTE_CLIENT_USERNAME, HostService } from "./host-service";
-import { HostedSiteDesktopService } from "./hosted-site-service";
 import { registerAccountIpcHandlers } from "./ipc/register-account-handlers";
 import { registerAgentIpcHandlers } from "./ipc/register-agent-handlers";
 import { registerAppIpcHandlers } from "./ipc/register-app-handlers";
@@ -68,38 +31,16 @@ import { registerUpdateIpcHandlers } from "./ipc/register-update-handlers";
 import { registerVoiceIpcHandlers } from "./ipc/register-voice-handlers";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
-  createMainWindowBoundsRecorder,
-  ensureMacApplicationPresence,
-  presentMainWindow,
-  readMainWindowBounds,
-  resolveMainWindowBounds,
-  writeMainWindowBounds,
-} from "./main-window-state";
-import { ManagedSkillService } from "./managed-skill-service";
-import { ProviderRuntimeManager } from "./provider-runtime-manager";
-import { RemoteDesktopManager } from "./remote-desktop-manager";
-import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
-import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
-import { decodeVoid } from "./remote-host-decoding";
-import { type DevelopmentRemoteServerConnection, RemoteServerManager } from "./remote-server-manager";
+  configureApplicationMenu,
+  createMainWindowController,
+  createMainWindowHolder,
+  showMainWindow,
+} from "./main-window";
+import { ensureMacApplicationPresence } from "./main-window-state";
 import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
-import {
-  configureAttachmentProtocol,
-  configureContentSecurityPolicy,
-  configureRendererPermissions,
-  configureServerLogoProtocols,
-} from "./session-configuration";
-import { readSetupState, writeSetupState } from "./setup-store";
-import { SkillMarketplaceService } from "./skill-marketplace-service";
-import { TeamStore } from "./team-store";
-import { TeamWebRtcBridge } from "./team-webrtc-bridge";
-import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
-import { isTrustedRendererUrl } from "./trusted-renderer";
-import { readUpdatePreference } from "./update-preference-store";
-import { supportsInstalledUpdates, UpdateService } from "./update-service";
-import { WHISPER_MODEL_NAME, WHISPER_MODEL_URL } from "./voice-model-service";
-import { VoiceTranscriptionService } from "./voice-transcription-service";
+import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
+import { TeardownRegistry } from "./teardown-registry";
 
 const logger = createOpenBotLogger("main");
 
@@ -179,28 +120,17 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-let mainWindow: BrowserWindow | null = null;
-let mainWindowLoad: Promise<BrowserWindow> | null = null;
-let browserHost: BrowserHost | null = null;
-let browserPictureInPicture: BrowserPictureInPicture | null = null;
-let agentService: AgentService | null = null;
-let mailboxStore: MailboxStore | null = null;
-let updateService: UpdateService | null = null;
-let providerRuntimeManager: ProviderRuntimeManager | null = null;
-let hostService: HostService | null = null;
-let remoteDesktopManager: RemoteDesktopManager | null = null;
-let remoteServerManager: RemoteServerManager | null = null;
-let centralAuthManager: CentralAuthManager | null = null;
+/**
+ * The one handle that replaces the fourteen module-scope service `let`s this file used to keep.
+ * Null until `createApplicationServices` returns, and never null again - which is why nothing below
+ * treats a null as a recoverable state beyond the startup window it really is.
+ */
+let services: ApplicationServices | null = null;
 let activeRemotePrincipalId: string | null = null;
 /** Counts account transitions, so queued work for a superseded one is dropped rather than applied. */
 let centralAuthGeneration = 0;
 let activeAnalyticsPrincipalId: string | null = null;
 let remoteAccountSync = Promise.resolve();
-let hostAnalytics: HostAnalytics | null = null;
-let teamWebRtcBridge: TeamWebRtcBridge | null = null;
-let voiceTranscriptionService: VoiceTranscriptionService | null = null;
-let dynamicIslandController: DynamicIslandWindowController | null = null;
-let computerUseMacSetupController: ComputerUseMacSetupWindowController | null = null;
 const macHapticFeedback = new MacHapticFeedback();
 let isQuitting = false;
 let shutdownStarted = false;
@@ -209,10 +139,6 @@ let systemSessionEndFlushStarted = false;
 let pendingInviteUrl: string | null = findInviteUrl(process.argv);
 let inviteReceiverReady = false;
 
-const SETUP_FILE = "openbot-setup-v2.json";
-const ANALYTICS_PREFERENCE_FILE = "openbot-analytics-preference-v1.json";
-const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
-const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
 const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
 
 if (!app.isPackaged) {
@@ -221,30 +147,20 @@ if (!app.isPackaged) {
   process.once("SIGTERM", quitAfterDevelopmentSignal);
   process.once("SIGHUP", quitAfterDevelopmentSignal);
 }
-const BROWSER_STATE_FILE = "openbot-browser-state-v1.json";
-const SIDEBAR_LAYOUT_FILE = "openbot-sidebar-layout-v1.json";
-const TEAM_FILE = "openbot-team-server-v1.json";
-/** One host per account. The v1 file above stays as the last build without accounts left it. */
-const TEAM_FILE_V2 = "openbot-team-server-v2.json";
-const REMOTE_SERVERS_FILE = "openbot-remote-servers-v1.json";
-const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
-const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential-v1.json";
-const REMOTE_DESKTOP_RUNTIME_SECRET_FILE = "openbot-remote-desktop-runtime-v1.json";
 
-// Resolved once, safely: every `app.setPath("userData", ...)` above has already run. `mainWindow`
-// is the one thing that cannot be captured here - it is reassigned whenever the window is rebuilt.
-const mainWindowStatePath = join(app.getPath("userData"), MAIN_WINDOW_STATE_FILE);
-const { restoreMainWindowBounds, currentMainWindowBounds, rememberMainWindowBounds, flushMainWindowBounds } =
-  createMainWindowBoundsRecorder({
-    getMainWindow: () => mainWindow,
-    readBounds: () => readMainWindowBounds(mainWindowStatePath),
-    writeBounds: (bounds) => writeMainWindowBounds(mainWindowStatePath, bounds),
-    reportError: (message, error) => logger.error(message, toLogValue(error)),
-  });
+/**
+ * Filled in as `createApplicationServices` builds, so a quit that arrives part-way through stops
+ * exactly what exists. Each step's position in the sequence is declared where the service is built.
+ */
+const teardown = new TeardownRegistry({
+  reportError: (name, error) => logger.error(`Unable to shut down ${name}:`, toLogValue(error)),
+});
+
+// Declared before the forwarders and the window surface because both read it, and it outlives any
+// one window: macOS destroys the main window on close and `activate` rebuilds it into this slot.
+const windowHolder = createMainWindowHolder();
 
 // Destructured so every `service.on("event", forwardX)` registration below reads as it always has.
-// `showMainWindow` is a hoisted declaration further down this file; passing it in is what keeps
-// `renderer-forwarders.ts` from importing back into this module.
 const {
   forwardAgentEvent,
   forwardBrowserDisplayState,
@@ -258,36 +174,70 @@ const {
   forwardDirectMessage,
   forwardDirectTyping,
 } = createRendererForwarders({
-  getMainWindow: () => mainWindow,
-  getAgentService: () => agentService,
-  getHostService: () => hostService,
-  getHostAnalytics: () => hostAnalytics,
-  getRemoteServerManager: () => remoteServerManager,
+  getMainWindow: () => windowHolder.current,
+  getAgentService: () => services?.service ?? null,
+  getHostService: () => services?.host ?? null,
+  getHostAnalytics: () => services?.analytics ?? null,
+  getRemoteServerManager: () => services?.remoteServers ?? null,
   showMainWindow,
 });
 
-interface IpcHandlerDependencies {
-  service: AgentService;
-  providerRuntimes: ProviderRuntimeManager;
-  mailbox: MailboxStore;
-  browser: BrowserHost;
-  browserPictureInPicture: BrowserPictureInPicture;
-  updater: UpdateService;
-  setupFile: string;
-  analyticsPreferenceFile: string;
-  updatePreferenceFile: string;
-  initializeAgent: () => Promise<void>;
-  sidebarLayout: SidebarLayoutStore;
-  host: HostService;
-  remoteDesktop: RemoteDesktopManager;
-  remoteServers: RemoteServerManager;
-  centralAuth: CentralAuthManager;
-  skills: SkillMarketplaceService;
-  hostedSites: HostedSiteDesktopService;
-  marketplaceAgents: AgentMarketplaceService;
-  voice: VoiceTranscriptionService;
-  dynamicIsland: DynamicIslandWindowController;
-  computerUseMacSetup: ComputerUseMacSetupWindowController;
+// Resolved once, safely: every `app.setPath("userData", ...)` above has already run.
+const windows = createMainWindowController({
+  holder: windowHolder,
+  statePath: join(app.getPath("userData"), MAIN_WINDOW_STATE_FILE),
+  appIconPath,
+  developmentProfile,
+  developmentRemoteRole,
+  developmentTestClientEnabled,
+  isQuitting: () => isQuitting,
+  getServices: () => services,
+  forwardAgentEvent,
+  onRendererLoadStarted: () => {
+    inviteReceiverReady = false;
+  },
+  onMainWindowCreated: attachWindowsSessionEndHandlers,
+  reportError: (message, error) => logger.error(message, toLogValue(error)),
+});
+
+/**
+ * Windows gives an application a few seconds between announcing a session end and killing it, so
+ * these two handlers flush rather than shut down: they deliberately do not call
+ * `prepareForShutdown`, which awaits network teardown the deadline has no room for. They are
+ * registered when the first window is built, long before any service exists, which is why every
+ * read below goes through `services?.`.
+ */
+function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
+  if (process.platform !== "win32") return;
+  window.on("query-session-end", () => {
+    systemSessionEnding = true;
+    isQuitting = true;
+    if (systemSessionEndFlushStarted) return;
+    systemSessionEndFlushStarted = true;
+    services?.updater.stop();
+    void windows
+      .flushMainWindowBounds()
+      .catch((error) =>
+        logger.error("Unable to save the main window position before Windows session end:", toLogValue(error)),
+      );
+    void services?.browser
+      .flushPersistentStorage()
+      .catch((error) => logger.error("Unable to flush browser storage before Windows session end:", toLogValue(error)));
+    void services?.providerRuntimes.stop();
+  });
+  window.on("session-end", () => {
+    systemSessionEnding = true;
+    isQuitting = true;
+    void windows
+      .flushMainWindowBounds()
+      .catch((error) =>
+        logger.error("Unable to save the main window position during Windows session end:", toLogValue(error)),
+      );
+    void services?.browser
+      .flushPersistentStorage()
+      .catch((error) => logger.error("Unable to flush browser storage during Windows session end:", toLogValue(error)));
+    void services?.providerRuntimes.stop();
+  });
 }
 
 function registerIpcHandlers({
@@ -300,7 +250,7 @@ function registerIpcHandlers({
   setupFile,
   analyticsPreferenceFile,
   updatePreferenceFile,
-  initializeAgent,
+  agentInitialization,
   sidebarLayout,
   host,
   remoteDesktop,
@@ -312,12 +262,13 @@ function registerIpcHandlers({
   voice,
   dynamicIsland,
   computerUseMacSetup,
-}: IpcHandlerDependencies): void {
+  analytics,
+}: ApplicationServices): void {
   // Every renderer-to-main endpoint is registered by one of these, one file per
   // domain under ./ipc. Nothing is registered inline here: this is the trust
   // boundary, and a reviewer should be able to read a domain's whole surface in
   // one file rather than find it interleaved with window and lifecycle code.
-  const getMainWindow = () => mainWindow;
+  const getMainWindow = () => windowHolder.current;
 
   registerAppIpcHandlers({
     service,
@@ -326,10 +277,10 @@ function registerIpcHandlers({
     updater,
     setupFile,
     analyticsPreferenceFile,
-    initializeAgent,
+    initializeAgent: () => agentInitialization.start(),
     appVariant,
     getMainWindow,
-    setAnalyticsTrackingEnabled: (enabled) => hostAnalytics?.setTrackingEnabled(enabled),
+    setAnalyticsTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
   });
   registerDynamicIslandIpcHandlers({ dynamicIsland });
   registerComputerUseIpcHandlers({ computerUseMacSetup });
@@ -358,325 +309,18 @@ function registerIpcHandlers({
   registerBrowserIpcHandlers({ browserPictureInPicture, browser, remoteServers });
 }
 
-function createWindow(): BrowserWindow {
-  let inspectElementModifierPressed = false;
-  const cursor = screen.getCursorScreenPoint();
-  const bounds = resolveMainWindowBounds(
-    currentMainWindowBounds(),
-    screen.getAllDisplays().map((display) => display.workArea),
-    screen.getDisplayNearestPoint(cursor).workArea,
-    { width: 1200, height: 820 },
-    { width: 960, height: 640 },
-  );
-  const window = new BrowserWindow({
-    ...bounds,
-    minWidth: 960,
-    minHeight: 640,
-    show: false,
-    backgroundColor: "#0b0d0e",
-    title: developmentProfile === "test-client" ? "OpenBot Local Client" : "OpenBot Local Host",
-    icon: appIconPath,
-    ...(process.platform === "darwin"
-      ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 8, y: 14 } }
-      : {}),
-    webPreferences: {
-      preload: join(__dirname, "../preload/index.cjs"),
-      contextIsolation: true,
-      devTools: true,
-      sandbox: true,
-      nodeIntegration: false,
-      webSecurity: true,
-    },
-  });
-
-  window.once("ready-to-show", () => {
-    if (
-      shouldShowDevelopmentWindow({
-        remoteRole: developmentRemoteRole,
-        testClientEnabled: developmentTestClientEnabled,
-      })
-    ) {
-      window.show();
-    }
-  });
-  window.on("close", (event) => {
-    rememberMainWindowBounds(window.getNormalBounds());
-    if (process.platform === "darwin" && !isQuitting) {
-      // The hidden renderer owns the cross-host Dynamic Island coordinator and must outlive its visible window.
-      event.preventDefault();
-      window.hide();
-    }
-  });
-  if (process.platform === "win32") {
-    window.on("query-session-end", () => {
-      systemSessionEnding = true;
-      isQuitting = true;
-      if (systemSessionEndFlushStarted) return;
-      systemSessionEndFlushStarted = true;
-      updateService?.stop();
-      void flushMainWindowBounds().catch((error) =>
-        logger.error("Unable to save the main window position before Windows session end:", toLogValue(error)),
-      );
-      void browserHost
-        ?.flushPersistentStorage()
-        .catch((error) =>
-          logger.error("Unable to flush browser storage before Windows session end:", toLogValue(error)),
-        );
-      void providerRuntimeManager?.stop();
-    });
-    window.on("session-end", () => {
-      systemSessionEnding = true;
-      isQuitting = true;
-      void flushMainWindowBounds().catch((error) =>
-        logger.error("Unable to save the main window position during Windows session end:", toLogValue(error)),
-      );
-      void browserHost
-        ?.flushPersistentStorage()
-        .catch((error) =>
-          logger.error("Unable to flush browser storage during Windows session end:", toLogValue(error)),
-        );
-      void providerRuntimeManager?.stop();
-    });
-  }
-  window.on("closed", () => {
-    if (mainWindow === window) mainWindow = null;
-  });
-  window.on("move", () => rememberMainWindowBounds(window.getNormalBounds()));
-  window.on("resize", () => rememberMainWindowBounds(window.getNormalBounds()));
-  window.on("hide", () => computerUseMacSetupController?.close());
-
-  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  window.webContents.on("before-input-event", (event, input) => {
-    if (input.key.toLowerCase() === "shift") {
-      inspectElementModifierPressed = input.type === "keyDown";
-    }
-    if (isToggleDevToolsShortcut(input)) {
-      event.preventDefault();
-      window.webContents.toggleDevTools();
-      return;
-    }
-    if (isSelectAllShortcut(input)) {
-      event.preventDefault();
-      void window.webContents.executeJavaScript(
-        `(() => {
-          const active = document.activeElement;
-          if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
-            active.select();
-            return;
-          }
-          if (!(active instanceof HTMLElement) || !active.isContentEditable) return;
-          const range = document.createRange();
-          range.selectNodeContents(active);
-          const selection = window.getSelection();
-          selection?.removeAllRanges();
-          selection?.addRange(range);
-        })()`,
-        true,
-      );
-      return;
-    }
-    const tabId = browserHost?.activeTabId;
-    if (
-      remoteServerManager?.activeServerId !== LOCAL_SERVER_ID ||
-      !browserHost?.visible ||
-      !tabId ||
-      !isCloseBrowserTabShortcut(input)
-    ) {
-      return;
-    }
-    event.preventDefault();
-    setImmediate(() => void browserHost?.close(tabId).catch(() => undefined));
-  });
-  window.webContents.on("context-menu", (event, params) => {
-    if (!inspectElementModifierPressed) return;
-    event.preventDefault();
-    window.webContents.inspectElement(params.x, params.y);
-  });
-  window.on("blur", () => {
-    inspectElementModifierPressed = false;
-  });
-  window.webContents.on("will-navigate", (event, targetUrl) => {
-    if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
-  });
-  window.webContents.on("did-finish-load", () => {
-    const service = agentService;
-    if (service) forwardAgentEvent("local", { type: "runtime-snapshot", snapshot: service.getRuntimeSnapshot() });
-    remoteServerManager?.refreshRuntimeSnapshots();
-  });
-
-  return window;
-}
-
-function createDynamicIslandWindow(bounds: Rectangle, _display: Display): BrowserWindow {
-  const window = new BrowserWindow({
-    ...bounds,
-    show: false,
-    transparent: true,
-    frame: false,
-    alwaysOnTop: true,
-    focusable: false,
-    hiddenInMissionControl: true,
-    resizable: false,
-    movable: false,
-    minimizable: false,
-    maximizable: false,
-    fullscreenable: false,
-    enableLargerThanScreen: true,
-    hasShadow: false,
-    skipTaskbar: true,
-    type: "panel",
-    backgroundColor: "#00000000",
-    webPreferences: {
-      preload: join(__dirname, "../preload/index.cjs"),
-      contextIsolation: true,
-      devTools: true,
-      sandbox: true,
-      nodeIntegration: false,
-      webSecurity: true,
-    },
-  });
-  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  window.webContents.on("will-navigate", (event, targetUrl) => {
-    if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
-  });
-  return window;
-}
-
-function createComputerUseMacSetupWindow(): BrowserWindow {
-  const workArea =
-    mainWindow && !mainWindow.isDestroyed()
-      ? screen.getDisplayMatching(mainWindow.getBounds()).workArea
-      : screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-  const width = 360;
-  const height = 300;
-  const window = new BrowserWindow({
-    width,
-    height,
-    x: workArea.x + workArea.width - width - 16,
-    y: workArea.y + 52,
-    show: false,
-    resizable: false,
-    minimizable: false,
-    maximizable: false,
-    fullscreenable: false,
-    skipTaskbar: true,
-    alwaysOnTop: true,
-    backgroundColor: "#0b0d0e",
-    title: "Set up Computer Use",
-    icon: appIconPath,
-    ...(process.platform === "darwin"
-      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 12, y: 13 } }
-      : {}),
-    webPreferences: {
-      preload: join(__dirname, "../preload/index.cjs"),
-      contextIsolation: true,
-      devTools: true,
-      sandbox: true,
-      nodeIntegration: false,
-      webSecurity: true,
-    },
-  });
-  window.setAlwaysOnTop(true, "floating");
-  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  window.webContents.on("will-navigate", (event, targetUrl) => {
-    if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
-  });
-  return window;
-}
-
-function loadRenderer(window: BrowserWindow): Promise<void> {
-  inviteReceiverReady = false;
-  const developmentUrl = process.env.ELECTRON_RENDERER_URL;
-  return developmentUrl ? window.loadURL(developmentUrl) : window.loadURL("openbot-app://app/index.html");
-}
-
-async function ensureMainWindow(): Promise<BrowserWindow> {
-  if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
-  if (mainWindowLoad) return mainWindowLoad;
-  const window = createWindow();
-  mainWindow = window;
-  mainWindowLoad = loadRenderer(window)
-    .then(() => window)
-    .catch((error) => {
-      if (!window.isDestroyed()) window.destroy();
-      if (mainWindow === window) mainWindow = null;
-      throw error;
-    })
-    .finally(() => {
-      mainWindowLoad = null;
-    });
-  return mainWindowLoad;
-}
-
-function showMainWindow(window: BrowserWindow): void {
-  presentMainWindow(window, process.platform, () => app.show());
-}
-
-function loadDynamicIslandRenderer(window: BrowserWindow, display: Display): Promise<void> {
-  const displayMode = display.internal ? "notch" : "island";
-  const developmentUrl = process.env.ELECTRON_RENDERER_URL;
-  const url = new URL(developmentUrl ?? "openbot-app://app/index.html");
-  url.searchParams.set("surface", "dynamic-island");
-  url.searchParams.set("display", displayMode);
-  const notch = dynamicIslandNotchSizeForDisplay(display);
-  if (notch) {
-    url.searchParams.set("notch-width", String(notch.width));
-    url.searchParams.set("notch-height", String(notch.height));
-  }
-  return window.loadURL(url.toString());
-}
-
-function loadComputerUseMacSetupRenderer(window: BrowserWindow, permission: MacPermissionId): Promise<void> {
-  const developmentUrl = process.env.ELECTRON_RENDERER_URL;
-  const url = new URL(developmentUrl ?? "openbot-app://app/index.html");
-  url.searchParams.set("surface", "computer-use-setup");
-  url.searchParams.set("permission", permission);
-  return window.loadURL(url.toString());
-}
-
-function configureApplicationMenu(service: AgentService, updater: UpdateService): void {
-  Menu.setApplicationMenu(
-    Menu.buildFromTemplate([
-      {
-        role: "appMenu",
-        submenu: [
-          {
-            label: "Stop all agents",
-            accelerator: "CommandOrControl+.",
-            click: () => void service.interruptAll(),
-          },
-          { type: "separator" },
-          {
-            label: "Check for Updates…",
-            click: () => void updater.checkForUpdates(),
-          },
-          { type: "separator" },
-          { role: "hide" },
-          { role: "hideOthers" },
-          { role: "unhide" },
-          { type: "separator" },
-          { role: "quit" },
-        ],
-      },
-      { role: "editMenu" },
-      { role: "viewMenu" },
-      { role: "windowMenu" },
-    ]),
-  );
-}
-
 function forwardCentralAuth(state: CentralAuthState): void {
   if (state.status === "signed_in") {
-    if (activeAnalyticsPrincipalId && activeAnalyticsPrincipalId !== state.user.id) hostAnalytics?.clear();
+    if (activeAnalyticsPrincipalId && activeAnalyticsPrincipalId !== state.user.id) services?.analytics.clear();
     activeAnalyticsPrincipalId = state.user.id;
   } else if (state.status === "signed_out") {
-    if (activeAnalyticsPrincipalId) hostAnalytics?.clear();
+    if (activeAnalyticsPrincipalId) services?.analytics.clear();
     activeAnalyticsPrincipalId = null;
   }
   // The renderer is told about the new account at the end of this function, before the
   // queued work below can finish, so the host stops answering for the previous account now.
   // The file is left alone until `applySignedInAccount` records the switch.
-  hostService?.unbindChangedAccount(state.status === "signed_in" ? state.user : null);
+  services?.host.unbindChangedAccount(state.status === "signed_in" ? state.user : null);
   const generation = ++centralAuthGeneration;
   remoteAccountSync = remoteAccountSync
     .then(async () => {
@@ -689,7 +333,7 @@ function forwardCentralAuth(state: CentralAuthState): void {
         // Best-effort, like every other network step here: a bridge disconnect that
         // rejects must not stop the local host from leaving the previous account.
         try {
-          await remoteServerManager?.disconnectRemoteSessions();
+          await services?.remoteServers.disconnectRemoteSessions();
         } catch (error) {
           logger.error("Unable to disconnect the previous account's remote sessions:", toLogValue(error));
         }
@@ -703,15 +347,15 @@ function forwardCentralAuth(state: CentralAuthState): void {
           // Stopping is best-effort; unbinding the host is not, so a failed teardown
           // must not leave the signed-out account's host bound.
           try {
-            await hostService?.stop(false);
+            await services?.host.stop(false);
           } catch (error) {
             logger.error("Unable to stop the host while signing out:", toLogValue(error));
           }
-          await hostService?.applySignedInAccount(null);
+          await services?.host.applySignedInAccount(null);
         }
         return;
       }
-      const host = hostService;
+      const host = services?.host ?? null;
       // The local host is rebound before the joined-server list is synchronized, and the
       // network failure is contained: this account must not end up signed in while the
       // previous account's host is still selected and possibly online.
@@ -723,10 +367,10 @@ function forwardCentralAuth(state: CentralAuthState): void {
           host.unbindChangedAccount(null);
           return;
         }
-        hostAnalytics?.flushPending();
+        services?.analytics.flushPending();
       }
       try {
-        await remoteServerManager?.syncRemoteHosts();
+        await services?.remoteServers.syncRemoteHosts();
       } catch (error) {
         logger.error("Unable to synchronize the joined servers:", toLogValue(error));
       }
@@ -735,8 +379,9 @@ function forwardCentralAuth(state: CentralAuthState): void {
     .catch((error) => {
       logger.error("Unable to synchronize the signed-in account:", toLogValue(error));
     });
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  sendToRenderer(mainWindow, IPC_CHANNELS.authEvent, state);
+  const window = windowHolder.current;
+  if (!window || window.isDestroyed()) return;
+  sendToRenderer(window, IPC_CHANNELS.authEvent, state);
 }
 
 function acceptInviteUrl(value: string): void {
@@ -746,9 +391,10 @@ function acceptInviteUrl(value: string): void {
     return;
   }
   pendingInviteUrl = value;
-  if (mainWindow && !mainWindow.isDestroyed() && inviteReceiverReady) {
-    showMainWindow(mainWindow);
-    if (sendToRenderer(mainWindow, IPC_CHANNELS.serversInvite, value)) pendingInviteUrl = null;
+  const window = windowHolder.current;
+  if (window && !window.isDestroyed() && inviteReceiverReady) {
+    showMainWindow(window);
+    if (sendToRenderer(window, IPC_CHANNELS.serversInvite, value)) pendingInviteUrl = null;
   }
 }
 
@@ -796,8 +442,9 @@ if (!hasSingleInstanceLock) {
   app.on("second-instance", (_event, argv) => {
     const deepLink = findInviteUrl(argv);
     if (deepLink) acceptOpenbotUrl(deepLink);
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    showMainWindow(mainWindow);
+    const window = windowHolder.current;
+    if (!window || window.isDestroyed()) return;
+    showMainWindow(window);
   });
 
   void app
@@ -812,414 +459,29 @@ if (!hasSingleInstanceLock) {
       if (process.platform === "darwin") app.dock?.setIcon(appIconPath);
       configureContentSecurityPolicy();
       configureRendererPermissions();
-      await restoreMainWindowBounds();
-      mainWindow = createWindow();
-      const computerUseMacSetupService = new ComputerUseMacSetupService({
-        getIconDataUrl: async (path) => (await app.getFileIcon(path, { size: "normal" })).toDataURL(),
-      });
-      computerUseMacSetupController = new ComputerUseMacSetupWindowController({
-        service: computerUseMacSetupService,
-        createWindow: createComputerUseMacSetupWindow,
-        loadWindow: loadComputerUseMacSetupRenderer,
-        openExternal: (url) => shell.openExternal(url),
-        revealPath: (path) => shell.showItemInFolder(path),
-        loadDragIcon: (path) => app.getFileIcon(path, { size: "normal" }),
-      });
-      dynamicIslandController = new DynamicIslandWindowController({
-        platform: process.platform,
-        preferencePath: join(app.getPath("userData"), DYNAMIC_ISLAND_PREFERENCE_FILE),
-        createWindow: createDynamicIslandWindow,
-        loadWindow: loadDynamicIslandRenderer,
-        getDisplays: () => screen.getAllDisplays(),
-        getMainWindow: () => mainWindow,
-        ensureMainWindow,
-        presentMainWindow: showMainWindow,
-        performHaptic: () => macHapticFeedback.performAlignment(),
-        performCriticalAction: async (action) => {
-          if (!agentService || !remoteServerManager) throw new Error("OpenBot is not ready.");
-          await performDynamicIslandCriticalAction(action, agentService, remoteServerManager, decodeVoid);
-        },
-      });
-      const centralAuthApiUrl = readCentralAuthApiUrl(
-        process.env.OPENBOT_AUTH_API_URL,
-        app.isPackaged ? "https://api.openbot.run" : "http://127.0.0.1:3100",
-      );
-      centralAuthManager = new CentralAuthManager({
-        apiUrl: centralAuthApiUrl,
-        mobileConnectApiUrl: readMobileConnectApiUrl(process.env.OPENBOT_MOBILE_AUTH_API_URL, centralAuthApiUrl),
-        storagePath: join(app.getPath("userData"), CENTRAL_AUTH_FILE),
-        canPersist: () => safeStorage.isEncryptionAvailable(),
-        encrypt: (value) => {
-          if (!safeStorage.isEncryptionAvailable()) {
-            throw new Error("macOS secure storage is unavailable.");
-          }
-          return safeStorage.encryptString(value);
-        },
-        decrypt: (value) => safeStorage.decryptString(value),
-      });
-      centralAuthManager.on("changed", forwardCentralAuth);
-      const centralAuth = centralAuthManager;
-      const centralAuthInitialization = centralAuthManager.initialize();
-      const store = new AgentStore(app.getPath("userData"), homedir());
-      await store.initialize();
-      const managedSkills = new ManagedSkillService(
-        app.isPackaged
-          ? join(process.resourcesPath, "managed-skills", "openbot-site-hosting", "SKILL.md")
-          : resolve(__dirname, "../../resources/managed-skills/openbot-site-hosting/SKILL.md"),
-      );
-      await managedSkills.syncAll(store.list());
-      const hostedSites = new HostedSiteDesktopService(centralAuthManager);
-      const sidebarLayoutStore = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
-      await sidebarLayoutStore.initialize();
-      await sidebarLayoutStore.reconcileAgents(new Set(store.list().map((agent) => agent.id)));
-      mailboxStore = new MailboxStore(app.getPath("userData"), store.sharedRoot, store.database);
-      await mailboxStore.initialize();
-      configureApplicationProtocol();
-      const developmentUrl = process.env.ELECTRON_RENDERER_URL;
-      teamWebRtcBridge = new TeamWebRtcBridge({
-        developmentUrl,
-        iceTransportPolicy:
-          developmentUrl && process.env.OPENBOT_DEV_ICE_TRANSPORT_POLICY === "relay" ? "relay" : "all",
-      });
-      browserHost = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE));
-      await browserHost.restore(store.list().map((agent) => ({ id: agent.id, threadId: agent.threadId })));
-      browserPictureInPicture = new BrowserPictureInPicture({
+      await windows.restoreMainWindowBounds();
+      const mainWindow = windows.openMainWindow();
+
+      const built = await createApplicationServices({
         mainWindow,
-        browser: browserHost,
-        preloadPath: join(__dirname, "../preload/index.cjs"),
-        iconPath: appIconPath,
-        developmentUrl: process.env.ELECTRON_RENDERER_URL,
-        onEvent: (event) => {
-          if (!mainWindow || mainWindow.isDestroyed()) return;
-          sendToRenderer(mainWindow, IPC_CHANNELS.browserPictureInPictureEvent, event);
-        },
+        windows,
+        appIconPath,
+        appVariant,
+        developmentRemoteRole,
+        developmentTestClientEnabled,
+        macHapticFeedback,
+        teardown,
+        forwardCentralAuth,
+        forwardBrowserDisplayState,
+        forwardProviderRuntimeStatus,
+        forwardVoiceModelStatus,
+        prepareForUpdateInstall,
       });
-      browserHost.onChanged((tabs, activeTabId) => forwardBrowserDisplayState({ tabs, activeTabId }));
-      const setupFile = join(app.getPath("userData"), SETUP_FILE);
-      const analyticsPreferenceFile = join(app.getPath("userData"), ANALYTICS_PREFERENCE_FILE);
-      const updatePreferenceFile = join(app.getPath("userData"), UPDATE_PREFERENCE_FILE);
-      const setupState = await readSetupState(setupFile);
-      const analyticsPreference = await readAnalyticsPreference(analyticsPreferenceFile);
-      const updatePreference = await readUpdatePreference(updatePreferenceFile);
-      providerRuntimeManager = new ProviderRuntimeManager({
-        root: join(app.getPath("userData"), "provider-runtimes"),
-      });
-      await providerRuntimeManager.initialize();
-      agentService = new AgentService(
-        store,
-        mailboxStore,
-        browserHost,
-        30_000,
-        setupState.preferredProvider ?? "codex",
-        null,
-        providerRuntimeManager.executablePath("codex"),
-        providerRuntimeManager.executablePath("claude"),
-        providerRuntimeManager.executablePath("grok"),
-        (agent) => managedSkills.syncAgent(agent),
-        hostedSites,
-      );
-      const service = agentService;
-      providerRuntimeManager.on("status", forwardProviderRuntimeStatus);
-      providerRuntimeManager.on("ready", (provider) => {
-        void service.refreshProvider(provider).catch((error) => {
-          logger.error(`Unable to refresh ${provider} after runtime installation:`, toLogValue(error));
-        });
-      });
-      const skillMarketplace = new SkillMarketplaceService(
-        centralAuthManager,
-        () => service.listAgents(),
-        async (agentId) => service.refreshAgentRuntime(agentId),
-      );
-      const agentMarketplace = new AgentMarketplaceService(centralAuthManager, service, skillMarketplace);
-      configureAttachmentProtocol({
-        mailbox: mailboxStore,
-        agents: service,
-        getRemoteServerManager: () => remoteServerManager,
-      });
-      const teamStore = new TeamStore(
-        join(app.getPath("userData"), TEAM_FILE_V2),
-        join(app.getPath("userData"), TEAM_FILE),
-      );
-      await teamStore.initialize();
-      if (developmentRemoteRole) {
-        const email =
-          developmentRemoteRole === "host"
-            ? (teamStore.getOwnerEmail() ?? "openbot-dev-host@example.com")
-            : "openbot-dev-client@example.com";
-        const user = await ensureDevelopmentAccount(centralAuthManager, email);
-        await teamStore.activateAccount(user);
-        if (developmentRemoteRole === "host" && !teamStore.configured) {
-          await teamStore.configureWithAccount("OpenBot Local Dev Host", user);
-        }
-        if (developmentRemoteRole === "client" && !setupState.completed) {
-          await writeSetupState(setupFile, "codex");
-        }
-      }
-      if (developmentRemoteRole === "host" && !developmentTestClientEnabled) {
-        const technicalMember = teamStore
-          .listMembers()
-          .find((member) => member.username === DEVELOPMENT_REMOTE_CLIENT_USERNAME);
-        if (technicalMember && technicalMember.role !== "owner") {
-          await teamStore.removeMember(technicalMember.id);
-        }
-      }
-      const teamChatStore = new TeamChatStore(store.database);
-      const remoteDesktopRuntime = await resolveRemoteDesktopRuntime({
-        isPackaged: app.isPackaged,
-        resourcesPath: process.resourcesPath,
-        sourceRoot: resolve(__dirname, "../.."),
-        platform: process.platform === "darwin" || process.platform === "win32" ? process.platform : "linux",
-        architecture: process.arch,
-        overrideRoot: process.env.OPENBOT_REMOTE_DESKTOP_RUNTIME_PATH,
-      });
-      hostService = new HostService({
-        appVersion: app.getVersion(),
-        store: teamStore,
-        agents: service,
-        skills: skillMarketplace,
-        sidebarLayout: sidebarLayoutStore,
-        mailbox: mailboxStore,
-        browser: browserHost,
-        chat: teamChatStore,
-        teamWebRtcBridge,
-        registerRemoteHost: (input) => {
-          if (!centralAuthManager) throw new Error("The account service is not ready.");
-          return centralAuthManager.registerRemoteHost(input);
-        },
-        issueRemoteHostTicket: (hostId) => {
-          if (!centralAuthManager) throw new Error("The account service is not ready.");
-          return centralAuthManager.issueRemoteHostTicket(hostId);
-        },
-        verifyRemoteSessionTicket: (ticket) => {
-          if (!centralAuthManager) throw new Error("The account service is not ready.");
-          return centralAuthManager.verifyRemoteSessionTicket(ticket);
-        },
-        endRemoteSession: (sessionId) => {
-          if (!centralAuthManager) throw new Error("The account service is not ready.");
-          return centralAuthManager.endRemoteSession(sessionId);
-        },
-        remoteControlPlaneUrl: centralAuth.resolveApiUrl("/"),
-        createRemoteInvite: (hostId, input) => centralAuth.createRemoteInvite(hostId, input),
-        listRemoteInvites: (hostId) => centralAuth.listRemoteInvites(hostId),
-        revokeRemoteInvite: (inviteId) => centralAuth.revokeRemoteInvite(inviteId),
-        listRemoteMembers: (hostId) => centralAuth.listRemoteMembers(hostId),
-        updateRemoteMember: (hostId, membershipId, role, reactivate) =>
-          centralAuth.updateRemoteMember(hostId, membershipId, role, reactivate),
-        removeRemoteMember: (hostId, membershipId) => centralAuth.removeRemoteMember(hostId, membershipId),
-        updateRemoteHostLogo: (hostId, image, version) => centralAuth.updateRemoteHostLogo(hostId, image, version),
-        allowLocalDevelopmentInvites: developmentRemoteRole === "host",
-        logDirectory: join(app.getPath("userData"), "logs", "remote"),
-        removeLegacyRemoteDesktopCredential: async () => {
-          const credentialPath = join(app.getPath("userData"), LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE);
-          await Promise.all([rm(credentialPath, { force: true }), rm(`${credentialPath}.tmp`, { force: true })]);
-        },
-        getSignedInUser: () => {
-          if (!centralAuthManager) throw new Error("The account service is not ready.");
-          return centralAuthManager.getSignedInUser();
-        },
-        redeemCentralTicket: (ticket, serverId) => {
-          if (!centralAuthManager) return Promise.resolve(null);
-          return centralAuthManager.redeemTeamAuthTicket(ticket, serverId);
-        },
-        sendTeamInviteEmail: (input) => {
-          if (!centralAuthManager) throw new Error("The account service is not ready.");
-          return centralAuthManager.sendTeamInviteEmail(input);
-        },
-        platform: process.platform === "darwin" || process.platform === "win32" ? process.platform : "linux",
-        unattended: false,
-        remoteDesktopRuntimePaths: remoteDesktopRuntime,
-        remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
-        getRemoteDesktopRuntimeCredentials: () => {
-          if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
-          return loadOrCreateRemoteDesktopCredentials(
-            join(app.getPath("userData"), REMOTE_DESKTOP_RUNTIME_SECRET_FILE),
-            {
-              encrypt: (value) => safeStorage.encryptString(value),
-              decrypt: (value) => safeStorage.decryptString(value),
-            },
-          );
-        },
-        getRemoteDesktopDisplays: () => {
-          const primaryId = screen.getPrimaryDisplay().id;
-          return screen.getAllDisplays().map((display, index) => ({
-            id: String(display.id),
-            label: display.label || `Display ${index + 1}`,
-            width: display.size.width,
-            height: display.size.height,
-            primary: display.id === primaryId,
-          }));
-        },
-        getRemoteDesktopIceServers: () => {
-          if (developmentRemoteRole === "host") return Promise.resolve([]);
-          const identity = teamStore.getIdentity();
-          if (!identity) throw new Error("The remote host identity is unavailable.");
-          const iceServers = teamWebRtcBridge?.getIceServers(identity.serverId) ?? [];
-          if (iceServers.length === 0) throw new Error("Remote Signal has not supplied ICE servers yet.");
-          return Promise.resolve(iceServers);
-        },
-      });
-      const signedInState = centralAuthManager.getState();
-      if (signedInState.status === "signed_in") {
-        await hostService.applySignedInAccount(signedInState.user);
-      } else if (signedInState.status === "signed_out") {
-        // Sign-out can settle before this service exists, leaving `forwardCentralAuth`
-        // nothing to deactivate. Unbinding here is what stops a persisted
-        // `activeAccountId` from keeping the last account's host configured - and
-        // unconfigurable - while nobody is signed in. A still-loading or failed account
-        // service keeps its host, and the event listener settles it.
-        await hostService.applySignedInAccount(null);
-      }
-      const analyticsPlatform = process.platform;
-      if (analyticsPlatform !== "darwin" && analyticsPlatform !== "win32" && analyticsPlatform !== "linux") {
-        throw new Error(`Unsupported analytics platform: ${analyticsPlatform}`);
-      }
-      hostAnalytics = new HostAnalytics({
-        enabled: app.isPackaged && appVariant === "production",
-        trackingEnabled: analyticsPreference.enabled,
-        appVersion: app.getVersion(),
-        platform: analyticsPlatform,
-        resolveOwner: () => {
-          const state = centralAuthManager?.getState();
-          if (state?.status !== "signed_in") return null;
-          const storedOwner = teamStore.getOwnerAnalyticsIdentity();
-          if (storedOwner) return storedOwner.id === state.user.id ? storedOwner : null;
-          const ownerEmail = teamStore.getOwnerEmail();
-          return !teamStore.configured || ownerEmail?.trim().toLowerCase() === state.user.email.trim().toLowerCase()
-            ? state.user
-            : null;
-        },
-        resolveAgent: (agentId) => service.listAgents().find((agent) => agent.id === agentId) ?? null,
-      });
-      hostAnalytics.flushPending();
-      remoteServerManager = new RemoteServerManager(
-        join(app.getPath("userData"), REMOTE_SERVERS_FILE),
-        {
-          encrypt: (value) => {
-            if (!safeStorage.isEncryptionAvailable()) {
-              throw new Error("macOS secure storage is unavailable.");
-            }
-            return safeStorage.encryptString(value);
-          },
-          decrypt: (value) => safeStorage.decryptString(value),
-        },
-        {
-          createTeamAuthTicket: (serverId) => {
-            if (!centralAuthManager) throw new Error("The account service is not ready.");
-            return centralAuthManager.createTeamAuthTicket(serverId);
-          },
-          getEmail: () => {
-            if (!centralAuthManager) throw new Error("The account service is not ready.");
-            return centralAuthManager.getSignedInUser().email;
-          },
-          sendTeamInviteEmail: (input) => {
-            if (!centralAuthManager) throw new Error("The account service is not ready.");
-            return centralAuthManager.sendTeamInviteEmail(input);
-          },
-        },
-        {
-          allowLocalDevelopmentInvites: developmentRemoteRole !== null,
-          appVersion: app.getVersion(),
-          getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
-          webrtcTransport: new TeamWebRtcClientTransport({
-            bridge: teamWebRtcBridge,
-            listHosts: () => {
-              if (!centralAuthManager) throw new Error("The account service is not ready.");
-              return centralAuthManager.listRemoteHosts();
-            },
-            startSession: (hostId) => {
-              if (!centralAuthManager) throw new Error("The account service is not ready.");
-              return centralAuthManager.startRemoteSession(hostId);
-            },
-            issueTicket: (sessionId, clientPublicKey) => {
-              if (!centralAuthManager) throw new Error("The account service is not ready.");
-              return centralAuthManager.issueRemoteSessionTicket(sessionId, clientPublicKey);
-            },
-            endSession: (sessionId) => {
-              if (!centralAuthManager) return Promise.resolve();
-              return centralAuthManager.endRemoteSession(sessionId);
-            },
-            createInvite: (hostId, input) => {
-              if (!centralAuthManager) throw new Error("The account service is not ready.");
-              return centralAuthManager.createRemoteInvite(hostId, input);
-            },
-            listInvites: (hostId) => {
-              if (!centralAuthManager) throw new Error("The account service is not ready.");
-              return centralAuthManager.listRemoteInvites(hostId);
-            },
-            previewInvite: (token) => {
-              if (!centralAuthManager) throw new Error("The account service is not ready.");
-              return centralAuthManager.previewRemoteInvite(token);
-            },
-            acceptInvite: (token) => {
-              if (!centralAuthManager) throw new Error("The account service is not ready.");
-              return centralAuthManager.acceptRemoteInvite(token);
-            },
-            revokeInvite: (inviteId) => {
-              if (!centralAuthManager) throw new Error("The account service is not ready.");
-              return centralAuthManager.revokeRemoteInvite(inviteId);
-            },
-            listMembers: (hostId) => {
-              if (!centralAuthManager) throw new Error("The account service is not ready.");
-              return centralAuthManager.listRemoteMembers(hostId);
-            },
-            updateMember: (hostId, membershipId, role, reactivate) => {
-              if (!centralAuthManager) throw new Error("The account service is not ready.");
-              return centralAuthManager.updateRemoteMember(hostId, membershipId, role, reactivate);
-            },
-            removeMember: (hostId, membershipId) => {
-              if (!centralAuthManager) throw new Error("The account service is not ready.");
-              return centralAuthManager.removeRemoteMember(hostId, membershipId);
-            },
-            getPrincipalId: () => {
-              if (!centralAuthManager) throw new Error("The account service is not ready.");
-              return centralAuthManager.getSignedInUser().id;
-            },
-            controlPlaneUrl: centralAuth.resolveApiUrl("/"),
-            downloadHostLogo: (hostId, version) => centralAuth.downloadRemoteHostLogo(hostId, version),
-            transferDirectory: join(app.getPath("userData"), "remote-transfers"),
-          }),
-        },
-      );
-      await remoteServerManager.initialize();
-      if (developmentRemoteRole === "host") {
-        await rm(developmentRemoteConnectionPath(), { force: true });
-        await hostService.startDevelopmentLocal();
-        if (developmentTestClientEnabled) {
-          await writeDevelopmentRemoteConnection(await hostService.createDevelopmentConnection());
-        }
-      } else if (developmentRemoteRole === "client") {
-        await connectDevelopmentRemoteServer(remoteServerManager);
-      }
-      configureServerLogoProtocols({ teamStore, remoteServers: remoteServerManager });
-      remoteDesktopManager = new RemoteDesktopManager(remoteServerManager);
-      const host = hostService;
-      const remoteDesktop = remoteDesktopManager;
-      const remoteServers = remoteServerManager;
-      voiceTranscriptionService = new VoiceTranscriptionService({
-        resourcesRoot: app.isPackaged ? join(process.resourcesPath, "whisper") : resolve(".openbot-build/whisper"),
-        modelPath: app.isPackaged
-          ? join(app.getPath("userData"), "runtimes", "whisper", WHISPER_MODEL_NAME)
-          : resolve(".openbot-build/whisper/model", WHISPER_MODEL_NAME),
-        modelDownloadUrl: WHISPER_MODEL_URL,
-      });
-      voiceTranscriptionService.on("modelStatus", forwardVoiceModelStatus);
-      const { autoUpdater } = electronUpdater;
-      updateService = new UpdateService(autoUpdater, {
-        currentVersion: app.getVersion(),
-        enabled:
-          app.isPackaged &&
-          supportsInstalledUpdates(process.platform) &&
-          existsSync(join(process.resourcesPath, "app-update.yml")),
-        autoDownload: updatePreference.autoDownload,
-        beforeInstall: prepareForUpdateInstall,
-        platform: process.platform,
-        logDirectory: join(app.getPath("userData"), "logs", "update"),
-        shipItDirectory: join(homedir(), "Library", "Caches", "app.openbot.desktop.ShipIt"),
-      });
+      services = built;
+      const { service, sidebarLayout, host, remoteDesktop, remoteServers, updater, dynamicIsland, teamStore } = built;
+
       service.on("event", (event) => forwardAgentEvent("local", event));
-      sidebarLayoutStore.on("changed", (layout) =>
-        forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }),
-      );
+      sidebarLayout.on("changed", (layout) => forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }));
       host.on("changed", forwardHostStatus);
       host.on("presence", (snapshot) => forwardTeamPresence("local", snapshot));
       host.on("directMessage", (event) => forwardDirectMessage("local", event));
@@ -1232,41 +494,21 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("presence", forwardTeamPresence);
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
-      updateService.on("status", forwardUpdateStatus);
-      updateService.start();
-      const agentInitialization = new AgentInitializationGate(() => service.initialize());
-      registerIpcHandlers({
-        service,
-        providerRuntimes: providerRuntimeManager,
-        mailbox: mailboxStore,
-        browser: browserHost,
-        browserPictureInPicture,
-        updater: updateService,
-        setupFile,
-        analyticsPreferenceFile,
-        updatePreferenceFile,
-        initializeAgent: () => agentInitialization.start(),
-        sidebarLayout: sidebarLayoutStore,
-        host,
-        remoteDesktop,
-        remoteServers,
-        centralAuth: centralAuthManager,
-        skills: skillMarketplace,
-        hostedSites,
-        marketplaceAgents: agentMarketplace,
-        voice: voiceTranscriptionService,
-        dynamicIsland: dynamicIslandController,
-        computerUseMacSetup: computerUseMacSetupController,
-      });
-      configureApplicationMenu(service, updateService);
-      await dynamicIslandController
+      updater.on("status", forwardUpdateStatus);
+      updater.start();
+      // Before the renderer loads: the trust boundary and every protocol it fetches through have to
+      // be in place before the first request can arrive.
+      registerIpcHandlers(built);
+      configureApplicationMenu(service, updater);
+      await dynamicIsland
         .initialize()
         .catch((error) => logger.error("Unable to initialize Dynamic Island:", toLogValue(error)));
-      await loadRenderer(mainWindow);
+      await windows.loadRenderer(mainWindow);
+      // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
       remoteServers.startEventConnections();
       const reconcileDynamicIsland = () =>
-        void dynamicIslandController
-          ?.reconcileWindow()
+        void dynamicIsland
+          .reconcileWindow()
           .catch((error) => logger.error("Unable to reconcile Dynamic Island displays:", toLogValue(error)));
       screen.on("display-added", reconcileDynamicIsland);
       screen.on("display-removed", reconcileDynamicIsland);
@@ -1280,20 +522,22 @@ if (!hasSingleInstanceLock) {
           remoteRole: developmentRemoteRole,
         })
       ) {
-        void centralAuthInitialization
+        void built.centralAuthInitialization
           .then(() => host.start())
           .catch((error) => logger.error("Unable to republish this OpenBot:", toLogValue(error)));
       }
-      void agentInitialization.start().catch((error) => {
+      void built.agentInitialization.start().catch((error) => {
         logger.error("Unable to initialize the local agent backend:", toLogValue(error));
       });
 
       app.on("activate", () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          showMainWindow(mainWindow);
+        const window = windowHolder.current;
+        if (window && !window.isDestroyed()) {
+          showMainWindow(window);
           return;
         }
-        void ensureMainWindow()
+        void windows
+          .ensureMainWindow()
           .then(showMainWindow)
           .catch((error) => logger.error("Unable to open the main window:", toLogValue(error)));
       });
@@ -1309,59 +553,6 @@ if (!hasSingleInstanceLock) {
     });
 }
 
-const DEVELOPMENT_REMOTE_CONNECTION_FILE = "openbot-dev-remote-connection-v1.json";
-const developmentRemoteServerConnectionSchema: z.ZodType<DevelopmentRemoteServerConnection> = z.object({
-  serverId: z.string().min(1),
-  serverName: z.string().min(1),
-  apiUrl: z.string().min(1),
-  fingerprint: z.string().min(1),
-  publicKey: z.string().min(1),
-  username: z.string().min(1),
-  sessionToken: z.string().min(1),
-});
-
-function developmentRemoteConnectionPath(): string {
-  return join(tmpdir(), DEVELOPMENT_REMOTE_CONNECTION_FILE);
-}
-
-async function ensureDevelopmentAccount(manager: CentralAuthManager, email: string) {
-  const initialized = await manager.initialize();
-  if (initialized.status === "signed_in" && initialized.user.email === email) return initialized.user;
-  if (initialized.status === "signed_in") await manager.logout();
-  const challenge = await manager.requestEmailCode(email);
-  if (challenge.status !== "code_sent" || !challenge.developmentCode) {
-    throw new Error("The local account API did not return a development sign-in code.");
-  }
-  const verified = await manager.verifyEmailCode(challenge.challengeId, challenge.developmentCode);
-  if (verified.status !== "signed_in") throw new Error("The local development account could not sign in.");
-  return verified.user;
-}
-
-async function writeDevelopmentRemoteConnection(connection: DevelopmentRemoteServerConnection): Promise<void> {
-  await writeFile(developmentRemoteConnectionPath(), `${JSON.stringify(connection)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-}
-
-async function connectDevelopmentRemoteServer(manager: RemoteServerManager): Promise<void> {
-  const deadline = Date.now() + 30_000;
-  let lastError: unknown = new Error("The local development host did not start.");
-  while (Date.now() < deadline) {
-    try {
-      const connection = developmentRemoteServerConnectionSchema.parse(
-        JSON.parse(await readFile(developmentRemoteConnectionPath(), "utf8")),
-      );
-      await manager.connectDevelopmentServer(connection);
-      return;
-    } catch (error) {
-      lastError = error;
-      await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
-    }
-  }
-  throw lastError;
-}
-
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
@@ -1369,8 +560,8 @@ app.on("window-all-closed", () => {
 app.on("before-quit", (event) => {
   isQuitting = true;
   if (systemSessionEnding) {
-    updateService?.stop();
-    void providerRuntimeManager?.stop();
+    services?.updater.stop();
+    void services?.providerRuntimes.stop();
     return;
   }
   if (shutdownStarted) return;
@@ -1379,86 +570,26 @@ app.on("before-quit", (event) => {
 });
 
 async function prepareForUpdateInstall(): Promise<void> {
-  await (browserHost?.flushPersistentStorage() ?? Promise.resolve());
-  await destroyBrowserForShutdown();
-  await prepareForShutdown(true);
+  await (services?.browser.flushPersistentStorage() ?? Promise.resolve());
+  await prepareForShutdown();
 }
 
-async function prepareForShutdown(browserAlreadyDestroyed = false): Promise<void> {
+/**
+ * The four steps ahead of `teardown.runAll()` are pinned here rather than registered: the notch
+ * windows and the haptic process have to disappear the moment the user asks to quit, not behind a
+ * remote host that can take seconds to stop. The two service calls among them are registered as
+ * well, for the case where the quit arrives before those services exist; both are idempotent, so
+ * running twice costs nothing.
+ */
+async function prepareForShutdown(): Promise<void> {
   if (shutdownStarted) return;
   shutdownStarted = true;
   isQuitting = true;
-  updateService?.stop();
-  await flushMainWindowBounds().catch((error) =>
-    logger.error("Unable to save the main window position:", toLogValue(error)),
-  );
-  dynamicIslandController?.destroy();
-  dynamicIslandController = null;
+  services?.updater.stop();
+  await windows
+    .flushMainWindowBounds()
+    .catch((error) => logger.error("Unable to save the main window position:", toLogValue(error)));
+  services?.dynamicIsland.destroy();
   macHapticFeedback.destroy();
-  if (!browserAlreadyDestroyed) await destroyBrowserForShutdown();
-  browserPictureInPicture?.destroy();
-  await (providerRuntimeManager?.stop() ?? Promise.resolve());
-  await (remoteServerManager?.stop() ?? Promise.resolve());
-  voiceTranscriptionService?.shutdown();
-  await (remoteDesktopManager?.stop() ?? Promise.resolve());
-  await (hostService?.shutdown() ?? Promise.resolve());
-  await (teamWebRtcBridge?.stop() ?? Promise.resolve());
-  await (agentService?.stop() ?? Promise.resolve());
-}
-
-async function destroyBrowserForShutdown(): Promise<void> {
-  await (browserHost?.destroy() ?? Promise.resolve());
-}
-
-function configureApplicationProtocol(): void {
-  const rendererRoot = resolve(__dirname, "../renderer");
-  session.defaultSession.protocol.handle("openbot-app", async (request) => {
-    try {
-      const url = new URL(request.url);
-      if (url.host !== "app") return new Response("Not found", { status: 404 });
-      const pathname = decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname);
-      const filePath = resolve(rendererRoot, `.${pathname}`);
-      const candidate = relative(rendererRoot, filePath);
-      if (candidate.startsWith("..") || isAbsolute(candidate)) {
-        return new Response("Not found", { status: 404 });
-      }
-      return new Response(await readFile(filePath), {
-        headers: {
-          "Content-Type": applicationContentType(filePath),
-          "Cache-Control": "no-store",
-          "X-Content-Type-Options": "nosniff",
-        },
-      });
-    } catch {
-      return new Response("Not found", { status: 404 });
-    }
-  });
-}
-
-function applicationContentType(
-  path: string,
-):
-  | "text/html; charset=utf-8"
-  | "text/javascript; charset=utf-8"
-  | "text/css; charset=utf-8"
-  | "image/svg+xml"
-  | "image/png"
-  | "font/woff2"
-  | "application/octet-stream" {
-  switch (extname(path).toLowerCase()) {
-    case ".html":
-      return "text/html; charset=utf-8";
-    case ".js":
-      return "text/javascript; charset=utf-8";
-    case ".css":
-      return "text/css; charset=utf-8";
-    case ".svg":
-      return "image/svg+xml";
-    case ".png":
-      return "image/png";
-    case ".woff2":
-      return "font/woff2";
-    default:
-      return "application/octet-stream";
-  }
+  await teardown.runAll();
 }

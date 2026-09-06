@@ -1,7 +1,7 @@
 /**
  * Everything that configures the default Electron session: the renderer's Content-Security-Policy,
- * its permission handlers, and the custom protocols that serve attachments, avatars and server
- * logos.
+ * its permission handlers, and the custom protocols that serve the packaged renderer bundle,
+ * attachments, avatars and server logos.
  *
  * **This module body must stay side-effect free.** The main entry point imports it, and an import
  * evaluates before the entry point's own statements - which is where `app.setPath("userData", ...)`
@@ -11,6 +11,7 @@
  */
 
 import { readFile } from "node:fs/promises";
+import { extname, isAbsolute, relative, resolve } from "node:path";
 import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { app, session } from "electron";
 import type { AgentService } from "../backend/agent-service";
@@ -51,20 +52,10 @@ export function configureRendererPermissions(): void {
 export interface AttachmentProtocolDependencies {
   mailbox: MailboxStore;
   agents: AgentService;
-  /**
-   * A getter, not a value, and the one place in this file that needs to be. This runs during
-   * `app.whenReady()` while `remoteServerManager` is still null, so the null branches below are
-   * that startup window rather than defensive padding. Both shapes type-check at every call site,
-   * so `tsc` cannot tell a value passed here from a getter - only this comment can.
-   */
-  getRemoteServerManager: () => RemoteServerManager | null;
+  remoteServers: RemoteServerManager;
 }
 
-export function configureAttachmentProtocol({
-  mailbox,
-  agents,
-  getRemoteServerManager,
-}: AttachmentProtocolDependencies): void {
+export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: AttachmentProtocolDependencies): void {
   session.defaultSession.protocol.handle("openbot-attachment", async (request) => {
     try {
       const url = new URL(request.url);
@@ -90,10 +81,7 @@ export function configureAttachmentProtocol({
       const url = new URL(request.url);
       const serverId = decodeURIComponent(url.hostname);
       const attachmentId = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
-      const remoteServers = getRemoteServerManager();
-      if (!remoteServers || !serverId || !attachmentId) {
-        return new Response("Not found", { status: 404 });
-      }
+      if (!serverId || !attachmentId) return new Response("Not found", { status: 404 });
       const attachment = await remoteServers.downloadAttachment(attachmentId, serverId);
       return new Response(Buffer.from(attachment.bytes), {
         headers: {
@@ -134,10 +122,7 @@ export function configureAttachmentProtocol({
       const url = new URL(request.url);
       const serverId = decodeURIComponent(url.hostname);
       const agentId = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
-      const remoteServers = getRemoteServerManager();
-      if (!remoteServers || !serverId || !agentId) {
-        return new Response("Not found", { status: 404 });
-      }
+      if (!serverId || !agentId) return new Response("Not found", { status: 404 });
       const version = url.searchParams.get("v");
       if (!version) return new Response("Not found", { status: 404 });
       const avatar = await remoteServers.downloadAgentAvatar(agentId, serverId, version);
@@ -156,7 +141,6 @@ export function configureAttachmentProtocol({
 
 export interface ServerLogoProtocolDependencies {
   teamStore: TeamStore;
-  /** Not a getter: unlike the pair above, this runs after `remoteServerManager` is constructed. */
   remoteServers: RemoteServerManager;
 }
 
@@ -197,4 +181,57 @@ export function configureServerLogoProtocols({ teamStore, remoteServers }: Serve
       return new Response("Not found", { status: 404 });
     }
   });
+}
+
+export function configureApplicationProtocol(): void {
+  const rendererRoot = resolve(__dirname, "../renderer");
+  session.defaultSession.protocol.handle("openbot-app", async (request) => {
+    try {
+      const url = new URL(request.url);
+      if (url.host !== "app") return new Response("Not found", { status: 404 });
+      const pathname = decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname);
+      const filePath = resolve(rendererRoot, `.${pathname}`);
+      const candidate = relative(rendererRoot, filePath);
+      if (candidate.startsWith("..") || isAbsolute(candidate)) {
+        return new Response("Not found", { status: 404 });
+      }
+      return new Response(await readFile(filePath), {
+        headers: {
+          "Content-Type": applicationContentType(filePath),
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    } catch {
+      return new Response("Not found", { status: 404 });
+    }
+  });
+}
+
+function applicationContentType(
+  path: string,
+):
+  | "text/html; charset=utf-8"
+  | "text/javascript; charset=utf-8"
+  | "text/css; charset=utf-8"
+  | "image/svg+xml"
+  | "image/png"
+  | "font/woff2"
+  | "application/octet-stream" {
+  switch (extname(path).toLowerCase()) {
+    case ".html":
+      return "text/html; charset=utf-8";
+    case ".js":
+      return "text/javascript; charset=utf-8";
+    case ".css":
+      return "text/css; charset=utf-8";
+    case ".svg":
+      return "image/svg+xml";
+    case ".png":
+      return "image/png";
+    case ".woff2":
+      return "font/woff2";
+    default:
+      return "application/octet-stream";
+  }
 }
