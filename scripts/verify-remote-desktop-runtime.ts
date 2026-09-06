@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { access, readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
+import { bundledLibraryLicense, isPortableLoadPath, readMachOLoadPaths } from "./mac-runtime-dylibs";
 import { createRemoteDesktopInputDigest, loadNativeRuntimeLock } from "./native-runtime-lock";
 
 const logger = createOpenBotLogger("verify-remote-desktop-runtime");
@@ -71,7 +72,62 @@ for (const name of [
   }
 }
 
+if (platform === "darwin") {
+  const libraries = await machOLibraries(root);
+  await verifyMachOLoadPaths(libraries);
+  verifyBundledLibraryLicenses(libraries, distributionChecksumEntries);
+}
+
 logger.info(`Verified the Sunshine and Moonlight Web runtime in ${root}`);
+
+/**
+ * Presence and checksums say the runtime is the approved build; only its load commands say whether
+ * it can start anywhere else. CMake links Sunshine against Homebrew by absolute path, and a binary
+ * that keeps those paths runs on the build runner and on a developer's Mac and nowhere else --
+ * which shows up as a session that never produces a frame, with every check green.
+ */
+async function verifyMachOLoadPaths(libraries: string[]) {
+  const binaries = [...names, ...libraries];
+  const unportable = binaries.flatMap((name) =>
+    readMachOLoadPaths(join(root, name))
+      .filter((path) => !isPortableLoadPath(path))
+      .map((path) => `  ${name} loads ${path}`),
+  );
+  if (unportable.length > 0) {
+    throw new Error(
+      `The runtime loads libraries that exist only on the machine that built it:\n${unportable.join("\n")}`,
+    );
+  }
+}
+
+/**
+ * A bundled library is one OpenBot redistributes, and both of the ones that reach the runtime today
+ * ask for their notice to travel with the binary. Presence in the tree is what creates the
+ * obligation, so this reads the tree rather than a list: a library that starts being bundled arrives
+ * here as a failure with its name in it, not as a release that quietly drops a licence.
+ */
+function verifyBundledLibraryLicenses(libraries: string[], distributionChecksums: { name: string }[]): void {
+  for (const library of libraries) {
+    const entry = bundledLibraryLicense(basename(library));
+    if (!entry) {
+      throw new Error(`${library} ships in the runtime with no licence recorded for it.`);
+    }
+    const file = `licenses/${entry.license}`;
+    if (!distributionChecksums.some((checksum) => checksum.name === file)) {
+      throw new Error(`${library} ships without ${file}, which its licence requires.`);
+    }
+  }
+}
+
+async function machOLibraries(directory: string, prefix = ""): Promise<string[]> {
+  const libraries: string[] = [];
+  for (const entry of await readdir(join(directory, ...prefix.split("/").filter(Boolean)), { withFileTypes: true })) {
+    const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) libraries.push(...(await machOLibraries(directory, relativePath)));
+    else if (entry.name.endsWith(".dylib")) libraries.push(relativePath);
+  }
+  return libraries;
+}
 
 async function verifyChecksums(checksumRoot: string, fileName: string) {
   const checksums = await readFile(join(checksumRoot, fileName), "utf8");

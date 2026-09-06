@@ -56,7 +56,27 @@ SBOMs, build provenance, and `remote-desktop-runtime-manifest.json`. It is not a
 update and it must never contain `latest.yml`.
 
 After publication, the workflow opens a draft PR that adds the release tag and SHA-256 values to
-`native-runtime.lock.json`. Normal CI and application release jobs then use:
+`native-runtime.lock.json`. That job runs only from `main`, because it pins against the lock it checks
+out: the input digest is derived from the recipe on disk, and a manifest built from a different recipe
+is refused.
+
+So a branch that changes the recipe pins by hand, and must, or merging it leaves `main` with an
+unpinned lock -- which is not a degraded state but a broken one, because
+`prepare-remote-desktop-runtime.ts` throws and takes every `package`, `dist:mac` and `dist:win` run
+with it. From the branch:
+
+```bash
+gh workflow run remote-desktop-runtime.yml --ref <branch>
+# once Publish and Verify published are green:
+gh release download remote-desktop-runtime-<input-digest> --pattern remote-desktop-runtime-manifest.json
+bun scripts/pin-remote-desktop-runtime.ts remote-desktop-runtime-manifest.json
+```
+
+Commit the rewritten `native-runtime.lock.json` to the branch and merge it with the recipe, so `main`
+never sees the two apart. The pin does not change the input digest -- it covers `recipeVersion`, both
+source entries and `targets`, not the artifacts -- so it cannot invalidate the release it just pinned.
+
+Normal CI and application release jobs then use:
 
 ```bash
 bun run install:remote-desktop-runtime
