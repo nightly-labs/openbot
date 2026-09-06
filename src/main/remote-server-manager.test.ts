@@ -206,6 +206,29 @@ describe("remote server links", () => {
     }
   });
 
+  it("keeps a WebRTC host when the development bootstrap offers the same host over HTTP", async () => {
+    const hostId = "00000000-0000-4000-8000-0000000000fd";
+    const fixture = await createRemoteManager({
+      servers: [storedHttpsServer(hostId, { transport: "webrtc-v2", apiUrl: `webrtc://${hostId}` })],
+    });
+    // No routes: reaching the dev host over HTTP at all fails the test by name.
+    const team = stubTeamFetch();
+
+    const summary = await fixture.manager.connectDevelopmentServer({
+      serverId: hostId,
+      serverName: "OpenBot Local Dev Host",
+      apiUrl: "http://localhost:63762",
+      fingerprint: "fingerprint",
+      publicKey: "public-key",
+      username: "openbot-dev-client",
+      sessionToken: "development-token",
+    });
+
+    expect(team.calls).toEqual([]);
+    expect(summary).toMatchObject({ id: hostId, apiUrl: null });
+    expect(fixture.server(hostId)).toMatchObject({ apiUrl: null });
+  });
+
   it("keeps the saved WebRTC host order and loads Remote Desktop readiness after connection", async () => {
     const directory = await mkdtemp(join(tmpdir(), "openbot-webrtc-host-order-"));
     const statePath = join(directory, "servers.json");
