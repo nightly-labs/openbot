@@ -438,7 +438,12 @@ jobs:
   pin:
     name: Open runtime lock PR
     needs: [prepare, publish, verify-published]
-    if: needs.publish.result == 'success' && needs.verify-published.result == 'success'
+    # Only from main, because the pin is computed against the checked-out lock: `pinRemoteDesktopRuntime`
+    # derives the input digest from the recipe it finds on disk and refuses a manifest that does not
+    # match it. Dispatched from a branch that changes the recipe -- the one case where publishing before
+    # merging is the point -- this job checks out main, whose digest is still the old one, and throws.
+    # Folding the pin into the branch is a manual step there -- `docs/RELEASING.md` has the sequence.
+    if: github.ref == 'refs/heads/main' && needs.publish.result == 'success' && needs.verify-published.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
