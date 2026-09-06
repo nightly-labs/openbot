@@ -19,8 +19,21 @@ const SUNSHINE_HTTP_PORT = 47_989;
 // host that will never produce a frame from one that is about to, so watching its own output is what
 // turns a member's session hanging at "connecting" into an error naming what the host owner must do.
 const SUNSHINE_SCREEN_CAPTURE_DENIED = "No screen capture permission";
-// Enough of the previous chunk to keep the marker findable when a read splits it.
+// Enough of what a stream has already printed to keep the marker findable when reads split it.
 const SUNSHINE_DIAGNOSTIC_OVERLAP = SUNSHINE_SCREEN_CAPTURE_DENIED.length;
+
+// One watcher per stream, because a chunk boundary falls wherever the pipe happened to fill and the
+// marker is longer than some of Sunshine's lines. Carrying the accumulated end forward -- rather
+// than the last chunk -- is what survives a marker spread over three reads.
+export function createScreenCaptureDenialWatcher(): (message: string) => boolean {
+  let printed = "";
+  return (message) => {
+    printed = `${printed}${message}`;
+    const denied = printed.includes(SUNSHINE_SCREEN_CAPTURE_DENIED);
+    printed = printed.slice(-SUNSHINE_DIAGNOSTIC_OVERLAP);
+    return denied;
+  };
+}
 const localAddressSchema = z.object({ address: z.string(), family: z.string(), port: z.number().int() });
 const moonlightHostSchema = z.object({
   host_id: z.number().int(),
@@ -83,7 +96,6 @@ export class SunshineMoonlightRuntime {
   #iceToken = "";
   #state: SunshineMoonlightRuntimeState | null = null;
   #screenCaptureDenied = false;
-  #sunshineDiagnosticTail = "";
   #selectedDisplayId: string | null = null;
   #starting: Promise<SunshineMoonlightRuntimeState> | null = null;
 
@@ -261,7 +273,6 @@ export class SunshineMoonlightRuntime {
     // A restart is how a newly granted permission takes effect, so the verdict is this process's
     // alone -- carrying the previous one over would keep reporting a grant the user has already made.
     this.#screenCaptureDenied = false;
-    this.#sunshineDiagnosticTail = "";
     this.#sunshine = this.#spawn(this.#options.paths.sunshine, [join(this.#options.stateDirectory, "sunshine.conf")], {
       cwd: dirname(this.#options.paths.sunshine),
       stdio: ["ignore", "pipe", "pipe"],
@@ -452,15 +463,12 @@ export class SunshineMoonlightRuntime {
 
   #pipeDiagnostics(process: ChildProcess, source: "sunshine" | "moonlight"): void {
     for (const stream of [process.stdout, process.stderr]) {
+      // Sunshine writes to both streams and they interleave, so each keeps its own carry-over: one
+      // shared between them would join a line neither printed and miss the one that matters.
+      const saidCaptureDenied = createScreenCaptureDenialWatcher();
       stream?.on("data", (chunk) => {
         const message = chunk.toString("utf8");
-        if (
-          source === "sunshine" &&
-          `${this.#sunshineDiagnosticTail}${message}`.includes(SUNSHINE_SCREEN_CAPTURE_DENIED)
-        ) {
-          this.#screenCaptureDenied = true;
-        }
-        if (source === "sunshine") this.#sunshineDiagnosticTail = message.slice(-SUNSHINE_DIAGNOSTIC_OVERLAP);
+        if (source === "sunshine" && saidCaptureDenied(message)) this.#screenCaptureDenied = true;
         this.#options.onDiagnostic?.(source, message);
       });
     }
