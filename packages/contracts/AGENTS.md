@@ -28,8 +28,8 @@ structure: which group each channel belongs to, and whether it is a **request** 
 or an **event** the main process sends. Nothing else in the repository decides those two facts.
 
 A type-level assertion at the bottom of `ipc-endpoints.ts` holds the two files together. Add a
-channel to `IPC_CHANNELS` and leave it out of every group and `ChannelCoverage` fails with the
-channel in the diagnostic:
+channel to `IPC_CHANNELS` and leave it out of every group and the `IpcEndpoints` declaration fails
+with the channel in the diagnostic:
 
 ```
 error TS2344: Type '{ channelsMissingFromEveryGroup: "app:brand-new-thing"; }'

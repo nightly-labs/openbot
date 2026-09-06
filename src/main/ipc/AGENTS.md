@@ -46,7 +46,7 @@ decoder spends its allocations on.
 
 | Rule | Enforced by |
 | --- | --- |
-| every declared channel belongs to a group | `ChannelCoverage` in `ipc-endpoints.ts` (`TS2344`) |
+| every declared channel belongs to a group | the `IpcEndpoints` declaration in `ipc-endpoints.ts` (`TS2344`) |
 | every request endpoint has exactly one handler | `GroupHandlers` (`TS2741` / `TS2353`) |
 | every group has a registrar | `registerIpcGroups` at `src/main/index.ts` (`TS2741`) |
 | a payload is decoded before the handler sees it | no constructor pairs one with a raw `unknown` |
