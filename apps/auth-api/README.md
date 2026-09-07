@@ -34,8 +34,15 @@ Commit `.env.dev` and `.env.production`. Never commit `.env.keys`.
 ## Email delivery
 
 Private Email SMTP is the primary delivery method. Use a separate app password.
-Do not use the mailbox password. For local development, put the values in the
-ignored `.dev.vars` file:
+Do not use the mailbox password.
+
+Local development sends no email at all. `.env.dev` blanks all five SMTP
+variables, which is what turns delivery off - `wrangler.jsonc` sets four of them
+in the top-level `vars` that local `vite dev` reads, and four out of five is the
+partial configuration `readSmtpConfig` rejects. The team-invitation endpoint then
+answers `503 email_delivery_not_configured`; login never reaches SMTP at all,
+because `AUTH_EXPOSE_DEVELOPMENT_CODE` returns its code in the API response. To
+exercise real delivery locally, put a full set in the ignored `.dev.vars` file:
 
 ```dotenv
 EMAIL_SMTP_HOST=mail.privateemail.com
@@ -43,8 +50,9 @@ EMAIL_SMTP_PORT=465
 EMAIL_SMTP_USERNAME=hello@openbot.run
 EMAIL_SMTP_PASSWORD=<PRIVATE_EMAIL_APP_PASSWORD>
 EMAIL_FROM=hello@openbot.run
-SITE_REPORT_HASH_SECRET=<AT_LEAST_32_RANDOM_CHARACTERS>
 ```
+
+`bun run env:set:smtp` encrypts the app password into `.env.production` only.
 
 For a deployed Worker, `bun run api:deploy` decrypts `.env.production`. It sends
 `EMAIL_SMTP_PASSWORD`, `SKILLS_ADMIN_TOKEN`, `REMOTE_TICKET_PRIVATE_JWK`,
