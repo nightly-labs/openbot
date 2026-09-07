@@ -205,6 +205,13 @@ fi
       expect(isDynamicRecord(registeredTools) ? Object.keys(registeredTools) : []).toEqual(
         expect.arrayContaining([
           "attach_files_to_response",
+          "create_agent",
+          "list_sections",
+          "create_section",
+          "rename_section",
+          "delete_section",
+          "assign_agent_section",
+          "update_profile",
           "remember",
           "forget_memory",
           "list_routines",

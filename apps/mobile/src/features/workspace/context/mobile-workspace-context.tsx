@@ -3,10 +3,7 @@ import {
   type AgentSummary,
   type ConversationSnapshot,
   type CreateAgentInput,
-  decodeAgentProfileDraft,
-  decodeSaveAgentProfileResult,
   isAvatarHue,
-  isSidebarLayoutSnapshot,
   type TeamRealtimeEvent,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -27,7 +24,6 @@ import {
   remoteConnectionFailure,
   remoteRecoveryMessage,
   resyncRemoteConversations,
-  saveReviewedAgentProfile,
 } from "@openbot/team-client";
 import { fetch } from "expo/fetch";
 import * as Crypto from "expo-crypto";
@@ -547,41 +543,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         setActiveServerId(host.hostId);
         // Membership is already committed. Directory failure must not reuse the consumed invite.
         void refreshHosts().catch(() => undefined);
-      },
-      profileGenerationSupported:
-        serverCapabilities.current.get(activeServer.id)?.includes("agent-profile-generation") ?? false,
-      getProfileLayout: () =>
-        request("GET", TEAM_API_ROUTES.sidebarLayout.state, (value) => {
-          if (!isSidebarLayoutSnapshot(value)) throw new Error("The server returned invalid sections.");
-          return value;
-        }),
-      generateProfile: (input) =>
-        request("POST", TEAM_API_ROUTES.agents.generateProfile, decodeAgentProfileDraft, {
-          prompt: input.prompt,
-          ...(input.agentId ? { agentId: input.agentId } : {}),
-          ...(input.draft ? { draft: { ...input.draft } } : {}),
-        }),
-      saveProfile: async (input, pending) => {
-        const generation = loadGeneration.current;
-        const result = await saveReviewedAgentProfile(
-          (value) => {
-            if (generation !== loadGeneration.current)
-              throw new Error("The workspace changed before the profile could be saved.");
-            return request("POST", TEAM_API_ROUTES.agents.saveProfile, decodeSaveAgentProfileResult, {
-              operationId: value.operationId,
-              draft: { ...value.draft },
-              ...(value.agentId ? { agentId: value.agentId } : {}),
-              ...(value.initialMessage ? { initialMessage: value.initialMessage } : {}),
-            });
-          },
-          input,
-          pending,
-        );
-        if (generation !== loadGeneration.current) return;
-        setAgents((current) => [
-          ...current.filter((agent) => agent.id !== result.agent.id),
-          projectAgent(activeServer.id, result.agent),
-        ]);
       },
       createAgent: async (input: CreateAgentInput) => {
         const created = await request("POST", TEAM_API_ROUTES.agents.all, decodeAgent, {

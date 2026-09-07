@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
@@ -81,6 +84,14 @@ export class ThreadLifecycle {
     const currentAgent = this.#store.list().find((candidate) => candidate.id === agent.id) ?? agent;
     const session = this.#store.activeProviderSession(agent.id);
     if (session) {
+      // Codex ignores dynamicTools on thread/resume. A replacement provider session is
+      // required when tools change; the public thread and its history stay intact.
+      if (client.provider === "codex" && !(await this.hasCurrentTools(session.externalSessionId))) {
+        const replacement = await this.startProviderThread(currentAgent, client, publicThreadId);
+        this.retireProviderSession(currentAgent, session.externalSessionId);
+        this.#hooks.logRecovery(currentAgent.id, client.provider, "replaced");
+        return replacement;
+      }
       if (this.#conversation.loadedClientFor(session.externalSessionId) !== client) {
         try {
           await this.resumeThread(currentAgent, client, session.externalSessionId);
@@ -117,6 +128,10 @@ export class ThreadLifecycle {
       decodeThreadResponse,
     );
     const externalThreadId = response.thread.id;
+    if (client.provider === "codex") {
+      await mkdir(this.toolManifestDirectory(), { recursive: true, mode: 0o700 });
+      await writeFile(this.toolManifestPath(externalThreadId), this.toolFingerprint(), { mode: 0o600 });
+    }
     this.#store.bindProviderSession(agent.id, externalThreadId);
     this.#conversation.bindThread(externalThreadId, agent.id);
     this.#conversation.markThreadLoaded(externalThreadId, client);
@@ -124,6 +139,29 @@ export class ThreadLifecycle {
     const handoff = this.buildProviderHandoff(agent.id, publicThreadId);
     if (handoff) this.#pendingHandoffs.set(externalThreadId, handoff);
     return externalThreadId;
+  }
+
+  private toolManifestDirectory(): string {
+    return join(this.#store.database.userDataPath, "provider-toolsets");
+  }
+
+  private toolManifestPath(sessionId: string): string {
+    return join(this.toolManifestDirectory(), createHash("sha256").update(sessionId).digest("hex"));
+  }
+
+  private toolFingerprint(): string {
+    return createHash("sha256")
+      .update(JSON.stringify([...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS]))
+      .digest("hex");
+  }
+
+  private async hasCurrentTools(sessionId: string): Promise<boolean> {
+    try {
+      return (await readFile(this.toolManifestPath(sessionId), "utf8")) === this.toolFingerprint();
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+      throw error;
+    }
   }
 
   async resumeThread(agent: AgentSummary, client: AgentClient, externalThreadId: string): Promise<void> {
@@ -136,7 +174,7 @@ export class ThreadLifecycle {
       approvalPolicy: "on-request",
       sandbox: "danger-full-access",
       developerInstructions: developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id)),
-      dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS],
+      ...(client.provider === "codex" ? {} : { dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS] }),
     };
 
     try {

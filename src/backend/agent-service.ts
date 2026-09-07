@@ -74,10 +74,12 @@ import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { generateProfile } from "./agent/profile-generation";
 import { ProfileSave } from "./agent/profile-save";
+import { createAgentToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
 import { type AgentClientFactory, ProviderRuntime } from "./agent/provider-runtime";
 import { type RoutineMutationOptions, RoutineScheduler } from "./agent/routine-scheduler";
 import { type OpenBotToolResponse, openBotToolResult } from "./agent/routine-tools";
 import { fitRuntimeSnapshot } from "./agent/runtime-snapshot";
+import { type AgentSidebar, handleSidebarTool } from "./agent/sidebar-tools";
 import { isDynamicToolCall, providerForAgent, providerLabel } from "./agent/thread-items";
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
@@ -133,6 +135,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #turn: TurnLifecycle;
   readonly #compaction: ContextCompaction;
   readonly #duplication: DuplicationGate;
+  readonly #sidebarLayout: AgentSidebar | null;
   #initialized = false;
   #stopping = false;
 
@@ -148,9 +151,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     bundledGrokExecutable: string | null | undefined = null,
     prepareAgentWorkspace: (agent: AgentSummary) => Promise<void> = async () => undefined,
     hostedSites: AgentHostedSites | null = null,
+    sidebarLayout: AgentSidebar | null = null,
   ) {
     super();
     this.#store = store;
+    this.#sidebarLayout = sidebarLayout;
     this.#profileSave = new ProfileSave(store, {
       create: (input, configure) =>
         this.createAgent({ ...input.draft, initialMessage: input.initialMessage ?? "" }, configure, input.operationId),
@@ -1183,21 +1188,31 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       };
     }
 
+    if (params.tool === "create_agent") {
+      const args = createAgentToolSchema.parse(params.arguments);
+      const hue = args.avatarHue ?? null;
+      const created = await this.createAgent(
+        {
+          name: args.name,
+          description: args.description,
+          initialMessage: args.initialMessage,
+          avatarSeed: args.avatarSeed ?? randomUUID(),
+          avatarHue: hue,
+        },
+        args.title === undefined
+          ? undefined
+          : (agent) => this.#store.updateAgent({ agentId: agent.id, title: args.title }),
+      );
+      return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(created) }] };
+    }
+
     if (params.tool === "update_profile") {
-      const args = params.arguments;
-      if (!isRecord(args)) throw new Error("update_profile arguments are required.");
-      const agentId = args.agentId;
-      if (!isString(agentId) || !agentId.trim()) throw new Error("agentId is required.");
-      const profileFields = ["name", "title", "description"] as const;
-      if (!profileFields.some((field) => args[field] !== undefined)) {
+      const args = updateProfileToolSchema.parse(params.arguments);
+      const { agentId, avatarHue, ...fields } = args;
+      if (Object.values(fields).every((value) => value === undefined) && avatarHue === undefined) {
         throw new Error("At least one profile field is required.");
       }
-      const input: UpdateAgentInput = { agentId };
-      for (const field of profileFields) {
-        const value = args[field];
-        if (value !== undefined && !isString(value)) throw new Error(`${field} must be a string.`);
-        if (value !== undefined) input[field] = value;
-      }
+      const input: UpdateAgentInput = { agentId, ...fields, ...(avatarHue === undefined ? {} : { avatarHue }) };
       const updated = await this.updateAgent(input);
       return {
         success: true,
@@ -1209,11 +1224,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               name: updated.name,
               title: updated.title,
               description: updated.description,
+              avatarSeed: updated.avatarSeed,
+              avatarHue: updated.avatarHue,
             }),
           },
         ],
       };
     }
+
+    const sidebarResult = await handleSidebarTool(
+      params.tool,
+      params.arguments,
+      this.#sidebarLayout,
+      new Set(this.listAgents().map((agent) => agent.id)),
+    );
+    if (sidebarResult) return sidebarResult;
 
     const routineResult = await this.#routines.handleTool(params, senderAgentId);
     if (routineResult) return routineResult;

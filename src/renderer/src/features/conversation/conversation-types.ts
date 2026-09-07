@@ -72,7 +72,6 @@ export interface ConversationProps {
   approval: Extract<AgentEvent, { type: "approval" }>["approval"] | undefined;
   browserTakeover: Extract<AgentEvent, { type: "browser-takeover-requested" }>["request"] | undefined;
   onSelectAgent: (agentId: string) => void;
-  onConfigureProfile?: () => void;
   onUpdateAgent: (agentId: string, updates: Omit<UpdateAgentInput, "agentId">) => Promise<void>;
   onSetAgentAvatar: (agentId: string, image: AvatarImageInput | null) => Promise<void>;
   onSendMessage: (

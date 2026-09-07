@@ -217,13 +217,28 @@ data and are manual because they can require local credentials.
 
 ### Prompt-driven agent profiles
 
-Desktop and mobile can generate and review a profile through the optional
-`agent-profile-generation` Team API capability. The host uses the existing agent's
-provider/model, or the creation defaults, in a separate provider client with tools
-restricted and no OpenBot conversation. Only the setup prompt, current draft, and
-available sidebar section names/IDs are supplied. Provider output is validated
-before it reaches the editable review form. Cancelling review leaves the agent
-unchanged; late responses are discarded when the client leaves that scope.
+Users create and edit agent profiles by asking an agent in the normal desktop or mobile
+conversation. `openbot.create_agent` creates a persistent teammate with instructions and a first
+task; `openbot.update_profile` changes an existing agent's name, title, instructions, or generated
+avatar. Both run through the existing agent service and validate arguments before changing state.
+Codex and Grok receive the dynamic tool definitions; Claude exposes the same operations through
+its SDK MCP bridge. There is no separate prompt-generation button or review dialog.
+
+Agents can organize teammates into flat sidebar sections through `list_sections`, `create_section`,
+`rename_section`, `delete_section`, and `assign_agent_section`. Assignment accepts a null section
+to ungroup an agent; deleting a section also ungroups its agents without deleting them. These tools
+use the same `SidebarLayoutStore` as manual sidebar edits, including persistence, validation,
+and change events delivered to desktop and connected clients.
+
+Codex fixes dynamic tools at provider-session creation; resume does not update them. A local
+`provider-toolsets` manifest records the tool fingerprint for each new Codex session. Sessions with
+missing or outdated fingerprints are replaced before the next turn, using the existing history
+handoff while retaining the public thread, agent identity, workspace, and stored conversation.
+Unchanged fingerprints resume the existing session.
+
+The optional `agent-profile-generation` Team API endpoints remain available. They use a separate
+provider client with tools restricted and validate drafts before returning them. Their save path
+retains its recovery and retry guarantees:
 
 A profile-creation marker is written before its workspace or agent row. Startup removes
 uncommitted creations before mailbox initialization and queue draining, while a committed

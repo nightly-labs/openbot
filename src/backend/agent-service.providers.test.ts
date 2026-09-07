@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdir, realpath, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, realpath, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
@@ -39,6 +39,62 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentService: providers", () => {
+  it("refreshes outdated Codex tools while preserving the agent and conversation, then resumes unchanged tools", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    const startService = async () => {
+      const next = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+      await next.initialize();
+      return next;
+    };
+    service = await startService();
+    await service.sendMessage({ agentId: "chief", text: "Remember that my researchers cover tennis and football." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const original = service.listAgents().find((agent) => agent.id === "chief");
+    const originalSession = store.activeProviderSession("chief")?.externalSessionId;
+    if (!original || !originalSession) throw new Error("The original session did not start.");
+    await service.stop();
+    const directory = join(store.database.userDataPath, "provider-toolsets");
+    const [manifest] = await readdir(directory);
+    if (!manifest) throw new Error("The session tool manifest was not saved.");
+    await writeFile(join(directory, manifest), "old-toolset");
+
+    service = await startService();
+    await service.sendMessage({ agentId: "chief", text: "Group my researchers." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const replacement = store.activeProviderSession("chief")?.externalSessionId;
+    expect(replacement).not.toBe(originalSession);
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
+      id: original.id,
+      threadId: original.threadId,
+      workspacePath: original.workspacePath,
+    });
+    expect(
+      (await service.readConversation("chief")).messages.some((message) =>
+        message.text.includes("tennis and football"),
+      ),
+    ).toBe(true);
+    const starts = client.requests.filter((request) => request.method === "thread/start");
+    expect(starts).toHaveLength(2);
+    expect(paramsRecord(starts[1]?.params)?.dynamicTools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "openbot",
+          tools: expect.arrayContaining([expect.objectContaining({ name: "create_section" })]),
+        }),
+      ]),
+    );
+    const turns = client.requests.filter((request) => request.method === "turn/start");
+    expect(JSON.stringify(turns.at(-1)?.params)).toContain("tennis and football");
+    await service.stop();
+
+    service = await startService();
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    expect(store.activeProviderSession("chief")?.externalSessionId).toBe(replacement);
+    expect(client.requests.filter((request) => request.method === "thread/start")).toHaveLength(2);
+  });
+
   it.each<AgentProvider>(["codex", "claude", "grok"])(
     "delivers the quiet collaboration policy to %s on startup and after restart",
     async (provider) => {
@@ -404,6 +460,13 @@ describe.sequential("AgentService: providers", () => {
               expect.objectContaining({ name: "ask_user" }),
               expect.objectContaining({ name: "list_agents" }),
               expect.objectContaining({ name: "update_profile" }),
+              expect.objectContaining({ name: "create_agent" }),
+              expect.objectContaining({ name: "list_sections" }),
+              expect.objectContaining({ name: "create_section" }),
+              expect.objectContaining({ name: "rename_section" }),
+              expect.objectContaining({ name: "delete_section" }),
+              expect.objectContaining({ name: "assign_agent_section" }),
+
               expect.objectContaining({ name: "list_routines" }),
               expect.objectContaining({ name: "create_routine" }),
               expect.objectContaining({ name: "update_routine" }),

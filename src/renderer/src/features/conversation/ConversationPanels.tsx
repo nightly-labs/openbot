@@ -143,7 +143,6 @@ export function ConversationPanels() {
               }
               onClose={() => setActiveRightPanel("none")}
               onWidthChange={setSettingsPanelWidth}
-              onConfigureProfile={props.onConfigureProfile}
               onUpdateAgent={props.onUpdateAgent}
               onUpdateRuntimeSettings={updateRuntimeSettings}
               onSetAgentAvatar={props.onSetAgentAvatar}

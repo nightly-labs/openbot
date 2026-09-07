@@ -33,7 +33,6 @@ export interface FirstAgentSetupProps {
   onChange: (value: FirstAgentDraft) => void;
   onSubmit: (value: FirstAgentDraft) => void | Promise<void>;
   onCancel?: () => void;
-  onGenerateProfile?: () => void;
 }
 
 export const FIRST_AGENT_AVATAR_SEEDS = avatarCandidateSeeds("first-bot", "first-bot", 0);
@@ -421,11 +420,6 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
           </Show>
 
           <div class="first-agent-submit-actions">
-            <Show when={props.onGenerateProfile}>
-              <Button variant="outline" disabled={props.submitting} onClick={props.onGenerateProfile}>
-                Generate from a prompt
-              </Button>
-            </Show>
             <Button
               type="submit"
               variant="default"

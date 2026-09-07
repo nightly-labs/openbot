@@ -1,12 +1,8 @@
 import type {
-  AgentProfileDraft,
   AvatarHue,
   ConversationSnapshot,
   CreateAgentInput,
-  GenerateAgentProfileInput,
   RespondToPromptInput,
-  SaveAgentProfileInput,
-  SidebarLayoutSnapshot,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import type { RemoteRecoveryStatus } from "@openbot/team-client";
@@ -64,10 +60,6 @@ export interface MobileWorkspaceContextValue {
   leaveServer: (serverId: string) => Promise<void>;
   refreshServers: () => Promise<void>;
   addRemoteServer: (input: AddRemoteServerInput) => Promise<void>;
-  profileGenerationSupported: boolean;
-  getProfileLayout: () => Promise<SidebarLayoutSnapshot>;
-  generateProfile: (input: GenerateAgentProfileInput) => Promise<AgentProfileDraft>;
-  saveProfile: (input: SaveAgentProfileInput, pending?: SaveAgentProfileInput) => Promise<void>;
   createAgent: (input: CreateAgentInput) => Promise<void>;
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
   deleteAgent: (agentId: string) => Promise<void>;

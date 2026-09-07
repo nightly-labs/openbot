@@ -313,6 +313,7 @@ export async function createApplicationServices({
     providerRuntimes.executablePath("grok"),
     (agent) => managedSkills.syncAgent(agent),
     hostedSites,
+    sidebarLayout,
   );
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
   providerRuntimes.on("status", forwardProviderRuntimeStatus);

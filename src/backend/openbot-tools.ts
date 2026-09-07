@@ -1,4 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { AVATAR_HUES } from "@openbot/contracts/ipc";
 import { ROUTINE_SCHEDULE_JSON_SCHEMA } from "./routine-tool-schema";
 
 export const OPENBOT_DYNAMIC_TOOLS = {
@@ -80,21 +81,100 @@ export const OPENBOT_DYNAMIC_TOOLS = {
     },
     {
       type: "function",
+      name: "list_sections",
+      description: "List sidebar sections (folders), their stable ids, and agent assignments before grouping agents.",
+      inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false },
+    },
+    {
+      type: "function",
+      name: "create_section",
+      description:
+        "Create a sidebar section (folder) to group existing agents. List sections first and reuse an existing matching section.",
+      inputSchema: {
+        type: "object",
+        properties: { name: { type: "string", minLength: 1, maxLength: INPUT_LIMITS.sidebarSectionName } },
+        required: ["name"],
+        additionalProperties: false,
+      },
+    },
+    {
+      type: "function",
+      name: "rename_section",
+      description: "Rename an existing custom sidebar section.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          sectionId: { type: "string", minLength: 1, maxLength: INPUT_LIMITS.identifier },
+          name: { type: "string", minLength: 1, maxLength: INPUT_LIMITS.sidebarSectionName },
+        },
+        required: ["sectionId", "name"],
+        additionalProperties: false,
+      },
+    },
+    {
+      type: "function",
+      name: "delete_section",
+      description: "Delete a custom sidebar section without deleting its agents; its agents become ungrouped.",
+      inputSchema: {
+        type: "object",
+        properties: { sectionId: { type: "string", minLength: 1, maxLength: INPUT_LIMITS.identifier } },
+        required: ["sectionId"],
+        additionalProperties: false,
+      },
+    },
+    {
+      type: "function",
+      name: "assign_agent_section",
+      description: "Move an existing agent into a sidebar section. Pass null for sectionId to ungroup it.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          agentId: { type: "string", minLength: 1, maxLength: INPUT_LIMITS.identifier },
+          sectionId: { type: ["string", "null"], minLength: 1, maxLength: INPUT_LIMITS.identifier },
+        },
+        required: ["agentId", "sectionId"],
+        additionalProperties: false,
+      },
+    },
+    {
+      type: "function",
       name: "list_agents",
       description: "List local OpenBot agents with their name, title, description, and current status.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
     },
     {
       type: "function",
+      name: "create_agent",
+      description:
+        "Create a persistent local OpenBot agent when the user asks for a new teammate. Choose its profile from the user's request and supply its first task. Use update_profile for an existing agent.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string", minLength: 1, maxLength: INPUT_LIMITS.agentName },
+          title: { type: "string", maxLength: INPUT_LIMITS.agentTitle },
+          description: { type: "string", maxLength: INPUT_LIMITS.agentDescription },
+          initialMessage: { type: "string", minLength: 1, maxLength: INPUT_LIMITS.messageText },
+          avatarSeed: { type: "string", minLength: 1, maxLength: 128, pattern: "^[a-z0-9:-]+$" },
+          avatarHue: { type: ["number", "null"], enum: [...AVATAR_HUES, null] },
+        },
+        required: ["name", "description", "initialMessage"],
+        additionalProperties: false,
+      },
+    },
+    {
+      type: "function",
       name: "update_profile",
-      description: "Update the name, title, and/or description of a local OpenBot agent.",
+      description:
+        "Update a local OpenBot agent’s name, title, instructions, or generated avatar from the user’s request.",
       inputSchema: {
         type: "object",
         properties: {
           agentId: { type: "string", minLength: 1 },
           name: { type: "string", maxLength: 80 },
           title: { type: "string", maxLength: 120 },
-          description: { type: "string", maxLength: 2_000 },
+          description: { type: "string", maxLength: INPUT_LIMITS.agentDescription },
+          avatarSeed: { type: "string", minLength: 1, maxLength: 128, pattern: "^[a-z0-9:-]+$" },
+          avatarHue: { type: ["number", "null"], enum: [...AVATAR_HUES, null] },
         },
         required: ["agentId"],
         additionalProperties: false,
