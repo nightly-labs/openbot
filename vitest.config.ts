@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import solidPlugin from "@solidjs/vite-plugin";
 import { configDefaults, defineConfig } from "vitest/config";
 import { NODE_TEST_TIMEOUT_MS } from "./src/backend/test-deadlines";
@@ -16,6 +17,17 @@ export default defineConfig({
       if (log.includes("[STRICT_READ_UNTRACKED]")) return false;
     },
     projects: [
+      {
+        esbuild: { jsx: "automatic" },
+        resolve: { alias: { "@": fileURLToPath(new URL("./apps/mobile/src", import.meta.url)) } },
+        test: {
+          name: "mobile-ui",
+          environment: "jsdom",
+          include: ["apps/mobile/src/**/*.test.tsx"],
+          restoreMocks: true,
+          setupFiles: ["./apps/mobile/src/test-setup.ts"],
+        },
+      },
       {
         extends: true,
         test: {

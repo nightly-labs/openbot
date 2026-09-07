@@ -9,7 +9,7 @@ import type { RemoteRecoveryStatus } from "@openbot/team-client";
 import type { MobileAgentActivities } from "./agent-activity";
 
 export type MobileServerKind = "local" | "remote";
-export type MobileServerState = "connecting" | "online" | "offline";
+export type MobileServerState = "unknown" | "connecting" | "online" | "offline" | "error";
 export type MobileServerDirectoryState = "loading" | "ready" | "error";
 
 export interface MobileServer {

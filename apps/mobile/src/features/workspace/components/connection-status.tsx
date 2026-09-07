@@ -5,12 +5,13 @@ import { View } from "react-native";
 import { ConnectionCountdown } from "@/features/workspace/components/connection-countdown";
 import { AnimatedCounter } from "@/features/workspace/components/connection-counter";
 import { ConnectionStatusReveal } from "@/features/workspace/components/connection-status-reveal";
+import { serverStatusLabel } from "@/features/workspace/model/server-status";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 
 function ConnectionStatusText({ server }: { server: MobileServer }) {
   const recovery = server.recoveryStatus;
-  const reconnecting = recovery && recovery.phase !== "online";
-  const title = reconnecting ? "Reconnecting" : server.state === "connecting" ? "Connecting…" : "Offline";
+  const reconnecting = recovery && recovery.phase !== "online" && recovery.phase !== "suspended";
+  const title = reconnecting ? "Reconnecting" : serverStatusLabel(server);
   const detail = reconnecting ? `Attempt ${recovery.attempt}/${REMOTE_RETRY_LIMIT}` : server.connectionMessage;
   const remainingSeconds = reconnecting ? recovery.remainingSeconds : null;
 

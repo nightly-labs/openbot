@@ -22,7 +22,6 @@ import {
   type RemoteTeamHost,
   type RemoteWorkspacePreferences,
   remoteConnectionFailure,
-  remoteRecoveryMessage,
   resyncRemoteConversations,
 } from "@openbot/team-client";
 import { fetch } from "expo/fetch";
@@ -47,6 +46,7 @@ import {
 } from "@/features/workspace/components/remote-team-transport";
 import { type MobileAgentActivities, reduceAgentActivity } from "@/features/workspace/model/agent-activity";
 import { decodeConversation } from "@/features/workspace/model/conversation";
+import { applyServerFailure, applyServerRecovery, resetServerStatus } from "@/features/workspace/model/server-status";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
 import type {
   MobileAgent,
@@ -152,7 +152,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           id: host.hostId,
           name: host.name,
           kind: host.role === "owner" ? "local" : "remote",
-          state: previous?.state ?? "offline",
+          state: previous?.state ?? "unknown",
           initialConnectionPending: previous?.initialConnectionPending ?? true,
           connectionMessage: previous?.connectionMessage ?? null,
           recoveryStatus: previous?.recoveryStatus,
@@ -249,13 +249,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       });
       if (currentGeneration !== loadGeneration.current) return;
       connectionStage.current = "connection";
-      setServers((current) =>
-        current.map((candidate) =>
-          candidate.id === server.id
-            ? { ...candidate, state: "online", initialConnectionPending: false, connectionMessage: null }
-            : candidate,
-        ),
-      );
     },
     [replaceServerAgents, request, preferenceStore],
   );
@@ -269,18 +262,18 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     const controller = createRemoteConnectionRecovery(
       () => loadServer(server),
       (error) => {
+        if (!foregroundRef.current) return;
         if (!failureReported) lastFailure = remoteConnectionFailure(connectionStage.current, error);
         failureReported = true;
         const connectionMessage = lastFailure;
         setServers((current) =>
           current.map((candidate) =>
-            candidate.id === server.id
-              ? { ...candidate, state: "offline", initialConnectionPending: false, connectionMessage }
-              : candidate,
+            candidate.id === server.id ? applyServerFailure(candidate, connectionMessage) : candidate,
           ),
         );
       },
       (status) => {
+        if (!foregroundRef.current) return;
         if (status.phase === "connecting") failureReported = false;
         if (status.phase === "online") {
           lastFailure = null;
@@ -288,16 +281,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         }
         setServers((current) =>
           current.map((candidate) =>
-            candidate.id === server.id
-              ? {
-                  ...candidate,
-                  state:
-                    status.phase === "online" ? "online" : status.phase === "connecting" ? "connecting" : "offline",
-                  connectionMessage: remoteRecoveryMessage(status, lastFailure),
-                  recoveryStatus: status,
-                  initialConnectionPending: candidate.initialConnectionPending && status.phase === "connecting",
-                }
-              : candidate,
+            candidate.id === server.id ? applyServerRecovery(candidate, status, lastFailure) : candidate,
           ),
         );
       },
@@ -307,6 +291,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     return () => {
       controller.dispose();
       if (recovery.current === controller) recovery.current = null;
+      setServers((current) =>
+        current.map((candidate) => (candidate.id === server.id ? resetServerStatus(candidate) : candidate)),
+      );
       loadGeneration.current += 1;
     };
   }, [activeServerId, activeServerPublicKey, loadServer, transportReady]);
@@ -316,6 +303,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const active = state === "active";
       foregroundRef.current = active;
       setForeground(active);
+      if (!active) {
+        loadGeneration.current += 1;
+        setServers((current) => current.map(resetServerStatus));
+      }
       recovery.current?.setActive(active);
     });
     return () => subscription.remove();
@@ -524,7 +515,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         updatePreferences(serverId, () => ({ hidden: [], pinned: [] }));
         setUnreadAgentIds((current) => current.filter((id) => !removedIds.has(id)));
       },
-      refreshServers: refreshHosts,
+      refreshServers: async () => {
+        recovery.current?.refresh();
+        await refreshHosts();
+      },
       addRemoteServer: async ({ inviteUrl }) => {
         const host = await directory.acceptInvite(inviteUrl);
         removedServers.current.delete(host.hostId);
@@ -534,7 +528,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             id: host.hostId,
             name: host.name,
             kind: "remote",
-            state: "offline",
+            state: "unknown",
             initialConnectionPending: true,
             connectionMessage: null,
             address: null,
@@ -681,7 +675,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           ref={setTransport}
           directory={directory}
           onConnectionUpdate={(update) => {
-            if (activeServerId === update.hostId && recovery.current) {
+            if (foregroundRef.current && activeServerId === update.hostId && recovery.current) {
               if (update.state === "offline") {
                 const failure = new Error(update.message ?? "The desktop went offline.");
                 // `protocol_error` is the peer saying a reconnect would be sent the same frame it
@@ -693,13 +687,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               if (update.resync) recovery.current.refresh();
               return;
             }
-            setServers((current) =>
-              current.map((server) =>
-                server.id === update.hostId
-                  ? { ...server, state: update.state, connectionMessage: update.message }
-                  : server,
-              ),
-            );
           }}
           onTeamEvent={handleTeamEvent}
         />

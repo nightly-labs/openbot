@@ -2,13 +2,13 @@ import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
+import { ServerStatusLabel } from "@/features/servers/components/server-status-label";
 import {
   SettingsContent,
   SettingsNote,
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
-
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 
 export function ConnectionSettingsScreen() {
@@ -53,9 +53,10 @@ export function ConnectionSettingsScreen() {
             disclosure={false}
             key={server.id}
             onPress={() => selectServer(server.id)}
-            supportingText={`${server.state}${server.id === activeServer.id ? " · Selected" : ""}`}
+            supportingText={server.id === activeServer.id ? "Selected" : undefined}
           >
             <Typography.Paragraph type="body-sm">{server.name}</Typography.Paragraph>
+            <ServerStatusLabel server={server} />
           </SettingsRow>
         ))}
         <SettingsRow disclosure={false} disabled={busy} onPress={() => void perform(refreshServers)}>
