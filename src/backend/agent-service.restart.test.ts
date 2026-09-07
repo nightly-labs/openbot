@@ -366,6 +366,66 @@ describe.sequential("AgentService: restart", () => {
     expect(events).toContainEqual({ type: "agents-changed", agents: service.listAgents() });
   });
 
+  it("holds due routines and queued work during deletion, then resumes after failure", async () => {
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => new FakeAgentClient(provider),
+    );
+    await service.initialize();
+    const agent = await store.getOrCreate("delete-routine");
+    vi.useFakeTimers({ now: new Date("2026-08-25T11:00:00.000Z") });
+    let releaseCleanup: (() => void) | undefined;
+    const cleanupGate = new Promise<void>((resolve) => {
+      releaseCleanup = resolve;
+    });
+    vi.spyOn(mailbox, "deleteAgentData").mockImplementationOnce(async () => {
+      await cleanupGate;
+      throw new Error("Cleanup failed");
+    });
+    const routine = service.createRoutine({
+      agentId: agent.id,
+      name: "Check during deletion",
+      instruction: "Check the queue.",
+      active: true,
+      timezone: "UTC",
+      schedule: { kind: "interval", amount: 15, unit: "minutes", anchorAt: "2026-08-25T11:00:00.000Z" },
+    });
+    const deletion = service.deleteAgent(agent.id);
+    const failedDeletion = expect(deletion).rejects.toThrow("Retry deleting the agent.");
+    try {
+      await vi.advanceTimersByTimeAsync(15 * 60_000);
+      expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id })).toEqual([]);
+      await expect(service.testRoutine({ agentId: agent.id, routineId: routine.id })).rejects.toThrow(
+        "Wait until the agent operation finishes before running a routine.",
+      );
+      await service.sendMessage({ agentId: agent.id, text: "Hold this work until cleanup finishes." });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(service.listQueue(agent.id).deliveries).toMatchObject([{ status: "queued", turnId: null }]);
+      expect(store.activeProviderSession(agent.id)).toBeNull();
+      await expect(service.deleteAgent(agent.id)).rejects.toThrow("Agent deletion is already in progress.");
+
+      releaseCleanup?.();
+      await failedDeletion;
+      const changed = nextRoutinesChanged(service, agent.id);
+      await vi.advanceTimersByTimeAsync(0);
+      await changed;
+      expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id })).toEqual([
+        expect.objectContaining({ kind: "scheduled" }),
+      ]);
+      vi.useRealTimers();
+      await waitFor(() => service?.listQueue(agent.id).deliveries.some((delivery) => delivery.status === "running"));
+    } finally {
+      releaseCleanup?.();
+      await failedDeletion;
+      vi.useRealTimers();
+    }
+  });
+
   it("queues independent manual routine runs and renders routine metadata", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);

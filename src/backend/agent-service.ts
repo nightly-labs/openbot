@@ -115,6 +115,7 @@ export interface ResolvedSharedFile {
 export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #profileSave: ProfileSave;
   readonly #profileClients = new Set<AgentClient>();
+  readonly #deletingAgents = new Set<string>();
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
   readonly #browser: AgentBrowserHost;
@@ -200,7 +201,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         awaitDrain: (agentId) => this.#drain.taskFor(agentId),
         syncMailboxMessages: (snapshot) => this.#mailboxSync.syncMailboxMessages(snapshot),
         listAgents: () => this.listAgents(),
-        pendingDuplicateAgents: () => this.#duplication.pendingAgents(),
+        excludedAgents: () => new Set([...this.#duplication.pendingAgents(), ...this.#deletingAgents]),
         isRunning: () => this.#initialized && !this.#stopping,
       },
     });
@@ -716,6 +717,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   async deleteAgent(agentId: string): Promise<void> {
+    if (this.#deletingAgents.has(agentId)) throw new Error("Agent deletion is already in progress.");
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     const hasPendingWork = this.#mailbox
       .listQueue(agentId)
@@ -725,14 +727,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     }
 
     const { wasPending, release } = this.#duplication.releaseForDelete(agentId);
+    this.#deletingAgents.add(agentId);
     try {
+      this.#routines.arm();
       await this.#deleteAgentData(agent ?? { id: agentId, threadId: null });
+      this.#duplication.forget(agentId);
+      if (!wasPending) this.#emit({ type: "agents-changed", agents: this.listAgents() });
     } finally {
       release();
+      this.#deletingAgents.delete(agentId);
+      this.#routines.arm();
+      if (this.#store.list().some((candidate) => candidate.id === agentId)) this.#drain.scheduleDrain(agentId);
     }
-    this.#duplication.forget(agentId);
-    if (!wasPending) this.#emit({ type: "agents-changed", agents: this.listAgents() });
-    this.#routines.arm();
   }
 
   async #deleteAgentData(agent: Pick<AgentSummary, "id" | "threadId">): Promise<void> {
