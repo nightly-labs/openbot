@@ -5,16 +5,20 @@ import { createHash } from "node:crypto";
 import { chmod, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import {
-  ATTACHMENT_FILE_EXTENSIONS,
   attachmentFileExtension,
   IMAGE_ATTACHMENT_EXTENSIONS,
   isSupportedAttachmentName,
+  MEDIA_ATTACHMENT_EXTENSIONS,
   SUPPORTED_ATTACHMENT_DESCRIPTION,
+  supportedAttachmentExtensions,
 } from "@openbot/contracts/attachment-files";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type FilePreview, type ImportAttachmentsInput, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { TEAM_EML_ATTACHMENTS_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  TEAM_EML_ATTACHMENTS_CAPABILITY,
+  TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import { app, type BrowserWindow, dialog, type OpenDialogOptions, shell } from "electron";
 import type { AgentService } from "../../backend/agent-service";
 import type { MailboxStore } from "../../backend/mailbox-store";
@@ -54,6 +58,8 @@ export function attachmentIpcHandlers({
         const { filter } = parseChooseAttachments(payload);
         const supportsEml =
           serverId === LOCAL_SERVER_ID || remoteServers.supportsCapability(serverId, TEAM_EML_ATTACHMENTS_CAPABILITY);
+        const supportsMedia =
+          serverId === LOCAL_SERVER_ID || remoteServers.supportsCapability(serverId, TEAM_MEDIA_ATTACHMENTS_CAPABILITY);
         const options: OpenDialogOptions = {
           properties: ["openFile", "multiSelections"],
           filters:
@@ -62,7 +68,7 @@ export function attachmentIpcHandlers({
               : [
                   {
                     name: "Supported files",
-                    extensions: ATTACHMENT_FILE_EXTENSIONS.filter((extension) => supportsEml || extension !== "eml"),
+                    extensions: supportedAttachmentExtensions({ eml: supportsEml, media: supportsMedia }),
                   },
                 ],
         };
@@ -229,7 +235,7 @@ async function uploadRemotePaths(remoteServers: RemoteServerManager, serverId: s
   if (paths.length > INPUT_LIMITS.attachments) {
     throw new Error(`Choose at most ${INPUT_LIMITS.attachments} files.`);
   }
-  assertRemoteEmlSupport(
+  assertRemoteAttachmentSupport(
     remoteServers,
     serverId,
     paths.map((path) => basename(path)),
@@ -261,7 +267,7 @@ async function uploadRemoteImports(
   if (input.paths.length + input.data.length > INPUT_LIMITS.attachments) {
     throw new Error(`Choose at most ${INPUT_LIMITS.attachments} files.`);
   }
-  assertRemoteEmlSupport(remoteServers, serverId, [
+  assertRemoteAttachmentSupport(remoteServers, serverId, [
     ...input.paths.map((path) => basename(path)),
     ...input.data.map((item) => basename(item.name)),
   ]);
@@ -292,7 +298,19 @@ async function uploadRemoteImports(
   );
 }
 
-function assertRemoteEmlSupport(remoteServers: RemoteServerManager, serverId: string, names: readonly string[]): void {
+function assertRemoteAttachmentSupport(
+  remoteServers: RemoteServerManager,
+  serverId: string,
+  names: readonly string[],
+): void {
+  if (
+    names.some((name) =>
+      MEDIA_ATTACHMENT_EXTENSIONS.some((extension) => extension === attachmentFileExtension(name)),
+    ) &&
+    !remoteServers.supportsCapability(serverId, TEAM_MEDIA_ATTACHMENTS_CAPABILITY)
+  ) {
+    throw new Error("This server does not support MP3 or MOV attachments. Update OpenBot on the host and retry.");
+  }
   if (!names.some((name) => attachmentFileExtension(name) === "eml")) return;
   if (remoteServers.supportsCapability(serverId, TEAM_EML_ATTACHMENTS_CAPABILITY)) return;
   throw new Error("This server does not support EML attachments. Update OpenBot on the host and retry.");
@@ -300,5 +318,7 @@ function assertRemoteEmlSupport(remoteServers: RemoteServerManager, serverId: st
 
 function assertSupportedAttachmentName(name: string): void {
   if (isSupportedAttachmentName(name)) return;
-  throw new Error(`${name} is not supported. Attach ${SUPPORTED_ATTACHMENT_DESCRIPTION}.`);
+  throw new Error(
+    `${name} is not supported. Attach ${SUPPORTED_ATTACHMENT_DESCRIPTION}. For other audio or video formats, export as MP3 or MOV, or attach a text transcript.`,
+  );
 }

@@ -139,6 +139,87 @@ describe.sequential("AgentService: restart", () => {
     });
   });
 
+  it("recovers history from sessions retired by an upgrade and retries failed reads without losing local messages", async () => {
+    const { store } = stores(root);
+    await store.initialize();
+    await store.getOrCreate("chief");
+    const threadId = await store.ensureThreadId("chief");
+    store.bindProviderSession("chief", "old-session");
+    const local = {
+      id: "local-message",
+      author: "user" as const,
+      text: "Keep this local message",
+      createdAt: "2026-08-01T12:00:00.000Z",
+      status: "completed" as const,
+    };
+    store.database.persistConversation(
+      { agentId: "chief", threadId, activeTurnId: null, revision: 0, messages: [local] },
+      "test.saved-before-upgrade",
+    );
+    // Version 14 changes session state only. Reopen the version 13 database to run the shipped upgrade.
+    store.database.connection.prepare("DELETE FROM schema_migrations WHERE version = 14").run();
+    store.database.close();
+
+    let failRead = true;
+    const events: AgentEvent[] = [];
+    const createService = () => {
+      const restored = stores(root);
+      const next = new AgentService(restored.store, restored.mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+        const client = new FakeAgentClient(provider);
+        client.threadRead = () => {
+          if (failRead) throw new Error("Saved provider history is unavailable. Try again.");
+          return {
+            thread: {
+              id: "old-session",
+              turns: [
+                {
+                  id: "old-turn",
+                  status: "completed",
+                  startedAt: 1785585600,
+                  items: [{ id: "old-reply", type: "agentMessage", text: "Reply saved before the update" }],
+                },
+              ],
+            },
+          };
+        };
+        return client;
+      });
+      next.on("event", (event) => events.push(event));
+      return { next, restored };
+    };
+    const first = createService();
+    service = first.next;
+    await service.initialize();
+    await waitFor(() =>
+      events.some((event) => event.type === "error" && event.code === "provider_history_backfill_pending"),
+    );
+    expect((await service.readConversation("chief")).messages).toEqual([expect.objectContaining(local)]);
+    expect(first.restored.store.activeProviderSession("chief")).toBeNull();
+    await service.stop();
+    first.restored.store.database.close();
+
+    failRead = false;
+    for (let restart = 0; restart < 2; restart += 1) {
+      const { next, restored } = createService();
+      service = next;
+      await service.initialize();
+      await waitFor(async () =>
+        (await next.readConversation("chief")).messages.some((message) => message.id === "old-reply"),
+      );
+      const recovered = await service.readConversation("chief");
+      expect(recovered.threadId).toBe(threadId);
+      expect(recovered.messages).toEqual([
+        expect.objectContaining(local),
+        expect.objectContaining({ id: "old-reply", text: "Reply saved before the update" }),
+      ]);
+      expect(restored.store.database.listProviderSessions(threadId)).toEqual([
+        expect.objectContaining({ externalSessionId: "old-session", state: "inactive" }),
+      ]);
+      await service.stop();
+      restored.store.database.close();
+    }
+  });
+
   it("does not persist unchanged provider history after repeated restarts", async () => {
     const clients: FakeAgentClient[] = [];
     const { store, mailbox } = stores(root);

@@ -41,6 +41,12 @@ renderer ──► @openbot/contracts ◄── preload ◄── main ──►
   projections before the main process sends changes to the renderer.
 - The auth API cannot import desktop implementation files.
 
+MP3 and MOV attachments use the existing file attachment contract with no inline preview. Import
+copies and hashes the original bytes under the shared attachment limits; it does not run media
+codecs or extract frames or transcripts. MIME types come from the file extension for these formats,
+so a supplied image or text MIME type cannot enable a preview. Remote support is additive through
+the `media-attachments` capability; released protocol adapters keep their existing meanings.
+
 ## State ownership
 
 - `openbot.db` is the source of truth for OpenBot agents, conversations, queues, reactions,
@@ -171,6 +177,11 @@ SQLite migration history starts at the frozen version 8 compatibility baseline. 
 schema unchanged, append every later migration in numeric order, and update the separate latest
 schema used for new databases. Never remove or rewrite a migration that may have shipped.
 
+At startup, chat recovery reads all saved provider sessions for each thread, including inactive
+sessions from an upgrade or a provider change. It uses each session's provider and merges the
+messages into SQLite without activating the old session. A failed read reports an error, keeps
+the saved messages, and can be tried again when the provider connects or the app restarts.
+
 ## Team API compatibility boundary
 
 Current remote connections use Team API protocol v3 over three ordered WebRTC DataChannels: `rpc`,
@@ -291,7 +302,10 @@ conversation. `openbot.create_agent` creates a persistent teammate with instruct
 task; `openbot.update_profile` changes an existing agent's name, title, instructions, or generated
 avatar. Both run through the existing agent service and validate arguments before changing state.
 Codex and Grok receive the dynamic tool definitions; Claude exposes the same operations through
-its SDK MCP bridge. There is no separate prompt-generation button or review dialog.
+its SDK MCP bridge. `src/backend/openbot-tools.ts` owns the tool names, descriptions, and Zod
+argument shapes used by both declarations. It reuses the profile, section, and routine schemas.
+Claude uses the SDK’s `AskUserQuestion` flow instead of the `ask_user` MCP tool.
+There is no separate prompt-generation button or review dialog.
 
 Agents can organize teammates into flat sidebar sections through `list_sections`, `create_section`,
 `rename_section`, `delete_section`, and `assign_agent_section`. Assignment accepts a null section

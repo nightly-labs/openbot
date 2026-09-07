@@ -4,7 +4,7 @@ import { access, mkdir, mkdtemp, open, readFile, rm, symlink, writeFile } from "
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_RUNTIME_TEXT_LIMIT,
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
@@ -472,6 +472,79 @@ describe("MailboxStore", () => {
         [{ name: "installer.exe", mimeType: "application/octet-stream", bytes: new Uint8Array([1]) }],
       ),
     ).rejects.toThrow("installer.exe is not supported");
+  });
+
+  it.each([
+    ["recording.mp3", "audio/mpeg"],
+    ["Screen Recording.MOV", "video/quicktime"],
+  ])("preserves %s from paths and bytes for the agent without decoding media", async (name, mimeType) => {
+    // Deliberately damaged media is still useful to an agent asked to inspect or repair it.
+    const bytes = Buffer.from("truncated recording\0");
+    const sourcePath = join(root, name);
+    await writeFile(sourcePath, bytes);
+    const drafts = await store.prepareImportedAttachments([sourcePath], [{ name, mimeType: "image/png", bytes }]);
+    expect(drafts).toMatchObject([
+      { name, mimeType, kind: "file", previewKind: "none", size: bytes.length },
+      { name, mimeType, kind: "file", previewKind: "none", size: bytes.length },
+    ]);
+    const receipt = await store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Inspect this recording",
+      draftIds: drafts.map((draft) => draft.id),
+    });
+    await rm(sourcePath);
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    const delivery = restored.getDelivery(receipt.deliveries[0].id);
+    expect(delivery?.managedAttachments).toHaveLength(2);
+    for (const attachment of delivery?.managedAttachments ?? []) {
+      await expect(readFile(attachment.path)).resolves.toEqual(bytes);
+    }
+  });
+
+  it.each(["mp3", "mov"])("rejects oversized %s recordings before copying them", async (extension) => {
+    const path = join(root, `large.${extension}`);
+    const file = await open(path, "w");
+    await file.truncate(ATTACHMENT_LIMITS.fileBytes + 1);
+    await file.close();
+    await expect(store.prepareAttachments([path])).rejects.toThrow("exceeds the 100 MB limit");
+  });
+
+  it("enforces byte-import and combined recording size limits", async () => {
+    await expect(
+      store.prepareImportedAttachments(
+        [],
+        [
+          {
+            name: "large.mp3",
+            mimeType: "audio/mpeg",
+            bytes: new Uint8Array(ATTACHMENT_LIMITS.fileBytes + 1),
+          },
+        ],
+      ),
+    ).rejects.toThrow("exceeds the 100 MB limit");
+    const bytes = new Uint8Array(ATTACHMENT_LIMITS.fileBytes);
+    await expect(
+      store.prepareImportedAttachments(
+        [],
+        [
+          { name: "first.mp3", mimeType: "audio/mpeg", bytes },
+          { name: "second.mov", mimeType: "video/quicktime", bytes },
+          { name: "third.mov", mimeType: "video/quicktime", bytes },
+        ],
+      ),
+    ).rejects.toThrow("Attachments exceed the 250 MB total limit.");
+    await expect(store.listExportAttachments()).resolves.toEqual([]);
+  });
+
+  it("gives an export alternative for unsupported media", async () => {
+    await expect(
+      store.prepareImportedAttachments(
+        [],
+        [{ name: "recording.avi", mimeType: "video/x-msvideo", bytes: new Uint8Array([1]) }],
+      ),
+    ).rejects.toThrow("For other audio or video formats, export as MP3 or MOV, or attach a text transcript.");
   });
 
   it("imports pathless image bytes and accepts an attachment-only user message", async () => {

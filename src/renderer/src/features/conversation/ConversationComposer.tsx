@@ -1,4 +1,8 @@
-import { ATTACHMENT_FILE_ACCEPT, IMAGE_ATTACHMENT_ACCEPT } from "@openbot/contracts/attachment-files";
+import { IMAGE_ATTACHMENT_ACCEPT, supportedAttachmentExtensions } from "@openbot/contracts/attachment-files";
+import {
+  TEAM_EML_ATTACHMENTS_CAPABILITY,
+  TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import { For, Loading, lazy, Show } from "solid-js";
 import {
   ArrowUp,
@@ -62,6 +66,17 @@ export function ConversationComposer() {
     voicePhase,
     voiceModelProgress,
   } = useConversationViewScope();
+  const attachmentAccept = () => {
+    const server = props.server;
+    const local = server?.kind !== "remote";
+    const capabilities = server?.compatibility?.capabilities ?? [];
+    return supportedAttachmentExtensions({
+      eml: local || capabilities.includes(TEAM_EML_ATTACHMENTS_CAPABILITY),
+      media: local || capabilities.includes(TEAM_MEDIA_ATTACHMENTS_CAPABILITY),
+    })
+      .map((extension) => `.${extension}`)
+      .join(",");
+  };
   return (
     <Show when={!props.prompt && !props.approval && !props.browserTakeover}>
       <div class="composer-wrap">
@@ -207,7 +222,7 @@ export function ConversationComposer() {
             <Input
               ref={setContextAttachmentPickerElement}
               type="file"
-              accept={ATTACHMENT_FILE_ACCEPT}
+              accept={attachmentAccept()}
               multiple
               hidden
               tabindex={-1}

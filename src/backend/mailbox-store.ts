@@ -1446,7 +1446,9 @@ function attachmentMetadata(
   explicitMimeType?: string,
 ): { kind: AttachmentKind; mimeType: string; previewKind: AttachmentPreviewKind } {
   const inferred = attachmentMimeTypeForName(name);
-  const mimeType = explicitMimeType?.trim() || inferred;
+  // Media stays an opaque file even if an importer supplies a preview MIME type.
+  const mimeType =
+    inferred.startsWith("audio/") || inferred.startsWith("video/") ? inferred : explicitMimeType?.trim() || inferred;
   const previewKind: AttachmentPreviewKind = mimeType.startsWith("image/")
     ? "image"
     : mimeType === "application/pdf"
@@ -1459,7 +1461,9 @@ function attachmentMetadata(
 
 function assertSupportedAttachmentName(name: string): void {
   if (isSupportedAttachmentName(name)) return;
-  throw new Error(`${name} is not supported. Attach ${SUPPORTED_ATTACHMENT_DESCRIPTION}.`);
+  throw new Error(
+    `${name} is not supported. Attach ${SUPPORTED_ATTACHMENT_DESCRIPTION}. For other audio or video formats, export as MP3 or MOV, or attach a text transcript.`,
+  );
 }
 
 function attachmentPreviewUrl(id: string): string {
