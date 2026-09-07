@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { realpath, stat } from "node:fs/promises";
 import { basename } from "node:path";
+import type { FailureCode } from "@openbot/contracts/analytics-failures";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AccountUsage,
@@ -52,7 +53,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { AGENT_RUNTIME_TEXT_LIMIT, isMessageReaction } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, recordDiagnostic } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
 import { AttachmentGateway } from "./agent/attachment-gateway";
 import { AttentionRegistry } from "./agent/attention-registry";
@@ -1340,13 +1341,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     };
   }
 
-  #emitError(code: string, error: unknown, agentId?: string): void {
-    this.#emit({
-      type: "error",
-      agentId,
+  #emitError(code: FailureCode, error: unknown, agentId?: string): void {
+    const message = error instanceof Error ? error.message : String(error);
+    // `local` because this failure already reaches analytics the long way:
+    // the event below becomes one `system_operation_failed` in
+    // `HostAnalytics.handleAgentEvent`. The local trail is what it lacks - a
+    // message, and a line that survives a quit.
+    recordDiagnostic({
       code,
-      message: error instanceof Error ? error.message : String(error),
+      severity: "error",
+      area: "agent",
+      message,
+      reach: "local",
+      ...(agentId ? { detail: { agentId } } : {}),
     });
+    this.#emit({ type: "error", agentId, code, message });
   }
 
   #emitRuntimeSnapshot(): void {

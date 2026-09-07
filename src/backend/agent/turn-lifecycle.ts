@@ -1,3 +1,4 @@
+import type { FailureCode } from "@openbot/contracts/analytics-failures";
 import type {
   AgentEvent,
   AgentSummary,
@@ -43,7 +44,7 @@ export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTar
 
 export interface TurnHooks {
   emit(event: AgentEvent): void;
-  emitError(code: string, error: unknown, agentId?: string): void;
+  emitError(code: FailureCode, error: unknown, agentId?: string): void;
   emitRuntimeSnapshot(): void;
   scheduleDrain(agentId: string): void;
   listAgents(): AgentSummary[];
@@ -259,7 +260,11 @@ export class TurnLifecycle {
       case "warning": {
         const message = getString(params, "message") ?? notification.method;
         if (notification.method === "warning" && isNonActionableCodexWarning(message)) return;
-        this.#hooks.emitError(`agent_${notification.method}`, message, agentId);
+        // A fixed code, with the provider's method name in the message. The
+        // method comes from provider-controlled JSON-RPC, so building the code
+        // out of it made every unseen method a new code that analytics folded
+        // to "unknown".
+        this.#hooks.emitError("agent_notification_failed", `${notification.method}: ${message}`, agentId);
       }
     }
   }

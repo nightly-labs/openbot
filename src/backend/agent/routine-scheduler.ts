@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { FailureCode } from "@openbot/contracts/analytics-failures";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentEvent,
@@ -48,7 +49,7 @@ export interface RoutineMutationOptions {
  */
 export interface RoutineHooks {
   emit(event: AgentEvent): void;
-  emitError(code: string, error: unknown, agentId?: string): void;
+  emitError(code: FailureCode, error: unknown, agentId?: string): void;
   emitQueue(agentId: string): void;
   scheduleDrain(agentId: string): void;
   interrupt(agentId: string, turnId: string): Promise<void>;

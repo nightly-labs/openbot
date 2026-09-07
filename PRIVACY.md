@@ -20,9 +20,12 @@ states, timing, provider, model, reasoning effort, application version, operatin
 failure codes.
 
 Analytics events do not contain message or direct-message text, prompts, replies, generated content,
-search queries, embedded-browser URLs or page titles, file names, local paths, commands, raw error
-messages, or local identifiers for agents, threads, turns, messages, servers, and team members.
-Website page views do not contain query parameters, hashes, or invitation values. Session replay and
+search queries, embedded-browser URLs or page titles, file names, local paths, commands, or local
+identifiers for agents, threads, turns, messages, servers, and team members.
+A failure event may contain a short error summary: at most 200 characters, with secrets,
+credentials, email addresses and home directory paths removed before it is sent, and never the
+output of a provider tool. It travels under the same Settings -> General analytics opt-out as every
+other event. Website page views do not contain query parameters, hashes, or invitation values. Session replay and
 automatic interaction capture are disabled.
 
 When a user signs in, OpenPanel receives the OpenBot account ID and normalized account email so UI
@@ -140,6 +143,13 @@ provider logs are outside the OpenBot application database and its daily mainten
   conversations, message queues, direct messages, reactions, read state, attachment drafts and
   indexes, team configuration, local team members and sessions, the shared browser profile, cookies,
   and application preferences.
+- `~/Library/Application Support/OpenBot/logs` contains local log files: `logs/diagnostics` holds
+  one JSON line per failure, `logs/update` the updater history, and `logs/remote` the Remote Desktop
+  process output. Every line passes the same redaction as an analytics event, and home directory
+  paths are shortened to `~`, but a line can hold more detail than an event does - a full error
+  message, a candidate binary path, an exit code. The logs are bounded and rotate: `logs/diagnostics`
+  keeps at most 1.5 MB, and the whole `logs` tree is swept back under 8 MB at startup. Nothing sends
+  them anywhere, and they are not part of the diagnostics export.
 - The local team configuration contains team member profiles, password hashes and salts when local
   password sign-in is used, invite and session token hashes, and the team identity key pair.
 - `~/.codex` is owned by Codex CLI and contains its login and thread data. OpenBot does not copy or
@@ -197,7 +207,8 @@ and managed message attachments. It intentionally excludes CLI credentials, brow
 agent workspace files.
 
 The diagnostics export contains application and CLI versions, capability states, and aggregate queue
-counts. It contains no conversations, visited URLs, account email, file contents, or local file paths.
+counts. It contains no conversations, visited URLs, account email, file contents, or local file
+paths, and it does not include the local log files.
 
 ## Delete local data
 

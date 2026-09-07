@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./analytics-failures": "./src/analytics-failures.ts",
     "./attachment-files": "./src/attachment-files.ts",
     "./attachment-references": "./src/attachment-references.ts",
     "./avatar-images": "./src/avatar-images.ts",

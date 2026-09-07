@@ -1,4 +1,13 @@
 import {
+  createFailureThrottle,
+  durationBucket,
+  type FailureThrottle,
+  failureMessagePolicy,
+  isFailureArea,
+  isFailureCode,
+  isFailureStage,
+} from "@openbot/contracts/analytics-failures";
+import {
   AGENT_PROVIDERS,
   AGENT_REASONING_EFFORTS,
   type AgentEvent,
@@ -10,6 +19,8 @@ import {
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isFunction, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
+import type { DiagnosticRecord, LogValue } from "@openbot/logging";
+import { redactedSummary } from "@openbot/logging";
 import { OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
 
 export const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
@@ -55,7 +66,19 @@ const HOST_ALLOWLIST = {
     "has_secret_prompt",
     "approval_kind",
   ],
-  system_operation_failed: ["provider", "model", "reasoning_effort", "area", "failure_code"],
+  system_operation_failed: [
+    "provider",
+    "model",
+    "reasoning_effort",
+    "area",
+    "failure_code",
+    "stage",
+    "message",
+    "errno",
+    "exit_code",
+    "duration_bucket",
+    "repeat_count",
+  ],
   hosted_site_action: ["action", "entry_point", "result", "failure_code"],
 } as const satisfies Record<HostEventName, readonly string[]>;
 
@@ -81,6 +104,15 @@ export class HostAnalytics {
   readonly #hostedSiteOwners = new Map<string, AnalyticsIdentity | null>();
   readonly #hostedSiteTerminalOperations = new Set<string>();
   readonly #operationQueue: AnalyticsOperationQueue = { active: false, operations: [] };
+  readonly #failureThrottle: FailureThrottle = createFailureThrottle();
+  readonly #createClient: ClientFactory;
+  readonly #globalProperties: { appVersion: string; platform: HostAnalyticsOptions["platform"] };
+  // A failure on a machine that has never signed in used to reach nobody: an
+  // ownerless event waits in `#pending` for an owner that never arrives. This
+  // client is never identified and carries no profile, which is what lets a
+  // failed provider start be reported at all.
+  #anonymousClient: HostOpenPanelClient | null = null;
+  #anonymousClientTried = false;
 
   constructor(
     options: HostAnalyticsOptions,
@@ -89,6 +121,8 @@ export class HostAnalytics {
     this.#resolveOwner = options.resolveOwner;
     this.#resolveAgent = options.resolveAgent;
     this.#trackingEnabled = options.trackingEnabled ?? true;
+    this.#createClient = createClient;
+    this.#globalProperties = { appVersion: options.appVersion, platform: options.platform };
     if (!options.enabled) {
       this.#client = null;
       return;
@@ -187,6 +221,7 @@ export class HostAnalytics {
           ...(event.agentId ? this.#agentProperties(event.agentId) : {}),
           area: "agent",
           failure_code: systemFailureCode(event.code),
+          message: event.message,
         });
         return;
       default:
@@ -300,17 +335,79 @@ export class HostAnalytics {
     for (const event of pending) this.#send(event.name, event.properties, owner.id, event.timestamp);
   }
 
+  /**
+   * One diagnostic, as one failure event. This is the other half of the local
+   * trail: the same record the log file keeps, minus everything the allowlist
+   * does not admit.
+   */
+  recordFailure(record: DiagnosticRecord): void {
+    if (!this.#client || !this.#trackingEnabled) return;
+    const detail = record.detail ?? {};
+    const durationMs = scalar(detail.durationMs);
+    this.#track("system_operation_failed", {
+      area: record.area ?? "unknown",
+      failure_code: record.code,
+      ...optional("stage", record.stage),
+      ...optional("message", record.message),
+      ...optional("provider", scalar(detail.provider)),
+      ...optional("errno", scalar(detail.errno)),
+      ...optional("exit_code", scalar(detail.exitCode)),
+      ...optional("repeat_count", scalar(detail.repeated)),
+      ...(isNumber(durationMs) ? { duration_bucket: durationBucket(durationMs) } : {}),
+    });
+  }
+
   #track(name: HostEventName, properties: HostProperties, ownerOverride?: AnalyticsIdentity | null): void {
     if (!this.#trackingEnabled) return;
-    const sanitized = sanitizeHostEvent(name, properties);
+    let sanitized = sanitizeHostEvent(name, properties);
+    if (name === "system_operation_failed") {
+      // Keyed on the normalized area and code, not the raw one: a crash loop
+      // that invents a new code each iteration would otherwise be 150 keys
+      // rather than one.
+      const repeated = this.#failureThrottle.admit(
+        `${sanitized.area ?? "unknown"}:${sanitized.failure_code ?? "unknown"}`,
+        Date.now(),
+      );
+      if (repeated === null) return;
+      if (repeated > 0) sanitized = sanitizeHostEvent(name, { ...sanitized, repeat_count: repeated });
+    }
     const owner = ownerOverride === undefined ? normalizeAnalyticsIdentity(this.#resolveOwner()) : ownerOverride;
     if (!owner) {
+      if (name === "system_operation_failed") {
+        this.#sendAnonymous(name, sanitized);
+        return;
+      }
       if (!this.#bufferOwnerlessEvents) return;
       this.#pending.push({ name, properties: sanitized, timestamp: new Date().toISOString() });
       if (this.#pending.length > MAX_PENDING_EVENTS) this.#pending.shift();
       return;
     }
     this.#trackForOwner(name, sanitized, owner, ownerOverride === undefined);
+  }
+
+  #sendAnonymous(name: HostEventName, properties: HostProperties): void {
+    const client = this.#anonymousScope();
+    if (!client) return;
+    this.#enqueue("track", () => client.track(name, { ...properties }));
+  }
+
+  #anonymousScope(): HostOpenPanelClient | null {
+    if (this.#anonymousClientTried) return this.#anonymousClient;
+    this.#anonymousClientTried = true;
+    try {
+      const client = this.#createClient({ apiUrl: OPENPANEL_API_URL, clientId: OPENPANEL_CLIENT_ID });
+      client.setGlobalProperties({
+        surface: "desktop_host",
+        environment: "production",
+        event_schema_version: ANALYTICS_SCHEMA_VERSION,
+        app_version: this.#globalProperties.appVersion,
+        platform: this.#globalProperties.platform,
+      });
+      this.#anonymousClient = client;
+    } catch {
+      this.#anonymousClient = null;
+    }
+    return this.#anonymousClient;
   }
 
   #identify(owner: AnalyticsIdentity): void {
@@ -400,13 +497,27 @@ function normalizeAnalyticsIdentity(user: AnalyticsIdentity | null): AnalyticsId
 
 export function sanitizeHostEvent(name: HostEventName, properties: HostProperties): HostProperties {
   const allowed = HOST_ALLOWLIST[name];
-  return Object.fromEntries(
+  const sanitized: HostProperties = Object.fromEntries(
     Object.entries(properties).flatMap(([key, value]) => {
       if (value === undefined || !allowed.some((item) => item === key)) return [];
       const safeValue = sanitizeHostProperty(name, key, value);
       return safeValue === undefined ? [] : [[key, safeValue]];
     }),
   );
+  // Provider output is the least controlled string in the app - a stderr line
+  // can carry a repository path, a prompt fragment or a pasted token - so the
+  // codes that carry it keep their text on the machine and send the code alone.
+  const code = sanitized.failure_code;
+  if (isFailureCode(code) && failureMessagePolicy(code) === "local_only") delete sanitized.message;
+  return sanitized;
+}
+
+function optional(key: string, value: string | number | boolean | undefined): HostProperties {
+  return value === undefined ? {} : { [key]: value };
+}
+
+function scalar(value: LogValue | undefined): string | number | boolean | undefined {
+  return isString(value) || isNumber(value) || isBoolean(value) ? value : undefined;
 }
 
 function sanitizeHostProperty(name: HostEventName, key: string, value: unknown): string | number | boolean | undefined {
@@ -435,7 +546,22 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
   if (key === "approval_kind") {
     return isOneOf(["command", "file-change", "permissions"] as const, value) ? value : undefined;
   }
-  if (key === "area") return value === "agent" ? value : undefined;
+  // Widened from the single `"agent"` it used to admit: with the whole app
+  // reporting, an area is the breakdown that keeps `log_error` from being one
+  // meaningless bar.
+  if (key === "area") return isFailureArea(value) ? value : "unknown";
+  if (key === "stage") return isFailureStage(value) ? value : undefined;
+  if (key === "message") return isString(value) ? redactedSummary(value) || undefined : undefined;
+  if (key === "errno") return isOneOf(SAFE_ERRNO, value) ? value : undefined;
+  if (key === "exit_code") {
+    return isNumber(value) && Number.isInteger(value) && value >= -256 && value <= 256 ? value : undefined;
+  }
+  if (key === "duration_bucket") {
+    return isOneOf(["lt_1s", "lt_10s", "lt_1m", "lt_10m", "gte_10m", "unknown"] as const, value) ? value : undefined;
+  }
+  if (key === "repeat_count") {
+    return isNumber(value) && Number.isInteger(value) && value >= 0 && value <= 10_000 ? value : undefined;
+  }
   if (key === "prompt_count") {
     return isNumber(value) && Number.isInteger(value) && value >= 0 && value <= 100 ? value : undefined;
   }
@@ -454,23 +580,37 @@ function normalizedTurnStatus(value: string): string {
   return ["completed", "failed", "interrupted", "cancelled"].includes(value) ? value : "other";
 }
 
+/**
+ * One shared list decides this now. The eleven literal cases this used to hold
+ * folded a third of the codes actually in use to `"unknown"`.
+ *
+ * The `agent_` fold stays as the last resort: a remote host on an older build
+ * still sends `agent_<jsonrpc method>`, and the family is better data than
+ * `"unknown"`.
+ */
 function systemFailureCode(value: string): string {
-  switch (value) {
-    case "context_compaction_failed":
-    case "delivery_start_failed":
-    case "delivery_turn_association_failed":
-    case "interrupt_failed":
-    case "memory_commit_failed":
-    case "provider_history_backfill_pending":
-    case "provider_metadata_refresh_failed":
-    case "routine_delivery_failed":
-    case "routine_delivery_recovery_failed":
-    case "routine_scheduler_failed":
-    case "server_request_failed":
-      return value;
-    default:
-      if (/^(?:claude|codex|grok)_(?:diagnostic|exited|start_failed)$/u.test(value)) return value;
-      if (value.startsWith("agent_")) return "agent_event_failed";
-      return "unknown";
-  }
+  if (isFailureCode(value)) return value;
+  return value.startsWith("agent_") ? "agent_event_failed" : "unknown";
 }
+
+/** Errors a user can act on, and nothing that could carry a path or a name. */
+const SAFE_ERRNO = [
+  "EACCES",
+  "EAGAIN",
+  "EBUSY",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTUNREACH",
+  "EINVAL",
+  "EIO",
+  "EISDIR",
+  "ELOOP",
+  "EMFILE",
+  "ENETUNREACH",
+  "ENOENT",
+  "ENOSPC",
+  "ENOTDIR",
+  "EPERM",
+  "EPIPE",
+  "ETIMEDOUT",
+] as const;

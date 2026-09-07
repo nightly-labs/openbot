@@ -1,3 +1,4 @@
+import type { FailureCode } from "@openbot/contracts/analytics-failures";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentEvent,
@@ -37,7 +38,7 @@ export interface AgentMemoriesOptions {
   store: AgentStore;
   conversation: ConversationRuntime;
   emit(event: AgentEvent): void;
-  emitError(code: string, error: unknown, agentId?: string): void;
+  emitError(code: FailureCode, error: unknown, agentId?: string): void;
 }
 
 /**
@@ -54,7 +55,7 @@ export class AgentMemories {
   readonly #store: AgentStore;
   readonly #conversation: ConversationRuntime;
   readonly #emit: (event: AgentEvent) => void;
-  readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
+  readonly #emitError: (code: FailureCode, error: unknown, agentId?: string) => void;
   readonly #memories: AgentMemoryStore;
   readonly #pending = new Map<string, PendingMemoryMutation[]>();
   readonly #epochs = new Map<string, number>();

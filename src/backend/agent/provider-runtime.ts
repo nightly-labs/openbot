@@ -1,4 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import type { FailureCode } from "@openbot/contracts/analytics-failures";
 import type {
   AccountUsage,
   AgentEvent,
@@ -8,6 +9,7 @@ import type {
   AgentSummary,
 } from "@openbot/contracts/ipc";
 import { isReasoningEffort } from "@openbot/contracts/ipc";
+import { recordDiagnostic } from "@openbot/logging";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import { type AgentCliInfo, CodexCliError, type CodexCliInfo, resolveCodexCli } from "./../cli";
@@ -161,7 +163,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #conversation: ConversationRuntime;
   readonly #hooks: ProviderHooks;
   readonly #emit: (event: AgentEvent) => void;
-  readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
+  readonly #emitError: (code: FailureCode, error: unknown, agentId?: string) => void;
   readonly #requestTimeoutMs: number;
   readonly #clientFactory: AgentClientFactory | null;
   readonly #bundledExecutables: ReadonlyMap<AgentProvider, string | null | undefined>;
@@ -184,7 +186,7 @@ export class ProviderRuntime implements ProviderPort {
     conversation: ConversationRuntime;
     hooks: ProviderHooks;
     emit: (event: AgentEvent) => void;
-    emitError: (code: string, error: unknown, agentId?: string) => void;
+    emitError: (code: FailureCode, error: unknown, agentId?: string) => void;
     requestTimeoutMs: number;
     preferredProvider: AgentProvider;
     clientFactory: AgentClientFactory | null;
@@ -470,9 +472,17 @@ export class ProviderRuntime implements ProviderPort {
           this.#cli.delete(provider);
           this.#accounts.delete(provider);
           await client.stop().catch(() => undefined);
-        } catch {
+        } catch (error) {
           // Keep a working client when an explicit account refresh is temporarily unavailable.
           const label = provider === "codex" ? "ChatGPT" : providerLabel(provider);
+          recordDiagnostic({
+            code: "provider_account_refresh_failed",
+            severity: "warn",
+            area: "provider",
+            stage: "provider_start",
+            message: error instanceof Error ? error.message : String(error),
+            detail: { provider, errorName: error instanceof Error ? error.name : "unknown", keptClient: true },
+          });
           this.#setStatus({
             providers: updateProviderStatus(this.#status.providers, provider, {
               state: "available",
@@ -653,6 +663,17 @@ export class ProviderRuntime implements ProviderPort {
     const fallbackMessage = `OpenBot could not connect ${providerLabel(provider)}. Try again.`;
     const rawMessage = error instanceof Error ? error.message : String(error);
     const message = /^(ChatGPT connection|OpenBot)/u.test(rawMessage) ? rawMessage : fallbackMessage;
+    if (message !== rawMessage) {
+      // `local_only`: the raw message is the provider's, not OpenBot's.
+      recordDiagnostic({
+        code: "provider_message_masked",
+        severity: "error",
+        area: "provider",
+        stage: "provider_start",
+        message: rawMessage,
+        detail: { provider, presentedMessage: message, hasActiveClient },
+      });
+    }
     const status = hasActiveClient
       ? {
           state: "available" as const,
@@ -903,13 +924,19 @@ export class ProviderRuntime implements ProviderPort {
         const driver = requireProviderDriver(provider);
         let client: AgentClient | null = null;
         let cli: AgentCliInfo | null = null;
+        // A plain reassigned local, deliberately: a helper or a wrapper here
+        // would change the await graph, and the per-provider publish order is
+        // pinned by a test.
+        let step = "resolve-cli";
         try {
           cli = await driver.resolveCli({ bundledExecutable: this.#bundledExecutables.get(provider) });
+          step = "create-client";
           client = this.#clientFactory
             ? this.#clientFactory(provider, cli)
             : driver.createClient(cli, this.#requestTimeoutMs);
           this.#bindClient(client);
           client.start();
+          step = "initialize";
           await client.request(
             "initialize",
             {
@@ -919,6 +946,7 @@ export class ProviderRuntime implements ProviderPort {
             decodeRecordResponse,
           );
           client.notify("initialized");
+          step = "account-read";
           const account = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult, 5_000);
           if (!account.account) {
             const message = provider === "codex" ? "Connect ChatGPT to continue." : driver.signInMessage;
@@ -933,6 +961,7 @@ export class ProviderRuntime implements ProviderPort {
             });
             return message;
           }
+          step = "validate-account";
           driver.validateAccount(account.account);
           this.#cli.set(provider, cli);
           this.#clients.set(provider, client);
@@ -956,7 +985,30 @@ export class ProviderRuntime implements ProviderPort {
               providerFailureStatus(provider, error, cli?.version),
             ),
           });
-          if (!(error instanceof CodexCliError)) this.#emitError(`${provider}_start_failed`, error);
+          recordDiagnostic({
+            code: "provider_connect_failed",
+            severity: "error",
+            area: "provider",
+            stage: "provider_start",
+            message,
+            detail: {
+              provider,
+              step,
+              errorName: error instanceof Error ? error.name : "unknown",
+              ...(error instanceof CodexCliError ? { errorCode: error.code } : {}),
+              ...(cli ? { cliVersion: cli.version, cliSource: cli.source ?? "system" } : {}),
+            },
+          });
+          // A `CodexCliError` used to emit nothing, which is the whole reason a
+          // user could see "OpenBot could not start its included ChatGPT
+          // runtime" with no log line and no event behind it. It is the most
+          // reportable failure here, not the least.
+          this.#emitError(
+            error instanceof CodexCliError && error.code === "missing"
+              ? `${provider}_runtime_missing`
+              : `${provider}_start_failed`,
+            error,
+          );
           return message;
         }
       }),

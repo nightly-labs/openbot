@@ -3,6 +3,7 @@
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { DiagnosticRecord } from "@openbot/logging";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   bundledClaudeExecutable,
@@ -79,12 +80,46 @@ describe("bundled Codex resolution", () => {
     const invalid = await createExecutable("broken-codex", "not a version");
     const bundled = await createExecutable("bundled-codex", "codex-cli 0.149.1");
 
+    const records: DiagnosticRecord[] = [];
     await expect(
-      resolveCodexCli({ systemCandidates: [outdated, invalid], bundledExecutable: bundled }),
+      resolveCodexCli({
+        systemCandidates: [outdated, invalid],
+        bundledExecutable: bundled,
+        onDiagnostic: (record) => records.push(record),
+      }),
     ).resolves.toEqual({
       executable: bundled,
       version: "0.149.1",
       source: "managed",
+    });
+
+    // Which candidate failed and why is the whole diagnostic. A resolve that
+    // succeeds on the third binary used to report nothing at all.
+    expect(records).toHaveLength(1);
+    expect(records[0]?.code).toBe("cli_resolved_after_failures");
+    expect(records[0]?.detail?.attempts).toMatchObject([
+      { path: outdated, source: "system", outcome: "outdated", version: "0.120.0" },
+      { path: invalid, source: "system", outcome: "unparsable" },
+      { path: bundled, source: "managed", outcome: "ok", version: "0.149.1" },
+    ]);
+  });
+
+  it.runIf(process.platform !== "win32")("reports every candidate when nothing resolves", async () => {
+    const records: DiagnosticRecord[] = [];
+
+    await expect(
+      resolveCodexCli({
+        systemCandidates: ["/nonexistent/codex"],
+        bundledExecutable: null,
+        onDiagnostic: (record) => records.push(record),
+      }),
+    ).rejects.toMatchObject({ code: "missing" });
+
+    expect(records[0]?.code).toBe("cli_resolve_failed");
+    expect(records[0]?.detail).toMatchObject({
+      provider: "codex",
+      errorCode: "missing",
+      attempts: [{ path: "/nonexistent/codex", outcome: "not-executable", errno: "ENOENT" }],
     });
   });
 });

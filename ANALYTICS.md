@@ -22,6 +22,11 @@ Every event has these low-cardinality properties:
 - `app_version` and `platform` on desktop surfaces;
 - `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`.
 
+An optional property added to an existing event does not need a new generation, because no report
+that ignores it changes meaning. Only a rename, a removal, or a change of meaning does. Generation 5
+gained the failure properties below (`area`, `stage`, `message`, `errno`, `exit_code`,
+`duration_bucket`, `repeat_count`) under this rule.
+
 Reports must filter to `event_schema_version = 5`. Generation 5 renames the product agent throughout: the
 `origin` property reports `agent` where generation 4 reported `bot`, so the two generations cannot be
 combined in one report. Historical events remain available but must not
@@ -33,6 +38,9 @@ be mixed into current conversion or reliability metrics.
 - A local host emits one lifecycle event under its owner's account.
 - Clients observing a remote host do not re-emit host lifecycle.
 - Landing, invitation, and pre-authentication events are anonymous.
+- A `system_operation_failed` event with no resolved owner is sent through a never-identified client
+  rather than held back. A provider that cannot start on a machine that never signed in is exactly
+  the failure worth seeing, and it has no account to attach.
 - OpenPanel receives the central account ID as `profileId` and the normalized account email as the
   profile email. Email is not copied into individual event properties.
 - Existing profiles are repaired by the controlled identity backfill when their `profileId` matches
@@ -67,7 +75,7 @@ lifecycle. A malformed preference fails closed; a missing preference uses the do
 | `system_turn_started` | How many host turns begin and from which origin? | Host accepted a unique turn start |
 | `system_turn_completed` | Are turns reliable and fast? | Host emitted completion; status describes outcome |
 | `system_agent_input_requested` | Where do agents need human input? | Host requested a prompt answer or approval |
-| `system_operation_failed` | Which host/provider area fails? | Host emitted a safe, allowlisted failure code |
+| `system_operation_failed` | Which host/provider area fails and why? | Host emitted a safe, allowlisted failure code, with `area`, `stage`, a redacted `message`, and where they apply `errno`, `exit_code`, `duration_bucket` and `repeat_count` |
 | `agent_input_action` | Can users resolve prompts and approvals? | Response IPC completed |
 | `queue_action` | Can users control queued work? | Queue operation completed |
 | `routine_action` | Are routines adopted and reliable? | Routine operation completed; `duration_ms` measures execution time |
@@ -95,8 +103,14 @@ version values use bounded safe formats, arrays are filtered and capped, and num
 non-finite, negative, or implausibly large inputs. Failure codes are static and allowlisted.
 
 Never send message content, prompts, answers, generated content, search terms, arbitrary URLs,
-referrers, file names, local paths, commands, tokens, invitation values, raw errors, or local
-identifiers. Website screen views use only the fixed paths `/` and `/join`. Session replay and
+referrers, file names, local paths, commands, tokens, invitation values, or local identifiers.
+
+A failure event may carry a `message`: a redacted summary of at most 200 characters, with secrets,
+credentials, emails and home directory paths removed before it leaves the process. It is never the
+raw error. Text OpenBot did not author - provider CLI output, a process exit line, a masked
+provider message - is `local_only`: it goes to the local diagnostics log and the `message` property
+is dropped. `failureMessagePolicy` in `packages/contracts/src/analytics-failures.ts` is the one
+place that decides this. Website screen views use only the fixed paths `/` and `/join`. Session replay and
 automatic interaction capture remain disabled.
 
 ## Required dashboards
@@ -126,4 +140,7 @@ change it; use the engaged-session report for meaningful landing activity.
   process restart boundary.
 - Provider conversion uses `connect_completed`, never resolution of the initial connect IPC.
 - An update status with phase `error` or `unsupported` is a failed action.
+- A failure that repeats produces one event carrying `repeat_count`, not one event per occurrence.
+- `system_operation_failed` is broken down by `area` as well as by `failure_code`, or the generic
+  `log_error` code hides everything under one bar.
 - Dashboard counts and profile assignment are smoke-tested after each analytics schema deployment.

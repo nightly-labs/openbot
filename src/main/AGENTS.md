@@ -124,6 +124,7 @@ Eight things that used to live in it now have their own file, and none of them s
 | `development-remote-bootstrap.ts` | the dev-only `OPENBOT_DEV_REMOTE_ROLE` account and connection |
 | `session-configuration.ts` | the renderer CSP and bundle protocol, the permission handlers, the attachment/avatar/logo protocols |
 | `renderer-forwarders.ts` | the eleven service events relayed to the renderer |
+| `diagnostics-log.ts` | the bounded JSON-line log under `userData/logs`: rotation, dedupe, the rate cap and the startup sweep. Takes its directory, home path and clock as options and imports no `electron`, so its test needs no mock |
 | `ipc/*-handlers.ts` | every IPC endpoint, one file per domain |
 
 `createApplicationServices` is **one function on purpose**, not a sequence of stages. A service

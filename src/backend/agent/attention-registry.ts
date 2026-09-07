@@ -1,3 +1,4 @@
+import type { FailureCode } from "@openbot/contracts/analytics-failures";
 import type {
   AgentApproval,
   AgentApprovalKind,
@@ -114,7 +115,7 @@ export interface AttentionRegistryOptions {
   hostedSites: HostedSiteApprovals;
   routines: RoutineAttention;
   emit(event: AgentEvent): void;
-  emitError(code: string, error: unknown, agentId?: string): void;
+  emitError(code: FailureCode, error: unknown, agentId?: string): void;
   emitRuntimeSnapshot(): void;
 }
 
@@ -139,7 +140,7 @@ export class AttentionRegistry {
   readonly #hostedSites: HostedSiteApprovals;
   readonly #routines: RoutineAttention;
   readonly #emit: (event: AgentEvent) => void;
-  readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
+  readonly #emitError: (code: FailureCode, error: unknown, agentId?: string) => void;
   readonly #emitRuntimeSnapshot: () => void;
   readonly #prompts = new Map<RequestId, PendingPrompt>();
   readonly #approvals = new Map<RequestId, PendingApproval>();

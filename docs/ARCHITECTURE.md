@@ -127,7 +127,12 @@ These are manual model evaluations, separate from the fake-provider lifecycle re
     secret-redacted, and redaction covers a serialized payload passed as one string, not only a
     structured param. `info` and above is written by default; `OPENBOT_LOG_LEVEL` lowers the
     threshold. Machine-readable stdout (piped JSON, tags, harness URLs) uses
-    `process.stdout.write` with a `// Machine-readable:` comment instead. Dev automation
+    `process.stdout.write` with a `// Machine-readable:` comment instead. The package also owns a
+    process-wide diagnostic sink: `logger.error`, `logger.failure` and a direct `recordDiagnostic`
+    call redact first and then reach whichever sink `setDiagnosticSink` holds. The main process is
+    the only registrant (`src/main/diagnostics-log.ts` plus `HostAnalytics`), so a failure recorded
+    anywhere gains a bounded local JSON line without that code depending on the main process, and
+    the renderer, which has its own module copy and no sink, cannot write that file. Dev automation
     (`scripts/dev-automation`, `bun run dev:automation`) drives the already-running dev app over its
     remote-debugging CDP port and never launches a second instance, seeds, or resets the dev profile.
     Because several worktrees run dev side by side, each instance publishes its worktree, profile,
