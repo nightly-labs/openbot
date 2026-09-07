@@ -68,6 +68,13 @@ type KeepQueueBlocked = (promise: Promise<unknown>) => void;
 
 const MAX_ENCODED_CAPTURE_PIXELS = 4_194_304;
 const ACTION_POST_DISPATCH_TIMEOUT_MS = 10_000;
+/**
+ * How long an operation that missed its deadline gets to unwind on its own before the debugger is
+ * detached under it, and again to unwind after the detach. Long enough that a renderer which is
+ * merely slower than the deadline it was given is never cancelled, short enough that the tab's queue
+ * is not held by a renderer that will never answer.
+ */
+const OPERATION_UNWIND_GRACE_MS = 1_000;
 
 interface BrowserConsoleMessageDetails {
   level: "info" | "warning" | "error" | "debug";
@@ -793,7 +800,16 @@ export class BrowserHost {
             await this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
               const timeoutMessage = "Browser wait condition timed out.";
               const deadline = Date.now() + timeoutMs;
-              await tab.engine.waitFor(condition, remainingTime(deadline, timeoutMessage));
+              // The engine checks this deadline between commands, which a frame that answers none of
+              // them never reaches.
+              const waitTimeout = remainingTime(deadline, timeoutMessage);
+              await this.#boundEngineOperation(
+                tab,
+                tab.engine.waitFor(condition, waitTimeout),
+                waitTimeout,
+                timeoutMessage,
+                keepQueueBlocked,
+              );
               return (
                 await this.#readSnapshot(
                   tab,
@@ -1163,26 +1179,58 @@ export class BrowserHost {
       diagnostics: history.diagnostics,
       actions: history.actions,
     });
-    let cancellationConfirmed = false;
-    const bounded = withTimeout(completion, timeoutMs, timeoutMessage).catch((error) => {
-      if (isTimeoutError(error)) cancellationConfirmed = tab.engine.cancelPendingCommands();
-      throw error;
-    });
-    // A snapshot walks every frame with CDP commands, and Electron's `sendCommand` has no timeout of
-    // its own: a frame whose renderer never answers leaves `completion` pending forever. The bound
-    // above returns an error to the caller, but the queue waits on every promise given to
-    // `keepQueueBlocked`, so without cancelling the command nothing on this tab ever runs again --
-    // navigation, takeover, close and host shutdown all queue behind that drain. Detaching the
-    // debugger is the only cancellation primitive there is, and a confirmed detach is what releases
-    // the drain; when the recorder holds the debugger there is nothing to detach and the wait stands.
-    keepQueueBlocked(
-      Promise.allSettled([bounded]).then(() =>
-        cancellationConfirmed ? undefined : Promise.allSettled([completion]).then(() => undefined),
-      ),
-    );
-    const result = await bounded;
+    // A snapshot walks every frame, so it is one of the engine operations a single unresponsive
+    // renderer can hold open forever.
+    const result = await this.#boundEngineOperation(tab, completion, timeoutMs, timeoutMessage, keepQueueBlocked);
     tab.revision = revision;
     return result;
+  }
+
+  /**
+   * Bounds an engine operation in wall-clock time and unwinds what it left behind. Electron's
+   * `sendCommand` carries no timeout of its own and the engine's own deadlines are checked between
+   * commands, so a frame whose renderer never answers leaves the operation pending forever however
+   * short a deadline it was given. Returning a timeout to the caller is not enough on its own: the
+   * queue waits on every promise given to `keepQueueBlocked`, so a command left outstanding means
+   * nothing on this tab ever runs again -- navigation, takeover, close and host shutdown all queue
+   * behind that drain.
+   */
+  #boundEngineOperation<T>(
+    tab: InternalTab,
+    completion: Promise<T>,
+    timeoutMs: number,
+    timeoutMessage: string,
+    keepQueueBlocked: KeepQueueBlocked,
+  ): Promise<T> {
+    let unwound: Promise<void> | undefined;
+    const bounded = withTimeout(completion, timeoutMs, timeoutMessage).catch((error) => {
+      if (isTimeoutError(error)) unwound = this.#unwindStalledOperation(tab, completion);
+      throw error;
+    });
+    keepQueueBlocked(Promise.allSettled([bounded]).then(() => unwound));
+    return bounded;
+  }
+
+  /**
+   * Gives an operation that missed its deadline a moment to unwind, and detaches the debugger if it
+   * will not. Detaching is the only cancellation primitive there is, and it is a blunt one: it takes
+   * the whole session down, so a command still in flight when the next one attaches over the top of it
+   * fails with `target closed while handling command` -- one operation away from the timeout that
+   * caused it. Most timeouts do not need it at all, because a deadline shorter than the page is the
+   * ordinary case and a live renderer answers what is outstanding in a few milliseconds. So the wait
+   * comes first, the detach only if the wait expires, and a second wait after it, so the queue
+   * advances into an attached debugger rather than one being torn down. When the recorder holds the
+   * debugger there is nothing to detach and the wait stands, because the command really is still
+   * outstanding.
+   */
+  async #unwindStalledOperation(tab: InternalTab, completion: Promise<unknown>): Promise<void> {
+    const settled = Promise.allSettled([completion]);
+    if (await finishesWithin(settled, OPERATION_UNWIND_GRACE_MS)) return;
+    if (!tab.engine.cancelPendingCommands()) {
+      await settled;
+      return;
+    }
+    await finishesWithin(settled, OPERATION_UNWIND_GRACE_MS);
   }
 
   async #runAction(
@@ -1203,6 +1251,7 @@ export class BrowserHost {
       const deadline = Date.now() + timeoutMs;
       const timeoutMessage = `Browser ${action} timed out.`;
       const snapshotDrains: Promise<unknown>[] = [];
+      let stalledSettle: Promise<void> | undefined;
       let actionRecorded = false;
       let dispatched = false;
       let cancellationConfirmed = false;
@@ -1238,10 +1287,19 @@ export class BrowserHost {
       const response = boundedOperation
         .then(async () => {
           const settleTimeout = Math.max(1, deadline - Date.now());
+          const settleCompletion = tab.engine.settle(settleTimeout);
           try {
-            await tab.engine.settle(settleTimeout);
+            // Settling bounds its own waiting with timers, but the commands it sends to each frame are
+            // not bounded by them, so an unresponsive frame holds the action's response open and the
+            // queue with it.
+            await withTimeout(settleCompletion, settleTimeout, timeoutMessage);
           } catch (error) {
             if (!isTimeoutError(error)) throw error;
+            // The settle may still be waiting on a frame that never answers, and unwinding it can go
+            // as far as detaching the debugger -- which the post-dispatch snapshot below is about to
+            // use. So the unwind is left to the drain, once the rest of the action has finished with
+            // the session.
+            stalledSettle = settleCompletion;
             if (tab.view.webContents.isLoading()) await tab.engine.stopLoading().catch(() => undefined);
           }
           tab.diagnostics.action({
@@ -1276,6 +1334,11 @@ export class BrowserHost {
           throw error;
         })
         .finally(() => restoreWebContentsFocus(previouslyFocused, tab.view.webContents));
+      snapshotDrains.push(
+        Promise.allSettled([response]).then(() =>
+          stalledSettle ? this.#unwindStalledOperation(tab, stalledSettle) : undefined,
+        ),
+      );
       const drained = Promise.allSettled([response])
         .then(() =>
           cancellationConfirmed ? undefined : Promise.allSettled([operationCompletion]).then(() => undefined),
@@ -1303,29 +1366,34 @@ export class BrowserHost {
     const started = tab.queue.then(() => {
       const deadline = Date.now() + timeoutMs;
       const timeoutMessage = "Browser evaluate timed out.";
-      let cancellationConfirmed = false;
+      let unwound: Promise<void> | undefined;
       const operationCompletion = tab.engine.evaluate(
         expression,
         awaitPromise,
         remainingTime(deadline, timeoutMessage),
       );
       // `awaitPromise` is what CDP's own execution timeout does not bound: an expression evaluating
-      // to a promise the page never settles leaves the command pending forever. Detaching the
-      // debugger is the only cancellation primitive there is, so the timeout takes it -- otherwise
-      // `drained` waits on that promise and the tab's queue never advances, which would also block
-      // takeover, close and shutdown.
+      // to a promise the page never settles leaves the command pending forever, and `drained` waits
+      // on that promise, so the tab's queue never advances -- which would also block takeover, close
+      // and shutdown.
       const boundedOperation = withTimeout(
         operationCompletion,
         remainingTime(deadline, timeoutMessage),
         timeoutMessage,
       ).catch((error) => {
-        if (isTimeoutError(error)) cancellationConfirmed = tab.engine.cancelPendingCommands();
+        if (isTimeoutError(error)) unwound = this.#unwindStalledOperation(tab, operationCompletion);
         throw error;
       });
       const response = boundedOperation
         .then(async (value) => {
           const settleTimeout = remainingTime(deadline, timeoutMessage);
-          await withTimeout(tab.engine.settle(settleTimeout), settleTimeout, timeoutMessage);
+          // Same unbounded commands as the action path settles through; the evaluation itself has
+          // already returned here, so unwinding this one only releases the drain sooner.
+          const settleCompletion = tab.engine.settle(settleTimeout);
+          await withTimeout(settleCompletion, settleTimeout, timeoutMessage).catch((error) => {
+            if (isTimeoutError(error)) unwound = this.#unwindStalledOperation(tab, settleCompletion);
+            throw error;
+          });
           tab.diagnostics.action({ action: "evaluate", outcome: "success" });
           return value;
         })
@@ -1338,9 +1406,7 @@ export class BrowserHost {
           throw error;
         });
       const drained = Promise.allSettled([response])
-        .then(() =>
-          cancellationConfirmed ? undefined : Promise.allSettled([operationCompletion]).then(() => undefined),
-        )
+        .then(() => unwound ?? Promise.allSettled([operationCompletion]).then(() => undefined))
         .then(() => undefined);
       return { drained, response };
     });
@@ -2181,6 +2247,14 @@ async function withTimeout<T>(promise: Promise<T>, milliseconds: number, message
   } finally {
     if (timeout) clearTimeout(timeout);
   }
+}
+
+/** Resolves to whether the work settled before the bound, rather than throwing when it did not. */
+async function finishesWithin(work: Promise<unknown>, milliseconds: number): Promise<boolean> {
+  return await withTimeout(work, milliseconds, "Browser operation unwind timed out.").then(
+    () => true,
+    () => false,
+  );
 }
 
 function isTimeoutError(error: unknown): boolean {

@@ -111,7 +111,8 @@ const server = createServer((request, response) => {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(`<!doctype html>
       <form onsubmit="event.preventDefault();document.querySelector('output').textContent='form-submit:' + event.isTrusted"><input aria-label="Query" /><button type="submit" aria-label="Search">Search</button></form>
-      <textarea aria-label="Body"></textarea>
+      <textarea aria-label="Body" onkeypress="document.querySelector('#keypress-log').textContent='keypress:' + event.key + ':' + event.shiftKey"></textarea>
+      <output id="keypress-log">no keypress</output>
       <div id="shadow-host"></div>
       <iframe title="Trigger frame" src="/frame-files?file_label=Trigger+files"></iframe>
       <output>ready</output>
@@ -835,6 +836,16 @@ async function main(): Promise<void> {
         `V2 Shift+Enter inserted no newline: ${toolError(shiftEnterPressed)} (${JSON.stringify(bodyAfterShiftEnter)})`,
       );
     }
+    // The character event carries the same modifier mask as the key events around it, or the page sees
+    // an unshifted Enter -- which is how a composer decides to send the message instead of breaking
+    // the line, whatever the textarea ends up containing.
+    const shiftEnterKeypress = await keysContents.executeJavaScript(
+      "document.querySelector('#keypress-log').textContent",
+      true,
+    );
+    if (shiftEnterKeypress !== "keypress:Enter:true") {
+      throw new Error(`V2 Shift+Enter reached the page unshifted: ${shiftEnterKeypress}`);
+    }
     // An input inside an iframe nested in a shadow root is reachable by target discovery, so its
     // document has to be reachable by document enumeration too. If it is not, the next frame
     // navigation reports the document as gone and frees the files the input is still holding.
@@ -935,6 +946,16 @@ async function main(): Promise<void> {
     });
     if (blockedSnapshotWait.success || !toolError(blockedSnapshotWait).includes("timed out")) {
       throw new Error(`V2 snapshot did not bound a frame that never answers: ${toolError(blockedSnapshotWait)}`);
+    }
+    // The same frame, reached by the other path whose CDP commands outlive their own deadline: a
+    // `text` condition is evaluated in every frame, and the wait checks its deadline between those
+    // commands, which a frame that answers none of them never reaches.
+    const blockedTextWait = await Promise.race([
+      callBrowserTool(browser, "wait_for", { tabId: blockedTab.id, text: "never appears", timeoutMs: 700 }),
+      new Promise((resolve) => setTimeout(() => resolve(null), 5_000)),
+    ]);
+    if (!isDynamicRecord(blockedTextWait) || blockedTextWait.success === true) {
+      throw new Error("V2 wait condition never returned from a frame that answers nothing.");
     }
     const blockedTabClosed = await Promise.race([
       browser.close(blockedTab.id).then(() => "closed"),

@@ -96,6 +96,15 @@ export class BrowserCdpEngine {
   #navigationGeneration = 0;
   #retainDebugger = false;
   #ownsDebugger = false;
+  /**
+   * How many leases are running. A lease detaches on the way out, and until this counter existed it
+   * detached whenever it was the one that had attached -- which is wrong as soon as two overlap. An
+   * operation that missed its deadline goes on running while the next one starts, so the one that
+   * finished first took the other's debugger down with it: `target closed while handling command` on
+   * the command in flight, then `No target available` for every command after it, on a page that was
+   * perfectly healthy.
+   */
+  #activeLeases = 0;
   #highlightSessionId: string | undefined;
   readonly #uploadDocumentIds = new Set<string>();
   readonly #targetSessions = new Map<string, { sessionId: string; url: string }>();
@@ -1259,11 +1268,11 @@ export class BrowserCdpEngine {
 
   async #lease<T>(operation: (send: SendCommand) => Promise<T>, attachFrames = true): Promise<T> {
     if (this.#contents.isDestroyed()) throw new Error("Browser tab was closed.");
-    const attachedHere = !this.#contents.debugger.isAttached();
-    if (attachedHere) {
+    if (!this.#contents.debugger.isAttached()) {
       this.#contents.debugger.attach("1.3");
       this.#ownsDebugger = true;
     }
+    this.#activeLeases += 1;
     const send: SendCommand = async (method, params = {}, sessionId) => {
       const result = await this.#contents.debugger.sendCommand(method, params, sessionId);
       if (!isDynamicRecord(result)) throw new Error(`CDP ${method} returned an invalid result.`);
@@ -1282,7 +1291,8 @@ export class BrowserCdpEngine {
       if (this.#environment) await this.#applyEnvironment(send, this.#environment);
       return await operation(send);
     } finally {
-      if (attachedHere && !this.#retainDebugger) this.#detachOwnedDebugger();
+      this.#activeLeases -= 1;
+      if (this.#activeLeases === 0 && !this.#retainDebugger) this.#detachOwnedDebugger();
     }
   }
 
@@ -2047,7 +2057,10 @@ async function dispatchShortcut(send: SendCommand, shortcut: string, sessionId?:
     await send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...keyInfo, modifiers }, sessionId);
     keyPressed = true;
     if (character !== undefined && (modifiers === 0 || shiftOnly))
-      await send("Input.dispatchKeyEvent", { type: "char", ...keyInfo, text: character }, sessionId);
+      // The keypress has to agree with the keydown around it. Without the mask CDP defaults it to
+      // zero, so `Shift+Enter` arrives at the page as an unshifted Enter -- and a composer that
+      // decides between "send" and "line break" in its keypress handler sends the message.
+      await send("Input.dispatchKeyEvent", { type: "char", ...keyInfo, modifiers, text: character }, sessionId);
     await send("Input.dispatchKeyEvent", { type: "keyUp", ...keyInfo, modifiers }, sessionId);
     keyPressed = false;
   } finally {
