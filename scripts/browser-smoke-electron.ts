@@ -226,10 +226,14 @@ async function main(): Promise<void> {
   app.setName("OpenBot");
   app.setPath("userData", userDataPath);
   app.setPath("sessionData", userDataPath);
+  // A backstop for a phase that hangs, not a performance budget -- and it has to stay clear of the
+  // phases that wait on a product timeout on purpose. Four of them now spend about ten seconds each
+  // proving that a frame which answers nothing is given up on, so 60 seconds no longer leaves room
+  // for a loaded machine.
   const hardTimeout = setTimeout(() => {
     process.stderr.write("BrowserHost smoke test timed out.\n");
     app.exit(1);
-  }, 60_000);
+  }, 120_000);
 
   try {
     if (persistencePhase) {
@@ -924,6 +928,9 @@ async function main(): Promise<void> {
       .getAllWebContents()
       .find((contents) => !contents.isDestroyed() && contents.getURL().startsWith(`${origin}/blocking-frame`));
     if (!blockedContents) throw new Error("Blocking frame fixture web contents were not available.");
+    // Taken before the frame spins, because a snapshot is the only way to learn a tab's revision and
+    // every operation below is meant to fail -- and a failed snapshot leaves the revision alone.
+    const blockedBaseline = await browser.snapshot(blockedTab.id);
     await blockedContents.executeJavaScript(
       `(() => {
         const frame = document.createElement('iframe');
@@ -956,6 +963,47 @@ async function main(): Promise<void> {
     ]);
     if (!isDynamicRecord(blockedTextWait) || blockedTextWait.success === true) {
       throw new Error("V2 wait condition never returned from a frame that answers nothing.");
+    }
+    // Upload staging resolves the input before the bounded upload action runs, on the same queue and
+    // by the same frame walk: a CSS target has to be proven unique everywhere, so the frame that
+    // answers nothing holds the preflight open ahead of the action the timeout was meant to cover.
+    const blockedUploadPreflight = await Promise.race([
+      browser
+        .resolveUploadTarget({
+          threadId: "smoke-thread",
+          turnId: "browser-v2-blocked-upload",
+          callId: "browser-v2-blocked-upload-call",
+          ownerAgentId: "smoke-bot",
+          namespace: "openbot_browser",
+          tool: "upload_files",
+          arguments: {
+            tabId: blockedTab.id,
+            target: { kind: "css", selector: "input[type=file]" },
+            paths: [nestedUploadPath],
+            timeoutMs: 700,
+          },
+        })
+        .then(
+          () => "resolved",
+          (error: unknown) => String(error),
+        ),
+      new Promise((resolve) => setTimeout(() => resolve(null), 5_000)),
+    ]);
+    if (typeof blockedUploadPreflight !== "string" || !blockedUploadPreflight.includes("timed out")) {
+      throw new Error(
+        `V2 upload preflight never returned from a frame that answers nothing: ${blockedUploadPreflight}`,
+      );
+    }
+    // The legacy `act` path settles the same way after dispatching, with no timeout of its own.
+    const blockedLegacyAct = await Promise.race([
+      browser.act(blockedTab.id, blockedBaseline.revision, { type: "scroll", deltaY: 0 }).then(
+        () => "acted",
+        (error: unknown) => String(error),
+      ),
+      new Promise((resolve) => setTimeout(() => resolve(null), 20_000)),
+    ]);
+    if (typeof blockedLegacyAct !== "string" || !blockedLegacyAct.includes("timed out")) {
+      throw new Error(`V2 legacy act never returned from a frame that answers nothing: ${blockedLegacyAct}`);
     }
     const blockedTabClosed = await Promise.race([
       browser.close(blockedTab.id).then(() => "closed"),

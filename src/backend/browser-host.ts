@@ -75,6 +75,12 @@ const ACTION_POST_DISPATCH_TIMEOUT_MS = 10_000;
  * is not held by a renderer that will never answer.
  */
 const OPERATION_UNWIND_GRACE_MS = 1_000;
+/**
+ * How long enumerating a tab's documents may take before it is unwound. It runs off a navigation
+ * rather than a tool call, so no caller is waiting on it and nothing else supplies a deadline -- but
+ * it is queued on the tab, so whatever the agent does next waits behind it.
+ */
+const DOCUMENT_ENUMERATION_TIMEOUT_MS = 10_000;
 
 interface BrowserConsoleMessageDetails {
   level: "info" | "warning" | "error" | "debug";
@@ -479,7 +485,20 @@ export class BrowserHost {
               return true;
             });
         }
-        await tab.engine.settle();
+        const settleTimeout = Math.max(1, deadline - Date.now());
+        const settleCompletion = tab.engine.settle(settleTimeout);
+        try {
+          // Settling bounds its own waiting with timers, but the commands it sends to each frame are
+          // not bounded by them, so a frame that answers none of them holds this action -- and the
+          // tab's queue behind it -- open for good.
+          await withTimeout(settleCompletion, settleTimeout, "Browser action timed out.");
+        } catch (error) {
+          if (!isTimeoutError(error)) throw error;
+          // The action fails from here as it always did, so nothing else is using the session and the
+          // unwind can start at once.
+          keepQueueBlocked(this.#unwindStalledOperation(tab, settleCompletion));
+          throw error;
+        }
         tab.diagnostics.action({
           action: action.type,
           target: target ? describeBrowserTarget(target) : undefined,
@@ -901,7 +920,19 @@ export class BrowserHost {
     const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
     this.#requireToolTab(params, tabId);
     const target = parseTarget(args.target);
-    return this.#enqueue(tabId, (tab) => tab.engine.resolveUploadTarget(target));
+    const timeoutMs = readTimeout(args);
+    return this.#enqueue(tabId, (tab, keepQueueBlocked) =>
+      // This preflight scans every frame for the input, so an unresponsive one holds it open exactly
+      // as it would the upload itself -- and it is queued ahead of that bounded upload, so without a
+      // bound of its own the tab never reaches the operation the timeout was meant to protect.
+      this.#boundEngineOperation(
+        tab,
+        tab.engine.resolveUploadTarget(target),
+        timeoutMs,
+        "Browser upload target resolution timed out.",
+        keepQueueBlocked,
+      ),
+    );
   }
 
   destroy(): Promise<void> {
@@ -1050,17 +1081,28 @@ export class BrowserHost {
         for (const listener of this.#documentListeners) listener(tab.id, new Set());
         return;
       }
-      const documentIds = tab.queue.then(() => tab.engine.documentIds());
-      tab.queue = documentIds.then(
-        () => undefined,
-        () => undefined,
-      );
-      void documentIds
+      if (this.#tabs.get(tab.id) !== tab) return;
+      // Enumeration walks every frame the tab has, and it is queued on the tab, so an unresponsive
+      // one stops the tab for good -- and this runs off a navigation, where no caller's deadline
+      // covers it.
+      void this.#enqueue(tab.id, (queuedTab, keepQueueBlocked) =>
+        this.#boundEngineOperation(
+          queuedTab,
+          queuedTab.engine.documentIds(),
+          DOCUMENT_ENUMERATION_TIMEOUT_MS,
+          "Browser document enumeration timed out.",
+          keepQueueBlocked,
+        ),
+      )
         .then((documentIds) => {
           if (generation !== documentGeneration || this.#tabs.get(tab.id) !== tab) return;
           for (const listener of this.#documentListeners) listener(tab.id, documentIds);
         })
-        .catch(() => {
+        .catch((error) => {
+          // The empty set below tells the upload staging that the documents holding its files are
+          // gone, and it deletes them. A timeout does not say that: it says the frames were never
+          // asked, so completeness could not be established and the files have to stand.
+          if (isTimeoutError(error)) return;
           if (!isMainFrame || generation !== documentGeneration || this.#tabs.get(tab.id) !== tab) return;
           for (const listener of this.#documentListeners) listener(tab.id, new Set());
         });
