@@ -171,8 +171,9 @@ conditional on the stored credential still matching the initiating session.
 The mobile client uses the same `/v1/me/profile`, `/v1/me/avatar` and
 `/v1/mobile-auth/devices?includeDesktop=true` endpoints as desktop; the last route's historical
 name does not restrict it to phones. Avatar uploads send validated binary bytes directly through
-Expo fetch, without constructing a React Native Blob from a typed array. Profile reads and writes
-are serialized to prevent an overlapping foreground refresh from restoring an older identity.
+Expo fetch, without constructing a React Native Blob from a typed array. Profile reads, writes and their UI-state application
+are serialized together. A read queued after an edit can apply a newer remote profile; a read
+before a later edit cannot overwrite that edit. Results apply only to the initiating login.
 Account-session queries are scoped to each login without including credentials in query keys,
 cancel when abandoned, and are removed on account transitions. An HTTP 401 clears only its
 initiating credential; transport failures retain the session for retry.

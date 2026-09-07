@@ -5,8 +5,9 @@ export function resolveSessionValidation(
   initiating: MobileSession,
   validated: MobileSession | null,
 ): MobileSession | null {
-  if (validated === null) {
-    return current?.sessionToken === initiating.sessionToken && current.apiUrl === initiating.apiUrl ? null : current;
-  }
-  return current === initiating ? validated : current;
+  // Called inside the profile queue: an earlier read applies before a later edit.
+  // A different login can still replace this session independently of that queue.
+  return current?.sessionToken === initiating.sessionToken && current.apiUrl === initiating.apiUrl
+    ? validated
+    : current;
 }

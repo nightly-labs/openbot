@@ -349,24 +349,38 @@ it("lists account sessions and only disconnects other devices", async () => {
 });
 
 describe("settings request lifecycle", () => {
-  it("refreshes the committed profile when validation overlaps an edit", async () => {
-    const started = Promise.withResolvers<void>();
-    const saveResponse = Promise.withResolvers<Response>();
-    let serverUser = session.user;
-    native.fetch.mockImplementationOnce(() => {
-      started.resolve();
-      return saveResponse.promise;
-    });
-    native.fetch.mockImplementationOnce(async () => Response.json(serverUser));
-    const save = updateMobileProfile(session, { name: "Saved name" });
-    await started.promise;
-    const refresh = validateMobileSession(session);
-    serverUser = { ...session.user, name: "Saved name" };
-    saveResponse.resolve(Response.json(serverUser));
-    await save;
-    expect((await refresh)?.user.name).toBe("Saved name");
-    expect((await readMobileSession())?.user.name).toBe("Saved name");
-  });
+  it.each(["edit-first", "read-first", "restore-original"] as const)(
+    "applies profile state in queue order (%s)",
+    async (order) => {
+      const started = Promise.withResolvers<void>();
+      const firstResponse = Promise.withResolvers<Response>();
+      let visible: MobileSession | null = session;
+      const apply = (updated: MobileSession | null) => {
+        visible = resolveSessionValidation(visible, session, updated);
+      };
+      native.fetch.mockImplementationOnce(() => {
+        started.resolve();
+        return firstResponse.promise;
+      });
+      const remoteUser = order === "restore-original" ? session.user : { ...session.user, name: "Newer remote name" };
+      const editedUser = { ...session.user, name: "Saved name" };
+      native.fetch.mockResolvedValueOnce(Response.json(order !== "read-first" ? remoteUser : editedUser));
+      const first =
+        order !== "read-first"
+          ? updateMobileProfile(session, { name: "Saved name" }, apply)
+          : validateMobileSession(session, apply);
+      await started.promise;
+      const second =
+        order !== "read-first"
+          ? validateMobileSession(session, apply)
+          : updateMobileProfile(session, { name: "Saved name" }, apply);
+      firstResponse.resolve(Response.json(order !== "read-first" ? editedUser : session.user));
+      await Promise.all([first, second]);
+      const expected = order !== "read-first" ? remoteUser : editedUser;
+      expect(visible?.user).toEqual(expected);
+      expect((await readMobileSession())?.user).toEqual(expected);
+    },
+  );
 
   it("applies expiry after an overlapping edit while protecting replacement logins and newer profiles", async () => {
     const started = Promise.withResolvers<void>();
@@ -389,7 +403,6 @@ describe("settings request lifecycle", () => {
     expect(resolveSessionValidation(newLogin, session, validated)).toBe(newLogin);
     const otherApi = { ...edited, apiUrl: "https://another.example.com" };
     expect(resolveSessionValidation(otherApi, session, validated)).toBe(otherApi);
-    expect(resolveSessionValidation(edited, session, session)).toBe(edited);
     expect(resolveSessionValidation(null, session, session)).toBeNull();
   });
 

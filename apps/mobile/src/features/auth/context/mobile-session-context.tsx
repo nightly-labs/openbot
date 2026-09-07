@@ -104,11 +104,12 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       }
       checking = true;
       try {
-        const validated = await validateMobileSession(current);
-        if (active) {
-          const next = resolveSessionValidation(sessionRef.current, current, validated);
-          if (next !== sessionRef.current) setCurrentSession(next);
-        }
+        await validateMobileSession(current, (validated) => {
+          if (active) {
+            const next = resolveSessionValidation(sessionRef.current, current, validated);
+            if (next !== sessionRef.current) setCurrentSession(next);
+          }
+        });
       } catch {
         // A temporary network failure must not sign the user out locally.
       } finally {
@@ -147,13 +148,10 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       const current = sessionRef.current;
       if (!current) throw new MobileSessionExpiredError();
       try {
-        const updated = await updateMobileProfile(current, change);
-        if (
-          sessionRef.current?.sessionToken === current.sessionToken &&
-          sessionRef.current?.apiUrl === current.apiUrl
-        ) {
-          setCurrentSession(updated);
-        }
+        await updateMobileProfile(current, change, (updated) => {
+          const next = resolveSessionValidation(sessionRef.current, current, updated);
+          if (next !== sessionRef.current) setCurrentSession(next);
+        });
       } catch (error) {
         handleSessionError(error, current);
         throw error;

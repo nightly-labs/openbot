@@ -120,8 +120,15 @@ async function readStoredSessionAndRevokeInvalid(requireRevocation: boolean): Pr
   }
 }
 
-export function validateMobileSession(session: MobileSession): Promise<MobileSession | null> {
-  return serializeMobileProfile(() => refreshMobileProfile(session));
+export function validateMobileSession(
+  session: MobileSession,
+  onValidated?: (validated: MobileSession | null) => void,
+): Promise<MobileSession | null> {
+  return serializeMobileProfile(async () => {
+    const validated = await refreshMobileProfile(session);
+    onValidated?.(validated);
+    return validated;
+  });
 }
 
 async function refreshMobileProfile(session: MobileSession): Promise<MobileSession | null> {
@@ -141,8 +148,7 @@ async function refreshMobileProfile(session: MobileSession): Promise<MobileSessi
   }
   const user = decodeUser(body);
   if (user.id !== session.user.id) throw new Error("The account service returned an invalid user.");
-  if (sameUser(user, session.user)) return session;
-  const updated = { ...session, user };
+  const updated = sameUser(user, session.user) ? session : { ...session, user };
   await saveMobileSessionIfCurrent(updated);
   return updated;
 }
@@ -193,8 +199,16 @@ export async function revokeMobileAccountSession(session: MobileSession, target:
 
 export type MobileProfileChange = { name: string } | { avatar: { bytes: Uint8Array; mimeType: AvatarMimeType } | null };
 
-export function updateMobileProfile(session: MobileSession, change: MobileProfileChange): Promise<MobileSession> {
-  return serializeMobileProfile(() => writeMobileProfile(session, change));
+export function updateMobileProfile(
+  session: MobileSession,
+  change: MobileProfileChange,
+  onUpdated?: (updated: MobileSession) => void,
+): Promise<MobileSession> {
+  return serializeMobileProfile(async () => {
+    const updated = await writeMobileProfile(session, change);
+    onUpdated?.(updated);
+    return updated;
+  });
 }
 
 async function writeMobileProfile(session: MobileSession, change: MobileProfileChange): Promise<MobileSession> {
