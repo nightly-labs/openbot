@@ -287,13 +287,11 @@ Run the narrowest relevant test, then `bun run lint` and `bun run typecheck`; bo
 to run whole, and CI owns the minutes-long suites. See `AGENTS.md` "CI owns the minutes-long suites"
 for the division of labour and what each CI job covers.
 
-The root Biome scripts use two worker threads by default. Set `RAYON_NUM_THREADS` to change this
-limit; `BIOME_THREADS` applies only to `biome ci` in the installed version. The aggregate TypeScript
-commands run projects in sequence and set `GOMAXPROCS=2` unless it is already set. This limits
-CPU use when several worktrees run checks on the same machine. Each TypeScript project writes its
-own ignored `.tsbuildinfo` cache beside its configuration. The first check creates the cache;
-later checks reuse it and check changed inputs. Delete the cache files to force fresh checks.
-All project scopes and lint rules remain enabled. A lower thread limit can increase elapsed time.
+Each TypeScript project writes its own ignored `.tsbuildinfo` cache beside its configuration.
+Each worktree starts with no cache. The first check creates these files; later checks reuse them
+and check changed inputs. Delete the cache files to force fresh checks. A new CI checkout also
+starts with no cache unless the CI job restores one. The aggregate commands keep all projects in
+parallel. Project scopes and compiler worker settings stay the same.
 
 Changes to packaging, native modules, or Electron security also require the applicable macOS and
 Windows package verification commands. Live provider and team smoke tests use isolated temporary
