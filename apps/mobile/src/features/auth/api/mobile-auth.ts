@@ -7,10 +7,12 @@ import {
   validateMobileConnectHostBinding,
 } from "@openbot/contracts/mobile-connect";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { validateProfileName } from "@openbot/contracts/validation";
 import { fetch } from "expo/fetch";
 import * as Crypto from "expo-crypto";
 import * as Device from "expo-device";
 import * as SecureStore from "expo-secure-store";
+import { z } from "zod";
 
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
@@ -126,6 +128,76 @@ export async function validateMobileSession(session: MobileSession): Promise<Mob
   }
   const user = decodeUser(body);
   if (sameUser(user, session.user)) return session;
+  const updated = { ...session, user };
+  await saveMobileSessionIfCurrent(updated);
+  return updated;
+}
+
+const accountSessionSchema = z.object({
+  sessionId: z.string().uuid(),
+  name: z.string(),
+  kind: z.enum(["desktop", "mobile"]),
+  current: z.boolean(),
+  connectedAt: z.number().finite(),
+  lastActiveAt: z.number().finite(),
+});
+export type MobileAccountSession = z.infer<typeof accountSessionSchema>;
+
+export async function listMobileAccountSessions(session: MobileSession): Promise<MobileAccountSession[]> {
+  return withMobileAuthRequestTimeout(async (signal) => {
+    const response = await fetch(new URL("/v1/mobile-auth/devices?includeDesktop=true", session.apiUrl).toString(), {
+      headers: { Authorization: `Bearer ${session.sessionToken}` },
+      signal,
+    });
+    if (!response.ok) throw new Error("Could not load account sessions. Try again.");
+    return z.object({ sessions: z.array(accountSessionSchema) }).parse(await response.json()).sessions;
+  });
+}
+
+export async function revokeMobileAccountSession(session: MobileSession, target: MobileAccountSession): Promise<void> {
+  if (target.current) throw new Error("Use Sign out to disconnect this device.");
+  await withMobileAuthRequestTimeout(async (signal) => {
+    const response = await fetch(
+      new URL(
+        `/v1/mobile-auth/devices/${encodeURIComponent(target.sessionId)}?includeDesktop=true`,
+        session.apiUrl,
+      ).toString(),
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.sessionToken}` },
+        signal,
+      },
+    );
+    if (!response.ok) throw new Error("Could not disconnect this session. Refresh and try again.");
+  });
+}
+
+export type MobileProfileChange = { name: string } | { avatar: Blob | null };
+
+export async function updateMobileProfile(session: MobileSession, change: MobileProfileChange): Promise<MobileSession> {
+  if ("name" in change && validateProfileName(change.name).error) {
+    throw new Error("Enter a display name between 3 and 20 characters.");
+  }
+  const isName = "name" in change;
+  const { response, body } = await withMobileAuthRequestTimeout(async (signal) => {
+    const request = await fetch(new URL(isName ? "/v1/me/profile" : "/v1/me/avatar", session.apiUrl).toString(), {
+      method: isName ? "PATCH" : change.avatar ? "PUT" : "DELETE",
+      headers: {
+        Authorization: `Bearer ${session.sessionToken}`,
+        ...(isName
+          ? { "Content-Type": "application/json" }
+          : change.avatar
+            ? { "Content-Type": change.avatar.type }
+            : {}),
+      },
+      body: isName ? JSON.stringify({ name: validateProfileName(change.name).name }) : change.avatar,
+      signal,
+    });
+    return { response: request, body: await readResponseBody(request, signal) };
+  });
+  if (!response.ok) throw new Error("Could not save your profile. Check your connection and try again.");
+  const user = decodeUser(body);
+  if (user.id !== session.user.id) throw new Error("The account service returned an invalid user.");
   const updated = { ...session, user };
   await saveMobileSessionIfCurrent(updated);
   return updated;

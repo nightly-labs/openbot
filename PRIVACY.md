@@ -100,6 +100,9 @@ other authorized devices. Older remote sessions without a device binding are dis
 on revocation. Short-lived QR codes and connection tickets still expire.
 Settings → Profile → Account sessions lets you list and disconnect other desktop or mobile sign-ins.
 Only device/session labels, IDs, sign-in times and last-activity times are returned, never credentials.
+Mobile Settings can update your account name and photo through the same account API and list or
+disconnect account sessions. The appearance preference is stored only on the phone.
+
 Mobile hidden and pinned chat preferences are stored on the phone, separately per account and server.
 Conversation read/unread changes are stored on the desktop host and shared with your other connected devices.
 

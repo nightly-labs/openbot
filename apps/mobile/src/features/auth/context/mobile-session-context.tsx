@@ -12,8 +12,10 @@ import { AppState, type AppStateStatus } from "react-native";
 
 import {
   logoutMobileSession,
+  type MobileProfileChange,
   type MobileSession,
   readMobileSession,
+  updateMobileProfile,
   validateMobileSession,
 } from "@/features/auth/api/mobile-auth";
 
@@ -22,6 +24,7 @@ interface MobileSessionContextValue {
   session: MobileSession | null;
   connect: (session: MobileSession) => void;
   signOut: () => Promise<void>;
+  updateProfile: (change: MobileProfileChange) => Promise<void>;
 }
 
 const MobileSessionContext = createContext<MobileSessionContextValue | null>(null);
@@ -101,14 +104,25 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     }
   }, [setCurrentSession]);
 
+  const updateProfile = useCallback(
+    async (change: MobileProfileChange) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      const updated = await updateMobileProfile(current, change);
+      if (sessionRef.current?.sessionToken === current.sessionToken) setCurrentSession(updated);
+    },
+    [setCurrentSession],
+  );
+
   const value = useMemo<MobileSessionContextValue>(
     () => ({
       loading: sessionState === undefined,
       session: sessionState ?? null,
       connect: setCurrentSession,
       signOut,
+      updateProfile,
     }),
-    [sessionState, setCurrentSession, signOut],
+    [sessionState, setCurrentSession, signOut, updateProfile],
   );
 
   return <MobileSessionContext.Provider value={value}>{children}</MobileSessionContext.Provider>;

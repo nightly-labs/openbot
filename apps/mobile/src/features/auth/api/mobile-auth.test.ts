@@ -1,6 +1,14 @@
 import { createMobileConnectUrl } from "@openbot/contracts/mobile-connect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { logoutMobileSession, type MobileSession, readMobileSession, redeemMobileConnectUrl } from "./mobile-auth";
+import {
+  listMobileAccountSessions,
+  logoutMobileSession,
+  type MobileSession,
+  readMobileSession,
+  redeemMobileConnectUrl,
+  revokeMobileAccountSession,
+  updateMobileProfile,
+} from "./mobile-auth";
 
 // The native Keychain and HTTP transport are the boundary; exercise the real session storage logic.
 const native = vi.hoisted(() => ({ storage: new Map<string, string>(), fetch: vi.fn<typeof fetch>() }));
@@ -260,3 +268,79 @@ function failNextLogout(failure: "network" | "timeout" | 500 | 401): void {
     return Response.json({ error: { message: "Server failure" } }, { status: failure });
   });
 }
+
+describe("mobile profile updates", () => {
+  it("persists the updated identity for the next launch", async () => {
+    const user = { ...session.user, name: "New name" };
+    native.fetch.mockResolvedValueOnce(Response.json(user));
+    const updated = await updateMobileProfile(session, { name: " New name " });
+    expect(updated.user).toEqual(user);
+    expect((await readMobileSession())?.user).toEqual(user);
+    expect(native.fetch).toHaveBeenCalledWith(
+      "https://api.openbot.run/v1/me/profile",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ name: "New name" }) }),
+    );
+  });
+
+  it("does not overwrite a newer login with an old profile response", async () => {
+    const newer = { ...session, sessionToken: "new-token" };
+    native.fetch.mockImplementationOnce(async () => {
+      native.storage.set(key, JSON.stringify(newer));
+      return Response.json({ ...session.user, name: "Old request" });
+    });
+    await updateMobileProfile(session, { name: "Old request" });
+    expect(await readMobileSession()).toEqual(newer);
+  });
+
+  it("retains the profile when saving fails or returns another account", async () => {
+    native.fetch.mockResolvedValueOnce(new Response(null, { status: 500 }));
+    await expect(updateMobileProfile(session, { name: "New name" })).rejects.toThrow("Could not save");
+    native.fetch.mockResolvedValueOnce(Response.json({ ...session.user, id: "other-account" }));
+    await expect(updateMobileProfile(session, { name: "New name" })).rejects.toThrow("invalid user");
+    expect(await readMobileSession()).toEqual(session);
+  });
+
+  it("uploads and removes the profile photo through the existing account API", async () => {
+    const user = { ...session.user, avatarUrl: "/v1/avatars/user?v=photo" };
+    const avatar = new Blob(["photo"], { type: "image/jpeg" });
+    native.fetch.mockResolvedValueOnce(Response.json(user));
+    await updateMobileProfile(session, { avatar });
+    expect((await readMobileSession())?.user.avatarUrl).toBe(user.avatarUrl);
+    expect(native.fetch).toHaveBeenLastCalledWith(
+      "https://api.openbot.run/v1/me/avatar",
+      expect.objectContaining({
+        method: "PUT",
+        body: avatar,
+        headers: { Authorization: "Bearer test-session-token", "Content-Type": "image/jpeg" },
+      }),
+    );
+    native.fetch.mockResolvedValueOnce(Response.json(session.user));
+    await updateMobileProfile(session, { avatar: null });
+    expect((await readMobileSession())?.user.avatarUrl).toBeNull();
+    expect(native.fetch).toHaveBeenLastCalledWith(
+      "https://api.openbot.run/v1/me/avatar",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+});
+
+it("lists account sessions and only disconnects other devices", async () => {
+  const current = {
+    sessionId: "11111111-1111-4111-8111-111111111111",
+    name: "Phone",
+    kind: "mobile",
+    current: true,
+    connectedAt: 1,
+    lastActiveAt: 2,
+  };
+  native.fetch.mockResolvedValueOnce(Response.json({ sessions: [current] }));
+  const [item] = await listMobileAccountSessions(session);
+  expect(item).toEqual(current);
+  await expect(revokeMobileAccountSession(session, item)).rejects.toThrow("Use Sign out");
+  native.fetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
+  await revokeMobileAccountSession(session, { ...item, current: false });
+  expect(native.fetch).toHaveBeenLastCalledWith(
+    `https://api.openbot.run/v1/mobile-auth/devices/${current.sessionId}?includeDesktop=true`,
+    expect.objectContaining({ method: "DELETE", headers: { Authorization: "Bearer test-session-token" } }),
+  );
+});

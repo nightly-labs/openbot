@@ -127,6 +127,14 @@ Mobile acknowledges rendered replies only in the foreground, focused chat at the
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
 host's SQLite and emit the same invalidation. Older hosts disable only this optional action.
+Mobile Settings uses one native form sheet with stable detents and a nested Expo Router stack.
+Inner pages push within the sheet and use native back navigation; standalone forms remain
+fit-to-content sheets. Both reuse SheetScrollView. General, Profile, Connections and About use HeroUI typography and shared
+form fields; the appearance picker remains a native Expo UI control. Appearance is device-local in SecureStore;
+Uniwind, navigation and native form hosts share the selected light/dark/system theme. Profile
+changes and account-session management use the existing account endpoints, with profile writes
+conditional on the stored credential still matching the initiating session.
+
 Mobile hidden/pinned chat preferences are device-local, persisted in SecureStore per account API,
 account ID and host ID; they are not part of the shared sidebar layout or conversation read state.
 Account/device and logical remote sessions deliberately have no time-based expiration; a finite

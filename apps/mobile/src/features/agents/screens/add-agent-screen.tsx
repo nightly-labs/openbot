@@ -38,7 +38,7 @@ export function AddAgentScreen() {
 
   return (
     <SheetScrollView
-      className="bg-background"
+      className="bg-sheet"
       contentContainerClassName="gap-5 px-5 pb-safe-offset-5 pt-5"
       contentInsetAdjustmentBehavior="automatic"
       keyboardDismissMode="interactive"
