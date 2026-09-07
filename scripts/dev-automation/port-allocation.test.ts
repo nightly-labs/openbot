@@ -46,7 +46,16 @@ describe("withDevPortAllocation", () => {
     rmSync(directory, { recursive: true, force: true });
   });
 
-  const lockFiles = (): string[] => readdirSync(directory).filter((entry) => entry.endsWith(".lock"));
+  // Sorted, because these assert which generations exist rather than the order
+  // the filesystem lists them in.
+  const heldLocks = (): string[] =>
+    readdirSync(directory)
+      .filter((entry) => entry.endsWith(".lock"))
+      .sort();
+  const spentLocks = (): string[] =>
+    readdirSync(directory)
+      .filter((entry) => entry.endsWith(".released"))
+      .sort();
   const plantLock = (generation: number, contents: string): string => {
     const path = join(directory, `port-allocation.${generation}.lock`);
     writeFileSync(path, contents);
@@ -88,7 +97,7 @@ describe("withDevPortAllocation", () => {
     // The ports the first one won, which is what makes the second walk past
     // them instead of probing them and finding them unbound.
     expect(seenBySecond.flatMap((record) => record.ports)).toEqual([{ name: "app-renderer", port: 5_173 }]);
-    expect(lockFiles()).toEqual([]);
+    expect(heldLocks()).toEqual([]);
   });
 
   it("lets only one of several processes allocate at a time, even with an abandoned lock to recover", async () => {
@@ -145,8 +154,36 @@ describe("withDevPortAllocation", () => {
     expect(new Set(sections.map((line) => line.split(" ")[1])).size).toBe(4);
     // Every lock these four took is released, and the abandoned one they all
     // recovered from is still there. See the supersede test below.
-    expect(lockFiles()).toEqual(["port-allocation.1.lock"]);
+    expect(heldLocks()).toEqual(["port-allocation.1.lock"]);
   }, 30_000);
+
+  it("never hands the same generation out twice", async () => {
+    // Releasing gives up the claim, not the number. A generation handed out
+    // again is the whole failure this scheme has to prevent: an allocator's
+    // scan, its read of the highest lock and its create are separate steps, so
+    // one of them can be holding a plan for generation 2 while a later arrival
+    // is handed a freed generation 1 - and once they are on different numbers,
+    // the exclusive create no longer makes them collide and both allocate. So
+    // a released lock keeps its file, under a name that no longer claims the
+    // lock, and each allocation gets the number above it.
+    const taken: string[] = [];
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await withDevPortAllocation(
+        async () => {
+          taken.push(...heldLocks());
+        },
+        { directory, readRecords: () => [] },
+      );
+    }
+
+    expect(taken).toEqual(["port-allocation.1.lock", "port-allocation.2.lock", "port-allocation.3.lock"]);
+    expect(heldLocks()).toEqual([]);
+    expect(spentLocks()).toEqual([
+      "port-allocation.1.released",
+      "port-allocation.2.released",
+      "port-allocation.3.released",
+    ]);
+  });
 
   it("names the holder of the lock it is waiting for", async () => {
     const waited: number[] = [];
@@ -198,7 +235,7 @@ describe("withDevPortAllocation", () => {
     );
 
     expect(entered).toBe(true);
-    expect(lockFiles()).toEqual(["port-allocation.1.lock"]);
+    expect(heldLocks()).toEqual(["port-allocation.1.lock"]);
   });
 
   it("never takes the lock from a live holder, however long it has held it", async () => {
@@ -233,15 +270,16 @@ describe("withDevPortAllocation", () => {
     await withDevPortAllocation(
       async () => {
         entered = true;
-        expect(lockFiles()).toEqual(["port-allocation.1.lock", "port-allocation.2.lock"]);
+        expect(heldLocks()).toEqual(["port-allocation.1.lock", "port-allocation.2.lock"]);
       },
       { directory, readRecords: () => [] },
     );
 
     expect(entered).toBe(true);
-    // Ours released, the recovered one still standing, so 1 is never handed
-    // out again.
-    expect(lockFiles()).toEqual(["port-allocation.1.lock"]);
+    // The recovered lock still standing and ours released, so neither number
+    // is ever handed out again.
+    expect(heldLocks()).toEqual(["port-allocation.1.lock"]);
+    expect(spentLocks()).toEqual(["port-allocation.2.released"]);
   });
 
   it("supersedes a lock whose holder pid has since been recycled", async () => {
@@ -270,7 +308,17 @@ describe("withDevPortAllocation", () => {
       }),
     ).rejects.toThrow("no available development port");
 
-    expect(lockFiles()).toEqual([]);
+    expect(heldLocks()).toEqual([]);
+    // Released rather than left claimed, so the next attempt is not blocked -
+    // and at generation 2, because generation 1 is spent.
+    let second = "";
+    await withDevPortAllocation(
+      async () => {
+        second = heldLocks().join();
+      },
+      { directory, readRecords: () => [], waitMs: 0 },
+    );
+    expect(second).toBe("port-allocation.2.lock");
   });
 
   it("leaves a lock a waiter took over after deciding this one was abandoned", async () => {

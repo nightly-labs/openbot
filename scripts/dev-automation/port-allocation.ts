@@ -6,36 +6,52 @@
 //
 // Ownership is a generation, not a path. Taking the lock means creating the
 // *next* numbered file with an exclusive create, so the only step that decides
-// who owns it is one the kernel makes atomic, and nothing is ever taken by
-// deleting. That is the whole reason for the numbering. With a single lock
-// path, recovering one whose holder has died has to `unlink`, and `unlink`
-// cannot be made conditional on what the path holds: two waiters that read the
-// same dead holder both delete, the first publishes a lock of its own and
-// starts allocating, and the second deletes that replacement and starts
-// beside it. Here the second one's create simply fails, and the judgement
-// about a dead holder decides only when to move on - never who won.
+// who owns it is one the kernel makes atomic. That is the whole reason for the
+// numbering. With a single lock path, recovering one whose holder has died has
+// to `unlink`, and `unlink` cannot be made conditional on what the path holds:
+// two waiters that read the same dead holder both delete, the first publishes a
+// lock of its own and starts allocating, and the second deletes that
+// replacement and starts beside it.
 //
 // One rule carries that, and it is the one to keep when changing this file:
-// **a lock file is removed by nothing but its own live holder, releasing it.**
-// The generation an allocator asks for is the highest it saw plus one, and the
-// scan and the create are separate steps that the scheduler is free to pull
-// apart - so anything that removes somebody else's lock lets the numbering run
-// backwards over a plan already made against it. Sweeping the litter is how
-// that got in: recover the lock a dead holder left at 1, take 2, release 2,
-// and an allocator arriving now finds an empty directory and takes 1, while an
-// allocator that read the directory before any of it still holds a plan for 2
-// and no longer collides with anybody. Both then allocate.
+// **no lock file is ever deleted.** A generation is used once and stays used.
+// Releasing renames the file to `.released` rather than removing it, and a lock
+// a crashed holder left behind is superseded where it lies.
 //
-// The price is that a lock a crashed holder left behind stays there. Nothing
-// reads it - the highest generation is the lock - and it is what keeps the
-// numbering from ever coming back down to it. A dev start that crashes leaves
-// one small file in the per-user temporary directory.
+// The reason is that the generation an allocator asks for is the highest it saw
+// plus one, and its scan, its read of that file and its create are separate
+// steps the scheduler is free to pull apart. A file that goes away between two
+// of them takes its number out of the count, and the next allocator to arrive
+// hands that number out again - to somebody, while a plan already made above it
+// is still in flight, so the two no longer collide and both allocate. Deleting
+// the superseded files did it; so did deleting our own on release, which is
+// subtler, because the file need not be gone when the other allocator *reads*
+// it, only when it reads its contents: an allocator that listed our live lock
+// and then found nothing there judges it abandoned and plans past it, and the
+// number it left behind goes to the next arrival.
+//
+// Renaming keeps the number spoken for either way. Every generation below the
+// highest one is a `.released` or an abandoned `.lock`, both of them free, and
+// what an allocator waits for is the highest generation with a live holder.
+// The files are tens of bytes in the per-user temporary directory, and the
+// system clears that directory; nothing here removes one, because removing one
+// is precisely what lets the numbering come back down.
 //
 // The critical section is a handful of `bind` probes and one file write, so it
 // is milliseconds long. Everything slow - `bun install`, electron-vite, the
 // Worker runtime - happens after the lock is released.
 
-import { closeSync, linkSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  linkSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import { verifyRecordedProcess } from "./registry-files";
@@ -48,6 +64,9 @@ import {
 
 const LOCK_PREFIX = "port-allocation.";
 const LOCK_SUFFIX = ".lock";
+// A released lock keeps its generation and gives up its claim, so the number
+// stays spoken for and no later allocator is handed it.
+const RELEASED_SUFFIX = ".released";
 const LOCK_WAIT_MS = 10_000;
 // How long a file whose contents say nothing may sit in the registry before an
 // allocator treats it as litter rather than as a lock.
@@ -73,6 +92,7 @@ interface LockHolder {
 interface HeldLock {
   generation: number;
   path: string;
+  released: boolean;
   holder: LockHolder | null;
 }
 
@@ -80,24 +100,34 @@ function lockPath(directory: string, generation: number): string {
   return join(directory, `${LOCK_PREFIX}${generation}${LOCK_SUFFIX}`);
 }
 
-// The staging files `tryCreateLock` writes end in `.tmp`, and the stack
-// records in `.json`, so neither is ever read as a lock.
-function lockGeneration(fileName: string): number | null {
-  if (!fileName.startsWith(LOCK_PREFIX) || !fileName.endsWith(LOCK_SUFFIX)) return null;
-  const raw = fileName.slice(LOCK_PREFIX.length, fileName.length - LOCK_SUFFIX.length);
-  const generation = Number(raw);
-  return Number.isInteger(generation) && generation > 0 ? generation : null;
+// Both suffixes count towards the numbering: a released generation is spent,
+// not free for somebody else to claim. The staging files `tryCreateLock` writes
+// end in `.tmp`, and the stack records in `.json`, so neither is read here.
+function lockGeneration(fileName: string): { generation: number; released: boolean } | null {
+  if (!fileName.startsWith(LOCK_PREFIX)) return null;
+  const released = fileName.endsWith(RELEASED_SUFFIX);
+  const suffix = released ? RELEASED_SUFFIX : LOCK_SUFFIX;
+  if (!fileName.endsWith(suffix)) return null;
+  const generation = Number(fileName.slice(LOCK_PREFIX.length, fileName.length - suffix.length));
+  return Number.isInteger(generation) && generation > 0 ? { generation, released } : null;
 }
 
-// The highest generation present, which is the one that owns the lock. Lower
-// ones are litter that nothing reads.
+// The highest generation present. That one decides both questions: whether the
+// lock is held, and what number the next allocator may ask for.
 function readCurrentLock(directory: string): HeldLock | null {
   let current: HeldLock | null = null;
   for (const entry of readdirSync(directory)) {
-    const generation = lockGeneration(entry);
-    if (generation === null || (current !== null && generation <= current.generation)) continue;
+    const parsed = lockGeneration(entry);
+    if (parsed === null || (current !== null && parsed.generation <= current.generation)) continue;
     const path = join(directory, entry);
-    current = { generation, path, holder: readLockHolder(path) };
+    current = {
+      generation: parsed.generation,
+      path,
+      released: parsed.released,
+      // A released file still holds the identity of whoever released it.
+      // Nothing reads it, and reading it would say "held" about a free lock.
+      holder: parsed.released ? null : readLockHolder(path),
+    };
   }
   return current;
 }
@@ -112,8 +142,10 @@ function lockFileAgeMs(path: string, now: number): number | null {
   }
 }
 
-// A lock to move past. Two states, and a *live* holder is neither of them:
+// A lock to move past. Three states, and a *live* holder is none of them:
 //
+//   - released. Its holder is finished with it, and the generation above it is
+//     the one to ask for.
 //   - unreadable contents. `link` publishes the lock and its holder in one
 //     step, so a lock file always parses the moment it exists. Garbage is a
 //     leftover from an older runner or from a developer's `touch` - moved past
@@ -132,6 +164,7 @@ function lockFileAgeMs(path: string, now: number): number | null {
 // stop, so the developer gets an error naming the pid instead. `unverified` -
 // a holder this machine cannot date - is treated as live for the same reason.
 function isAbandonedLock(lock: HeldLock, now: number, staleMs: number, fileAgeMs = lockFileAgeMs): boolean {
+  if (lock.released) return true;
   if (lock.holder === null) {
     const age = fileAgeMs(lock.path, now);
     return age === null || age > staleMs;
@@ -249,14 +282,27 @@ function tryCreateLock(path: string, holder: LockHolder): boolean {
   }
 }
 
-// Only remove a lock this process still holds - the one case where removing a
-// lock file is safe. An allocator that read ours as the highest generation read
-// it as live, because we are running, so it waited rather than planning a
-// generation above it: nothing is holding a plan that our removal could let
-// back down. A file that no longer carries our identity is somebody else's, and
-// deleting theirs would let a third allocator in beside them.
+// Give up the claim without giving up the number. `rename` is one step, so the
+// generation is spoken for on both sides of it and no allocator can be handed
+// it - which removing the file would allow, however briefly it seemed safe.
+//
+// Only our own lock. A file that no longer carries our identity is somebody
+// else's - a hand-planted lock, or a future change that reintroduces some way
+// of taking one in place - and releasing theirs would let a third allocator in
+// beside them.
 function releaseLock(path: string, holder: LockHolder): void {
   const current = readLockHolder(path);
   if (current !== null && (current.pid !== holder.pid || current.acquiredAt !== holder.acquiredAt)) return;
-  rmSync(path, { force: true });
+  try {
+    renameSync(path, `${path.slice(0, -LOCK_SUFFIX.length)}${RELEASED_SUFFIX}`);
+  } catch (error) {
+    // Nothing to release. Anything else is worth seeing, because a lock left
+    // holding its claim stops every dev start on this machine until it goes
+    // stale.
+    if (!isMissingPathError(error)) throw error;
+  }
+}
+
+function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
