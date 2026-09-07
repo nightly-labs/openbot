@@ -27,8 +27,10 @@ belongs.
 
 A fresh worktree has no `node_modules`, and every command below dies with `biome: command not found`
 or `Cannot find module '@openbot/logging'` until it does. Run `bun install --frozen-lockfile` first,
-or `bun scripts/prepare-dev-environment.ts`, which adds the local D1 migration and asserts the Bun
-version and the `.env.keys` `.worktreeinclude` carries across.
+or `bun scripts/prepare-dev-environment.ts`, which adds the local D1 migration, asserts the Bun
+version, and generates `apps/auth-api/.env.dev` if the checkout has none. That file is per-machine
+and untracked; only `.env.production` is still encrypted, so a missing `.env.keys` no longer stops
+local development.
 
 Before you call a task done, run the narrowest test for what you touched, then `bun run lint` and
 `bun run typecheck` — plus `bun run check:ui` if you touched `src/renderer`, which scans the whole

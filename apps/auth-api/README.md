@@ -8,28 +8,32 @@ and team authentication tickets.
 
 ## Local development
 
-The repository contains encrypted `.env.dev` and `.env.production` files. The
-private keys stay in the ignored root `.env.keys` file. Dotenvx decrypts the
-selected file only in process memory. The explicit development flag returns the
-code in the API response. It never writes the code to logs.
+`.env.dev` is generated, not committed. `bun run dev` and `bun run dev:api` call
+`scripts/development-secrets.ts`, which writes one on first run: a fresh ES256
+ticket key pair plus random admin, report and webhook secrets, all local to the
+checkout. Nothing in it is shared with production or with another machine, so a
+fork needs no key from anyone. Delete the file and rerun to get a fresh set.
+
+`.env.production` is the only encrypted file, and its private key stays in the
+ignored root `.env.keys`. Dotenvx decrypts it only in process memory, and only
+the deploy and secret-rotation commands read it.
 
 ```bash
 bun run api:migrate:local
 bun run dev:api
 ```
 
-The local address is `http://127.0.0.1:3100`.
+The local address is `http://127.0.0.1:3100`. The explicit development flag
+returns the sign-in code in the API response. It never writes the code to logs.
 
-Update and validate the encrypted files with these commands:
+Update and validate the encrypted production file with these commands:
 
 ```bash
-bunx dotenvx set AUTH_EXPOSE_DEVELOPMENT_CODE true -f apps/auth-api/.env.dev -fk .env.keys
 printf '%s' '<APP_PASSWORD>' | bun run env:set:smtp
-bun run env:validate:dev
 bun run env:validate:prod
 ```
 
-Commit `.env.dev` and `.env.production`. Never commit `.env.keys`.
+Commit `.env.production`. Never commit `.env.keys` or `.env.dev`.
 
 ## Email delivery
 

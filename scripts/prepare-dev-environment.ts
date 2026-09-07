@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ensureDevelopmentEnvFile } from "./development-secrets";
 
 const scriptsRoot = dirname(fileURLToPath(import.meta.url));
 export const developmentProjectRoot = dirname(scriptsRoot);
@@ -19,7 +19,9 @@ export function prepareDevelopmentEnvironment(
 ): void {
   const projectRoot = input.projectRoot ?? developmentProjectRoot;
   assertSupportedBunVersion(input.bunVersion ?? process.versions.bun ?? "unknown");
-  assertDevelopmentSecrets(projectRoot);
+  // Before `bun install`, because a fresh clone has no `.env.dev` and both dev services load one.
+  // Only `.env.production` is still encrypted, so a fork needs no `.env.keys` to reach this point.
+  ensureDevelopmentEnvFile(projectRoot);
 
   const executable = input.executable ?? process.execPath;
   const run = input.run ?? execDevelopmentCommand;
@@ -35,21 +37,6 @@ export function assertSupportedBunVersion(version: string): void {
   throw new Error(
     `Unsupported Bun ${version}. OpenBot development requires stable Bun ${supportedBunVersion}. Install the exact version with the command in https://github.com/NorbertBodziony/openbot#development, then retry.`,
   );
-}
-
-export function assertDevelopmentSecrets(projectRoot: string): void {
-  const keyPath = join(projectRoot, ".env.keys");
-  let hasKeys = false;
-  try {
-    hasKeys = statSync(keyPath).isFile() && statSync(keyPath).size > 0;
-  } catch {
-    // The actionable error below is the same for a missing or unreadable key file.
-  }
-  if (!hasKeys) {
-    throw new Error(
-      "Missing or empty .env.keys. Add it to the local checkout so Codex can copy it through .worktreeinclude.",
-    );
-  }
 }
 
 function execDevelopmentCommand(executable: string, args: string[], options: { cwd: string; stdio: "inherit" }): void {
