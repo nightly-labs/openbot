@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 export type DevelopmentProfile = "app" | "test-client";
 
 export function readDevelopmentProfile(value: string | undefined): DevelopmentProfile {
@@ -6,7 +8,7 @@ export function readDevelopmentProfile(value: string | undefined): DevelopmentPr
 
 export function readDevelopmentInstanceId(value: string | undefined): string | null {
   const trimmed = value?.trim();
-  return trimmed && /^\d{4,5}$/u.test(trimmed) ? trimmed : null;
+  return trimmed && /^(?:\d{4,5}|wt-[a-f0-9]{64})$/u.test(trimmed) ? trimmed : null;
 }
 
 // The remote-debugging switch is development-only, and the port must be one
@@ -15,6 +17,12 @@ export function readDevelopmentInstanceId(value: string | undefined): string | n
 export function readDevelopmentRemoteDebuggingPort(value: string | undefined): string | null {
   const port = Number(value?.trim());
   return Number.isInteger(port) && port >= 1_024 && port <= 65_535 ? String(port) : null;
+}
+
+// Keep isolated profiles stable across port changes. The prefix separates them
+// from existing numeric instance ids; the full digest avoids the old five-digit collisions.
+export function developmentInstanceIdForWorktree(projectRoot: string): string {
+  return `wt-${createHash("sha256").update(projectRoot).digest("hex")}`;
 }
 
 export function developmentUserDataName(profile: DevelopmentProfile, instanceId: string | null = null): string {

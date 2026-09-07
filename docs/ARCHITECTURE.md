@@ -134,7 +134,30 @@ These are manual model evaluations, separate from the fake-provider lifecycle re
     renderer port and debugging port to a registry in the per-user temporary directory
     (`scripts/dev-automation/instance-registry.ts`); automation resolves the record of the worktree
     it runs in, verifies the renderer port and the `window.openbot` preload bridge before driving a
-    page, and refuses `click` or `type` on an instance it only inferred. Every dev window stays
+    page, and refuses `click` or `type` on an instance it only inferred. A second registry beside it
+    (`scripts/dev-automation/stack-registry.ts`) records every port and pid a whole dev stack holds,
+    Storybook included, and `scripts/dev-automation/port-allocation.ts` serializes read, choose and
+    publish behind one machine-wide lock: probing a port and binding it seconds later is a check
+    followed by a use, so two runners starting together both used to win 5173 and the unsuffixed
+    `OpenBot Dev` profile with it. Ownership of that lock is a generation rather than a path: taking
+    it means creating the next numbered file with an exclusive create, so who owns it is decided by
+    a step the kernel makes atomic and never by a delete. Once a lock path exists it stays, and nothing ever
+    frees it: releasing replaces the contents with a released marker in one `rename` onto the same
+    path, and a lock whose holder has died is superseded where it lies. An allocator asks for the
+    highest generation it saw plus one, so anything that frees a path - deleting it, or renaming it
+    aside - lets that number be handed out again beside a plan already made against it. A holder
+    that is still running is never moved past, however long it has held it. Reading a registry is
+    the same shape and holds to the same rule: a record whose processes are gone is filtered out of
+    every read, so its ports are free from that moment, but the file is never deleted by the reader
+    that judged it - the supervisor may have republished it with a detached child in between, and a
+    sibling worktree on a newer branch writes records this checkout cannot parse at all.
+    `bun run dev:forget` is what removes a record, because a developer asking for it is a decision
+    rather than a guess. It drops the instance records of the stack it forgets, and a pid is not an
+    identity: an instance record is stored under its pid, so the app that recycles one writes over
+    the record of the app that had it. Each record dates itself, so the worktree and the recorded
+    start time decide whose it is, and a live instance is never a dead stack's. `bun run dev:status` and `bun run dev:stop`
+    (`scripts/dev-stack.ts`) read those pids instead of matching a process name, which is what makes
+    stopping one worktree's stack leave the others alone. Every dev window stays
     reachable: `pages` lists the targets and `--page=<target-id|url-substring>` drives any of them, so
     the app window is the default rather than a limit. Page URLs reach the diagnostics and the
     snapshot document only through `describeTarget`.

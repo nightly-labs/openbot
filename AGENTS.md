@@ -128,9 +128,13 @@ which of these your change touched.**
    host profiles. Never run either unless asked; `dev:seed --dry-run` inspects without touching
    anything.
 2. **The shared dev stack.** Several agents work in worktrees on this machine at once, sharing one
-   profile and one set of default ports, so a second `bun run dev` fights the first and can leave a
-   half-written profile behind. Reuse the running instance, or get an isolated one with
-   `developmentUserDataName(profile, instanceId)` in `src/main/development-profile.ts`. Drive the
+   profile and one set of default ports. `bun run dev` now allocates every port under one
+   machine-wide lock and publishes it, so a sibling worktree walks past it instead of claiming it
+   as well, and a second stack in *this* worktree is refused unless you pass `--force`. Reuse the
+   running instance anyway, or get a profile of your own with `bun run dev --isolated`, which keys
+   the instance id to the worktree path (`developmentInstanceIdForWorktree` in
+   `src/main/development-profile.ts`). `bun run storybook` allocates through the same registry, so
+   its port is the one it announces. Drive the
    running instance for e2e smoke checks with `bun run dev:automation` instead of launching Electron
    yourself. Each dev instance publishes its worktree, profile and ports, so
    `bun run dev:automation instances` lists what is live and a command run inside a worktree drives
@@ -142,7 +146,17 @@ which of these your change touched.**
    or an embedded browser view. The app window is only what you get when you aim at nothing. `--wait-for=<role>,<name>` settles on an
   accessible target before a capture and after a mutation, so a flow needs no snapshot loop.
 3. **Killing processes by pattern.** `pkill -f electron` or `pkill -f bun` kills other sessions' work
-   mid-write. Target a PID you started, or ask.
+   mid-write. `bun run dev:status` lists every stack live on this machine with its ports, pids and
+   worktree, and `bun run dev:stop` stops this worktree's stack and the children it left behind from
+   the registry - a lookup, not a pattern. `dev:status` reports every stack, because the one holding
+   the port this worktree wanted is a sibling's; `dev:stop` acts on this worktree only. Another
+   worktree's stack takes `--pid=<supervisor pid>`, and every stack takes `--all`, so stopping
+   someone else's work is a thing you say rather than a side effect. A pid is signalled only while
+   its start time still matches the record, so a recycled pid is left alone: `dev:stop` reports what
+   it could not confirm, keeps the record and exits non-zero, and `bun run dev:forget` drops such a
+   record once you have dealt with the process yourself. Nothing else deletes a record - a dead one
+   is filtered out of every read, so its ports are free again, but the file waits for `dev:forget`. Anything not in the registry: target a PID
+   you started, or ask.
 
 ## Words we use
 
