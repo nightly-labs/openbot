@@ -299,6 +299,13 @@ Protocol support has no fixed time or release limit. Removal is an exceptional a
 Run the narrowest relevant test, then `bun run lint` and `bun run typecheck`; both are cheap enough
 to run whole, and CI owns the minutes-long suites. See `AGENTS.md` "CI owns the minutes-long suites"
 for the division of labour and what each CI job covers.
+
+Each TypeScript project writes its own ignored `.tsbuildinfo` cache beside its configuration.
+Each worktree starts with no cache. The first check creates these files; later checks reuse them
+and check changed inputs. Delete the cache files to force fresh checks. A new CI checkout also
+starts with no cache unless the CI job restores one. The aggregate commands keep all projects in
+parallel. Project scopes and compiler worker settings stay the same.
+
 Changes to packaging, native modules, or Electron security also require the applicable macOS and
 Windows package verification commands. Live provider and team smoke tests use isolated temporary
 data and are manual because they can require local credentials.

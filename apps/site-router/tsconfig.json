@@ -7,6 +7,7 @@
     "types": ["@cloudflare/workers-types"],
     "strict": true,
     "noEmit": true,
+    "incremental": true,
     "skipLibCheck": true
   },
   "include": ["src", "test"]

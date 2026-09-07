@@ -6,6 +6,7 @@
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "incremental": true,
     "types": ["bun"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "../scripts/*.ts"]
