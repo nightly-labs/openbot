@@ -3,12 +3,13 @@
 // The boundary this file names is the disk bound: a failure that arrives in a
 // retry loop must not be able to grow the log without limit, and a secret must
 // never reach the file even though the record was built from raw process text.
-import { mkdir, mkdtemp, readdir, readFile, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DiagnosticRecord } from "@openbot/logging";
 import { describe, expect, it } from "vitest";
 import { appendTextLog, createDiagnosticsLog } from "./diagnostics-log";
+import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 
 async function temporaryLogsTree(): Promise<string> {
   return join(await mkdtemp(join(tmpdir(), "openbot-diagnostics-")), "logs");
@@ -30,14 +31,38 @@ describe("appendTextLog", () => {
       directory,
       fileName: "remote-screen.log",
       text: "auth Bearer abcdef123456\n",
-      maxFileBytes: 16,
+      maxFileBytes: 20,
     });
-    await appendTextLog({ directory, fileName: "remote-screen.log", text: "connected\n", maxFileBytes: 16 });
+    await appendTextLog({ directory, fileName: "remote-screen.log", text: "connected\n", maxFileBytes: 20 });
 
     expect(await readdir(directory)).toEqual(["remote-screen.log", "remote-screen.log.1"]);
     expect(await readFile(join(directory, "remote-screen.log.1"), "utf8")).toBe("auth [redacted]\n");
     expect(await readFile(join(directory, "remote-screen.log"), "utf8")).toBe("connected\n");
   });
+});
+
+it("keeps remote whitespace tokens off disk", async () => {
+  const directory = join(await temporaryLogsTree(), "remote");
+  await appendRemoteDiagnosticLog(
+    directory,
+    "sunshine",
+    "token abcdef123456 token=anothersecret123 token:thirdsecret123",
+  );
+  expect(await readFile(join(directory, "sunshine.log"), "utf8")).toBe("[redacted] [redacted] [redacted]");
+});
+
+it("bounds remote text in UTF-8 bytes after redaction", async () => {
+  const directory = join(await temporaryLogsTree(), "remote");
+  await appendTextLog({
+    directory,
+    fileName: "output.log",
+    text: `token=abcdef123456 ${"界".repeat(100)}`,
+    maxFileBytes: 40,
+    maxTextBytes: 30,
+  });
+  const text = await readFile(join(directory, "output.log"), "utf8");
+  expect(Buffer.byteLength(text)).toBeLessThanOrEqual(30);
+  expect(text).toBe(`token=[redacted] ${"界".repeat(4)}`);
 });
 
 describe("createDiagnosticsLog", () => {
@@ -55,6 +80,7 @@ describe("createDiagnosticsLog", () => {
 
     const names = (await readdir(directory)).sort();
     expect(names).toEqual(["diagnostics.log", "diagnostics.log.1", "diagnostics.log.2"]);
+    for (const name of names) expect((await stat(join(directory, name))).size).toBeLessThanOrEqual(400);
     const latest = await readRecords(directory);
     expect(latest.at(-1)?.code).toBe("cli_resolve_failed_39");
   });
@@ -71,7 +97,47 @@ describe("createDiagnosticsLog", () => {
 
     const [record] = await readRecords(directory);
     expect(record).toMatchObject({ code: "provider_runtime_http_failed", message: "download failed", truncated: true });
-    expect(record.detail).toEqual({ status: 500 });
+    expect(record.detail).toMatchObject({ status: 500 });
+  });
+
+  it.each(["界", "\u0000", "😀"])("bounds a message with escaped or multibyte text %s", async (character) => {
+    const directory = join(await temporaryLogsTree(), "diagnostics");
+    const log = createDiagnosticsLog({ directory, maxLineBytes: 512 });
+    log.append({ code: "log_error", message: character.repeat(4000) });
+    await log.flush();
+    const text = await readFile(join(directory, "diagnostics.log"), "utf8");
+    expect(Buffer.byteLength(text)).toBeLessThanOrEqual(512);
+    expect(await readRecords(directory)).toEqual([
+      expect.objectContaining({
+        code: "log_error",
+        truncated: true,
+        detail: { fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u) },
+      }),
+    ]);
+  });
+
+  it("retains distinct failures and links their repeat counts", async () => {
+    const directory = join(await temporaryLogsTree(), "diagnostics");
+    const log = createDiagnosticsLog({ directory, now: () => 1000 });
+    for (const message of ["Window position failed", "Browser storage failed"]) {
+      log.append({ code: "log_error", area: "main", message });
+      log.append({ code: "log_error", area: "main", message });
+    }
+    await log.flush();
+    const records = await readRecords(directory);
+    expect(records.slice(0, 2).map((record) => record.message)).toEqual([
+      "Window position failed",
+      "Browser storage failed",
+    ]);
+    expect(records[2]).toMatchObject({
+      area: "main",
+      detail: { repeated: 1, fingerprint: records[0]?.detail?.fingerprint },
+    });
+    expect(records[3]).toMatchObject({
+      area: "main",
+      detail: { repeated: 1, fingerprint: records[1]?.detail?.fingerprint },
+    });
+    expect(records[0]?.detail?.fingerprint).not.toBe(records[1]?.detail?.fingerprint);
   });
 
   it("collapses a repeated failure into one record and one count", async () => {

@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { extname, posix, resolve, win32 } from "node:path";
 import { promisify } from "node:util";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { type DiagnosticSink, recordDiagnostic, toLogValue } from "@openbot/logging";
+import { type DiagnosticSink, recordDiagnostic, redactText, toLogValue } from "@openbot/logging";
 
 const execFileAsync = promisify(execFile);
 const MINIMUM_CODEX_VERSION = [0, 144, 1] as const;
@@ -192,7 +192,7 @@ async function resolveProviderCli(
       attempts.push({
         ...base,
         outcome: "unparsable",
-        stdoutHead: stdout.slice(0, 120),
+        stdoutHead: redactText(stdout).slice(0, 120),
         durationMs: Date.now() - startedAt,
       });
       failures.push(new CodexCliError(spec.invalidCandidate, "invalid"));

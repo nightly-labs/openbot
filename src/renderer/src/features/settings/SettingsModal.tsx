@@ -11,7 +11,7 @@ import type {
   ProviderRuntimeStatus,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
-import { createSignal, Show } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import {
   Button,
   CircleArrowDown,
@@ -39,6 +39,7 @@ import { createSettingsUpdatesStore } from "./stores/updates-store";
 
 export interface SettingsModalProps {
   open: boolean;
+  generalSettingsRequest?: number;
   onOpenChange: (open: boolean) => void;
   value: GeneralSettingsValue;
   onValueChange: (value: GeneralSettingsValue) => void;
@@ -100,6 +101,12 @@ const tabDetails: Record<SettingsTab, { title: string; description: string }> = 
  */
 export function SettingsModal(props: SettingsModalProps) {
   const [activeTab, setActiveTab] = createSignal<SettingsTab>("general");
+  createEffect(
+    () => props.generalSettingsRequest,
+    (request) => {
+      if (request) setActiveTab("general");
+    },
+  );
   let modalElement: HTMLElement | undefined;
 
   const general = createSettingsGeneralStore(props);

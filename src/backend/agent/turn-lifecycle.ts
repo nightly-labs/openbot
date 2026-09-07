@@ -260,11 +260,7 @@ export class TurnLifecycle {
       case "warning": {
         const message = getString(params, "message") ?? notification.method;
         if (notification.method === "warning" && isNonActionableCodexWarning(message)) return;
-        // A fixed code, with the provider's method name in the message. The
-        // method comes from provider-controlled JSON-RPC, so building the code
-        // out of it made every unseen method a new code that analytics folded
-        // to "unknown".
-        this.#hooks.emitError("agent_notification_failed", `${notification.method}: ${message}`, agentId);
+        this.#hooks.emitError(`agent_${notification.method}`, message, agentId);
       }
     }
   }

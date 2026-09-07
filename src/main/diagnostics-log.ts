@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { appendFile, mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { type DiagnosticRecord, type LogValue, redactDiagnostic, redactText } from "@openbot/logging";
@@ -19,7 +20,7 @@ export const DEFAULT_MAX_FILE_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 /** Enough fingerprints for a wide burst, bounded so a unique-per-record flood cannot grow the map. */
 const MAX_TRACKED_FINGERPRINTS = 500;
 /** The `detail` keys that identify *which* failure this is. `durationMs` is deliberately absent: it differs every time. */
-const FINGERPRINT_KEYS = ["provider", "path", "errno", "exitCode", "step"];
+const FINGERPRINT_KEYS = ["provider", "path", "errno", "exitCode", "step", "errorCode", "agentId", "attempts"];
 
 export interface DiagnosticsLogOptions {
   directory: string;
@@ -51,6 +52,8 @@ interface DedupeEntry {
   openedAt: number;
   suppressed: number;
   code: string;
+  area?: string;
+  stage?: string;
 }
 
 /**
@@ -64,7 +67,7 @@ export function createDiagnosticsLog(options: DiagnosticsLogOptions): Diagnostic
   const now = options.now ?? Date.now;
   const maxFileBytes = options.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES;
   const retained = options.retainedGenerations ?? DEFAULT_RETAINED_GENERATIONS;
-  const maxLineBytes = options.maxLineBytes ?? DEFAULT_MAX_LINE_BYTES;
+  const maxLineBytes = Math.min(options.maxLineBytes ?? DEFAULT_MAX_LINE_BYTES, maxFileBytes);
   const dedupeWindowMs = options.dedupeWindowMs ?? DEFAULT_DEDUPE_WINDOW_MS;
   const rateLimit = options.rateLimit ?? DEFAULT_RATE_LIMIT;
   const path = join(options.directory, options.fileName ?? "diagnostics.log");
@@ -99,7 +102,7 @@ export function createDiagnosticsLog(options: DiagnosticsLogOptions): Diagnostic
           (value) => value.size,
           () => 0,
         );
-      if (knownSize >= maxFileBytes) {
+      if (knownSize + Buffer.byteLength(line, "utf8") > maxFileBytes) {
         await rotate();
         knownSize = 0;
       }
@@ -121,7 +124,8 @@ export function createDiagnosticsLog(options: DiagnosticsLogOptions): Diagnostic
   }
 
   const emit = (record: DiagnosticRecord): void => {
-    enqueue(`${serialize(record, maxLineBytes, abbreviations)}\n`);
+    const line = serialize(record, maxLineBytes, abbreviations);
+    if (line !== null) enqueue(`${line}\n`);
   };
 
   const closeWindow = (fingerprint: string, entry: DedupeEntry): void => {
@@ -131,7 +135,9 @@ export function createDiagnosticsLog(options: DiagnosticsLogOptions): Diagnostic
         at: new Date(now()).toISOString(),
         code: entry.code,
         severity: "warn",
-        detail: { repeated: entry.suppressed },
+        area: entry.area,
+        stage: entry.stage,
+        detail: { fingerprint, repeated: entry.suppressed },
       });
     }
   };
@@ -171,8 +177,14 @@ export function createDiagnosticsLog(options: DiagnosticsLogOptions): Diagnostic
           const oldest = dedupe.entries().next();
           if (!oldest.done) closeWindow(oldest.value[0], oldest.value[1]);
         }
-        dedupe.set(fingerprint, { openedAt: at, suppressed: 0, code: redacted.code });
-        emit(redacted);
+        dedupe.set(fingerprint, {
+          openedAt: at,
+          suppressed: 0,
+          code: redacted.code,
+          area: redacted.area,
+          stage: redacted.stage,
+        });
+        emit({ ...redacted, detail: { ...redacted.detail, fingerprint } });
       } catch {
         // As above: reporting a failure may not raise one.
       }
@@ -206,23 +218,42 @@ export function createDiagnosticsLog(options: DiagnosticsLogOptions): Diagnostic
  * Rotation keeps the newest bytes and drops the oldest file. Truncating in
  * place would do the opposite of what a reader needs.
  */
-function serialize(record: DiagnosticRecord, maxLineBytes: number, abbreviations: [string, string][]): string {
+function serialize(record: DiagnosticRecord, maxLineBytes: number, abbreviations: [string, string][]): string | null {
   const abbreviated = abbreviateRecord(record, abbreviations);
+  // Include the line separator and JSON escaping in the byte limit.
+  const fits = (line: string): boolean => Buffer.byteLength(line, "utf8") + 1 <= maxLineBytes;
   let line = JSON.stringify(abbreviated);
-  if (Buffer.byteLength(line, "utf8") <= maxLineBytes) return line;
+  if (fits(line)) return line;
   const detail = { ...(abbreviated.detail ?? {}) };
-  // Largest field first: one oversize payload is what pushes a record over the
-  // cap, and dropping it keeps every small field that names the failure.
-  const byWeight = Object.keys(detail).sort(
-    (left, right) => JSON.stringify(detail[right] ?? null).length - JSON.stringify(detail[left] ?? null).length,
-  );
+  const bounded = { ...abbreviated, detail, truncated: true };
+  // Keep the link to repeat summaries even when the original message needs truncation.
+  const byWeight = Object.keys(detail)
+    .filter((key) => key !== "fingerprint")
+    .sort((left, right) => JSON.stringify(detail[right] ?? null).length - JSON.stringify(detail[left] ?? null).length);
   for (const key of byWeight) {
     delete detail[key];
-    line = JSON.stringify({ ...abbreviated, detail, truncated: true });
-    if (Buffer.byteLength(line, "utf8") <= maxLineBytes) return line;
+    line = JSON.stringify(bounded);
+    if (fits(line)) return line;
   }
-  const message = abbreviated.message?.slice(0, maxLineBytes / 2);
-  return JSON.stringify({ ...abbreviated, message, detail: undefined, truncated: true });
+  // A message can contain multibyte characters or JSON escape sequences.
+  // Search the serialized size, not the source string's character count.
+  for (const key of ["message", "area", "stage", "code", "at"] as const) {
+    const value = bounded[key];
+    if (!value) continue;
+    let low = 0;
+    let high = value.length;
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      bounded[key] = value.slice(0, middle);
+      if (fits(JSON.stringify(bounded))) low = middle;
+      else high = middle - 1;
+    }
+    bounded[key] = value.slice(0, low);
+    line = JSON.stringify(bounded);
+    if (fits(line)) return line;
+  }
+  const marker = '{"truncated":true}';
+  return fits(marker) ? marker : null;
 }
 
 function abbreviateRecord(
@@ -259,9 +290,11 @@ function uniquePrefixes(directory: string | undefined): string[] {
 function fingerprintOf(record: DiagnosticRecord): string {
   const detail = record.detail ?? {};
   const identity = FINGERPRINT_KEYS.filter((key) => detail[key] !== undefined).map(
-    (key) => `${key}=${JSON.stringify(detail[key])}`,
+    (key) => `${key}=${JSON.stringify(detail[key], (name, value) => (name === "durationMs" ? undefined : value))}`,
   );
-  return [record.code, record.area ?? "", record.stage ?? "", ...identity].join("|");
+  return createHash("sha256")
+    .update(JSON.stringify([record.code, record.area, record.stage, record.message, ...identity]))
+    .digest("hex");
 }
 
 interface PruneOptions {
@@ -338,7 +371,16 @@ export async function appendTextLog(options: {
   maxTextBytes?: number;
 }): Promise<void> {
   const path = join(options.directory, options.fileName);
-  const clean = redactText(options.text).slice(0, options.maxTextBytes ?? DEFAULT_MAX_TEXT_BYTES);
+  const maxFileBytes = options.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES;
+  const maxTextBytes = Math.min(options.maxTextBytes ?? DEFAULT_MAX_TEXT_BYTES, maxFileBytes);
+  const redacted = redactText(options.text);
+  let clean = "";
+  let bytes = 0;
+  for (const character of redacted) {
+    bytes += Buffer.byteLength(character, "utf8");
+    if (bytes > maxTextBytes) break;
+    clean += character;
+  }
   if (!clean) return;
   const next = (textChains.get(path) ?? Promise.resolve()).then(async () => {
     try {
@@ -347,7 +389,7 @@ export async function appendTextLog(options: {
         (value) => value.size,
         () => 0,
       );
-      if (size >= (options.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES)) {
+      if (size + Buffer.byteLength(clean, "utf8") > maxFileBytes) {
         await rm(`${path}.1`, { force: true });
         await rename(path, `${path}.1`);
       }

@@ -1,4 +1,6 @@
 import type {
+  AgentEvent,
+  AgentProviderStatus,
   ProviderRuntimeSnapshot,
   ProviderRuntimeStatus,
   ProviderRuntimesDesktopApi,
@@ -10,6 +12,7 @@ import { FALLBACK_UPDATE_STATUS } from "../../app-defaults";
 import { TOAST_DURATION, Toaster } from "../../components/ui";
 import { DEFAULT_GENERAL_SETTINGS } from "../settings/app-settings";
 import { SettingsModal } from "../settings/SettingsModal";
+import { createProviderFailureNotifications } from "./provider-failure-notifications";
 import { createProviderRuntimeStore } from "./provider-runtime-store";
 import type { ProviderUpdate } from "./provider-update";
 import {
@@ -178,4 +181,96 @@ it("keeps Settings open when the update notification is closed", async () => {
   fireEvent.click(close);
   expect(onOpenChange).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: "Close settings" })).toBeInTheDocument();
+});
+
+it("keeps a dismissed provider failure closed until it changes or recovers", async () => {
+  render(() => <Toaster />);
+  const failures = createProviderFailureNotifications({
+    serverId: "local",
+    remoteName: () => undefined,
+    openSettings: () => {},
+  });
+  const status: AgentProviderStatus = {
+    id: "codex",
+    state: "error",
+    version: null,
+    message: "token=abcdefgh123456 /Users/ada failed",
+  };
+  const event: Extract<AgentEvent, { type: "error" }> = {
+    type: "error",
+    code: "codex_start_failed",
+    message: "raw provider message",
+  };
+  try {
+    failures.sync([status]);
+    failures.handleError(event, [status]);
+    expect(await screen.findByText("token=[redacted] ~ failed")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Close notification" })).toHaveLength(1);
+    const close = screen.getByRole("button", { name: "Close notification" });
+    close.focus();
+    expect(close).toHaveFocus();
+    fireEvent.click(close);
+    await waitFor(() => expect(screen.queryByText("ChatGPT could not start")).not.toBeInTheDocument());
+    failures.sync([status]);
+    failures.handleError(event, [status]);
+    flush();
+    expect(screen.queryByText("ChatGPT could not start")).not.toBeInTheDocument();
+    failures.sync([{ ...status, message: "A different failure" }]);
+    expect(await screen.findByText("A different failure")).toBeInTheDocument();
+    failures.sync([{ ...status, state: "available", message: null }]);
+    await waitFor(() => expect(screen.queryByText("ChatGPT could not start")).not.toBeInTheDocument());
+    failures.handleError(event, []);
+    expect(await screen.findByText(event.message)).toBeInTheDocument();
+  } finally {
+    failures.dispose();
+  }
+});
+
+it("labels a remote provider failure and removes it when the server scope ends", async () => {
+  render(() => <Toaster />);
+  const failures = createProviderFailureNotifications({
+    serverId: "remote",
+    remoteName: () => "Studio Mac",
+    openSettings: () => {
+      throw new Error("Remote providers cannot open local settings");
+    },
+  });
+  const event: Extract<AgentEvent, { type: "error" }> = {
+    type: "error",
+    code: "grok_runtime_missing",
+    message: "Grok is missing",
+  };
+  failures.handleError({ ...event, agentId: "chief" }, []);
+  flush();
+  expect(screen.queryByText("Grok is missing")).not.toBeInTheDocument();
+  failures.handleError(event, []);
+  expect(await screen.findByText("Grok could not start on Studio Mac")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Open Settings" })).not.toBeInTheDocument();
+  failures.dispose();
+  await waitFor(() => expect(screen.queryByText("Grok could not start on Studio Mac")).not.toBeInTheDocument());
+});
+
+it("offers Settings only when the workspace is available", async () => {
+  render(() => <Toaster />);
+  let available = false;
+  const failures = createProviderFailureNotifications({
+    serverId: "local",
+    remoteName: () => undefined,
+    settingsAvailable: () => available,
+    openSettings: (event) => event.preventDefault(),
+  });
+  const status: AgentProviderStatus = { id: "codex", state: "error", version: null, message: "Provider unavailable" };
+  try {
+    failures.sync([status]);
+    expect(await screen.findByText("ChatGPT could not start")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open Settings" })).not.toBeInTheDocument();
+    available = true;
+    failures.sync([status]);
+    expect(await screen.findByRole("button", { name: "Open Settings" })).toBeEnabled();
+    available = false;
+    failures.sync([status]);
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Open Settings" })).not.toBeInTheDocument());
+  } finally {
+    failures.dispose();
+  }
 });

@@ -64,7 +64,8 @@ export const PROVIDER_FAILURE_CODES: readonly ProviderFailureCode[] = AGENT_PROV
 const NAMED_FAILURE_CODES = [
   // The agent service.
   "agent_event_failed",
-  "agent_notification_failed",
+  "agent_error",
+  "agent_warning",
   "context_compaction_failed",
   "context_compaction_timeout",
   "conversation_publication_failed",
@@ -186,15 +187,11 @@ export function isFailureStage(value: unknown): value is FailureStage {
 /**
  * Whether the message that came with a failure may leave the machine.
  *
- * `local_only` is for text OpenBot did not write. A provider `diagnostic` is
- * any stderr line matching `error|failed|warning`, and a masked message is the
- * original the user was never shown - both can carry a repository path, a
- * prompt fragment or a pasted token. They are written whole to the local log
- * and reported to analytics as a code and a count.
+ * Only the two verified message sources below may send a summary. Other
+ * messages can contain provider output, file paths, or user content.
  */
 export function failureMessagePolicy(code: FailureCode): "send" | "local_only" {
-  if (code.endsWith("_diagnostic") || code.endsWith("_exited")) return "local_only";
-  return code === "provider_status_masked" || code === "provider_message_masked" ? "local_only" : "send";
+  return code === "cli_resolve_failed" || code === "provider_runtime_http_failed" ? "send" : "local_only";
 }
 
 export type DurationBucket = "unknown" | "lt_1s" | "lt_10s" | "lt_1m" | "lt_10m" | "gte_10m";

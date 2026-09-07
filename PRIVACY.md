@@ -22,10 +22,10 @@ failure codes.
 Analytics events do not contain message or direct-message text, prompts, replies, generated content,
 search queries, embedded-browser URLs or page titles, file names, local paths, commands, or local
 identifiers for agents, threads, turns, messages, servers, and team members.
-A failure event may contain a short error summary: at most 200 characters, with secrets,
-credentials, email addresses and home directory paths removed before it is sent, and never the
-output of a provider tool. It travels under the same Settings -> General analytics opt-out as every
-other event. Website page views do not contain query parameters, hashes, or invitation values. Session replay and
+A failure event can contain a summary only for CLI resolution or a runtime download HTTP error.
+The summary is limited to 200 characters. Secrets, credentials, email addresses and home directory
+paths are removed before transmission. Other error messages and provider output stay local.
+These summaries use the same Settings -> General analytics opt-out as every other event. Website page views do not contain query parameters, hashes, or invitation values. Session replay and
 automatic interaction capture are disabled.
 
 When a user signs in, OpenPanel receives the OpenBot account ID and normalized account email so UI

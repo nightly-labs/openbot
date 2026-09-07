@@ -6,9 +6,15 @@ export async function appendRemoteDiagnosticLog(
   message: string | Uint8Array,
 ): Promise<void> {
   const safeName = name.replace(/[^a-zA-Z0-9_-]/gu, "-").slice(0, 80);
-  // The text is a remote process's own stdout, so it goes through the one
-  // redaction the app has rather than the weaker copy that used to live here.
-  await appendTextLog({ directory, fileName: `${safeName}.log`, text: Buffer.from(message).toString("utf8") });
+  // Keep the token format used by the remote processes. The shared redactor
+  // then removes the other secret formats before truncation or disk writes.
+  await appendTextLog({
+    directory,
+    fileName: `${safeName}.log`,
+    text: Buffer.from(message)
+      .toString("utf8")
+      .replace(/token[=: ]+[A-Za-z0-9._-]{8,}/giu, "[redacted]"),
+  });
 }
 
 interface ManagedChildProcess {

@@ -782,16 +782,12 @@ describe("host analytics", () => {
       message: "could not interrupt sk-ant-abcdefgh1234 for owner@example.com",
     });
 
-    // This assertion changed meaning: it used to state that the message never
-    // leaves the machine. A failure now carries a redacted, truncated summary,
-    // which is what makes an event debuggable at all.
     expect(client.track).toHaveBeenCalledWith("system_operation_failed", {
       provider: "codex",
       model: "gpt-5.6-luna",
       reasoning_effort: "medium",
       area: "agent",
       failure_code: "interrupt_failed",
-      message: "could not interrupt [redacted] for [redacted-email]",
       profileId: "owner-account",
     });
   });
@@ -825,6 +821,36 @@ describe("host analytics", () => {
     expect(properties).not.toHaveProperty("profileId");
     expect(client.identify).not.toHaveBeenCalled();
   });
+
+  it.each([
+    "agent_error",
+    "agent_warning",
+    "agent_notification_failed",
+    "agent_old_method",
+    "log_error",
+    "provider_connect_failed",
+    "provider_runtime_verify_failed",
+    "codex_start_failed",
+    "codex_exited",
+    "provider_message_masked",
+    "unknown",
+    undefined,
+  ])("keeps unverified messages local for %s", (code) => {
+    const message = "prompt fragment /work/customer/private.txt token abcdef123456";
+    const sanitized = sanitizeHostEvent("system_operation_failed", { failure_code: code, message });
+    expect(sanitized).not.toHaveProperty("message");
+  });
+
+  it.each(["cli_resolve_failed", "provider_runtime_http_failed"])(
+    "redacts and bounds a verified %s summary",
+    (code) => {
+      const sanitized = sanitizeHostEvent("system_operation_failed", {
+        failure_code: code,
+        message: `token=abcdefgh123456 owner@example.com /Users/ada ${"x".repeat(300)}`,
+      });
+      expect(sanitized.message).toBe(`${`token=[redacted] [redacted-email] ~ ${"x".repeat(300)}`.slice(0, 199)}…`);
+    },
+  );
 
   it("counts a repeated failure instead of sending it again", () => {
     const client = fakeClient();

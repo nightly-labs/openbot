@@ -105,12 +105,12 @@ non-finite, negative, or implausibly large inputs. Failure codes are static and 
 Never send message content, prompts, answers, generated content, search terms, arbitrary URLs,
 referrers, file names, local paths, commands, tokens, invitation values, or local identifiers.
 
-A failure event may carry a `message`: a redacted summary of at most 200 characters, with secrets,
-credentials, emails and home directory paths removed before it leaves the process. It is never the
-raw error. Text OpenBot did not author - provider CLI output, a process exit line, a masked
-provider message - is `local_only`: it goes to the local diagnostics log and the `message` property
-is dropped. `failureMessagePolicy` in `packages/contracts/src/analytics-failures.ts` is the one
-place that decides this. Website screen views use only the fixed paths `/` and `/join`. Session replay and
+A failure event can contain a redacted summary of at most 200 characters only for
+`cli_resolve_failed` and `provider_runtime_http_failed`. These two codes have verified message
+sources. All other messages stay local, including unknown or missing codes, generic logger errors,
+and provider notifications. The sanitizer removes their `message` property.
+`failureMessagePolicy` in `packages/contracts/src/analytics-failures.ts` defines this policy.
+Website screen views use only the fixed paths `/` and `/join`. Session replay and
 automatic interaction capture remain disabled.
 
 ## Required dashboards

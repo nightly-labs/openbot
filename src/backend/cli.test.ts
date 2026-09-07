@@ -77,7 +77,7 @@ describe("bundled Codex resolution", () => {
 
   it.runIf(process.platform !== "win32")("falls back when the system CLI is outdated or invalid", async () => {
     const outdated = await createExecutable("old-codex", "codex-cli 0.120.0");
-    const invalid = await createExecutable("broken-codex", "not a version");
+    const invalid = await createExecutable("broken-codex", `${"x ".repeat(53)}Bearer ${"a".repeat(200)}`);
     const bundled = await createExecutable("bundled-codex", "codex-cli 0.149.1");
 
     const records: DiagnosticRecord[] = [];
@@ -99,7 +99,7 @@ describe("bundled Codex resolution", () => {
     expect(records[0]?.code).toBe("cli_resolved_after_failures");
     expect(records[0]?.detail?.attempts).toMatchObject([
       { path: outdated, source: "system", outcome: "outdated", version: "0.120.0" },
-      { path: invalid, source: "system", outcome: "unparsable" },
+      { path: invalid, source: "system", outcome: "unparsable", stdoutHead: `${"x ".repeat(53)}[redacted]\n` },
       { path: bundled, source: "managed", outcome: "ok", version: "0.149.1" },
     ]);
   });

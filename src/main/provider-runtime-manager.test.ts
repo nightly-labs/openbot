@@ -34,11 +34,13 @@ describe("ProviderRuntimeManager", () => {
     await mkdir(join(previousExecutable, ".."), { recursive: true });
     await writeFile(previousExecutable, "previous runtime");
     const progress: number[] = [];
+    const records: DiagnosticRecord[] = [];
     const manager = new ProviderRuntimeManager({
       root,
       platform: "darwin",
       architecture: "arm64",
       lock,
+      diagnostics: (record) => records.push(record),
       fetchImpl: async (input) => {
         const url = String(input);
         if (url.endsWith("/LICENSE")) return new Response(license);
@@ -52,6 +54,13 @@ describe("ProviderRuntimeManager", () => {
       version: "1.0.21",
       availableVersion: "1.0.22",
     });
+    expect(manager.executablePath("grok")).toBe(join(root, "grok", "darwin-arm64", lock.grok.version, "bin", "grok"));
+    expect(records).toContainEqual(
+      expect.objectContaining({
+        code: "provider_runtime_verify_failed",
+        detail: expect.objectContaining({ provider: "grok" }),
+      }),
+    );
     const finished = waitFor(manager, (snapshot) => snapshot.providers.grok.phase === "ready");
     manager.on("status", (snapshot) => {
       const value = snapshot.providers.grok.progress;

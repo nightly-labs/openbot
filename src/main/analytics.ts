@@ -508,7 +508,7 @@ export function sanitizeHostEvent(name: HostEventName, properties: HostPropertie
   // can carry a repository path, a prompt fragment or a pasted token - so the
   // codes that carry it keep their text on the machine and send the code alone.
   const code = sanitized.failure_code;
-  if (isFailureCode(code) && failureMessagePolicy(code) === "local_only") delete sanitized.message;
+  if (!isFailureCode(code) || failureMessagePolicy(code) !== "send") delete sanitized.message;
   return sanitized;
 }
 
