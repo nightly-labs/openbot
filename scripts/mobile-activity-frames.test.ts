@@ -3,9 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type BloubActivityFrame,
   bloubActivityGeometry,
+  bloubMorphGeometry,
   FPS,
   FRAME_COUNT,
+  nativeFrame,
   prepareBloubActivityFrames,
+  prepareBloubIdleFrames,
+  prepareBloubMorphFrames,
   prepareBloubSettlingFrames,
   SETTLE,
 } from "../apps/mobile/src/features/agents/model/bloub-activity";
@@ -33,6 +37,83 @@ function idleQueue() {
     },
   };
 }
+
+it("keeps an idle avatar moving and blinking while sharing cancellable preparation", () => {
+  const geometry = bloubActivityGeometry("idle-preview");
+  const idle = idleQueue();
+  let frames: BloubActivityFrame[] = [];
+  let duplicate: BloubActivityFrame[] = [];
+  const cancelled = vi.fn();
+  const cancel = prepareBloubIdleFrames(geometry, cancelled, idle.schedule);
+  prepareBloubIdleFrames(
+    geometry,
+    (result) => {
+      frames = result;
+    },
+    idle.schedule,
+  );
+  prepareBloubIdleFrames(
+    geometry,
+    (result) => {
+      duplicate = result;
+    },
+    idle.schedule,
+  );
+  cancel();
+  expect(frames).toEqual([]);
+  while (idle.next()) {
+    /* Finish the shared idle sequence. */
+  }
+  expect(cancelled).not.toHaveBeenCalled();
+  expect(duplicate).toBe(frames);
+  expect(new Set(frames.map((frame) => frame.body.d)).size).toBeGreaterThan(1);
+  const eyeOpening = frames.map((frame) => frame.eyes[0]?.matrix[3] ?? 1);
+  expect(Math.min(...eyeOpening)).toBeLessThan(0.2);
+  expect(Math.max(...eyeOpening)).toBeGreaterThan(0.5);
+  const engine = new BotEngine(100, "idle", geometry.radii, geometry.expression);
+  expect(frames[0]).toEqual(nativeFrame(engine.sample(0)));
+  // Both sides of the loop meet at the same pose and velocity.
+  expect(frames.at(-1)).toEqual(frames[1]);
+});
+
+it("morphs the displayed avatar into the selected face and retargets from an intermediate shape", () => {
+  const from = bloubActivityGeometry("morph-from");
+  const to = bloubActivityGeometry("morph-to");
+  const idle = idleQueue();
+  const source = nativeFrame(new BotEngine(100, "idle", from.radii, from.expression).sample(0));
+  let frames: BloubActivityFrame[] = [];
+  prepareBloubMorphFrames(
+    from,
+    to,
+    source,
+    (result) => {
+      frames = result;
+    },
+    idle.schedule,
+  );
+  while (idle.next()) {
+    /* Finish the morph. */
+  }
+  expect(frames[0]).toEqual(source);
+  const target = nativeFrame(new BotEngine(100, "idle", to.radii, to.expression).sample(BotEngine.SHAPE_MORPH));
+  expect(frames.at(-1)).toEqual(target);
+  expect(frames[6]).not.toEqual(source);
+  expect(frames[6]).not.toEqual(target);
+
+  const intermediate = bloubMorphGeometry(from, to, 6 / FPS);
+  const displayed = nativeFrame(
+    new BotEngine(100, "idle", intermediate.radii, intermediate.expression).sample(6 / FPS),
+  );
+  expect(displayed.body).toEqual(frames[6].body);
+  const cancelled = vi.fn();
+  const cancel = prepareBloubMorphFrames(intermediate, from, displayed, cancelled, idle.schedule);
+  idle.next();
+  cancel();
+  while (idle.next()) {
+    /* Cancelled selections must not replace the latest choice. */
+  }
+  expect(cancelled).not.toHaveBeenCalled();
+});
 
 describe("loader frame preparation", () => {
   it("leaves the first commit free of animation sampling and yields between bounded batches", () => {

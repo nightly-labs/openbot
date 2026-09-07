@@ -38,11 +38,29 @@ export function BloubAvatar({ agentId, hue, seed, size = 54 }: BloubAvatarProps)
   const { agents, servers } = useMobileWorkspace();
   const serverId = agents.find((agent) => agent.id === agentId)?.serverId;
   const disconnected = !servers.some((server) => server.id === serverId && server.state === "online");
+  const activity = useAgentActivity(agentId);
+  return (
+    <BloubAvatarPreview
+      hue={hue}
+      seed={seed}
+      size={size}
+      disconnected={disconnected}
+      working={!disconnected && Boolean(activity && activity.phase !== "waiting")}
+    />
+  );
+}
+
+export function BloubAvatarPreview({
+  hue,
+  seed,
+  size = 54,
+  disconnected = false,
+  working = false,
+}: Omit<BloubAvatarProps, "agentId"> & { disconnected?: boolean; working?: boolean }) {
   const appearance = useConnectionAppearance(disconnected);
   const colorProps = useAnimatedProps(() => ({ values: [appearance.get().saturation] }));
   const appearanceProps = useAnimatedProps(() => ({ opacity: appearance.get().opacity }));
-  const activity = useAgentActivity(agentId);
-  const frame = useBloubActivityFrame(seed, !disconnected && Boolean(activity && activity.phase !== "waiting"));
+  const frame = useBloubActivityFrame(seed, working, !disconnected);
   const bodyProps = useAnimatedProps(() => frame.get().body);
   const maskId = `bloub-${useId().replaceAll(":", "")}`;
   const color = getBloubAvatarColor(seed, hue);

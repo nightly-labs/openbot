@@ -53,12 +53,13 @@ function AuthenticatedStack() {
           name="add-agent"
           options={{
             contentStyle: { backgroundColor: background },
+            headerShown: true,
             headerStyle: { backgroundColor: background },
             headerTransparent: false,
+            title: "Create an agent",
             presentation: "formSheet",
-            sheetAllowedDetents: "fitToContents",
+            sheetAllowedDetents: [1],
             sheetGrabberVisible: true,
-            title: "Add agent",
           }}
         />
         <Stack.Screen

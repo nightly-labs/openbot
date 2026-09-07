@@ -1,5 +1,6 @@
 import { Host, TextInput } from "@expo/ui";
 import { useNativeState } from "@expo/ui/swift-ui";
+import { accessibilityLabel } from "@expo/ui/swift-ui/modifiers";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { View } from "react-native";
@@ -15,6 +16,10 @@ export function SheetFormField({
   isRequired = false,
   label,
   maxLength,
+  multiline = false,
+  appearance = "default",
+  hideLabel = false,
+  textAlign,
   onChangeText,
   onSubmitEditing,
   placeholder,
@@ -23,26 +28,33 @@ export function SheetFormField({
 }: SheetFormFieldProps) {
   const [foreground, muted, surface, border] = useThemeColor(["foreground", "muted", "surface", "border"]);
   const nativeValue = useNativeState(value);
+  const height = multiline ? 108 : 54;
 
   return (
     <View className="gap-2">
-      <Typography type="body-sm" weight="semibold">
-        {label}
-        {isRequired ? " *" : ""}
-      </Typography>
+      {!hideLabel && (
+        <Typography type="body-sm" weight="semibold">
+          {label}
+          {isRequired ? " *" : ""}
+        </Typography>
+      )}
       <View
         style={{
           backgroundColor: surface,
           borderColor: border,
           borderCurve: "continuous",
           borderRadius: 16,
-          borderWidth: 1,
-          height: 54,
+          borderWidth: appearance === "soft" ? 0 : 1,
+          height,
           overflow: "hidden",
         }}
       >
-        <Host ignoreSafeArea="all" style={{ height: 54 }}>
+        <Host ignoreSafeArea="all" style={{ height }}>
           <TextInput
+            modifiers={[accessibilityLabel(label)]}
+            multiline={multiline}
+            numberOfLines={multiline ? 4 : 1}
+            textAlign={textAlign}
             autoCapitalize={autoCapitalize}
             autoCorrect={autoCorrect}
             autoFocus={autoFocus}
@@ -52,7 +64,7 @@ export function SheetFormField({
             placeholderTextColor={muted}
             returnKeyType={returnKeyType}
             selectionColor={foreground}
-            style={{ height: 54, paddingHorizontal: 16 }}
+            style={{ height, paddingHorizontal: 16 }}
             textStyle={{ color: String(foreground), fontSize: 16 }}
             value={nativeValue}
             onChangeText={onChangeText}
