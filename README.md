@@ -230,6 +230,15 @@ Cloudflare Workers
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for dependency direction, state ownership, and
 rules for new modules.
 
+## Chat attachments
+
+Attach MP3 audio and MOV video through the file picker or drag and drop. The limits are 100 MB per
+file, 250 MB per message, and 10 files per message. OpenBot gives the agent the original file; it does
+not play, decode, transcribe, or validate the recording during import. Damaged recordings can be
+attached for inspection. Analysis depends on the tools available to the agent. For other audio or
+video formats, export as MP3 or MOV, or attach a text transcript. Remote hosts must advertise the
+`media-attachments` capability; update the host if this feature is unavailable.
+
 ## Local data and network boundaries
 
 - `~/OpenBot/Agents/<agent-id>` — one working directory per agent. A profile written before the

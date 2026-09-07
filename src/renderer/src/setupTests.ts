@@ -15,18 +15,37 @@ export class TestResizeObserver implements ResizeObserver {
    */
   static readonly instances = new Set<TestResizeObserver>();
 
-  readonly #elements = new Set<Element>();
+  readonly #elements = new Map<Element, ResizeObserverBoxOptions>();
 
-  // No constructor: the callback is discarded, because no test drives a resize.
-  // They only assert on `instances`.
+  constructor(private readonly callback: ResizeObserverCallback) {}
+
+  static resize(element: Element, box: ResizeObserverBoxOptions): void {
+    for (const observer of TestResizeObserver.instances) {
+      if (observer.#elements.get(element) !== box) continue;
+      const bounds = element.getBoundingClientRect();
+      const size = [{ inlineSize: bounds.width, blockSize: bounds.height }];
+      observer.callback(
+        [
+          {
+            target: element,
+            contentRect: bounds,
+            borderBoxSize: size,
+            contentBoxSize: size,
+            devicePixelContentBoxSize: size,
+          },
+        ],
+        observer,
+      );
+    }
+  }
 
   disconnect(): void {
     this.#elements.clear();
     TestResizeObserver.instances.delete(this);
   }
 
-  observe(element: Element): void {
-    this.#elements.add(element);
+  observe(element: Element, options?: ResizeObserverOptions): void {
+    this.#elements.set(element, options?.box ?? "content-box");
     TestResizeObserver.instances.add(this);
   }
 
