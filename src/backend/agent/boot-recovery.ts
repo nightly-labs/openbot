@@ -140,35 +140,37 @@ export class BootRecovery {
   async backfillProviderHistory(): Promise<void> {
     for (const agent of this.#store.list()) {
       if (!agent.threadId) continue;
-      const session = this.#store.activeProviderSession(agent.id);
-      const client = this.#providers.clientForAgent(agent);
-      if (!session || !client) continue;
-      try {
-        const response = await client.request(
-          "thread/read",
-          { threadId: session.externalSessionId, includeTurns: true },
-          decodeThreadResponse,
-        );
-        const imported = snapshotFromThread(agent.id, response.thread, (deliveryId) =>
-          this.#mailbox.getDelivery(deliveryId),
-        );
-        imported.threadId = agent.threadId;
-        const current = this.#store.database.readConversation(agent.id, agent.threadId);
-        const merged = mergeProviderHistory(current, imported);
-        this.#mailboxSync.syncMailboxMessages(merged);
-        if (conversationContentSignature(merged) === conversationContentSignature(current)) {
+      // Inactive sessions still own history after an upgrade or provider switch.
+      for (const session of this.#store.database.listProviderSessions(agent.threadId)) {
+        const client = this.#providers.clientFor(session.provider);
+        if (!client) continue;
+        try {
+          const response = await client.request(
+            "thread/read",
+            { threadId: session.externalSessionId, includeTurns: true },
+            decodeThreadResponse,
+          );
+          const imported = snapshotFromThread(agent.id, response.thread, (deliveryId) =>
+            this.#mailbox.getDelivery(deliveryId),
+          );
+          imported.threadId = agent.threadId;
+          const current = this.#store.database.readConversation(agent.id, agent.threadId);
+          const merged = mergeProviderHistory(current, imported);
+          this.#mailboxSync.syncMailboxMessages(merged);
+          if (conversationContentSignature(merged) === conversationContentSignature(current)) {
+            const live = this.#conversation.snapshot(agent.id);
+            if (!live?.activeTurnId) this.#conversation.setSnapshot(agent.id, current);
+            continue;
+          }
+          const persisted = this.#store.database.persistConversation(merged, "provider-history.backfilled", {
+            provider: session.provider,
+            externalSessionId: session.externalSessionId,
+          });
           const live = this.#conversation.snapshot(agent.id);
-          if (!live?.activeTurnId) this.#conversation.setSnapshot(agent.id, current);
-          continue;
+          if (!live?.activeTurnId) this.#conversation.setSnapshot(agent.id, persisted);
+        } catch (error) {
+          this.#hooks.emitError("provider_history_backfill_pending", error, agent.id);
         }
-        const persisted = this.#store.database.persistConversation(merged, "provider-history.backfilled", {
-          provider: session.provider,
-          externalSessionId: session.externalSessionId,
-        });
-        const live = this.#conversation.snapshot(agent.id);
-        if (!live?.activeTurnId) this.#conversation.setSnapshot(agent.id, persisted);
-      } catch (error) {
-        this.#hooks.emitError("provider_history_backfill_pending", error, agent.id);
       }
     }
   }

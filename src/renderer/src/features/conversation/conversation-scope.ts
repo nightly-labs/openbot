@@ -1,7 +1,6 @@
 import type { UpdateAgentInput } from "@openbot/contracts/ipc";
 import { createContext, createEffect, onCleanup, onSettled, untrack, useContext } from "solid-js";
 import { createScopeGuard } from "../../scope-lifetime";
-import { clearChatSearchHighlights, findChatSearchMatches, renderChatSearchHighlights } from "./chat-search";
 import { useConversationController } from "./conversation-controller-context";
 import { agentConversationKey, composerDraftKey } from "./conversation-keys";
 import type { ComposerDraft, ConversationProps } from "./conversation-types";
@@ -176,40 +175,13 @@ export function createConversationViewScope(props: ConversationProps) {
     setConversationError,
   } = composer;
   const queue = createQueueStore({ props });
-  const {
-    activeDeliveries,
-    orderedQueuedDeliveries,
-    presentedQueueDeliveries,
-    renderedQueueDeliveries,
-    setRenderedQueueDeliveries,
-    queuePanelVisible,
-    getQueueExitTimer,
-  } = queue;
+  const { activeDeliveries, orderedQueuedDeliveries, presentedQueueDeliveries, queuePanelVisible } = queue;
   const activity = createActivityStore({
     props,
     activeDeliveries,
     agentActivityPresentations: resources.agentActivityPresentations,
   });
-  const {
-    renderedAgentActivity,
-    setRenderedAgentActivity,
-    agentActivitySpaceReserved,
-    setAgentActivitySpaceReserved,
-    streamingAgentMessage,
-    activeActivityId,
-    agentActivity,
-    activityPresentation,
-    clearAgentActivityShowTimer,
-    clearAgentActivityExitTimer,
-    clearAgentActivityExitDelayTimer,
-    getAgentActivityShowTimer,
-    getAgentActivityExitTimer,
-    getAgentActivityExitDelayTimer,
-  } = activity;
-  const queueExitTimer = getQueueExitTimer();
-  const agentActivityShowTimer = getAgentActivityShowTimer();
-  const agentActivityExitTimer = getAgentActivityExitTimer();
-  const agentActivityExitDelayTimer = getAgentActivityExitDelayTimer();
+  const { renderedAgentActivity, agentActivitySpaceReserved, setAgentActivitySpaceReserved, agentActivity } = activity;
   const browser = createBrowserStore({
     props,
     browserOpenRequests: resources.browserOpenRequests,
@@ -237,9 +209,7 @@ export function createConversationViewScope(props: ConversationProps) {
     activateBrowserTab,
     reloadBrowserTab,
     navigateBrowserTab,
-    getPreviousBrowserTabCount,
   } = browser;
-  const previousBrowserTabCount = getPreviousBrowserTabCount();
   const browserSidebarOpen = () => browserInteractionAvailable() && activeRightPanel() === "browser";
   const browserPipOpen = () => browserInteractionAvailable() && activeRightPanel() === "browser-pip";
   const screenOpen = () => browserSidebarOpen() || browserPipOpen();
@@ -271,9 +241,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const {
     scrollFades,
     showScrollToLatest,
-    setShowScrollToLatest,
     unreadDividerVisible,
-    setUnreadDividerVisible,
     messageVirtualizer,
     timelineMessages,
     updateScrollFade,
@@ -287,6 +255,12 @@ export function createConversationViewScope(props: ConversationProps) {
   const search = createSearchStore({
     props,
     chatSearchOpen,
+    chatSearchQuery,
+    activeChatSearchIndex,
+    scrollElement: () => scrollElement,
+    revealMatch: () => {
+      stickToLatest = false;
+    },
     setChatSearchOpen,
     setChatSearchQuery,
     chatSearchMatches,
@@ -296,17 +270,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setChatSearchTotal,
     setActiveChatSearchIndex,
   });
-  const {
-    openChatSearch,
-    closeChatSearch,
-    moveChatSearch,
-    handleChatSearchShortcut,
-    setChatSearchInputElement,
-    getChatSearchInput,
-    getChatSearchReturnFocus,
-  } = search;
-  const chatSearchInput = getChatSearchInput();
-  const chatSearchReturnFocus = getChatSearchReturnFocus();
+  const { closeChatSearch, moveChatSearch, handleChatSearchShortcut, setChatSearchInputElement } = search;
   const voice = createVoiceStore({
     props,
     resources,
@@ -329,14 +293,7 @@ export function createConversationViewScope(props: ConversationProps) {
       restoreTranscript: (...args) => composer.restoreVoiceTranscript(...args),
     },
   });
-  const {
-    startVoiceRecording,
-    stopVoiceRecording,
-    finishVoiceRecording,
-    stopVoiceStream,
-    startVoiceElapsedTimer,
-    stopVoiceElapsedTimer,
-  } = voice;
+  const { startVoiceRecording, stopVoiceRecording } = voice;
   const actions = createComposerActions({
     props,
     agentReady,
@@ -413,13 +370,11 @@ export function createConversationViewScope(props: ConversationProps) {
   });
   const {
     updateTeamTyping,
-    stopTeamTyping,
     addAttachments,
     openAttachmentPicker,
     openAttachmentPickerFromKey,
     editQueuedMessage,
     cancelQueuedMessageEdit,
-    saveQueuedMessageEdit,
     reorderPresentedQueue,
     submitComposer,
     sendSelectionInstruction,
@@ -452,12 +407,7 @@ export function createConversationViewScope(props: ConversationProps) {
     viewIsMounted,
     saveAgentPatch,
   });
-  const { updateRuntimeSettings, selectModel, selectAndConfirmModel, selectAndConfirmReasoning } = settings;
-  onCleanup(() => {
-    clearAgentActivityShowTimer();
-    clearAgentActivityExitDelayTimer();
-    clearAgentActivityExitTimer();
-  });
+  const { updateRuntimeSettings, selectAndConfirmModel, selectAndConfirmReasoning } = settings;
   let scrollElement: HTMLDivElement | undefined;
   let virtualRoot: HTMLDivElement | undefined;
   let agentActivitySlot: HTMLDivElement | undefined;
@@ -473,10 +423,6 @@ export function createConversationViewScope(props: ConversationProps) {
   let browserVisibilityFrame: number | undefined;
   let browserBoundsFrame: number | undefined;
   let browserVisibilityGeneration = 0;
-  let chatSearchFrame: number | undefined;
-  let chatSearchTimer: ReturnType<typeof setTimeout> | undefined;
-  let chatSearchRequest = 0;
-  let lastChatSearchQuery = "";
   let stickToLatest = true;
   let lastConversationIdentity: string | undefined;
   let lastPanelAgentId: string | undefined;
@@ -606,77 +552,6 @@ export function createConversationViewScope(props: ConversationProps) {
 
   createEffect(
     () => ({
-      open: chatSearchOpen(),
-      query: chatSearchQuery(),
-      messageSignature: props.messages
-        .map((message) => `${message.id}:${message.body}:${message.items?.join("\u0000") ?? ""}`)
-        .join("\u0001"),
-      remoteMessageIds: chatSearchMessageIds(),
-      activeRemoteIndex: activeChatSearchIndex(),
-    }),
-    ({ open, query, remoteMessageIds, activeRemoteIndex }) => {
-      if (chatSearchFrame !== undefined) cancelAnimationFrame(chatSearchFrame);
-      if (chatSearchTimer !== undefined) clearTimeout(chatSearchTimer);
-      const queryChanged = query !== lastChatSearchQuery;
-      lastChatSearchQuery = query;
-      if (!open || !query.trim()) {
-        setChatSearchMatches([]);
-        if (remoteMessageIds.length > 0) setChatSearchMessageIds([]);
-        setChatSearchTotal(0);
-        setActiveChatSearchIndex(-1);
-        clearChatSearchHighlights();
-        return;
-      }
-      if (props.onSearchMessages) {
-        if (queryChanged) {
-          const request = ++chatSearchRequest;
-          chatSearchTimer = setTimeout(() => {
-            void props
-              .onSearchMessages?.(query)
-              .then((result) => {
-                if (request !== chatSearchRequest) return;
-                setChatSearchMessageIds(result.messageIds);
-                setChatSearchTotal(result.total);
-                const index = result.messageIds.length > 0 ? 0 : -1;
-                setActiveChatSearchIndex(index);
-                const messageId = result.messageIds[index];
-                if (messageId) void props.onOpenSearchMessage?.(messageId);
-              })
-              .catch(() => {
-                if (request !== chatSearchRequest) return;
-                setChatSearchMessageIds([]);
-                setChatSearchTotal(0);
-                setActiveChatSearchIndex(-1);
-              });
-          }, 150);
-        }
-        const activeMessageId = remoteMessageIds[activeRemoteIndex];
-        chatSearchFrame = requestAnimationFrame(() => {
-          chatSearchFrame = undefined;
-          if (!scrollElement || !activeMessageId) return;
-          const matches = findChatSearchMatches(scrollElement, query).filter(
-            (match) => match.message.dataset.chatSearchMessage === activeMessageId,
-          );
-          setChatSearchMatches(matches);
-        });
-        return;
-      }
-      chatSearchFrame = requestAnimationFrame(() => {
-        chatSearchFrame = undefined;
-        if (!scrollElement) return;
-        const matches = findChatSearchMatches(scrollElement, query);
-        setChatSearchMatches(matches);
-        setActiveChatSearchIndex((current) => {
-          if (matches.length === 0) return -1;
-          if (queryChanged || current < 0) return 0;
-          return Math.min(current, matches.length - 1);
-        });
-      });
-    },
-  );
-
-  createEffect(
-    () => ({
       request: props.messageFocusRequest,
       agentId: props.agent?.id,
       loaded: props.loaded,
@@ -695,33 +570,6 @@ export function createConversationViewScope(props: ConversationProps) {
       });
     },
   );
-
-  createEffect(
-    () => ({
-      open: chatSearchOpen(),
-      matches: chatSearchMatches(),
-      activeIndex: activeChatSearchIndex(),
-    }),
-    ({ open, matches, activeIndex }) => {
-      if (!open) return;
-      const renderedIndex = props.onSearchMessages ? 0 : activeIndex;
-      renderChatSearchHighlights(matches, renderedIndex);
-      const match = matches[renderedIndex];
-      if (!match) return;
-      stickToLatest = false;
-      match.message.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-        block: "center",
-        inline: "nearest",
-      });
-    },
-  );
-
-  onCleanup(() => {
-    if (chatSearchFrame !== undefined) cancelAnimationFrame(chatSearchFrame);
-    if (chatSearchTimer !== undefined) clearTimeout(chatSearchTimer);
-    clearChatSearchHighlights();
-  });
 
   createEffect(
     () => {
@@ -1026,7 +874,6 @@ export function createConversationViewScope(props: ConversationProps) {
     setStickToLatest,
     setUnreadMessagesDividerElement,
     setVirtualRootElement,
-    activeActivityId,
     activeBrowserControl,
     actingBrowserControl,
     activeBrowserTab,
@@ -1035,81 +882,44 @@ export function createConversationViewScope(props: ConversationProps) {
     browserTakeoverTab,
     respondToBrowserTakeover,
     activeChatSearchIndex,
-    activeDeliveries,
-    activeRightPanel,
-    activityPresentation,
-    addAttachments,
     agentActivity,
     agentReady,
-    agentActivityExitDelayTimer,
-    agentActivityExitTimer,
-    agentActivityShowTimer,
-    agentActivitySlot,
     agentActivitySpaceReserved,
     activateBrowserTab,
     attachmentAction,
     attachmentBusy,
     browserAddress,
-    browserPipOpen,
     browserSidebarOpen,
-    browserBoundsFrame,
     browserControlAgent,
     browserControlForTab,
     browserControllerForTab,
     browserPanelWidth,
-    browserResizeObserver,
     browserTabs,
-    browserVisibilityFrame,
-    browserVisibilityGeneration,
-    browserWindowResizeHandler,
-    cancelQueuedMessageEdit,
-    chatSearchFrame,
-    chatSearchInput,
     chatSearchMatches,
-    chatSearchMessageIds,
     chatSearchOpen,
     chatSearchQuery,
-    chatSearchRequest,
-    chatSearchReturnFocus,
-    chatSearchTimer,
     chatSearchTotal,
-    clearAgentActivityExitDelayTimer,
-    clearAgentActivityExitTimer,
-    clearAgentActivityShowTimer,
     closeBrowserTab,
     closeChatSearch,
     closeSidebarFilePreview,
     composerError,
     composerFocusRequest,
     composerHasContent,
-    controller,
     copiedMessageId,
     copyMessage,
     currentDraft,
     currentConversationError,
     installedSkills,
-    currentUnreadCount,
-    drafts,
     dropActive,
     editQueuedMessage,
     editingDeliveryId: currentEditingDeliveryId,
-    editingDraftBackup,
     expandedEmojiMessageId,
     scrollFades,
     filePreviewOpen,
-    finishVoiceRecording,
     handleChatSearchShortcut,
     hideBrowserPanel,
     jumpToLatestMessage,
     jumpToUnreadMessages,
-    lastChatSearchQuery,
-    lastConversationIdentity,
-    lastHandledMessageFocusNonce,
-    lastHandledSettingsRequestNonce,
-    lastPanelAgentId,
-    lastRuntimeSettingsSignature,
-    latestScrollFrame,
-    latestScrollSettleFrame,
     markMessageSeen,
     markUnreadMessages,
     markingRead,
@@ -1120,7 +930,6 @@ export function createConversationViewScope(props: ConversationProps) {
     openAttachmentPicker,
     openAttachmentPickerFromKey,
     openBrowserAddress,
-    openChatSearch,
     openExternalMessageUrl,
     openMoreMessageId,
     openReactionMessageId,
@@ -1129,77 +938,41 @@ export function createConversationViewScope(props: ConversationProps) {
     openSharedFile,
     openSidebarFileExternally,
     openWorkspaceFile,
-    orderedQueuedDeliveries,
     presentedQueueDeliveries,
     previewAttachment,
-    previousBrowserTabCount,
     props,
-    queueExitTimer,
     queuePanelVisible,
     reactToMessage,
     navigateBrowserTab,
     reloadBrowserTab,
     removeAttachment,
     renderedAgentActivity,
-    renderedQueueDeliveries,
     reorderPresentedQueue,
     replyTarget,
     replyToMessage,
-    resources,
-    rightPanels,
     routineSettingsRequest,
-    saveAgentPatch,
     updateRuntimeSettings,
-    saveQueuedMessageEdit,
     scheduleUnreadDividerVisibilityUpdate,
     screenOpen,
-    scrollElement,
-    scrollResizeObserver,
     selectAndConfirmModel,
     selectAndConfirmReasoning,
-    selectModel,
     selectionSending,
     sendSelectionInstruction,
-    setActiveChatSearchIndex,
     setActiveRightPanel,
-    setAgentActivitySpaceReserved,
-    setAttachmentBusy,
     setBrowserAddress,
     setBrowserAddressEditing,
     setBrowserPanelWidth,
-    setChatSearchMatches,
-    setChatSearchMessageIds,
-    setChatSearchOpen,
     setChatSearchQuery,
-    setChatSearchTotal,
     setComposerError,
     setComposerFocusRequest,
-    setCopiedMessageId,
-    setDrafts,
     setDropActive,
-    setEditingDeliveryId,
-    setEditingDraftBackup,
     setExpandedEmojiMessageId,
-    setMarkingRead,
     setMediaPreview,
     setOpenMoreMessageId,
     setOpenReactionMessageId,
-    setRenderedAgentActivity,
-    setRenderedQueueDeliveries,
-    setRightPanels,
     handleRoutineSettingsRequest,
-    setSelectionSending,
-    setSidebarFilePreview,
-    setSettingsModel,
     setSettingsPanelWidth,
-    setSettingsProvider,
-    setSettingsReasoning,
     setShowComposerActions,
-    setShowScrollToLatest,
-    setSubmitting,
-    setUnreadDividerVisible,
-    setVoiceElapsedSeconds,
-    setVoicePhase,
     settingsModel,
     settingsProvider,
     settingsOpen,
@@ -1210,24 +983,16 @@ export function createConversationViewScope(props: ConversationProps) {
     showBrowserPip,
     showComposerActions,
     showScrollToLatest,
-    startVoiceElapsedTimer,
     startVoiceRecording,
-    stickToLatest,
-    stopTeamTyping,
-    stopVoiceElapsedTimer,
     stopVoiceRecording,
-    stopVoiceStream,
-    streamingAgentMessage,
     submitComposer,
     submitting,
     unreadDividerVisible,
-    unreadMessagesDivider,
     unreferencedDraftAttachments,
     updateCurrentDraft,
     updateScrollFade,
     updateTeamTyping,
     updateUnreadDividerVisibility,
-    virtualRoot,
     voiceElapsedSeconds,
     voicePhase,
     voiceModelProgress,

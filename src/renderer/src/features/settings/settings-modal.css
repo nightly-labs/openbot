@@ -431,6 +431,12 @@
   content: "";
 }
 
+/* The row pads its own inline edges here, so the button margin goes and the gap between two
+   actions has to come from the wrapper instead. */
+.provider-picker-embedded .provider-picker-actions {
+  gap: var(--openbot-space-2);
+}
+
 .provider-picker-embedded .provider-picker-install {
   margin-right: 0;
 }

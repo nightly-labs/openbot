@@ -76,7 +76,9 @@ export function PanelResizer(props: PanelResizerProps) {
     const resizeTarget = props.onParentResize ? handle?.parentElement?.parentElement : handle?.parentElement;
     if (resizeTarget) {
       parentResizeObserver = new ResizeObserver(enforceBounds);
-      parentResizeObserver.observe(resizeTarget);
+      // Panel widths also change the parent's padding. Only its outer size
+      // should restore the preferred width, or a drag resets itself.
+      parentResizeObserver.observe(resizeTarget, { box: "border-box" });
     }
     return () => {
       cleanupDrag?.();

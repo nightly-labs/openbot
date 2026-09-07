@@ -70,8 +70,7 @@ export function ConversationHeader() {
         </Show>
         <Show when={props.remoteDesktopEnabled !== false && props.server?.kind === "remote" ? props.server : undefined}>
           {(server) => {
-            const enabled = () =>
-              props.remoteDesktopSessionActive || (server().state === "online" && server().remoteDesktopAvailable);
+            const enabled = () => props.remoteDesktopSessionActive || server().state === "online";
             const label = () => (props.remoteDesktopSessionActive ? "Resume remote control" : "Open remote control");
             return (
               <Button

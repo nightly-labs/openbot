@@ -754,3 +754,43 @@ export const Empty: Story = {
     pinnedItems: [],
   },
 };
+
+export const FirstAgent: Story = {
+  args: {
+    ...Empty.args,
+    emptyAction: {
+      label: "Create your first agent",
+      avatarSeed: "first-bot",
+      onSelect: fn(),
+    },
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+  play: async ({ canvas }) => {
+    const button = canvas.getByRole("button", { name: "Create your first agent" });
+    const avatar = button.querySelector<HTMLElement>(".agent-row-avatar");
+    const label = canvas.getByText("Create your first agent");
+    if (!avatar) throw new Error("First agent avatar is missing.");
+    const buttonBounds = button.getBoundingClientRect();
+    const avatarBounds = avatar.getBoundingClientRect();
+    const labelBounds = label.getBoundingClientRect();
+    await expect(
+      Math.abs(avatarBounds.top + avatarBounds.height / 2 - buttonBounds.top - buttonBounds.height / 2),
+    ).toBeLessThan(1);
+    await expect(
+      Math.abs(avatarBounds.top + avatarBounds.height / 2 - labelBounds.top - labelBounds.height / 2),
+    ).toBeLessThan(1);
+    await expect(labelBounds.left - avatarBounds.right).toBe(8);
+    await expect(avatarBounds.top).toBeGreaterThanOrEqual(buttonBounds.top);
+    await expect(avatarBounds.bottom).toBeLessThanOrEqual(buttonBounds.bottom);
+  },
+};
+
+export const FirstAgentNarrow: Story = {
+  ...FirstAgent,
+  decorators: [(Story) => <div style={{ width: "220px", height: "100vh" }}>{Story()}</div>],
+};
+
+export const FirstAgentCompact: Story = {
+  args: { ...FirstAgent.args, compact: true },
+  decorators: [(Story) => <div style={{ width: "80px", height: "100vh" }}>{Story()}</div>],
+};

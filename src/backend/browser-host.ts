@@ -20,7 +20,7 @@ import type {
   BrowserViewTarget,
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isNumber, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import {
   app,
@@ -48,7 +48,13 @@ import {
   type StoredBrowserTab,
   storedBrowserTab,
 } from "./browser-state";
-import { browserTargetSchema, parseBrowserToolArguments } from "./browser-tools";
+import { type BrowserDynamicToolHooks, browserInputAction, browserToolTimeout } from "./browser-tool-actions";
+import {
+  type BrowserToolArguments,
+  type BrowserToolCall,
+  parseBrowserToolArguments,
+  parseBrowserToolCall,
+} from "./browser-tools";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
 
@@ -56,12 +62,6 @@ interface BrowserHostEvents {
   changed: [tabs: BrowserTab[], activeTabId: string | null];
   controlChanged: [state: BrowserControlState];
   documentChanged: [tabId: string, documentIds: ReadonlySet<string>];
-}
-
-interface BrowserDynamicToolHooks {
-  onUploadTargetResolved?: (inputId: string, documentId: string) => void;
-  onUploadAssigned?: (inputId: string, documentId: string) => void;
-  onUploadOperationStarted?: (completion: Promise<void>) => void;
 }
 
 type KeepQueueBlocked = (promise: Promise<unknown>) => void;
@@ -115,14 +115,7 @@ interface StoredBrowserStateV2 {
   tabs: Array<StoredBrowserTab & { environment: BrowserEnvironment }>;
 }
 
-type BrowserAction =
-  | { type: "click"; ref: string }
-  | { type: "type"; ref: string; text: string; submit?: boolean }
-  | { type: "key"; key: string }
-  | { type: "scroll"; deltaY: number }
-  | { type: "back" }
-  | { type: "forward" }
-  | { type: "reload" };
+type BrowserAction = BrowserToolArguments<"act">["action"];
 
 export class BrowserHost {
   static readonly CONTROL_IDLE_GRACE_MS = 1_200;
@@ -453,7 +446,10 @@ export class BrowserHost {
       if (revision !== tab.revision) {
         throw new Error("Stale browser references. Take a fresh snapshot before acting.");
       }
-      const target = "ref" in action ? ({ kind: "ref", ref: action.ref, revision } as const) : undefined;
+      const target =
+        action.type === "click" || action.type === "type"
+          ? ({ kind: "ref", ref: action.ref, revision } as const)
+          : undefined;
       const deadline = Date.now() + 10_000;
       try {
         const dispatch = async (): Promise<void> => {
@@ -564,11 +560,12 @@ export class BrowserHost {
     hooks: BrowserDynamicToolHooks = {},
   ): Promise<DynamicToolResult> {
     try {
-      const args = parseBrowserToolArguments(params.tool, params.arguments);
-      this.#beginControl(params, args);
-      switch (params.tool) {
+      const call = parseBrowserToolCall(params.tool, params.arguments);
+      this.#beginControl(params, call);
+      switch (call.tool) {
         case "open": {
-          const url = requiredString(args, "url", INPUT_LIMITS.browserUrl);
+          const { args } = call;
+          const url = args.url;
           const tab = await this.open(url, params.threadId, params.ownerAgentId ?? null);
           this.#updateControlTab(params, tab.id);
           return textResult({ tab });
@@ -591,9 +588,10 @@ export class BrowserHost {
           return textResult({ tabs, activeTabId, control });
         }
         case "snapshot": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
+          const { args } = call;
+          const tabId = args.tabId;
           this.#requireToolTab(params, tabId);
-          const mode = parseImageMode(args.image);
+          const mode = args.image ?? "auto";
           const capture = await this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
             const result = await this.#readSnapshot(tab, tab.revision + 1, keepQueueBlocked);
             const includeImage = mode === "always" || (mode === "auto" && result.recommendImage);
@@ -608,12 +606,13 @@ export class BrowserHost {
           return this.#snapshotResult(capture.result, mode, capture.imageUrl);
         }
         case "navigate": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
+          const { args } = call;
+          const tabId = args.tabId;
           this.#requireToolTab(params, tabId);
-          const url = optionalString(args, "url", INPUT_LIMITS.browserUrl);
-          const direction = optionalEnum(args, "direction", ["back", "forward", "reload"] as const);
+          const url = args.url;
+          const direction = args.direction;
           if (!url && !direction) throw new Error("navigate requires url or direction.");
-          const timeoutMs = readTimeout(args, 30_000);
+          const timeoutMs = browserToolTimeout(args.timeoutMs);
           return textResult(
             await this.#runAction(
               tabId,
@@ -650,177 +649,42 @@ export class BrowserHost {
             ),
           );
         }
-        case "click": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
-          this.#requireToolTab(params, tabId);
-          const target = parseTarget(args.target);
-          return textResult(
-            await this.#runAction(
-              tabId,
-              "click",
-              target,
-              (tab, deadline, markDispatched) =>
-                tab.engine.click(
-                  target,
-                  {
-                    button: optionalEnum(args, "button", ["left", "middle", "right"] as const),
-                    clickCount: optionalNumber(args, "clickCount"),
-                    modifiers: optionalStringArray(args, "modifiers", 4),
-                  },
-                  deadline,
-                  markDispatched,
-                ),
-              readTimeout(args),
-            ),
-          );
-        }
-        case "type": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
-          this.#requireToolTab(params, tabId);
-          const target = parseTarget(args.target);
-          const text = stringValue(args, "text", INPUT_LIMITS.browserActionText);
-          const mode = optionalEnum(args, "mode", ["replace", "append"] as const) ?? "replace";
-          return textResult(
-            await this.#runAction(
-              tabId,
-              "type",
-              target,
-              async (tab, deadline, markDispatched) => {
-                await tab.engine.type(target, text, { mode, submit: args.submit === true }, deadline, markDispatched);
-              },
-              readTimeout(args),
-            ),
-          );
-        }
-        case "press": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
-          this.#requireToolTab(params, tabId);
-          const target = args.target === undefined ? undefined : parseTarget(args.target);
-          const key = requiredString(args, "key", 128);
-          return textResult(
-            await this.#runAction(
-              tabId,
-              "press",
-              target,
-              (tab, deadline, markDispatched) => tab.engine.press(key, target, deadline, markDispatched),
-              readTimeout(args),
-            ),
-          );
-        }
-        case "hover": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
-          this.#requireToolTab(params, tabId);
-          const target = parseTarget(args.target);
-          return textResult(
-            await this.#runAction(
-              tabId,
-              "hover",
-              target,
-              (tab, deadline, markDispatched) => tab.engine.hover(target, deadline, markDispatched),
-              readTimeout(args),
-            ),
-          );
-        }
-        case "scroll": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
-          this.#requireToolTab(params, tabId);
-          const target = args.target === undefined ? undefined : parseTarget(args.target);
-          const deltaX = optionalNumber(args, "deltaX") ?? 0;
-          const deltaY = optionalNumber(args, "deltaY") ?? 0;
-          if (deltaX === 0 && deltaY === 0) throw new Error("scroll requires deltaX or deltaY.");
-          return textResult(
-            await this.#runAction(
-              tabId,
-              "scroll",
-              target,
-              (tab, deadline, markDispatched) => tab.engine.scroll(target, deltaX, deltaY, deadline, markDispatched),
-              readTimeout(args),
-            ),
-          );
-        }
-        case "select_option": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
-          this.#requireToolTab(params, tabId);
-          const target = parseTarget(args.target);
-          const values = requiredStringArray(args, "values", 100, 1_000, "allow-empty");
-          return textResult(
-            await this.#runAction(
-              tabId,
-              "select-option",
-              target,
-              (tab, deadline, markDispatched) => tab.engine.selectOption(target, values, deadline, markDispatched),
-              readTimeout(args),
-            ),
-          );
-        }
-        case "set_checked": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
-          this.#requireToolTab(params, tabId);
-          const target = parseTarget(args.target);
-          const checked = requiredBoolean(args, "checked");
-          return textResult(
-            await this.#runAction(
-              tabId,
-              "set-checked",
-              target,
-              (tab, deadline, markDispatched) => tab.engine.setChecked(target, checked, deadline, markDispatched),
-              readTimeout(args),
-            ),
-          );
-        }
-        case "drag": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
-          this.#requireToolTab(params, tabId);
-          const source = parseTarget(args.source);
-          const target = parseTarget(args.target);
-          return textResult(
-            await this.#runAction(
-              tabId,
-              "drag",
-              source,
-              (tab, deadline, markDispatched) => tab.engine.drag(source, target, deadline, markDispatched),
-              readTimeout(args),
-            ),
-          );
-        }
+        case "click":
+        case "type":
+        case "press":
+        case "hover":
+        case "scroll":
+        case "select_option":
+        case "set_checked":
+        case "drag":
         case "upload_files": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
-          this.#requireToolTab(params, tabId);
-          const target = parseTarget(args.target);
-          const paths = requiredStringArray(args, "paths", INPUT_LIMITS.attachments, INPUT_LIMITS.path, "reject-empty");
+          this.#requireToolTab(params, call.args.tabId);
+          const action = browserInputAction(call, hooks);
           return textResult(
             await this.#runAction(
-              tabId,
-              "upload-files",
-              target,
-              async (tab, deadline, markDispatched) => {
-                const assignment = await tab.engine.uploadFiles(
-                  target,
-                  paths,
-                  (resolved) => hooks.onUploadTargetResolved?.(resolved.inputId, resolved.documentId),
-                  deadline,
-                  markDispatched,
-                );
-                hooks.onUploadAssigned?.(assignment.inputId, assignment.documentId);
-              },
-              readTimeout(args),
-              hooks.onUploadOperationStarted,
+              call.args.tabId,
+              action.name,
+              action.target,
+              (tab, deadline, markDispatched) => action.run(tab.engine, deadline, markDispatched),
+              browserToolTimeout(call.args.timeoutMs),
+              call.tool === "upload_files" ? hooks.onUploadOperationStarted : undefined,
             ),
           );
         }
         case "wait_for": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
+          const { args } = call;
+          const tabId = args.tabId;
           this.#requireToolTab(params, tabId);
-          const target = args.target === undefined ? undefined : parseTarget(args.target);
+          const target = args.target;
           const condition = {
             target,
-            text: optionalString(args, "text", 2_000),
-            url: optionalString(args, "url", INPUT_LIMITS.browserUrl),
-            state: optionalEnum(args, "state", ["load", "domcontentloaded", "dom-quiet"] as const),
+            text: args.text,
+            url: args.url,
+            state: args.state,
           };
           if (!condition.target && !condition.text && !condition.url && !condition.state)
             throw new Error("wait_for requires a condition.");
-          const timeoutMs = readTimeout(args, 30_000);
+          const timeoutMs = browserToolTimeout(args.timeoutMs);
           return textResult(
             await this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
               const timeoutMessage = "Browser wait condition timed out.";
@@ -848,19 +712,22 @@ export class BrowserHost {
           );
         }
         case "evaluate": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
+          const { args } = call;
+          const tabId = args.tabId;
           this.#requireToolTab(params, tabId);
-          const expression = requiredString(args, "expression", 64_000);
-          if (!expression.trim()) throw new Error("expression must not be blank.");
-          const awaitPromise = args.awaitPromise === undefined ? true : requiredBoolean(args, "awaitPromise");
-          return textResult(await this.#runEvaluation(tabId, expression, awaitPromise, readTimeout(args)));
+          const expression = args.expression;
+          const awaitPromise = args.awaitPromise ?? true;
+          return textResult(
+            await this.#runEvaluation(tabId, expression, awaitPromise, browserToolTimeout(args.timeoutMs)),
+          );
         }
         case "set_environment": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
+          const { args } = call;
+          const tabId = args.tabId;
           this.#requireToolTab(params, tabId);
           return textResult(
             await this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
-              const environment = parseEnvironment(args, tab.environment, tab.view.getBounds());
+              const environment = resolveEnvironment(args, tab.environment, tab.view.getBounds());
               // This also bounds the engine's rollback if applying the environment fails.
               await this.#boundEngineOperation(
                 tab,
@@ -877,31 +744,36 @@ export class BrowserHost {
           );
         }
         case "recording_start": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
+          const { args } = call;
+          const tabId = args.tabId;
           this.#requireToolTab(params, tabId);
           await this.#enqueue(tabId, (tab) => this.#recorder.start(tabId, tab.view.webContents));
           return textResult({ recording: true, tabId, limits: { durationMs: 300_000, bytes: 104_857_600 } });
         }
         case "recording_stop": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
+          const { args } = call;
+          const tabId = args.tabId;
           this.#requireToolTab(params, tabId);
           return textResult({ artifact: await this.#enqueue(tabId, () => this.#recorder.stop(tabId)) });
         }
         case "act": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
+          const { args } = call;
+          const tabId = args.tabId;
           this.#requireToolTab(params, tabId);
-          const revision = requiredNumber(args, "revision");
-          const action = parseAction(args.action);
+          const revision = args.revision;
+          const action = args.action;
           return textResult(await this.act(tabId, revision, action));
         }
         case "screenshot": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
+          const { args } = call;
+          const tabId = args.tabId;
           this.#requireToolTab(params, tabId);
           const imageUrl = await this.screenshot(tabId);
           return { success: true, contentItems: [{ type: "inputImage", imageUrl }] };
         }
         case "close_tab": {
-          const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
+          const { args } = call;
+          const tabId = args.tabId;
           if (this.#tabs.has(tabId)) this.#requireToolTab(params, tabId);
           await this.close(tabId);
           return textResult({ closed: true });
@@ -913,7 +785,7 @@ export class BrowserHost {
           // been asked for control when nobody was.
           throw new Error("Browser takeover is handled by the agent service, not the browser host.");
         default:
-          throw new Error(`Unknown browser tool: ${params.tool}`);
+          return call satisfies never;
       }
     } catch (error) {
       return {
@@ -930,10 +802,10 @@ export class BrowserHost {
 
   async resolveUploadTarget(params: DynamicToolCallParams): Promise<BrowserUploadAssignment> {
     const args = parseBrowserToolArguments("upload_files", params.arguments);
-    const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
+    const tabId = args.tabId;
     this.#requireToolTab(params, tabId);
-    const target = parseTarget(args.target);
-    const timeoutMs = readTimeout(args);
+    const target = args.target;
+    const timeoutMs = browserToolTimeout(args.timeoutMs);
     return this.#enqueue(tabId, (tab, keepQueueBlocked) =>
       // This preflight scans every frame for the input, so an unresponsive one holds it open exactly
       // as it would the upload itself -- and it is queued ahead of that bounded upload, so without a
@@ -1592,7 +1464,7 @@ export class BrowserHost {
     for (const listener of this.#listeners) listener(tabs, this.#activeTabId);
   }
 
-  #beginControl(params: DynamicToolCallParams, args: DynamicRecord): void {
+  #beginControl(params: DynamicToolCallParams, call: BrowserToolCall): void {
     const id = controlSessionId(params.threadId, params.turnId);
     const timer = this.#controlTimers.get(id);
     if (timer) clearTimeout(timer);
@@ -1603,8 +1475,8 @@ export class BrowserHost {
       threadId: params.threadId,
       turnId: params.turnId,
       callId: params.callId,
-      tabId: isString(args.tabId) ? args.tabId : null,
-      action: browserControlAction(params.tool, args),
+      tabId: "tabId" in call.args ? call.args.tabId : null,
+      action: browserControlAction(call),
       detailAction: browserControlDetailAction(params.tool),
       phase: "acting",
       startedAt: previous?.startedAt ?? new Date().toISOString(),
@@ -1692,8 +1564,8 @@ function restoreWebContentsFocus(previous: WebContents | null, controlled: WebCo
   }
 }
 
-function browserControlAction(tool: string, args: DynamicRecord): BrowserControlAction {
-  switch (tool) {
+function browserControlAction(call: BrowserToolCall): BrowserControlAction {
+  switch (call.tool) {
     case "open":
       return "open";
     case "list_tabs":
@@ -1707,9 +1579,9 @@ function browserControlAction(tool: string, args: DynamicRecord): BrowserControl
     case "status":
       return "list-tabs";
     case "navigate":
-      if (args.direction === "back") return "back";
-      if (args.direction === "forward") return "forward";
-      if (args.direction === "reload") return "reload";
+      if (call.args.direction === "back") return "back";
+      if (call.args.direction === "forward") return "forward";
+      if (call.args.direction === "reload") return "reload";
       return "open";
     case "click":
       return "click";
@@ -1739,21 +1611,8 @@ function browserControlAction(tool: string, args: DynamicRecord): BrowserControl
       return "screenshot";
     case "recording_stop":
       return "screenshot";
-    case "act": {
-      const action = isRecord(args.action) ? args.action.type : null;
-      if (
-        action === "click" ||
-        action === "type" ||
-        action === "key" ||
-        action === "scroll" ||
-        action === "back" ||
-        action === "forward" ||
-        action === "reload"
-      ) {
-        return action;
-      }
-      return "snapshot";
-    }
+    case "act":
+      return call.args.action.type;
     default:
       return "snapshot";
   }
@@ -1941,22 +1800,22 @@ function readConsoleMessage(args: unknown[]): BrowserConsoleMessageDetails | nul
   };
 }
 
-function parseEnvironment(
-  value: DynamicRecord,
+function resolveEnvironment(
+  value: BrowserToolArguments<"set_environment">,
   current: BrowserEnvironment,
   bounds: BrowserBounds,
 ): BrowserEnvironment {
-  const preset = optionalEnum(value, "preset", ["fill", "desktop", "tablet", "mobile", "custom"] as const);
+  const preset = value.preset;
   const presetSize = presetDimensions(preset);
   const explicitScale = value.deviceScaleFactor !== undefined;
   const scaleConvertsFill =
     explicitScale && (preset === "fill" || (preset === undefined && current.viewport.mode === "fill"));
   const requestedWidth =
-    optionalNumber(value, "width") ??
+    value.width ??
     presetSize?.width ??
     (preset === "fill" || scaleConvertsFill ? bounds.width : current.viewport.width);
   const requestedHeight =
-    optionalNumber(value, "height") ??
+    value.height ??
     presetSize?.height ??
     (preset === "fill" || scaleConvertsFill ? bounds.height : current.viewport.height);
   const width = Math.round(requestedWidth);
@@ -1979,9 +1838,7 @@ function parseEnvironment(
   }
   // Fill clears the device metrics override, so it cannot inherit a custom emulation scale.
   const scale =
-    mode === "fill"
-      ? 1
-      : (optionalNumber(value, "deviceScaleFactor") ?? presetSize?.scale ?? current.viewport.deviceScaleFactor);
+    mode === "fill" ? 1 : (value.deviceScaleFactor ?? presetSize?.scale ?? current.viewport.deviceScaleFactor);
   if (scale < 0.5 || scale > 4) throw new Error("deviceScaleFactor must be between 0.5 and 4.");
   if (!isSafeViewportSize(width, height, scale)) {
     throw new Error(`The physical viewport must not exceed ${MAX_PHYSICAL_VIEWPORT_PIXELS.toLocaleString()} pixels.`);
@@ -2000,8 +1857,8 @@ function parseEnvironment(
       deviceScaleFactor: scale,
       preset: resolvedPreset,
     },
-    colorScheme: optionalEnum(value, "colorScheme", ["light", "dark", "system"] as const) ?? current.colorScheme,
-    reducedMotion: value.reducedMotion === undefined ? current.reducedMotion : requiredBoolean(value, "reducedMotion"),
+    colorScheme: value.colorScheme ?? current.colorScheme,
+    reducedMotion: value.reducedMotion ?? current.reducedMotion,
   };
 }
 
@@ -2020,12 +1877,6 @@ function boundedCaptureDataUrl(image: NativeImage): string {
     .toDataURL();
 }
 
-function parseTarget(value: unknown): BrowserTarget {
-  const parsed = browserTargetSchema.safeParse(value);
-  if (!parsed.success) throw new Error(`Invalid browser target: ${parsed.error.issues[0]?.message ?? "unknown error"}`);
-  return parsed.data;
-}
-
 function describeBrowserTarget(target: BrowserTarget): string {
   switch (target.kind) {
     case "ref":
@@ -2041,54 +1892,6 @@ function describeBrowserTarget(target: BrowserTarget): string {
   }
 }
 
-function parseImageMode(value: unknown): BrowserImageMode {
-  return value === undefined
-    ? "auto"
-    : (optionalEnum({ value }, "value", ["auto", "always", "never"] as const) ?? "auto");
-}
-
-function readTimeout(value: DynamicRecord, maximum = 30_000): number {
-  const timeout = optionalNumber(value, "timeoutMs") ?? Math.min(maximum, 10_000);
-  if (!Number.isInteger(timeout) || timeout < 0 || timeout > maximum)
-    throw new Error(`timeoutMs must be between 0 and ${maximum}.`);
-  return Math.max(1, timeout);
-}
-
-function optionalString(value: DynamicRecord, key: string, maxLength: number): string | undefined {
-  if (value[key] === undefined) return undefined;
-  return requiredString(value, key, maxLength);
-}
-
-function stringValue(value: DynamicRecord, key: string, maxLength: number): string {
-  const raw = value[key];
-  if (!isString(raw)) throw new Error(`${key} must be a string.`);
-  if (raw.length > maxLength) throw new Error(`${key} is too long.`);
-  return raw;
-}
-
-function optionalNumber(value: DynamicRecord, key: string): number | undefined {
-  if (value[key] === undefined) return undefined;
-  return requiredNumber(value, key);
-}
-
-function requiredBoolean(value: DynamicRecord, key: string): boolean {
-  if (!isBoolean(value[key])) throw new Error(`${key} must be a boolean.`);
-  return value[key];
-}
-
-function optionalEnum<const T extends readonly string[]>(
-  value: DynamicRecord,
-  key: string,
-  options: T,
-): T[number] | undefined {
-  const raw = value[key];
-  if (raw === undefined) return undefined;
-  if (!isString(raw)) throw new Error(`${key} must be one of: ${options.join(", ")}.`);
-  const match = options.find((option) => option === raw);
-  if (match === undefined) throw new Error(`${key} must be one of: ${options.join(", ")}.`);
-  return match;
-}
-
 function presetDimensions(preset: "fill" | "desktop" | "tablet" | "mobile" | "custom" | undefined) {
   switch (preset) {
     case "desktop":
@@ -2100,33 +1903,6 @@ function presetDimensions(preset: "fill" | "desktop" | "tablet" | "mobile" | "cu
     default:
       return null;
   }
-}
-
-/**
- * The empty string is a value for one of these lists and not the other. `<option value="">` is how a
- * page spells "no selection", and an unlabelled one cannot be addressed by label either, so rejecting
- * it puts a real option out of reach. An empty path is never a file.
- */
-function requiredStringArray(
-  value: DynamicRecord,
-  key: string,
-  maximum: number,
-  maxLength: number,
-  empty: "allow-empty" | "reject-empty",
-): string[] {
-  const raw = value[key];
-  if (!Array.isArray(raw) || raw.length === 0 || raw.length > maximum)
-    throw new Error(`${key} must contain between 1 and ${maximum} strings.`);
-  return raw.map((entry) => {
-    if (!isString(entry) || entry.length > maxLength || (!entry && empty === "reject-empty"))
-      throw new Error(`${key} contains an invalid string.`);
-    return entry;
-  });
-}
-
-function optionalStringArray(value: DynamicRecord, key: string, maximum: number): string[] | undefined {
-  if (value[key] === undefined) return undefined;
-  return requiredStringArray(value, key, maximum, 64, "reject-empty");
 }
 
 function navigateHistory(contents: WebContents, direction: BrowserNavigationDirection): boolean {
@@ -2224,44 +2000,6 @@ async function navigateAndWait(
       finish(error);
     }
   });
-}
-
-function parseAction(value: unknown): BrowserAction {
-  if (!isRecord(value) || !isString(value.type)) throw new Error("Invalid browser action.");
-  switch (value.type) {
-    case "click":
-      return { type: "click", ref: requiredString(value, "ref", INPUT_LIMITS.identifier) };
-    case "type":
-      return {
-        type: "type",
-        ref: requiredString(value, "ref", INPUT_LIMITS.identifier),
-        text: requiredString(value, "text", INPUT_LIMITS.browserActionText),
-        submit: value.submit === true,
-      };
-    case "key":
-      return { type: "key", key: requiredString(value, "key", 32) };
-    case "scroll":
-      return { type: "scroll", deltaY: requiredNumber(value, "deltaY") };
-    case "back":
-    case "forward":
-    case "reload":
-      return { type: value.type };
-    default:
-      throw new Error(`Unknown browser action: ${value.type}`);
-  }
-}
-
-function requiredString(value: DynamicRecord, key: string, maxLength: number): string {
-  if (!isString(value[key]) || !value[key].trim()) throw new Error(`${key} is required.`);
-  if (value[key].length > maxLength) throw new Error(`${key} is too long.`);
-  return value[key];
-}
-
-function requiredNumber(value: DynamicRecord, key: string): number {
-  if (!isNumber(value[key]) || !Number.isFinite(value[key])) {
-    throw new Error(`${key} must be a number.`);
-  }
-  return value[key];
 }
 
 function textResult(value: unknown): DynamicToolResult {

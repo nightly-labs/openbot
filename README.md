@@ -156,9 +156,10 @@ Use `bun run dev:seed --dry-run` to inspect the target and fixture counts withou
 | `bun run storybook` | Start Storybook on a port allocated through the same registry, so two worktrees never announce one port. `OPENBOT_STORYBOOK_PORT` moves where the search starts; `--port` is refused. |
 | `bun run dev:automation` | Drive the running dev app over CDP: `instances`, `pages`, `snapshot`, `screenshot`, `click`/`type` by accessible role. `--page=<target-id\|url-substring>` aims at any window, including embedded browser views; `--wait-for=<role>,<name>` settles on an accessible target instead of polling; mutations need `--allow-mutations` and a named instance (this worktree's record, `--instance=<id>` or `--port=`). |
 | `bun run check` | Run Biome, both typechecks, offline tests, the browser smoke test, and the production build. |
+| `bun run typecheck` | Check all 11 projects in parallel with a separate incremental cache for each project in this worktree. |
 | `bun run check:ui` | Check the renderer against the design system: shared primitives, Kobalte and Lucide confined to `components/ui`, palette tokens instead of colour, size, radius and transition literals. Reads the whole renderer in 60 ms. |
 | `bun run test:backend` | Run backend tests only. |
-| `bun run test:browser` | Run the local embedded-browser smoke test. |
+| `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, or `--scenario=evaluation` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
 | `bun run package` | Build an unpacked local ARM64 application. |
 | `bun run package:verify` | Build and verify the real ARM64 app bundle, icon, metadata, ASAR, and fuses. |
@@ -229,6 +230,15 @@ Cloudflare Workers
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for dependency direction, state ownership, and
 rules for new modules.
+
+## Chat attachments
+
+Attach MP3 audio and MOV video through the file picker or drag and drop. The limits are 100 MB per
+file, 250 MB per message, and 10 files per message. OpenBot gives the agent the original file; it does
+not play, decode, transcribe, or validate the recording during import. Damaged recordings can be
+attached for inspection. Analysis depends on the tools available to the agent. For other audio or
+video formats, export as MP3 or MOV, or attach a text transcript. Remote hosts must advertise the
+`media-attachments` capability; update the host if this feature is unavailable.
 
 ## Local data and network boundaries
 

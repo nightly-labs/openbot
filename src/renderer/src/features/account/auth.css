@@ -848,6 +848,13 @@
   accent-color: var(--openbot-text-primary);
 }
 
+/* The actions share the grid cell the row reserves for them. In this variant the buttons carry
+   their own trailing margin, which both separates them and holds the last one off the edge. */
+.provider-picker-actions {
+  display: flex;
+  align-items: center;
+}
+
 .ui-button.provider-picker-install {
   min-width: 58px;
   min-height: 28px;
@@ -923,6 +930,33 @@
   color: var(--openbot-text-readable);
 }
 
+/* The version and the status badge, in the one cell the row's last column reserves. They are read
+   together - "v2.1.246" and "Ready" answer one question between them - and a shared cell keeps a
+   provider with no version to report from leaving a gap where the badge used to sit. */
+.provider-picker-state {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The installed version. Muted, because it answers a question a user asks once and then stops
+   asking, and tabular so that a version which changes under a running update replaces itself
+   without shifting the badge beside it. */
+.provider-picker-version {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-picker-option-selected .provider-picker-version {
+  color: var(--openbot-text-readable);
+}
+
 .provider-picker-status {
   display: flex;
   align-items: center;
@@ -938,7 +972,8 @@
 }
 
 .provider-picker-status-sign-in-required,
-.provider-picker-status-outdated {
+.provider-picker-status-outdated,
+.provider-picker-status-update-available {
   color: var(--openbot-warning);
 }
 
@@ -973,7 +1008,8 @@
 }
 
 .provider-picker-status-sign-in-required i,
-.provider-picker-status-outdated i {
+.provider-picker-status-outdated i,
+.provider-picker-status-update-available i {
   background: var(--openbot-warning);
 }
 

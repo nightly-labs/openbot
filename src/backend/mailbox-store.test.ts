@@ -1,10 +1,10 @@
 // @vitest-environment node
 
-import { access, mkdir, mkdtemp, open, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, open, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_RUNTIME_TEXT_LIMIT,
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
@@ -474,6 +474,79 @@ describe("MailboxStore", () => {
     ).rejects.toThrow("installer.exe is not supported");
   });
 
+  it.each([
+    ["recording.mp3", "audio/mpeg"],
+    ["Screen Recording.MOV", "video/quicktime"],
+  ])("preserves %s from paths and bytes for the agent without decoding media", async (name, mimeType) => {
+    // Deliberately damaged media is still useful to an agent asked to inspect or repair it.
+    const bytes = Buffer.from("truncated recording\0");
+    const sourcePath = join(root, name);
+    await writeFile(sourcePath, bytes);
+    const drafts = await store.prepareImportedAttachments([sourcePath], [{ name, mimeType: "image/png", bytes }]);
+    expect(drafts).toMatchObject([
+      { name, mimeType, kind: "file", previewKind: "none", size: bytes.length },
+      { name, mimeType, kind: "file", previewKind: "none", size: bytes.length },
+    ]);
+    const receipt = await store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Inspect this recording",
+      draftIds: drafts.map((draft) => draft.id),
+    });
+    await rm(sourcePath);
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    const delivery = restored.getDelivery(receipt.deliveries[0].id);
+    expect(delivery?.managedAttachments).toHaveLength(2);
+    for (const attachment of delivery?.managedAttachments ?? []) {
+      await expect(readFile(attachment.path)).resolves.toEqual(bytes);
+    }
+  });
+
+  it.each(["mp3", "mov"])("rejects oversized %s recordings before copying them", async (extension) => {
+    const path = join(root, `large.${extension}`);
+    const file = await open(path, "w");
+    await file.truncate(ATTACHMENT_LIMITS.fileBytes + 1);
+    await file.close();
+    await expect(store.prepareAttachments([path])).rejects.toThrow("exceeds the 100 MB limit");
+  });
+
+  it("enforces byte-import and combined recording size limits", async () => {
+    await expect(
+      store.prepareImportedAttachments(
+        [],
+        [
+          {
+            name: "large.mp3",
+            mimeType: "audio/mpeg",
+            bytes: new Uint8Array(ATTACHMENT_LIMITS.fileBytes + 1),
+          },
+        ],
+      ),
+    ).rejects.toThrow("exceeds the 100 MB limit");
+    const bytes = new Uint8Array(ATTACHMENT_LIMITS.fileBytes);
+    await expect(
+      store.prepareImportedAttachments(
+        [],
+        [
+          { name: "first.mp3", mimeType: "audio/mpeg", bytes },
+          { name: "second.mov", mimeType: "video/quicktime", bytes },
+          { name: "third.mov", mimeType: "video/quicktime", bytes },
+        ],
+      ),
+    ).rejects.toThrow("Attachments exceed the 250 MB total limit.");
+    await expect(store.listExportAttachments()).resolves.toEqual([]);
+  });
+
+  it("gives an export alternative for unsupported media", async () => {
+    await expect(
+      store.prepareImportedAttachments(
+        [],
+        [{ name: "recording.avi", mimeType: "video/x-msvideo", bytes: new Uint8Array([1]) }],
+      ),
+    ).rejects.toThrow("For other audio or video formats, export as MP3 or MOV, or attach a text transcript.");
+  });
+
   it("imports pathless image bytes and accepts an attachment-only user message", async () => {
     const [draft] = await store.prepareImportedAttachments(
       [],
@@ -551,6 +624,47 @@ describe("MailboxStore", () => {
     await restored.initialize();
 
     await expect(restored.resolveAttachment(draft.id)).resolves.toBeNull();
+  });
+
+  it("rejects deliveries during deletion and permits new work after release", async () => {
+    const release = store.blockAgentDeliveries("chief");
+    await expect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "sales" },
+        recipientAgentIds: ["chief", "sales"],
+        text: "Work",
+      }),
+    ).rejects.toThrow("The recipient is being deleted.");
+    expect(store.listQueue("chief").deliveries).toEqual([]);
+    expect(store.listQueue("sales").deliveries).toEqual([]);
+    release();
+    await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Retry" });
+    expect(store.listQueue("chief").deliveries).toMatchObject([{ text: "Retry", status: "queued" }]);
+  });
+
+  it("rejects prepared attachments after deletion finishes without restoring deleted deliveries", async () => {
+    const source = join(root, "overlapping.txt");
+    await writeFile(source, "Keep this draft available for retry.");
+    const [draft] = await store.prepareAttachments([source]);
+    const sending = store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Overlapping delivery",
+      draftIds: [draft.id],
+    });
+    // Enqueue has reached asynchronous attachment preparation, but cannot insert yet.
+    const release = store.blockAgentDeliveries("chief");
+    const rejected = expect(sending).rejects.toThrow("The recipient is being deleted.");
+    release();
+    await rejected;
+    await store.deleteAgentData("chief");
+    await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["sales"], text: "Unrelated write" });
+    expect(store.listQueue("chief").deliveries).toEqual([]);
+    expect(await readdir(join(root, "Shared", "Transfers"))).toEqual([]);
+    await expect(store.resolveAttachment(draft.id)).resolves.toBeTruthy();
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    expect(restored.listQueue("chief").deliveries).toEqual([]);
   });
 
   it("removes deleted agent deliveries while preserving messages visible to other agents", async () => {

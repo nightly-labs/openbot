@@ -1,5 +1,6 @@
-import type { ConversationPage, DirectConversationSnapshot } from "@openbot/contracts/ipc";
+import type { ConversationPage, ConversationReadState, DirectConversationSnapshot } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
+import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
 import { AppProviders } from "./app-providers";
@@ -40,7 +41,7 @@ describe("OpenBot connected desktop shell", () => {
       const scope = useServerScope();
       return (
         <output aria-label="Unread replies">
-          {scope.loaded() ? (conversation.conversationReads().chief?.unreadCount ?? -1) : "Loading"}
+          {scope.loaded() ? (conversation.conversations.chief?.read?.unreadCount ?? -1) : "Loading"}
         </output>
       );
     }
@@ -160,7 +161,7 @@ describe("OpenBot connected desktop shell", () => {
             Load older agent messages
           </button>
           <output aria-label="agent read state">
-            {conversation.conversationReads().chief?.unreadCount ?? -1}|
+            {conversation.conversations.chief?.read?.unreadCount ?? -1}|
             {conversation
               .activeMessages()
               .map((message) => message.id)
@@ -215,6 +216,93 @@ describe("OpenBot connected desktop shell", () => {
       ),
     );
   });
+
+  it("can load older messages after a latest-page request replaces the pending page", async () => {
+    const page = testConversationPage("chief", [], {
+      pageInfo: { hasOlder: true, olderCursor: "older" },
+    });
+    const older = Promise.withResolvers<ConversationPage>();
+    const readOlder = vi.fn().mockReturnValue(older.promise);
+    vi.mocked(window.openbot.agent.readConversationPage).mockImplementation(async (input) =>
+      input.anchor?.type === "before" ? readOlder() : page,
+    );
+    let conversation: ReturnType<typeof useConversation> | undefined;
+    function Probe() {
+      conversation = useConversation();
+      const scope = useServerScope();
+      return <output aria-label="Conversation loaded">{scope.loaded() ? "Ready" : "Loading"}</output>;
+    }
+    render(() => (
+      <AppProviders>
+        <Probe />
+      </AppProviders>
+    ));
+    await waitFor(() => expect(screen.getByRole("status", { name: "Conversation loaded" })).toHaveTextContent("Ready"));
+    const pendingOlder = conversation?.loadOlderAgentMessages("chief");
+    await waitFor(() => expect(readOlder).toHaveBeenCalledOnce());
+    await conversation?.loadLatestAgentMessages("chief");
+    older.resolve(page);
+    await pendingOlder;
+    flush();
+    readOlder.mockResolvedValue(
+      testConversationPage("chief", [
+        {
+          id: "earlier-reply",
+          author: "assistant",
+          text: "Earlier reply",
+          createdAt: "2026-08-30T02:00:00.000Z",
+          status: "completed",
+        },
+      ]),
+    );
+    await conversation?.loadOlderAgentMessages("chief");
+    flush();
+    expect(conversation?.conversations.chief?.messages.map((message) => message.id)).toContain("earlier-reply");
+  });
+
+  it.each(["resolve", "reject"] as const)(
+    "does not restore a removed conversation when its pending read and older page %s",
+    async (outcome) => {
+      const page = testConversationPage("chief", [], {
+        pageInfo: { hasOlder: true, olderCursor: "older" },
+      });
+      const older = Promise.withResolvers<ConversationPage>();
+      const read = Promise.withResolvers<ConversationReadState>();
+      vi.mocked(window.openbot.agent.readConversationPage).mockImplementation(async (input) =>
+        input.anchor?.type === "before" ? older.promise : page,
+      );
+      vi.mocked(window.openbot.agent.markConversationRead).mockReturnValue(read.promise);
+      let conversation: ReturnType<typeof useConversation> | undefined;
+      function Probe() {
+        conversation = useConversation();
+        const scope = useServerScope();
+        return (
+          <output aria-label="Cached conversations">
+            {scope.loaded() ? Object.keys(conversation.conversations).join(",") || "Empty" : "Loading"}
+          </output>
+        );
+      }
+      render(() => (
+        <AppProviders>
+          <Probe />
+        </AppProviders>
+      ));
+      await waitFor(() =>
+        expect(screen.getByRole("status", { name: "Cached conversations" })).toHaveTextContent("chief"),
+      );
+      const pendingOlder = conversation?.loadOlderAgentMessages("chief");
+      const pendingRead = conversation?.markAgentMessagesRead("chief", "reply");
+      await waitFor(() => expect(window.openbot.agent.markConversationRead).toHaveBeenCalled());
+      flush(() => conversation?.removeConversation("chief"));
+      expect(screen.getByRole("status", { name: "Cached conversations" })).toHaveTextContent("Empty");
+      if (outcome === "resolve") older.resolve(page);
+      else older.reject(new Error("The conversation was removed."));
+      read.resolve({ unreadCount: 0, firstUnreadMessageId: null, throughMessageId: "reply" });
+      await Promise.all([pendingOlder, pendingRead]);
+      flush();
+      expect(screen.getByRole("status", { name: "Cached conversations" })).toHaveTextContent("Empty");
+    },
+  );
 
   it("does not persist a redundant read for an already-read refreshed page", async () => {
     render(() => <App />);

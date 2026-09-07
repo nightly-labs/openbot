@@ -138,8 +138,15 @@ export class RemoteScreenGateway {
     if (this.#sessions.size >= REMOTE_DESKTOP_MAX_SESSIONS) {
       throw new RemoteScreenError(429, "session_capacity_reached", "The host already has four active sessions.");
     }
-    if (!this.#options.runtimePaths || this.#options.platform === "linux") {
-      throw new RemoteScreenError(503, "host_unavailable", "The Sunshine and Moonlight Web runtime is not installed.");
+    if (this.#options.platform === "linux") {
+      throw new RemoteScreenError(503, "host_unavailable", "Remote desktop hosting is not supported on Linux.");
+    }
+    if (!this.#options.runtimePaths) {
+      throw new RemoteScreenError(
+        503,
+        "host_unavailable",
+        "The Sunshine and Moonlight Web runtime is missing or is not supported on this host. Install the full OpenBot release on an Apple silicon Mac or Windows x64 host, then restart OpenBot.",
+      );
     }
     await this.#ensureRuntime();
     // The runtime starts and answers either way, so this is the only place the refusal can become a
