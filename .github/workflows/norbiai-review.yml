@@ -8,6 +8,13 @@ on:
   # code to satisfy it.
   issue_comment:
     types: [created]
+  # The other way past the fork token problem, and one click rather than a typed comment:
+  # a review submitted from this repository carries the write token a fork's push run
+  # cannot have. `commented` is deliberately not honoured below — submitting inline notes
+  # is not a request for a review — so the states that reach the gate are the two that are
+  # already a verdict on the pull request.
+  pull_request_review:
+    types: [submitted]
 
 concurrency:
   # A comment must never cancel a review, running or queued. Concurrency is resolved for the
@@ -20,7 +27,11 @@ concurrency:
   # each comment run gets a group of its own, where it can neither cancel nor be cancelled;
   # the reviews themselves still serialize on the self-hosted runner. Push runs keep the
   # shared group, where cancelling a review of superseded code is what we want.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event.comment.id }}
+  #
+  # A submitted-review run needs that same private group, and does not inherit it: its
+  # payload carries `pull_request`, so the number resolves and it would land in the shared
+  # push group, where the next push would cancel the recheck it asked for.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event.comment.id || github.event.review.id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -37,12 +48,16 @@ jobs:
     # below says, so it could review and then fail to publish either the comment or the
     # gate status — and nobody asked for it to try.
     #
-    # The comment path is an explicit request from someone who can already merge, so it runs
-    # on drafts and on forks too: `/norbiai review` means review it now. `issue_comment`
-    # fires in the base repository, which is what gives that path the write token the push
-    # path cannot have on a fork. `github.event.issue.pull_request` is what separates a pull
-    # request comment from an issue comment, and `author_association` is a cheap pre-filter
-    # that keeps a drive-by comment from reaching the permission lookup below.
+    # The comment and review paths are an explicit request from someone who can already
+    # merge, so they run on drafts and on forks too: `/norbiai review`, or an approval,
+    # means review it now. Both `issue_comment` and `pull_request_review` fire in the base
+    # repository, which is what gives them the write token the push path cannot have on a
+    # fork. `github.event.issue.pull_request` is what separates a pull request comment from
+    # an issue comment, and `author_association` is a cheap pre-filter that keeps a
+    # drive-by from reaching the permission lookup below.
+    #
+    # `review.state` is lower case in the webhook payload where the REST API spells it
+    # upper; `contains` compares strings case-insensitively, so the gate holds either way.
     if: >
       (github.event_name == 'pull_request' &&
         github.event.pull_request.head.repo.full_name == github.repository &&
@@ -50,18 +65,21 @@ jobs:
       (github.event_name == 'issue_comment' &&
         github.event.issue.pull_request != null &&
         contains(github.event.comment.body, '/norbiai review') &&
-        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request_review' &&
+        contains(fromJSON('["approved", "changes_requested"]'), github.event.review.state) &&
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.review.author_association))
 
     permissions:
       contents: read
 
     steps:
-      - name: Verify the commenter can merge
-        if: github.event_name == 'issue_comment'
+      - name: Verify the requester can merge
+        if: github.event_name != 'pull_request'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          COMMENTER: ${{ github.event.comment.user.login }}
+          REQUESTER: ${{ github.event.comment.user.login || github.event.review.user.login }}
         run: |
           set -euo pipefail
 
@@ -69,22 +87,22 @@ jobs:
           # with an unknown permission. `maintain` answers `write` here and `triage`
           # answers `read`, so `admin` and `write` are exactly the roles that can merge.
           if ! permission=$(
-            gh api "repos/${GITHUB_REPOSITORY}/collaborators/${COMMENTER}/permission" \
+            gh api "repos/${GITHUB_REPOSITORY}/collaborators/${REQUESTER}/permission" \
               --jq '.permission' 2>/dev/null
           ); then
-            echo "::error title=NorbiAI could not authorize the request::Could not read the repository permission of @${COMMENTER}."
+            echo "::error title=NorbiAI could not authorize the request::Could not read the repository permission of @${REQUESTER}."
             exit 1
           fi
 
           case "$permission" in
             admin | write) ;;
             *)
-              echo "::error title=NorbiAI ignored the request::@${COMMENTER} has ${permission:-no} access to ${GITHUB_REPOSITORY}. Only someone who can merge the pull request can ask for a finding to be rechecked."
+              echo "::error title=NorbiAI ignored the request::@${REQUESTER} has ${permission:-no} access to ${GITHUB_REPOSITORY}. Only someone who can merge the pull request can ask for a review or for a finding to be rechecked."
               exit 1
               ;;
           esac
 
-          echo "@${COMMENTER} has ${permission} access."
+          echo "@${REQUESTER} has ${permission} access."
 
   review:
     # Gated by `authorize`, which carries the event filter: a skipped or refused
@@ -105,19 +123,27 @@ jobs:
 
     env:
       PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
-      # Empty on a comment run. Both are SHAs, not free text.
-      EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      # Empty on a comment or review run, which resolves the pair from the API instead. A
+      # review payload does carry both, and honouring them would be wrong: they are the head
+      # as of the review, while the checkout below is the merge ref fetched now. A push
+      # landing in between would leave this run reviewing the superseded commit and
+      # publishing the gate status on it — and on a fork that push gets no run of its own to
+      # correct the newest commit. Both are SHAs, not free text.
+      EVENT_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+      EVENT_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
       STATUS_CONTEXT: NorbiAI review
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # A comment run has no pull request ref of its own and would land on the default
-          # branch, where neither the base nor the head commit need exist. The merge ref is
-          # what the push path already gets by default, and it reaches both parents.
-          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/merge', github.event.issue.number) || '' }}
+          # A comment or review run has no pull request ref of its own and would land on the
+          # default branch, where neither the base nor the head commit need exist. The merge
+          # ref is what the push path already gets by default, and it reaches both parents.
+          # Written as a negation so the push path keeps the empty default: an expression of
+          # the form `cond && '' || format(...)` picks the format branch every time, because
+          # the empty string is falsy.
+          ref: ${{ github.event_name != 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number || github.event.issue.number) || '' }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -179,6 +205,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TRIGGER_COMMENT_ID: ${{ github.event.comment.id }}
+          TRIGGER_REVIEW_ID: ${{ github.event.review.id }}
         run: |
           set -euo pipefail
 
@@ -343,6 +370,37 @@ jobs:
               }
             ' "$responses_raw" > "$responses_file"
           fi
+
+          # A review run's request is the review body, and a review is not an issue comment,
+          # so none of the lookups above can see it: without this, approving with a rebuttal
+          # written in it asks for a recheck and hands the reviewer no argument. Prepending
+          # keeps the promise the comment path makes — the request that asked for this review
+          # comes first and whole. `authorize` already proved this author can merge, and an
+          # approval with no body adds nothing rather than an empty block. Digits only, so
+          # the id can only ever be an id, and the body goes to a file so nothing in it has
+          # to survive a delimiter.
+          case "${TRIGGER_REVIEW_ID:-}" in
+            "") ;;
+            *[!0-9]*)
+              echo "::warning title=NorbiAI ignored a malformed review id::Not reading the triggering review"
+              ;;
+            *)
+              trigger_review="$RUNNER_TEMP/norbiai-trigger-review.txt"
+              if ! gh api \
+                "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews/${TRIGGER_REVIEW_ID}" \
+                --jq 'if (.body // "" | test("\\S"))
+                  then "### @\(.user.login) at \(.submitted_at)\n\(.body)\n"
+                  else "" end' > "$trigger_review" 2>/dev/null
+              then
+                echo "::warning title=NorbiAI request unavailable::Could not read the review that asked for this run"
+              elif grep -q '[^[:space:]]' "$trigger_review"; then
+                combined="$RUNNER_TEMP/norbiai-author-responses-combined.txt"
+                head -c 20000 "$trigger_review" > "$combined"
+                cat "$responses_file" >> "$combined"
+                mv "$combined" "$responses_file"
+              fi
+              ;;
+          esac
 
           {
             echo "previous_file=$previous_file"
