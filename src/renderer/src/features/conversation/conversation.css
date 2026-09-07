@@ -1223,8 +1223,10 @@
 }
 
 .agent-settings-field textarea {
+  field-sizing: content;
   min-height: 88px;
-  resize: none;
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 .agent-settings-field input::placeholder,
@@ -3225,165 +3227,6 @@
 
 .message-reaction-pill:focus-visible {
   outline: none;
-}
-
-.thinking-entry {
-  width: 100%;
-}
-
-.thinking-entry-animated {
-  opacity: 0;
-  animation: message-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) forwards;
-}
-
-.thinking-disclosure {
-  width: min(620px, 88%);
-}
-
-.thinking-summary {
-  display: inline-flex;
-  height: auto;
-  min-height: 28px;
-  align-items: center;
-  gap: 6px;
-  border: 0;
-  border-radius: var(--openbot-radius-md);
-  background: none;
-  padding: 4px 7px 4px 5px;
-  color: var(--openbot-text-muted);
-  cursor: pointer;
-  font-size: var(--openbot-text-sm);
-  line-height: 18px;
-  user-select: none;
-  transition:
-    background var(--openbot-duration-hover) ease,
-    color var(--openbot-duration-hover) ease;
-}
-
-.thinking-summary:hover,
-.thinking-summary:focus-visible,
-.thinking-disclosure[data-expanded="true"] .thinking-summary {
-  background: var(--openbot-hover);
-  color: var(--openbot-text-secondary);
-  outline: none;
-}
-
-.thinking-mark,
-.thinking-chevron {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 14px;
-  stroke-width: var(--openbot-icon-stroke);
-}
-
-.thinking-label {
-  white-space: nowrap;
-}
-
-/* The sweep marks live reasoning; it settles into flat text the moment the agent answers. */
-.thinking-label[data-working="true"] {
-  background: linear-gradient(
-    90deg,
-    var(--openbot-text-muted) 35%,
-    var(--openbot-text-primary) 50%,
-    var(--openbot-text-muted) 65%
-  );
-  background-clip: text;
-  background-size: 200% 100%;
-  color: transparent;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: thinking-label-shimmer 1.4s linear infinite;
-}
-
-.thinking-label[data-working="false"] {
-  animation: thinking-label-settle var(--openbot-duration-normal) ease-out both;
-}
-
-.thinking-chevron {
-  margin-left: -2px;
-  transition: transform var(--openbot-duration-normal) ease;
-}
-
-.thinking-disclosure[data-expanded="true"] .thinking-chevron {
-  transform: rotate(180deg);
-}
-
-.thinking-panel {
-  display: grid;
-  grid-template-rows: 0fr;
-  opacity: 0;
-  transition:
-    grid-template-rows var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1),
-    opacity var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.thinking-disclosure[data-expanded="true"] .thinking-panel {
-  grid-template-rows: 1fr;
-  opacity: 1;
-}
-
-.thinking-panel-clip {
-  overflow: hidden;
-}
-
-.thinking-details {
-  position: relative;
-  margin: 3px 0 4px 12px;
-  padding: 3px 0 3px 13px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: 18px;
-}
-
-.thinking-details::before {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  background: var(--openbot-border);
-  content: "";
-  inline-size: 1px;
-}
-
-.thinking-step {
-  margin: 0;
-  white-space: pre-line;
-  animation: thinking-step-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
-  animation-delay: calc(var(--thinking-step-index) * 80ms);
-}
-
-.thinking-step + .thinking-step {
-  margin-top: 6px;
-}
-
-@keyframes thinking-label-shimmer {
-  from {
-    background-position: 150% 0;
-  }
-  to {
-    background-position: -50% 0;
-  }
-}
-
-@keyframes thinking-label-settle {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes thinking-step-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
 }
 
 .chat-action-entry-animated {
@@ -5696,9 +5539,7 @@ button.chat-action-target:active,
   .image-generation-label,
   /* Matches the scoped shimmer above, which outranks the bare class on its own. */
   .image-generation:not(.image-generation-ready, .image-generation-failed) .image-generation-label,
-  .agent-activity-label,
-  .thinking-label,
-  .thinking-step {
+  .agent-activity-label {
     animation: none;
     transition: none;
   }
@@ -5835,6 +5676,9 @@ button.chat-action-target:active,
   place-items: center;
   border: 0;
   border-radius: var(--openbot-radius-pill);
+  /* Without this the button primitive's inline padding outgrows the 28px width
+     under border-box sizing and stretches the circle into a pill. */
+  padding: 0;
   background: var(--openbot-hover);
   color: var(--openbot-text-secondary);
   transition:
@@ -5880,6 +5724,7 @@ button.chat-action-target:active,
   place-items: center;
   border: 0;
   border-radius: var(--openbot-radius-pill);
+  padding: 0;
   background: transparent;
   color: var(--openbot-text-primary);
   transition: transform var(--openbot-duration-fast) var(--openbot-ease-out);
@@ -5918,12 +5763,14 @@ button.chat-action-target:active,
   color: var(--openbot-text-primary);
 }
 
-.dictation-button svg {
-  width: 14px;
-  height: 14px;
+.composer-button svg,
+.dictation-button svg,
+.voice-button svg {
+  width: 16px;
+  height: 16px;
 }
 
-.dictation-spinner {
+.composer-spinner {
   animation: ui-spin 720ms linear infinite;
 }
 
@@ -6934,10 +6781,7 @@ button.chat-action-target:active,
   .agent-row-thinking-dots i,
   .agent-row-agent-status-responded,
   .agent-row-agent-status-unread,
-  .agent-settings-panel,
-  .thinking-summary,
-  .thinking-chevron,
-  .thinking-panel {
+  .agent-settings-panel {
     animation: none;
     transition: none;
   }

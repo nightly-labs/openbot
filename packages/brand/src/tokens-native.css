@@ -55,6 +55,11 @@
      * These two back tracking-openbot-tight and tracking-openbot-wide. */
     --openbot-tracking-tight: -0.1px;
     --openbot-tracking-wide: 0.02em;
+    --openbot-bg-sheet: #fcfcfc;
+    --openbot-bg-grouped: #f2f2f2;
+    --openbot-text-grouped-secondary: #858589;
+    --openbot-border-grouped: #dddddf;
+    --openbot-radius-grouped: 16px;
   }
 
   @variant dark {
@@ -89,5 +94,10 @@
     --openbot-shadow-overlay: 0 12px 32px rgba(0, 0, 0, 0.48);
     --openbot-tracking-tight: -0.1px;
     --openbot-tracking-wide: 0.02em;
+    --openbot-bg-sheet: #121212;
+    --openbot-bg-grouped: #212121;
+    --openbot-text-grouped-secondary: #96969b;
+    --openbot-border-grouped: #333335;
+    --openbot-radius-grouped: 16px;
   }
 }

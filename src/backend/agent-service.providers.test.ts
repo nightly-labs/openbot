@@ -11,6 +11,7 @@ import { AgentService } from "./agent-service";
 import {
   CREATE_AGENT_INPUT,
   createFakeClaude,
+  createFakeGrok,
   FakeAgentClient,
   fakeBrowser,
   firstInputText,
@@ -38,6 +39,50 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentService: providers", () => {
+  it.each<AgentProvider>(["codex", "claude", "grok"])(
+    "delivers the quiet collaboration policy to %s on startup and after restart",
+    async (provider) => {
+      process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+      process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+      const { store, mailbox } = stores(root);
+      for (const method of ["thread/start", "thread/resume"]) {
+        const clients = new Map<AgentProvider, FakeAgentClient>();
+        service = new AgentService(store, mailbox, fakeBrowser(), 30_000, provider, (selectedProvider) => {
+          const client = new FakeAgentClient(selectedProvider);
+          clients.set(selectedProvider, client);
+          return client;
+        });
+        await service.initialize();
+        if (method === "thread/start") {
+          await store.getOrCreate("chief");
+          await service.updateAgent({
+            agentId: "chief",
+            provider,
+            model: provider === "codex" ? "gpt-5.6-luna" : provider === "claude" ? "claude-sonnet-5" : "grok-4.5",
+          });
+        }
+        await service.sendMessage({ agentId: "chief", text: "Continue coordinating the research task." });
+        await waitFor(() =>
+          service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"),
+        );
+
+        const request = clients.get(provider)?.requests.find((candidate) => candidate.method === method);
+        const instructions = paramsRecord(request?.params)?.developerInstructions;
+        expect(instructions).toContain("Keep routine teammate communication internal");
+        expect(instructions).toContain("On startup or resume, begin or continue the task without narrating setup");
+        expect(instructions).toContain(
+          "Report meaningful outcomes, completed work, material changes, blockers, failures",
+        );
+        expect(instructions).toContain("required user input or approval");
+        expect(instructions).toContain("If the user asks for a detailed coordination report, provide it");
+        expect(instructions).toContain("explicitly send the result back");
+        expect(instructions).toContain("Do not create acknowledgement loops");
+        expect(instructions).not.toContain("When you receive a reply, summarize it for the user");
+        await service.stop();
+      }
+    },
+  );
+
   it("derives live progress from the provider-neutral turn and tool lifecycle", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
@@ -67,6 +112,71 @@ describe.sequential("AgentService: providers", () => {
     expect(progress()).toEqual([]);
     const stored = await service.readConversation("chief");
     expect(stored.messages.find((message) => message.id === `activity:${turnId}`)).toBeUndefined();
+    client.emit(
+      "notification",
+      notification("item/started", {
+        threadId,
+        turnId,
+        item: { id: "reasoning-1", type: "reasoning", summary: [], content: [] },
+      }),
+    );
+    client.emit(
+      "notification",
+      notification("item/reasoning/summaryTextDelta", {
+        threadId,
+        turnId,
+        itemId: "reasoning-1",
+        summaryIndex: 0,
+        delta: "Inspecting the sources.",
+      }),
+    );
+    client.emit(
+      "notification",
+      notification("item/reasoning/summaryPartAdded", {
+        threadId,
+        turnId,
+        itemId: "reasoning-1",
+        summaryIndex: 1,
+      }),
+    );
+    client.emit(
+      "notification",
+      notification("item/reasoning/summaryTextDelta", {
+        threadId,
+        turnId,
+        itemId: "reasoning-1",
+        summaryIndex: 1,
+        delta: "Comparing the results.",
+      }),
+    );
+    const reasoning = (await service.readConversation("chief")).messages.find(
+      (message) => message.id === "reasoning-1",
+    );
+    expect(reasoning).toMatchObject({
+      itemType: "commentary",
+      status: "streaming",
+      text: "Inspecting the sources.\n\nComparing the results.",
+    });
+    client.emit(
+      "notification",
+      notification("item/completed", {
+        threadId,
+        turnId,
+        item: {
+          id: "reasoning-1",
+          type: "reasoning",
+          summary: ["Inspecting the sources.", "Comparing the results."],
+          content: [],
+        },
+      }),
+    );
+    expect(
+      (await service.readConversation("chief")).messages.find((message) => message.id === "reasoning-1"),
+    ).toMatchObject({
+      itemType: "commentary",
+      status: "completed",
+      text: reasoning?.text,
+    });
     const conversationEventCount = () => events.filter((event) => event.type === "conversation").length;
     const persistedBeforeTools = conversationEventCount();
 

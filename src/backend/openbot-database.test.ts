@@ -402,7 +402,8 @@ describe("OpenBotDatabase", () => {
     const messages = Array.from({ length: 1_000 }, (_, index) => ({
       id: `message-${index.toString().padStart(5, "0")}`,
       author: index % 2 === 0 ? ("user" as const) : ("assistant" as const),
-      text: index === 234 ? "A unique pagination needle" : `Message ${index}`,
+      text: index === 234 || index === 235 ? "A unique pagination needle" : `Message ${index}`,
+      itemType: index === 235 ? "commentary" : undefined,
       createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, 0, index)).toISOString(),
       status: "completed" as const,
     }));
@@ -447,7 +448,9 @@ describe("OpenBotDatabase", () => {
 
     const search = database.searchConversationMessages("pagination needle", agent.id, undefined, 100);
     expect(search.total).toBe(1);
-    expect(search.results[0]?.message.id).toBe("message-00234");
+    expect(search.results.map((result) => result.message.id)).toEqual(["message-00234"]);
+    expect(search.nextCursor).toBeNull();
+    expect(database.searchConversationMessages("pagination needle")).toEqual(search);
     database.close();
   });
 

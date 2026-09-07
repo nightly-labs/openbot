@@ -1,7 +1,7 @@
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { AgentProvider } from "../agent-client";
 import { AppServerError } from "../app-server-client";
-import { type DynamicToolCallParams, getString, isRecord, type ThreadItem } from "../protocol";
+import { type DynamicToolCallParams, getString, isRecord, reasoningText, type ThreadItem } from "../protocol";
 
 export function isNonActionableCodexWarning(message: string): boolean {
   return message.startsWith("Skill descriptions were shortened to fit");
@@ -38,6 +38,14 @@ export function isDynamicToolCall(value: unknown): value is DynamicToolCallParam
 
 export function toThreadItem(value: DynamicRecord): ThreadItem | null {
   const type = getString(value, "type");
+  if (type === "reasoning") {
+    return {
+      type: "agentMessage",
+      id: getString(value, "id") ?? undefined,
+      phase: "commentary",
+      text: reasoningText(value),
+    };
+  }
   return type ? { ...value, type } : null;
 }
 

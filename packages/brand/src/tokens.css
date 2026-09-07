@@ -13,6 +13,13 @@
  */
 
 :root {
+  /* Grouped sheet surfaces, used by the native app. */
+  --openbot-bg-sheet: #121212;
+  --openbot-bg-grouped: #212121;
+  --openbot-text-grouped-secondary: #96969b;
+  --openbot-border-grouped: #333335;
+  --openbot-radius-grouped: 16px;
+
   /* Grok Bot-inspired neutral system. Keep UI colors here, not in components. */
   --openbot-bg-canvas: #1a1a1a;
   --openbot-bg-canvas-clear: rgba(26, 26, 26, 0);

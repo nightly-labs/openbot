@@ -8,7 +8,6 @@ import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { BloubAvatar, getBloubAvatarColor } from "@/features/agents/components/bloub-avatar";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
-import { ChatThinking } from "@/features/chat/components/chat-thinking";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import type { ChatMessage } from "@/features/chat/model/chat-messages";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
@@ -74,6 +73,14 @@ export const ChatMessageList = forwardRef<ChatScrollViewRef, ChatMessageListProp
   const isFocused = useIsFocused();
   const animateMessages = isFocused && canSend && appActive;
   const activity = useAgentActivity(agent.id);
+  const latestThinking = messages.findLast(
+    (message) => message.kind === "thinking" && message.turnId === activity?.turnId,
+  );
+  const thinkingDetail =
+    latestThinking?.kind === "thinking" &&
+    !messages.some((message) => message.kind === "message" && message.author === "agent" && message.streaming)
+      ? latestThinking.steps.at(-1)?.text
+      : null;
   const activityLabel =
     activity?.phase === "waiting"
       ? messages.some(
@@ -81,9 +88,11 @@ export const ChatMessageList = forwardRef<ChatScrollViewRef, ChatMessageListProp
         )
         ? "Waiting for your answer"
         : "Waiting for your input on desktop"
-      : activity?.phase === "responding"
-        ? "Responding…"
-        : activity?.detail || "Thinking…";
+      : thinkingDetail
+        ? thinkingDetail
+        : activity?.phase === "responding"
+          ? "Responding…"
+          : activity?.detail || "Thinking…";
   const userBubbleColor = getBloubAvatarColor(agent.avatarSeed, agent.avatarHue);
   const appearance = useConnectionAppearance(!canSend);
   const red = Number.parseInt(userBubbleColor.slice(1, 3), 16);
@@ -148,35 +157,31 @@ export const ChatMessageList = forwardRef<ChatScrollViewRef, ChatMessageListProp
         </View>
       ) : null}
 
-      {messages.map((message) =>
-        message.kind === "thinking" ? (
-          <ChatThinking
-            key={message.id}
-            steps={message.steps}
-            working={Boolean(activity && activity.turnId === message.turnId)}
-          />
-        ) : message.kind === "question" ? (
-          <ChatQuestionPrompt
-            key={message.id}
-            prompt={message.prompt}
-            controller={message.id === questionForm.messageId ? questionForm : undefined}
-            canSend={canSend}
-          />
-        ) : (
-          <Animated.View
-            key={message.id}
-            className={`max-w-[88%] rounded-[30px] px-4 py-3 ${message.author === "user" ? "self-end" : "self-start bg-control/60"}`}
-            style={[{ borderCurve: "circular" }, message.author === "user" ? userBubbleStyle : undefined]}
-          >
-            <ChatMarkdown
-              body={message.body}
-              color={message.author === "user" ? "#0a0a0c" : foreground}
-              streaming={message.author === "agent" && message.streaming}
-              animationEnabled={animateMessages}
+      {messages
+        .filter((message) => message.kind !== "thinking")
+        .map((message) =>
+          message.kind === "question" ? (
+            <ChatQuestionPrompt
+              key={message.id}
+              prompt={message.prompt}
+              controller={message.id === questionForm.messageId ? questionForm : undefined}
+              canSend={canSend}
             />
-          </Animated.View>
-        ),
-      )}
+          ) : (
+            <Animated.View
+              key={message.id}
+              className={`max-w-[88%] rounded-[30px] px-4 py-3 ${message.author === "user" ? "self-end" : "self-start bg-control/60"}`}
+              style={[{ borderCurve: "circular" }, message.author === "user" ? userBubbleStyle : undefined]}
+            >
+              <ChatMarkdown
+                body={message.body}
+                color={message.author === "user" ? "#0a0a0c" : foreground}
+                streaming={message.author === "agent" && message.streaming}
+                animationEnabled={animateMessages}
+              />
+            </Animated.View>
+          ),
+        )}
 
       {activity ? (
         <View

@@ -180,11 +180,14 @@ export class TurnLifecycle {
         this.#applyItem(agentId, threadId, turnId, threadItem, notification.method === "item/completed");
         return;
       }
+      case "item/reasoning/summaryTextDelta":
+      case "item/reasoning/textDelta":
+      case "item/reasoning/summaryPartAdded":
       case "item/agentMessage/delta": {
         if (!threadId || !agentId) return;
         const turnId = getString(params, "turnId");
         const itemId = getString(params, "itemId");
-        const delta = getString(params, "delta");
+        const delta = notification.method === "item/reasoning/summaryPartAdded" ? "\n\n" : getString(params, "delta");
         if (!turnId || !itemId || delta === null) return;
         this.#itemTurns.set(itemId, turnId);
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
@@ -193,6 +196,13 @@ export class TurnLifecycle {
         if (!message) {
           message = newAssistantMessage(itemId, turnId);
           snapshot.messages.push(message);
+        }
+        if (notification.method.startsWith("item/reasoning/")) {
+          if (message.itemType !== "commentary") {
+            message.itemType = "commentary";
+            this.#conversation.emitConversation(snapshot);
+          }
+          if (notification.method === "item/reasoning/summaryPartAdded" && !message.text) return;
         }
         message.text += delta;
         message.status = "streaming";

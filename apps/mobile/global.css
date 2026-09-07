@@ -7,6 +7,11 @@
 @import "@openbot/brand/tokens-native.css";
 
 @theme inline {
+  --color-sheet: var(--openbot-bg-sheet);
+  --color-grouped: var(--openbot-bg-grouped);
+  --color-grouped-secondary: var(--openbot-text-grouped-secondary);
+  --color-grouped-border: var(--openbot-border-grouped);
+  --radius-grouped: var(--openbot-radius-grouped);
   --color-canvas: var(--openbot-bg-canvas);
   --color-sidebar: var(--openbot-bg-sidebar);
   --color-control: var(--openbot-bg-control);
