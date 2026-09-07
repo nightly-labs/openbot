@@ -1,11 +1,12 @@
 // @vitest-environment node
+import { createHash } from "node:crypto";
 import { mkdir, readdir, realpath, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
 import { AgentService } from "./agent-service";
 import {
@@ -135,13 +136,45 @@ describe.sequential("AgentService: providers", () => {
           service?.listQueue("chief").deliveries.filter((delivery) => delivery.status === "failed").length === attempt,
       );
     }
-    expect(await readdir(handoffs)).toHaveLength(2);
+    const recordedHandoffs = await readdir(handoffs);
+    const recordedManifests = await readdir(manifests);
+    expect(recordedHandoffs).toHaveLength(2);
     await service.stop();
+    const orphan = createHash("sha256").update("unrecorded-session").digest("hex");
+    await writeFile(join(handoffs, orphan), "Private history written before a crash.");
+    await writeFile(join(manifests, orphan), "unrecorded-toolset");
     service = await start();
+    expect(await readdir(handoffs)).toEqual(recordedHandoffs);
+    expect(await readdir(manifests)).toEqual(recordedManifests);
     await service.deleteAgent("chief");
     expect(await readdir(handoffs)).toEqual([]);
     expect(await readdir(manifests)).toEqual([]);
     expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(false);
+  });
+
+  it("removes private handoff files immediately when replacement session binding fails", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Private history for the replacement session." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const original = store.activeProviderSession("chief")?.externalSessionId;
+    const manifests = join(store.database.userDataPath, "provider-toolsets");
+    const recorded = await readdir(manifests);
+    for (const file of recorded) await writeFile(join(manifests, file), "outdated");
+    const binding = vi.spyOn(store, "bindProviderSession").mockImplementationOnce(() => {
+      throw new Error("Session binding failed.");
+    });
+    try {
+      await service.sendMessage({ agentId: "chief", text: "Continue with new tools." });
+      await waitFor(() => service?.listQueue("chief").deliveries.some((delivery) => delivery.status === "failed"));
+      expect(store.activeProviderSession("chief")?.externalSessionId).toBe(original);
+      expect(await readdir(join(store.database.userDataPath, "provider-handoffs"))).toEqual([]);
+      expect(await readdir(manifests)).toEqual(recorded);
+    } finally {
+      binding.mockRestore();
+    }
   });
 
   it.each<AgentProvider>(["codex", "claude", "grok"])(

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import type { AgentClient, AgentProvider } from "../agent-client";
@@ -83,6 +83,24 @@ export class ThreadLifecycle {
     this.#pendingHandoffs.delete(sessionId);
   }
 
+  async reconcileProviderSessionFiles(): Promise<void> {
+    const recorded = new Set(
+      this.#store.database.listExternalSessionIds().map((id) => createHash("sha256").update(id).digest("hex")),
+    );
+    for (const name of ["provider-handoffs", "provider-toolsets"]) {
+      const directory = join(this.#store.database.userDataPath, name);
+      const files = await readdir(directory, { withFileTypes: true }).catch((error: unknown) => {
+        if (error instanceof Error && "code" in error && error.code === "ENOENT") return [];
+        throw error;
+      });
+      for (const file of files) {
+        if (file.isFile() && /^[a-f0-9]{64}$/.test(file.name) && !recorded.has(file.name)) {
+          await rm(join(directory, file.name), { force: true });
+        }
+      }
+    }
+  }
+
   dispose(): void {
     this.#pendingHandoffs.clear();
     this.#pendingRuntimeRefreshes.clear();
@@ -143,19 +161,26 @@ export class ThreadLifecycle {
       decodeThreadResponse,
     );
     const externalThreadId = response.thread.id;
-    if (client.provider === "codex") {
-      await mkdir(this.toolManifestDirectory(), { recursive: true, mode: 0o700 });
-      await writeFile(this.toolManifestPath(externalThreadId), this.toolFingerprint(), { mode: 0o600 });
+    try {
+      if (client.provider === "codex") {
+        await mkdir(this.toolManifestDirectory(), { recursive: true, mode: 0o700 });
+        await writeFile(this.toolManifestPath(externalThreadId), this.toolFingerprint(), { mode: 0o600 });
+      }
+      const handoff = this.buildProviderHandoff(agent.id, publicThreadId);
+      if (handoff) {
+        await mkdir(join(this.#store.database.userDataPath, "provider-handoffs"), { recursive: true, mode: 0o700 });
+        // Persist before binding the replacement: a crash must not activate a session
+        // whose first turn can no longer recover the existing conversation context.
+        await writeFile(this.handoffPath(externalThreadId), handoff, { mode: 0o600 });
+        this.#pendingHandoffs.set(externalThreadId, handoff);
+      }
+      this.#store.bindProviderSession(agent.id, externalThreadId);
+    } catch (error) {
+      await this.deleteProviderSessionFiles(externalThreadId).catch((cleanupError: unknown) => {
+        throw new AggregateError([error, cleanupError], "Failed to prepare and clean up the provider session.");
+      });
+      throw error;
     }
-    const handoff = this.buildProviderHandoff(agent.id, publicThreadId);
-    if (handoff) {
-      await mkdir(join(this.#store.database.userDataPath, "provider-handoffs"), { recursive: true, mode: 0o700 });
-      // Persist before binding the replacement: a crash must not activate a session
-      // whose first turn can no longer recover the existing conversation context.
-      await writeFile(this.handoffPath(externalThreadId), handoff, { mode: 0o600 });
-      this.#pendingHandoffs.set(externalThreadId, handoff);
-    }
-    this.#store.bindProviderSession(agent.id, externalThreadId);
     this.#conversation.bindThread(externalThreadId, agent.id);
     this.#conversation.markThreadLoaded(externalThreadId, client);
     this.#conversation.ensureSnapshot(agent.id, publicThreadId);
