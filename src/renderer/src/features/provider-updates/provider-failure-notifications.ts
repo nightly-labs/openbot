@@ -7,6 +7,10 @@ import {
 import { redactedSummary } from "@openbot/logging";
 import { toast } from "../../components/ui";
 
+function providerFailed(status: AgentProviderStatus): boolean {
+  return status.state === "error" || status.state === "not-installed" || status.state === "outdated";
+}
+
 /** Notifications for one server scope. A dismissed failure stays closed until it changes or recovers. */
 export function createProviderFailureNotifications(options: {
   serverId: string;
@@ -50,7 +54,7 @@ export function createProviderFailureNotifications(options: {
   return {
     sync(statuses: AgentProviderStatus[]): void {
       for (const status of statuses) {
-        if (status.state === "error") report(status.id, status.message ?? "");
+        if (providerFailed(status)) report(status.id, status.message ?? "");
         else if (status.state === "available") clear(status.id);
       }
     },
@@ -61,7 +65,7 @@ export function createProviderFailureNotifications(options: {
       );
       if (!provider) return;
       const status = statuses.find((status) => status.id === provider);
-      report(provider, status?.state === "error" ? (status.message ?? event.message) : event.message);
+      report(provider, status && providerFailed(status) ? (status.message ?? event.message) : event.message);
     },
     dispose(): void {
       for (const provider of failures.keys()) clear(provider);

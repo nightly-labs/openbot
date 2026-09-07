@@ -183,48 +183,53 @@ it("keeps Settings open when the update notification is closed", async () => {
   expect(screen.getByRole("button", { name: "Close settings" })).toBeInTheDocument();
 });
 
-it("keeps a dismissed provider failure closed until it changes or recovers", async () => {
-  render(() => <Toaster />);
-  const failures = createProviderFailureNotifications({
-    serverId: "local",
-    remoteName: () => undefined,
-    openSettings: () => {},
-  });
-  const status: AgentProviderStatus = {
-    id: "codex",
-    state: "error",
-    version: null,
-    message: "token=abcdefgh123456 /Users/ada failed",
-  };
-  const event: Extract<AgentEvent, { type: "error" }> = {
-    type: "error",
-    code: "codex_start_failed",
-    message: "raw provider message",
-  };
-  try {
-    failures.sync([status]);
-    failures.handleError(event, [status]);
-    expect(await screen.findByText("token=[redacted] ~ failed")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Close notification" })).toHaveLength(1);
-    const close = screen.getByRole("button", { name: "Close notification" });
-    close.focus();
-    expect(close).toHaveFocus();
-    fireEvent.click(close);
-    await waitFor(() => expect(screen.queryByText("ChatGPT could not start")).not.toBeInTheDocument());
-    failures.sync([status]);
-    failures.handleError(event, [status]);
-    flush();
-    expect(screen.queryByText("ChatGPT could not start")).not.toBeInTheDocument();
-    failures.sync([{ ...status, message: "A different failure" }]);
-    expect(await screen.findByText("A different failure")).toBeInTheDocument();
-    failures.sync([{ ...status, state: "available", message: null }]);
-    await waitFor(() => expect(screen.queryByText("ChatGPT could not start")).not.toBeInTheDocument());
-    failures.handleError(event, []);
-    expect(await screen.findByText(event.message)).toBeInTheDocument();
-  } finally {
-    failures.dispose();
-  }
-});
+it.each<AgentProviderStatus["state"]>(["error", "not-installed", "outdated"])(
+  "keeps a dismissed %s provider failure closed until it changes or recovers",
+  async (state) => {
+    render(() => <Toaster />);
+    const failures = createProviderFailureNotifications({
+      serverId: "local",
+      remoteName: () => undefined,
+      openSettings: () => {},
+    });
+    const status: AgentProviderStatus = {
+      id: "grok",
+      state,
+      version: null,
+      message: "token=abcdefgh123456 /Users/ada failed",
+    };
+    const event: Extract<AgentEvent, { type: "error" }> = {
+      type: "error",
+      code: state === "not-installed" ? "grok_runtime_missing" : "grok_start_failed",
+      message: "raw provider message",
+    };
+    try {
+      failures.sync([status]);
+      expect(await screen.findByText("token=[redacted] ~ failed")).toBeInTheDocument();
+      failures.handleError(event, [status]);
+      flush();
+      expect(screen.getByText("token=[redacted] ~ failed")).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "Close notification" })).toHaveLength(1);
+      const close = screen.getByRole("button", { name: "Close notification" });
+      close.focus();
+      expect(close).toHaveFocus();
+      fireEvent.click(close);
+      await waitFor(() => expect(screen.queryByText("Grok could not start")).not.toBeInTheDocument());
+      failures.sync([status]);
+      failures.handleError(event, [status]);
+      flush();
+      expect(screen.queryByText("Grok could not start")).not.toBeInTheDocument();
+      failures.sync([{ ...status, message: "A different failure" }]);
+      expect(await screen.findByText("A different failure")).toBeInTheDocument();
+      failures.sync([{ ...status, state: "available", message: null }]);
+      await waitFor(() => expect(screen.queryByText("Grok could not start")).not.toBeInTheDocument());
+      failures.handleError(event, []);
+      expect(await screen.findByText(event.message)).toBeInTheDocument();
+    } finally {
+      failures.dispose();
+    }
+  },
+);
 
 it("labels a remote provider failure and removes it when the server scope ends", async () => {
   render(() => <Toaster />);
