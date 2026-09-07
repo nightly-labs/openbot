@@ -1993,7 +1993,11 @@ function parseEnvironment(
   ) {
     throw new Error("Viewport dimensions are outside the supported range.");
   }
-  const scale = optionalNumber(value, "deviceScaleFactor") ?? presetSize?.scale ?? current.viewport.deviceScaleFactor;
+  // Fill clears the device metrics override, so it cannot inherit a custom emulation scale.
+  const scale =
+    mode === "fill"
+      ? 1
+      : (optionalNumber(value, "deviceScaleFactor") ?? presetSize?.scale ?? current.viewport.deviceScaleFactor);
   if (scale < 0.5 || scale > 4) throw new Error("deviceScaleFactor must be between 0.5 and 4.");
   if (!isSafeViewportSize(width, height, scale)) {
     throw new Error(`The physical viewport must not exceed ${MAX_PHYSICAL_VIEWPORT_PIXELS.toLocaleString()} pixels.`);

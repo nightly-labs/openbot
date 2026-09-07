@@ -1665,6 +1665,18 @@ async function main(): Promise<void> {
     if (oversizedEnvironment.success || !toolError(oversizedEnvironment).includes("physical viewport")) {
       throw new Error("V2 environment accepted an unsafe physical pixel area.");
     }
+    await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 1200, height: 800 } });
+    const restoredFill = await callBrowserTool(browser, "set_environment", { tabId: v2Tab.id, preset: "fill" });
+    const restoredFillSnapshot = toolTextPayload(restoredFill);
+    if (
+      !restoredFill.success ||
+      !isDynamicRecord(restoredFillSnapshot?.viewport) ||
+      restoredFillSnapshot.viewport.mode !== "fill" ||
+      restoredFillSnapshot.viewport.deviceScaleFactor !== 1 ||
+      restoredFillSnapshot.viewport.width !== 1200
+    ) {
+      throw new Error(`V2 mobile-to-fill reset retained the custom scale: ${JSON.stringify(restoredFill)}`);
+    }
     const preTakeoverSnapshot = await browser.snapshot(v2Tab.id);
     const preTakeoverTarget = preTakeoverSnapshot.elements.find((element) => element.name === "SPA");
     if (!preTakeoverTarget) throw new Error("V2 takeover stale-reference fixture was not available.");
