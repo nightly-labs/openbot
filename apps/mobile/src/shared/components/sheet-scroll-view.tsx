@@ -1,6 +1,6 @@
 import type { PropsWithChildren, ReactNode } from "react";
 import { type ScrollViewProps, View } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { KeyboardAwareScrollView, type KeyboardAwareScrollViewProps } from "react-native-keyboard-controller";
 import { withUniwind } from "uniwind";
 
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
@@ -13,6 +13,7 @@ interface SheetScrollViewProps extends PropsWithChildren {
   contentInsetAdjustmentBehavior?: ScrollViewProps["contentInsetAdjustmentBehavior"];
   header?: ReactNode;
   keyboardDismissMode?: ScrollViewProps["keyboardDismissMode"];
+  keyboardMode?: KeyboardAwareScrollViewProps["mode"];
   keyboardShouldPersistTaps?: ScrollViewProps["keyboardShouldPersistTaps"];
   showsVerticalScrollIndicator?: boolean;
 }
@@ -24,12 +25,15 @@ export function SheetScrollView({
   contentInsetAdjustmentBehavior = "automatic",
   header,
   keyboardDismissMode,
+  keyboardMode,
   keyboardShouldPersistTaps,
   showsVerticalScrollIndicator = false,
 }: SheetScrollViewProps) {
   return (
     <StyledKeyboardAwareScrollView
       bottomOffset={20}
+      disableScrollOnKeyboardHide
+      mode={keyboardMode}
       className={className}
       contentInsetAdjustmentBehavior={contentInsetAdjustmentBehavior}
       keyboardDismissMode={keyboardDismissMode}

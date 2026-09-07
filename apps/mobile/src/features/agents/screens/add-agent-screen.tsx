@@ -45,6 +45,7 @@ export function AddAgentScreen() {
       contentContainerClassName="gap-5 px-5 pb-safe-offset-8 pt-5"
       contentInsetAdjustmentBehavior="automatic"
       keyboardDismissMode="interactive"
+      keyboardMode="layout"
       keyboardShouldPersistTaps="handled"
     >
       <AgentAppearancePicker
