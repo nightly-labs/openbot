@@ -75,27 +75,20 @@ export function prepareBloubActivityFrames(geometry: Geometry, onReady: Ready, s
   let preparation = pending.get(geometry.key);
   if (!preparation) {
     const listeners = new Set<Ready>();
-    const frames: BloubActivityFrame[] = [];
-    const source = activityFrames(geometry);
-    function batch() {
-      // Share pending work too: the header and activity row can mount together.
-      for (let count = 0; count < 4; count += 1) {
-        const next = source.next();
-        if (next.done) {
-          const oldest = sequences.keys().next().value;
-          if (sequences.size >= MAX_CACHED_SEQUENCES && oldest !== undefined) sequences.delete(oldest);
-          // Mounted players retain their frames after cache eviction.
-          sequences.set(geometry.key, frames);
-          pending.delete(geometry.key);
-          for (const listener of listeners) listener(frames);
-          return;
-        }
-        frames.push(next.value);
-      }
-      cancel = schedule(batch);
-    }
-    let cancel = schedule(batch);
-    preparation = { listeners, cancel: () => cancel() };
+    // Share pending work too: the header and activity row can mount together.
+    const cancel = prepareFrames(
+      activityFrames(geometry),
+      (frames) => {
+        const oldest = sequences.keys().next().value;
+        if (sequences.size >= MAX_CACHED_SEQUENCES && oldest !== undefined) sequences.delete(oldest);
+        // Mounted players retain their frames after cache eviction.
+        sequences.set(geometry.key, frames);
+        pending.delete(geometry.key);
+        for (const listener of listeners) listener(frames);
+      },
+      schedule,
+    );
+    preparation = { listeners, cancel };
     pending.set(geometry.key, preparation);
   }
   const current = preparation;
@@ -107,4 +100,45 @@ export function prepareBloubActivityFrames(geometry: Geometry, onReady: Ready, s
       pending.delete(geometry.key);
     }
   };
+}
+
+function* settlingFrames(
+  geometry: Geometry,
+  sourceIndex: number,
+  sourceFrame: BloubActivityFrame,
+): Generator<BloubActivityFrame> {
+  const seconds = (Math.floor(sourceIndex) % FRAME_COUNT) / FPS;
+  const engine = cycleEngine(geometry, seconds, sourceIndex >= FRAME_COUNT);
+  engine.setState("idle", seconds);
+  yield sourceFrame;
+  for (let index = 1; index <= Math.ceil(SETTLE * FPS); index += 1) {
+    yield nativeFrame(engine.sample(seconds + index / FPS));
+  }
+}
+
+export function prepareBloubSettlingFrames(
+  geometry: Geometry,
+  sourceIndex: number,
+  sourceFrame: BloubActivityFrame,
+  onReady: Ready,
+  schedule: Schedule = scheduleIdle,
+) {
+  return prepareFrames(settlingFrames(geometry, sourceIndex, sourceFrame), onReady, schedule);
+}
+
+function prepareFrames(source: Generator<BloubActivityFrame>, onReady: Ready, schedule: Schedule) {
+  const frames: BloubActivityFrame[] = [];
+  function batch() {
+    for (let count = 0; count < 4; count += 1) {
+      const next = source.next();
+      if (next.done) {
+        onReady(frames);
+        return;
+      }
+      frames.push(next.value);
+    }
+    cancel = schedule(batch);
+  }
+  let cancel = schedule(batch);
+  return () => cancel();
 }

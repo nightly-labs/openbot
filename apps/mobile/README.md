@@ -75,6 +75,11 @@ when no longer needed.
 Working avatars also prepare their sequences in idle batches of at most four frames, sharing
 both pending work and cached geometry across presentations. They hold the idle pose until ready;
 leaving the screen or ending activity unsubscribes, cancelling preparation when no player needs it.
+Returning to idle uses the same bounded scheduler and holds the displayed pose until ready;
+resuming activity or unmounting cancels the pending return.
+
+Streaming Markdown reveals words only for messages up to 2,000 characters. Longer responses
+show incoming text directly, avoiding a full Markdown parse for every additional word reveal.
 
 Structured question forms appear inline in mobile chat, including when reopening downloaded history.
 They support option selection, multiple questions, skipping and cancellation. Custom answers are typed

@@ -3,8 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type BloubActivityFrame,
   bloubActivityGeometry,
+  FPS,
   FRAME_COUNT,
   prepareBloubActivityFrames,
+  prepareBloubSettlingFrames,
+  SETTLE,
 } from "../apps/mobile/src/features/agents/model/bloub-activity";
 import {
   type LoaderFrame,
@@ -206,3 +209,37 @@ describe("activity sequence eviction", () => {
     expect(remounted).toEqual(mounted);
   });
 });
+
+it.each([30, 120, 190, FRAME_COUNT + 30, FRAME_COUNT + 120, FRAME_COUNT + 190])(
+  "settles from displayed activity frame %i in cancellable bounded batches",
+  (sourceIndex) => {
+    const geometry = bloubActivityGeometry("settling-avatar");
+    const cycle = preparedActivity(geometry);
+    const idle = idleQueue();
+    const sample = vi.spyOn(BotEngine.prototype, "sample");
+    const ready = vi.fn();
+    try {
+      prepareBloubSettlingFrames(geometry, sourceIndex, cycle[sourceIndex], ready, idle.schedule);
+      expect(sample).not.toHaveBeenCalled();
+      while (idle.next()) {
+        expect(sample.mock.calls.length).toBeLessThanOrEqual(4);
+        sample.mockClear();
+      }
+      expect(ready).toHaveBeenCalledOnce();
+      expect(ready.mock.calls[0][0]).toHaveLength(Math.ceil(SETTLE * FPS) + 1);
+      expect(ready.mock.calls[0][0][0]).toEqual(cycle[sourceIndex]);
+      ready.mockClear();
+      const cancel = prepareBloubSettlingFrames(geometry, sourceIndex, cycle[sourceIndex], ready, idle.schedule);
+      idle.next();
+      sample.mockClear();
+      cancel();
+      while (idle.next()) {
+        /* Drain any incorrectly retained preparation. */
+      }
+      expect(sample).not.toHaveBeenCalled();
+      expect(ready).not.toHaveBeenCalled();
+    } finally {
+      sample.mockRestore();
+    }
+  },
+);

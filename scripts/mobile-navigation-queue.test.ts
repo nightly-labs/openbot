@@ -1,11 +1,19 @@
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
-import type * as RoutingQueueModule from "../apps/mobile/node_modules/expo-router/build/global-state/routingQueue";
 import { createChatNavigationGate } from "../apps/mobile/src/features/agents/model/chat-navigation-gate";
 
 function loadRoutingQueue() {
-  const exports: Partial<typeof RoutingQueueModule> = {};
+  // Keep the VM boundary structural: importing Expo Router's types here brings
+  // React Native's global fetch/timer declarations into the desktop Node project.
+  const exports: {
+    routingQueue?: {
+      snapshot: () => { type: string }[];
+      subscribe: (listener: () => void) => () => void;
+      add: (action: { type: string; payload?: { name: string; params: { agentId: string } } }) => void;
+      run: (ref: { current: null }) => void;
+    };
+  } = {};
   // Exercise the installed patch without loading native route resolution in Node.
   runInNewContext(
     readFileSync(

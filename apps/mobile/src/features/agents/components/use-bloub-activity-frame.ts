@@ -8,12 +8,11 @@ import { scheduleOnRN } from "react-native-worklets";
 import {
   type BloubActivityFrame,
   bloubActivityGeometry,
-  cycleEngine,
   FPS,
   FRAME_COUNT,
   nativeFrame,
   prepareBloubActivityFrames,
-  SETTLE,
+  prepareBloubSettlingFrames,
 } from "../model/bloub-activity";
 
 interface Playback {
@@ -79,14 +78,14 @@ export function useBloubActivityFrame(seed: string, working: boolean) {
         playback.set({ frames: [rest], index: 0, loopStart: null });
         return;
       }
-      const seconds = (Math.floor(current.index) % FRAME_COUNT) / FPS;
-      const engine = cycleEngine(geometry, seconds, current.index >= FRAME_COUNT);
-      engine.setState("idle", seconds);
-      const frames = Array.from({ length: Math.ceil(SETTLE * FPS) + 1 }, (_, index) =>
-        nativeFrame(engine.sample(seconds + index / FPS)),
-      );
-      playback.set({ frames, index: 0, loopStart: null });
-      setPlaying(true);
+      // Hold the displayed pose while preparing the return to idle.
+      setPlaying(false);
+      const sourceFrame = current.frames[Math.floor(current.index)] ?? rest;
+      playback.set({ frames: [sourceFrame], index: 0, loopStart: null });
+      return prepareBloubSettlingFrames(geometry, current.index, sourceFrame, (frames) => {
+        playback.set({ frames, index: 0, loopStart: null });
+        setPlaying(true);
+      });
     }
   }, [focused, geometry, playback, reducedMotion, rest, working]);
 
