@@ -23,6 +23,7 @@ import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { type AgentAvatarLocation, useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
+import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
@@ -100,6 +101,7 @@ export function AgentListRow({
 }: AgentListRowProps) {
   const [background, accent, accentForeground] = useThemeColor(["background", "accent", "accent-foreground"]);
   const { unreadAgentIds } = useMobileWorkspace();
+  const { openingGesture } = useAppDrawer();
   const { startAgentNavigationAnimated, toggleAgentPinAnimated, transition } = useAgentPinTransition();
   const pendingPinRef = useRef(false);
   const agentContextMenu = useAgentContextMenu(agent);
@@ -191,6 +193,8 @@ export function AgentListRow({
       onSwipeableClose={handleSwipeableClose}
       overshootFriction={8}
       overshootRight={false}
+      // Rightward drags belong to the drawer; it yields to row actions on leftward drags.
+      requireExternalGestureToFail={openingGesture}
       renderRightActions={(_progress, _translation, swipeable) => (
         <View className="w-[88px] overflow-hidden" style={{ backgroundColor: accent }}>
           <Pressable
