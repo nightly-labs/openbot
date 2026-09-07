@@ -1,8 +1,12 @@
 import { HeaderHeightContext, HeaderShownContext } from "expo-router/react-navigation";
 import { type PropsWithChildren, type ReactNode, useContext } from "react";
-import { ScrollView, type ScrollViewProps, View } from "react-native";
+import { type ScrollViewProps, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { withUniwind } from "uniwind";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { isIOS } from "@/shared/lib/platform";
+
+const StyledKeyboardAwareScrollView = withUniwind(KeyboardAwareScrollView);
 
 interface SheetScrollViewProps extends PropsWithChildren {
   className?: string;
@@ -32,8 +36,12 @@ export function SheetScrollView({
   const showCustomEdge = scrollEdgeEffect && !nativeHeader;
 
   return (
-    <ScrollView
+    <StyledKeyboardAwareScrollView
       className={className}
+      bottomOffset={16}
+      disableScrollOnKeyboardHide
+      mode="insets"
+      automaticallyAdjustKeyboardInsets={false}
       bounces={false}
       alwaysBounceVertical={false}
       overScrollMode="never"
@@ -58,6 +66,6 @@ export function SheetScrollView({
       <View style={nativeHeader ? { paddingTop: headerHeight } : undefined}>
         <View className={contentContainerClassName}>{children}</View>
       </View>
-    </ScrollView>
+    </StyledKeyboardAwareScrollView>
   );
 }

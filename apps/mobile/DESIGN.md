@@ -113,6 +113,15 @@ Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. 
   bottom safe-area utilities, so it remains reachable on small screens and with the keyboard open.
 - Use `keyboardDismissMode="interactive"` and `keyboardShouldPersistTaps="handled"` for forms,
   following existing screens. Reuse `SheetFormField` instead of rebuilding its platform inputs.
+- `SheetScrollView` uses `KeyboardAwareScrollView` to reveal the focused field and keep the last
+  action reachable above the keyboard. Keep `mode="insets"`: a layout spacer changes the intrinsic
+  sheet height and conflicts with native sheet sizing. Use `disableScrollOnKeyboardHide` to keep
+  the user's position. The keyboard-controller 1.21.9 patch shrinks insets during dismissal and
+  clamps only the current offset beyond the remaining content, instead of replaying a saved offset
+  after a new drag. `scripts/mobile-keyboard-scroll.test.ts` covers that event sequence against the
+  installed library. Leave `automaticallyAdjustKeyboardInsets` disabled and do not add another
+  keyboard-avoiding wrapper. Verify tapping outside a field followed immediately by scrolling,
+  interactive keyboard dismissal, reaching the final action, and short fit-to-content sheets.
 
 ### Palette, groups and text
 
