@@ -1050,6 +1050,39 @@ async function main(): Promise<void> {
     if (blockedTabClosed !== "closed") {
       throw new Error("V2 snapshot timeout left the tab queue waiting on a CDP command it never cancelled.");
     }
+    // Environment commands reach the main renderer before the snapshot starts. Use a separate site
+    // so stopping that renderer does not stop the other fixture tabs.
+    const frozenOrigin = `http://environment.localhost:${address.port}`;
+    const frozenTab = await browser.open(`${frozenOrigin}/spinning-frame`, "smoke-thread", "smoke-bot");
+    const frozenContents = webContents
+      .getAllWebContents()
+      .find((contents) => !contents.isDestroyed() && contents.getURL().startsWith(frozenOrigin));
+    if (!frozenContents) throw new Error("Environment timeout fixture web contents were not available.");
+    const rendererStarted = new Promise<void>((resolve) => {
+      frozenContents.once("console-message", () => resolve());
+    });
+    void frozenContents
+      .executeJavaScript("console.info('environment renderer stopped'); while (true) {}", true)
+      .catch(() => undefined);
+    await rendererStarted;
+    const frozenEnvironment = await Promise.race([
+      callBrowserTool(browser, "set_environment", { tabId: frozenTab.id, colorScheme: "dark" }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 20_000)),
+    ]);
+    if (
+      !frozenEnvironment ||
+      frozenEnvironment.success ||
+      !toolError(frozenEnvironment).includes("Browser environment change timed out.")
+    ) {
+      throw new Error(
+        `V2 environment change did not bound an unresponsive renderer: ${JSON.stringify(frozenEnvironment)}`,
+      );
+    }
+    const frozenClosed = await Promise.race([
+      browser.close(frozenTab.id).then(() => true),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5_000)),
+    ]);
+    if (!frozenClosed) throw new Error("V2 environment timeout left the tab queue blocked.");
     // `submit: true` reached through a snapshot ref is the case that used to fail: typing changes a
     // contenteditable's visible text, so re-resolving the same ref to press Enter fingerprinted the
     // element against its pre-typing text and threw instead of submitting.
@@ -1410,26 +1443,6 @@ async function main(): Promise<void> {
     ) {
       throw new Error("V2 dispatched action did not report success when settling exceeded its deadline.");
     }
-    await v2Contents.executeJavaScript(
-      `(() => {
-      globalThis.__openbotOriginalMutationObserver = MutationObserver;
-      globalThis.__openbotOriginalSetTimeout = setTimeout;
-      globalThis.__openbotActiveObservers = 0;
-      globalThis.setTimeout = () => 0;
-      globalThis.MutationObserver = class extends MutationObserver {
-        #observing = false;
-        observe(...args) {
-          if (!this.#observing) { this.#observing = true; globalThis.__openbotActiveObservers += 1; }
-          return super.observe(...args);
-        }
-        disconnect() {
-          if (this.#observing) { this.#observing = false; globalThis.__openbotActiveObservers -= 1; }
-          return super.disconnect();
-        }
-      };
-    })()`,
-      true,
-    );
     const quietWait = await callBrowserTool(browser, "wait_for", {
       tabId: v2Tab.id,
       state: "dom-quiet",
@@ -1438,12 +1451,6 @@ async function main(): Promise<void> {
     if (quietWait.success || !toolError(quietWait).includes("timed out")) {
       throw new Error("V2 DOM-quiet wait suppressed its timeout.");
     }
-    const activeObservers = await v2Contents.executeJavaScript("globalThis.__openbotActiveObservers", true);
-    if (activeObservers !== 0) throw new Error("V2 DOM-quiet timeout left a MutationObserver active.");
-    await v2Contents.executeJavaScript(
-      "globalThis.MutationObserver = globalThis.__openbotOriginalMutationObserver; globalThis.setTimeout = globalThis.__openbotOriginalSetTimeout; delete globalThis.__openbotOriginalMutationObserver; delete globalThis.__openbotOriginalSetTimeout; delete globalThis.__openbotActiveObservers;",
-      true,
-    );
     await v2Contents.executeJavaScript(
       "clearInterval(globalThis.__openbotNoise); delete globalThis.__openbotNoise; true",
       true,

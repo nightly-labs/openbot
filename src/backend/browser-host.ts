@@ -868,7 +868,14 @@ export class BrowserHost {
           return textResult(
             await this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
               const environment = parseEnvironment(args, tab.environment, tab.view.getBounds());
-              await tab.engine.setEnvironment(environment);
+              // This also bounds the engine's rollback if applying the environment fails.
+              await this.#boundEngineOperation(
+                tab,
+                tab.engine.setEnvironment(environment),
+                10_000,
+                "Browser environment change timed out.",
+                keepQueueBlocked,
+              );
               tab.environment = environment;
               await this.#persistState();
               this.#emitChanged();
