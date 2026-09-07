@@ -710,7 +710,7 @@ export class BrowserHost {
           const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
           this.#requireToolTab(params, tabId);
           const target = parseTarget(args.target);
-          const values = requiredStringArray(args, "values", 100, 1_000);
+          const values = requiredStringArray(args, "values", 100, 1_000, "allow-empty");
           return textResult(
             await this.#runAction(
               tabId,
@@ -755,7 +755,7 @@ export class BrowserHost {
           const tabId = requiredString(args, "tabId", INPUT_LIMITS.identifier);
           this.#requireToolTab(params, tabId);
           const target = parseTarget(args.target);
-          const paths = requiredStringArray(args, "paths", INPUT_LIMITS.attachments, INPUT_LIMITS.path);
+          const paths = requiredStringArray(args, "paths", INPUT_LIMITS.attachments, INPUT_LIMITS.path, "reject-empty");
           return textResult(
             await this.#runAction(
               tabId,
@@ -1970,19 +1970,31 @@ function presetDimensions(preset: "fill" | "desktop" | "tablet" | "mobile" | "cu
   }
 }
 
-function requiredStringArray(value: DynamicRecord, key: string, maximum: number, maxLength: number): string[] {
+/**
+ * The empty string is a value for one of these lists and not the other. `<option value="">` is how a
+ * page spells "no selection", and an unlabelled one cannot be addressed by label either, so rejecting
+ * it puts a real option out of reach. An empty path is never a file.
+ */
+function requiredStringArray(
+  value: DynamicRecord,
+  key: string,
+  maximum: number,
+  maxLength: number,
+  empty: "allow-empty" | "reject-empty",
+): string[] {
   const raw = value[key];
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > maximum)
     throw new Error(`${key} must contain between 1 and ${maximum} strings.`);
   return raw.map((entry) => {
-    if (!isString(entry) || !entry || entry.length > maxLength) throw new Error(`${key} contains an invalid string.`);
+    if (!isString(entry) || entry.length > maxLength || (!entry && empty === "reject-empty"))
+      throw new Error(`${key} contains an invalid string.`);
     return entry;
   });
 }
 
 function optionalStringArray(value: DynamicRecord, key: string, maximum: number): string[] | undefined {
   if (value[key] === undefined) return undefined;
-  return requiredStringArray(value, key, maximum, 64);
+  return requiredStringArray(value, key, maximum, 64, "reject-empty");
 }
 
 function navigateHistory(

@@ -410,6 +410,13 @@ export class BrowserCdpEngine {
           const steps = ((targetCycleRank - startCycleRank + cycleIndices.length) % cycleIndices.length) + 1;
           const initial = Array.from(plan.desiredLabel)[0];
           if (!initial) throw new Error("Select target returned an empty typeahead key.");
+          // Chromium keeps a typeahead buffer per select for about a second, so a second
+          // `select_option` inside that window appends to the characters the first one typed: `a`
+          // after `b` searches for `ba`, matches nothing, and leaves the selection where it was.
+          // A focus round-trip clears the buffer. Waiting the timer out is the only alternative and
+          // costs a second on every call.
+          await this.#callOnNode(send, resolved.backendNodeId, "function() { this.blur(); }", [], resolved.sessionId);
+          await send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
           for (let index = 0; index < steps; index++) {
             await dispatchTextKey(send, initial, resolved.sessionId);
           }
@@ -455,8 +462,16 @@ export class BrowserCdpEngine {
         selectedIndices.length !== desiredIndices.length ||
         selectedIndices.some((index, position) => index !== desiredIndices[position])
       ) {
+        // An option with no label has nothing to type towards, and on macOS typeahead is the only
+        // keyboard strategy a closed select honours -- ArrowDown opens the native popup instead of
+        // moving the selection, and no CDP key event reaches that popup. Say so, because the indices
+        // alone leave the caller with nothing to act on.
+        const unreachable =
+          !plan.multiple && plan.desiredLabel === ""
+            ? " An option with no label can only be reached by keyboard where a closed select honours arrow keys, which macOS does not."
+            : "";
         throw new Error(
-          `Native select interaction did not produce the requested selection (expected ${desiredIndices.join(",")}, got ${selectedIndices.join(",")}).`,
+          `Native select interaction did not produce the requested selection (expected ${desiredIndices.join(",")}, got ${selectedIndices.join(",")}).${unreachable}`,
         );
       }
     });
@@ -667,6 +682,7 @@ export class BrowserCdpEngine {
   async documentIds(): Promise<Set<string>> {
     return this.#lease(async (send) => {
       const ids = new Set<string>();
+      let complete = true;
       for (const capture of this.#snapshotTargets(Number.POSITIVE_INFINITY)) {
         if (ids.size === this.#uploadDocumentIds.size) break;
         const contextId = await automationContextId(send, capture.sessionId);
@@ -681,12 +697,20 @@ export class BrowserCdpEngine {
         );
         const exception = recordValue(result.exceptionDetails);
         if (exception) throw new Error(exceptionDescription(exception));
-        const values = recordValue(result.result)?.value;
-        if (!Array.isArray(values)) throw new Error("Browser documents returned invalid identities.");
+        const payload = recordValue(recordValue(result.result)?.value);
+        const values = payload?.ids;
+        if (!Array.isArray(values) || !isBoolean(payload?.complete))
+          throw new Error("Browser documents returned invalid identities.");
+        if (!payload.complete) complete = false;
         for (const value of values) {
           if (isString(value)) ids.add(value);
         }
       }
+      // A scan that hit the node budget proves nothing about the documents it never reached, and the
+      // caller frees the staged files of every id missing from this set. So an unvisited document is
+      // presumed open: keeping a staging directory until the tab closes costs a temp directory, while
+      // freeing one whose input is still live hands the page a path that no longer exists.
+      if (!complete) return new Set(this.#uploadDocumentIds);
       for (const documentId of this.#uploadDocumentIds) {
         if (!ids.has(documentId)) this.#uploadDocumentIds.delete(documentId);
       }
@@ -2354,7 +2378,9 @@ function documentIdsExpression(documentIds: string[]): string {
         }
       }
     }
-    return ids;
+    // Completeness is what the caller needs and cannot infer: an id absent from a truncated scan was
+    // never looked for, while an id absent from an exhaustive one is genuinely gone.
+    return { ids, complete: wanted.size === 0 || scanned < ${MAX_SNAPSHOT_SCANNED_NODES} };
   })()`;
 }
 

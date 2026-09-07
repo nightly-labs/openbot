@@ -145,7 +145,7 @@ const server = createServer((request, response) => {
     const port = request.socket.localPort;
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(`<!doctype html>
-      <label>Mode <select aria-label="Mode" oninput="this.dataset.inputTrusted=String(event.isTrusted)" onchange="this.dataset.changeTrusted=String(event.isTrusted)"><option value="a">Alpha</option><option value="b">Beta</option></select></label>
+      <label>Mode <select aria-label="Mode" oninput="this.dataset.inputTrusted=String(event.isTrusted)" onchange="this.dataset.changeTrusted=String(event.isTrusted)"><option value="a">Alpha</option><option value="b">Beta</option><option value="">Any mode</option></select></label>
       <label><input type="checkbox" aria-label="Agree" />Agree</label>
       <label><input type="radio" name="choice" aria-label="Primary choice" checked />Primary</label>
       <label><input type="radio" name="choice" aria-label="Secondary choice" />Secondary</label>
@@ -660,6 +660,27 @@ async function main(): Promise<void> {
     ) {
       throw new Error("V2 select did not use trusted native input.");
     }
+    // An option whose value is the empty string is how a page spells "no selection", and the value is
+    // the only way to address it -- its label is shared with Alpha's initial, so typeahead alone lands
+    // elsewhere. Rejecting the empty string as invalid put a real option out of reach.
+    const clearedSelection = await callBrowserTool(browser, "select_option", {
+      tabId: v2Tab.id,
+      target: { kind: "role", role: "combobox", name: "Mode", exact: true },
+      values: [""],
+    });
+    const clearedValue = await v2Contents.executeJavaScript(
+      `document.querySelector('[aria-label="Mode"]').value`,
+      true,
+    );
+    if (!clearedSelection.success || clearedValue !== "") {
+      throw new Error(`V2 select could not clear through an empty option: ${toolError(clearedSelection)}`);
+    }
+    const reselected = await callBrowserTool(browser, "select_option", {
+      tabId: v2Tab.id,
+      target: { kind: "role", role: "combobox", name: "Mode", exact: true },
+      values: ["b"],
+    });
+    if (!reselected.success) throw new Error(`V2 select could not restore a value: ${toolError(reselected)}`);
     const partialSelection = await callBrowserTool(browser, "select_option", {
       tabId: v2Tab.id,
       target: { kind: "role", role: "combobox", name: "Mode", exact: true },
@@ -800,6 +821,36 @@ async function main(): Promise<void> {
       .some((change) => change.tabId === keysTab.id && change.documentIds.has(shadowFrameDocumentId));
     if (!retainedShadowFrame) {
       throw new Error("V2 document enumeration lost an upload document inside a shadow-root iframe.");
+    }
+    // The same document, now behind a parent grown past the enumeration node budget. A walk that stops
+    // early never reaches the upload frame, and a partial list reported as complete is indistinguishable
+    // from a closed document -- which frees the files the input downstairs is still holding.
+    const grown = await callBrowserTool(browser, "evaluate", {
+      tabId: keysTab.id,
+      expression: `(() => {
+        const bulk = document.createElement('div');
+        for (let index = 0; index < 10500; index++) bulk.appendChild(document.createElement('span'));
+        document.body.appendChild(bulk);
+        return document.querySelectorAll('*').length;
+      })()`,
+    });
+    if (!grown.success) throw new Error(`V2 could not grow the keys document: ${toolError(grown)}`);
+    const changesBeforeGrownNavigation = retainedDocumentChanges.length;
+    await keysContents.executeJavaScript(
+      `(() => {
+        document.querySelector('iframe[title="Trigger frame"]').src = '/frame-files?file_label=Grown+files';
+        return true;
+      })()`,
+      true,
+    );
+    await waitFor(async () =>
+      retainedDocumentChanges.slice(changesBeforeGrownNavigation).some((change) => change.tabId === keysTab.id),
+    );
+    const retainedPastBudget = retainedDocumentChanges
+      .slice(changesBeforeGrownNavigation)
+      .some((change) => change.tabId === keysTab.id && change.documentIds.has(shadowFrameDocumentId));
+    if (!retainedPastBudget) {
+      throw new Error("V2 document enumeration reported a truncated scan as complete and lost an upload document.");
     }
     await browser.close(keysTab.id);
     // `submit: true` reached through a snapshot ref is the case that used to fail: typing changes a
