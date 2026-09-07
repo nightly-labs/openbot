@@ -157,15 +157,6 @@ export function retainedAutoReadState(entry: AgentAutoReadEntry | undefined): Co
   return entry.status === "succeeded" ? entry.state : entry.optimisticState;
 }
 
-/**
- * The newest revision applied for a conversation, or -1 when none is. Snapshots
- * and pages may re-apply their own revision, so they compare with `<`; a delta
- * has to advance it, so it compares with `<=`.
- */
-export function appliedConversationRevision(revisions: Record<string, number>, agentId: string): number {
-  return revisions[agentId] ?? -1;
-}
-
 /** What to do about a message the renderer would like to mark read. */
 export type AgentAutoReadDecision =
   /** Already asked for this message: repaint what that ask stands behind. */
