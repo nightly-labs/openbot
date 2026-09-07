@@ -1149,6 +1149,11 @@ describe.sequential("AgentService: queue", () => {
     const agentId = getString(created, "id");
     if (!agentId) throw new Error("The tool did not return the created agent id.");
     expect(service.listQueue(agentId).deliveries).toHaveLength(1);
+    await service.setAvatar(agentId, {
+      mimeType: "image/png",
+      bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    });
+    expect(store.resolveAvatar(agentId)).not.toBeNull();
     const invalid = await callOpenBotTool(client, threadId, "update_profile", {
       agentId,
       name: "Invalid",
@@ -1164,6 +1169,8 @@ describe.sequential("AgentService: queue", () => {
     expect(invalidCreation.error).toBeDefined();
     expect(service.listAgents().filter((agent) => agent.name === "Invalid")).toEqual([]);
     await callOpenBotTool(client, threadId, "update_profile", { agentId, avatarHue: null });
+    expect(service.listAgents().find((agent) => agent.id === agentId)?.avatarUrl).toBeNull();
+    expect(store.resolveAvatar(agentId)).toBeNull();
     const initialLayout = await callOpenBotTool(client, threadId, "list_sections", {});
     expect(openBotToolPayload(initialLayout.result)).toMatchObject({ sections: [], agentAssignments: {} });
     const grouped = await callOpenBotTool(client, threadId, "create_section", { name: "Research" });

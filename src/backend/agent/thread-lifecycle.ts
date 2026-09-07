@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import type { AgentClient, AgentProvider } from "../agent-client";
@@ -70,7 +70,9 @@ export class ThreadLifecycle {
     return this.#pendingHandoffs.get(threadId);
   }
 
-  deletePendingHandoff(threadId: string): void {
+  async deletePendingHandoff(threadId: string): Promise<void> {
+    if (!this.#pendingHandoffs.has(threadId)) return;
+    await rm(this.handoffPath(threadId), { force: true });
     this.#pendingHandoffs.delete(threadId);
   }
 
@@ -84,6 +86,12 @@ export class ThreadLifecycle {
     const currentAgent = this.#store.list().find((candidate) => candidate.id === agent.id) ?? agent;
     const session = this.#store.activeProviderSession(agent.id);
     if (session) {
+      try {
+        const handoff = await readFile(this.handoffPath(session.externalSessionId), "utf8");
+        this.#pendingHandoffs.set(session.externalSessionId, handoff);
+      } catch (error) {
+        if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+      }
       // Codex ignores dynamicTools on thread/resume. A replacement provider session is
       // required when tools change; the public thread and its history stay intact.
       if (client.provider === "codex" && !(await this.hasCurrentTools(session.externalSessionId))) {
@@ -132,13 +140,27 @@ export class ThreadLifecycle {
       await mkdir(this.toolManifestDirectory(), { recursive: true, mode: 0o700 });
       await writeFile(this.toolManifestPath(externalThreadId), this.toolFingerprint(), { mode: 0o600 });
     }
+    const handoff = this.buildProviderHandoff(agent.id, publicThreadId);
+    if (handoff) {
+      await mkdir(join(this.#store.database.userDataPath, "provider-handoffs"), { recursive: true, mode: 0o700 });
+      // Persist before binding the replacement: a crash must not activate a session
+      // whose first turn can no longer recover the existing conversation context.
+      await writeFile(this.handoffPath(externalThreadId), handoff, { mode: 0o600 });
+      this.#pendingHandoffs.set(externalThreadId, handoff);
+    }
     this.#store.bindProviderSession(agent.id, externalThreadId);
     this.#conversation.bindThread(externalThreadId, agent.id);
     this.#conversation.markThreadLoaded(externalThreadId, client);
     this.#conversation.ensureSnapshot(agent.id, publicThreadId);
-    const handoff = this.buildProviderHandoff(agent.id, publicThreadId);
-    if (handoff) this.#pendingHandoffs.set(externalThreadId, handoff);
     return externalThreadId;
+  }
+
+  private handoffPath(sessionId: string): string {
+    return join(
+      this.#store.database.userDataPath,
+      "provider-handoffs",
+      createHash("sha256").update(sessionId).digest("hex"),
+    );
   }
 
   private toolManifestDirectory(): string {
@@ -239,7 +261,7 @@ export class ThreadLifecycle {
   }
 
   buildProviderHandoff(agentId: string, threadId: string): string | null {
-    if (this.#store.database.listProviderSessions(threadId).length < 2) return null;
+    if (this.#store.database.listProviderSessions(threadId).length < 1) return null;
     const persisted = this.#store.database.readConversation(agentId, threadId);
     const messages = mergeConversationSnapshots(persisted, {
       agentId,

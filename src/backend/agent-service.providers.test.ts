@@ -41,7 +41,10 @@ afterEach(async () => {
 describe.sequential("AgentService: providers", () => {
   it("refreshes outdated Codex tools while preserving the agent and conversation, then resumes unchanged tools", async () => {
     const { store, mailbox } = stores(root);
-    const client = new FakeAgentClient("codex");
+    let rejectTurn = false;
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
+      if (method === "turn/start" && rejectTurn) throw new Error("Provider rejected the handoff turn.");
+    });
     const startService = async () => {
       const next = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
       await next.initialize();
@@ -59,9 +62,17 @@ describe.sequential("AgentService: providers", () => {
     if (!manifest) throw new Error("The session tool manifest was not saved.");
     await writeFile(join(directory, manifest), "old-toolset");
 
+    rejectTurn = true;
     service = await startService();
     await service.sendMessage({ agentId: "chief", text: "Group my researchers." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitFor(() => service?.listQueue("chief").deliveries.some((delivery) => delivery.status === "failed"));
+    await service.stop();
+    rejectTurn = false;
+    service = await startService();
+    await service.sendMessage({ agentId: "chief", text: "Try grouping them again." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
     const replacement = store.activeProviderSession("chief")?.externalSessionId;
     expect(replacement).not.toBe(originalSession);
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
@@ -90,7 +101,9 @@ describe.sequential("AgentService: providers", () => {
 
     service = await startService();
     await service.sendMessage({ agentId: "chief", text: "Continue." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
     expect(store.activeProviderSession("chief")?.externalSessionId).toBe(replacement);
     expect(client.requests.filter((request) => request.method === "thread/start")).toHaveLength(2);
   });

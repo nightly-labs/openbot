@@ -1213,7 +1213,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         throw new Error("At least one profile field is required.");
       }
       const input: UpdateAgentInput = { agentId, ...fields, ...(avatarHue === undefined ? {} : { avatarHue }) };
-      const updated = await this.updateAgent(input);
+      let updated = await this.updateAgent(input);
+      if (args.avatarSeed !== undefined || args.avatarHue !== undefined) {
+        updated = await this.setAvatar(agentId, null);
+      }
       return {
         success: true,
         contentItems: [

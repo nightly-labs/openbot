@@ -298,15 +298,18 @@ export class DrainScheduler {
           this.#threads.logRecovery(agent.id, client.provider, "resumed");
         }
       }
-      this.#threads.deletePendingHandoff(threadId);
       await this.#mailbox.markRunning(delivery.id, response.turn.id);
       confirmedTurnId = response.turn.id;
       const currentDelivery = this.#mailbox.getDelivery(delivery.id)?.delivery;
-      if (currentDelivery?.status !== "running" || currentDelivery.turnId !== response.turn.id) return;
-      snapshot.activeTurnId = response.turn.id;
-      this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.id);
-      this.#mailboxSync.emitQueue(agent.id);
-      this.#conversation.emitConversation(this.#conversation.snapshot(agent.id) ?? snapshot);
+      if (currentDelivery?.status === "running" && currentDelivery.turnId === response.turn.id) {
+        snapshot.activeTurnId = response.turn.id;
+        this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.id);
+        this.#mailboxSync.emitQueue(agent.id);
+        this.#conversation.emitConversation(this.#conversation.snapshot(agent.id) ?? snapshot);
+      }
+      await this.#threads.deletePendingHandoff(threadId).catch((error) => {
+        this.#hooks.emitError("history_handoff_cleanup_failed", error, agent.id);
+      });
     } catch (error) {
       const currentDelivery = this.#mailbox.getDelivery(delivery.id)?.delivery;
       if (confirmedTurnId && currentDelivery?.status === "running" && currentDelivery.turnId === confirmedTurnId) {

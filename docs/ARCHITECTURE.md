@@ -261,7 +261,8 @@ Codex fixes dynamic tools at provider-session creation; resume does not update t
 `provider-toolsets` manifest records the tool fingerprint for each new Codex session. Sessions with
 missing or outdated fingerprints are replaced before the next turn, using the existing history
 handoff while retaining the public thread, agent identity, workspace, and stored conversation.
-Unchanged fingerprints resume the existing session.
+Unchanged fingerprints resume the existing session. Pending history handoffs are written before
+the replacement is bound, reloaded after restart, and removed after a turn accepts the handoff.
 
 The optional `agent-profile-generation` Team API endpoints remain available. They use a separate
 provider client with tools restricted and validate drafts before returning them. Their save path
