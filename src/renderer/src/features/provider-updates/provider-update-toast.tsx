@@ -228,14 +228,19 @@ function liveToast(provider: AgentProviderId, presentation: ProviderUpdatePresen
     description: parts.description,
     action: { label: parts.label, onClick: parts.onClick },
     duration: PERSISTENT,
-    onDismiss: () => releaseProviderUpdateToast(provider),
+    onDismiss: () => {
+      if (liveToasts.get(provider) === parts.live) releaseProviderUpdateToast(provider);
+    },
   });
 
   return parts.live;
 }
 
-/** Offer the update. `onUpdate` starts it; the toast stays and becomes the progress report. */
+/** Open an offer or an explicitly started update. Reports alone never reopen a closed toast. */
 export function showProviderUpdateToast(update: ProviderUpdate, onUpdate: () => void): void {
+  const timer = dismissTimers.get(update.provider);
+  if (timer !== undefined) window.clearTimeout(timer);
+  dismissTimers.delete(update.provider);
   const presentation = presentProviderUpdate(update);
   const live = liveToast(update.provider, presentation);
   live.present(presentation);
@@ -249,8 +254,9 @@ export function showProviderUpdateToast(update: ProviderUpdate, onUpdate: () => 
  * own timer never started, and cannot be started now without replacing the notification.
  */
 export function reportProviderUpdateToast(update: ProviderUpdate, onRetry: () => void): void {
+  const live = liveToasts.get(update.provider);
+  if (!live) return;
   const presentation = presentProviderUpdate(update);
-  const live = liveToast(update.provider, presentation);
   live.present(presentation);
   live.setAct(onRetry);
 

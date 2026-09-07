@@ -3,7 +3,7 @@ import { createEffect, createSignal, createUniqueId, onCleanup, Show } from "sol
 import { expect, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { ProviderPicker, type ProviderPickerOption } from "../src/components/ProviderPicker";
-import { Button, Checkbox, Heading, Text, Toaster, toast } from "../src/components/ui";
+import { Button, Checkbox, Heading, Text, Toaster } from "../src/components/ui";
 import { type ProviderUpdate, providerUpdatesToAnnounce } from "../src/features/provider-updates/provider-update";
 import {
   dismissProviderUpdateToast,
@@ -70,6 +70,8 @@ function ProviderUpdateFlow(props: { failOnce?: boolean; controls?: boolean }) {
 
   function startUpdate(id: AgentProviderId): void {
     clearTimers();
+    const update = updates().find((update) => update.provider === id);
+    if (update) showProviderUpdateToast(update, () => startUpdate(id));
     running.add(id);
     setRuntime(id, { phase: "downloading", progress: 0, message: null });
     let progress = 0;
@@ -135,7 +137,7 @@ function ProviderUpdateFlow(props: { failOnce?: boolean; controls?: boolean }) {
 
   onCleanup(() => {
     clearTimers();
-    toast.dismiss();
+    for (const id of PROVIDERS) dismissProviderUpdateToast(id);
   });
 
   const options = (): ProviderPickerOption[] =>
