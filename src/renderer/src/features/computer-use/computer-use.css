@@ -38,11 +38,11 @@
   width: 30px;
   height: 30px;
   border-radius: var(--openbot-radius-md);
-  background: var(--openbot-settings-accent-soft);
+  background: var(--openbot-accent-soft);
 }
 
 .computer-use-permission-icon svg {
-  color: var(--openbot-settings-accent-text);
+  color: var(--openbot-accent-text);
 }
 
 .computer-use-helper-row .z-badge {
@@ -170,8 +170,8 @@
   place-items: center;
   flex: 0 0 auto;
   border-radius: var(--openbot-radius-md);
-  background: var(--openbot-settings-accent-soft);
-  color: var(--openbot-settings-accent-text);
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
 }
 
 .computer-use-setup-permission-icon svg {
@@ -219,7 +219,7 @@
 }
 
 .computer-use-drag-card:hover {
-  border-color: var(--openbot-settings-accent-strong);
+  border-color: var(--openbot-accent-strong);
   background: var(--openbot-bg-control-hover);
   transform: translateY(-1px);
 }

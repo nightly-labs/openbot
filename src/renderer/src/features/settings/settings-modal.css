@@ -19,13 +19,7 @@
 
 .settings-modal {
   --openbot-bg-surface: var(--openbot-bg-control);
-  --openbot-accent: var(--openbot-settings-accent);
-  --openbot-accent-hover: var(--openbot-settings-accent-hover);
-  --openbot-accent-text: var(--openbot-settings-accent-text);
-  --openbot-accent-soft: var(--openbot-settings-accent-soft);
-  --openbot-accent-strong: var(--openbot-settings-accent-strong);
   --openbot-text-muted: var(--openbot-settings-text-muted);
-  --openbot-border-focus: var(--openbot-settings-accent);
   --openbot-button-destructive: var(--openbot-settings-danger);
   --openbot-button-destructive-soft: var(--openbot-settings-danger-soft);
   --openbot-button-destructive-hover: var(--openbot-settings-danger-hover);
@@ -301,7 +295,7 @@
 }
 
 .settings-modal :where(.ui-button-variant-default) {
-  background: var(--openbot-settings-accent);
+  background: var(--openbot-accent);
   color: var(--openbot-text-primary);
 }
 
@@ -315,7 +309,7 @@
 }
 
 .settings-modal .ui-switch[data-checked] {
-  background: var(--openbot-settings-accent);
+  background: var(--openbot-accent);
 }
 
 .settings-modal .ui-switch-thumb[data-checked] {
@@ -324,7 +318,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .settings-modal :where(.ui-button-variant-default):hover:not(:disabled):not([data-disabled]) {
-    background: var(--openbot-settings-accent-hover);
+    background: var(--openbot-accent-hover);
   }
 
   .settings-modal :where(.ui-button-variant-destructive):hover:not(:disabled):not([data-disabled]) {

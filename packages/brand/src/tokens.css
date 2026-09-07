@@ -14,23 +14,23 @@
 
 :root {
   /* Grok Bot-inspired neutral system. Keep UI colors here, not in components. */
-  --openbot-bg-canvas: #070707;
-  --openbot-bg-canvas-clear: rgba(7, 7, 7, 0);
-  --openbot-bg-sidebar: #111111;
-  --openbot-bg-surface: #262626;
-  --openbot-bg-surface-clear: rgba(38, 38, 38, 0);
-  --openbot-bg-surface-raised: #2f2f2f;
-  --openbot-bg-control: #1b1b1b;
-  --openbot-bg-control-hover: #313131;
-  --openbot-bg-control-active: #3a3a3a;
-  --openbot-tabs-bar-bg: #202020;
-  --openbot-tabs-pill-bg: #454545;
+  --openbot-bg-canvas: #1a1a1a;
+  --openbot-bg-canvas-clear: rgba(26, 26, 26, 0);
+  --openbot-bg-sidebar: #1a1a1a;
+  --openbot-bg-surface: #212121;
+  --openbot-bg-surface-clear: rgba(33, 33, 33, 0);
+  --openbot-bg-surface-raised: #242424;
+  --openbot-bg-control: #212121;
+  --openbot-bg-control-hover: #242424;
+  --openbot-bg-control-active: #2a2a2a;
+  --openbot-tabs-bar-bg: #212121;
+  --openbot-tabs-pill-bg: #2f2f2f;
   --openbot-bg-switch: #5f5f5f;
-  --openbot-bg-overlay: rgba(7, 7, 7, 0.92);
+  --openbot-bg-overlay: rgba(26, 26, 26, 0.92);
   --openbot-dialog-overlay: rgba(0, 0, 0, 0.1);
   --openbot-dialog-ring: rgba(255, 255, 255, 0.1);
-  --openbot-command-overlay: rgba(7, 7, 7, 0.76);
-  --openbot-bg-glass: rgba(38, 38, 38, 0.76);
+  --openbot-command-overlay: rgba(26, 26, 26, 0.76);
+  --openbot-bg-glass: rgba(33, 33, 33, 0.76);
 
   /* Landing-page glass surfaces. Public web only, but declared here so the
      next person to reach for a translucent panel finds one already named. */
@@ -52,12 +52,12 @@
   --openbot-queue-border: var(--openbot-border-strong);
   --openbot-queue-text: var(--openbot-text-primary);
   --openbot-queue-action: var(--openbot-text-muted);
-  --openbot-border: rgba(255, 255, 255, 0.08);
-  --openbot-border-strong: rgba(255, 255, 255, 0.14);
+  --openbot-border: rgba(255, 255, 255, 0.055);
+  --openbot-border-strong: rgba(255, 255, 255, 0.11);
   --openbot-image-outline: rgba(255, 255, 255, 0.1);
-  --openbot-border-focus: rgba(105, 96, 241, 0.72);
-  --openbot-focus-tint: rgba(214, 173, 242, 0.34);
-  --openbot-text-primary: #f2f2f2;
+  --openbot-border-focus: rgba(0, 146, 255, 0.72);
+  --openbot-focus-tint: rgba(0, 146, 255, 0.34);
+  --openbot-text-primary: #ffffff;
   --openbot-text-on-light: #141414;
   --openbot-surface-light: #f0f0f0;
   --openbot-qr-background: #ffffff;
@@ -65,9 +65,9 @@
   --openbot-onboarding-desktop-blue: #7eb4f2;
   --openbot-onboarding-desktop-indigo: #6f7de8;
   --openbot-onboarding-window: #f3f5f8;
-  --openbot-text-secondary: rgba(255, 255, 255, 0.72);
-  --openbot-text-muted: rgba(255, 255, 255, 0.48);
-  --openbot-text-dim: rgba(255, 255, 255, 0.32);
+  --openbot-text-secondary: #c5c5c5;
+  --openbot-text-muted: #888888;
+  --openbot-text-dim: #6a6a6a;
   --openbot-text-readable: rgba(255, 255, 255, 0.52);
   --openbot-text-muted-on-light: rgba(20, 20, 20, 0.52);
   --openbot-text-dim-on-light: rgba(20, 20, 20, 0.36);
@@ -76,21 +76,16 @@
   --openbot-download-card-chip: rgba(20, 20, 20, 0.1);
   --openbot-download-card-border: rgba(20, 20, 20, 0.16);
   --openbot-download-card-focus: rgba(242, 242, 242, 0.86);
-  --openbot-text-placeholder: rgba(255, 255, 255, 0.38);
+  --openbot-text-placeholder: #acacac;
   --openbot-text-on-accent: #ffffff;
   --openbot-text-on-status: #07130c;
-  --openbot-accent: #6960f1;
-  --openbot-accent-hover: #7a73ff;
-  --openbot-accent-text: #a49fff;
-  --openbot-accent-soft: rgba(105, 96, 241, 0.16);
-  --openbot-accent-strong: rgba(105, 96, 241, 0.34);
+  --openbot-accent: #0092ff;
+  --openbot-accent-hover: #1fa2ff;
+  --openbot-accent-text: #6cc4ff;
+  --openbot-accent-soft: rgba(0, 146, 255, 0.16);
+  --openbot-accent-strong: rgba(0, 146, 255, 0.34);
   --openbot-action: #f0f0f0;
   --openbot-action-foreground: #141414;
-  --openbot-settings-accent: #3c82f6;
-  --openbot-settings-accent-hover: #4b8df7;
-  --openbot-settings-accent-text: #91b9fa;
-  --openbot-settings-accent-soft: rgba(60, 130, 246, 0.16);
-  --openbot-settings-accent-strong: rgba(60, 130, 246, 0.34);
   --openbot-settings-text-muted: rgba(255, 255, 255, 0.59);
   --openbot-settings-danger: #eb4145;
   --openbot-settings-danger-hover: #f05256;
@@ -124,6 +119,11 @@
   --openbot-message-badge-text: #91c8ff;
   --openbot-message-badge-soft: rgba(116, 185, 255, 0.16);
   --openbot-message-badge-border: rgba(116, 185, 255, 0.24);
+  /* The "new thing is available" pill. One call site - .sidebar-update-pill - and it
+     is deliberately not --openbot-accent: an announcement is not an action. */
+  --openbot-badge-new: #ff1e5e;
+  --openbot-badge-new-soft: rgba(255, 30, 94, 0.16);
+  --openbot-badge-new-border: rgba(255, 30, 94, 0.28);
   --openbot-approval-badge-soft: rgba(227, 184, 102, 0.18);
   --openbot-approval-badge-border: rgba(227, 184, 102, 0.3);
   --openbot-danger: #e47d75;
@@ -149,7 +149,7 @@
   --openbot-file-pink: #d98ac9;
   --openbot-file-pink-soft: rgba(217, 138, 201, 0.14);
   --openbot-file-purple: var(--openbot-accent-text);
-  --openbot-file-purple-soft: rgba(105, 96, 241, 0.14);
+  --openbot-file-purple-soft: rgba(0, 146, 255, 0.14);
   --openbot-data-table-header-bg: #242424;
   --openbot-data-table-body-bg: #1a1a1a;
   --openbot-data-table-border: #303030;
@@ -183,35 +183,56 @@
   --openbot-coral: var(--openbot-danger);
   --openbot-font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --openbot-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
-  --openbot-text-nano: 7px;
-  --openbot-text-micro: 8px;
-  --openbot-text-2xs: 10px;
-  --openbot-text-xs: 11px;
+  /* Six steps, one line-height each, named for the step it pairs with. The scale had
+   * sixteen sizes and eight line-heights, four of them a single call site, which is how
+   * an 11px size ended up paired with a 26px line-height. scripts/ui-foundation-check.ts
+   * holds "untokenized font-size" at zero, so a size that is not here has nowhere to go. */
   --openbot-text-sm: 12px;
   --openbot-text-md: 13px;
   --openbot-text-lg: 14px;
-  --openbot-text-base: 15px;
   --openbot-text-xl: 16px;
-  --openbot-text-settings-title: 18px;
-  --openbot-text-2xl: 20px;
+  --openbot-text-2xl: 18px;
   --openbot-text-3xl: 24px;
-  --openbot-text-4xl: 28px;
-  --openbot-text-5xl: 40px;
-  --openbot-text-display: 32px;
-  --openbot-text-hero: clamp(3rem, 8vw, 6.5rem);
-  --openbot-leading-xs: 14px;
   --openbot-leading-sm: 16px;
   --openbot-leading-md: 18px;
   --openbot-leading-lg: 20px;
   --openbot-leading-xl: 22px;
-  --openbot-leading-settings-title: 24px;
-  --openbot-leading-2xl: 26px;
+  --openbot-leading-2xl: 24px;
+  --openbot-leading-3xl: 30px;
+
+  /* Not scale steps, and named for their surface so they do not read as one. Three
+   * full-bleed screens (login wordmark, first-run setup, onboarding) and the public
+   * landing page carry type above 24px; .landing-hero-logo is sized in em off
+   * --openbot-text-hero, so that token is layout, not just type. */
+  --openbot-text-display: 32px;
   --openbot-leading-display: 38px;
+  --openbot-text-hero: clamp(3rem, 8vw, 6.5rem);
+
+  /* Glyphs, not copy: a file-extension string inside a fixed 16-24px chip. Below the
+   * scale's floor because the container is fixed, not because the text is small. Outside
+   * the text-* namespace so text-* means exactly the six steps above. */
+  --openbot-glyph-xs: 7px;
+  --openbot-glyph-sm: 8px;
+
+  /* TEMPORARY. Every name below is deleted once its call sites are rewritten onto the
+   * six-step scale; each one resolves to its replacement meanwhile so the retheme lands
+   * as one reviewable visual change and the call-site sweep as a provable no-op.
+   * scripts/design-tokens.test.ts names any reference left behind when they go. */
+  --openbot-text-nano: var(--openbot-glyph-xs);
+  --openbot-text-micro: var(--openbot-glyph-sm);
+  --openbot-text-2xs: var(--openbot-text-sm);
+  --openbot-text-xs: var(--openbot-text-sm);
+  --openbot-text-base: var(--openbot-text-lg);
+  --openbot-text-settings-title: var(--openbot-text-2xl);
+  --openbot-text-4xl: var(--openbot-text-3xl);
+  --openbot-text-5xl: 40px;
+  --openbot-leading-xs: var(--openbot-leading-sm);
+  --openbot-leading-settings-title: var(--openbot-leading-2xl);
   --openbot-weight-regular: 400;
   --openbot-weight-medium: 500;
   --openbot-weight-semibold: 600;
   --openbot-weight-bold: 700;
-  --openbot-tracking-tight: -0.02em;
+  --openbot-tracking-tight: -0.1px;
   --openbot-tracking-normal: 0;
   --openbot-tracking-wide: 0.02em;
   --openbot-space-0-5: 2px;
@@ -240,6 +261,10 @@
   --openbot-control-md: 32px;
   --openbot-control-lg: 36px;
   --openbot-control-xl: 40px;
+  /* Unitless on purpose. Lucide icons carry viewBox="0 0 24 24", so CSS stroke-width
+   * resolves in user units, not px: a literal 1px paints 1 * (16/24) = 0.67 device px at
+   * the 16px default size and reads blurry. 1.5 user units is the 1px the design asks for. */
+  --openbot-icon-stroke: 1.5;
   --openbot-icon-xs: 12px;
   --openbot-icon-sm: 14px;
   --openbot-icon-md: 16px;

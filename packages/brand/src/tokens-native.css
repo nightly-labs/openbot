@@ -53,31 +53,31 @@
      * variable from a @variant block, so a token @theme inline reaches through
      * var() has to be declared here or the utility resolves to nothing on native.
      * These two back tracking-openbot-tight and tracking-openbot-wide. */
-    --openbot-tracking-tight: -0.02em;
+    --openbot-tracking-tight: -0.1px;
     --openbot-tracking-wide: 0.02em;
   }
 
   @variant dark {
     /* biome-ignore lint/suspicious/noDuplicateCustomProperties: Theme variants intentionally share semantic token names. */
-    --openbot-bg-canvas: #070707;
-    --openbot-bg-sidebar: #111111;
-    --openbot-bg-surface: #262626;
-    --openbot-bg-surface-raised: #2f2f2f;
-    --openbot-bg-control: #1b1b1b;
-    --openbot-bg-control-active: #3a3a3a;
-    --openbot-bg-overlay: rgba(7, 7, 7, 0.92);
-    --openbot-border: rgba(255, 255, 255, 0.08);
-    --openbot-border-strong: rgba(255, 255, 255, 0.14);
-    --openbot-text-primary: #f2f2f2;
-    --openbot-text-secondary: rgba(255, 255, 255, 0.72);
-    --openbot-text-muted: rgba(255, 255, 255, 0.48);
-    --openbot-text-dim: rgba(255, 255, 255, 0.32);
+    --openbot-bg-canvas: #1a1a1a;
+    --openbot-bg-sidebar: #1a1a1a;
+    --openbot-bg-surface: #212121;
+    --openbot-bg-surface-raised: #242424;
+    --openbot-bg-control: #212121;
+    --openbot-bg-control-active: #2a2a2a;
+    --openbot-bg-overlay: rgba(26, 26, 26, 0.92);
+    --openbot-border: rgba(255, 255, 255, 0.055);
+    --openbot-border-strong: rgba(255, 255, 255, 0.11);
+    --openbot-text-primary: #ffffff;
+    --openbot-text-secondary: #c5c5c5;
+    --openbot-text-muted: #888888;
+    --openbot-text-dim: #6a6a6a;
     --openbot-text-on-accent: #ffffff;
     --openbot-text-on-status: #07130c;
     --openbot-action: #f0f0f0;
     --openbot-action-foreground: #141414;
-    --openbot-accent: #6960f1;
-    --openbot-accent-text: #a49fff;
+    --openbot-accent: #0092ff;
+    --openbot-accent-text: #6cc4ff;
     --openbot-logo-production: #d6adf2;
     --openbot-logo-eye: #040007;
     --openbot-success: #61c985;
@@ -87,7 +87,7 @@
     --openbot-scroll-edge-overlay: rgba(0, 0, 0, 0.72);
     --openbot-shadow-card: 0 0 0 transparent;
     --openbot-shadow-overlay: 0 12px 32px rgba(0, 0, 0, 0.48);
-    --openbot-tracking-tight: -0.02em;
+    --openbot-tracking-tight: -0.1px;
     --openbot-tracking-wide: 0.02em;
   }
 }

@@ -100,7 +100,7 @@
 }
 
 .settings-mobile-connect-expiry {
-  color: var(--openbot-settings-accent-text);
+  color: var(--openbot-accent-text);
   font-variant-numeric: tabular-nums;
 }
 

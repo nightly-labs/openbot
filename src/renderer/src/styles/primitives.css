@@ -442,9 +442,9 @@
 }
 
 :where(.z-badge-variant-info-light) {
-  border-color: var(--openbot-settings-accent-soft);
-  background: var(--openbot-settings-accent-soft);
-  color: var(--openbot-settings-accent-text);
+  border-color: var(--openbot-accent-soft);
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
 }
 
 :where(.z-badge-variant-primary-outline) {
@@ -474,7 +474,7 @@
 :where(.z-badge-variant-info-outline) {
   border-color: var(--openbot-border-strong);
   background: transparent;
-  color: var(--openbot-settings-accent-text);
+  color: var(--openbot-accent-text);
 }
 
 :where(.ui-checkbox) {

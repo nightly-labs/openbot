@@ -26,15 +26,15 @@
   align-items: center;
   border: 0;
   border-radius: var(--openbot-radius-lg) var(--openbot-radius-lg) var(--openbot-radius-md) var(--openbot-radius-md);
-  background: var(--openbot-settings-accent-strong);
-  box-shadow: 0 0 0 1px var(--openbot-settings-accent-soft);
+  background: var(--openbot-accent-strong);
+  box-shadow: 0 0 0 1px var(--openbot-accent-soft);
   -webkit-backdrop-filter: blur(var(--openbot-space-3));
   backdrop-filter: blur(var(--openbot-space-3));
   padding: calc(var(--openbot-space-1) + 1px) var(--openbot-space-1-5)
     calc(var(--openbot-space-4) + var(--openbot-space-1) - 1px);
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--openbot-space-2);
-  color: var(--openbot-settings-accent-text);
+  color: var(--openbot-accent-text);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -80,7 +80,7 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--openbot-settings-accent-text);
+  color: var(--openbot-accent-text);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
   line-height: var(--openbot-leading-sm);
