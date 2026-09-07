@@ -8,7 +8,6 @@ import type {
   AgentSummary,
 } from "@openbot/contracts/ipc";
 import { isReasoningEffort } from "@openbot/contracts/ipc";
-import { isString } from "@openbot/contracts/runtime-values";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import { type AgentCliInfo, CodexCliError, type CodexCliInfo, resolveCodexCli } from "./../cli";
@@ -22,6 +21,7 @@ import {
   decodeRecordResponse,
   getArray,
   isRecord,
+  type ModelListResponse,
 } from "./../protocol";
 import { BUILT_IN_PROVIDER_DRIVERS, type CliLoginCommand, requireProviderDriver } from "./../provider-drivers";
 import { normalizeAccountUsage } from "./account-usage";
@@ -148,10 +148,6 @@ const FALLBACK_MODELS: AgentModelOption[] = [
     supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
   },
 ];
-
-const CURATED_CODEX_MODEL_IDS = new Set(
-  FALLBACK_MODELS.filter((model) => model.provider === "codex").map((model) => model.id),
-);
 
 /**
  * Owns provider processes, their CLIs, accounts, login flows and the derived AgentStatus.
@@ -1080,23 +1076,31 @@ export class ProviderRuntime implements ProviderPort {
   async #refreshModelCatalog(): Promise<void> {
     const discovered = (
       await Promise.all(
-        [...this.#clients.values()].map(async (client): Promise<AgentModelOption[]> => {
+        BUILT_IN_PROVIDER_DRIVERS.map(async ({ id: provider }): Promise<AgentModelOption[]> => {
+          const previous = this.#models.filter((model) => model.provider === provider);
+          const client = this.#clients.get(provider);
+          if (!client) return provider === "grok" ? [] : previous;
           try {
-            const response = await client.request(
-              "model/list",
-              { limit: 100, includeHidden: false },
-              decodeModelListResponse,
-              5_000,
-            );
-            const serverModels = new Map(
-              response.data
-                .filter((item): item is typeof item & { model: string } => !item.hidden && isString(item.model))
-                .map((item) => [item.model, item] as const),
-            );
+            const serverModels = new Map<string, ModelListResponse["data"][number]>();
+            const cursors = new Set<string>();
+            let cursor: string | undefined;
+            do {
+              const response = await client.request(
+                "model/list",
+                { limit: 100, includeHidden: false, ...(cursor ? { cursor } : {}) },
+                decodeModelListResponse,
+                5_000,
+              );
+              for (const item of response.data) {
+                if (!item.hidden && item.model?.trim()) serverModels.set(item.model, item);
+              }
+              cursor = client.provider === "codex" ? response.nextCursor : undefined;
+              if (cursor && cursors.has(cursor)) throw new Error("Model discovery repeated a pagination cursor.");
+              if (cursor) cursors.add(cursor);
+            } while (cursor);
             const models: AgentModelOption[] = [];
             for (const server of serverModels.values()) {
               if (!server.model) continue;
-              if (client.provider === "codex" && !CURATED_CODEX_MODEL_IDS.has(server.model)) continue;
               const fallback = FALLBACK_MODELS.find(
                 (candidate) => candidate.provider === client.provider && candidate.id === server.model,
               );
@@ -1119,24 +1123,12 @@ export class ProviderRuntime implements ProviderPort {
             }
             return models;
           } catch {
-            return client.provider === "grok"
-              ? []
-              : FALLBACK_MODELS.filter((model) => model.provider === client.provider);
+            return client.provider === "grok" ? [] : previous;
           }
         }),
       )
     ).flat();
-    const discoveredById = new Map(discovered.map((model) => [`${model.provider}:${model.id}`, model]));
-    const staticModels = FALLBACK_MODELS.map(
-      (fallback) => discoveredById.get(`${fallback.provider}:${fallback.id}`) ?? fallback,
-    );
-    this.#models = [
-      ...staticModels,
-      ...discovered.filter(
-        (model) =>
-          !FALLBACK_MODELS.some((fallback) => fallback.provider === model.provider && fallback.id === model.id),
-      ),
-    ];
+    this.#models = discovered;
   }
 
   async #probeComputerUse(client: AgentClient): Promise<"ready" | "setup-required" | "unavailable"> {

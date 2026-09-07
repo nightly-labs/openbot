@@ -16,6 +16,8 @@ import {
   waitFor,
 } from "../agent-service-test-harness";
 
+import { getString } from "../protocol";
+
 let root: string;
 let service: AgentService | null = null;
 
@@ -81,15 +83,138 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
     expect(availableOrder).toEqual(["claude", "grok", "codex"]);
 
-    // The fake advertises gpt-5.5, gpt-5.4, gpt-5.4-mini and gpt-5.3-codex-spark
-    // alongside the curated three, so CURATED_CODEX_MODEL_IDS has to drop four.
     expect(
       service
         .listModels()
         .filter((model) => model.provider === "codex")
         .map((model) => model.id),
-    ).toEqual(["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"]);
+    ).toEqual([
+      "gpt-5.6-luna",
+      "gpt-5.6-terra",
+      "gpt-5.6-sol",
+      "gpt-5.5",
+      "gpt-5.4",
+      "gpt-5.4-mini",
+      "gpt-5.3-codex-spark",
+    ]);
   });
+  it("uses startup fallbacks when provider discovery is unavailable", async () => {
+    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+      const client = new FakeAgentClient(provider);
+      client.modelList = () => {
+        throw new Error("Discovery unavailable");
+      };
+      return client;
+    });
+    const fallback = service.listModels();
+    await service.initialize();
+    expect(service.listModels()).toEqual(fallback);
+  });
+
+  it.each(["codex", "claude"] as const)(
+    "discovers and refreshes %s models without losing the catalog on failure",
+    async (provider) => {
+      process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+      const { store, mailbox } = stores(root);
+      const client = new FakeAgentClient(provider);
+      const id = provider === "codex" ? "gpt-6-astra" : "claude-future-model";
+      let response: unknown = {
+        data: [
+          {
+            model: id,
+            displayName: "Discovered model",
+            defaultReasoningEffort: "high",
+            supportedReasoningEfforts: [{ reasoningEffort: "high" }],
+          },
+          { model: "hidden-model", hidden: true },
+        ],
+      };
+      let failure = false;
+      let queried = false;
+      client.modelList = () => {
+        queried = true;
+        if (failure) throw new Error("Discovery unavailable");
+        return response;
+      };
+      service = new AgentService(store, mailbox, fakeBrowser(), 30_000, provider, (candidate) =>
+        candidate === provider ? client : new FakeAgentClient(candidate),
+      );
+      await service.initialize();
+      const catalog = () => service?.listModels().filter((model) => model.provider === provider);
+      expect(catalog()).toEqual([
+        {
+          provider,
+          id,
+          name: "Discovered model",
+          description: expect.any(String),
+          defaultReasoningEffort: "high",
+          supportedReasoningEfforts: ["high"],
+        },
+      ]);
+
+      const refresh = async () => {
+        queried = false;
+        const current = service;
+        if (!current) throw new Error("Service not initialized");
+        const published = new Promise<void>((resolve) => {
+          const listener = (event: { type: string }) => {
+            if (event.type !== "status" || !queried) return;
+            current.off("event", listener);
+            resolve();
+          };
+          current.on("event", listener);
+        });
+        await current.refreshProviders();
+        await published;
+      };
+      failure = true;
+      await refresh();
+      expect(catalog()?.map((model) => model.id)).toEqual([id]);
+      failure = false;
+      response = { data: [{ model: id }, { model: "newly-available" }] };
+      await refresh();
+      expect(catalog()?.map((model) => model.id)).toEqual([id, "newly-available"]);
+      response = { data: [] };
+      await refresh();
+      expect(catalog()).toEqual([]);
+      failure = true;
+      await refresh();
+      expect(catalog()).toEqual([]);
+    },
+  );
+
+  it("collects all ChatGPT pages and keeps the previous catalog when pagination fails", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    let repeat = false;
+    client.modelList = (params) => {
+      const cursor = getString(params, "cursor");
+      return cursor
+        ? { data: [{ model: "gpt-6-astra" }, { model: "gpt-5.6-sol" }], nextCursor: repeat ? "page-2" : null }
+        : { data: [{ model: repeat ? "partial-result" : "gpt-5.6-sol" }], nextCursor: "page-2" };
+    };
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    expect(
+      service
+        .listModels()
+        .filter((model) => model.provider === "codex")
+        .map((model) => model.id),
+    ).toEqual(["gpt-5.6-sol", "gpt-6-astra"]);
+    expect(client.requests).toContainEqual({
+      method: "model/list",
+      params: { limit: 100, includeHidden: false, cursor: "page-2" },
+    });
+    const previous = service.listModels();
+    repeat = true;
+    // initialize awaits metadata discovery, unlike the background provider Refresh action.
+    await service.stop();
+    await service.initialize();
+    expect(service.listModels()).toEqual(previous);
+  });
+
   it("connects ChatGPT through the Codex App Server and promotes the authenticated client", async () => {
     const { store, mailbox } = stores(root);
     const codexClients: FakeAgentClient[] = [];
