@@ -249,3 +249,27 @@ for the division of labour and what each CI job covers.
 Changes to packaging, native modules, or Electron security also require the applicable macOS and
 Windows package verification commands. Live provider and team smoke tests use isolated temporary
 data and are manual because they can require local credentials.
+
+
+## Website analytics
+
+Public website tracking lives in `apps/auth-api/src/lib/analytics.ts`. It runs only on the
+production `openbot.run` hostname. Landing and invitation events carry a bounded
+`source_platform`, the existing `acquisition_source` category, and a domain-only referrer.
+
+A recognized `utm_source` tag takes precedence over the referring domain. Exact domain and
+subdomain matches select known platforms; URL paths and substring matches do not. Unrecognized
+platforms use `unknown`. No referral signal retains the coarse `direct` category, which does
+not prove a visitor typed the address. Raw campaign tags are never transmitted.
+See [PRIVACY.md](../PRIVACY.md) for the data boundary.
+
+The OpenPanel Growth dashboard uses a session funnel from `landing_viewed` to
+`landing_download_clicked`. A download click is not a completed download or installation.
+Break down the funnel by `acquisition_source`, then `source_platform` once schema version 7
+events reach OpenPanel. Historical events do not contain the new platform property.
+
+For download-click reports, `platform` means the requested macOS or Windows download;
+`placement` means the button location. These properties exist only on the download step.
+Use them to compare click counts, not as a shared visit-to-click funnel breakdown.
+The invitation-page funnel is separate: `join_page_action` with `action=view` followed by
+`action=download` or `action=open_app`.
