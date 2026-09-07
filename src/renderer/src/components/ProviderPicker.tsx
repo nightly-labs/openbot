@@ -143,7 +143,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       class={`provider-picker-status provider-picker-status-${visualState()}`}
                       tone={providerStatusTone(visualState())}
                       shape="pill"
-                      dot={runtimeStatus()?.phase !== "downloading"}
                     >
                       {providerStatusLabel(state(), connecting(), runtimeStatus())}
                     </Badge>

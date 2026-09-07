@@ -527,14 +527,6 @@
   stroke-width: 2.5;
 }
 
-.z-badge-dot {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 auto;
-  border-radius: var(--openbot-radius-pill);
-  background: currentColor;
-}
-
 :where(.ui-input, .ui-textarea, .ui-native-select) {
   width: 100%;
   min-width: 0;
