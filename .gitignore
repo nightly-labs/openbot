@@ -14,7 +14,6 @@ coverage/
 .dev.vars
 .dev.vars.*
 !.env.example
-!apps/auth-api/.env.dev
 !apps/auth-api/.env.production
 !remote/.env.production
 *.key

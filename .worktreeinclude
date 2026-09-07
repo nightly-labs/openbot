@@ -2,3 +2,6 @@
 .env.keys
 # Local dotenvx decryption key used by the Remote production stack.
 remote/.env.keys
+# Generated local development env file, so a worktree reuses this machine's dev identity
+# instead of generating a second one.
+apps/auth-api/.env.dev
