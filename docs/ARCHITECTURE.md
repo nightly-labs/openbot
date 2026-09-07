@@ -297,7 +297,10 @@ conversation. `openbot.create_agent` creates a persistent teammate with instruct
 task; `openbot.update_profile` changes an existing agent's name, title, instructions, or generated
 avatar. Both run through the existing agent service and validate arguments before changing state.
 Codex and Grok receive the dynamic tool definitions; Claude exposes the same operations through
-its SDK MCP bridge. There is no separate prompt-generation button or review dialog.
+its SDK MCP bridge. `src/backend/openbot-tools.ts` owns the tool names, descriptions, and Zod
+argument shapes used by both declarations. It reuses the profile, section, and routine schemas.
+Claude uses the SDK’s `AskUserQuestion` flow instead of the `ask_user` MCP tool.
+There is no separate prompt-generation button or review dialog.
 
 Agents can organize teammates into flat sidebar sections through `list_sections`, `create_section`,
 `rename_section`, `delete_section`, and `assign_agent_section`. Assignment accepts a null section

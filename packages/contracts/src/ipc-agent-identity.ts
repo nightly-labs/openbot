@@ -40,8 +40,10 @@ export function isReasoningEffort(value: unknown): value is AgentReasoningEffort
   return isOneOf(AGENT_REASONING_EFFORTS, value);
 }
 
+export const AVATAR_SEED_PATTERN = /^[a-z0-9:-]{1,128}$/;
+
 export function isAvatarSeed(value: unknown): value is string {
-  return isString(value) && /^[a-z0-9:-]{1,128}$/.test(value);
+  return isString(value) && AVATAR_SEED_PATTERN.test(value);
 }
 
 export function isAvatarHue(value: unknown): value is AvatarHue {
