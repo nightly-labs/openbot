@@ -58,6 +58,12 @@ the `media-attachments` capability; released protocol adapters keep their existi
 
 - `openbot.db` is the source of truth for OpenBot agents, conversations, queues, reactions,
   attachments, and provider-session bindings.
+- `MailboxStore` owns attachment records, staged generated attachments, mailbox commits, and the
+  file-deletion outbox. `AttachmentFiles` owns draft and transfer files: copying, size limits,
+  hashes, manifests, managed-path checks, and cleanup. It does not read or write the database.
+  Generated response attachments become visible only after the conversation and mailbox commit
+  succeeds. Agent deletion and queue edits record file removals in the mailbox transaction; the
+  deletion outbox retries failed removals.
 - `~/.codex`, `~/.claude`, and `~/.grok` are provider-owned login and resume state. They are not OpenBot
   conversation storage.
 - D1 is the source of truth for central accounts, remote membership, invitations, and logical sessions.
