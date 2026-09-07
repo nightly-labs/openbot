@@ -1,6 +1,7 @@
 import { ATTACHMENT_FILE_ACCEPT, IMAGE_ATTACHMENT_ACCEPT } from "@openbot/contracts/attachment-files";
 import { For, Loading, lazy, Show } from "solid-js";
 import {
+  ArrowUp,
   Button,
   DropdownMenu,
   File,
@@ -9,12 +10,13 @@ import {
   Input,
   LoaderCircle,
   Mic,
+  Plus,
   Puzzle,
 } from "../../components/ui";
 import { fileBadge, formatFileSize } from "./AttachmentCards";
 import { attachmentReferenceTone } from "./AttachmentReference";
 import { ComposerEditor } from "./ComposerEditor";
-import { CloseIcon, MoreIcon, PlusIcon, StopIcon } from "./ConversationIcons";
+import { CloseIcon, MoreIcon, StopIcon } from "./ConversationIcons";
 import { useConversationViewScope } from "./conversation-scope";
 import { RichMessageText } from "./RichMessageText";
 import { formatVoiceDuration, voiceButtonLabel } from "./voice-status";
@@ -229,7 +231,7 @@ export function ConversationComposer() {
                   !agentReady()
                 }
               >
-                <PlusIcon />
+                <Plus aria-hidden="true" />
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
                 <DropdownMenu.Content aria-label="Add to prompt">
@@ -288,7 +290,7 @@ export function ConversationComposer() {
                       }
                       fallback={<Mic aria-hidden="true" />}
                     >
-                      <LoaderCircle class="dictation-spinner" aria-hidden="true" />
+                      <LoaderCircle class="composer-spinner" aria-hidden="true" />
                     </Show>
                   </Button>
                 }
@@ -335,7 +337,9 @@ export function ConversationComposer() {
                     }
                     onClick={submitComposer}
                   >
-                    {submitting() ? "…" : "↑"}
+                    <Show when={submitting()} fallback={<ArrowUp aria-hidden="true" />}>
+                      <LoaderCircle class="composer-spinner" aria-hidden="true" />
+                    </Show>
                   </Button>
                 }
               >

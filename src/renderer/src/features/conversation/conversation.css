@@ -1258,8 +1258,10 @@
 }
 
 .agent-settings-field textarea {
+  field-sizing: content;
   min-height: 88px;
-  resize: none;
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 .agent-settings-field input::placeholder,
@@ -5865,6 +5867,9 @@ button.chat-action-target:active,
   place-items: center;
   border: 0;
   border-radius: var(--openbot-radius-pill);
+  /* Without this the button primitive's inline padding outgrows the 28px width
+     under border-box sizing and stretches the circle into a pill. */
+  padding: 0;
   background: var(--openbot-hover);
   color: var(--openbot-text-secondary);
   transition:
@@ -5910,6 +5915,7 @@ button.chat-action-target:active,
   place-items: center;
   border: 0;
   border-radius: var(--openbot-radius-pill);
+  padding: 0;
   background: transparent;
   color: var(--openbot-text-primary);
   transition: transform var(--openbot-duration-fast) var(--openbot-ease-out);
@@ -5948,12 +5954,14 @@ button.chat-action-target:active,
   color: var(--openbot-white);
 }
 
-.dictation-button svg {
-  width: 14px;
-  height: 14px;
+.composer-button svg,
+.dictation-button svg,
+.voice-button svg {
+  width: 16px;
+  height: 16px;
 }
 
-.dictation-spinner {
+.composer-spinner {
   animation: ui-spin 720ms linear infinite;
 }
 

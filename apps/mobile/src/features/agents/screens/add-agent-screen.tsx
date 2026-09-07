@@ -1,3 +1,4 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import * as Crypto from "expo-crypto";
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
@@ -55,14 +56,14 @@ export function AddAgentScreen() {
         autoCapitalize="words"
         autoFocus
         label="Name"
-        maxLength={80}
+        maxLength={INPUT_LIMITS.agentName}
         placeholder="Research partner"
         value={name}
         onChangeText={setName}
       />
       <SheetFormField
-        label="Role"
-        maxLength={240}
+        label="Instructions"
+        maxLength={INPUT_LIMITS.agentDescription}
         placeholder="What should this agent be good at?"
         value={description}
         onChangeText={setDescription}
