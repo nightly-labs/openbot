@@ -356,6 +356,7 @@ export function ConversationTimeline() {
                                 >
                                   <BubbleContent>
                                     <MessageBody
+                                      animate={animateEntrance}
                                       message={message() ?? initialMessage}
                                       referencedMessage={
                                         timelineMessages().find(

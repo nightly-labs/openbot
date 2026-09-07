@@ -314,3 +314,17 @@ export const ComparisonTableNarrow: Story = {
     await expect(region.scrollWidth).toBeGreaterThan(region.clientWidth);
   },
 };
+
+export const CompletedAnswerReveal: Story = {
+  args: {
+    message: {
+      ...message,
+      id: "completed-answer-reveal",
+      body: "## Findings\n\nThe final answer is ready with **formatted text**.\n\n- Review the changes\n- Run the checks",
+      animate: true,
+      streaming: false,
+      attachments: [],
+    },
+  },
+  render: (storyArgs) => <MessageBodySurface args={storyArgs} variant="ghost" width="460px" />,
+};

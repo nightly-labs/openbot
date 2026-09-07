@@ -36,19 +36,16 @@ function streamingTextGapMs(): number {
   return value.endsWith("s") && !value.endsWith("ms") ? amount * 1000 : amount;
 }
 
-function createStreamingBody(message: () => AgentMessage) {
+function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
   const initialMessage = untrack(message);
   const animateInitialText =
-    initialMessage.author === "agent" &&
-    initialMessage.streaming === true &&
-    initialMessage.animate === true &&
-    !prefersReducedMotion();
+    initialMessage.author === "agent" && (animate ?? initialMessage.animate) === true && !prefersReducedMotion();
   let targetBody = initialMessage.body;
   let targetStreaming = initialMessage.author === "agent" && initialMessage.streaming === true;
   const [body, setBody] = createSignal(animateInitialText ? "" : initialMessage.body);
   const [animateTail, setAnimateTail] = createSignal(false);
-  const [smoothHeight, setSmoothHeight] = createSignal(targetStreaming);
-  let smoothingActive = targetStreaming;
+  const [smoothHeight, setSmoothHeight] = createSignal(targetStreaming || animateInitialText);
+  let smoothingActive = targetStreaming || animateInitialText;
   let revealTimer: number | undefined;
   let smoothHeightTimer: number | undefined;
 
@@ -120,10 +117,12 @@ function createStreamingBody(message: () => AgentMessage) {
     clearRevealTimer();
     if (smoothHeightTimer !== undefined) window.clearTimeout(smoothHeightTimer);
   });
-  return { animateTail, body, smoothHeight };
+  const revealing = createMemo(() => message().streaming === true || body() !== message().body);
+  return { animateTail, body, smoothHeight, revealing };
 }
 
 export function MessageBody(props: {
+  animate?: boolean;
   message: AgentMessage;
   referencedMessage?: AgentMessage;
   agents: AgentProfile[];
@@ -136,7 +135,10 @@ export function MessageBody(props: {
   onOpenWorkspaceFile?: (path: string) => void;
   onDownload?: (attachment: AttachmentSummary) => void;
 }) {
-  const streamingBody = createStreamingBody(() => props.message);
+  const streamingBody = createStreamingBody(
+    () => props.message,
+    untrack(() => props.animate),
+  );
   const streamedBody = streamingBody.body;
   const selectionInstruction = createMemo(() =>
     props.message.author === "you" && props.message.replyToMessageId
@@ -166,7 +168,7 @@ export function MessageBody(props: {
   );
   const contentBlocks = createMemo<MessageContentBlock[]>(() =>
     props.message.author === "agent"
-      ? messageContentBlocks(streamedBody(), props.message.streaming === true)
+      ? messageContentBlocks(streamedBody(), streamingBody.revealing())
       : [{ type: "text", text: selectionInstruction()?.instruction ?? props.message.body }],
   );
   const lastTextBlockIndex = createMemo(() => {
@@ -241,7 +243,7 @@ export function MessageBody(props: {
                   return (
                     <CodeBlock
                       block={block}
-                      streaming={props.message.streaming === true && index() === contentBlocks().length - 1}
+                      streaming={streamingBody.revealing() && index() === contentBlocks().length - 1}
                     />
                   );
                 }
@@ -267,7 +269,7 @@ export function MessageBody(props: {
                         onOpenSharedFile={props.onOpenSharedFile}
                         onOpenWorkspaceFile={props.onOpenWorkspaceFile}
                         showCitationFooter={index() === lastTextBlockIndex()}
-                        streaming={props.message.streaming === true && index() === contentBlocks().length - 1}
+                        streaming={streamingBody.revealing() && index() === contentBlocks().length - 1}
                         streamingTail={streamingBody.animateTail() && index() === lastTextBlockIndex()}
                       />
                     </div>
