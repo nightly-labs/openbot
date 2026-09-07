@@ -60,6 +60,50 @@ export const ProviderUnavailable: Story = {
   },
 };
 
+/**
+ * The three isolated update states. An update is a re-download of a newer runtime, so the
+ * in-flight and failed rows reuse the Cancel and Retry buttons a first download already has.
+ */
+const claudeReady: ProviderPickerOption["runtimeStatus"] = {
+  phase: "ready",
+  progress: 100,
+  message: null,
+  version: "2.1.246",
+};
+
+function withClaudeUpdate(runtimeStatus: ProviderPickerOption["runtimeStatus"]): ProviderPickerOption[] {
+  return options.map((option) =>
+    option.id === "claude"
+      ? { ...option, state: "available", message: null, runtimeStatus, availableVersion: "2.1.250" }
+      : option,
+  );
+}
+
+export const UpdateAvailable: Story = {
+  args: { value: "claude", options: withClaudeUpdate(claudeReady), onUpdateProvider: fn() },
+};
+
+export const UpdateInProgress: Story = {
+  args: {
+    value: "claude",
+    options: withClaudeUpdate({ phase: "downloading", progress: 42, message: null, version: "2.1.246" }),
+    onCancelProviderDownload: fn(),
+  },
+};
+
+export const UpdateFailed: Story = {
+  args: {
+    value: "claude",
+    options: withClaudeUpdate({
+      phase: "download-error",
+      progress: 55,
+      message: "The update was interrupted.",
+      version: "2.1.246",
+    }),
+    onDownloadProvider: fn(),
+  },
+};
+
 export const AllowUnavailableSelection: Story = {
   args: {
     value: "claude",

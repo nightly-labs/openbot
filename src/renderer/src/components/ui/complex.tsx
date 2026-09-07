@@ -80,7 +80,17 @@ export const Dialog: DialogApi = {
   Portal: (props) => <DialogPrimitive.Portal {...props} />,
   Trigger: (props) => <DialogPrimitive.Trigger {...props} />,
   Overlay: (props) => <DialogPrimitive.Overlay {...props} class={withBaseClass("ui-dialog-overlay", props.class)} />,
-  Content: (props) => <DialogPrimitive.Content {...props} class={withBaseClass("ui-dialog-content", props.class)} />,
+  Content: (props) => (
+    <DialogPrimitive.Content
+      {...props}
+      class={withBaseClass("ui-dialog-content", props.class)}
+      onInteractOutside={(event) => {
+        props.onInteractOutside?.(event);
+        const target = event.detail.originalEvent.target;
+        if (target instanceof Element && target.closest("[data-kb-top-layer]")) event.preventDefault();
+      }}
+    />
+  ),
   Title: (props) => <DialogPrimitive.Title {...props} />,
   Description: (props) => <DialogPrimitive.Description {...props} />,
   CloseButton: (props) => <DialogPrimitive.CloseButton {...props} />,

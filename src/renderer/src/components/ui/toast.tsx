@@ -5,30 +5,40 @@ import { cx } from "./utils";
 
 export type ToasterProps = ComponentProps<typeof Sonner>;
 
+/**
+ * How long a notification stays before the Toaster dismisses it.
+ *
+ * Exported so that a caller which has to run its own timer - one holding a single toast open across
+ * a long operation, which sonner cannot re-arm - settles on the same count as everything else.
+ */
+export const TOAST_DURATION = 6_000;
+
 export function Toaster(props: ToasterProps): JSX.Element {
   return (
-    <Sonner
-      {...props}
-      class={cx("ui-toaster", (props.closeButton ?? true) && "ui-toaster-closeable", props.class)}
-      theme={props.theme ?? "dark"}
-      position={props.position ?? "top-right"}
-      visibleToasts={props.visibleToasts ?? 3}
-      duration={props.duration ?? 6_000}
-      gap={props.gap ?? 8}
-      richColors={props.richColors ?? false}
-      closeButton={props.closeButton ?? true}
-      pauseWhenPageIsHidden={props.pauseWhenPageIsHidden ?? true}
-      containerAriaLabel={props.containerAriaLabel ?? "Notifications"}
-      toastOptions={{ closeButtonAriaLabel: "Close notification", ...props.toastOptions }}
-      icons={{
-        success: <CircleCheck class="ui-toast-icon" aria-hidden="true" />,
-        info: <Info class="ui-toast-icon" aria-hidden="true" />,
-        warning: <TriangleAlert class="ui-toast-icon" aria-hidden="true" />,
-        error: <OctagonX class="ui-toast-icon" aria-hidden="true" />,
-        loading: <LoaderCircle class="ui-toast-icon ui-toast-loading-icon" aria-hidden="true" />,
-        ...props.icons,
-      }}
-    />
+    <div data-kb-top-layer="" class="ui-toast-layer">
+      <Sonner
+        {...props}
+        class={cx("ui-toaster", (props.closeButton ?? true) && "ui-toaster-closeable", props.class)}
+        theme={props.theme ?? "dark"}
+        position={props.position ?? "top-right"}
+        visibleToasts={props.visibleToasts ?? 3}
+        duration={props.duration ?? TOAST_DURATION}
+        gap={props.gap ?? 8}
+        richColors={props.richColors ?? false}
+        closeButton={props.closeButton ?? true}
+        pauseWhenPageIsHidden={props.pauseWhenPageIsHidden ?? true}
+        containerAriaLabel={props.containerAriaLabel ?? "Notifications"}
+        toastOptions={{ closeButtonAriaLabel: "Close notification", ...props.toastOptions }}
+        icons={{
+          success: <CircleCheck class="ui-toast-icon" aria-hidden="true" />,
+          info: <Info class="ui-toast-icon" aria-hidden="true" />,
+          warning: <TriangleAlert class="ui-toast-icon" aria-hidden="true" />,
+          error: <OctagonX class="ui-toast-icon" aria-hidden="true" />,
+          loading: <LoaderCircle class="ui-toast-icon ui-toast-loading-icon" aria-hidden="true" />,
+          ...props.icons,
+        }}
+      />
+    </div>
   );
 }
 

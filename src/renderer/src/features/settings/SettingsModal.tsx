@@ -56,8 +56,10 @@ export interface SettingsModalProps {
   processAvatarFile?: (file: File) => Promise<AvatarImageInput>;
   agentStatus?: AgentStatus;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
+  providerAvailableVersions?: Partial<Record<AgentProviderId, string | null>>;
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
+  onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
   hostedSitesApi?: HostedSitesDesktopApi;
   restoreFocusTarget?: HTMLElement | null;
@@ -204,6 +206,7 @@ export function SettingsModal(props: SettingsModalProps) {
             selectMount={modalElement}
             onDownloadProvider={props.onDownloadProvider}
             onCancelProviderDownload={props.onCancelProviderDownload}
+            onUpdateProvider={props.onUpdateProvider}
             onConnectProvider={props.onConnectProvider}
           />
         </Tabs.Content>

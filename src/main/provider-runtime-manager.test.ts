@@ -29,6 +29,9 @@ describe("ProviderRuntimeManager", () => {
     lock.grok.artifacts["darwin-arm64"].assetSha256 = digest(executable);
     lock.grok.licenseSha256 = digest(license);
     lock.grok.noticesSha256 = digest(notices);
+    const previousExecutable = join(root, "grok", "darwin-arm64", "1.0.21", "bin", "grok");
+    await mkdir(join(previousExecutable, ".."), { recursive: true });
+    await writeFile(previousExecutable, "previous runtime");
     const progress: number[] = [];
     const manager = new ProviderRuntimeManager({
       root,
@@ -42,7 +45,12 @@ describe("ProviderRuntimeManager", () => {
         return chunkedResponse(executable, 1_024, { etag: '"runtime-1"' });
       },
     });
-    await manager.initialize();
+    const initial = await manager.initialize();
+    expect(initial.providers.grok).toMatchObject({
+      phase: "not-downloaded",
+      version: "1.0.21",
+      availableVersion: "1.0.22",
+    });
     const finished = waitFor(manager, (snapshot) => snapshot.providers.grok.phase === "ready");
     manager.on("status", (snapshot) => {
       const value = snapshot.providers.grok.progress;
@@ -50,20 +58,41 @@ describe("ProviderRuntimeManager", () => {
     });
 
     const accepted = await manager.download("grok");
-    expect(accepted.providers.grok.phase).toBe("downloading");
+    expect(accepted.providers.grok).toMatchObject({
+      phase: "downloading",
+      version: "1.0.21",
+      availableVersion: "1.0.22",
+    });
     const snapshot = await finished;
 
-    expect(snapshot.providers.grok).toMatchObject({ phase: "ready", version: "1.0.22" });
+    expect(snapshot.providers.grok).toMatchObject({ phase: "ready", version: "1.0.22", availableVersion: null });
     expect(progress.length).toBeGreaterThan(2);
     expect(progress.every((value, index) => index === 0 || value >= (progress[index - 1] ?? 0))).toBe(true);
+    expect(await readFile(previousExecutable, "utf8")).toBe("previous runtime");
     const installed = manager.executablePath("grok");
     if (!installed) throw new Error("The managed Grok path is missing.");
     expect(await readFile(installed, "utf8")).toBe(new TextDecoder().decode(executable));
     expect((await readdir(join(root, "grok"))).some((entry) => entry.startsWith(".installing-"))).toBe(false);
   });
 
+  it.each(["9.0.0", "invalid-version", "1.0.21"])(
+    "does not offer an update for an incomplete or newer folder %s",
+    async (version) => {
+      const root = await temporaryRoot();
+      const bin = join(root, "grok", "darwin-arm64", version, "bin");
+      await mkdir(bin, { recursive: true });
+      if (version !== "1.0.21") await writeFile(join(bin, "grok"), "not an older runtime");
+      const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
+      const snapshot = await manager.initialize();
+      expect(snapshot.providers.grok).toMatchObject({ phase: "not-downloaded", version: null, availableVersion: null });
+    },
+  );
+
   it("allows three transfers and cancels only the selected provider", async () => {
     const root = await temporaryRoot();
+    const oldClaude = join(root, "claude", "darwin-arm64", "2.1.246", "bin", "claude");
+    await mkdir(join(oldClaude, ".."), { recursive: true });
+    await writeFile(oldClaude, "old runtime");
     const responseBody = new Uint8Array(64_000);
     const manager = new ProviderRuntimeManager({
       root,
@@ -82,7 +111,12 @@ describe("ProviderRuntimeManager", () => {
 
     await manager.cancel("claude");
     const snapshot = manager.getStatus();
-    expect(snapshot.providers.claude.phase).toBe("not-downloaded");
+    expect(snapshot.providers.claude).toMatchObject({
+      phase: "not-downloaded",
+      version: "2.1.246",
+      availableVersion: "2.1.263",
+    });
+    expect(await readFile(oldClaude, "utf8")).toBe("old runtime");
     expect(snapshot.providers.codex.phase).toBe("downloading");
     expect(snapshot.providers.grok.phase).toBe("downloading");
     await expect(access(join(root, ".downloads", "claude-darwin-arm64-2.1.263.partial"))).rejects.toThrow();
