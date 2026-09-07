@@ -1991,9 +1991,13 @@ async function main(): Promise<void> {
       : [];
     const clientHintBrands = getString(identity.requestHeaders, "sec-ch-ua") ?? "";
     const chromiumMajorVersion = process.versions.chrome.split(".")[0];
+    // The page and its requests present plain Chromium: neither the build token nor the app product
+    // token, which `navigator.userAgentData.brands` never carried either. A site that gates on a
+    // browser allowlist reads a product it does not know as an unsupported browser -- WhatsApp Web
+    // refuses to start on it, which blocks the QR login.
     if (
       headerSnapshot.text.includes("Electron/") ||
-      !headerSnapshot.text.includes("OpenBot/") ||
+      headerSnapshot.text.includes("OpenBot/") ||
       !navigatorUserAgent?.includes(`Chrome/${chromiumMajorVersion}`) ||
       getString(identity.requestHeaders, "user-agent") !== navigatorUserAgent ||
       identity.navigatorWebdriver !== false ||
