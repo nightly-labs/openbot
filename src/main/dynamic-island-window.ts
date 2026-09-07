@@ -10,12 +10,20 @@ import {
   IDLE_DYNAMIC_ISLAND_PRESENTATION,
   IPC_CHANNELS,
 } from "@openbot/contracts/ipc";
+import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
 import type { BrowserWindow, Display, Rectangle } from "electron";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
 import { sendToRenderer } from "./renderer-ipc";
 
+const logger = createOpenBotLogger("dynamic-island-window");
+
 export const DYNAMIC_ISLAND_WINDOW_SIZE = { width: 614, height: 380 } as const;
 const DYNAMIC_ISLAND_COMPACT_WINDOW_HEIGHT = 50;
+// Leaving interaction starts a collapse the renderer animates for roughly 600ms: the panel fades,
+// then the shell springs back down to the notch. The window is the only thing clipping it, so
+// dropping to the compact height on the same tick guillotines the still-tall island - the lower
+// half disappears at once while the top morphs. Hold the tall window until the shell has landed.
+export const DYNAMIC_ISLAND_COLLAPSE_SETTLE_MS = 700;
 
 const MACBOOK_NOTCH_REFERENCE = {
   displayWidth: 1512,
@@ -38,6 +46,7 @@ export interface DynamicIslandWindowControllerOptions {
   performCriticalAction: (
     action: Extract<DynamicIslandAction, { type: "answer-prompt" | "respond-approval" }>,
   ) => Promise<void>;
+  logger?: Logger;
 }
 
 export class DynamicIslandWindowController {
@@ -48,6 +57,7 @@ export class DynamicIslandWindowController {
   readonly #interactiveDisplays = new Set<number>();
   readonly #criticalActions = new Map<string, Promise<void>>();
   readonly #notchSizes = new Map<number, { width: number; height: number }>();
+  readonly #collapseTimers = new Map<number, ReturnType<typeof setTimeout>>();
   #preferenceMutation = Promise.resolve();
   #windowReconciliation = Promise.resolve();
   #destroyed = false;
@@ -116,10 +126,31 @@ export class DynamicIslandWindowController {
     else this.#interactiveDisplays.delete(displayId);
     const display = this.#options.getDisplays().find((candidate) => candidate.id === displayId);
     const bounds = display ? dynamicIslandWindowBounds(display) : undefined;
+    this.#cancelCollapse(displayId);
     if (interactive && bounds) window.setBounds(dynamicIslandInteractiveWindowBounds(bounds, true), false);
     window.setFocusable(interactive);
     window.setIgnoreMouseEvents(!interactive, { forward: true });
-    if (!interactive && bounds) window.setBounds(dynamicIslandInteractiveWindowBounds(bounds, false), false);
+    if (interactive || !bounds) return;
+    this.#collapseTimers.set(
+      displayId,
+      setTimeout(() => {
+        this.#collapseTimers.delete(displayId);
+        if (this.#interactiveDisplays.has(displayId) || window.isDestroyed()) return;
+        // The display can be rearranged while the island animates shut, and reconciliation will
+        // have moved the still-tall window to the new geometry. Ask where the window belongs now
+        // rather than replaying the rectangle captured when the pointer left.
+        const current = this.#options.getDisplays().find((candidate) => candidate.id === displayId);
+        if (!current) return;
+        window.setBounds(dynamicIslandInteractiveWindowBounds(dynamicIslandWindowBounds(current), false), false);
+      }, DYNAMIC_ISLAND_COLLAPSE_SETTLE_MS),
+    );
+  }
+
+  #cancelCollapse(displayId: number): void {
+    const timer = this.#collapseTimers.get(displayId);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    this.#collapseTimers.delete(displayId);
   }
 
   async performAction(action: DynamicIslandAction): Promise<void> {
@@ -175,6 +206,7 @@ export class DynamicIslandWindowController {
       this.#windows.delete(displayId);
       this.#interactiveDisplays.delete(displayId);
       this.#notchSizes.delete(displayId);
+      this.#cancelCollapse(displayId);
       if (!window.isDestroyed()) window.destroy();
     }
 
@@ -185,7 +217,10 @@ export class DynamicIslandWindowController {
       const current = this.#windows.get(display.id);
       if (current && !current.isDestroyed()) {
         current.setBounds(
-          dynamicIslandInteractiveWindowBounds(bounds, this.#interactiveDisplays.has(display.id)),
+          dynamicIslandInteractiveWindowBounds(
+            bounds,
+            this.#interactiveDisplays.has(display.id) || this.#collapseTimers.has(display.id),
+          ),
           false,
         );
         if (notchSizeChanged(this.#notchSizes.get(display.id), notchSize)) {
@@ -199,7 +234,10 @@ export class DynamicIslandWindowController {
       try {
         await this.createDisplayWindow(display, bounds);
       } catch (error) {
-        console.error(`Unable to load Dynamic Island on display ${display.id}:`, error);
+        (this.#options.logger ?? logger).error(
+          `Unable to load Dynamic Island on display ${display.id}:`,
+          toLogValue(error),
+        );
       }
     }
   }
@@ -238,6 +276,7 @@ export class DynamicIslandWindowController {
         this.#windows.delete(display.id);
         this.#interactiveDisplays.delete(display.id);
         this.#notchSizes.delete(display.id);
+        this.#cancelCollapse(display.id);
       }
     });
     try {
@@ -267,6 +306,7 @@ export class DynamicIslandWindowController {
   }
 
   private destroyWindows(): void {
+    for (const displayId of [...this.#collapseTimers.keys()]) this.#cancelCollapse(displayId);
     const windows = [...this.#windows.values()];
     this.#windows.clear();
     this.#interactiveDisplays.clear();
@@ -305,7 +345,7 @@ function notchSizeChanged(
 function criticalActionKey(
   action: Extract<DynamicIslandAction, { type: "answer-prompt" | "respond-approval" }>,
 ): string {
-  return [action.type, action.serverId, action.botId, String(action.requestId)].join("\u0000");
+  return [action.type, action.serverId, action.agentId, String(action.requestId)].join("\u0000");
 }
 
 export function dynamicIslandWindowBounds(display: Pick<Display, "bounds">): Rectangle {

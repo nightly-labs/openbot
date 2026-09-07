@@ -1,6 +1,6 @@
 import { BotEngine } from "@norbert_bodziony/bloub";
 import { describe, expect, it, vi } from "vitest";
-import { bloubActivityFrames, bloubActivityGeometry } from "../apps/mobile/src/features/bots/model/bloub-activity";
+import { bloubActivityFrames, bloubActivityGeometry } from "../apps/mobile/src/features/agents/model/bloub-activity";
 import {
   type LoaderFrame,
   prepareLoaderFrames,
@@ -103,8 +103,8 @@ describe("loader frame preparation", () => {
 });
 
 it("reuses sampled SVG data for separate presentations with the same avatar geometry", () => {
-  const header = bloubActivityFrames(bloubActivityGeometry("bot-test"));
-  const activity = bloubActivityFrames(bloubActivityGeometry("bot-test"));
+  const header = bloubActivityFrames(bloubActivityGeometry("agent-test"));
+  const activity = bloubActivityFrames(bloubActivityGeometry("agent-test"));
   expect(activity).toBe(header);
 });
 

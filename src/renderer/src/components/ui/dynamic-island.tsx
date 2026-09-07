@@ -1,7 +1,7 @@
 import type { DynamicIslandNotchSize } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, onCleanup, onSettled, Show, untrack } from "solid-js";
-import { cx } from "./utils";
+import { cx, mix, prefersReducedMotion } from "./utils";
 
 export type DynamicIslandViewState = "compact" | "expanded";
 export type DynamicIslandHoverBehavior = "none" | "grow" | "expand";
@@ -62,6 +62,13 @@ const HOVER_SPRING = {
 } as const;
 const CONTENT_SPRING = { response: 0.34, dampingFraction: 0.88 } as const;
 const CONTENT_EXIT_DURATION = 280;
+// The shell holds still for `CONTENT_EXIT_LEAD`, then contracts on `CLOSE_SPRING` and takes the
+// panel's lower half with it: the panel is pinned under the notch and `overflow: clip` on the shell
+// cuts whatever no longer fits. The old exit faded over the full 280ms at a near-unity scale, so
+// roughly 50px of still-visible content was guillotined mid-fade — the bottom vanished at once
+// while the top morphed. Finishing the fade before the shell's edge arrives, and keeping the
+// content shrinking toward the notch after it, makes the panel withdraw instead of being sliced.
+const CONTENT_EXIT_FADE_OFFSET = 0.45;
 const CONTENT_BLUR = 4;
 const CONTENT_ENTER_DELAY = 90;
 const CONTENT_BLUR_OPEN_DURATION = 460;
@@ -874,10 +881,6 @@ function springKeyframes(spring: Spring, frame: (progress: number) => Keyframe):
   });
 }
 
-function mix(start: number, end: number, progress: number): number {
-  return start + (end - start) * progress;
-}
-
 function resizeSpring(
   container: HTMLElement,
   start: { width: number; height: number },
@@ -962,8 +965,9 @@ function createSpringContentTransition(options: SpringContentTransitionOptions):
               })
             : animate(
                 [
-                  { opacity: startOpacity, transform: `translateY(0px) scale(${startScale})` },
-                  { opacity: 0, transform: "translateY(-4px) scale(0.985)" },
+                  { opacity: startOpacity, transform: `translateY(0px) scale(${startScale})`, offset: 0 },
+                  { opacity: 0, transform: "translateY(-6px) scale(0.94)", offset: CONTENT_EXIT_FADE_OFFSET },
+                  { opacity: 0, transform: "translateY(-12px) scale(0.86)", offset: 1 },
                 ],
                 {
                   duration: CONTENT_EXIT_DURATION,
@@ -1076,10 +1080,6 @@ function animateIslandBlur(targets: HTMLElement[], endBlur: number, options: Isl
 
 function captureIslandBlurs(targets: HTMLElement[]): Map<HTMLElement, number> {
   return new Map(targets.map((target) => [target, computedBlur(getComputedStyle(target).filter)]));
-}
-
-function prefersReducedMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
 
 function computedScale(transform: string): number {

@@ -39,7 +39,7 @@ describe("remote browser responses", () => {
         url: "https://example.com/",
         loading: false,
         ownerThreadId: "thread-1",
-        ownerBotId: "bot-1",
+        ownerAgentId: "bot-1",
       }),
     ).toMatchObject({ id: "tab-1", url: "https://example.com/" });
     expect(() => decodeBrowserTab(undefined)).toThrowError("Invalid remote browser tab.");
@@ -204,6 +204,29 @@ describe("remote server links", () => {
       await manager.stop();
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it("keeps a WebRTC host when the development bootstrap offers the same host over HTTP", async () => {
+    const hostId = "00000000-0000-4000-8000-0000000000fd";
+    const fixture = await createRemoteManager({
+      servers: [storedHttpsServer(hostId, { transport: "webrtc-v2", apiUrl: `webrtc://${hostId}` })],
+    });
+    // No routes: reaching the dev host over HTTP at all fails the test by name.
+    const team = stubTeamFetch();
+
+    const summary = await fixture.manager.connectDevelopmentServer({
+      serverId: hostId,
+      serverName: "OpenBot Local Dev Host",
+      apiUrl: "http://localhost:63762",
+      fingerprint: "fingerprint",
+      publicKey: "public-key",
+      username: "openbot-dev-client",
+      sessionToken: "development-token",
+    });
+
+    expect(team.calls).toEqual([]);
+    expect(summary).toMatchObject({ id: hostId, apiUrl: null });
+    expect(fixture.server(hostId)).toMatchObject({ apiUrl: null });
   });
 
   it("keeps the saved WebRTC host order and loads Remote Desktop readiness after connection", async () => {
@@ -606,6 +629,7 @@ describe("remote server order", () => {
         expect(url.searchParams.get("path")).toBe("~/OpenBot/Shared/report.csv");
       } else {
         expect(url.pathname).toBe("/v1/workspace-files");
+        // Read off the URL this client puts on the wire, so it carries the frozen `botId` spelling.
         expect(url.searchParams.get("botId")).toBe("chief");
         expect(url.searchParams.get("path")).toBe("app/page.tsx");
       }
@@ -718,6 +742,36 @@ describe("remote connection failures", () => {
     await fixture.manager.retryConnection(hostId);
     transport.emit("disconnected", hostId);
     expect(fixture.server(hostId)).toMatchObject({ state: "offline" });
+  });
+
+  // A retry has to leave a working host reading as working. `connect` on a channel that never
+  // dropped announces nothing -- there is no new session to announce -- so nothing else clears the
+  // "connecting" the retry itself just set, and the host read as reconnecting for as long as it
+  // stayed up.
+  it("puts a WebRTC host that was already connected back to online after a retry", async () => {
+    const hostId = "00000000-0000-4000-8000-0000000000fe";
+    const transport = fakeWebRtcTransport([
+      {
+        hostId,
+        name: "Host",
+        logoKey: null,
+        devicePublicKey: null,
+        authEpoch: 1,
+        membershipId: "member-1",
+        role: "member",
+      },
+    ]);
+    vi.spyOn(transport, "connect").mockResolvedValue(undefined);
+    vi.spyOn(transport, "isConnected").mockReturnValue(true);
+    const fixture = await createRemoteManager({
+      servers: [storedHttpsServer(hostId, { transport: "webrtc-v2", apiUrl: `webrtc://${hostId}` })],
+      appVersion: "0.4.0",
+      managerOptions: { webrtcTransport: transport },
+    });
+
+    await fixture.manager.retryConnection(hostId);
+
+    expect(fixture.server(hostId)).toMatchObject({ state: "online" });
   });
 
   // Signing in ends with the desktop probe, whose rejection `login` deliberately swallows -- the

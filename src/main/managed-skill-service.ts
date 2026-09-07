@@ -1,10 +1,13 @@
 import { lstat, mkdir, readFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import type { BotSummary } from "@openbot/contracts/ipc";
+import type { AgentSummary } from "@openbot/contracts/ipc";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 
 const MANAGED_SKILL_SLUG = "openbot-site-hosting";
 const OWNERSHIP_MARKER = ".openbot-managed.json";
 const OWNERSHIP_CONTENT = `${JSON.stringify({ managedBy: "openbot", slug: MANAGED_SKILL_SLUG, version: 1 })}\n`;
+
+const logger = createOpenBotLogger("managed-skill-service");
 
 interface SyncTargetsResult {
   collisions: string[];
@@ -17,14 +20,14 @@ export class ManagedSkillService {
   constructor(
     private readonly sourcePath: string,
     private readonly reportCollision: (target: string) => void = (target) => {
-      console.warn(`OpenBot preserved an unowned managed-skill collision at ${target}.`);
+      logger.warn(`OpenBot preserved an unowned managed-skill collision at ${target}.`);
     },
     private readonly reportFailure: (target: string, error: unknown) => void = (target, error) => {
-      console.error(`OpenBot could not synchronize the managed skill at ${target}.`, error);
+      logger.error(`OpenBot could not synchronize the managed skill at ${target}.`, toLogValue(error));
     },
   ) {}
 
-  async syncAll(bots: BotSummary[]): Promise<void> {
+  async syncAll(agents: AgentSummary[]): Promise<void> {
     let content: string;
     try {
       content = await this.content();
@@ -32,22 +35,22 @@ export class ManagedSkillService {
       this.reportFailure(this.sourcePath, error);
       return;
     }
-    const results = await Promise.allSettled(bots.map((bot) => syncTargets(bot.workspacePath, content)));
+    const results = await Promise.allSettled(agents.map((agent) => syncTargets(agent.workspacePath, content)));
     for (let index = 0; index < results.length; index += 1) {
       const result = results[index];
       if (result.status === "fulfilled") {
         this.reportResult(result.value);
       } else {
-        this.reportFailure(bots[index]?.workspacePath ?? "unknown workspace", result.reason);
+        this.reportFailure(agents[index]?.workspacePath ?? "unknown workspace", result.reason);
       }
     }
   }
 
-  async syncBot(bot: BotSummary): Promise<void> {
+  async syncAgent(agent: AgentSummary): Promise<void> {
     try {
-      this.reportResult(await syncTargets(bot.workspacePath, await this.content()));
+      this.reportResult(await syncTargets(agent.workspacePath, await this.content()));
     } catch (error) {
-      this.reportFailure(bot.workspacePath, error);
+      this.reportFailure(agent.workspacePath, error);
     }
   }
 

@@ -7,45 +7,51 @@ renderer do with it".
 
 ## Where an IPC endpoint goes
 
-A renderer-to-main endpoint is **declared in `packages/contracts`** and **registered in
-`src/main/ipc/`, one file per domain** — never inline in `index.ts`. `registerIpcHandlers` there is
-a dispatcher and nothing else: it wires dependencies and calls one `register*IpcHandlers` per
-domain, so a reviewer can read a domain's whole surface in one file instead of finding it
-interleaved with window and lifecycle code. `register-team-handlers.ts` is the shape to copy — a
-`*IpcDependencies` interface, object destructuring in the signature, no imports from `index.ts`.
+A renderer-to-main endpoint is **declared in `packages/contracts`** — a wire value in
+`ipc-channels.ts` and an entry in a group in `ipc-endpoints.ts` — and **implemented in
+`src/main/ipc/`, one file per domain**, never inline in `index.ts`. A module there exports one
+`*IpcHandlers` function that *returns* its handlers keyed by endpoint name rather than registering
+them; `registerIpcHandlers` in `index.ts` wires dependencies, spreads them all into
+`registerIpcGroups`, and does nothing else. `team-handlers.ts` is the shape to copy — a
+`*IpcDependencies` interface, object destructuring in the signature, a
+`Pick<IpcGroupHandlers, …>` return type, no imports from `index.ts`.
+
+That return type is what makes the main side exhaustive without a test. Miss an endpoint and it is
+`TS2741` naming the endpoint; add one the group never declared and it is `TS2353`; leave a whole
+group with no registrar behind it and `registerIpcGroups` in `index.ts` is `TS2741` naming the
+group. `ipc/AGENTS.md` has the four ways to bind a handler.
 
 Three things run at module scope in `index.ts` — `app.setPath`, `app.enableSandbox`,
 `protocol.registerSchemesAsPrivileged` — which is why nothing in the main process can be imported
 by a test that has not mocked `electron`, and why the coverage test below reads sources instead.
 
 - `handleTrusted` / `handleTrustedWithEvent` from `./trusted-ipc` are the only registration
-  primitives. `ipc-channel-coverage.test.ts` fails on the *name* `ipcMain` anywhere else in
-  `src/main`, because an aliased import would register an endpoint with no sender check that no
-  scan can see.
-- Parse every argument, and the type checker holds you to it. A channel with a payload takes the
-  decoder as the middle argument — `handleTrusted(channel, decode, handler)` — and the two overloads
-  leave a handler that declares a parameter no way to typecheck without one, because
-  `(input: unknown) => Result` is not assignable to the no-payload `() => Result`. `./ipc/validation.ts`
+  primitives, and `./ipc/define-ipc-group.ts` is the only caller of them.
+  `ipc-channel-coverage.test.ts` fails on the *name* `ipcMain` anywhere else in `src/main`, because
+  an aliased import would register an endpoint with no sender check that no scan can see, and on
+  either wrapper's name anywhere else, because both take a `string` channel — a direct call is a
+  privileged handler on a channel no group declares.
+- Parse every argument, and the type checker holds you to it. A handler with a payload is bound with
+  `payloadHandler(decode, handler)`, and there is no constructor that pairs a payload with a raw
+  `unknown`, because `(input: unknown) => Result` is not assignable to the no-payload `() => Result`
+  that `handler()` takes. `./ipc/validation.ts`
   has the primitives (`requireString`, `stringPayload`, `optionalPayload`, `nullishPayload`,
   `isObject`) and the `*-inputs.ts` files hold the per-domain parsers. Decoding runs *after* the
   sender check, so an untrusted frame never reaches a parser.
-- Never write a channel name as a string literal. Every reference goes through `IPC_CHANNELS`, and
-  the coverage test rejects a channel argument that is not a direct `IPC_CHANNELS.x` reference —
-  a literal or a variable would hide the endpoint from every assertion in that file.
+- Never write a channel name as a string literal. A handler never names a channel at all — the group
+  does — and the remaining references, all `sendToRenderer` calls, go through `IPC_CHANNELS`. The
+  coverage test rejects a channel argument that is not a direct `IPC_CHANNELS.x` reference: a literal
+  or a variable would hide the endpoint from every assertion in that file.
 - Sending to the renderer goes through `sendToRenderer` in `./renderer-ipc.ts`, which drops the
   message on a destroyed or still-loading window rather than throwing into the emitter.
 
-A domain module that is never called from `registerIpcHandlers` would otherwise be invisible: the
-coverage scan reads sources, so an orphaned file still looks registered while every channel in it
-rejects at runtime. `tsc` catches only half of it — deleting the call alone is `TS6133`, because the
-call site is the import's only use, but deleting the import along with it compiles, and so does a
-new registrar nobody wired up. "Calls every registrar under `src/main/ipc` exactly once from the
-dispatcher" in `ipc-channel-coverage.test.ts` is the other half. Do not silence a `TS6133` here by
-deleting the import; that turns the loud failure into the quiet one.
+A domain module the dispatcher never calls used to be invisible, and a test scanned for it. It is
+now the return type's job: the module's groups are missing from the `registerIpcGroups` argument, so
+deleting the spread and its import together is `TS2741` rather than a clean compile.
 
-Adding a channel touches four files in one change: the contract, `src/main/ipc/`,
-`src/preload/index.ts`, and `src/renderer/src/preview/mock-openbot.ts`. See
-`packages/contracts/AGENTS.md` for what enforces which pair.
+Adding a channel touches five files in one change: `ipc-channels.ts`, `ipc-endpoints.ts`,
+`src/main/ipc/`, `src/preload/index.ts`, and `src/renderer/src/preview/mock-openbot.ts`. Only the
+preload has no type behind it. See `packages/contracts/AGENTS.md` for what enforces which pair.
 
 ## The boundary is a Non-negotiable
 
@@ -55,6 +61,13 @@ is defence in depth. `trusted-renderer.ts` decides what an origin is, `renderer-
 it may ask for, `content-security-policy.ts` what it may load. Each has a test, and a change to any
 of them needs one. Widening `isTrustedRendererUrl` to accept a development convenience is the
 single most expensive edit available in this directory.
+
+The split is also enforced by path. `biome.json` gives `src/main`, `src/backend` and `src/preload` a
+`noRestrictedImports` group rejecting `**/renderer/**`, and the renderer the mirror of it, so the
+first import across the boundary fails `bun run lint` with the reason rather than passing review as
+a convenience. `src/main` importing `src/backend` is the one direction left open, and the handler
+registrations and the Team API server use it. Share a type through `packages/contracts` instead of
+reaching for the module.
 
 ## Waiting in a main-process test
 
@@ -83,6 +96,14 @@ from the tests that appeared to cover them. `FakeEventSocket` gets that right on
 `foo.ts` / `foo.test.ts`; the `agent-service.*.test.ts` pattern in `src/backend` is not the model
 here, because that one divides the tests of a class that refused to divide.
 
+`team-api-server.*.test.ts` is the one place that pattern *is* right, and for the same reason it is
+wrong above: `TeamApiServer` is a class that will not divide. Every case drives real HTTP against a
+real listener on a real port, so the only seam between two cases is the route they call - which is
+why the suite is cut by domain, alongside the route modules, rather than by unit. Its fixtures are
+`team-api-server-test-harness.ts`, and its header says what the harness will not default for you and
+why each of those defaults would quietly change what a case tests. `host-service.test.ts` came out of
+the same file: it was the block testing a different class.
+
 `electron` cannot be imported outside an Electron process, so a test for anything in here mocks it.
 `trusted-ipc.test.ts` shows the pattern: `vi.hoisted` a registrations `Map`, `vi.mock("electron")`
 to capture into it, then invoke the captured listener with a fabricated sender frame. Mocking is
@@ -91,7 +112,44 @@ not import `electron` in the first place.
 
 ## Size
 
-`index.ts` is the dispatcher plus window and lifecycle code and should not grow handlers again.
+`index.ts` is the dispatcher plus lifecycle code and should not grow service construction again.
+Eight things that used to live in it now have their own file, and none of them should come back:
+
+| File | What it owns |
+| --- | --- |
+| `application-services.ts` | building every service in dependency order, and nothing else |
+| `main-window.ts` | every `BrowserWindow`, the renderer URLs, the application menu, the bounds recorder |
+| `main-window-state.ts` | reading, resolving and debounce-writing the window's saved position |
+| `teardown-registry.ts` | the shutdown sequence, declared at construction rather than restated |
+| `development-remote-bootstrap.ts` | the dev-only `OPENBOT_DEV_REMOTE_ROLE` account and connection |
+| `session-configuration.ts` | the renderer CSP and bundle protocol, the permission handlers, the attachment/avatar/logo protocols |
+| `renderer-forwarders.ts` | the eleven service events relayed to the renderer |
+| `ipc/*-handlers.ts` | every IPC endpoint, one file per domain |
+
+`createApplicationServices` is **one function on purpose**, not a sequence of stages. A service
+assigned to a `const` and passed to a non-null parameter type-checks only through control-flow
+narrowing inside a single function body; cutting it into sub-stages would put a 15-field parameter
+object between every pair and bring back the ordering hazard below. It also *only constructs* — the
+event wiring, `registerIpcHandlers`, `loadRenderer` and `app.on("activate")` stay in `index.ts`,
+because a composition root that also wires ends up with a parameter list larger than its return
+value, which is a service locator with the dependency direction inverted.
+
+Each service registers its own teardown step next to its construction, with an explicit ordinal.
+The order is declared rather than inferred because shutdown here is largely *construction* order,
+not its reverse: the browser host closes before the picture-in-picture window that holds it, and the
+provider runtimes stop before the agent service that owns them.
+
+A dependency wired at module scope, before `app.whenReady()`, is passed as a **function** -
+`getAgentService: () => AgentService | null` - and read on every call, because nothing is
+constructed yet and a captured `null` never recovers. `renderer-forwarders.ts` and `main-window.ts`
+are the two that qualify, and they now read one handle each rather than eleven. Anything wired from
+*inside* `application-services.ts` takes the value: `configureAttachmentProtocol` and
+`configureServerLogoProtocols` both take `remoteServers: RemoteServerManager`, and the IPC
+registrars take their stores directly. Which of the two a dependency needs is the one thing here
+`tsc` cannot decide for you - `() => X | null` and `X | null` both type-check at every call site.
+The same trap has a second form inside the composition root: a constructor argument wants the
+window that exists now, while a callback that fires later must re-read `getMainWindow()`, or it goes
+stale the first time macOS closes and rebuilds the window.
 
 `remote-server-manager.ts` used to be the outlier at 2828 lines. It is now the composition root of a
 flat `remote-server-*` / `remote-*-decoding` family, and each of those files has exactly one reason
@@ -112,7 +170,51 @@ they *meet*: the request path never names the event stream and the event stream 
 path, so a callback passed in its constructor is how the two are connected. That indirection is the
 design, not an accident to tidy up.
 
+`team-api-server.ts` went the same way, one level down. The class, the WebSocket side and the
+lifecycle stay in it; the routes live in `src/main/team-api/`, one file per domain, each exporting a
+`route*(context, deps)` that answers `"handled"` or `"unmatched"` and declaring its own narrow
+`*RouteDependencies` in the shape `src/main/ipc/` uses:
+
+| Concern | File |
+| --- | --- |
+| the shared vocabulary: the class every route throws, the service types, the parsers, the context | `http-error.ts`, `dependencies.ts`, `request-helpers.ts`, `request-context.ts` |
+| members, invitations, sessions, presence, the account routes behind auth | `route-team.ts` |
+| one domain each | `route-remote-screen.ts`, `route-direct.ts`, `route-browser.ts`, `route-files.ts` |
+| the agent collection and the sole `/v1/agents/:agentId` regex, which owns the four below | `route-agents.ts` |
+| one agent sub-resource each | `route-agent-memories.ts`, `route-agent-routines.ts`, `route-agent-conversation.ts`, `route-agent-queue.ts` |
+
+A new endpoint goes in the module for its domain, and nothing else has to be read. Four invariants
+hold the split together, and the wire protocol is frozen (root AGENTS.md, Non-negotiable), so none of
+them is a preference:
+
+- **The gates run in order**: `compatibility`, then the remote-screen delegation, then the protocol
+  gate, then a path-independent 401. `compatibility` first is what stops an out-of-date client
+  looping on 426 with no way to read the endpoint telling it to update; the delegation above the
+  protocol gate is because a browser fetching the viewer sends no protocol header and no token; the
+  401 above the routes is why an unknown path without a token is 401 and not 404.
+- **The dispatcher owns the only 404.** A module that does not serve a path *or its method* returns
+  `"unmatched"` and never answers on its own. This is what keeps a wrong method on a known path
+  answering 404 rather than 405, which is what the released clients were built against.
+- **The dispatcher owns the only `catch`.** A local one would cut an unexpected error off from the
+  logger and answer 400 where the truth was a 500.
+- **`HttpError` has one definition**, in `http-error.ts`. The catch classifies by `instanceof`, so a
+  second copy silently turns every 400 into a 500 and no round-trip test sees it.
+
+The last statement of every route module is `return "unmatched"`, and what enforces that is the
+declared `Promise<RouteOutcome>` rather than the convention: falling out of the end is TS2366,
+"function lacks ending return statement". There is no `noImplicitReturns` here, so the annotation is
+the whole guard - a module that drops it gets `undefined` inferred, and `undefined` reads as a silent
+404. `tsc` covers this, so it does not want a test.
+
 Three things are deliberately not unified, and each says so in its own file header: the `FromHost`
 decoders and their `FromMain` twins in `src/preload/index.ts` (different trust boundaries), the HTTPS
 V1/V3 and WebRTC V2 wire encodings (released protocols), and the control-plane methods on
 `RemoteTeamDirectory` (a different server from the host).
+
+Only the first of those three is also *checked*. `ipc-channel-coverage.test.ts` compares the set of
+`decode*FromHost` names under `src/main` against the set of `decode*FromMain` names in the preload
+and fails unless they match exactly, so neither half can lose its twin - which is how the pair gets
+merged in practice: one is deleted, its callers point at the other, and trusted-sender validation
+ends up applied to a remote team server. Adding a decoder to one side means adding it to the other.
+The check enforces the naming bijection and nothing more; two names bound to one decoder still needs
+a reviewer, and the test says so where it is defined.

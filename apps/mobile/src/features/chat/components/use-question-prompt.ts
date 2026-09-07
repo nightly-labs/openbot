@@ -18,12 +18,12 @@ function initialState(scope: string): PromptState {
 }
 
 export function useQuestionPrompt(
-  botId: string,
+  agentId: string,
   message: Extract<ChatMessage, { kind: "question" }> | undefined,
   canSend: boolean,
-  respond: (botId: string, input: RespondToPromptInput) => Promise<void>,
+  respond: (agentId: string, input: RespondToPromptInput) => Promise<void>,
 ) {
-  const scope = JSON.stringify([botId, message?.id]);
+  const scope = JSON.stringify([agentId, message?.id]);
   const [stored, setState] = useState(() => initialState(scope));
   // A new form never inherits drafts (especially private answers) from its predecessor.
   const state = stored.scope === scope ? stored : initialState(scope);
@@ -43,7 +43,7 @@ export function useQuestionPrompt(
     submitting.current.add(scope);
     update({ pending: true, failedAnswers: null });
     try {
-      await respond(botId, { requestId: prompt.requestId, answers });
+      await respond(agentId, { requestId: prompt.requestId, answers });
       update({ resolution: answeredPromptResolution(prompt.questions, answers), answers: {}, drafts: {} });
     } catch {
       update({ failedAnswers: answers });

@@ -4,8 +4,8 @@ import { isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
 import type {
   AgentEvent,
+  AgentSummary,
   AvatarImageInput,
-  BotSummary,
   ConversationPage,
   ConversationPageAnchor,
   ConversationReadState,
@@ -21,7 +21,7 @@ import type {
   DirectTypingInput,
   DirectTypingRealtimeEvent,
   DraftAttachment,
-  DuplicateBotResult,
+  DuplicateAgentResult,
   InvitePreview,
   InviteSummary,
   JoinServerInput,
@@ -42,7 +42,7 @@ import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
-import { decodeBotSummary, decodeDraftAttachment, decodeDuplicateBotResultFromHost } from "./remote-agent-decoding";
+import { decodeAgentSummary, decodeDraftAttachment, decodeDuplicateAgentResultFromHost } from "./remote-agent-decoding";
 import {
   decodeConversationPageFromHost,
   decodeConversationReadState,
@@ -384,6 +384,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   async connectDevelopmentServer(input: DevelopmentRemoteServerConnection): Promise<ServerSummary> {
+    // A published dev host answers over WebRTC, and that membership belongs to an account the
+    // control plane keeps across restarts. The technical member this connection carries does not:
+    // publishing reconciles it away, so adopting an HTTP entry over the WebRTC one -- same host, so
+    // same id -- would replace a working server with one the host answers 401 to. The host role
+    // writes the file either way; which of the two connections wins is decided here.
+    const adopted = this.#store.find(input.serverId);
+    if (adopted?.transport === "webrtc-v2") return requiredServerSummary(this.list(), input.serverId);
     const verifiedIdentity = await this.#client.verifyIdentity(input.apiUrl, input.serverId, input.fingerprint);
     if (verifiedIdentity.publicKey !== input.publicKey || verifiedIdentity.serverName !== input.serverName) {
       throw new Error("The local development server identity changed.");
@@ -516,6 +523,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         this.#connections.setState(serverId, "connecting");
         this.#emitChanged();
         await this.#webrtcTransport.connect(serverId);
+        // The `connected` handler is what turns that "connecting" back into "online", and a host
+        // that was already connected raises no such event -- the session it would announce is the
+        // one still running. Retrying a host whose channel had never actually dropped therefore
+        // left it reading as reconnecting until it next went offline for real.
+        if (this.#connections.stateFor(serverId) === "connecting" && this.#webrtcTransport.isConnected(serverId)) {
+          this.#connections.markConnected(serverId);
+          this.#emitChanged();
+        }
         return requiredServerSummary(this.list(), serverId);
       }
       await this.#client.ensureCompatibility(server, true);
@@ -565,15 +580,15 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     return this.#client.request(serverId, path, decoder, init);
   }
 
-  async duplicateBot(botId: string, serverId = this.#store.activeServerId): Promise<DuplicateBotResult> {
-    const key = `${serverId}\0${botId}`;
+  async duplicateAgent(agentId: string, serverId = this.#store.activeServerId): Promise<DuplicateAgentResult> {
+    const key = `${serverId}\0${agentId}`;
     const operationId = this.#duplicateOperationIds.get(key) ?? randomUUID();
     this.#duplicateOperationIds.set(key, operationId);
     try {
       const result = await this.request(
         serverId,
-        TEAM_API_ROUTES.agent.duplicate(botId),
-        decodeDuplicateBotResultFromHost,
+        TEAM_API_ROUTES.agent.duplicate(agentId),
+        decodeDuplicateAgentResultFromHost,
         { method: "POST", body: { operationId }, timeoutMs: REMOTE_DUPLICATION_TIMEOUT_MS },
       );
       this.#duplicateOperationIds.delete(key);
@@ -590,32 +605,33 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     return this.request(serverId, TEAM_API_ROUTES.agents.conversationReads, decodeConversationReadStates);
   }
 
-  readAgentConversation(botId: string, serverId = this.#store.activeServerId): Promise<ConversationWithReadState> {
-    return this.request(serverId, TEAM_API_ROUTES.agent.conversation(botId), decodeConversationWithReadState);
+  readAgentConversation(agentId: string, serverId = this.#store.activeServerId): Promise<ConversationWithReadState> {
+    return this.request(serverId, TEAM_API_ROUTES.agent.conversation(agentId), decodeConversationWithReadState);
   }
 
   readAgentConversationPage(
-    botId: string,
+    agentId: string,
     anchor: ConversationPageAnchor = { type: "latest" },
     limit = 50,
     serverId = this.#store.activeServerId,
   ): Promise<ConversationPage> {
     return this.request(
       serverId,
-      `${TEAM_API_ROUTES.agent.conversationPage(botId)}${pageQuery(anchor, limit)}`,
+      `${TEAM_API_ROUTES.agent.conversationPage(agentId)}${pageQuery(anchor, limit)}`,
       decodeConversationPageFromHost,
     );
   }
 
   searchAgentConversationMessages(
     query: string,
-    botId?: string,
+    agentId?: string,
     cursor?: string,
     limit = 100,
     serverId = this.#store.activeServerId,
   ): Promise<ConversationSearchPage> {
     const parameters = new URLSearchParams({ q: query, limit: String(limit) });
-    if (botId) parameters.set("botId", botId);
+    // A query parameter never reaches the JSON adapters, so it keeps the released spelling.
+    if (agentId) parameters.set("botId", agentId);
     if (cursor) parameters.set("cursor", cursor);
     return this.request(
       serverId,
@@ -628,7 +644,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     input: MarkConversationReadInput,
     serverId = this.#store.activeServerId,
   ): Promise<ConversationReadState> {
-    return this.request(serverId, TEAM_API_ROUTES.agent.conversationRead(input.botId), decodeConversationReadState, {
+    return this.request(serverId, TEAM_API_ROUTES.agent.conversationRead(input.agentId), decodeConversationReadState, {
       method: "POST",
       body: { throughMessageId: input.throughMessageId },
     });
@@ -687,7 +703,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   setTyping(input: SetTeamTypingInput, serverId = this.#store.activeServerId): void {
     const server = this.#store.find(serverId);
     if (server?.transport === "webrtc-v2") {
-      void this.#webrtcTransport?.setTyping(serverId, input.botId, input.typing).catch(() => undefined);
+      void this.#webrtcTransport?.setTyping(serverId, input.agentId, input.typing).catch(() => undefined);
       return;
     }
     this.#events.send(serverId, { type: "team-typing", ...input });
@@ -798,12 +814,12 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   async setAgentAvatar(
-    botId: string,
+    agentId: string,
     image: AvatarImageInput | null,
     serverId = this.#store.activeServerId,
-  ): Promise<BotSummary> {
+  ): Promise<AgentSummary> {
     const server = this.#store.require(serverId);
-    const url = new URL(TEAM_API_ROUTES.agent.avatar(botId), server.apiUrl);
+    const url = new URL(TEAM_API_ROUTES.agent.avatar(agentId), server.apiUrl);
     const headers = new Headers();
     if (image) headers.set("Content-Type", image.mimeType);
     const response = await this.#client.fetch(server, url, {
@@ -817,16 +833,16 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       response.status,
       await response.json(),
     );
-    return addRemotePreviewUrls(decodeBotSummary(value), server.id);
+    return addRemotePreviewUrls(decodeAgentSummary(value), server.id);
   }
 
   async downloadAgentAvatar(
-    botId: string,
+    agentId: string,
     serverId = this.#store.activeServerId,
     version?: string,
   ): Promise<{ bytes: Uint8Array; mimeType: string }> {
     const server = this.#store.require(serverId);
-    const url = new URL(TEAM_API_ROUTES.agent.avatar(botId), server.apiUrl);
+    const url = new URL(TEAM_API_ROUTES.agent.avatar(agentId), server.apiUrl);
     if (version) url.searchParams.set("v", version);
     const response = await this.#client.fetch(server, url);
     return {
@@ -888,13 +904,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   async downloadWorkspaceFile(
-    botId: string,
+    agentId: string,
     workspacePath: string,
     serverId = this.#store.activeServerId,
   ): Promise<{ bytes: Uint8Array; name: string }> {
     const server = this.#store.require(serverId);
     const url = new URL(TEAM_API_ROUTES.workspaceFiles, server.apiUrl);
-    url.searchParams.set("botId", botId);
+    // A query parameter never reaches the JSON adapters, so it keeps the released spelling.
+    url.searchParams.set("botId", agentId);
     url.searchParams.set("path", workspacePath);
     const response = await this.#client.fetch(server, url);
     const disposition = response.headers.get("content-disposition") ?? "";
@@ -925,7 +942,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   async #syncWebRtcHosts(): Promise<void> {
     const transport = this.#webrtcTransport;
     if (!transport) return;
-    const { servers, removedHostIds, pinnedKeys } = reconcileWebRtcHosts({
+    const { servers, removedHostIds, staleTransportHostIds, pinnedKeys } = reconcileWebRtcHosts({
       hosts: await transport.listHosts(),
       servers: this.#store.servers,
       preservedIdentities: this.#store.preservedIdentities,
@@ -939,6 +956,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       await transport.disconnect(serverId).catch(() => undefined);
       this.#clearServerConnectionState(serverId);
     }
+    // Before the store changes, because after it `ensure` answers for the new entry: it branches on
+    // the transport it finds and starts the WebRTC one beside an HTTPS controller it never aborts,
+    // so both would deliver the same events and the socket for an entry that no longer exists could
+    // still mark a healthy host offline. No `disconnect` -- see `staleTransportHostIds`.
+    for (const serverId of staleTransportHostIds) this.#clearServerConnectionState(serverId);
     await this.#store.replaceServers(servers);
   }
 

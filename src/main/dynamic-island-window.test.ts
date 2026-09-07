@@ -10,10 +10,12 @@ import {
   type DynamicIslandPresentation,
   IPC_CHANNELS,
 } from "@openbot/contracts/ipc";
+import { createOpenBotLogger } from "@openbot/logging";
 import type { BrowserWindow, Display, Rectangle } from "electron";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as preferenceStore from "./dynamic-island-preference-store";
 import {
+  DYNAMIC_ISLAND_COLLAPSE_SETTLE_MS,
   DynamicIslandWindowController,
   dynamicIslandNotchSizeForDisplay,
   dynamicIslandWindowBounds,
@@ -36,9 +38,9 @@ function criticalPresentation(
   mode: "approval" | "question",
   requestId: string,
   serverId = "local",
-  botId = "chief",
+  agentId = "chief",
 ): DynamicIslandPresentation {
-  const bot = { id: botId, name: "Chief", avatarSeed: botId, avatarHue: 215 as const, avatarUrl: null };
+  const agent = { id: agentId, name: "Chief", avatarSeed: agentId, avatarHue: 215 as const, avatarUrl: null };
   if (mode === "approval") {
     return {
       serverId,
@@ -46,7 +48,7 @@ function criticalPresentation(
       remainingCount: 0,
       item: {
         requestId,
-        bot,
+        agent,
         title: "Approve",
         detail: "Review the request.",
         truncated: false,
@@ -67,7 +69,7 @@ function criticalPresentation(
     remainingCount: 0,
     item: {
       requestId,
-      bot,
+      agent,
       title: "Choose",
       detail: "Choose an option.",
       questions: [{ id: "choice", header: "Choose", question: "Choose an option.", isSecret: false, options: null }],
@@ -76,6 +78,7 @@ function criticalPresentation(
 }
 
 afterEach(async () => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
@@ -193,7 +196,12 @@ describe("dynamic island window geometry", () => {
     expect(windows[0]?.destroy).toHaveBeenCalledOnce();
     expect(windows[1]?.setBounds).toHaveBeenCalledWith({ x: 1793, y: 20, width: 614, height: 380 }, false);
 
+    // The window is the only thing clipping the island, so it keeps the tall bounds until the
+    // renderer's collapse animation has landed - otherwise the lower half is cut off at once.
+    vi.useFakeTimers();
     controller.setInteractive(43, false);
+    expect(windows[1]?.setBounds).not.toHaveBeenCalledWith({ x: 1793, y: 20, width: 614, height: 50 }, false);
+    await vi.advanceTimersByTimeAsync(DYNAMIC_ISLAND_COLLAPSE_SETTLE_MS);
     expect(windows[1]?.setBounds).toHaveBeenCalledWith({ x: 1793, y: 20, width: 614, height: 50 }, false);
   });
 
@@ -280,10 +288,11 @@ describe("dynamic island window geometry", () => {
   it("continues loading other displays when one overlay fails", async () => {
     const root = await temporaryRoot();
     const windows: FakeWindow[] = [];
-    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const lines: string[] = [];
     const controller = new DynamicIslandWindowController({
       platform: "darwin",
       preferencePath: join(root, "preference.json"),
+      logger: createOpenBotLogger("test", (line) => lines.push(line)),
       createWindow: (bounds) => {
         const window = new FakeWindow(80 + windows.length, bounds);
         windows.push(window);
@@ -305,7 +314,7 @@ describe("dynamic island window geometry", () => {
     expect(windows).toHaveLength(2);
     expect(windows[0]?.destroy).toHaveBeenCalledOnce();
     expect(controller.overlayRendererIds).toEqual(new Set([81]));
-    expect(error).toHaveBeenCalledWith("Unable to load Dynamic Island on display 1:", expect.any(Error));
+    expect(lines.some((line) => line.includes("Unable to load Dynamic Island on display 1:"))).toBe(true);
   });
 
   it("does not recreate overlays when disabling during display loading", async () => {
@@ -495,7 +504,7 @@ describe("dynamic island window geometry", () => {
     const action: DynamicIslandAction = {
       type: "answer-prompt",
       serverId: "local",
-      botId: "research",
+      agentId: "research",
       requestId: "prompt-1",
       answers: { source: ["Official data"] },
     };
@@ -537,7 +546,7 @@ describe("dynamic island window geometry", () => {
     const action = {
       type: "answer-prompt",
       serverId: "local",
-      botId: "chief",
+      agentId: "chief",
       requestId: "prompt-shared",
       answers: { source: ["Official data"] },
     } satisfies DynamicIslandAction;
@@ -577,7 +586,7 @@ describe("dynamic island window geometry", () => {
     const action = {
       type: "answer-prompt",
       serverId: "local",
-      botId: "chief",
+      agentId: "chief",
       requestId: "prompt-pinned",
       answers: { source: ["Official data"] },
     } satisfies DynamicIslandAction;
@@ -608,7 +617,7 @@ describe("dynamic island window geometry", () => {
     const action: DynamicIslandAction = {
       type: "answer-prompt",
       serverId: "remote",
-      botId: "research",
+      agentId: "research",
       requestId: "prompt-stale",
       answers: { source: ["Official data"] },
     };
@@ -639,7 +648,7 @@ describe("dynamic island window geometry", () => {
     const action = {
       type: "open-failure",
       serverId: "local",
-      botId: "research",
+      agentId: "research",
       turnId: "turn-failed",
     } satisfies DynamicIslandAction;
     mainWindow.webContents.isLoadingMainFrame.mockReturnValue(true);

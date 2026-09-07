@@ -1,0 +1,71 @@
+import { INPUT_LIMITS } from "./input-limits";
+import { type AgentProviderId, isAgentProvider } from "./ipc-agent-status";
+import { isBoundedString } from "./ipc-bounded-values";
+import { isDynamicRecord, isOneOf, isString } from "./runtime-values";
+
+export type AgentModelId = string;
+
+export const AGENT_REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+export type AgentReasoningEffort = (typeof AGENT_REASONING_EFFORTS)[number];
+
+export const AVATAR_HUES = [0, 30, 55, 100, 150, 185, 215, 245, 280, 320] as const;
+export type AvatarHue = (typeof AVATAR_HUES)[number];
+
+// Square brackets are in the set because a provider CLI puts them there: the Claude CLI reports its
+// 1M-context Fable variant as `claude-fable-5-1[1m]`, and every id this guard sees was minted by a
+// CLI OpenBot does not control. Without them the model was unselectable and, worse, unlistable --
+// `isAgentModelOption` refuses the option, and the list decoders on both the IPC and the Team API
+// side fail closed on the whole array with it, so one such id emptied the model picker locally and
+// took a remote server offline entirely. Failing closed is what the contract asks of a malformed
+// known payload and it stays, which leaves this charset as the only thing between a legitimate CLI
+// id and a bricked server -- so an id is a single opaque token here rather than a list of the models
+// this build happens to know: no whitespace, quotes, control characters or path separators beyond
+// the `/` a provider prefix uses, and nothing downstream builds a filesystem path or a URL out of
+// one -- `/v1/agents/models` takes no model parameter.
+export function isAgentModel(value: unknown): value is AgentModelId {
+  return isString(value) && value.length > 0 && value.length <= 160 && /^[A-Za-z0-9][A-Za-z0-9._:/[\]-]*$/.test(value);
+}
+
+export function isClaudeModel(model: AgentModelId): boolean {
+  return model.startsWith("claude-");
+}
+
+export function providerForLegacyModel(model: AgentModelId): AgentProviderId {
+  if (isClaudeModel(model)) return "claude";
+  if (model.startsWith("grok-")) return "grok";
+  return "codex";
+}
+
+export function isReasoningEffort(value: unknown): value is AgentReasoningEffort {
+  return isOneOf(AGENT_REASONING_EFFORTS, value);
+}
+
+export function isAvatarSeed(value: unknown): value is string {
+  return isString(value) && /^[a-z0-9:-]{1,128}$/.test(value);
+}
+
+export function isAvatarHue(value: unknown): value is AvatarHue {
+  return isOneOf(AVATAR_HUES, value);
+}
+
+export interface AgentModelOption {
+  provider: AgentProviderId;
+  id: AgentModelId;
+  name: string;
+  description: string;
+  defaultReasoningEffort: AgentReasoningEffort;
+  supportedReasoningEfforts: AgentReasoningEffort[];
+}
+
+export function isAgentModelOption(value: unknown): value is AgentModelOption {
+  return (
+    isDynamicRecord(value) &&
+    isAgentProvider(value.provider) &&
+    isAgentModel(value.id) &&
+    isBoundedString(value.name, INPUT_LIMITS.modelName) &&
+    isBoundedString(value.description, INPUT_LIMITS.agentDescription) &&
+    isReasoningEffort(value.defaultReasoningEffort) &&
+    Array.isArray(value.supportedReasoningEfforts) &&
+    value.supportedReasoningEfforts.every(isReasoningEffort)
+  );
+}

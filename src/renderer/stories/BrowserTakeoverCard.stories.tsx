@@ -1,7 +1,7 @@
 import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { BrowserTakeoverCard } from "../src/components/ConversationPrompts";
+import { BrowserTakeoverCard } from "../src/features/conversation/ConversationPrompts";
 import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
 
 const tab: BrowserTab = {
@@ -10,7 +10,7 @@ const tab: BrowserTab = {
   url: "https://accounts.example.com/login",
   loading: false,
   ownerThreadId: "thread-chief",
-  ownerBotId: "chief",
+  ownerAgentId: "chief",
 };
 
 const preview: BrowserPreview = {
@@ -23,7 +23,7 @@ const meta = {
   title: "Conversation/BrowserTakeoverCard",
   component: BrowserTakeoverCard,
   args: {
-    botName: "Chief",
+    agentName: "Chief",
     tab,
     preview,
     previewStatus: "ready",

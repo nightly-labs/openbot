@@ -36,6 +36,14 @@ export interface WebRtcHostReconciliation {
   readonly servers: StoredRemoteServer[];
   /** Stored WebRTC hosts the directory no longer lists. The caller disconnects and forgets these. */
   readonly removedHostIds: readonly string[];
+  /**
+   * Stored non-WebRTC hosts this reconciliation stops keeping: replaced by a directory listing for
+   * the same id, or dropped because a released build lets the directory own the list. The caller
+   * forgets their connection state, and does not disconnect -- they were never on the WebRTC
+   * transport, and where the id survives the only thing a disconnect could name is the entry that
+   * just replaced them.
+   */
+  readonly staleTransportHostIds: readonly string[];
   /** Keys the caller should pin on the transport, in directory order. */
   readonly pinnedKeys: readonly HostKeyPin[];
 }
@@ -82,8 +90,20 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
 
   const listedById = new Map(listed.map((server) => [server.id, server]));
   const seen = new Set<string>();
+  const staleTransportHostIds: string[] = [];
   const servers = input.servers.flatMap((server) => {
-    if (server.transport !== "webrtc-v2") return input.keepOtherTransports ? [{ ...server }] : [];
+    if (server.transport !== "webrtc-v2") {
+      // Development only, and only for a host the directory does not list. A listed one is this
+      // same host reached over WebRTC -- keeping the stored entry as well as appending the listing
+      // below would put one id in the list twice, and every lookup by id then answers whichever
+      // copy it reached first.
+      if (input.keepOtherTransports && !listedById.has(server.id)) return [{ ...server }];
+      // The entry goes, so whatever it opened has to go with it, and nothing else here says so:
+      // `removedHostIds` reports WebRTC ids, and a replaced id is still in `servers`, so a caller
+      // diffing the two lists sees this host as kept.
+      staleTransportHostIds.push(server.id);
+      return [];
+    }
     const refreshed = listedById.get(server.id);
     if (!refreshed) return [];
     seen.add(server.id);
@@ -100,6 +120,7 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
     removedHostIds: input.servers
       .filter((server) => server.transport === "webrtc-v2" && !seen.has(server.id))
       .map((server) => server.id),
+    staleTransportHostIds,
     pinnedKeys,
   };
 }

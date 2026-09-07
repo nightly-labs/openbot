@@ -4,7 +4,7 @@ import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-
 export function decodeConversation(value: unknown): ConversationSnapshot {
   if (
     !isDynamicRecord(value) ||
-    !isString(value.botId) ||
+    !isString(value.agentId) ||
     (value.threadId !== null && !isString(value.threadId)) ||
     (value.activeTurnId !== null && !isString(value.activeTurnId)) ||
     !isNumber(value.revision) ||
@@ -15,7 +15,7 @@ export function decodeConversation(value: unknown): ConversationSnapshot {
     throw new Error("The server returned an invalid conversation.");
   }
   return {
-    botId: value.botId,
+    agentId: value.agentId,
     threadId: value.threadId,
     activeTurnId: value.activeTurnId,
     revision: value.revision,

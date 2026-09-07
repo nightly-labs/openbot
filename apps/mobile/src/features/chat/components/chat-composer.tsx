@@ -10,7 +10,7 @@ import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-
 interface ChatComposerProps {
   action: ViewStyle["backgroundColor"];
   actionForeground: ViewStyle["backgroundColor"];
-  botName: string;
+  agentName: string;
   bottomInset: number;
   disabled: boolean;
   draft: string;
@@ -27,7 +27,7 @@ interface ChatComposerProps {
 export function ChatComposer({
   action,
   actionForeground,
-  botName,
+  agentName,
   bottomInset,
   disabled,
   draft,
@@ -102,7 +102,7 @@ export function ChatComposer({
       >
         <TextInput
           ref={inputRef}
-          accessibilityLabel={answerQuestion?.question ?? `Message ${botName}`}
+          accessibilityLabel={answerQuestion?.question ?? `Message ${agentName}`}
           accessibilityState={{ disabled }}
           editable={!disabled}
           showSoftInputOnFocus={!disabled}
@@ -112,7 +112,7 @@ export function ChatComposer({
               ? answerQuestion.isSecret
                 ? "Enter a private answer"
                 : "Type your answer"
-              : `Ask ${botName}`
+              : `Ask ${agentName}`
           }
           secureTextEntry={answerQuestion?.isSecret ?? false}
           autoCorrect={!answerQuestion?.isSecret}

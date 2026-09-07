@@ -1,40 +1,54 @@
 // @vitest-environment node
 
-// One channel list, two hand-written mirrors: the main process registers
-// handlers, the preload calls them, and only the type checker links the two.
-// It cannot link them completely - a channel the preload invokes with no main
-// handler type-checks and rejects at runtime, and a handler nobody calls is
-// dead trust-boundary surface. This test is that link.
+// What is left of the channel mirrors once the type checker owns the rest.
 //
-// Verification is static because neither side can be imported: src/main/index.ts
-// calls app.setPath, app.enableSandbox and protocol.registerSchemesAsPrivileged
-// at module scope and does not export its registrations, and src/preload/index.ts
-// calls contextBridge.exposeInMainWorld at module scope and exports nothing.
-// Reading the sources is safe here because a channel name is never written as a
-// literal on either side - every reference goes through IPC_CHANNELS. Two tests
-// below keep that true rather than assumed: one reads the channel argument of
-// every known call and rejects anything but a direct IPC_CHANNELS reference, so
-// a string or a variable cannot slip an endpoint past the scan, and one rejects
-// an IPC_CHANNELS reference no known call reads.
+// The main process no longer names a channel to register one: `registerIpcGroups` in
+// src/main/ipc/define-ipc-group.ts takes an object keyed by every group and every request
+// endpoint IPC_ENDPOINTS declares, so a missing handler, a stray handler and an unregistered
+// group are all compile errors that name what is wrong. The tests that scanned src/main for
+// `handleTrusted` calls and for a registrar the dispatcher forgot are gone with them.
+//
+// Three links have no type to carry them, and they are what is left here:
+//
+//   - the preload invokes and subscribes by channel, and its API object is shaped for the
+//     renderer rather than for IPC_ENDPOINTS, so nothing pairs a method with an endpoint;
+//   - an event is sent from wherever it happens, by any number of call sites, so "every event
+//     channel has a sender" is a property of the source and not of a type;
+//   - the sender check, the rule that keeps every registration behind it, and the rule that
+//     keeps the wrappers themselves reachable only from the binder.
+//
+// Verification is static because neither side can be imported: src/main/index.ts calls
+// app.setPath, app.enableSandbox and protocol.registerSchemesAsPrivileged at module scope and
+// does not export its registrations, and src/preload/index.ts calls contextBridge.exposeInMainWorld
+// at module scope and exports nothing. Reading the sources is safe here because a channel name is
+// never written as a literal on either side - every reference goes through IPC_CHANNELS. Two tests
+// below keep that true rather than assumed: one reads the channel argument of every known call and
+// rejects anything but a direct IPC_CHANNELS reference, so a string or a variable cannot slip an
+// endpoint past the scan, and one rejects an IPC_CHANNELS reference no known call reads.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { IPC_CHANNELS } from "@openbot/contracts/ipc";
+import { IPC_CHANNELS, IPC_ENDPOINTS, type IpcEndpoint, type IpcEndpointGroup } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 
 const repositoryRoot = resolve(import.meta.dirname, "../..");
 
 // The channel is the first argument to each of these, except sendToRenderer,
-// where it follows the target window. What comes after the channel varies —
-// handleTrusted takes either a handler alone or a payload decoder and a handler —
-// and the scan reads only the channel position, so it does not care.
-const MAIN_HANDLER_CALLEES = ["handleTrusted", "handleTrustedWithEvent"];
+// where it follows the target window. What comes after the channel varies, and
+// the scan reads only the channel position, so it does not care.
 const MAIN_SEND_CALLEES = ["sendToRenderer"];
 const PRELOAD_INVOKE_CALLEES = ["ipcRenderer.invoke", "invokeAgent", "invokeAgentForServer"];
 const PRELOAD_SUBSCRIBE_CALLEES = ["ipcRenderer.on", "ipcRenderer.once"];
 const PRELOAD_UNSUBSCRIBE_CALLEES = ["ipcRenderer.removeListener", "ipcRenderer.off"];
 
-const declaredChannels = Object.keys(IPC_CHANNELS).sort();
+// IPC_ENDPOINTS says which kind each channel is; the scans below produce IPC_CHANNELS keys, so
+// the wire values come back through this to compare against them.
+const channelKeys = new Map(
+  Object.entries(IPC_CHANNELS).map(([key, value]): readonly [string, string] => [value, key]),
+);
+
+const requestChannels = channelsOfKind("request");
+const eventChannels = channelsOfKind("event");
 
 // Two of the calls address a recipient before the channel: sendToRenderer takes
 // the target window, invokeAgentForServer the server id.
@@ -42,13 +56,9 @@ const CHANNEL_AFTER_RECIPIENT = ["sendToRenderer", "invokeAgentForServer"];
 
 // Every call shape the scan knows, with the position its channel argument sits in.
 const CHANNEL_ARGUMENT_POSITION: ReadonlyMap<string, number> = new Map(
-  [
-    ...MAIN_HANDLER_CALLEES,
-    ...MAIN_SEND_CALLEES,
-    ...PRELOAD_INVOKE_CALLEES,
-    ...PRELOAD_SUBSCRIBE_CALLEES,
-    ...PRELOAD_UNSUBSCRIBE_CALLEES,
-  ].map((callee): readonly [string, number] => [callee, CHANNEL_AFTER_RECIPIENT.includes(callee) ? 1 : 0]),
+  [...MAIN_SEND_CALLEES, ...PRELOAD_INVOKE_CALLEES, ...PRELOAD_SUBSCRIBE_CALLEES, ...PRELOAD_UNSUBSCRIBE_CALLEES].map(
+    (callee): readonly [string, number] => [callee, CHANNEL_AFTER_RECIPIENT.includes(callee) ? 1 : 0],
+  ),
 );
 
 const CHANNEL_REFERENCE = /^IPC_CHANNELS\.([A-Za-z0-9_]+)$/;
@@ -59,22 +69,42 @@ const mainSources = sourceFilesUnder("src/main");
 const PRELOAD_MODULE = "src/preload/index.ts";
 const preloadSources = [PRELOAD_MODULE];
 
-// The dispatcher, and the directory whose modules it has to reach.
-const DISPATCHER_MODULE = "src/main/index.ts";
-const REGISTRAR_DIRECTORY = "src/main/ipc/";
-
-// `export function registerSomethingIpcHandlers(` - the shape src/main/AGENTS.md
-// requires of every module under src/main/ipc.
-const REGISTRAR_EXPORT = /export function (register[A-Za-z0-9_]*IpcHandlers)\s*\(/g;
-
 // The one module allowed to touch ipcMain, because it is the sender check.
 const TRUSTED_IPC_MODULE = "src/main/trusted-ipc.ts";
+
+// The one module allowed to name the wrappers, because it is the only one that reads a channel out
+// of the manifest to hand them.
+const BINDER_MODULE = "src/main/ipc/define-ipc-group.ts";
+
+// The wrappers by name. The scan reads names rather than the import path because readSource strips
+// string literals, and a name has to appear to be imported, called, or aliased at all.
+const TRUSTED_WRAPPERS = /\bhandleTrusted(?:WithEvent)?\b/;
 
 // The parameter both wrappers take and pass straight to ipcMain.
 const WRAPPER_CHANNEL_PARAMETER = "channel";
 
 // The call that makes a registration a trusted one.
 const SENDER_CHECK = "isTrustedRendererUrl";
+
+// How many twin decoders the pair currently has. The comparison below is between
+// two sets, so a regex that stopped matching would leave both empty and green;
+// this is the floor that makes that failure loud instead.
+const TWIN_DECODER_FLOOR = 8;
+
+// Every twin in the tree is a `function` today, so the alias check below matches
+// nothing and would stay green even if its pattern stopped working. This is that
+// check's fixture: each line it must reject beside a correct one it must leave
+// alone, the way a rule under `tools/biome/anti-slop/rules` carries one.
+const TWIN_ALIAS_FIXTURE = `
+const decodeAliasedFromMain = decodeAliasedFromHost;
+const decodeAnnotatedFromMain: Decoder<Alias> = shared.decodeAliasedFromHost as Decoder<Alias>;
+const decodeSignedFromMain: (value: unknown) => Alias = decodeAliasedFromHost;
+const decodeBuiltFromHost = guardedDecoder(isBuilt, "built");
+const decodeInlineFromHost = (value: unknown) => (isInline(value) ? value : null);
+function decodeWrittenFromMain(value: unknown): Written | null {
+  return isWritten(value) ? value : null;
+}
+`;
 
 // The preload's agent helpers take the channel as a parameter and pass it on,
 // so the forwarding call names a variable by design. Their own call sites carry
@@ -88,16 +118,6 @@ const FORWARDED_CHANNEL_ARGUMENTS: readonly string[] = [
 const mainCalls = collectCalls(mainSources);
 const preloadCalls = collectCalls(preloadSources);
 
-const registrars = mainSources
-  .filter((file) => file.startsWith(REGISTRAR_DIRECTORY))
-  .flatMap((file) =>
-    [...readSource(file).matchAll(REGISTRAR_EXPORT)]
-      .map((match) => match[1])
-      .filter((name): name is string => name !== undefined)
-      .map((name) => ({ file, name })),
-  );
-
-const handled = channelsCalledBy(mainCalls, MAIN_HANDLER_CALLEES);
 const sent = channelsCalledBy(mainCalls, MAIN_SEND_CALLEES);
 const invoked = channelsCalledBy(preloadCalls, PRELOAD_INVOKE_CALLEES);
 const subscribed = channelsCalledBy(preloadCalls, PRELOAD_SUBSCRIBE_CALLEES);
@@ -129,62 +149,41 @@ describe("IPC channel coverage", () => {
     expect(stray).toEqual([]);
   });
 
-  it("registers or sends every declared channel in the main process, and nothing it does not declare", () => {
-    expect([...handled, ...sent].sort()).toEqual(declaredChannels);
+  // The main side of these three is now the type checker's: `registerIpcGroups` cannot compile
+  // unless every request endpoint has exactly one handler behind it. What no type reaches is the
+  // preload, whose API object is shaped for the renderer, and the event senders, which are
+  // ordinary calls scattered wherever the event happens.
+  it("invokes exactly the request endpoints from the preload", () => {
+    expect(invoked).toEqual(requestChannels);
   });
 
-  it("invokes or subscribes to every declared channel in the preload, and nothing it does not declare", () => {
-    expect([...invoked, ...subscribed].sort()).toEqual(declaredChannels);
+  it("subscribes to exactly the event endpoints from the preload", () => {
+    expect(subscribed).toEqual(eventChannels);
   });
 
-  it("backs every channel the preload invokes with a registered main handler", () => {
-    expect(invoked).toEqual(handled);
+  it("sends exactly the event endpoints from the main process", () => {
+    expect(sent).toEqual(eventChannels);
   });
 
-  // The assertions above compare sets, which is right for sends and
-  // subscriptions - a channel may have many of each - but wrong for handlers.
-  // ipcMain.handle throws on a second registration for the same channel, so a
-  // channel registered in two files crashes the app on every launch while
-  // deduplication leaves every set comparison green.
-  it("registers each request channel exactly once in the main process", () => {
-    const registrations = new Map<string, string[]>();
-    for (const call of mainCalls) {
-      if (!MAIN_HANDLER_CALLEES.includes(call.callee)) continue;
-      const channel = channelOf(call);
-      if (channel === null) continue;
-      registrations.set(channel, [...(registrations.get(channel) ?? []), `${call.file} ${call.callee}`]);
+  // ipcMain.handle throws on a second registration for the same channel, and `registerIpcGroups`
+  // walks every group, so one channel named by two groups - or twice inside one - crashes the app
+  // on every launch. The type-level coverage assertion in packages/contracts compares sets and so
+  // says nothing about it; this does. It reads the manifest rather than the sources, because after
+  // the migration the manifest is the only place a registration is named.
+  it("declares each channel in exactly one endpoint group", () => {
+    const declarations = new Map<string, string[]>();
+    for (const [group, endpoints] of Object.entries<IpcEndpointGroup>(IPC_ENDPOINTS)) {
+      for (const [name, endpoint] of Object.entries<IpcEndpoint>(endpoints)) {
+        declarations.set(endpoint.channel, [...(declarations.get(endpoint.channel) ?? []), `${group}.${name}`]);
+      }
     }
 
-    const duplicated = [...registrations]
+    const shared = [...declarations]
       .filter(([, sites]) => sites.length > 1)
       .map(([channel, sites]) => `${channel}: ${sites.join(", ")}`)
       .sort();
 
-    expect(duplicated).toEqual([]);
-  });
-
-  // Every test above reads sources, so a registrar the dispatcher never calls
-  // still looks registered while every channel in it rejects at runtime. The
-  // type checker only sees half of that: deleting the call alone is TS6133,
-  // because the call site is the import's only use, but deleting the import
-  // with it compiles. So does a new registrar nobody ever wired up. This is
-  // the other half.
-  it("calls every registrar under src/main/ipc exactly once from the dispatcher", () => {
-    // A blind regex would make this test vacuous rather than red.
-    expect(registrars.length).toBeGreaterThan(10);
-
-    const dispatcher = readSource(DISPATCHER_MODULE);
-    const unreachable = registrars
-      .map(({ file, name }) => ({ file, name, calls: callCount(dispatcher, name) }))
-      .filter(({ calls }) => calls !== 1)
-      .map(({ file, name, calls }) => `${name} (${file}) is called ${calls} times by ${DISPATCHER_MODULE}`)
-      .sort();
-
-    expect(unreachable).toEqual([]);
-  });
-
-  it("gives every event channel the preload listens for a main process sender", () => {
-    expect(subscribed).toEqual(sent);
+    expect(shared).toEqual([]);
   });
 
   // Everything above compares IPC_CHANNELS keys, but Electron sees the values.
@@ -221,6 +220,26 @@ describe("IPC channel coverage", () => {
     expect(raw).toEqual([]);
   });
 
+  // The wrappers take a `string` channel, because ipcMain does. That is the last way a privileged
+  // handler can exist outside IPC_ENDPOINTS: `handleTrusted("undeclared:channel", …)` compiles, gets
+  // the sender check, and belongs to no group, so neither the coverage assertion in
+  // packages/contracts nor anything above notices it. Keeping the call site in one module is what
+  // closes it - `registerIpcGroup` and `registerIpcGroups` are both handed a group name and read the
+  // channel out of the manifest, so a channel the manifest does not declare has no way in.
+  it("calls the trusted wrappers only from the endpoint binder", () => {
+    // The list below is empty when the rule holds and empty when the pattern stops matching, so the
+    // binder naming them is the fixture that tells the two apart.
+    expect(TRUSTED_WRAPPERS.test(readSource(BINDER_MODULE))).toBe(true);
+
+    const callers = mainSources
+      .filter((file) => file !== BINDER_MODULE && file !== TRUSTED_IPC_MODULE)
+      .filter((file) => TRUSTED_WRAPPERS.test(readSource(file)))
+      .map((file) => `${file} names a trusted wrapper`)
+      .sort();
+
+    expect(callers).toEqual([]);
+  });
+
   // Exempting the wrapper module is what makes the assertion above possible, and
   // the exemption is only safe while everything it exempts is a wrapper. Two ways
   // it stops being one: a registration with a channel of its own, which is an
@@ -250,7 +269,7 @@ describe("IPC channel coverage", () => {
   // Every value the preload hands the renderer is validated by a guard in
   // packages/contracts, the same one the main process uses. A guard written here
   // instead is a second rule for one type, and the second rule is always the
-  // looser one - the preload's own isBotSummary never checked `provider` and its
+  // looser one - the preload's own isAgentSummary never checked `provider` and its
   // isConversationWithReadState accepted any array as the message list. An empty
   // list is the only form that stays honest: it says the preload declares no rule
   // of its own rather than counting the ones it does.
@@ -263,6 +282,47 @@ describe("IPC channel coverage", () => {
       .sort();
 
     expect(declared).toEqual([]);
+  });
+
+  // `decodeXFromHost` here and `decodeXFromMain` in the preload are deliberately two
+  // functions for one shape: the preload checks what the main process sent the
+  // renderer, which is a trusted sender, while these check a remote team server,
+  // which is not.
+  //
+  // What this enforces is the naming bijection, and only that: neither half may lose
+  // its twin. That catches the way the pair actually gets merged - one is deleted and
+  // its callers point at the other, which reads in review as a tidy deduplication and
+  // passes every other assertion in this file. It does not prove the two names have
+  // separate implementations - the test below covers the one aliasing spelling a
+  // source scan can recognise, and a wrapper that forwards to the other decoder is
+  // still review's job.
+  //
+  // Names only, never the file list: the headers describe four wire-area siblings,
+  // but two of them hold no suffixed decoder at all, so where the twin lives is not
+  // the invariant. Nor is `export` - the preload exports nothing, and one FromHost
+  // decoder is module-private.
+  it("gives every FromHost decoder a FromMain twin, and the reverse", () => {
+    const host = twinDecoders(mainSources, "Host");
+    const main = twinDecoders(preloadSources, "Main");
+
+    expect(host.length).toBeGreaterThanOrEqual(TWIN_DECODER_FLOOR);
+    expect(host).toEqual(main);
+  });
+
+  // The bijection above is satisfied by two names, so it survives
+  // `const decodeXFromMain = decodeXFromHost` - which would hand a remote team
+  // server the validation written for a trusted sender while keeping both names in
+  // place. An initializer that is a bare reference is that merge; an initializer
+  // that calls something is an implementation, which is what keeps the factory
+  // spelling this family already uses (`remote-agent-decoding.ts:162`) accepted.
+  it("declares each twin decoder rather than aliasing the other", () => {
+    expect(aliasedTwinsIn(TWIN_ALIAS_FIXTURE)).toEqual([
+      "decodeAliasedFromMain",
+      "decodeAnnotatedFromMain",
+      "decodeSignedFromMain",
+    ]);
+
+    expect(aliasedTwins([...mainSources, ...preloadSources])).toEqual([]);
   });
 });
 
@@ -287,10 +347,55 @@ function sourceFilesUnder(directory: string): readonly string[] {
   return files;
 }
 
-// The import specifier carries no parenthesis, so this counts call sites and
-// not the name's other appearance in the dispatcher.
-function callCount(source: string, name: string): number {
-  return [...source.matchAll(new RegExp(`\\b${name}\\s*\\(`, "g"))].length;
+// Every channel of one kind, as the IPC_CHANNELS key the source scans produce.
+function channelsOfKind(kind: IpcEndpoint["kind"]): readonly string[] {
+  const keys = new Set<string>();
+  for (const group of Object.values<IpcEndpointGroup>(IPC_ENDPOINTS)) {
+    for (const endpoint of Object.values<IpcEndpoint>(group)) {
+      if (endpoint.kind !== kind) continue;
+      const key = channelKeys.get(endpoint.channel);
+      if (key !== undefined) keys.add(key);
+    }
+  }
+  return [...keys].sort();
+}
+
+// Every decoder declared with the given suffix, the suffix removed so the two
+// sides compare directly. `const` counts as well as `function`: the family already
+// builds decoders out of guardedDecoder factories, and a regex blind to that
+// spelling would drop one silently here and fail on the opposite side.
+function twinDecoders(files: readonly string[], side: "Host" | "Main"): readonly string[] {
+  const declaration = new RegExp(`(?:function|const)\\s+(decode[A-Za-z0-9_]*)From${side}\\b`, "g");
+  const names = new Set<string>();
+  for (const file of files) {
+    for (const match of readSource(file).matchAll(declaration)) {
+      const name = match[1];
+      if (name !== undefined) names.add(name);
+    }
+  }
+  return [...names].sort();
+}
+
+// A suffixed decoder bound straight to another name: `= other`, `= module.other`,
+// either of them with a trailing `as T`. An initializer holding a call, an arrow or a
+// body is an implementation and is left alone. The annotation this skips over may itself
+// be a function type, so `=>` has to be consumed there rather than mistaken for the
+// assignment - otherwise `const decodeXFromMain: (value: unknown) => X = other` is read
+// from the arrow onwards and escapes.
+const TWIN_ASSIGNMENT = /const\s+(decode[A-Za-z0-9_]*From(?:Host|Main))\s*(?::(?:[^=;]|=>)+)?=\s*([^;]+);/g;
+const BARE_REFERENCE = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\s+as\s+[\w$.<>[\], |]+)?$/;
+
+function aliasedTwinsIn(source: string): readonly string[] {
+  const aliases: string[] = [];
+  for (const match of source.matchAll(TWIN_ASSIGNMENT)) {
+    const [, name, initializer] = match;
+    if (name !== undefined && initializer !== undefined && BARE_REFERENCE.test(initializer.trim())) aliases.push(name);
+  }
+  return aliases;
+}
+
+function aliasedTwins(files: readonly string[]): readonly string[] {
+  return files.flatMap((file) => aliasedTwinsIn(readSource(file)).map((name) => `${file} aliases ${name}`));
 }
 
 function readSource(file: string): string {

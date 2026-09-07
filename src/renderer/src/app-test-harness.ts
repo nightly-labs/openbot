@@ -1,7 +1,9 @@
 import type {
   AgentEvent,
+  AgentProviderId,
+  AgentStatus,
+  AgentSummary,
   AttachmentImportEvent,
-  BotSummary,
   BrowserPictureInPictureEvent,
   CentralAuthState,
   ConversationPage,
@@ -30,6 +32,46 @@ function installAnalyticsSpies(): void {
   vi.spyOn(desktopAnalytics, "scope").mockImplementation(() => ({ track: trackScopedAnalytics }));
   vi.spyOn(desktopAnalytics, "anonymousScope").mockImplementation(() => ({ track: trackScopedAnalytics }));
 }
+const CONNECTING_STATUS: Record<AgentProviderId, AgentStatus> = {
+  codex: {
+    phase: "blocked",
+    cliVersion: "0.149.1",
+    auth: { kind: "unknown" },
+    providers: [
+      { id: "codex", state: "sign-in-required", connectionState: "connecting", version: "0.149.1", message: null },
+      { id: "claude", state: "sign-in-required", version: "2.1.246", message: null },
+    ],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  },
+  claude: {
+    phase: "blocked",
+    cliVersion: "2.1.246",
+    auth: { kind: "unknown" },
+    providers: [
+      { id: "codex", state: "sign-in-required", version: "0.149.1", message: null },
+      { id: "claude", state: "sign-in-required", connectionState: "connecting", version: "2.1.246", message: null },
+    ],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  },
+  grok: {
+    phase: "blocked",
+    cliVersion: "1.0.5",
+    auth: { kind: "unknown" },
+    providers: [
+      { id: "codex", state: "sign-in-required", version: "0.149.1", message: null },
+      { id: "claude", state: "sign-in-required", version: "2.1.246", message: null },
+      { id: "grok", state: "sign-in-required", connectionState: "connecting", version: "1.0.5", message: null },
+    ],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  },
+};
+
 const defaultMatchMedia = window.matchMedia;
 
 export let emitAgentEvent: ((event: AgentEvent) => void) | undefined;
@@ -171,7 +213,7 @@ export function subscriberCounts(): BridgeSubscriberCounts {
   };
 }
 
-export const BOTS: BotSummary[] = [
+export const AGENTS: AgentSummary[] = [
   {
     id: "chief",
     provider: "codex",
@@ -185,7 +227,7 @@ export const BOTS: BotSummary[] = [
     avatarHue: null,
     avatarUrl: null,
     threadId: "thread-chief",
-    workspacePath: "/tmp/OpenBot/Bots/chief",
+    workspacePath: "/tmp/OpenBot/Agents/chief",
     preview: "No messages yet",
     updatedAt: null,
   },
@@ -202,7 +244,7 @@ export const BOTS: BotSummary[] = [
     avatarHue: 280,
     avatarUrl: null,
     threadId: null,
-    workspacePath: "/tmp/OpenBot/Bots/sales-outbound",
+    workspacePath: "/tmp/OpenBot/Agents/sales-outbound",
     preview: "No messages yet",
     updatedAt: null,
   },
@@ -224,12 +266,12 @@ export function testServer(id: string, active: boolean): ServerSummary {
 }
 
 export function testConversationPage(
-  botId: string,
+  agentId: string,
   messages: ConversationPage["messages"] = [],
   overrides: Partial<ConversationPage> = {},
 ): ConversationPage {
   return {
-    botId,
+    agentId,
     threadId: "thread-1",
     activeTurnId: null,
     revision: 1,
@@ -254,7 +296,7 @@ export function queuedDelivery(
   return {
     id,
     messageId: `${id}-message`,
-    recipientBotId: "chief",
+    recipientAgentId: "chief",
     sender: { kind: "user" },
     text,
     attachments: [],
@@ -385,61 +427,9 @@ export function installOpenbotStub(): void {
       revealComputerUseHelper: vi.fn().mockResolvedValue(undefined),
       closeComputerUsePermissionSetup: vi.fn().mockResolvedValue(undefined),
       openExternal: vi.fn().mockResolvedValue(undefined),
-      connectChatGPT: vi.fn().mockResolvedValue({
-        phase: "blocked",
-        cliVersion: "0.149.1",
-        auth: { kind: "unknown" },
-        providers: [
-          {
-            id: "codex",
-            state: "sign-in-required",
-            connectionState: "connecting",
-            version: "0.149.1",
-            message: null,
-          },
-          { id: "claude", state: "sign-in-required", version: "2.1.246", message: null },
-        ],
-        capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
-        message: null,
-        fullAccess: true,
-      }),
-      connectClaude: vi.fn().mockResolvedValue({
-        phase: "blocked",
-        cliVersion: "2.1.246",
-        auth: { kind: "unknown" },
-        providers: [
-          { id: "codex", state: "sign-in-required", version: "0.149.1", message: null },
-          {
-            id: "claude",
-            state: "sign-in-required",
-            connectionState: "connecting",
-            version: "2.1.246",
-            message: null,
-          },
-        ],
-        capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
-        message: null,
-        fullAccess: true,
-      }),
-      connectGrok: vi.fn().mockResolvedValue({
-        phase: "blocked",
-        cliVersion: "1.0.5",
-        auth: { kind: "unknown" },
-        providers: [
-          { id: "codex", state: "sign-in-required", version: "0.149.1", message: null },
-          { id: "claude", state: "sign-in-required", version: "2.1.246", message: null },
-          {
-            id: "grok",
-            state: "sign-in-required",
-            connectionState: "connecting",
-            version: "1.0.5",
-            message: null,
-          },
-        ],
-        capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
-        message: null,
-        fullAccess: true,
-      }),
+      // One channel, so the mock has to answer for whichever provider the caller names:
+      // each response marks that provider connecting and reports its own CLI version.
+      connectProvider: vi.fn(async (provider: AgentProviderId) => CONNECTING_STATUS[provider]),
       refreshAgentProviders: vi.fn().mockResolvedValue({
         phase: "ready",
         cliVersion: "0.144.1",
@@ -579,14 +569,14 @@ export function installOpenbotStub(): void {
             supportedReasoningEfforts: ["low", "medium", "high"],
           },
         ]),
-        listBots: vi.fn().mockResolvedValue(BOTS),
+        listAgents: vi.fn().mockResolvedValue(AGENTS),
         listInstalledSkills: vi.fn().mockResolvedValue([]),
         listMemories: vi.fn().mockResolvedValue([]),
         listRoutines: vi.fn().mockResolvedValue([]),
         listRoutineRuns: vi.fn().mockResolvedValue([]),
         createMemory: vi.fn().mockImplementation(async (input) => ({
           id: "memory-new",
-          botId: input.botId,
+          agentId: input.agentId,
           text: input.text,
           origin: "manual",
           sourceTurnId: null,
@@ -595,7 +585,7 @@ export function installOpenbotStub(): void {
         })),
         updateMemory: vi.fn().mockImplementation(async (input) => ({
           id: input.memoryId,
-          botId: input.botId,
+          agentId: input.agentId,
           text: input.text,
           origin: "manual",
           sourceTurnId: null,
@@ -618,48 +608,48 @@ export function installOpenbotStub(): void {
           agentAssignments: {},
           agentOrder: [],
         }),
-        createBot: vi.fn().mockImplementation(async (input) => ({
-          ...BOTS[0],
-          id: "bot-new",
+        createAgent: vi.fn().mockImplementation(async (input) => ({
+          ...AGENTS[0],
+          id: "agent-new",
           name: input.name,
           title: "",
           description: input.description,
           avatarSeed: input.avatarSeed,
           avatarHue: input.avatarHue,
         })),
-        duplicateBot: vi.fn().mockImplementation(async (botId) => {
-          const source = BOTS.find((bot) => bot.id === botId) ?? BOTS[0];
-          const bot = {
+        duplicateAgent: vi.fn().mockImplementation(async (agentId) => {
+          const source = AGENTS.find((agent) => agent.id === agentId) ?? AGENTS[0];
+          const agent = {
             ...source,
-            id: `${botId}-copy`,
+            id: `${agentId}-copy`,
             name: `${source.name} copy`,
             threadId: null,
-            workspacePath: `/tmp/OpenBot/Bots/${botId}-copy`,
+            workspacePath: `/tmp/OpenBot/Agents/${agentId}-copy`,
             preview: "No messages yet",
             updatedAt: null,
           };
           return {
-            bot,
+            agent,
             layout: {
               revision: 1,
               sections: [],
               order: ["people", "unassigned"],
               agentAssignments: {},
-              agentOrder: ["chief", "sales-outbound", bot.id],
+              agentOrder: ["chief", "sales-outbound", agent.id],
             },
           };
         }),
-        updateBot: vi.fn().mockImplementation(async (input) => ({
-          ...BOTS.find((bot) => bot.id === input.botId),
+        updateAgent: vi.fn().mockImplementation(async (input) => ({
+          ...AGENTS.find((agent) => agent.id === input.agentId),
           ...input,
         })),
         setAvatar: vi.fn().mockImplementation(async (input) => ({
-          ...BOTS.find((bot) => bot.id === input.botId),
+          ...AGENTS.find((agent) => agent.id === input.agentId),
           avatarUrl: input.image ? "openbot-avatar://agent/chief?v=test" : null,
         })),
-        deleteBot: vi.fn().mockResolvedValue(undefined),
-        readConversation: vi.fn().mockImplementation(async (botId) => ({
-          botId,
+        deleteAgent: vi.fn().mockResolvedValue(undefined),
+        readConversation: vi.fn().mockImplementation(async (agentId) => ({
+          agentId,
           threadId: null,
           activeTurnId: null,
           revision: 0,
@@ -667,7 +657,7 @@ export function installOpenbotStub(): void {
           readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },
         })),
         readConversationPage: vi.fn().mockImplementation(async (input) => {
-          const snapshot = await window.openbot.agent.readConversation(input.botId);
+          const snapshot = await window.openbot.agent.readConversation(input.agentId);
           const messages = snapshot.messages.slice(-Math.min(input.limit ?? 50, 100));
           return {
             ...snapshot,
@@ -705,10 +695,10 @@ export function installOpenbotStub(): void {
         }),
         sendMessage: vi.fn().mockResolvedValue({
           messageId: "message-1",
-          deliveries: [{ id: "delivery-1", recipientBotId: "chief", status: "queued", position: 1 }],
+          deliveries: [{ id: "delivery-1", recipientAgentId: "chief", status: "queued", position: 1 }],
         }),
         setMessageReaction: vi.fn().mockResolvedValue(undefined),
-        listQueue: vi.fn().mockImplementation(async (botId) => ({ botId, deliveries: [] })),
+        listQueue: vi.fn().mockImplementation(async (agentId) => ({ agentId, deliveries: [] })),
         acknowledgeFailedTurn: vi.fn().mockResolvedValue(undefined),
         cancelQueuedMessage: vi.fn().mockResolvedValue(undefined),
         steerQueuedMessage: vi.fn().mockResolvedValue(undefined),
@@ -928,7 +918,7 @@ export function presenceMember(id: string, email: string, name: string): TeamPre
     createdAt: "2026-08-18T10:00:00.000Z",
     disabled: false,
     online: true,
-    typingBotId: null,
+    typingAgentId: null,
   };
 }
 

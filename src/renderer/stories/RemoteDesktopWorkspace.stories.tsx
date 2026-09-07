@@ -1,7 +1,7 @@
 import type { RemoteDesktopSession } from "@openbot/contracts/ipc";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { RemoteDesktopWorkspace } from "../src/components/RemoteDesktopWorkspace";
+import { RemoteDesktopWorkspace } from "../src/features/remote-desktop/RemoteDesktopWorkspace";
 import macDesktopMock from "./assets/remote-desktop-mac-mock.png";
 import { STORY_SERVERS } from "./fixtures";
 
@@ -47,7 +47,7 @@ const meta = {
   title: "Team/RemoteDesktopWorkspace",
   component: RemoteDesktopWorkspace,
   args,
-  decorators: [(Story) => <div style="height: 720px; background: var(--openbot-bg);">{Story()}</div>],
+  decorators: [(Story) => <div style="height: 720px; background: var(--openbot-bg-canvas);">{Story()}</div>],
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof RemoteDesktopWorkspace>;
 

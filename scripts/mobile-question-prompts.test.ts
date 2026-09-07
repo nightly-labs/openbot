@@ -22,7 +22,7 @@ const questions: AgentPromptQuestion[] = [
 
 function conversation(): ConversationSnapshot {
   return {
-    botId: "bot-test",
+    agentId: "agent-test",
     threadId: "thread-test",
     activeTurnId: "turn-test",
     revision: 1,

@@ -48,7 +48,7 @@ events to React Native. This keeps the production transport identical while rema
 Expo Go without a development build.
 
 Remote connection recovery makes up to five attempts, waiting 10 seconds after each failure. After
-five failures it waits two minutes before starting a new series. The bot list shows `Reconnecting`
+five failures it waits two minutes before starting a new series. The agent list shows `Reconnecting`
 beside the server-list button in the header, with a smaller attempt counter and retry countdown below.
 The status disappears once connected. Chat shows a compact, centered `Reconnecting · x/5 · m:ss`
 above the composer, with the same animated digits and no banner. The composer and status float over
@@ -80,15 +80,15 @@ updates synchronize their resolution across devices. Offline forms are disabled,
 can be retried, and completed or expired forms cannot be submitted again. Private answers use a
 secure input and are omitted from the local completion summary; unsent drafts stay in component memory.
 
-When no bots have loaded and the selected server is connecting or offline, the bot list shows
-`Waiting for connection`. The empty-server prompt appears only once the server is online; bots
+When no agents have loaded and the selected server is connecting or offline, the agent list shows
+`Waiting for connection`. The empty-server prompt appears only once the server is online; agents
 already loaded remain visible during reconnection.
 
-While a server is disconnected, its bot avatars and colored chat bubbles fade locally with the same
+While a server is disconnected, its agent avatars and colored chat bubbles fade locally with the same
 280 ms transition. Chat input, attachments,
 voice/send controls and suggested prompts are disabled. Draft text is preserved, and the controls
 and original colors return when the server is online. This visual state is derived only in the
-mobile UI: it never changes the bot's synced avatar profile or sends appearance updates over RTC.
+mobile UI: it never changes the agent's synced avatar profile or sends appearance updates over RTC.
 
 Invitations pin the desktop public key before acceptance. Pins are stored in the device Keychain /
 Keystore, scoped to the account service and user, and checked on later directory refreshes. Joining
@@ -111,7 +111,7 @@ src/
     (app)/              routes available to an authenticated session
   features/
     auth/               QR sign-in, session storage, and session context
-    bots/               bot list, bot actions, and pin transitions
+    agents/             agent list, agent actions, and pin transitions
     chat/               chat screen and its focused UI sections
     search/             search model, controls, results, and screen
     servers/            server drawer and joining a server

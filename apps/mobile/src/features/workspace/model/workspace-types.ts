@@ -1,12 +1,12 @@
 import type {
-  BotAvatarHue,
+  AvatarHue,
   ConversationSnapshot,
-  CreateBotInput,
+  CreateAgentInput,
   RespondToPromptInput,
-  UpdateBotInput,
+  UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import type { RemoteRecoveryStatus } from "@openbot/team-client";
-import type { MobileBotActivities } from "./bot-activity";
+import type { MobileAgentActivities } from "./agent-activity";
 
 export type MobileServerKind = "local" | "remote";
 export type MobileServerState = "connecting" | "online" | "offline";
@@ -26,7 +26,7 @@ export interface MobileServer {
   membershipId: string;
 }
 
-export interface MobileBot {
+export interface MobileAgent {
   id: string;
   serverId: string;
   name: string;
@@ -35,12 +35,12 @@ export interface MobileBot {
   preview: string;
   updatedLabel: string;
   avatarSeed: string;
-  avatarHue: BotAvatarHue | null;
+  avatarHue: AvatarHue | null;
 }
 
-export const MAX_PINNED_BOTS = 6;
+export const MAX_PINNED_AGENTS = 6;
 
-export type ToggleBotPinResult = "limit" | "pinned" | "unpinned" | "error";
+export type ToggleAgentPinResult = "limit" | "pinned" | "unpinned" | "error";
 
 interface AddRemoteServerInput {
   inviteUrl: string;
@@ -50,28 +50,28 @@ export interface MobileWorkspaceContextValue {
   servers: MobileServer[];
   serverDirectoryState: MobileServerDirectoryState;
   serverDirectoryError: string | null;
-  bots: MobileBot[];
+  agents: MobileAgent[];
   activeServer: MobileServer;
-  activeBots: MobileBot[];
-  hiddenBots: MobileBot[];
-  pinnedBotIds: string[];
-  unreadBotIds: string[];
+  activeAgents: MobileAgent[];
+  hiddenAgents: MobileAgent[];
+  pinnedAgentIds: string[];
+  unreadAgentIds: string[];
   conversations: Record<string, ConversationSnapshot>;
-  activityByServer: Record<string, MobileBotActivities>;
+  activityByServer: Record<string, MobileAgentActivities>;
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
   refreshServers: () => Promise<void>;
   addRemoteServer: (input: AddRemoteServerInput) => Promise<void>;
-  createBot: (input: CreateBotInput) => Promise<void>;
-  updateBot: (input: UpdateBotInput) => Promise<void>;
-  deleteBot: (botId: string) => Promise<void>;
-  duplicateBot: (botId: string) => Promise<void>;
-  loadConversation: (botId: string) => Promise<ConversationSnapshot>;
-  respondToPrompt: (botId: string, input: RespondToPromptInput) => Promise<void>;
-  sendMessage: (botId: string, text: string) => Promise<void>;
-  hideBot: (botId: string) => void;
-  unhideBot: (botId: string) => void;
-  markBotRead: (botId: string, throughMessageId?: string) => void;
-  markBotUnread: (botId: string) => void;
-  toggleBotPin: (botId: string) => ToggleBotPinResult;
+  createAgent: (input: CreateAgentInput) => Promise<void>;
+  updateAgent: (input: UpdateAgentInput) => Promise<void>;
+  deleteAgent: (agentId: string) => Promise<void>;
+  duplicateAgent: (agentId: string) => Promise<void>;
+  loadConversation: (agentId: string) => Promise<ConversationSnapshot>;
+  respondToPrompt: (agentId: string, input: RespondToPromptInput) => Promise<void>;
+  sendMessage: (agentId: string, text: string) => Promise<void>;
+  hideAgent: (agentId: string) => void;
+  unhideAgent: (agentId: string) => void;
+  markAgentRead: (agentId: string, throughMessageId?: string) => void;
+  markAgentUnread: (agentId: string) => void;
+  toggleAgentPin: (agentId: string) => ToggleAgentPinResult;
 }

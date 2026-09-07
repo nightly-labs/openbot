@@ -5,15 +5,15 @@ import { type ComponentRef, forwardRef } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { KeyboardChatScrollView } from "react-native-keyboard-controller";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
-import { BloubAvatar, getBloubAvatarColor } from "@/features/bots/components/bloub-avatar";
+import { BloubAvatar, getBloubAvatarColor } from "@/features/agents/components/bloub-avatar";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
 import { ChatThinking } from "@/features/chat/components/chat-thinking";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import type { ChatMessage } from "@/features/chat/model/chat-messages";
-import { useBotActivity } from "@/features/workspace/components/use-bot-activity";
+import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
-import type { MobileBot } from "@/features/workspace/context/mobile-workspace-context";
+import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 
 const STARTER_OPTIONS = [
   { id: "plan", label: "Plan the next steps", detail: "Turn a goal into a clear plan" },
@@ -22,7 +22,7 @@ const STARTER_OPTIONS = [
 ] as const;
 
 interface ChatMessageListProps {
-  bot: MobileBot;
+  agent: MobileAgent;
   bottomInset: number;
   keyboardOffset: number;
   canSend: boolean;
@@ -48,7 +48,7 @@ type ChatScrollViewRef = ComponentRef<typeof KeyboardChatScrollView>;
 
 export const ChatMessageList = forwardRef<ChatScrollViewRef, ChatMessageListProps>(function ChatMessageList(
   {
-    bot,
+    agent,
     bottomInset,
     keyboardOffset,
     canSend,
@@ -73,7 +73,7 @@ export const ChatMessageList = forwardRef<ChatScrollViewRef, ChatMessageListProp
 ) {
   const isFocused = useIsFocused();
   const animateMessages = isFocused && canSend && appActive;
-  const activity = useBotActivity(bot.id);
+  const activity = useAgentActivity(agent.id);
   const activityLabel =
     activity?.phase === "waiting"
       ? messages.some(
@@ -84,7 +84,7 @@ export const ChatMessageList = forwardRef<ChatScrollViewRef, ChatMessageListProp
       : activity?.phase === "responding"
         ? "Responding…"
         : activity?.detail || "Thinking…";
-  const userBubbleColor = getBloubAvatarColor(bot.avatarSeed, bot.avatarHue);
+  const userBubbleColor = getBloubAvatarColor(agent.avatarSeed, agent.avatarHue);
   const appearance = useConnectionAppearance(!canSend);
   const red = Number.parseInt(userBubbleColor.slice(1, 3), 16);
   const green = Number.parseInt(userBubbleColor.slice(3, 5), 16);
@@ -171,7 +171,7 @@ export const ChatMessageList = forwardRef<ChatScrollViewRef, ChatMessageListProp
             <ChatMarkdown
               body={message.body}
               color={message.author === "user" ? "#0a0a0c" : foreground}
-              streaming={message.author === "bot" && message.streaming}
+              streaming={message.author === "agent" && message.streaming}
               animationEnabled={animateMessages}
             />
           </Animated.View>
@@ -184,9 +184,9 @@ export const ChatMessageList = forwardRef<ChatScrollViewRef, ChatMessageListProp
           accessible
           accessibilityLiveRegion="polite"
           accessibilityRole="text"
-          accessibilityLabel={`${bot.name}: ${activityLabel}`}
+          accessibilityLabel={`${agent.name}: ${activityLabel}`}
         >
-          <BloubAvatar botId={bot.id} hue={bot.avatarHue} seed={bot.avatarSeed} size={36} />
+          <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={36} />
           <Typography.Paragraph type="body-sm" className="flex-1 text-text-secondary">
             {activityLabel}
           </Typography.Paragraph>

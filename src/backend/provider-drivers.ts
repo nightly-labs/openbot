@@ -6,11 +6,25 @@ import { type AgentCliInfo, resolveClaudeCli, resolveCodexCli, resolveGrokCli } 
 import { GrokAgentClient } from "./grok-client";
 import type { AccountReadResult } from "./protocol";
 
+/**
+ * Signing in by running the provider's own CLI and waiting for the process to exit. Codex
+ * has no entry here: it signs in over the app-server protocol against a URL the user opens
+ * in a browser, and shares no step with spawning a command.
+ */
+export interface CliLoginCommand {
+  readonly argv: readonly string[];
+  readonly env: (cli: AgentCliInfo) => Record<string, string>;
+  readonly timeoutMs: number;
+}
+
+const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
+
 export interface BuiltInProviderDriver {
   id: AgentProviderId;
   label: string;
   signInMessage: string;
-  resolveCli(): Promise<AgentCliInfo>;
+  cliLogin?: CliLoginCommand;
+  resolveCli(options?: { bundledExecutable?: string | null }): Promise<AgentCliInfo>;
   createClient(cli: AgentCliInfo, requestTimeoutMs: number): AgentClient;
   authState(account: AccountReadResult["account"]): AgentAuthState;
   validateAccount(account: NonNullable<AccountReadResult["account"]>): void;
@@ -34,6 +48,11 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     id: "claude",
     label: "Claude",
     signInMessage: "Connect Claude to continue.",
+    cliLogin: {
+      argv: ["auth", "login", "--claudeai"],
+      env: (cli): Record<string, string> => (cli.source === "managed" ? { DISABLE_AUTOUPDATER: "1" } : {}),
+      timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+    },
     resolveCli: resolveClaudeCli,
     createClient: (cli, requestTimeoutMs) => new ClaudeAgentClient(cli, undefined, undefined, requestTimeoutMs),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
@@ -43,6 +62,11 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     id: "grok",
     label: "Grok",
     signInMessage: "Run `grok login` or set XAI_API_KEY to use Grok.",
+    cliLogin: {
+      argv: ["--no-auto-update", "login"],
+      env: () => ({ GROK_OAUTH2_REFERRER: "openbot" }),
+      timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+    },
     resolveCli: resolveGrokCli,
     createClient: (cli, requestTimeoutMs) => new GrokAgentClient(cli, requestTimeoutMs),
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),

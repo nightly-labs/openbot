@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import type * as RoutingQueueModule from "../apps/mobile/node_modules/expo-router/build/global-state/routingQueue";
-import { createChatNavigationGate } from "../apps/mobile/src/features/bots/model/chat-navigation-gate";
+import { createChatNavigationGate } from "../apps/mobile/src/features/agents/model/chat-navigation-gate";
 
 function loadRoutingQueue() {
   const exports: Partial<typeof RoutingQueueModule> = {};
@@ -39,7 +39,7 @@ describe("mobile navigation queue", () => {
     queue.add({ type: "GO_BACK" });
     queue.run({ current: null });
     observed = queue.snapshot();
-    queue.add({ type: "NAVIGATE", payload: { name: "chat/[botId]", params: { botId: "bot-test" } } });
+    queue.add({ type: "NAVIGATE", payload: { name: "chat/[agentId]", params: { agentId: "agent-test" } } });
     unsubscribe();
     expect(notifications).toEqual([["GO_BACK"], ["NAVIGATE"]]);
   });

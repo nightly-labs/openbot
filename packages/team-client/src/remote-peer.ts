@@ -1,5 +1,12 @@
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
+import {
+  SIGNAL_PROTOCOL_VERSION,
+  SIGNAL_TURN_REFRESH_INTERVAL_MS,
+  type SignalClientMessage,
+  type SignalServerMessage,
+} from "@openbot/contracts/signal-protocol/messages";
 import {
   decodeTeamProtocolV2AuthFrame,
   decodeTeamProtocolV2CurrentEvent,
@@ -78,6 +85,12 @@ export interface RemoteTeamConnectionUpdate {
   hostId: string;
   state: "connecting" | "online" | "offline";
   message: string | null;
+  /**
+   * Set when no reconnect can fix this failure, because the two ends disagree about the wire rather
+   * than about whether there is one. A consumer that retries every offline update has to be told
+   * the difference, or it retries into the same frame forever.
+   */
+  code?: "protocol_error";
   resync?: boolean;
 }
 
@@ -91,19 +104,6 @@ interface ActionsRef {
   current: RemoteTeamPeerActions;
 }
 type ChannelKind = "rpc" | "events" | "files" | "desktop";
-type SignalClientMessage =
-  | { type: "hello"; version: 1; peer: "client"; token: string }
-  | { type: "offer"; version: 1; connectionId: string; channel: "team"; sdp: string }
-  | {
-      type: "ice-candidate";
-      version: 1;
-      connectionId: string;
-      channel: "team";
-      candidate: string;
-      sdpMid: string | null;
-      sdpMLineIndex: number | null;
-    }
-  | { type: "turn-refresh"; version: 1; connectionId: string | null };
 
 interface PendingRequest {
   method: string;
@@ -297,20 +297,36 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     socket.onopen = () => {
       if (state.closed || peer !== state || state.socket !== socket) return;
       state.reconnectAttempt = 0;
-      socket.send(
-        JSON.stringify({ type: "hello", version: 1, peer: "client", token: state.resumeToken ?? state.ticket }),
-      );
+      const hello: SignalClientMessage = {
+        type: "hello",
+        version: SIGNAL_PROTOCOL_VERSION,
+        peer: "client",
+        token: state.resumeToken ?? state.ticket,
+      };
+      socket.send(JSON.stringify(hello));
     };
     socket.onmessage = (event) => {
       if (!isString(event.data)) return;
-      try {
-        const message = JSON.parse(event.data);
-        state.signalChain = state.signalChain
-          .then(() => handleSignal(state, message, actions))
-          .catch((error) => failPeer(state, error, actions));
-      } catch (error) {
-        failPeer(state, error, actions);
-      }
+      const data = event.data;
+      state.signalChain = state.signalChain
+        .then(async () => {
+          if (state.closed || peer !== state) return;
+          let message: SignalServerMessage | null;
+          try {
+            message = decodeSignalServerMessage(JSON.parse(data));
+          } catch (error) {
+            // Where the two ends stop agreeing about the wire, and the service would send the same
+            // bytes to the reconnect this would otherwise ask for. `protocol_error` is what lets a
+            // consumer stop instead: every other failure here is a connection that a retry can fix,
+            // and a caller cannot tell them apart from an `offline` update alone.
+            return failPeer(state, error, actions, "protocol_error");
+          }
+          // A frame type this build does not know is a newer Signal service, not a broken connection.
+          if (message) await handleSignal(state, message, actions);
+        })
+        // Only what handling a frame this peer did read can throw -- an ICE or SDP operation the
+        // browser refused, or a host that said it went away. Those are connections failing.
+        .catch((error) => failPeer(state, error, actions));
     };
     socket.onerror = () => socket.close();
     socket.onclose = () => {
@@ -321,34 +337,21 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     };
   }
 
-  async function handleSignal(state: PeerState, value: unknown, actions: ActionsRef): Promise<void> {
+  async function handleSignal(state: PeerState, message: SignalServerMessage, actions: ActionsRef): Promise<void> {
     if (state.closed || peer !== state) return;
-    if (!isDynamicRecord(value) || value.version !== 1 || !isString(value.type)) {
-      throw new Error("Signal returned an invalid message.");
-    }
-    if (value.type === "error") {
-      throw new Error(isString(value.message) ? value.message : "Signal rejected the connection.");
-    }
-    if (value.type === "ready") {
-      if (value.resumeToken !== undefined && !isString(value.resumeToken)) {
-        throw new Error("Signal returned an incomplete connection.");
-      }
-      if (value.connectionId !== undefined && !isString(value.connectionId)) {
-        throw new Error("Signal returned an incomplete connection.");
-      }
-      const nextIceServers = value.iceServers === undefined ? null : decodeIceServers(value.iceServers);
-      if (value.iceServers !== undefined && !nextIceServers) {
-        throw new Error("Signal returned an incomplete connection.");
-      }
-      state.resumeToken = isString(value.resumeToken) ? value.resumeToken : state.resumeToken;
-      state.connectionId = isString(value.connectionId) ? value.connectionId : state.connectionId;
-      state.iceServers = nextIceServers ?? state.iceServers;
+    if (message.type === "error") throw new Error(message.message);
+    if (message.type === "ready") {
+      state.resumeToken = message.resumeToken;
+      // Null on the `ready` that answers a TURN refresh: the credentials are new, the connection is
+      // the one already open.
+      state.connectionId = message.connectionId ?? state.connectionId;
+      state.iceServers = message.iceServers;
       if (!state.connectionId || state.iceServers.length === 0)
         throw new Error("Signal returned an incomplete connection.");
       scheduleTurnRefresh(state);
       if (state.connection) {
         state.connection.setConfiguration({ iceServers: state.iceServers, bundlePolicy: "max-bundle" });
-        if (nextIceServers) await restartIce(state);
+        await restartIce(state);
       }
       if (!state.connection) {
         const connection = createPeerConnection(state, state.iceServers, actions);
@@ -358,7 +361,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         await connection.setLocalDescription(offer);
         sendSignal(state, {
           type: "offer",
-          version: 1,
+          version: SIGNAL_PROTOCOL_VERSION,
           connectionId: state.connectionId,
           channel: "team",
           sdp: requiredSdp(offer),
@@ -366,28 +369,31 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       }
       return;
     }
-    if (value.type === "disconnect" && value.connectionId === state.connectionId) {
+    if (message.type === "disconnect" && message.connectionId === state.connectionId) {
       failPeer(state, new Error("The desktop went offline."), actions);
       return;
     }
-    if (value.channel !== "team" || value.connectionId !== state.connectionId) return;
-    if (value.type === "answer" && isString(value.sdp)) {
+    // `peer-ready`, `turn-refresh` and a `disconnect` for someone else carry nothing this peer acts
+    // on; only the relayed negotiation does, and only on the team channel.
+    if (message.type !== "answer" && message.type !== "ice-candidate" && message.type !== "ice-restart") return;
+    if (message.channel !== "team" || message.connectionId !== state.connectionId) return;
+    if (message.type === "answer") {
       const previousFingerprint = state.binding?.hostFingerprint;
-      const nextFingerprint = value.sdp
+      const nextFingerprint = message.sdp
         .match(/^a=fingerprint:sha-256\s+([^\r\n]+)$/imu)?.[1]
         ?.trim()
         .toUpperCase();
       if (previousFingerprint && nextFingerprint !== previousFingerprint) {
         throw new Error("The desktop restarted. Reconnecting with a new authenticated session.");
       }
-      await state.connection?.setRemoteDescription({ type: "answer", sdp: value.sdp });
-    } else if (value.type === "ice-candidate" && isString(value.candidate)) {
+      await state.connection?.setRemoteDescription({ type: "answer", sdp: message.sdp });
+    } else if (message.type === "ice-candidate") {
       await state.connection?.addIceCandidate({
-        candidate: value.candidate,
-        sdpMid: isString(value.sdpMid) ? value.sdpMid : null,
-        sdpMLineIndex: isNumber(value.sdpMLineIndex) ? value.sdpMLineIndex : null,
+        candidate: message.candidate,
+        sdpMid: message.sdpMid,
+        sdpMLineIndex: message.sdpMLineIndex,
       });
-    } else if (value.type === "ice-restart") {
+    } else {
       await restartIce(state);
     }
   }
@@ -399,7 +405,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       if (!event.candidate || !state.connectionId || state.socket?.readyState !== WebSocket.OPEN) return;
       sendSignal(state, {
         type: "ice-candidate",
-        version: 1,
+        version: SIGNAL_PROTOCOL_VERSION,
         connectionId: state.connectionId,
         channel: "team",
         candidate: event.candidate.candidate,
@@ -680,7 +686,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     await connection.setLocalDescription(offer);
     sendSignal(state, {
       type: "offer",
-      version: 1,
+      version: SIGNAL_PROTOCOL_VERSION,
       connectionId: state.connectionId,
       channel: "team",
       sdp: requiredSdp(offer),
@@ -710,20 +716,29 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       state.turnRefreshTimer = null;
       if (state.socket?.readyState === WebSocket.OPEN) {
         try {
-          sendSignal(state, { type: "turn-refresh", version: 1, connectionId: state.connectionId });
+          sendSignal(state, {
+            type: "turn-refresh",
+            version: SIGNAL_PROTOCOL_VERSION,
+            connectionId: state.connectionId,
+          });
         } catch {
           // The reconnect path will request fresh TURN credentials.
         }
       }
       scheduleTurnRefresh(state);
-    }, 45 * 60_000);
+    }, SIGNAL_TURN_REFRESH_INTERVAL_MS);
   }
 
-  function failPeer(state: PeerState, error: unknown, actions: ActionsRef): void {
+  function failPeer(state: PeerState, error: unknown, actions: ActionsRef, code?: "protocol_error"): void {
     if (state.closed || peer !== state) return;
     const message = error instanceof Error ? error.message : "The WebRTC connection failed.";
     rejectConnection(state, new Error(message));
-    void actions.current.onConnectionUpdate({ hostId: state.hostId, state: "offline", message });
+    void actions.current.onConnectionUpdate({
+      hostId: state.hostId,
+      state: "offline",
+      message,
+      ...(code ? { code } : {}),
+    });
     void closePeer(actions.current.endSession);
   }
 
@@ -821,23 +836,5 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     const bytes = new Uint8Array(binary.length);
     for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
     return bytes;
-  }
-
-  function decodeIceServers(value: unknown): RTCIceServer[] | null {
-    if (!Array.isArray(value)) return null;
-    const result: RTCIceServer[] = [];
-    for (const candidate of value) {
-      if (!isDynamicRecord(candidate)) return null;
-      const urls = candidate.urls;
-      if (!isString(urls) && !(Array.isArray(urls) && urls.every(isString))) return null;
-      if (candidate.username !== undefined && !isString(candidate.username)) return null;
-      if (candidate.credential !== undefined && !isString(candidate.credential)) return null;
-      result.push({
-        urls,
-        ...(isString(candidate.username) ? { username: candidate.username } : {}),
-        ...(isString(candidate.credential) ? { credential: candidate.credential } : {}),
-      });
-    }
-    return result;
   }
 }

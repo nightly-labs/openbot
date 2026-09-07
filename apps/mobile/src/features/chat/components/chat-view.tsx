@@ -9,21 +9,21 @@ import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 
-import { useBotPinTransition } from "@/features/bots/components/bot-pin-transition";
+import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { latestReadableMessage, projectChatMessages } from "@/features/chat/model/chat-messages";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
-import { useBotActivity } from "@/features/workspace/components/use-bot-activity";
-import type { MobileBot } from "@/features/workspace/context/mobile-workspace-context";
+import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
+import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { isIOS } from "@/shared/lib/platform";
 
 interface MobileChatViewProps {
   animateAvatarOnExit?: boolean;
-  bot: MobileBot;
+  agent: MobileAgent;
 }
 
 const CHAT_BACK_EDGE_WIDTH = 24;
@@ -33,16 +33,16 @@ function leaveConversation(): void {
   else router.replace("/connected");
 }
 
-export function MobileChatView({ animateAvatarOnExit = false, bot }: MobileChatViewProps) {
+export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileChatViewProps) {
   const isFocused = useIsFocused();
   const [appActive, setAppActive] = useState(AppState.currentState === "active");
   const [atLatest, setAtLatest] = useState(false);
   const [composerHeight, setComposerHeight] = useState(0);
   const insets = useSafeAreaInsets();
   const keyboardOffset = Math.max(insets.bottom, 10) - 10;
-  const { leaveBotChatAnimated } = useBotPinTransition();
+  const { leaveAgentChatAnimated } = useAgentPinTransition();
   const scrollViewRef = useRef<ComponentRef<typeof ChatMessageList>>(null);
-  const initialScrollBotIdRef = useRef<string | null>(bot.id);
+  const initialScrollAgentIdRef = useRef<string | null>(agent.id);
   const [foreground, muted, fieldBackground, raised, action, actionForeground, background] = useThemeColor([
     "foreground",
     "muted",
@@ -59,21 +59,21 @@ export function MobileChatView({ animateAvatarOnExit = false, bot }: MobileChatV
   const {
     conversations,
     loadConversation,
-    markBotRead,
+    markAgentRead,
     servers,
     respondToPrompt,
     sendMessage: sendTeamMessage,
   } = useMobileWorkspace();
-  const conversation = conversations[bot.id];
+  const conversation = conversations[agent.id];
   const conversationRef = useRef(conversation);
   conversationRef.current = conversation;
-  const activity = useBotActivity(bot.id);
+  const activity = useAgentActivity(agent.id);
   const messages = useMemo(() => projectChatMessages(conversation?.messages ?? []), [conversation]);
   const liquidGlassAvailable = isLiquidGlassAvailable();
   const latestMessage = latestReadableMessage(conversation?.messages ?? []);
   const readBoundary = latestMessage?.id;
   const readBoundaryStatus = latestMessage?.status;
-  const server = servers.find((server) => server.id === bot.serverId);
+  const server = servers.find((server) => server.id === agent.serverId);
   const serverOnline = server?.state === "online";
   const activePrompt = messages.findLast(
     (message) =>
@@ -83,7 +83,7 @@ export function MobileChatView({ animateAvatarOnExit = false, bot }: MobileChatV
       message.turnId === conversation?.activeTurnId,
   );
   const questionForm = useQuestionPrompt(
-    bot.id,
+    agent.id,
     activePrompt?.kind === "question" ? activePrompt : undefined,
     serverOnline,
     respondToPrompt,
@@ -96,33 +96,33 @@ export function MobileChatView({ animateAvatarOnExit = false, bot }: MobileChatV
 
   useEffect(() => {
     if (isFocused && appActive && atLatest && serverOnline && readBoundary && readBoundaryStatus) {
-      markBotRead(bot.id, readBoundary);
+      markAgentRead(agent.id, readBoundary);
     }
-  }, [isFocused, appActive, atLatest, serverOnline, readBoundary, readBoundaryStatus, bot.id, markBotRead]);
+  }, [isFocused, appActive, atLatest, serverOnline, readBoundary, readBoundaryStatus, agent.id, markAgentRead]);
 
   useEffect(() => {
     setAtLatest(false);
-    initialScrollBotIdRef.current = bot.id;
-  }, [bot.id]);
+    initialScrollAgentIdRef.current = agent.id;
+  }, [agent.id]);
 
   const fetchHistory = useCallback(() => {
     if (!serverOnline) return;
     const requestId = ++historyRequestRef.current;
     const revisionBeforeLoad = conversationRef.current?.revision ?? null;
     setHistoryLoadFailed(false);
-    void loadConversation(bot.id)
+    void loadConversation(agent.id)
       .then((snapshot) => {
         if (
           historyRequestRef.current === requestId &&
           (revisionBeforeLoad === null || snapshot.revision > revisionBeforeLoad)
         ) {
-          initialScrollBotIdRef.current = bot.id;
+          initialScrollAgentIdRef.current = agent.id;
         }
       })
       .catch(() => {
         if (historyRequestRef.current === requestId) setHistoryLoadFailed(true);
       });
-  }, [bot.id, loadConversation, serverOnline]);
+  }, [agent.id, loadConversation, serverOnline]);
 
   useEffect(() => {
     fetchHistory();
@@ -132,16 +132,16 @@ export function MobileChatView({ animateAvatarOnExit = false, bot }: MobileChatV
   }, [fetchHistory]);
 
   const handleContentSizeChange = useCallback(() => {
-    if (!conversation || (initialScrollBotIdRef.current !== bot.id && !atLatest)) return;
-    initialScrollBotIdRef.current = null;
+    if (!conversation || (initialScrollAgentIdRef.current !== agent.id && !atLatest)) return;
+    initialScrollAgentIdRef.current = null;
     scrollViewRef.current?.scrollToEnd({ animated: false });
     setAtLatest(true);
-  }, [atLatest, bot.id, conversation]);
+  }, [atLatest, agent.id, conversation]);
 
   const handleLeaveConversation = useCallback(() => {
-    if (animateAvatarOnExit) leaveBotChatAnimated(bot.id);
+    if (animateAvatarOnExit) leaveAgentChatAnimated(agent.id);
     else leaveConversation();
-  }, [animateAvatarOnExit, bot.id, leaveBotChatAnimated]);
+  }, [animateAvatarOnExit, agent.id, leaveAgentChatAnimated]);
 
   const edgeBackGesture = useMemo(
     () =>
@@ -170,7 +170,7 @@ export function MobileChatView({ animateAvatarOnExit = false, bot }: MobileChatV
     }
     setDraft("");
     setShowStarter(false);
-    void sendTeamMessage(bot.id, body).catch(() => setDraft((current) => current || body));
+    void sendTeamMessage(agent.id, body).catch(() => setDraft((current) => current || body));
     requestAnimationFrame(() => scrollViewRef.current?.scrollToEnd({ animated: true }));
   }
 
@@ -179,7 +179,7 @@ export function MobileChatView({ animateAvatarOnExit = false, bot }: MobileChatV
       <View className="flex-1" style={{ backgroundColor: background }}>
         <View className="flex-1">
           <ChatHeader
-            bot={bot}
+            agent={agent}
             fallbackBackground={fieldBackground}
             foreground={foreground}
             liquidGlassAvailable={liquidGlassAvailable}
@@ -188,7 +188,7 @@ export function MobileChatView({ animateAvatarOnExit = false, bot }: MobileChatV
           />
           <ChatMessageList
             ref={scrollViewRef}
-            bot={bot}
+            agent={agent}
             bottomInset={composerHeight}
             keyboardOffset={keyboardOffset}
             canSend={serverOnline}
@@ -228,13 +228,13 @@ export function MobileChatView({ animateAvatarOnExit = false, bot }: MobileChatV
             <ConnectionStatus server={server} />
             <ChatComposer
               key={JSON.stringify([
-                bot.id,
+                agent.id,
                 questionForm.question ? questionForm.messageId : null,
                 questionForm.question?.id,
               ])}
               action={action}
               actionForeground={actionForeground}
-              botName={bot.name}
+              agentName={agent.name}
               bottomInset={insets.bottom}
               disabled={!serverOnline || questionForm.pending}
               answerQuestion={questionForm.question}

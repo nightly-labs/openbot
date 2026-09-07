@@ -1,3 +1,26 @@
+/**
+ * The one stylesheet that did not move into a feature directory, deliberately.
+ *
+ * Its last few hundred lines are a theme layer, not app-shell content: fourteen
+ * grouped rules assign the palette to selectors from every domain at once, and
+ * some of those selectors - .browser-tab, .message-action-button,
+ * .composer-button, .choice-card - are not even declared in this file. Splitting
+ * the sidebar or remote-desktop rules out means either duplicating those
+ * declarations into a second file, which is the one thing the shared palette
+ * exists to prevent, or leaving them here while their domain's own rules move
+ * past them. The second is not theoretical: .sidebar-icon-button:hover is
+ * declared twice at equal specificity, once here and once in the theme block, so
+ * moving the first past the second silently turns the hover background from
+ * --openbot-bg-control-hover into --openbot-border. Nothing in tsc, vitest or
+ * check:ui sees that.
+ *
+ * If you want the sidebar rules in features/sidebar/, lift the theme layer out
+ * first - into its own sheet that loads last, for every domain - and the split
+ * becomes mechanical. Until then this file stays whole, and
+ * noDescendingSpecificity stays off for it in biome.json because its source
+ * order is load-bearing.
+ */
+
 .app-frame {
   --left-header-height: 38px;
   --server-rail-width: 64px;
@@ -34,7 +57,6 @@
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  gap: var(--openbot-space-5);
   padding: var(--openbot-space-6);
 }
 
@@ -233,8 +255,8 @@
   }
 }
 
-.global-search-avatar.bot-avatar {
-  --bot-avatar-optical-offset: -2px;
+.global-search-avatar.agent-avatar {
+  --agent-avatar-optical-offset: -2px;
 
   width: 28px;
   height: 28px;
@@ -533,894 +555,6 @@
   transform: translateY(-50%);
 }
 
-.remote-dialog-backdrop {
-  position: fixed;
-  z-index: 300;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 28px;
-  background: var(--openbot-bg-overlay);
-  backdrop-filter: blur(10px);
-}
-
-.remote-dialog {
-  width: min(520px, 100%);
-  max-height: min(760px, calc(100vh - 56px));
-  overflow: auto;
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
-  padding: 22px;
-  background: var(--openbot-bg-surface);
-  color: var(--openbot-text-primary);
-  box-shadow: 0 28px 90px var(--openbot-shadow-dialog);
-}
-
-.remote-host-dialog {
-  width: min(680px, 100%);
-}
-
-.remote-host-dialog-setup {
-  width: min(560px, 100%);
-}
-
-.remote-dialog > header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 14px;
-}
-
-.remote-dialog h2,
-.remote-dialog h3,
-.remote-dialog p {
-  margin: 0;
-}
-.remote-dialog h2 {
-  margin-top: 3px;
-  font-size: var(--openbot-text-2xl);
-  letter-spacing: -0.025em;
-}
-.remote-dialog h3 {
-  font-size: var(--openbot-text-md);
-}
-.remote-dialog > p,
-.remote-host-setup > p {
-  margin-bottom: 18px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
-  line-height: 1.55;
-}
-
-.remote-dialog > header > button {
-  width: 28px;
-  height: 28px;
-  border: 0;
-  border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-hover);
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xl);
-  cursor: pointer;
-}
-
-.remote-dialog-eyebrow {
-  color: var(--openbot-accent-text);
-  font-size: var(--openbot-text-2xs);
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.remote-field {
-  display: grid;
-  gap: 7px;
-  margin: 14px 0;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-sm);
-  font-weight: 600;
-}
-
-.remote-field input,
-.remote-field textarea {
-  width: 100%;
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-md);
-  padding: 10px 11px;
-  outline: none;
-  resize: vertical;
-  background: var(--openbot-bg-surface);
-  color: var(--openbot-text-primary);
-  font: inherit;
-  font-weight: 450;
-}
-
-.remote-field input:focus,
-.remote-field textarea:focus {
-  border-color: var(--openbot-border-focus);
-  background: var(--openbot-bg-surface-raised);
-}
-.remote-field small {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  font-weight: 450;
-}
-
-.remote-account-chip {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  margin: 16px 0;
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-md);
-  padding: 11px 12px;
-  background: var(--openbot-bg-control-hover);
-}
-.remote-account-chip > span {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-hover);
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-md);
-  font-weight: 700;
-}
-.remote-account-chip > div {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-.remote-account-chip small {
-  color: var(--openbot-text-readable);
-  font-size: var(--openbot-text-2xs);
-}
-.remote-account-chip strong {
-  overflow: hidden;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-sm);
-  text-overflow: ellipsis;
-}
-
-.remote-dialog footer,
-.remote-host-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 20px;
-}
-
-.remote-primary-button,
-.remote-secondary-button {
-  min-height: 34px;
-  border: 1px solid transparent;
-  border-radius: var(--openbot-radius-md);
-  padding: 0 13px;
-  font-size: var(--openbot-text-sm);
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.remote-primary-button {
-  background: var(--openbot-text-primary);
-  color: var(--openbot-text-on-light);
-}
-.remote-secondary-button {
-  border-color: var(--openbot-border-strong);
-  background: var(--openbot-bg-control-hover);
-  color: var(--openbot-text-primary);
-}
-.remote-primary-button:disabled,
-.remote-secondary-button:disabled {
-  cursor: default;
-  opacity: 0.45;
-}
-
-.remote-dialog-error,
-.remote-invite-result {
-  margin-top: 14px;
-  border-radius: var(--openbot-radius-md);
-  padding: 10px 11px;
-  background: var(--openbot-danger-soft);
-  color: var(--openbot-danger);
-  font-size: var(--openbot-text-sm);
-}
-
-.remote-invite-composer {
-  margin-top: 20px;
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
-  padding: 15px;
-  background: var(--openbot-bg-surface);
-}
-
-.remote-section-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-.remote-section-heading p {
-  margin-top: 4px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-}
-.remote-section-heading label {
-  display: grid;
-  gap: 4px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.remote-section-heading select {
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-sm);
-  padding: 5px 25px 5px 8px;
-  background: var(--openbot-bg-control);
-  color: var(--openbot-text-primary);
-  font: inherit;
-  text-transform: none;
-}
-.remote-invite-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3px;
-  margin-top: 14px;
-  border-radius: var(--openbot-radius-md);
-  padding: 3px;
-  background: var(--openbot-bg-control);
-}
-.remote-invite-tabs button {
-  min-height: 31px;
-  border: 0;
-  border-radius: var(--openbot-radius-sm);
-  background: transparent;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  font-weight: 650;
-  cursor: pointer;
-}
-.remote-invite-tabs button.active {
-  border-color: var(--openbot-border-focus);
-  background: var(--openbot-accent-soft);
-  color: var(--openbot-text-primary);
-  box-shadow: 0 1px 4px var(--openbot-shadow-popover-ambient);
-}
-.remote-invite-email {
-  margin-bottom: 0;
-}
-.remote-invite-submit {
-  width: 100%;
-  margin-top: 12px;
-}
-
-.remote-invite-result {
-  background: var(--openbot-success-soft);
-  color: var(--openbot-success);
-}
-.remote-status-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.remote-status-card {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-  border: 1px solid var(--openbot-hover);
-  border-radius: var(--openbot-radius-lg);
-  padding: 13px;
-  background: var(--openbot-bg-control-hover);
-}
-
-.remote-status-card span {
-  color: var(--openbot-text-readable);
-  font-size: var(--openbot-text-xs);
-}
-.remote-status-card i {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-right: 7px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-muted);
-}
-.remote-status-card i.online {
-  background: var(--openbot-success);
-}
-.remote-status-card strong {
-  font-size: var(--openbot-text-md);
-}
-.remote-status-card small {
-  overflow: hidden;
-  color: var(--openbot-text-readable);
-  font-size: var(--openbot-text-2xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.remote-session-list {
-  display: grid;
-  gap: 9px;
-  margin-top: 20px;
-}
-.remote-session-list article {
-  border: 1px solid var(--openbot-hover);
-  border-radius: var(--openbot-radius-md);
-  padding: 12px;
-  background: var(--openbot-bg-surface);
-}
-.remote-session-list article > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.remote-session-list strong {
-  overflow: hidden;
-  font-size: var(--openbot-text-sm);
-  text-overflow: ellipsis;
-}
-.remote-session-list p {
-  margin: 8px 0;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-}
-.remote-session-list small {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-}
-.remote-session-list button {
-  float: right;
-}
-.remote-session-phase {
-  border-radius: var(--openbot-radius-pill);
-  padding: 3px 7px;
-  background: var(--openbot-hover);
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-  text-transform: capitalize;
-}
-.remote-session-phase-connected {
-  background: var(--openbot-success-soft);
-  color: var(--openbot-success);
-}
-.remote-session-phase-error {
-  background: var(--openbot-danger-soft);
-  color: var(--openbot-danger);
-}
-
-.remote-host-dialog {
-  position: relative;
-  width: min(900px, 100%);
-  max-height: min(780px, calc(100vh - 40px));
-  overflow: hidden;
-  padding: 0;
-  background: var(--openbot-bg-surface);
-}
-
-.remote-dialog > .remote-admin-header {
-  min-height: 70px;
-  align-items: center;
-  margin: 0;
-  border-bottom: 1px solid var(--openbot-border);
-  padding: 14px 18px 13px 22px;
-  background: var(--openbot-bg-host-header);
-}
-
-.remote-admin-header h2 {
-  font-size: var(--openbot-text-2xl);
-}
-
-.remote-host-setup {
-  max-width: 540px;
-  padding: 24px;
-}
-
-.remote-admin-shell {
-  display: grid;
-  height: min(680px, calc(100vh - 111px));
-  min-height: 510px;
-  grid-template-columns: 190px minmax(0, 1fr);
-}
-
-.remote-admin-nav {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 4px;
-  border-right: 1px solid var(--openbot-hover);
-  padding: 15px 11px 12px;
-  background: var(--openbot-bg-sidebar);
-}
-
-.remote-admin-nav-button {
-  display: grid;
-  width: 100%;
-  min-height: 39px;
-  align-items: center;
-  border: 0;
-  border-radius: var(--openbot-radius-md);
-  background: transparent;
-  padding: 0 10px;
-  grid-template-columns: 18px minmax(0, 1fr) auto;
-  gap: 9px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  font-weight: 570;
-  text-align: left;
-  transition:
-    background-color var(--openbot-duration-hover) ease,
-    color var(--openbot-duration-hover) ease,
-    transform var(--openbot-duration-fast) ease;
-}
-
-.remote-admin-nav-button:hover {
-  background: var(--openbot-hover);
-  color: var(--openbot-text-primary);
-}
-
-.remote-admin-nav-button:active {
-  transform: scale(0.985);
-}
-
-.remote-admin-nav-button.active {
-  border-color: var(--openbot-border-focus);
-  background: var(--openbot-accent-soft);
-  color: var(--openbot-text-primary);
-  box-shadow: inset 0 0 0 1px var(--openbot-hover);
-}
-
-.remote-admin-nav-button svg {
-  width: 17px;
-  height: 17px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.35;
-}
-
-.remote-admin-nav-button small {
-  min-width: 18px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-hover);
-  padding: 2px 5px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-  text-align: center;
-}
-
-.remote-admin-nav-button.active small {
-  color: var(--openbot-text-primary);
-}
-
-.remote-admin-nav-state {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: auto;
-  padding: 10px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-}
-
-.remote-admin-nav-state i {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-dim);
-  box-shadow: 0 0 0 3px var(--openbot-hover);
-}
-
-.remote-admin-nav-state i.online {
-  background: var(--openbot-success);
-  box-shadow: 0 0 0 3px var(--openbot-success-soft);
-}
-
-.remote-admin-content {
-  min-width: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  background:
-    radial-gradient(circle at 86% -10%, var(--openbot-success-wash), transparent 34%), var(--openbot-bg-host-canvas);
-}
-
-.remote-admin-view {
-  width: min(100%, 690px);
-  margin: 0 auto;
-  padding: 27px 28px 36px;
-}
-
-.remote-admin-view-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 20px;
-}
-
-.remote-admin-view-heading h3 {
-  margin-top: 3px;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-2xl);
-  font-weight: 620;
-  letter-spacing: -0.025em;
-}
-
-.remote-admin-view-heading p {
-  margin-top: 5px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  line-height: 1.5;
-}
-
-.remote-admin-kicker {
-  color: var(--openbot-success);
-  font-size: var(--openbot-text-2xs);
-  font-weight: 720;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-}
-
-.remote-admin-status-pill {
-  flex: 0 0 auto;
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-pill);
-  padding: 5px 9px;
-  background: var(--openbot-hover);
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-  font-weight: 680;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.remote-admin-status-pill.online {
-  border-color: var(--openbot-success-soft);
-  background: var(--openbot-success-soft);
-  color: var(--openbot-success);
-}
-
-.remote-admin-metrics {
-  display: grid;
-  min-width: 0;
-  margin: 10px 0 0;
-  border: 1px solid var(--openbot-hover);
-  border-radius: var(--openbot-radius-lg);
-  background: var(--openbot-bg-surface);
-  padding: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.remote-admin-metrics > div {
-  display: grid;
-  gap: 2px;
-  padding: 13px 14px;
-}
-
-.remote-admin-metrics > div + div {
-  border-left: 1px solid var(--openbot-hover);
-}
-
-.remote-admin-metrics strong {
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-xl);
-  font-variant-numeric: tabular-nums;
-  font-weight: 620;
-}
-
-.remote-admin-metrics span {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-}
-
-.remote-admin-control-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin-top: 16px;
-  border: 1px solid var(--openbot-hover);
-  border-radius: var(--openbot-radius-lg);
-  padding: 15px;
-  background: var(--openbot-bg-surface);
-}
-
-.remote-admin-control-card h3 {
-  color: var(--openbot-text-primary);
-}
-
-.remote-admin-control-card p {
-  max-width: 340px;
-  margin-top: 4px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-  line-height: 1.45;
-}
-
-.remote-admin-control-card .remote-host-actions {
-  flex: 0 0 auto;
-  margin: 0;
-}
-
-.remote-admin-view .remote-invite-composer {
-  margin-top: 0;
-  border-color: var(--openbot-success-soft);
-  background: linear-gradient(135deg, var(--openbot-success-wash), transparent 52%), var(--openbot-bg-host-inset);
-}
-
-.remote-inline-note {
-  margin-top: 9px;
-  color: var(--openbot-warning);
-  font-size: var(--openbot-text-2xs);
-  text-align: center;
-}
-
-.remote-invite-result {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 12px;
-  border: 1px solid var(--openbot-success-soft);
-  border-radius: var(--openbot-radius-md);
-  padding: 10px 11px;
-  background: var(--openbot-success-soft);
-  color: var(--openbot-success);
-}
-
-.remote-invite-result > div {
-  display: grid;
-  gap: 2px;
-}
-
-.remote-invite-result strong {
-  color: var(--openbot-success);
-  font-size: var(--openbot-text-xs);
-}
-
-.remote-invite-result span {
-  color: var(--openbot-success);
-  font-size: var(--openbot-text-2xs);
-}
-
-.remote-invite-result button {
-  flex: 0 0 auto;
-  border: 0;
-  border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-success-soft);
-  padding: 6px 8px;
-  color: var(--openbot-success);
-  font-size: var(--openbot-text-2xs);
-  font-weight: 620;
-}
-
-.remote-admin-list {
-  margin-top: 22px;
-}
-
-.remote-admin-list > header {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 7px;
-  padding: 0 3px;
-}
-
-.remote-admin-list > header h3 {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  font-weight: 620;
-}
-
-.remote-admin-list > header span {
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-hover);
-  padding: 2px 6px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-}
-
-.remote-admin-list > div {
-  overflow: hidden;
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
-  background: var(--openbot-bg-host-inset);
-}
-
-.remote-access-row {
-  display: grid;
-  min-height: 57px;
-  align-items: center;
-  padding: 8px 10px;
-  grid-template-columns: 34px minmax(110px, 1fr) auto auto auto;
-  gap: 9px;
-}
-
-.remote-identity-mark {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border: 1px solid var(--openbot-success-soft);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-success-soft);
-  color: var(--openbot-success);
-  font-size: var(--openbot-text-2xs);
-  font-weight: 720;
-}
-
-.remote-identity-mark.muted {
-  border-color: var(--openbot-border);
-  background: var(--openbot-hover);
-  color: var(--openbot-text-muted);
-}
-
-.remote-access-copy {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.remote-access-copy strong,
-.remote-access-copy span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.remote-access-copy strong {
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-xs);
-  font-weight: 560;
-}
-
-.remote-access-copy span {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-}
-
-.remote-member-presence {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-  line-height: 11px;
-}
-
-.remote-member-presence i {
-  width: 5px;
-  height: 5px;
-  flex: 0 0 auto;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-muted);
-}
-
-.remote-member-presence.online {
-  color: var(--openbot-success);
-}
-
-.remote-member-presence.online i {
-  background: var(--openbot-success);
-  box-shadow: 0 0 0 2px var(--openbot-success-soft);
-}
-
-.remote-role-select select,
-.remote-role-badge {
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-hover);
-  padding: 5px 23px 5px 7px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-}
-
-.remote-role-badge {
-  padding-right: 7px;
-}
-
-.remote-text-button,
-.remote-more-button {
-  border: 0;
-  border-radius: var(--openbot-radius-sm);
-  background: transparent;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-  font-weight: 590;
-}
-
-.remote-text-button {
-  padding: 7px;
-}
-
-.remote-text-button:hover:not(:disabled),
-.remote-more-button:hover:not(:disabled) {
-  background: var(--openbot-hover);
-  color: var(--openbot-text-primary);
-}
-
-.remote-text-button-danger:hover:not(:disabled) {
-  background: var(--openbot-danger-soft);
-  color: var(--openbot-danger);
-}
-
-.remote-more-button {
-  width: 26px;
-  height: 26px;
-  color: var(--openbot-text-muted);
-}
-
-.remote-more-button svg {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: 1.5;
-}
-
-.remote-text-button:disabled,
-.remote-more-button:disabled,
-.remote-role-select select:disabled {
-  cursor: default;
-  opacity: 0.45;
-}
-
-.remote-remove-confirmation {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 7px;
-  border-top: 1px solid var(--openbot-danger-soft);
-  padding: 8px 10px;
-  background: var(--openbot-danger-soft);
-}
-
-.remote-remove-confirmation span {
-  margin-right: auto;
-  color: var(--openbot-danger);
-  font-size: var(--openbot-text-2xs);
-}
-
-.remote-remove-confirmation button {
-  border: 0;
-  border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-hover);
-  padding: 6px 8px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-  font-weight: 600;
-}
-
-.remote-remove-confirmation button.danger {
-  background: var(--openbot-danger-soft);
-  color: var(--openbot-danger);
-}
-
-.remote-admin-empty {
-  padding: 18px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
-  text-align: center;
-}
-
-.remote-host-dialog > .remote-dialog-error {
-  position: absolute;
-  z-index: 5;
-  right: 16px;
-  bottom: 14px;
-  max-width: 430px;
-  margin: 0;
-  box-shadow: 0 10px 35px var(--openbot-shadow-popover-ambient);
-}
-
 @media (max-width: 800px) {
   .app-frame-with-server-rail {
     --server-rail-width: 56px;
@@ -1431,61 +565,6 @@
   .server-rail {
     --server-rail-inline-padding: 5px;
   }
-  .remote-status-grid {
-    grid-template-columns: 1fr;
-  }
-  .remote-dialog-backdrop {
-    padding: 12px;
-  }
-  .remote-admin-shell {
-    height: calc(100vh - 95px);
-    min-height: 0;
-    grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-  .remote-admin-nav {
-    flex-direction: row;
-    border-right: 0;
-    border-bottom: 1px solid var(--openbot-hover);
-    padding: 7px;
-  }
-  .remote-admin-nav-button {
-    grid-template-columns: 16px minmax(0, 1fr) auto;
-    padding-inline: 8px;
-  }
-  .remote-admin-nav-state {
-    display: none;
-  }
-  .remote-admin-view {
-    padding: 22px 16px 34px;
-  }
-  .remote-admin-control-card {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .remote-access-row {
-    grid-template-columns: 34px minmax(90px, 1fr) auto;
-  }
-  .remote-access-row .remote-role-select,
-  .remote-access-row .remote-role-badge {
-    grid-column: 3;
-  }
-  .remote-access-row .remote-text-button {
-    grid-column: 2;
-  }
-  .remote-access-row .remote-more-button {
-    grid-column: 3;
-  }
-}
-
-.remote-access-row-wrap + .remote-access-row-wrap,
-.remote-admin-list > div > .remote-access-row + .remote-access-row {
-  border-top: 1px solid var(--openbot-hover);
-}
-
-.remote-access-row-wrap.disabled .remote-identity-mark,
-.remote-access-row-wrap.disabled .remote-access-copy {
-  opacity: 0.45;
 }
 
 .panel-resizer {
@@ -1795,7 +874,7 @@ textarea {
   color: var(--openbot-text-muted);
 }
 
-.bot-list {
+.agent-list {
   display: flex;
   min-height: 0;
   flex: 1;
@@ -1806,11 +885,11 @@ textarea {
   scrollbar-width: none;
 }
 
-.bot-list::-webkit-scrollbar {
+.agent-list::-webkit-scrollbar {
   display: none;
 }
 
-.bot-list-content {
+.agent-list-content {
   position: relative;
 }
 
@@ -1824,13 +903,33 @@ textarea {
   transition: margin-top var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-.sidebar-section {
-  --sidebar-section-drag-y: 0px;
+/**
+ * The one drag offset transport. Every row that a drag pushes out of the way - a section, an agent,
+ * a person, a pinned tile - writes this pair inline and translates by it, so there is one name to
+ * grep and one computation behind it.
+ *
+ * The reset below is not cosmetic. Custom properties inherit, and agent and person rows sit inside
+ * a section that can be shifting itself; without a declaration of their own they would inherit its
+ * offset and move twice. Each row's inline style still wins over this reset.
+ */
+.sidebar-section,
+.sidebar-agent-item,
+.sidebar-person-item,
+.sidebar-pinned-item {
+  --sidebar-drag-x: 0px;
+  --sidebar-drag-y: 0px;
+}
 
+/** Only the rows actually in motion get a layer; the shifting class is toggled per offset. */
+.sidebar-drag-shifting {
+  will-change: transform;
+}
+
+.sidebar-section {
   position: relative;
   border-radius: var(--openbot-radius-md);
   opacity: 1;
-  transform: translate3d(0, var(--sidebar-section-drag-y), 0);
+  transform: translate3d(var(--sidebar-drag-x), var(--sidebar-drag-y), 0);
   transition-property: background-color, box-shadow, opacity, transform;
   transition-duration: var(--openbot-duration-fast);
   transition-timing-function: ease-out;
@@ -1869,8 +968,7 @@ textarea {
   transition: none;
 }
 
-.sidebar-section-dragging,
-.sidebar-section-shifting {
+.sidebar-section-dragging {
   will-change: transform;
 }
 
@@ -1900,26 +998,26 @@ textarea {
   touch-action: pan-y;
 }
 
-.bot-list[data-sidebar-dragging],
-.bot-list[data-sidebar-dragging] .sidebar-section-drag-handle,
-.bot-list[data-sidebar-dragging] .sidebar-section-toggle,
-.bot-list[data-sidebar-dragging] .agent-row,
-.bot-list[data-sidebar-dragging] .person-row {
+.agent-list[data-sidebar-dragging],
+.agent-list[data-sidebar-dragging] .sidebar-section-drag-handle,
+.agent-list[data-sidebar-dragging] .sidebar-section-toggle,
+.agent-list[data-sidebar-dragging] .agent-row,
+.agent-list[data-sidebar-dragging] .person-row {
   cursor: grabbing;
 }
 
-.bot-list[data-sidebar-dragging] .sidebar-section-toggle {
+.agent-list[data-sidebar-dragging] .sidebar-section-toggle {
   pointer-events: none;
 }
 
-.bot-list[data-sidebar-dragging] .sidebar-section-toggle:hover,
-.bot-list[data-sidebar-dragging] .sidebar-section-toggle:focus-visible {
+.agent-list[data-sidebar-dragging] .sidebar-section-toggle:hover,
+.agent-list[data-sidebar-dragging] .sidebar-section-toggle:focus-visible {
   background: transparent;
   color: var(--openbot-text-readable);
 }
 
-.bot-list[data-sidebar-dragging] .sidebar-section-toggle:hover .sidebar-section-chevron,
-.bot-list[data-sidebar-dragging] .sidebar-section-toggle:focus-visible .sidebar-section-chevron {
+.agent-list[data-sidebar-dragging] .sidebar-section-toggle:hover .sidebar-section-chevron,
+.agent-list[data-sidebar-dragging] .sidebar-section-toggle:focus-visible .sidebar-section-chevron {
   opacity: 0;
 }
 
@@ -2066,25 +1164,25 @@ textarea {
   color: var(--openbot-text-secondary);
 }
 
-.bot-row.sidebar-agent-drag-preview {
+.agent-row.sidebar-agent-drag-preview {
   background: var(--openbot-bg-surface-raised);
   transition: none;
 }
 
-.bot-row.sidebar-person-drag-preview {
+.agent-row.sidebar-person-drag-preview {
   background: var(--openbot-bg-surface-raised);
   transition: none;
 }
 
-.bot-row.sidebar-agent-drag-preview *,
-.bot-row.sidebar-person-drag-preview * {
+.agent-row.sidebar-agent-drag-preview *,
+.agent-row.sidebar-person-drag-preview * {
   animation: none;
   transition: none;
 }
 
 .sidebar-agent-item {
   position: relative;
-  transform: translate3d(0, var(--sidebar-agent-drag-y, 0px), 0);
+  transform: translate3d(var(--sidebar-drag-x), var(--sidebar-drag-y), 0);
   transition: transform var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
@@ -2092,16 +1190,15 @@ textarea {
   margin-top: 4px;
 }
 
-.sidebar-agent-item-shifting,
 .sidebar-agent-item-dragging {
   will-change: transform;
 }
 
-.bot-list[data-sidebar-dragging="agent"] .sidebar-agent-item {
+.agent-list[data-sidebar-dragging="agent"] .sidebar-agent-item {
   will-change: transform;
 }
 
-.bot-list[data-sidebar-dragging="person"] .sidebar-person-item {
+.agent-list[data-sidebar-dragging="person"] .sidebar-person-item {
   will-change: transform;
 }
 
@@ -2126,7 +1223,7 @@ textarea {
 
 .sidebar-person-item {
   position: relative;
-  transform: translate3d(0, var(--sidebar-person-drag-y, 0px), 0);
+  transform: translate3d(var(--sidebar-drag-x), var(--sidebar-drag-y), 0);
   transition: transform var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
@@ -2134,7 +1231,6 @@ textarea {
   margin-top: 4px;
 }
 
-.sidebar-person-item-shifting,
 .sidebar-person-item-dragging {
   will-change: transform;
 }
@@ -2232,18 +1328,15 @@ textarea {
 }
 
 .sidebar-pinned-item {
-  --sidebar-pinned-drag-x: 0px;
-  --sidebar-pinned-drag-y: 0px;
-
   position: relative;
   width: 72px;
   flex: 0 0 72px;
   opacity: 1;
-  transform: translate3d(var(--sidebar-pinned-drag-x), var(--sidebar-pinned-drag-y), 0);
+  transform: translate3d(var(--sidebar-drag-x), var(--sidebar-drag-y), 0);
   transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-.bot-row.sidebar-pinned-row {
+.agent-row.sidebar-pinned-row {
   width: 72px;
   height: 94px;
   min-height: 94px;
@@ -2259,14 +1352,14 @@ textarea {
   transform: scale(0.96);
 }
 
-.bot-row.sidebar-pinned-row .sidebar-pinned-avatar {
+.agent-row.sidebar-pinned-row .sidebar-pinned-avatar {
   width: 48px;
   height: 48px;
   flex-basis: 48px;
 }
 
-.bot-row.sidebar-pinned-row .bot-avatar,
-.bot-row.sidebar-pinned-row.person-row .person-avatar {
+.agent-row.sidebar-pinned-row .agent-avatar,
+.agent-row.sidebar-pinned-row.person-row .person-avatar {
   width: 48px;
   height: 48px;
 }
@@ -2412,7 +1505,7 @@ textarea {
   font-weight: 680;
 }
 
-.bot-row {
+.agent-row {
   display: flex;
   width: 100%;
   height: 54px;
@@ -2431,27 +1524,23 @@ textarea {
     transform var(--openbot-duration-normal) ease;
 }
 
-.bot-row + .bot-row {
+.agent-row + .agent-row {
   margin-top: 4px;
 }
 
-.bot-row:hover {
+.agent-row:hover {
   background: var(--openbot-hover);
 }
 
-.bot-row:active {
+.agent-row:active {
   transform: scale(0.99);
 }
 
-.bot-row-active {
+.agent-row-active {
   background: var(--openbot-active);
 }
 
-.bot-row-menu-open {
-  background: var(--openbot-border);
-}
-
-.bot-row-avatar {
+.agent-row-avatar {
   position: relative;
   display: grid;
   width: 36px;
@@ -2462,7 +1551,7 @@ textarea {
   transition: transform var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-.bot-row-agent-status {
+.agent-row-agent-status {
   position: absolute;
   z-index: 1;
   right: -5px;
@@ -2475,11 +1564,11 @@ textarea {
   pointer-events: none;
 }
 
-.bot-row-active .bot-row-agent-status {
+.agent-row-active .agent-row-agent-status {
   border-color: var(--openbot-bg-control);
 }
 
-.bot-row-agent-status-working {
+.agent-row-agent-status-working {
   width: 24px;
   height: 16px;
   border-radius: var(--openbot-radius-pill);
@@ -2487,13 +1576,13 @@ textarea {
   color: var(--openbot-text-secondary);
 }
 
-.bot-row-thinking-dots {
+.agent-row-thinking-dots {
   display: inline-flex;
   align-items: center;
   gap: 2px;
 }
 
-.bot-row-thinking-dots i {
+.agent-row-thinking-dots i {
   width: 3px;
   height: 3px;
   border-radius: var(--openbot-radius-pill);
@@ -2502,15 +1591,15 @@ textarea {
   animation: typing-dot-pulse 900ms ease-in-out infinite;
 }
 
-.bot-row-thinking-dots i:nth-child(2) {
+.agent-row-thinking-dots i:nth-child(2) {
   animation-delay: var(--openbot-duration-fast);
 }
 
-.bot-row-thinking-dots i:nth-child(3) {
+.agent-row-thinking-dots i:nth-child(3) {
   animation-delay: var(--openbot-duration-overlay);
 }
 
-.bot-row-agent-status-responded {
+.agent-row-agent-status-responded {
   width: 16px;
   height: 16px;
   border-radius: var(--openbot-radius-pill);
@@ -2519,7 +1608,7 @@ textarea {
   animation: sidebar-reply-in var(--openbot-duration-overlay) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.bot-row-agent-status-responded svg {
+.agent-row-agent-status-responded svg {
   width: 10px;
   height: 10px;
   fill: none;
@@ -2529,7 +1618,7 @@ textarea {
   stroke-linejoin: round;
 }
 
-.bot-row-agent-status-unread {
+.agent-row-agent-status-unread {
   min-width: 16px;
   height: 16px;
   border-radius: var(--openbot-radius-pill);
@@ -2563,16 +1652,16 @@ textarea {
   }
 }
 
-.bot-delete-backdrop {
+.agent-delete-backdrop {
   position: fixed;
   z-index: 100;
   inset: 0;
   display: grid;
   place-items: center;
-  animation: bot-backdrop-in var(--openbot-duration-normal) ease-out;
+  animation: agent-backdrop-in var(--openbot-duration-normal) ease-out;
 }
 
-.bot-delete-dialog {
+.agent-delete-dialog {
   display: flex;
   width: min(390px, calc(100vw - 40px));
   flex-direction: column;
@@ -2580,10 +1669,10 @@ textarea {
   background: var(--openbot-bg-control);
   padding: 26px 26px 20px;
   text-align: center;
-  animation: bot-dialog-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: agent-dialog-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.bot-delete-dialog h2 {
+.agent-delete-dialog h2 {
   margin: 0;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-2xl);
@@ -2592,7 +1681,7 @@ textarea {
   letter-spacing: -0.25px;
 }
 
-.bot-delete-dialog > p {
+.agent-delete-dialog > p {
   max-width: 310px;
   margin: 8px 0 0;
   color: var(--openbot-text-muted);
@@ -2600,7 +1689,7 @@ textarea {
   line-height: 19px;
 }
 
-.bot-delete-dialog .bot-delete-error {
+.agent-delete-dialog .agent-delete-error {
   width: 100%;
   margin-top: 14px;
   border-radius: var(--openbot-radius-md);
@@ -2620,17 +1709,17 @@ textarea {
   color: var(--openbot-danger);
 }
 
-.bot-context-submenu-chevron {
+.agent-context-submenu-chevron {
   margin-left: auto;
   color: var(--openbot-text-muted);
 }
 
-.bot-context-submenu {
+.agent-context-submenu {
   max-height: min(520px, calc(100vh - 16px));
   overflow-y: auto;
 }
 
-.bot-delete-actions {
+.agent-delete-actions {
   display: grid;
   width: 100%;
   margin-top: 22px;
@@ -2638,7 +1727,7 @@ textarea {
   gap: 9px;
 }
 
-.bot-delete-actions button {
+.agent-delete-actions button {
   height: 38px;
   border: 0.5px solid var(--openbot-border);
   border-radius: var(--openbot-radius-md);
@@ -2651,46 +1740,46 @@ textarea {
     opacity var(--openbot-duration-hover) ease;
 }
 
-.bot-delete-actions button:hover {
+.agent-delete-actions button:hover {
   background: var(--openbot-border);
 }
 
-.bot-delete-actions button:disabled {
+.agent-delete-actions button:disabled {
   cursor: default;
   opacity: 0.55;
 }
 
-.bot-delete-actions .bot-delete-confirm {
+.agent-delete-actions .agent-delete-confirm {
   border-color: var(--openbot-danger);
   background: var(--openbot-danger);
   color: var(--openbot-text-primary);
 }
 
-.bot-delete-actions .bot-delete-confirm:hover {
+.agent-delete-actions .agent-delete-confirm:hover {
   background: var(--openbot-danger);
 }
 
-@keyframes bot-context-in {
+@keyframes agent-context-in {
   from {
     opacity: 0;
     transform: scale(0.96) translateY(-3px);
   }
 }
 
-@keyframes bot-backdrop-in {
+@keyframes agent-backdrop-in {
   from {
     opacity: 0;
   }
 }
 
-@keyframes bot-dialog-in {
+@keyframes agent-dialog-in {
   from {
     opacity: 0;
     transform: scale(0.97) translateY(5px);
   }
 }
 
-.bot-avatar {
+.agent-avatar {
   display: grid;
   width: 32px;
   height: 32px;
@@ -2702,21 +1791,21 @@ textarea {
   overflow: visible;
 }
 
-.bot-avatar > svg {
+.agent-avatar > svg {
   display: block;
   width: 128%;
   height: 128%;
   overflow: visible;
-  translate: var(--bot-avatar-optical-offset-x, 0) var(--bot-avatar-optical-offset, 0);
+  translate: var(--agent-avatar-optical-offset-x, 0) var(--agent-avatar-optical-offset, 0);
 }
 
-.bot-avatar-custom {
+.agent-avatar-custom {
   overflow: hidden;
   background: var(--openbot-hover);
   box-shadow: inset 0 0 0 1px var(--openbot-border);
 }
 
-.bot-avatar-custom > img,
+.agent-avatar-custom > img,
 .composer-mention-avatar > img {
   display: block;
   width: 100%;
@@ -2724,8 +1813,8 @@ textarea {
   object-fit: cover;
 }
 
-.bot-row .bot-avatar {
-  --bot-avatar-optical-offset: -4px;
+.agent-row .agent-avatar {
+  --agent-avatar-optical-offset: -4px;
 
   width: 36px;
   height: 36px;
@@ -2870,7 +1959,7 @@ textarea {
   stroke-width: 1.5;
 }
 
-.avatar-image-upload-preview .bot-avatar {
+.avatar-image-upload-preview .agent-avatar {
   width: 42px;
   height: 42px;
 }
@@ -2938,7 +2027,7 @@ textarea {
     0 1px 3px var(--openbot-shadow-popover-ambient);
 }
 
-.avatar-face-choice .bot-avatar {
+.avatar-face-choice .agent-avatar {
   width: 34px;
   height: 34px;
 }
@@ -2977,14 +2066,14 @@ textarea {
   font-weight: 650;
 }
 
-.conversation-title .bot-avatar {
-  --bot-avatar-optical-offset: -2px;
+.conversation-title .agent-avatar {
+  --agent-avatar-optical-offset: -2px;
 
   width: 18px;
   height: 18px;
 }
 
-.bot-row-copy {
+.agent-row-copy {
   min-width: 0;
   flex: 1;
   opacity: 1;
@@ -2994,7 +2083,7 @@ textarea {
     transform var(--openbot-duration-slow) cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-.bot-row-heading {
+.agent-row-heading {
   display: flex;
   min-width: 0;
   align-items: baseline;
@@ -3002,7 +2091,7 @@ textarea {
   gap: 8px;
 }
 
-.bot-row-title {
+.agent-row-title {
   display: flex;
   min-width: 0;
   align-items: center;
@@ -3010,17 +2099,17 @@ textarea {
   overflow: hidden;
 }
 
-.bot-row-title:has(.bot-role-badge) {
-  --bot-role-badge-collapsed-width: calc(2ch + 9px);
+.agent-row-title:has(.agent-role-badge) {
+  --agent-role-badge-collapsed-width: calc(2ch + 9px);
 
   display: grid;
   grid-template-columns:
-    fit-content(calc(100% - var(--bot-role-badge-collapsed-width) - 5px))
-    minmax(var(--bot-role-badge-collapsed-width), 1fr);
+    fit-content(calc(100% - var(--agent-role-badge-collapsed-width) - 5px))
+    minmax(var(--agent-role-badge-collapsed-width), 1fr);
 }
 
-.bot-row-title strong,
-.person-row .bot-row-heading strong {
+.agent-row-title strong,
+.person-row .agent-row-heading strong {
   min-width: 0;
   overflow: hidden;
   color: var(--openbot-text-primary);
@@ -3031,7 +2120,7 @@ textarea {
   white-space: nowrap;
 }
 
-.bot-role-badge {
+.agent-role-badge {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -3048,15 +2137,15 @@ textarea {
   white-space: nowrap;
 }
 
-.bot-role-badge > span {
+.agent-role-badge > span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.bot-row-time,
-.person-row .bot-row-heading > span {
+.agent-row-time,
+.person-row .agent-row-heading > span {
   min-width: 0;
   max-width: 54px;
   overflow: hidden;
@@ -3068,7 +2157,7 @@ textarea {
   white-space: nowrap;
 }
 
-.bot-row-preview {
+.agent-row-preview {
   display: block;
   margin-top: 0;
   overflow: hidden;
@@ -3103,17 +2192,17 @@ textarea {
   text-align: center;
 }
 
-.sidebar-first-bot-state {
+.sidebar-first-agent-state {
   display: flex;
   min-height: 100%;
   flex-direction: column;
 }
 
-.ui-button.sidebar-first-bot-action {
+.ui-button.sidebar-first-agent-action {
   flex: 0 0 auto;
 }
 
-.sidebar-first-bot-empty {
+.sidebar-first-agent-empty {
   display: grid;
   flex: 1;
   place-items: center;
@@ -3144,13 +2233,13 @@ textarea {
   padding-bottom: 9px;
 }
 
-.app-frame:has(.account-dock-hybrid) .bot-list,
+.app-frame:has(.account-dock-hybrid) .agent-list,
 .app-frame:has(.account-dock-hybrid) .server-rail-list {
   padding-bottom: 60px;
   scroll-padding-bottom: 60px;
 }
 
-.app-frame:has(.account-dock-hybrid) .bot-list.scroll-fade-bottom:not(.scroll-fade-top),
+.app-frame:has(.account-dock-hybrid) .agent-list.scroll-fade-bottom:not(.scroll-fade-top),
 .app-frame:has(.account-dock-hybrid) .server-rail-list.scroll-fade-bottom:not(.scroll-fade-top) {
   -webkit-mask-image: linear-gradient(
     to bottom,
@@ -3168,7 +2257,7 @@ textarea {
   );
 }
 
-.app-frame:has(.account-dock-hybrid) .bot-list.scroll-fade-top.scroll-fade-bottom,
+.app-frame:has(.account-dock-hybrid) .agent-list.scroll-fade-top.scroll-fade-bottom,
 .app-frame:has(.account-dock-hybrid) .server-rail-list.scroll-fade-top.scroll-fade-bottom {
   -webkit-mask-image: linear-gradient(
     to bottom,
@@ -3630,7 +2719,7 @@ textarea {
   transition-delay: 55ms;
 }
 
-.sidebar-compact .bot-list {
+.sidebar-compact .agent-list {
   padding-inline: 12px;
 }
 
@@ -3650,15 +2739,15 @@ textarea {
   white-space: nowrap;
 }
 
-.sidebar-compact .bot-row {
+.sidebar-compact .agent-row {
   padding-inline: 8px;
 }
 
-.sidebar-compact .bot-row-avatar {
+.sidebar-compact .agent-row-avatar {
   transform: translateX(6px);
 }
 
-.sidebar-compact .bot-row.sidebar-pinned-row {
+.sidebar-compact .agent-row.sidebar-pinned-row {
   width: 60px;
   height: 60px;
   min-height: 60px;
@@ -3670,7 +2759,7 @@ textarea {
   flex-basis: 60px;
 }
 
-.sidebar-compact .bot-row.sidebar-pinned-row .sidebar-pinned-avatar {
+.sidebar-compact .agent-row.sidebar-pinned-row .sidebar-pinned-avatar {
   transform: none;
 }
 
@@ -3678,13 +2767,12 @@ textarea {
   display: none;
 }
 
-.sidebar-compact .bot-row-copy {
+.sidebar-compact .agent-row-copy {
   opacity: 0;
   pointer-events: none;
   transform: translateX(-8px);
 }
 
-.footer-glyph,
 .account-dock-avatar {
   display: grid;
   width: 32px;
@@ -3707,16 +2795,6 @@ textarea {
   height: 100%;
   border-radius: inherit;
   object-fit: cover;
-}
-
-.footer-count {
-  margin-left: auto;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-success-soft);
-  padding: 2px 7px;
-  color: var(--openbot-success);
-  font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: var(--openbot-text-2xs);
 }
 
 .account-dock-copy {
@@ -3975,9 +3053,6 @@ textarea {
   color: var(--openbot-text-secondary);
 }
 
-.remote-status-card i.online,
-.remote-admin-nav-state i.online,
-.remote-member-presence.online i,
 .person-avatar.online > i {
   background: var(--openbot-success);
 }
@@ -3985,7 +3060,6 @@ textarea {
 .sidebar-icon-button:hover,
 .header-panel-toggle:hover,
 .browser-tab:hover,
-.browser-tab-active,
 .browser-new-tab:hover,
 .browser-toolbar-button:hover:not(:disabled),
 .message-action-button:hover,
@@ -3996,60 +3070,44 @@ textarea {
 .reaction-picker-row button[aria-checked="true"],
 .message-more-menu button:hover,
 .message-more-menu button:focus-visible,
-.choice-dismiss:hover,
 .media-close:hover,
 .composer-button:hover,
 .composer-attachment > button:hover,
 .account-menu-row:hover,
-.bot-context-menu button:hover,
-.bot-context-menu button:focus-visible,
-.remote-text-button:hover:not(:disabled),
-.remote-more-button:hover:not(:disabled),
-.remote-dialog > header > button:hover,
-.remote-admin-nav-button:hover,
-.remote-primary-button:hover:not(:disabled),
-.remote-secondary-button:hover:not(:disabled) {
+.agent-context-menu button:hover,
+.agent-context-menu button:focus-visible {
   background: var(--openbot-bg-control-hover);
   color: var(--openbot-text-primary);
 }
 
 .sidebar-icon-button:active,
 .header-panel-toggle:active,
-.bot-row:active,
+.agent-row:active,
 .composer-button:active,
 .voice-button:active,
-.remote-primary-button:active:not(:disabled),
-.remote-secondary-button:active:not(:disabled),
-.settings-switch:active,
 .agent-settings-nav-button:active {
   transform: scale(0.97);
 }
 
-.bot-row:hover,
-.bot-row-menu-open {
+.agent-row:hover {
   background: var(--openbot-bg-control);
 }
 
-.bot-list[data-sidebar-dragging] .bot-row:hover {
+.agent-list[data-sidebar-dragging] .agent-row:hover {
   background: transparent;
 }
 
-.bot-list[data-sidebar-dragging] .bot-row.bot-row-active,
-.bot-list[data-sidebar-dragging] .bot-row.bot-row-active:hover {
+.agent-list[data-sidebar-dragging] .agent-row.agent-row-active,
+.agent-list[data-sidebar-dragging] .agent-row.agent-row-active:hover {
   background: var(--openbot-active);
 }
 
-.agent-settings-content,
-.remote-admin-content,
-.remote-admin-view {
+.agent-settings-content {
   color: var(--openbot-text-primary);
 }
 
 .agent-settings-model,
 .agent-settings-notifications,
-.remote-admin-control-card,
-.remote-invite-composer,
-.remote-status-card,
 .approval-card,
 .choice-card,
 .agent-setup-card,
@@ -4064,22 +3122,16 @@ textarea {
 
 .choice-key,
 .composer-mention-token,
-.attachment-thumb,
-.remote-account-chip,
-.remote-status-card,
-.remote-session-phase,
 .remote-desktop-empty-mark {
   background: var(--openbot-bg-control-hover);
   color: var(--openbot-text-secondary);
 }
 
-.remote-dialog-backdrop,
 .media-backdrop {
   background: var(--openbot-bg-overlay);
 }
 
-.remote-dialog,
-.bot-delete-dialog {
+.agent-delete-dialog {
   border-color: var(--openbot-border-strong);
   background: var(--openbot-bg-surface);
 }

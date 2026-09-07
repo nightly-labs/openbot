@@ -3,12 +3,12 @@
 
 import type {
   AccountUsage,
+  AgentMemory,
   AgentModelOption,
   AgentStatus,
-  BotMemory,
-  BotSummary,
+  AgentSummary,
   DraftAttachment,
-  DuplicateBotResult,
+  DuplicateAgentResult,
   InstalledSkill,
   QueuedMessageReceipt,
   QueueSnapshot,
@@ -16,11 +16,11 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   isAccountUsage,
+  isAgentMemory,
   isAgentModelOption,
   isAgentStatus,
+  isAgentSummary,
   isAttachmentSummary,
-  isBotMemory,
-  isBotSummary,
   isQueuedMessageReceipt,
   isQueueSnapshot,
   isRoutine,
@@ -49,12 +49,12 @@ export function decodeDraftAttachment(value: unknown): DraftAttachment {
   };
 }
 
-export function decodeBotSummary(value: unknown): BotSummary {
+export function decodeAgentSummary(value: unknown): AgentSummary {
   const record = decodeRecord(value, "agent");
   // Servers older than 63b55606 omit `avatarUrl` entirely. The shared guard requires the field, so
   // normalize the absent case to null before validating rather than loosening the guard for everyone.
   const candidate = record.avatarUrl === undefined ? { ...record, avatarUrl: null } : record;
-  if (!isBotSummary(candidate)) throw new Error("Invalid agent.");
+  if (!isAgentSummary(candidate)) throw new Error("Invalid agent.");
   const marketplaceSource = decodeMarketplaceSource(candidate.marketplaceSource);
   return {
     id: candidate.id,
@@ -76,13 +76,13 @@ export function decodeBotSummary(value: unknown): BotSummary {
   };
 }
 
-function decodeMarketplaceSource(value: unknown): BotSummary["marketplaceSource"] {
+function decodeMarketplaceSource(value: unknown): AgentSummary["marketplaceSource"] {
   if (value === undefined) return undefined;
   const record = decodeRecord(value, "agent marketplace source");
   const skillIds = record.skillIds;
   const routineIds = record.routineIds;
   if (
-    !isString(record.agentId) ||
+    !isString(record.listingId) ||
     !isString(record.versionId) ||
     !isNumber(record.version) ||
     !Number.isInteger(record.version) ||
@@ -94,7 +94,7 @@ function decodeMarketplaceSource(value: unknown): BotSummary["marketplaceSource"
     throw new Error("Invalid agent marketplace source.");
   }
   return {
-    agentId: record.agentId,
+    listingId: record.listingId,
     versionId: record.versionId,
     version: record.version,
     skillIds: [...skillIds],
@@ -116,6 +116,15 @@ export function decodeAccountUsageFromHost(value: unknown): AccountUsage {
   return value;
 }
 
+// Fails closed on a member, not just on the array: `packages/contracts/AGENTS.md` makes a malformed
+// known payload a `protocol_error`, and a list this build silently shortens is the shape that rule
+// exists to forbid -- the host and the client would disagree about what was offered with nothing
+// saying so. What made `claude-fable-5-1[1m]` take a whole server offline was not this guard but
+// `isAgentModel` having no square brackets in its character set, so a legitimate id read as
+// malformed; widening the set is the fix, and a model id is deliberately an opaque token there
+// rather than a closed list for exactly this reason. An id that still fails it is a host sending
+// something no version of this protocol allows, and a new provider or reasoning effort is an
+// additive change the contract routes through capability negotiation instead.
 export function decodeAgentModelOptions(value: unknown): AgentModelOption[] {
   if (!Array.isArray(value) || !value.every(isAgentModelOption)) {
     throw new Error("Invalid remote agent models.");
@@ -123,9 +132,9 @@ export function decodeAgentModelOptions(value: unknown): AgentModelOption[] {
   return value;
 }
 
-export function decodeBotSummaries(value: unknown): BotSummary[] {
+export function decodeAgentSummaries(value: unknown): AgentSummary[] {
   if (!Array.isArray(value)) throw new Error("Invalid remote agent list.");
-  return value.map(decodeBotSummary);
+  return value.map(decodeAgentSummary);
 }
 
 export function decodeInstalledSkillsFromHost(value: unknown): InstalledSkill[] {
@@ -147,13 +156,13 @@ export function decodeInstalledSkillsFromHost(value: unknown): InstalledSkill[] 
   });
 }
 
-export function decodeBotMemory(value: unknown): BotMemory {
-  if (!isBotMemory(value)) throw new Error("Invalid remote agent memory.");
+export function decodeAgentMemory(value: unknown): AgentMemory {
+  if (!isAgentMemory(value)) throw new Error("Invalid remote agent memory.");
   return value;
 }
 
-export function decodeBotMemories(value: unknown): BotMemory[] {
-  if (!Array.isArray(value) || !value.every(isBotMemory)) {
+export function decodeAgentMemories(value: unknown): AgentMemory[] {
+  if (!Array.isArray(value) || !value.every(isAgentMemory)) {
     throw new Error("Invalid remote agent memories.");
   }
   return value;
@@ -169,10 +178,10 @@ export function decodeSidebarLayoutSnapshot(value: unknown): SidebarLayoutSnapsh
   return value;
 }
 
-export function decodeDuplicateBotResultFromHost(value: unknown): DuplicateBotResult {
+export function decodeDuplicateAgentResultFromHost(value: unknown): DuplicateAgentResult {
   const record = decodeRecord(value, "agent duplication");
   return {
-    bot: decodeBotSummary(record.bot),
+    agent: decodeAgentSummary(record.agent),
     layout: decodeSidebarLayoutSnapshot(record.layout),
   };
 }

@@ -2,7 +2,7 @@ import type { ConversationMessage, ConversationQuestionPrompt } from "@openbot/c
 
 export type ChatMessage =
   | { id: string; kind: "question"; turnId: string | undefined; prompt: ConversationQuestionPrompt }
-  | { id: string; kind: "message"; author: "bot" | "user"; body: string; streaming: boolean }
+  | { id: string; kind: "message"; author: "agent" | "user"; body: string; streaming: boolean }
   | { id: string; kind: "thinking"; turnId: string | undefined; steps: { id: string; text: string }[] };
 
 export function projectChatMessages(messages: ConversationMessage[]): ChatMessage[] {
@@ -27,7 +27,7 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
       result.push({
         id: message.id,
         kind: "message",
-        author: message.author === "user" ? "user" : "bot",
+        author: message.author === "user" ? "user" : "agent",
         body: message.text,
         streaming: message.status === "streaming",
       });

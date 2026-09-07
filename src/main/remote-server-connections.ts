@@ -122,15 +122,14 @@ export class RemoteServerConnections {
   // `fallbackState` is what to show when the error is one this app has no specific word for -- the
   // caller knows whether that means "still blocked" or "just failed".
   reportError(serverId: string, error: unknown, fallbackState: ServerSummary["state"] | null = null): void {
-    this.#apply(serverId, classifyRemoteConnectionError(error), fallbackState);
-    this.#onChanged();
+    if (this.#apply(serverId, classifyRemoteConnectionError(error), fallbackState).changed) this.#onChanged();
   }
 
   // The WebRTC transport's own failures. Returns whether reconnecting is now suspended, because the
   // caller schedules the retry and this is the one thing that stops it.
   reportTransportError(serverId: string, code: string, message: string): boolean {
-    const suspended = this.#apply(serverId, classifyTransportError(code, message), null);
-    this.#onChanged();
+    const { changed, suspended } = this.#apply(serverId, classifyTransportError(code, message), null);
+    if (changed) this.#onChanged();
     return suspended;
   }
 
@@ -144,23 +143,40 @@ export class RemoteServerConnections {
     this.#statuses.delete(serverId);
   }
 
-  #apply(serverId: string, outcome: RemoteConnectionOutcome, fallbackState: ServerSummary["state"] | null): boolean {
+  #apply(
+    serverId: string,
+    outcome: RemoteConnectionOutcome,
+    fallbackState: ServerSummary["state"] | null,
+  ): { changed: boolean; suspended: boolean } {
+    const status = this.#mutable(serverId);
+    let changed = false;
     // The host told us what it speaks on its way to refusing us. Recording it is what lets the app
     // say "update the host" instead of "something went wrong".
     if (outcome.hostSupport) {
-      this.setCompatibility(serverId, {
+      const compatibility = {
         ...checkingCompatibility(this.#appVersion),
         hostAppVersion: outcome.hostSupport.appVersion,
         hostProtocol: outcome.hostSupport.protocol,
         capabilities: outcome.hostSupport.capabilities,
-      });
+      };
+      changed ||= !sameCompatibility(status.compatibility, compatibility);
+      status.compatibility = compatibility;
     }
-    const status = this.#mutable(serverId);
-    if (outcome.issue) status.issue = outcome.issue;
+    // The issue object is replaced even when it says the same thing, because `clearStaleIssue`
+    // withdraws a complaint by identity -- but an identical complaint is not news, and reporting it
+    // as one is what turns a host answering 401 into a broadcast storm: every refused request would
+    // wake every window, and a window that reacts by asking again closes the loop.
+    if (outcome.issue) {
+      changed ||= !sameIssue(status.issue, outcome.issue);
+      status.issue = outcome.issue;
+    }
     const state = outcome.state ?? fallbackState;
-    if (state) status.state = state;
+    if (state) {
+      changed ||= status.state !== state;
+      status.state = state;
+    }
     if (outcome.suspendReconnect) this.#onReconnectSuspended(serverId);
-    return outcome.suspendReconnect;
+    return { changed, suspended: outcome.suspendReconnect };
   }
 
   #mutable(serverId: string): MutableStatus {
@@ -170,4 +186,23 @@ export class RemoteServerConnections {
     this.#statuses.set(serverId, status);
     return status;
   }
+}
+
+function sameIssue(left: ServerConnectionIssue | null, right: ServerConnectionIssue): boolean {
+  return left?.code === right.code && left?.message === right.message && left?.retryable === right.retryable;
+}
+
+function sameCompatibility(left: ServerCompatibility | null, right: ServerCompatibility): boolean {
+  return (
+    left != null &&
+    left.localAppVersion === right.localAppVersion &&
+    left.hostAppVersion === right.hostAppVersion &&
+    left.negotiatedProtocol === right.negotiatedProtocol &&
+    left.localProtocol.minimum === right.localProtocol.minimum &&
+    left.localProtocol.maximum === right.localProtocol.maximum &&
+    left.hostProtocol?.minimum === right.hostProtocol?.minimum &&
+    left.hostProtocol?.maximum === right.hostProtocol?.maximum &&
+    left.capabilities.length === right.capabilities.length &&
+    left.capabilities.every((capability, index) => capability === right.capabilities[index])
+  );
 }

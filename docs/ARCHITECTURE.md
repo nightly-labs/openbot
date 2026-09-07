@@ -10,6 +10,7 @@ apps/
   auth-api/          Cloudflare Worker, account login, remote membership, and connection tickets
 packages/
   contracts/         Process and network boundary types, limits, and pure validation
+  logging/           ts-log Logger interface plus the redacting console/file implementation
 src/
   backend/           Agent runtime, provider adapters, event storage, queues, and browser host
   main/              Electron lifecycle, trusted IPC, host server, and operating-system adapters
@@ -61,8 +62,9 @@ renderer ──► @openbot/contracts ◄── preload ◄── main ──►
 5. Keep Electron entry points small. New features use a service or a focused IPC input module.
 6. Do not add a second linter or formatter. Biome and its repository-owned anti-slop plugins are the
    only repository lint and format tools.
-7. Put renderer state in a domain context module at the root of `src/renderer/src`, and place it by
-   lifetime: state that belongs to one team server goes inside the keyed scope in
+7. Put renderer state in a domain context module inside that domain's feature directory,
+   `src/renderer/src/features/<domain>/<domain>-context.tsx`, beside the logic, views and tests that
+   read it, and place it by lifetime: state that belongs to one team server goes inside the keyed scope in
    `app-providers.tsx`, everything else above it. A server switch discards and rebuilds that scope,
    so it is the only per-server teardown there is - a signal on the wrong side of that boundary
    either survives a switch it should not or dies in one it should not, and no list of setters can
@@ -77,6 +79,25 @@ renderer ──► @openbot/contracts ◄── preload ◄── main ──►
    renders, and passes a value down as a prop when two of them would otherwise derive it twice. A
    component that assembles another one's props is how the god controller grew back last time.
 9. Do not add temporary compatibility paths without a removal condition and a test for that condition. Released Team API protocol adapters are permanent by default and follow the policy below.
+10. Log through `@openbot/logging` (`ts-log` Logger), never bare `console.*` - Biome's `noConsole`
+    enforces this in `src`, `scripts` and `packages`. The remote-desktop build recipe files listed in
+    the `Require a recipe version bump` step of `.github/workflows/remote-desktop-runtime.yml` are
+    exempt: any edit to them, cosmetic or not, forces `remoteDesktop.recipeVersion` up and a full
+    native runtime rebuild, so their logging is frozen until the recipe changes for a real reason. Every line is timestamped, prefixed and
+    secret-redacted, and redaction covers a serialized payload passed as one string, not only a
+    structured param. `info` and above is written by default; `OPENBOT_LOG_LEVEL` lowers the
+    threshold. Machine-readable stdout (piped JSON, tags, harness URLs) uses
+    `process.stdout.write` with a `// Machine-readable:` comment instead. Dev automation
+    (`scripts/dev-automation`, `bun run dev:automation`) drives the already-running dev app over its
+    remote-debugging CDP port and never launches a second instance, seeds, or resets the dev profile.
+    Because several worktrees run dev side by side, each instance publishes its worktree, profile,
+    renderer port and debugging port to a registry in the per-user temporary directory
+    (`scripts/dev-automation/instance-registry.ts`); automation resolves the record of the worktree
+    it runs in, verifies the renderer port and the `window.openbot` preload bridge before driving a
+    page, and refuses `click` or `type` on an instance it only inferred. Every dev window stays
+    reachable: `pages` lists the targets and `--page=<target-id|url-substring>` drives any of them, so
+    the app window is the default rather than a limit. Page URLs reach the diagnostics and the
+    snapshot document only through `describeTarget`.
 
 SQLite migration history starts at the frozen version 8 compatibility baseline. Keep the baseline
 schema unchanged, append every later migration in numeric order, and update the separate latest
@@ -153,8 +174,9 @@ Protocol support has no fixed time or release limit. Removal is an exceptional a
 
 ## Required verification
 
-Run the narrowest relevant test plus a targeted `biome check` and `tsc`; CI owns the full suite. See
-`AGENTS.md` "Do not run repo-wide checks" for the division of labour and what each CI job covers.
+Run the narrowest relevant test, then `bun run lint` and `bun run typecheck`; both are cheap enough
+to run whole, and CI owns the minutes-long suites. See `AGENTS.md` "CI owns the minutes-long suites"
+for the division of labour and what each CI job covers.
 Changes to packaging, native modules, or Electron security also require the applicable macOS and
 Windows package verification commands. Live provider and team smoke tests use isolated temporary
 data and are manual because they can require local credentials.
