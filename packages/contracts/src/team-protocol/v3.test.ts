@@ -192,6 +192,28 @@ it("round trips reviewed profiles through the additive v3 HTTP and WebRTC routes
   expect(
     decodeTeamProtocolV3WebRtcHttpRequest("POST", path, encodeTeamProtocolV3WebRtcHttpRequest("POST", path, input)),
   ).toEqual(input);
+  const incomplete = { ...input, draft: { ...draft, name: "", description: "" } };
+  expect(
+    decodeTeamProtocolV3CurrentHttpRequest(
+      "POST",
+      path,
+      JSON.parse(encodeTeamProtocolV3CurrentHttpRequest("POST", path, incomplete)),
+    ),
+  ).toEqual(incomplete);
+  expect(
+    decodeTeamProtocolV3WebRtcHttpRequest(
+      "POST",
+      path,
+      encodeTeamProtocolV3WebRtcHttpRequest("POST", path, incomplete),
+    ),
+  ).toEqual(incomplete);
+  expect(() =>
+    encodeTeamProtocolV3CurrentHttpRequest("POST", path, {
+      ...incomplete,
+      draft: { ...incomplete.draft, description: "x".repeat(2001) },
+    }),
+  ).toThrow();
+  expect(() => decodeTeamProtocolV3CurrentHttpResponse("POST", path, 200, incomplete.draft)).toThrow();
   const response = encodeTeamProtocolV3CurrentHttpResponse("POST", path, 200, draft);
   expect(decodeTeamProtocolV3CurrentHttpResponse("POST", path, 200, JSON.parse(response))).toEqual(draft);
   expect(() => decodeTeamProtocolV3CurrentHttpResponse("POST", path, 200, { ...draft, avatarHue: 20 })).toThrow();
@@ -217,6 +239,7 @@ it("rejects invalid reviewed saves at the protocol boundary", async () => {
     { ...input, operationId: "invalid" },
     { ...input, initialMessage: "" },
     { ...input, draft: { ...input.draft, name: "" } },
+    { ...input, draft: { ...input.draft, description: "" } },
     { ...input, draft: { ...input.draft, avatarSeed: "../avatar.png" } },
   ]) {
     expect(() => parseSaveAgentProfile(invalid)).toThrow("valid reviewed profile");

@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { randomUUID } from "node:crypto";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
@@ -21,6 +22,7 @@ import {
   waitFor,
 } from "./agent-service-test-harness";
 import { getString } from "./protocol";
+import { SidebarLayoutStore } from "./sidebar-layout-store";
 
 let root: string;
 let logPath: string;
@@ -206,6 +208,46 @@ describe.sequential("AgentService: queue", () => {
     expect(service.listAgents()).toEqual([]);
     expect(store.database.listAgents()).toEqual([]);
     await expect(readdir(join(root, "home", "OpenBot", "Agents"))).resolves.toEqual([]);
+  });
+
+  it("removes queued profile creation on receipt failure and runs only the successful retry", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    const sidebar = new SidebarLayoutStore(join(root, "sidebar.json"));
+    await sidebar.initialize();
+    const input = {
+      operationId: randomUUID(),
+      initialMessage: "Introduce yourself",
+      draft: {
+        name: "Researcher",
+        title: "Research",
+        description: "Cite sources",
+        avatarSeed: "research",
+        avatarHue: null,
+        sectionId: null,
+      },
+    };
+    let failedAgentId = "";
+    const failure = vi.spyOn(store, "commitReviewedProfile").mockImplementationOnce((agentId) => {
+      failedAgentId = agentId;
+      expect(mailbox.listQueue(agentId).deliveries.map((delivery) => delivery.status)).toEqual(["queued"]);
+      throw new Error("Receipt write failed.");
+    });
+    await expect(service.saveProfile(input, sidebar)).rejects.toThrow("Receipt write failed.");
+    expect(service.listAgents()).toEqual([]);
+    expect(store.database.listAgents()).toEqual([]);
+    expect(mailbox.listQueue(failedAgentId).deliveries).toEqual([]);
+    expect(sidebar.getSnapshot().agentAssignments).toEqual({});
+    expect(client.requests.filter((request) => request.method === "turn/start")).toEqual([]);
+    await expect(readdir(join(root, "home", "OpenBot", "Agents"))).resolves.toEqual([]);
+    failure.mockRestore();
+    const result = await service.saveProfile(input, sidebar);
+    expect((await service.saveProfile(input, sidebar)).agent.id).toBe(result.agent.id);
+    expect(service.listAgents()).toHaveLength(1);
+    await waitFor(() => client.requests.some((request) => request.method === "turn/start"));
+    expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
   });
 
   it("keeps the agent model and thread when a lazy provider cannot start", async () => {

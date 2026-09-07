@@ -33,18 +33,20 @@ export interface SaveAgentProfileResult {
   layout: SidebarLayoutSnapshot;
 }
 
-export function isAgentProfileDraft(value: unknown): value is AgentProfileDraft {
+function isBoundedProfileDraft(value: unknown): value is AgentProfileDraft {
   return (
     isDynamicRecord(value) &&
     isBoundedString(value.name, INPUT_LIMITS.agentName) &&
-    value.name.trim().length > 0 &&
     isBoundedString(value.title, INPUT_LIMITS.agentTitle) &&
     isBoundedString(value.description, INPUT_LIMITS.agentDescription) &&
-    value.description.trim().length > 0 &&
     isAvatarSeed(value.avatarSeed) &&
     (value.avatarHue === null || isAvatarHue(value.avatarHue)) &&
     (value.sectionId === null || isIdentifier(value.sectionId))
   );
+}
+
+export function isAgentProfileDraft(value: unknown): value is AgentProfileDraft {
+  return isBoundedProfileDraft(value) && value.name.trim().length > 0 && value.description.trim().length > 0;
 }
 
 export function parseGenerateAgentProfile(value: unknown): GenerateAgentProfileInput {
@@ -53,7 +55,7 @@ export function parseGenerateAgentProfile(value: unknown): GenerateAgentProfileI
     !isBoundedString(value.prompt, INPUT_LIMITS.messageText) ||
     !value.prompt.trim() ||
     (value.agentId !== undefined && !isIdentifier(value.agentId)) ||
-    (value.draft !== undefined && !isAgentProfileDraft(value.draft))
+    (value.draft !== undefined && !isBoundedProfileDraft(value.draft))
   ) {
     throw new Error("Provide a valid profile prompt and draft.");
   }

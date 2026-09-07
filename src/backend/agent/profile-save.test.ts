@@ -30,8 +30,8 @@ async function fixture() {
   const save = new ProfileSave(store, {
     create: async (input, configure) => configure(await store.createAgent(input.draft)),
     changed: () => undefined,
-    delete: async (id) => {
-      await store.deleteAgent(id);
+    delete: async (agent) => {
+      await store.deleteAgent(agent.id);
     },
   });
   cleanups.push(async () => {

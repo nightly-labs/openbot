@@ -12,7 +12,7 @@
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   overflow-y: auto;
-  padding: var(--openbot-space-5);
+  padding: var(--openbot-space-6);
   background: var(--openbot-bg-control);
   color: var(--openbot-text-primary);
   border: 1px solid var(--openbot-border);

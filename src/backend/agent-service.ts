@@ -158,8 +158,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const session = this.#store.activeProviderSession(agent.id);
         if (session) this.#conversation.unloadThread(session.externalSessionId);
         this.#emit({ type: "agents-changed", agents: this.listAgents() });
+        this.#drain.scheduleDrain(agent.id);
       },
-      delete: (agentId) => this.deleteAgent(agentId),
+      delete: async (agent) => {
+        await this.#deleteAgentData(agent);
+        this.#emit({ type: "agents-changed", agents: this.listAgents() });
+      },
     });
     this.#mailbox = mailbox;
     this.#browser = browser;
@@ -322,6 +326,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       providers: this.#providers,
       duplication: this.#duplication,
+      profileSave: this.#profileSave,
       compaction: this.#compaction,
       routines: this.#routines,
       threads: this.#threads,

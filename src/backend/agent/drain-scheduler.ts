@@ -6,6 +6,7 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import { agentNamesById, displayMessageReferences } from "./delivery-content";
 import type { DuplicationGate } from "./duplication-gate";
 import type { MailboxSync } from "./mailbox-sync";
+import type { ProfileSave } from "./profile-save";
 import type { ProviderRuntime } from "./provider-runtime";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { isMissingProviderSessionError, isRequestTimeout, providerForAgent } from "./thread-items";
@@ -23,6 +24,7 @@ export interface DrainSchedulerOptions {
   conversation: ConversationRuntime;
   providers: ProviderRuntime;
   duplication: DuplicationGate;
+  profileSave: ProfileSave;
   compaction: ContextCompaction;
   routines: RoutineScheduler;
   threads: ThreadLifecycle;
@@ -34,7 +36,7 @@ export interface DrainSchedulerOptions {
  * provider turn for it.
  *
  * Every controller that can hold an agent back owns one `#mayDrain` clause
- * (duplication, compaction, routines); this class only composes them, and
+ * (profile creation, duplication, compaction, routines); this class only composes them, and
  * `#drainAgent` repeats the guard because a drain scheduled a microtask ago
  * may have been muted since. Owns the draining/scheduled/task maps. Takes
  * `ThreadLifecycle` directly — thread recovery is a dependency, not a hook.
@@ -46,6 +48,7 @@ export class DrainScheduler {
   readonly #conversation: ConversationRuntime;
   readonly #providers: ProviderRuntime;
   readonly #duplication: DuplicationGate;
+  readonly #profileSave: ProfileSave;
   readonly #compaction: ContextCompaction;
   readonly #routines: RoutineScheduler;
   readonly #threads: ThreadLifecycle;
@@ -61,6 +64,7 @@ export class DrainScheduler {
     this.#conversation = options.conversation;
     this.#providers = options.providers;
     this.#duplication = options.duplication;
+    this.#profileSave = options.profileSave;
     this.#compaction = options.compaction;
     this.#routines = options.routines;
     this.#threads = options.threads;
@@ -69,7 +73,10 @@ export class DrainScheduler {
 
   mayDrain(agentId: string): boolean {
     return (
-      this.#duplication.mayDrain(agentId) && this.#compaction.mayDrain(agentId) && this.#routines.mayDrain(agentId)
+      this.#profileSave.mayDrain(agentId) &&
+      this.#duplication.mayDrain(agentId) &&
+      this.#compaction.mayDrain(agentId) &&
+      this.#routines.mayDrain(agentId)
     );
   }
 

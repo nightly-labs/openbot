@@ -15,11 +15,17 @@ interface ProfileSaveHooks {
     configure: (agent: AgentSummary) => Promise<AgentSummary>,
   ): Promise<AgentSummary>;
   changed(agent: AgentSummary): void;
-  delete(agentId: string): Promise<void>;
+  delete(agent: AgentSummary): Promise<void>;
 }
 
 /** Coordinates reviewed profiles with the separately persisted sidebar, and receipts for network retries. */
 export class ProfileSave {
+  readonly #pendingAgents = new Set<string>();
+
+  mayDrain(agentId: string): boolean {
+    return !this.#pendingAgents.has(agentId);
+  }
+
   #queue: Promise<void> = Promise.resolve();
   constructor(
     private readonly store: AgentStore,
@@ -70,6 +76,7 @@ export class ProfileSave {
         } else {
           agent = await this.hooks.create(input, async (candidate) => {
             created = candidate;
+            this.#pendingAgents.add(candidate.id);
             return configure(candidate);
           });
           agent = this.store.commitReviewedProfile(agent.id, input.draft, commandId, layout).agent;
@@ -77,8 +84,10 @@ export class ProfileSave {
         const result = { agent, layout };
         return result;
       } catch (error) {
-        if (created && this.store.list().some((agent) => agent.id === created?.id)) await this.hooks.delete(created.id);
+        if (created && this.store.list().some((agent) => agent.id === created?.id)) await this.hooks.delete(created);
         throw error;
+      } finally {
+        if (created) this.#pendingAgents.delete(created.id);
       }
     });
     if (oldAvatar) await rm(oldAvatar.path, { force: true }).catch(() => undefined);
