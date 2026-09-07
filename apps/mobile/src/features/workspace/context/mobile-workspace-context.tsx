@@ -27,6 +27,7 @@ import {
   remoteConnectionFailure,
   remoteRecoveryMessage,
   resyncRemoteConversations,
+  saveReviewedAgentProfile,
 } from "@openbot/team-client";
 import { fetch } from "expo/fetch";
 import * as Crypto from "expo-crypto";
@@ -560,14 +561,22 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           ...(input.agentId ? { agentId: input.agentId } : {}),
           ...(input.draft ? { draft: { ...input.draft } } : {}),
         }),
-      saveProfile: async (input) => {
+      saveProfile: async (input, pending) => {
         const generation = loadGeneration.current;
-        const result = await request("POST", TEAM_API_ROUTES.agents.saveProfile, decodeSaveAgentProfileResult, {
-          operationId: input.operationId,
-          draft: { ...input.draft },
-          ...(input.agentId ? { agentId: input.agentId } : {}),
-          ...(input.initialMessage ? { initialMessage: input.initialMessage } : {}),
-        });
+        const result = await saveReviewedAgentProfile(
+          (value) => {
+            if (generation !== loadGeneration.current)
+              throw new Error("The workspace changed before the profile could be saved.");
+            return request("POST", TEAM_API_ROUTES.agents.saveProfile, decodeSaveAgentProfileResult, {
+              operationId: value.operationId,
+              draft: { ...value.draft },
+              ...(value.agentId ? { agentId: value.agentId } : {}),
+              ...(value.initialMessage ? { initialMessage: value.initialMessage } : {}),
+            });
+          },
+          input,
+          pending,
+        );
         if (generation !== loadGeneration.current) return;
         setAgents((current) => [
           ...current.filter((agent) => agent.id !== result.agent.id),

@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentProfileDraft } from "@openbot/contracts/ipc";
+import type { AgentProfileDraft, SaveAgentProfileInput } from "@openbot/contracts/ipc";
+import { saveReviewedAgentProfile } from "@openbot/team-client";
 import { afterEach, expect, it, vi } from "vitest";
 import { AgentStore } from "../agent-store";
 import { SidebarLayoutStore } from "../sidebar-layout-store";
@@ -131,4 +132,30 @@ it("removes an incomplete new agent and its assignment when profile persistence 
   const result = await save.save(input, sidebar);
   expect(store.list()).toHaveLength(1);
   expect(sidebar.getSnapshot().agentAssignments[result.agent.id]).toBe(input.draft.sectionId);
+});
+
+it("reconciles a lost creation response before applying edited retry fields", async () => {
+  const { store, sidebar, save } = await fixture();
+  const original = { operationId: randomUUID(), initialMessage: "Hello", draft: { ...draft } };
+  const send = async (input: SaveAgentProfileInput) => save.save(input, sidebar);
+  // The host commits, but the client never receives the response.
+  const committed = await send(original);
+  const edited = { ...original, operationId: randomUUID(), draft: { ...draft, name: "Revised researcher" } };
+  const result = await saveReviewedAgentProfile(send, edited, original);
+  expect(result.agent.id).toBe(committed.agent.id);
+  expect(result.agent.name).toBe("Revised researcher");
+  expect(store.list()).toHaveLength(1);
+  expect((await saveReviewedAgentProfile(send, edited, original)).agent.id).toBe(committed.agent.id);
+  expect(store.list()).toHaveLength(1);
+});
+
+it("allows correcting a rejected creation while retaining its original retry identity", async () => {
+  const { store, sidebar, save } = await fixture();
+  const original = { operationId: randomUUID(), initialMessage: "Hello", draft: { ...draft, sectionId: randomUUID() } };
+  const send = async (input: SaveAgentProfileInput) => save.save(input, sidebar);
+  await expect(send(original)).rejects.toThrow("Unknown sidebar section");
+  const edited = { ...original, operationId: randomUUID(), draft: { ...draft } };
+  const result = await saveReviewedAgentProfile(send, edited, original);
+  expect(result.agent.name).toBe(draft.name);
+  expect(store.list()).toHaveLength(1);
 });

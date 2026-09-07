@@ -1,5 +1,10 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type AgentProfileDraft, AVATAR_HUES, type SidebarSection } from "@openbot/contracts/ipc";
+import {
+  type AgentProfileDraft,
+  AVATAR_HUES,
+  type SaveAgentProfileInput,
+  type SidebarSection,
+} from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { Button, Typography } from "heroui-native";
 import { useEffect, useRef, useState } from "react";
@@ -40,6 +45,7 @@ export function AgentProfileSetup({
     operationId: Crypto.randomUUID(),
   });
   const mounted = useRef(true);
+  const pendingSave = useRef<SaveAgentProfileInput | undefined>(undefined);
   const load = useRef(getProfileLayout);
   const initialAgent = useRef(agents.find((agent) => agent.id === agentId));
   useEffect(() => {
@@ -114,7 +120,7 @@ export function AgentProfileSetup({
     if (!state.draft || state.busy) return;
     setState((current) => ({ ...current, busy: true, saving: true, error: "" }));
     try {
-      await saveProfile({
+      const input = {
         operationId: state.operationId,
         draft: state.draft,
         ...(agentId
@@ -122,7 +128,10 @@ export function AgentProfileSetup({
           : {
               initialMessage: `Introduce yourself briefly and explain how you can help. Your standing instructions: ${state.draft.description}`,
             }),
-      });
+      };
+      const previous = pendingSave.current;
+      pendingSave.current ??= input;
+      await saveProfile(input, previous);
       if (mounted.current) onSaved();
     } catch (error) {
       if (mounted.current)

@@ -7,6 +7,7 @@ import {
 } from "./current";
 import requestFixture from "./fixtures/v3/client-http-request.json";
 import responseFixture from "./fixtures/v3/host-http-response.json";
+import profileResponseFixture from "./fixtures/v3/profile-host-response.json";
 import {
   decodeTeamProtocolV1HttpRequest,
   highestCommonTeamProtocol,
@@ -244,4 +245,19 @@ it("rejects invalid reviewed saves at the protocol boundary", async () => {
   ]) {
     expect(() => parseSaveAgentProfile(invalid)).toThrow("valid reviewed profile");
   }
+});
+
+it("keeps profile save responses frozen across HTTP and WebRTC adapters", () => {
+  const path = "/v1/agents/profile/save";
+  const current = { ...currentResponseFixture, agent: { ...currentResponseFixture.agent, futureIpcField: "private" } };
+  expect(JSON.parse(encodeTeamProtocolV3CurrentHttpResponse("POST", path, 200, current))).toEqual(
+    profileResponseFixture,
+  );
+  expect(encodeTeamProtocolV3WebRtcHttpResponse("POST", path, 200, current)).toEqual(profileResponseFixture);
+  expect(decodeTeamProtocolV3CurrentHttpResponse("POST", path, 200, profileResponseFixture)).toEqual(
+    currentResponseFixture,
+  );
+  expect(decodeTeamProtocolV3WebRtcHttpResponse("POST", path, 200, profileResponseFixture)).toEqual(
+    currentResponseFixture,
+  );
 });

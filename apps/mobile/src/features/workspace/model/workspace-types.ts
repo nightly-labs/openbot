@@ -67,7 +67,7 @@ export interface MobileWorkspaceContextValue {
   profileGenerationSupported: boolean;
   getProfileLayout: () => Promise<SidebarLayoutSnapshot>;
   generateProfile: (input: GenerateAgentProfileInput) => Promise<AgentProfileDraft>;
-  saveProfile: (input: SaveAgentProfileInput) => Promise<void>;
+  saveProfile: (input: SaveAgentProfileInput, pending?: SaveAgentProfileInput) => Promise<void>;
   createAgent: (input: CreateAgentInput) => Promise<void>;
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
   deleteAgent: (agentId: string) => Promise<void>;

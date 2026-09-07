@@ -1,4 +1,5 @@
 import type { SaveAgentProfileInput } from "@openbot/contracts/ipc";
+import { saveReviewedAgentProfile } from "@openbot/team-client";
 import { desktopAnalytics } from "../../analytics";
 import { toAgentProfile, withoutAgent } from "../../app-message-projection";
 import { createStoredProfile } from "../../app-stored-values";
@@ -101,8 +102,15 @@ const AgentActions = createSimpleContext({
       }
     }
 
-    async function saveReviewedProfile(input: SaveAgentProfileInput): Promise<void> {
-      const result = await window.openbot.agent.saveProfile(input);
+    async function saveReviewedProfile(input: SaveAgentProfileInput, pending?: SaveAgentProfileInput): Promise<void> {
+      const result = await saveReviewedAgentProfile(
+        (value) => {
+          if (!scopeIsCurrent()) throw new Error("The workspace changed before the profile could be saved.");
+          return window.openbot.agent.saveProfile(value);
+        },
+        input,
+        pending,
+      );
       if (!scopeIsCurrent()) return;
       const profile = createStoredProfile(toAgentProfile(result.agent));
       setAgentList((current) => [profile, ...current.filter((agent) => agent.id !== profile.id)]);

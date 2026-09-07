@@ -2,6 +2,7 @@ import { Host, TextInput } from "@expo/ui";
 import { useNativeState } from "@expo/ui/swift-ui";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
+import { useEffect } from "react";
 import { View } from "react-native";
 
 import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.types";
@@ -10,6 +11,8 @@ export function SheetFormField({
   autoCapitalize,
   autoCorrect,
   autoFocus,
+  editable,
+  multiline = false,
   hint,
   inputMode,
   isRequired = false,
@@ -23,6 +26,10 @@ export function SheetFormField({
 }: SheetFormFieldProps) {
   const [foreground, muted, surface, border] = useThemeColor(["foreground", "muted", "surface", "border"]);
   const nativeValue = useNativeState(value);
+  useEffect(() => {
+    nativeValue.set(value);
+  }, [nativeValue, value]);
+  const height = multiline ? 144 : 54;
 
   return (
     <View className="gap-2">
@@ -37,22 +44,24 @@ export function SheetFormField({
           borderCurve: "continuous",
           borderRadius: 16,
           borderWidth: 1,
-          height: 54,
+          height,
           overflow: "hidden",
         }}
       >
-        <Host ignoreSafeArea="all" style={{ height: 54 }}>
+        <Host ignoreSafeArea="all" style={{ height }}>
           <TextInput
             autoCapitalize={autoCapitalize}
             autoCorrect={autoCorrect}
             autoFocus={autoFocus}
+            editable={editable}
+            multiline={multiline}
             inputMode={inputMode}
             maxLength={maxLength}
             placeholder={placeholder}
             placeholderTextColor={muted}
             returnKeyType={returnKeyType}
             selectionColor={foreground}
-            style={{ height: 54, paddingHorizontal: 16 }}
+            style={{ height, paddingHorizontal: 16 }}
             textStyle={{ color: String(foreground), fontSize: 16 }}
             value={nativeValue}
             onChangeText={onChangeText}

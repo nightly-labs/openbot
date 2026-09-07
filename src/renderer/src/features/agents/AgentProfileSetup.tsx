@@ -27,7 +27,7 @@ export interface AgentProfileSetupProps {
   initialDraft?: AgentProfileDraft;
   sections: SidebarSection[];
   generate: (input: GenerateAgentProfileInput) => Promise<AgentProfileDraft>;
-  save: (input: SaveAgentProfileInput) => Promise<void>;
+  save: (input: SaveAgentProfileInput, pending?: SaveAgentProfileInput) => Promise<void>;
   onClose: () => void;
 }
 
@@ -43,6 +43,7 @@ export function AgentProfileSetup(props: AgentProfileSetupProps) {
     operationId: crypto.randomUUID(),
   });
   const active = createScopeGuard();
+  let pendingSave: SaveAgentProfileInput | undefined;
   const update = (patch: Partial<AgentProfileDraft>) =>
     setState((current) => {
       if (current.draft) Object.assign(current.draft, patch);
@@ -87,7 +88,7 @@ export function AgentProfileSetup(props: AgentProfileSetupProps) {
       current.error = "";
     });
     try {
-      await props.save({
+      const input = {
         operationId: state.operationId,
         draft,
         ...(props.agentId
@@ -95,7 +96,10 @@ export function AgentProfileSetup(props: AgentProfileSetupProps) {
           : {
               initialMessage: `Introduce yourself briefly and explain how you can help. Your standing instructions: ${draft.description}`,
             }),
-      });
+      };
+      const previous = pendingSave;
+      pendingSave ??= input;
+      await props.save(input, previous);
       if (active()) props.onClose();
     } catch (error) {
       if (active())

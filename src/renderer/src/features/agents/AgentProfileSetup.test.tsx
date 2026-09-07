@@ -43,16 +43,14 @@ it("lets the user revise and edit a generated profile before saving", async () =
 
 it("retains edits after a failed save so the user can retry", async () => {
   let saved: SaveAgentProfileInput | undefined;
-  const save = vi.fn(async (input: SaveAgentProfileInput) => {
+  const save = vi.fn(async (input: SaveAgentProfileInput, _pending?: SaveAgentProfileInput) => {
     if (!saved) {
       saved = input;
       throw new Error("Connection lost");
     }
-    expect(input.operationId).toBe(saved.operationId);
   });
   render(() => (
     <AgentProfileSetup
-      agentId="agent-existing"
       initialDraft={draft}
       sections={[]}
       generate={async () => draft}
@@ -66,11 +64,17 @@ it("retains edits after a failed save so the user can retry", async () => {
   await fireEvent.click(screen.getByRole("button", { name: "Generate profile" }));
   await screen.findByRole("button", { name: "Revise profile" });
   await fireEvent.input(screen.getByRole("textbox", { name: "Name" }), { target: { value: "My researcher" } });
-  await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+  await fireEvent.click(screen.getByRole("button", { name: "Create agent" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Connection lost");
   expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("My researcher");
-  await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+  await fireEvent.click(screen.getByRole("button", { name: "Revise profile" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Create agent" })).toBeEnabled());
+  await fireEvent.input(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Edited after failure" } });
+  await fireEvent.click(screen.getByRole("button", { name: "Create agent" }));
   await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+  expect(save.mock.calls[1]?.[1]).toEqual(saved);
+  expect(save.mock.calls[1]?.[0].operationId).not.toBe(saved?.operationId);
+  expect(save.mock.calls[1]?.[0].draft.name).toBe("Edited after failure");
 });
 
 it("shows generation failure without changing or saving the existing profile", async () => {
