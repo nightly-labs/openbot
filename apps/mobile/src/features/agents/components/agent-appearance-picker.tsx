@@ -1,10 +1,11 @@
-import { AVATAR_HUE_OPTIONS, avatarCandidateSeeds, avatarHueSwatch } from "@openbot/brand/bloub-avatar";
+import { AVATAR_HUE_OPTIONS, avatarHueSwatch } from "@openbot/brand/bloub-avatar";
 import type { AvatarHue } from "@openbot/contracts/ipc";
 import { Button } from "heroui-native";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { View } from "react-native";
 
 import { BloubAvatarPreview, BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
+import { createAvatarCandidates } from "@/features/agents/model/avatar-candidates";
 
 interface AgentAppearancePickerProps {
   seed: string;
@@ -25,8 +26,7 @@ export function AgentAppearancePicker({
   onSeedChange,
   onHueChange,
 }: AgentAppearancePickerProps) {
-  const [candidates, setCandidates] = useState({ seed, batch: 0 });
-  const seeds = useMemo(() => avatarCandidateSeeds(candidates.seed, candidates.seed, candidates.batch), [candidates]);
+  const [candidates, setCandidates] = useState(() => createAvatarCandidates(seed));
 
   return (
     <View className="gap-4">
@@ -43,7 +43,7 @@ export function AgentAppearancePicker({
         accessibilityRole="radiogroup"
         accessibilityLabel="Shape and expression"
       >
-        {seeds.map((candidate, index) => (
+        {candidates.seeds.map((candidate, index) => (
           <Button
             key={candidate}
             isIconOnly
@@ -64,7 +64,7 @@ export function AgentAppearancePicker({
         size="sm"
         className="self-center"
         isDisabled={disabled}
-        onPress={() => setCandidates((current) => ({ seed, batch: current.batch + 1 }))}
+        onPress={() => setCandidates((current) => createAvatarCandidates(seed, current))}
       >
         <Button.Label>More faces</Button.Label>
       </Button>
