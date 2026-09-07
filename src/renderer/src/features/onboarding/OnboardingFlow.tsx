@@ -8,11 +8,10 @@ import type {
 } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { ProviderPicker, type ProviderPickerOption } from "../../components/ProviderPicker";
-import { Button } from "../../components/ui";
+import { ArrowUp, Button, Plus } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
-import { PlusIcon } from "../conversation/ConversationIcons";
 import { fallbackProviderState } from "./onboarding-provider-state";
 
 export interface OnboardingFlowProps {
@@ -335,7 +334,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                       aria-label="Add to prompt"
                       disabled
                     >
-                      <PlusIcon />
+                      <Plus aria-hidden="true" />
                     </Button>
                     <div class="composer-primary-actions">
                       <Button
@@ -346,7 +345,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                         aria-label="Send message"
                         disabled
                       >
-                        ↑
+                        <ArrowUp aria-hidden="true" />
                       </Button>
                     </div>
                   </div>
