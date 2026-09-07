@@ -1,6 +1,6 @@
 import { createRemoteConnectionRecovery, REMOTE_RETRY_INTERVAL_MS } from "@openbot/team-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { applyServerRecovery, resetServerStatus, serverStatusLabel } from "./server-status";
+import { applyServerFailure, applyServerRecovery, resetServerStatus, serverStatusLabel } from "./server-status";
 import type { MobileServer } from "./workspace-types";
 
 const server: MobileServer = {
@@ -19,6 +19,39 @@ const server: MobileServer = {
 afterEach(() => vi.useRealTimers());
 
 describe("mobile server availability", () => {
+  it("keeps the protocol error visible when suspending RTC rejects an in-flight workspace load", async () => {
+    let current = resetServerStatus(server);
+    let connection = Promise.withResolvers<void>();
+    const onError = vi.fn(() => {
+      current = applyServerFailure(current, "The desktop request failed.");
+    });
+    const controller = createRemoteConnectionRecovery(
+      () => connection.promise,
+      onError,
+      (status) => {
+        current = applyServerRecovery(current, status, "Signal returned an invalid message.");
+      },
+    );
+    try {
+      controller.setActive(true);
+      controller.suspend(new Error("Signal returned an invalid message."));
+      const protocolMessage = current.connectionMessage;
+      connection.reject(new Error("The server disconnected."));
+      await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(2));
+      expect(serverStatusLabel(current)).toBe("Connection error");
+      expect(current.connectionMessage).toBe(protocolMessage);
+
+      connection = Promise.withResolvers<void>();
+      controller.refresh();
+      expect(serverStatusLabel(current)).toBe("Offline");
+      connection.resolve();
+      await vi.waitFor(() => expect(serverStatusLabel(current)).toBe("Online"));
+      expect(current.connectionMessage).toBeNull();
+    } finally {
+      controller.dispose();
+    }
+  });
+
   it("shows retry, protocol error, and recovery states from the live connection controller", async () => {
     vi.useFakeTimers();
     let current = { ...resetServerStatus(server), initialConnectionPending: true };

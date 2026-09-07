@@ -14,6 +14,12 @@ export function serverStatusLabel(server: Pick<MobileServer, "state" | "initialC
   return LABELS[server.state];
 }
 
+export function applyServerFailure(server: MobileServer, connectionMessage: string | null): MobileServer {
+  // Suspending RTC also rejects in-flight loads; their failure must not replace the protocol error.
+  if (server.recoveryStatus?.phase === "suspended") return server;
+  return { ...server, state: "offline", initialConnectionPending: false, connectionMessage };
+}
+
 export function applyServerRecovery(
   server: MobileServer,
   status: RemoteRecoveryStatus,

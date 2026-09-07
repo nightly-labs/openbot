@@ -46,7 +46,7 @@ import {
 } from "@/features/workspace/components/remote-team-transport";
 import { type MobileAgentActivities, reduceAgentActivity } from "@/features/workspace/model/agent-activity";
 import { decodeConversation } from "@/features/workspace/model/conversation";
-import { applyServerRecovery, resetServerStatus } from "@/features/workspace/model/server-status";
+import { applyServerFailure, applyServerRecovery, resetServerStatus } from "@/features/workspace/model/server-status";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
 import type {
   MobileAgent,
@@ -265,9 +265,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const connectionMessage = lastFailure;
         setServers((current) =>
           current.map((candidate) =>
-            candidate.id === server.id
-              ? { ...candidate, state: "offline", initialConnectionPending: false, connectionMessage }
-              : candidate,
+            candidate.id === server.id ? applyServerFailure(candidate, connectionMessage) : candidate,
           ),
         );
       },
