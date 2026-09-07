@@ -728,6 +728,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async #deleteAgentData(agent: AgentSummary): Promise<void> {
     const providerSessions = agent.threadId ? this.#store.database.listProviderSessions(agent.threadId) : [];
+    // Keep session records available for a retry if removing private transcript files fails.
+    for (const session of providerSessions) await this.#threads.deleteProviderSessionFiles(session.externalSessionId);
     const errors: unknown[] = [];
     try {
       await this.#mailbox.deleteAgentData(agent.id);

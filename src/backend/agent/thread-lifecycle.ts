@@ -76,6 +76,13 @@ export class ThreadLifecycle {
     this.#pendingHandoffs.delete(threadId);
   }
 
+  async deleteProviderSessionFiles(sessionId: string): Promise<void> {
+    // Deletion also covers retired sessions and handoffs not loaded this run.
+    await rm(this.handoffPath(sessionId), { force: true });
+    await rm(this.toolManifestPath(sessionId), { force: true });
+    this.#pendingHandoffs.delete(sessionId);
+  }
+
   dispose(): void {
     this.#pendingHandoffs.clear();
     this.#pendingRuntimeRefreshes.clear();

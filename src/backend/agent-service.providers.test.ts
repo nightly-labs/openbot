@@ -108,6 +108,42 @@ describe.sequential("AgentService: providers", () => {
     expect(client.requests.filter((request) => request.method === "thread/start")).toHaveLength(2);
   });
 
+  it("deletes unloaded pending handoffs for active and retired sessions with their agent", async () => {
+    const { store, mailbox } = stores(root);
+    let rejectTurn = false;
+    const client = new FakeAgentClient("codex", "DONE", true, true, {}, async (method) => {
+      if (rejectTurn && method === "turn/start") throw new Error("Turn rejected.");
+    });
+    const start = async () => {
+      const next = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+      await next.initialize();
+      return next;
+    };
+    service = await start();
+    await service.sendMessage({ agentId: "chief", text: "Private conversation to remove with this agent." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const manifests = join(store.database.userDataPath, "provider-toolsets");
+    const handoffs = join(store.database.userDataPath, "provider-handoffs");
+    rejectTurn = true;
+    for (const attempt of [1, 2]) {
+      await service.stop();
+      for (const file of await readdir(manifests)) await writeFile(join(manifests, file), "outdated");
+      service = await start();
+      await service.sendMessage({ agentId: "chief", text: `Continue ${attempt}` });
+      await waitFor(
+        () =>
+          service?.listQueue("chief").deliveries.filter((delivery) => delivery.status === "failed").length === attempt,
+      );
+    }
+    expect(await readdir(handoffs)).toHaveLength(2);
+    await service.stop();
+    service = await start();
+    await service.deleteAgent("chief");
+    expect(await readdir(handoffs)).toEqual([]);
+    expect(await readdir(manifests)).toEqual([]);
+    expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(false);
+  });
+
   it.each<AgentProvider>(["codex", "claude", "grok"])(
     "delivers the quiet collaboration policy to %s on startup and after restart",
     async (provider) => {
