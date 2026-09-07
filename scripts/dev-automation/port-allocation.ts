@@ -14,28 +14,27 @@
 // replacement and starts beside it.
 //
 // One rule carries that, and it is the one to keep when changing this file:
-// **no lock file is ever deleted.** A generation is used once and stays used.
-// Releasing renames the file to `.released` rather than removing it, and a lock
-// a crashed holder left behind is superseded where it lies.
+// **once a lock path exists, it stays, and nothing ever frees it.** Releasing
+// replaces its contents with a released marker - one `rename` onto the same
+// path, so the path is occupied on both sides of it - and a lock a crashed
+// holder left behind is superseded where it lies.
 //
-// The reason is that the generation an allocator asks for is the highest it saw
-// plus one, and its scan, its read of that file and its create are separate
-// steps the scheduler is free to pull apart. A file that goes away between two
-// of them takes its number out of the count, and the next allocator to arrive
-// hands that number out again - to somebody, while a plan already made above it
-// is still in flight, so the two no longer collide and both allocate. Deleting
-// the superseded files did it; so did deleting our own on release, which is
-// subtler, because the file need not be gone when the other allocator *reads*
-// it, only when it reads its contents: an allocator that listed our live lock
-// and then found nothing there judges it abandoned and plans past it, and the
-// number it left behind goes to the next arrival.
+// The reason is that an allocator asks for the highest generation it saw plus
+// one, and its scan, its read of that file and its create are separate steps
+// the scheduler is free to pull apart. Anything that frees a lock path lets
+// that number be handed out a second time, to a later arrival, while a plan
+// already made against it is still in flight - and once the two are on
+// different numbers the exclusive create no longer makes them collide, so both
+// allocate. Three ways in, all of them shut now: deleting the superseded
+// files; deleting our own on release; and renaming ours out of the way on
+// release, which keeps the *number* spoken for but leaves the path - the thing
+// `link` arbitrates over - free for the next asker.
 //
-// Renaming keeps the number spoken for either way. Every generation below the
-// highest one is a `.released` or an abandoned `.lock`, both of them free, and
-// what an allocator waits for is the highest generation with a live holder.
-// The files are tens of bytes in the per-user temporary directory, and the
-// system clears that directory; nothing here removes one, because removing one
-// is precisely what lets the numbering come back down.
+// So the state of a lock lives in its contents, at a path that never goes
+// away. `bind` probes cost milliseconds and the files are tens of bytes, in
+// the per-user temporary directory that the system clears. Nothing here
+// removes one, because removing one is precisely what lets an allocator in
+// beside another.
 //
 // The critical section is a handful of `bind` probes and one file write, so it
 // is milliseconds long. Everything slow - `bun install`, electron-vite, the
@@ -64,9 +63,6 @@ import {
 
 const LOCK_PREFIX = "port-allocation.";
 const LOCK_SUFFIX = ".lock";
-// A released lock keeps its generation and gives up its claim, so the number
-// stays spoken for and no later allocator is handed it.
-const RELEASED_SUFFIX = ".released";
 const LOCK_WAIT_MS = 10_000;
 // How long a file whose contents say nothing may sit in the registry before an
 // allocator treats it as litter rather than as a lock.
@@ -89,45 +85,38 @@ interface LockHolder {
   acquiredAt: number;
 }
 
+// What a lock path says about itself. The path existing means only that the
+// generation is spent; whether it is *held* is in the contents.
+type LockState = { kind: "held"; holder: LockHolder } | { kind: "released" } | { kind: "unreadable" };
+
 interface HeldLock {
   generation: number;
   path: string;
-  released: boolean;
-  holder: LockHolder | null;
+  state: LockState;
 }
 
 function lockPath(directory: string, generation: number): string {
   return join(directory, `${LOCK_PREFIX}${generation}${LOCK_SUFFIX}`);
 }
 
-// Both suffixes count towards the numbering: a released generation is spent,
-// not free for somebody else to claim. The staging files `tryCreateLock` writes
-// end in `.tmp`, and the stack records in `.json`, so neither is read here.
-function lockGeneration(fileName: string): { generation: number; released: boolean } | null {
-  if (!fileName.startsWith(LOCK_PREFIX)) return null;
-  const released = fileName.endsWith(RELEASED_SUFFIX);
-  const suffix = released ? RELEASED_SUFFIX : LOCK_SUFFIX;
-  if (!fileName.endsWith(suffix)) return null;
-  const generation = Number(fileName.slice(LOCK_PREFIX.length, fileName.length - suffix.length));
-  return Number.isInteger(generation) && generation > 0 ? { generation, released } : null;
+// The staging files `tryCreateLock` and `releaseLock` write end in `.tmp`, and
+// the stack records in `.json`, so neither is ever read as a lock.
+function lockGeneration(fileName: string): number | null {
+  if (!fileName.startsWith(LOCK_PREFIX) || !fileName.endsWith(LOCK_SUFFIX)) return null;
+  const generation = Number(fileName.slice(LOCK_PREFIX.length, fileName.length - LOCK_SUFFIX.length));
+  return Number.isInteger(generation) && generation > 0 ? generation : null;
 }
 
 // The highest generation present. That one decides both questions: whether the
-// lock is held, and what number the next allocator may ask for.
+// lock is held, and what number the next allocator may ask for. Every lower
+// one is a path that exists to keep its number out of circulation.
 function readCurrentLock(directory: string): HeldLock | null {
   let current: HeldLock | null = null;
   for (const entry of readdirSync(directory)) {
-    const parsed = lockGeneration(entry);
-    if (parsed === null || (current !== null && parsed.generation <= current.generation)) continue;
+    const generation = lockGeneration(entry);
+    if (generation === null || (current !== null && generation <= current.generation)) continue;
     const path = join(directory, entry);
-    current = {
-      generation: parsed.generation,
-      path,
-      released: parsed.released,
-      // A released file still holds the identity of whoever released it.
-      // Nothing reads it, and reading it would say "held" about a free lock.
-      holder: parsed.released ? null : readLockHolder(path),
-    };
+    current = { generation, path, state: readLockState(path) };
   }
   return current;
 }
@@ -164,12 +153,17 @@ function lockFileAgeMs(path: string, now: number): number | null {
 // stop, so the developer gets an error naming the pid instead. `unverified` -
 // a holder this machine cannot date - is treated as live for the same reason.
 function isAbandonedLock(lock: HeldLock, now: number, staleMs: number, fileAgeMs = lockFileAgeMs): boolean {
-  if (lock.released) return true;
-  if (lock.holder === null) {
+  if (lock.state.kind === "released") return true;
+  if (lock.state.kind === "unreadable") {
     const age = fileAgeMs(lock.path, now);
     return age === null || age > staleMs;
   }
-  return verifyRecordedProcess({ pid: lock.holder.pid, startedAt: lock.holder.acquiredAt }) === "gone";
+  const { pid, acquiredAt } = lock.state.holder;
+  return verifyRecordedProcess({ pid, startedAt: acquiredAt }) === "gone";
+}
+
+function lockHolderPid(lock: HeldLock): number | null {
+  return lock.state.kind === "held" ? lock.state.holder.pid : null;
 }
 
 function parseLockHolder(raw: unknown): LockHolder | null {
@@ -180,14 +174,20 @@ function parseLockHolder(raw: unknown): LockHolder | null {
   return { pid, acquiredAt };
 }
 
-function readLockHolder(path: string): LockHolder | null {
+function readLockState(path: string): LockState {
+  let raw: unknown;
   try {
-    return parseLockHolder(JSON.parse(readFileSync(path, "utf8")));
+    raw = JSON.parse(readFileSync(path, "utf8"));
   } catch {
-    // Missing or garbage. Both mean nobody readable holds it, which the caller
-    // weighs against how long the file has been there.
-    return null;
+    // Missing or garbage. Both mean nothing readable claims it, which the
+    // caller weighs against how long the file has been there.
+    return { kind: "unreadable" };
   }
+  // Before the holder, because a released marker keeps the identity of whoever
+  // released it and would otherwise read as a claim.
+  if (isDynamicRecord(raw) && raw.released === true) return { kind: "released" };
+  const holder = parseLockHolder(raw);
+  return holder === null ? { kind: "unreadable" } : { kind: "held", holder };
 }
 
 // Reads the whole dev registry, hands the caller the records under the lock,
@@ -233,11 +233,11 @@ export async function withDevPortAllocation<T>(
     }
     if (now() >= deadline) {
       throw new Error(
-        `The dev port allocation lock at ${current.path} is still held by pid ${current.holder?.pid ?? "unknown"}. ` +
+        `The dev port allocation lock at ${current.path} is still held by pid ${lockHolderPid(current) ?? "unknown"}. ` +
           "Check `bun run dev:status` and stop that dev stack, or wait for it to finish starting.",
       );
     }
-    onWait?.(current.holder?.pid ?? 0);
+    onWait?.(lockHolderPid(current) ?? 0);
     await wait(Math.min(pollIntervalMs, Math.max(deadline - now(), 1)));
   }
 
@@ -282,27 +282,25 @@ function tryCreateLock(path: string, holder: LockHolder): boolean {
   }
 }
 
-// Give up the claim without giving up the number. `rename` is one step, so the
-// generation is spoken for on both sides of it and no allocator can be handed
-// it - which removing the file would allow, however briefly it seemed safe.
+// Give up the claim without giving up the path. `rename` onto our own lock
+// path replaces its contents in one step, so the path is occupied before and
+// after and no allocator can ever be handed that generation again - which
+// removing the file allowed, and so did renaming it aside, however briefly
+// either looked safe.
 //
-// Only our own lock. A file that no longer carries our identity is somebody
-// else's - a hand-planted lock, or a future change that reintroduces some way
-// of taking one in place - and releasing theirs would let a third allocator in
-// beside them.
+// Only our own lock. Contents that are not ours belong to something else - a
+// hand-planted lock, or a future change that reintroduces some way of taking
+// one in place - and releasing theirs would let a third allocator in beside
+// them.
 function releaseLock(path: string, holder: LockHolder): void {
-  const current = readLockHolder(path);
-  if (current !== null && (current.pid !== holder.pid || current.acquiredAt !== holder.acquiredAt)) return;
-  try {
-    renameSync(path, `${path.slice(0, -LOCK_SUFFIX.length)}${RELEASED_SUFFIX}`);
-  } catch (error) {
-    // Nothing to release. Anything else is worth seeing, because a lock left
-    // holding its claim stops every dev start on this machine until it goes
-    // stale.
-    if (!isMissingPathError(error)) throw error;
+  const state = readLockState(path);
+  if (state.kind === "held" && (state.holder.pid !== holder.pid || state.holder.acquiredAt !== holder.acquiredAt)) {
+    return;
   }
-}
-
-function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
+  // Contents we cannot read are not ours either, and the path still has to
+  // stay occupied, so leave it: the stale window is what recovers it.
+  if (state.kind === "unreadable") return;
+  const staging = `${path}.${process.pid}.release.tmp`;
+  writeFileSync(staging, `${JSON.stringify({ released: true, ...holder })}\n`, { encoding: "utf8", mode: 0o600 });
+  renameSync(staging, path);
 }

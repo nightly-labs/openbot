@@ -48,14 +48,14 @@ describe("withDevPortAllocation", () => {
 
   // Sorted, because these assert which generations exist rather than the order
   // the filesystem lists them in.
-  const heldLocks = (): string[] =>
+  const lockFiles = (): string[] =>
     readdirSync(directory)
       .filter((entry) => entry.endsWith(".lock"))
       .sort();
-  const spentLocks = (): string[] =>
-    readdirSync(directory)
-      .filter((entry) => entry.endsWith(".released"))
-      .sort();
+  // The lock paths that stay to keep their number out of circulation, marked
+  // as no longer claimed. A path that exists is not a lock that is held.
+  const releasedLocks = (): string[] =>
+    lockFiles().filter((entry) => readFileSync(join(directory, entry), "utf8").includes('"released":true'));
   const plantLock = (generation: number, contents: string): string => {
     const path = join(directory, `port-allocation.${generation}.lock`);
     writeFileSync(path, contents);
@@ -97,7 +97,8 @@ describe("withDevPortAllocation", () => {
     // The ports the first one won, which is what makes the second walk past
     // them instead of probing them and finding them unbound.
     expect(seenBySecond.flatMap((record) => record.ports)).toEqual([{ name: "app-renderer", port: 5_173 }]);
-    expect(heldLocks()).toEqual([]);
+    // One generation each, both given up.
+    expect(releasedLocks()).toEqual(["port-allocation.1.lock", "port-allocation.2.lock"]);
   });
 
   it("lets only one of several processes allocate at a time, even with an abandoned lock to recover", async () => {
@@ -152,9 +153,15 @@ describe("withDevPortAllocation", () => {
       "enter leave enter leave enter leave enter leave",
     );
     expect(new Set(sections.map((line) => line.split(" ")[1])).size).toBe(4);
-    // Every lock these four took is released, and the abandoned one they all
-    // recovered from is still there. See the supersede test below.
-    expect(heldLocks()).toEqual(["port-allocation.1.lock"]);
+    // A generation each, all given up, and the abandoned lock they recovered
+    // from still standing on its own path. See the supersede test below.
+    expect(lockFiles().length).toBe(5);
+    expect(releasedLocks()).toEqual([
+      "port-allocation.2.lock",
+      "port-allocation.3.lock",
+      "port-allocation.4.lock",
+      "port-allocation.5.lock",
+    ]);
   }, 30_000);
 
   it("never hands the same generation out twice", async () => {
@@ -167,22 +174,25 @@ describe("withDevPortAllocation", () => {
     // a released lock keeps its file, under a name that no longer claims the
     // lock, and each allocation gets the number above it.
     const taken: string[] = [];
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
       await withDevPortAllocation(
         async () => {
-          taken.push(...heldLocks());
+          // The one path that is not released yet is the one we hold. Just its
+          // number, so a failure prints which generation came round again.
+          taken.push(
+            ...lockFiles()
+              .filter((entry) => releasedLocks().includes(entry) === false)
+              .map((entry) => entry.replace("port-allocation.", "").replace(".lock", "")),
+          );
         },
         { directory, readRecords: () => [] },
       );
     }
 
-    expect(taken).toEqual(["port-allocation.1.lock", "port-allocation.2.lock", "port-allocation.3.lock"]);
-    expect(heldLocks()).toEqual([]);
-    expect(spentLocks()).toEqual([
-      "port-allocation.1.released",
-      "port-allocation.2.released",
-      "port-allocation.3.released",
-    ]);
+    expect(taken.join(",")).toBe("1,2,3,4");
+    // Every path still there and none of them claimed, which is what keeps
+    // those four numbers from being handed out a second time.
+    expect(releasedLocks().length).toBe(4);
   });
 
   it("names the holder of the lock it is waiting for", async () => {
@@ -235,7 +245,9 @@ describe("withDevPortAllocation", () => {
     );
 
     expect(entered).toBe(true);
-    expect(heldLocks()).toEqual(["port-allocation.1.lock"]);
+    expect(releasedLocks()).toEqual(["port-allocation.2.lock"]);
+    // Not ours to write to, and its number stays out of circulation.
+    expect(readFileSync(path, "utf8")).toBe('{"pid": 4');
   });
 
   it("never takes the lock from a live holder, however long it has held it", async () => {
@@ -270,16 +282,16 @@ describe("withDevPortAllocation", () => {
     await withDevPortAllocation(
       async () => {
         entered = true;
-        expect(heldLocks()).toEqual(["port-allocation.1.lock", "port-allocation.2.lock"]);
+        expect(lockFiles()).toEqual(["port-allocation.1.lock", "port-allocation.2.lock"]);
       },
       { directory, readRecords: () => [] },
     );
 
     expect(entered).toBe(true);
-    // The recovered lock still standing and ours released, so neither number
-    // is ever handed out again.
-    expect(heldLocks()).toEqual(["port-allocation.1.lock"]);
-    expect(spentLocks()).toEqual(["port-allocation.2.released"]);
+    // Both paths still standing, so neither number is handed out again, and
+    // only ours says it is no longer claimed.
+    expect(lockFiles()).toEqual(["port-allocation.1.lock", "port-allocation.2.lock"]);
+    expect(releasedLocks()).toEqual(["port-allocation.2.lock"]);
   });
 
   it("supersedes a lock whose holder pid has since been recycled", async () => {
@@ -308,13 +320,15 @@ describe("withDevPortAllocation", () => {
       }),
     ).rejects.toThrow("no available development port");
 
-    expect(heldLocks()).toEqual([]);
+    expect(releasedLocks()).toEqual(["port-allocation.1.lock"]);
     // Released rather than left claimed, so the next attempt is not blocked -
-    // and at generation 2, because generation 1 is spent.
+    // and it takes generation 2, because generation 1 is spent.
     let second = "";
     await withDevPortAllocation(
       async () => {
-        second = heldLocks().join();
+        second = lockFiles()
+          .filter((entry) => releasedLocks().includes(entry) === false)
+          .join();
       },
       { directory, readRecords: () => [], waitMs: 0 },
     );
