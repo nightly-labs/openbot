@@ -58,6 +58,11 @@ renderer ──► @openbot/contracts ◄── preload ◄── main ──►
 - Renderer signals and stores are projections for the current screen only. They are not durable
   state, and one concern is one record - a row of parallel signals over its fields lets a screen
   hold states the product does not have.
+- The desktop conversation context owns one record per agent inside the keyed server scope.
+  Page, read, runtime-message, and removal commands keep its fields together. Other domains cannot
+  write its store. Automatic-read retry markers stay above that scope; composer drafts and
+  in-flight attachments keep their existing controller lifetime. The conversation view scope
+  composes behavior stores. Search requests, highlights, timers, and cleanup belong to the search store.
 
 ## Agent communication policy
 

@@ -5,7 +5,6 @@ import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { useConversation } from "../conversation/conversation-context";
-import { agentConversationKey } from "../conversation/conversation-keys";
 import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useSetup } from "../onboarding/onboarding-context";
 import { useSidebar } from "../sidebar/sidebar-context";
@@ -49,7 +48,7 @@ const ServerScope = createSimpleContext({
     const { setTeamPresence } = usePresence();
     const { activeDirectMemberId, directConversations, refreshDirectThreads, markDirectMessagesRead } =
       useDirectMessages();
-    const { setModelOptions, activeAgent, setAgentChatOpenRevision, setAgentStatus, applyStoredAgents } = useAgents();
+    const { setModelOptions, activeAgent, setAgentStatus, applyStoredAgents } = useAgents();
     const {
       setBrowserControlState,
       supportsBrowser,
@@ -59,14 +58,8 @@ const ServerScope = createSimpleContext({
     } = useBrowserTabs();
     const { setSidebarLayout, loadLayout: loadSidebarLayout, reconcileActiveServerPins } = useSidebar();
     const { globalSearchOpen, setGlobalSearchVisibility, selectAgent } = useNavigation();
-    const {
-      conversationReads,
-      setRecentReplies,
-      agentChatsToMarkRead,
-      agentChatsRetriedOnOpen,
-      applyConversationReads,
-      isAgentChatOpen,
-    } = useConversation();
+    const { conversations, clearRecentReplies, requestConversationRead, applyConversationReads, isAgentChatOpen } =
+      useConversation();
 
     const [loaded, setLoaded] = createSignal(false);
     const owner = getOwner();
@@ -94,13 +87,10 @@ const ServerScope = createSimpleContext({
       // `appFocused()` already reads true by the time this one runs.
       const handleWindowFocus = () => {
         flush(() => {
-          setRecentReplies({});
+          clearRecentReplies();
           const agentId = activeAgent()?.id;
-          if (agentId && isAgentChatOpen(agentId) && (conversationReads()[agentId]?.unreadCount ?? 0) > 0) {
-            const trackingKey = agentConversationKey(activeServerId(), agentId);
-            agentChatsToMarkRead.add(trackingKey);
-            agentChatsRetriedOnOpen.delete(agentId);
-            setAgentChatOpenRevision((current) => current + 1);
+          if (agentId && isAgentChatOpen(agentId) && (conversations[agentId]?.read?.unreadCount ?? 0) > 0) {
+            requestConversationRead(agentId);
           }
           const memberId = activeDirectMemberId();
           if (memberId && (directConversations()[memberId]?.readState?.unreadCount ?? 0) > 0) {

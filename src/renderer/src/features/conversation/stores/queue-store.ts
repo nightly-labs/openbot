@@ -50,7 +50,6 @@ export function createQueueStore(deps: QueueStoreDeps) {
     renderedQueueDeliveries,
     setRenderedQueueDeliveries,
     queuePanelVisible,
-    getQueueExitTimer: () => queueExitTimer,
   };
 }
 
