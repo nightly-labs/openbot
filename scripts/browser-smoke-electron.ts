@@ -1142,6 +1142,18 @@ async function main(): Promise<void> {
     if (oversizedEvaluation.success || !toolError(oversizedEvaluation).includes("exceeds 64 KB")) {
       throw new Error("V2 page evaluation accepted an oversized result.");
     }
+    // A promise the page never settles is the one evaluation CDP's own execution timeout does not
+    // bound, so the host has to cancel the pending command itself. If it does not, the tab's queue
+    // waits on that promise forever and every later operation -- including close and shutdown --
+    // blocks behind it, which is what the next call proves it does not.
+    const neverSettlingEvaluation = await callBrowserTool(browser, "evaluate", {
+      tabId: v2Tab.id,
+      expression: "new Promise(() => {})",
+      timeoutMs: 300,
+    });
+    if (neverSettlingEvaluation.success || !toolError(neverSettlingEvaluation).includes("timed out")) {
+      throw new Error("V2 page evaluation did not bound a promise the page never settles.");
+    }
     const evaluationAfterFailure = await callBrowserTool(browser, "evaluate", {
       tabId: v2Tab.id,
       expression: "({ queueRecovered: true })",

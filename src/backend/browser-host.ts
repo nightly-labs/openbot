@@ -1286,12 +1286,26 @@ export class BrowserHost {
     const started = tab.queue.then(() => {
       const deadline = Date.now() + timeoutMs;
       const timeoutMessage = "Browser evaluate timed out.";
+      let cancellationConfirmed = false;
       const operationCompletion = tab.engine.evaluate(
         expression,
         awaitPromise,
         remainingTime(deadline, timeoutMessage),
       );
-      const response = withTimeout(operationCompletion, remainingTime(deadline, timeoutMessage), timeoutMessage)
+      // `awaitPromise` is what CDP's own execution timeout does not bound: an expression evaluating
+      // to a promise the page never settles leaves the command pending forever. Detaching the
+      // debugger is the only cancellation primitive there is, so the timeout takes it -- otherwise
+      // `drained` waits on that promise and the tab's queue never advances, which would also block
+      // takeover, close and shutdown.
+      const boundedOperation = withTimeout(
+        operationCompletion,
+        remainingTime(deadline, timeoutMessage),
+        timeoutMessage,
+      ).catch((error) => {
+        if (isTimeoutError(error)) cancellationConfirmed = tab.engine.cancelPendingCommands();
+        throw error;
+      });
+      const response = boundedOperation
         .then(async (value) => {
           const settleTimeout = remainingTime(deadline, timeoutMessage);
           await withTimeout(tab.engine.settle(settleTimeout), settleTimeout, timeoutMessage);
@@ -1306,7 +1320,11 @@ export class BrowserHost {
           });
           throw error;
         });
-      const drained = Promise.allSettled([operationCompletion, response]).then(() => undefined);
+      const drained = Promise.allSettled([response])
+        .then(() =>
+          cancellationConfirmed ? undefined : Promise.allSettled([operationCompletion]).then(() => undefined),
+        )
+        .then(() => undefined);
       return { drained, response };
     });
     const result = started.then(({ response }) => response);
