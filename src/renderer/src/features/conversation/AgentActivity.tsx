@@ -1,8 +1,5 @@
 import type { StateId } from "@norbert_bodziony/bloub";
-import { For } from "solid-js";
-import { Button } from "../../components/ui/button";
-import { ChevronDown, Sparkles } from "../../components/ui/icons";
-import type { AgentMessage, AgentProfile } from "../../data";
+import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
 
 export const AGENT_ACTIVITY_ANIMATIONS = [
@@ -91,49 +88,4 @@ function pickActivityLabel(
   const tone = random();
   const pool = Number.isFinite(tone) && tone >= 0.7 ? PLAYFUL_ACTIVITY_LABELS : FACTUAL_ACTIVITY_LABELS;
   return pickDifferent(pool, previous, random);
-}
-
-export function ThinkingDisclosure(props: {
-  message: AgentMessage;
-  working: boolean;
-  open: boolean | undefined;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const steps = () => props.message.items?.filter((item) => item.trim()) ?? [];
-  /* Open while the agent reasons so the trace reads as it arrives, closed once it has answered —
-     until the reader decides otherwise. */
-  const expanded = () => props.open ?? props.working;
-  return (
-    <article class="thinking-entry">
-      <div class="thinking-disclosure" data-expanded={expanded()}>
-        <Button
-          variant="ghost"
-          size="xs"
-          class="thinking-summary"
-          aria-expanded={expanded() ? "true" : "false"}
-          aria-label={expanded() ? "Hide thinking details" : "Show thinking details"}
-          onClick={() => props.onOpenChange(!expanded())}
-        >
-          <Sparkles class="thinking-mark" aria-hidden="true" />
-          <span class="thinking-label" role="status" data-working={props.working}>
-            {props.working ? "Thinking" : "Thought it through"}
-          </span>
-          <ChevronDown class="thinking-chevron" aria-hidden="true" />
-        </Button>
-        <div class="thinking-panel" aria-hidden={expanded() ? undefined : "true"}>
-          <div class="thinking-panel-clip">
-            <div class="thinking-details">
-              <For each={steps()}>
-                {(item, index) => (
-                  <p class="thinking-step" style={{ "--thinking-step-index": String(index()) }}>
-                    {item}
-                  </p>
-                )}
-              </For>
-            </div>
-          </div>
-        </div>
-      </div>
-    </article>
-  );
 }

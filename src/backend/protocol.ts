@@ -262,8 +262,18 @@ function decodeThreadItem(value: unknown): ThreadItem {
   if (status !== undefined && status !== null) item.status = status;
   const phase = optionalString(record, "phase");
   if (phase !== undefined && phase !== null) item.phase = phase;
-  if (record.content !== undefined) item.content = decodeThreadContent(record.content);
+  if (record.content !== undefined && item.type !== "reasoning") item.content = decodeThreadContent(record.content);
+  if (item.type === "reasoning") {
+    return { ...item, type: "agentMessage", phase: "commentary", text: reasoningText(record) };
+  }
   return item;
+}
+
+/** Prefer the readable summary when a provider also includes raw reasoning content. */
+export function reasoningText(item: unknown): string {
+  const summary = getArray(item, "summary").filter(isString);
+  const content = getArray(item, "content").filter(isString);
+  return (summary.length > 0 ? summary : content).join("\n\n");
 }
 
 function decodeThreadContent(value: unknown): Array<{ type: string; text?: string }> {

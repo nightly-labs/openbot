@@ -512,7 +512,7 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(screen.queryByRole("status", { name: /^Chief is working:/ })).not.toBeInTheDocument());
   });
 
-  it("streams commentary into both the thinking trace and current activity", async () => {
+  it("shows only the latest commentary beside the agent activity", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     await confirmOnboardingModel();
@@ -576,10 +576,8 @@ describe("OpenBot connected desktop shell", () => {
       createdAt: firstCommentary.createdAt,
       revision: 3,
     });
-    // Reasoning reads in the trace, which opens itself while the agent works.
-    const trace = await screen.findByRole("button", { name: "Hide thinking details" });
-    expect(trace.getAttribute("aria-expanded")).toBe("true");
-    expect(await screen.findAllByText("Inspecting the release checks")).not.toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Hide thinking details" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show thinking details" })).not.toBeInTheDocument();
     expect(
       await within(screen.getByRole("region", { name: "Current activity" })).findByText(
         "Inspecting the release checks",
@@ -599,7 +597,8 @@ describe("OpenBot connected desktop shell", () => {
         latestCommentary,
       ]),
     );
-    expect(await screen.findAllByText("Verifying the final build artifacts")).not.toHaveLength(0);
+    expect(await screen.findAllByText("Verifying the final build artifacts")).toHaveLength(1);
+    expect(screen.queryByText("Inspecting the release checks")).not.toBeInTheDocument();
     expect(
       screen.getByRole("status", { name: "Chief is working: Verifying the final build artifacts" }),
     ).toBeInTheDocument();
@@ -668,7 +667,7 @@ describe("OpenBot connected desktop shell", () => {
 
     const activity = await screen.findByRole("region", { name: "Current activity" });
     expect(within(activity).queryByText("Verifying the build artifacts")).not.toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Hide thinking details" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hide thinking details" })).not.toBeInTheDocument();
   });
 
   it("merges compact runtime attention into the active server", async () => {

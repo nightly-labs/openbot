@@ -223,7 +223,6 @@ export function createServerConversationState() {
   const [openReactionMessageId, setOpenReactionMessageId] = createSignal<string | null>(null);
   const [openMoreMessageId, setOpenMoreMessageId] = createSignal<string | null>(null);
   const [expandedEmojiMessageId, setExpandedEmojiMessageId] = createSignal<string | null>(null);
-  const [expandedThinkingMessages, setExpandedThinkingMessages] = createSignal<Record<string, boolean>>({});
   const [copiedMessageId, setCopiedMessageId] = createSignal<string | null>(null);
   const [chatSearchOpen, setChatSearchOpen] = createSignal(false);
   const [chatSearchQuery, setChatSearchQuery] = createSignal("");
@@ -269,8 +268,6 @@ export function createServerConversationState() {
     setOpenMoreMessageId,
     expandedEmojiMessageId,
     setExpandedEmojiMessageId,
-    expandedThinkingMessages,
-    setExpandedThinkingMessages,
     copiedMessageId,
     setCopiedMessageId,
     chatSearchOpen,
