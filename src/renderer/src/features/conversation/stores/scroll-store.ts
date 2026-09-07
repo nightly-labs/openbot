@@ -1,4 +1,4 @@
-import { createMemo, createSignal, onCleanup } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { createScrollFades } from "../../../components/createScrollFades";
 import type { ConversationProps } from "../conversation-types";
 import { calculateChatScrollMargin, createChatVirtualizer } from "../createChatVirtualizer";
@@ -34,6 +34,18 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   let unreadVisibilityFrame: number | undefined;
 
   const timelineMessages = createMemo(() => deps.props.messages.filter((message) => message.kind !== "thinking"));
+
+  createEffect(
+    () =>
+      deps.props.loaded &&
+      timelineMessages().length === 0 &&
+      deps.props.hasOlder &&
+      !deps.props.loadingOlder &&
+      !deps.props.olderError,
+    (needsOlderPage) => {
+      if (needsOlderPage) deps.props.onLoadOlder?.();
+    },
+  );
 
   const messageVirtualizer = createChatVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: () => timelineMessages().length,

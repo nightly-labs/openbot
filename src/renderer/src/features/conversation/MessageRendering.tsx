@@ -28,11 +28,11 @@ function nextStreamingText(current: string, target: string, streaming: boolean):
   return streaming ? current : target;
 }
 
-function streamingTextGapMs(): number {
-  const value = getComputedStyle(document.documentElement).getPropertyValue("--stream-gap").trim();
-  if (!value) return STREAMING_TEXT_GAP_FALLBACK_MS;
+function streamingTextDurationMs(property = "--stream-gap", fallback = STREAMING_TEXT_GAP_FALLBACK_MS): number {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(property).trim();
+  if (!value) return fallback;
   const amount = Number.parseFloat(value);
-  if (!Number.isFinite(amount)) return STREAMING_TEXT_GAP_FALLBACK_MS;
+  if (!Number.isFinite(amount)) return fallback;
   return value.endsWith("s") && !value.endsWith("ms") ? amount * 1000 : amount;
 }
 
@@ -61,10 +61,14 @@ function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
   };
   const settleHeightSmoothing = () => {
     if (smoothHeightTimer !== undefined) window.clearTimeout(smoothHeightTimer);
-    smoothHeightTimer = window.setTimeout(() => {
-      smoothHeightTimer = undefined;
-      setSmoothHeight(false);
-    }, streamingTextGapMs() * 2);
+    smoothHeightTimer = window.setTimeout(
+      () => {
+        smoothHeightTimer = undefined;
+        setSmoothHeight(false);
+        setAnimateTail(false);
+      },
+      Math.max(streamingTextDurationMs() * 2, streamingTextDurationMs("--stream-fade", 350)),
+    );
   };
   const scheduleReveal = () => {
     if (revealTimer !== undefined) return;
@@ -81,7 +85,7 @@ function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
         smoothingActive = false;
         settleHeightSmoothing();
       }
-    }, streamingTextGapMs());
+    }, streamingTextDurationMs());
   };
 
   createEffect(

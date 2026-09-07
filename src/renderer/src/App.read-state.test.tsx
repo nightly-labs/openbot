@@ -84,6 +84,40 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByText("Loaded earlier")).toBeInTheDocument();
   });
 
+  it("loads past commentary-only pages to reach earlier answers", async () => {
+    const thought = (id: string) => ({
+      id,
+      author: "assistant" as const,
+      text: "Checking sources",
+      itemType: "commentary",
+      createdAt: "2026-08-30T02:02:00.000Z",
+      status: "completed" as const,
+    });
+    vi.mocked(window.openbot.agent.readConversationPage).mockImplementation(async (input) => {
+      if (input.anchor?.type !== "before") {
+        return testConversationPage("chief", [thought("thought-latest")], {
+          pageInfo: { hasOlder: true, olderCursor: "middle" },
+        });
+      }
+      if (input.anchor.cursor === "middle") {
+        return testConversationPage("chief", [thought("thought-middle")], {
+          pageInfo: { hasOlder: true, olderCursor: "first" },
+        });
+      }
+      return testConversationPage("chief", [
+        {
+          id: "earlier-answer",
+          author: "assistant",
+          text: "Earlier answer is reachable",
+          createdAt: "2026-08-30T02:00:00.000Z",
+          status: "completed",
+        },
+      ]);
+    });
+    render(() => <App />);
+    expect(await screen.findByText("Earlier answer is reachable")).toBeInTheDocument();
+  });
+
   it("keeps the current read state when an older page returns stale read data", async () => {
     const latestMessage = {
       id: "reply-latest-page",
