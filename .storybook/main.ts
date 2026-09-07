@@ -8,10 +8,14 @@ const config = {
   addons: ["@storybook/addon-a11y"],
   framework: {
     name: "storybook-solidjs-vite",
+    options: {
+      // CI checks compilation. Local Storybook keeps automatic prop documentation.
+      docgen: process.env.OPENBOT_STORYBOOK_CHECK === "true" ? false : undefined,
+    },
   },
   viteFinal: async (viteConfig) => {
     const mergedConfig = mergeConfig(viteConfig, {
-      plugins: [solidPlugin(), tailwindcss({ optimize: false })],
+      plugins: [tailwindcss({ optimize: false })],
       build: {
         // Storybook bundles axe and its preview runtime into intentionally large development-only chunks.
         chunkSizeWarningLimit: 1_200,

@@ -307,6 +307,10 @@ Run the narrowest relevant test, then `bun run lint` and `bun run typecheck`; bo
 to run whole, and CI owns the minutes-long suites. See [AGENTS.md, Checks](../AGENTS.md#checks)
 for the division of labour and what each CI job covers.
 
+The Storybook CI job builds all stories with `OPENBOT_STORYBOOK_CHECK=true`. This skips Solid's
+automatic prop documentation analysis. The job checks compilation and does not publish its output.
+Local Storybook keeps this analysis. Both paths use one Solid compiler plugin.
+
 Each TypeScript project writes its own ignored `.tsbuildinfo` cache beside its configuration.
 Each worktree starts with no cache. The first check creates these files; later checks reuse them
 and check changed inputs. Delete the cache files to force fresh checks. A new CI checkout also
