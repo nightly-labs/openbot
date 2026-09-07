@@ -20,11 +20,6 @@
 .settings-modal {
   --openbot-bg-surface: var(--openbot-bg-control);
   --openbot-text-muted: var(--openbot-settings-text-muted);
-  --openbot-button-destructive: var(--openbot-settings-danger);
-  --openbot-button-destructive-soft: var(--openbot-settings-danger-soft);
-  --openbot-button-destructive-hover: var(--openbot-settings-danger-hover);
-  --openbot-button-destructive-focus: var(--openbot-settings-danger-focus);
-  --openbot-button-destructive-border: var(--openbot-settings-danger-border);
   width: min(880px, calc(100vw - 48px));
   height: min(600px, calc(100dvh - 48px));
   min-width: 0;
@@ -304,7 +299,7 @@
 }
 
 .settings-modal :where(.ui-button-variant-destructive) {
-  background: var(--openbot-settings-danger);
+  background: var(--openbot-danger);
   color: var(--openbot-text-primary);
 }
 
@@ -322,7 +317,7 @@
   }
 
   .settings-modal :where(.ui-button-variant-destructive):hover:not(:disabled):not([data-disabled]) {
-    background: var(--openbot-settings-danger-hover);
+    background: var(--openbot-danger-hover);
     color: var(--openbot-text-primary);
   }
 }

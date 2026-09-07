@@ -1605,8 +1605,8 @@
 
 .agent-routine-action-buttons .ui-button-variant-destructive {
   border-color: transparent;
-  background: var(--openbot-button-destructive-soft);
-  color: var(--openbot-button-destructive);
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger);
 }
 
 .agent-routine-action-buttons .ui-button-variant-default {
@@ -1617,8 +1617,8 @@
 
 @media (hover: hover) and (pointer: fine) {
   .agent-routine-action-buttons .ui-button-variant-destructive:hover:not(:disabled):not([data-disabled]) {
-    background: var(--openbot-button-destructive-hover);
-    color: var(--openbot-button-destructive);
+    background: var(--openbot-danger-soft-hover);
+    color: var(--openbot-danger);
   }
 
   .agent-routine-action-buttons .ui-button-variant-default:hover:not(:disabled):not([data-disabled]) {

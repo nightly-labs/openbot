@@ -86,11 +86,6 @@
   --openbot-action: #f0f0f0;
   --openbot-action-foreground: #141414;
   --openbot-settings-text-muted: rgba(255, 255, 255, 0.59);
-  --openbot-settings-danger: #eb4145;
-  --openbot-settings-danger-hover: #f05256;
-  --openbot-settings-danger-soft: rgba(235, 65, 69, 0.2);
-  --openbot-settings-danger-focus: rgba(235, 65, 69, 0.4);
-  --openbot-settings-danger-border: rgba(235, 65, 69, 0.5);
   --openbot-provider-codex: var(--openbot-text-primary);
   --openbot-provider-claude: #d97757;
   --openbot-provider-grok: var(--openbot-text-primary);
@@ -128,14 +123,18 @@
   --openbot-badge-new-border: rgba(255, 30, 94, 0.28);
   --openbot-approval-badge-soft: rgba(255, 148, 18, 0.18);
   --openbot-approval-badge-border: rgba(255, 148, 18, 0.3);
-  --openbot-danger: #e47d75;
-  --openbot-danger-soft: rgba(228, 125, 117, 0.13);
-  --openbot-danger-strong: #ff4058;
-  --openbot-button-destructive: oklch(0.704 0.191 22.216);
-  --openbot-button-destructive-soft: oklch(0.704 0.191 22.216 / 20%);
-  --openbot-button-destructive-hover: oklch(0.704 0.191 22.216 / 30%);
-  --openbot-button-destructive-focus: oklch(0.704 0.191 22.216 / 40%);
-  --openbot-button-destructive-border: oklch(0.704 0.191 22.216 / 50%);
+  /* One red. The palette carried four families - danger (#e47d75), danger-strong
+     (#ff4058), settings-danger (#eb4145) and button-destructive (oklch, #ff6467) -
+     all between hue 352 and 359, i.e. the same red at four saturations, and the
+     settings family existed only to re-override button-destructive inside one modal.
+     #fd2f3b is the reference's count badge. The five steps below are roles, not
+     shades: solid fill, its hover, tinted fill, its hover, ring, border. */
+  --openbot-danger: #fd2f3b;
+  --openbot-danger-hover: #fd5d67;
+  --openbot-danger-soft: rgba(253, 47, 59, 0.16);
+  --openbot-danger-soft-hover: rgba(253, 47, 59, 0.28);
+  --openbot-danger-focus: rgba(253, 47, 59, 0.4);
+  --openbot-danger-border: rgba(253, 47, 59, 0.5);
   --openbot-file-blue: #74b9ff;
   --openbot-file-blue-soft: rgba(116, 185, 255, 0.14);
   --openbot-file-yellow: var(--openbot-warning);

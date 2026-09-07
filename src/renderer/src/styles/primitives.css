@@ -172,8 +172,8 @@
 }
 
 :where(.ui-button-variant-destructive) {
-  background: var(--openbot-button-destructive-soft);
-  color: var(--openbot-button-destructive);
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger);
 }
 
 :where(.ui-button-variant-destructive-ghost) {
@@ -206,13 +206,13 @@
   }
 
   :where(.ui-button-variant-destructive):hover:not(:disabled):not([data-disabled]) {
-    background: var(--openbot-button-destructive-hover);
-    color: var(--openbot-button-destructive);
+    background: var(--openbot-danger-soft-hover);
+    color: var(--openbot-danger);
   }
 
   :where(.ui-button-variant-destructive-ghost):hover:not(:disabled):not([data-disabled]) {
-    background: var(--openbot-button-destructive-soft);
-    color: var(--openbot-button-destructive);
+    background: var(--openbot-danger-soft);
+    color: var(--openbot-danger);
   }
 
   :where(.ui-button-variant-link):hover:not(:disabled):not([data-disabled]) {
@@ -231,16 +231,16 @@
 }
 
 :where(.ui-button-variant-destructive):focus-visible {
-  border-color: var(--openbot-button-destructive-focus);
+  border-color: var(--openbot-danger-focus);
 }
 
 :where(.ui-button-variant-destructive, .ui-button-variant-destructive-ghost):focus-visible {
-  box-shadow: 0 0 0 3px var(--openbot-button-destructive-focus);
+  box-shadow: 0 0 0 3px var(--openbot-danger-focus);
 }
 
 :where(.ui-button)[aria-invalid="true"] {
-  border-color: var(--openbot-button-destructive-border);
-  box-shadow: 0 0 0 3px var(--openbot-button-destructive-focus);
+  border-color: var(--openbot-danger-border);
+  box-shadow: 0 0 0 3px var(--openbot-danger-focus);
 }
 
 :where(.ui-button):disabled,
@@ -855,8 +855,8 @@
 }
 
 .ui-switch[data-invalid] {
-  border-color: var(--openbot-button-destructive-border);
-  box-shadow: 0 0 0 3px var(--openbot-button-destructive-focus);
+  border-color: var(--openbot-danger-border);
+  box-shadow: 0 0 0 3px var(--openbot-danger-focus);
 }
 
 .ui-switch:not([data-pointer-focus]):has(.ui-switch-input:focus-visible) {
@@ -865,8 +865,8 @@
 }
 
 .ui-switch[data-invalid]:not([data-pointer-focus]):has(.ui-switch-input:focus-visible) {
-  border-color: var(--openbot-button-destructive-border);
-  box-shadow: 0 0 0 3px var(--openbot-button-destructive-focus);
+  border-color: var(--openbot-danger-border);
+  box-shadow: 0 0 0 3px var(--openbot-danger-focus);
 }
 
 .ui-switch-field {
@@ -1353,7 +1353,7 @@
 }
 
 .ui-radial-progress[data-tone="danger"] {
-  --ui-radial-progress-color: var(--openbot-danger-strong);
+  --ui-radial-progress-color: var(--openbot-danger);
 }
 
 .ui-radial-progress-chart {
@@ -1851,7 +1851,7 @@ button.ui-bubble-content {
 }
 
 .ui-bubble-variant-destructive > .ui-bubble-content {
-  border-color: var(--openbot-button-destructive-border);
+  border-color: var(--openbot-danger-border);
   background: var(--openbot-danger-soft);
 }
 

@@ -2911,13 +2911,13 @@ textarea {
 
 .account-menu-danger,
 .account-menu-danger .account-menu-icon {
-  color: var(--openbot-danger-strong);
+  color: var(--openbot-danger);
 }
 
 .account-menu-danger:hover:not(:disabled),
 .account-menu-danger:focus-visible {
   background: var(--openbot-danger-soft);
-  color: var(--openbot-danger-strong);
+  color: var(--openbot-danger);
 }
 
 .account-menu-separator {
