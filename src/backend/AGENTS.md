@@ -63,7 +63,10 @@ wrong.
 
 ## Size
 
-`mailbox-store.ts` is the largest file in this directory, at about 1,700 lines.
+`mailbox-store.ts` owns mailbox state and database writes. `attachment-files.ts` owns draft and
+transfer file operations; it must not import `MailboxStore` or write database state. Keep the staged
+generated-attachment map in the store. Apply it to mailbox state only after the atomic conversation
+and mailbox commit succeeds. Keep deletion-outbox completion in the store, after file removal.
 
 The two that used to be larger are both worth copying. `agent-service.ts` was split into one
 controller per concern, each constructed and owned by the service; `openbot-database.ts` was split

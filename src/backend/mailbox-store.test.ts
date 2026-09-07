@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { access, mkdir, mkdtemp, open, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, open, readdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
@@ -35,12 +35,40 @@ describe("MailboxStore", () => {
     await source.close();
 
     await expect(store.listExportAttachments()).resolves.toEqual([]);
+    expect(() =>
+      store.persistGeneratedAttachmentsWithConversation(
+        { agentId: "missing-agent", threadId: "missing-thread", activeTurnId: null, revision: 0, messages: [] },
+        "response.attachments-added",
+        {},
+        staged.map((attachment) => attachment.id),
+      ),
+    ).toThrow("Unknown agent for conversation");
     await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Unrelated work" });
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
     await restored.initialize();
     await expect(restored.listExportAttachments()).resolves.toEqual([]);
 
     await store.discardStagedGeneratedAttachments(staged.map((attachment) => attachment.id));
+    await expect(readdir(join(root, "Shared", "Transfers", "generated"))).resolves.toEqual([]);
+  });
+
+  it("copies the opened generated file if its source path is replaced", async () => {
+    const sourcePath = join(root, "opened.png");
+    await writeFile(sourcePath, "authorized image");
+    const source = await open(sourcePath, "r");
+    try {
+      await rename(sourcePath, join(root, "original.png"));
+      await writeFile(sourcePath, "replacement data");
+
+      const [attachment] = await store.stageGeneratedAttachments({ sources: [{ path: sourcePath, handle: source }] });
+
+      await expect(
+        readFile(join(root, "Shared", "Transfers", "generated", attachment.id, attachment.name), "utf8"),
+      ).resolves.toBe("authorized image");
+      await store.discardStagedGeneratedAttachments([attachment.id]);
+    } finally {
+      await source.close();
+    }
   });
 
   it("preserves the extension when it shortens a long attachment name", async () => {
@@ -232,7 +260,7 @@ describe("MailboxStore", () => {
     });
   });
 
-  it("rejects managed attachments after their contents change", async () => {
+  it("rejects managed attachments after their contents change without changing size", async () => {
     const source = join(root, "mutable.txt");
     await writeFile(source, "original");
     const [draft] = await store.prepareAttachments([source]);
@@ -243,7 +271,7 @@ describe("MailboxStore", () => {
       draftIds: [draft.id],
     });
     const attachment = store.getDelivery(receipt.deliveries[0].id)?.managedAttachments[0];
-    await writeFile(attachment?.path ?? "missing", "changed");
+    await writeFile(attachment?.path ?? "missing", "modified");
 
     await expect(store.verifyDeliveryAttachments(receipt.deliveries[0].id)).rejects.toThrow("has changed");
     await expect(store.resolveAttachment(attachment?.id ?? "")).resolves.toBeNull();
@@ -607,11 +635,13 @@ describe("MailboxStore", () => {
       ownerThreadId: "thread-chief",
     });
 
-    await expect(store.resolveAttachment(attachment.id)).resolves.toBeTruthy();
+    const resolved = await store.resolveAttachment(attachment.id);
+    expect(resolved).not.toBeNull();
     await store.deleteAgentData("chief");
 
     await expect(store.resolveAttachment(attachment.id)).resolves.toBeNull();
     await expect(store.listExportAttachments()).resolves.toEqual([]);
+    await expect(access(resolved?.path ?? "missing")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("cleans unrecoverable attachment drafts when a new app session starts", async () => {
@@ -692,7 +722,7 @@ describe("MailboxStore", () => {
     const source = join(root, "inside.txt");
     const outside = join(root, "outside.txt");
     await writeFile(source, "original");
-    await writeFile(outside, "secret");
+    await writeFile(outside, "original");
     const [draft] = await store.prepareAttachments([source]);
     const receipt = await store.enqueue({
       sender: { kind: "user" },
