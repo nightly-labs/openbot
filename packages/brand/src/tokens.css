@@ -98,7 +98,7 @@
   --openbot-unread-text: #07131f;
   --openbot-success: #61c985;
   --openbot-success-soft: rgba(97, 201, 133, 0.12);
-  --openbot-success-wash: rgba(111, 205, 188, 0.045);
+  --openbot-success-wash: rgba(97, 201, 133, 0.045);
   /* Both warning marks in the reference measure hue 33 at full saturation (#ff9917 on
      the triangle, #ff9412 on the heading). The palette's #e3b866 was a desaturated gold
      at hue 39, which reads as a disabled state rather than as something needing attention. */
@@ -140,22 +140,21 @@
   --openbot-file-yellow-soft: var(--openbot-warning-soft);
   --openbot-file-orange: #f0a06a;
   --openbot-file-orange-soft: rgba(240, 160, 106, 0.14);
-  --openbot-file-teal: #6bc7d9;
-  --openbot-file-teal-soft: rgba(107, 199, 217, 0.14);
+  --openbot-file-teal: var(--openbot-question-option);
+  --openbot-file-teal-soft: var(--openbot-question-option-soft);
   --openbot-file-green: var(--openbot-success);
   --openbot-file-green-soft: var(--openbot-success-soft);
   --openbot-file-red: var(--openbot-danger);
   --openbot-file-red-soft: var(--openbot-danger-soft);
   --openbot-file-pink: #d98ac9;
   --openbot-file-pink-soft: rgba(217, 138, 201, 0.14);
-  --openbot-file-purple: var(--openbot-accent-text);
-  --openbot-file-purple-soft: rgba(0, 124, 247, 0.14);
+  --openbot-file-default: var(--openbot-accent-text);
+  --openbot-file-default-soft: rgba(0, 124, 247, 0.14);
   --openbot-data-table-border: #303030;
   --openbot-data-table-header-text: #a1a1a1;
   --openbot-data-table-text: #f5f5f5;
   --openbot-data-table-outer-border: rgba(255, 255, 255, 0);
   --openbot-data-table-ring: rgba(255, 255, 255, 0.12);
-  --openbot-comparison-table-yes: #34d399;
   --openbot-shadow-popover-ambient: rgba(0, 0, 0, 0.1);
   --openbot-shadow-dialog: rgba(0, 0, 0, 0.48);
   --openbot-shadow-dynamic-island: rgba(0, 0, 0, 0.6);

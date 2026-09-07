@@ -4959,7 +4959,7 @@ button.chat-action-target:active,
 }
 
 .message-comparison-table-yes {
-  color: var(--openbot-comparison-table-yes);
+  color: var(--openbot-success);
 }
 
 .message-comparison-table-no {
@@ -5328,8 +5328,8 @@ button.chat-action-target:active,
 
 .message-file-reference,
 .composer-file-reference {
-  --file-reference-color: var(--openbot-file-purple);
-  --file-reference-soft: var(--openbot-file-purple-soft);
+  --file-reference-color: var(--openbot-file-default);
+  --file-reference-soft: var(--openbot-file-default-soft);
 
   display: inline-flex;
   min-width: 0;
@@ -5518,8 +5518,8 @@ button.chat-action-target:active,
 }
 
 .attachment-file-visual {
-  --file-reference-color: var(--openbot-file-purple);
-  --file-reference-soft: var(--openbot-file-purple-soft);
+  --file-reference-color: var(--openbot-file-default);
+  --file-reference-soft: var(--openbot-file-default-soft);
 
   display: grid;
   width: 40px;
