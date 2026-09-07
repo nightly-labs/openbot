@@ -229,9 +229,10 @@ describe("the diagnostic sink", () => {
   it("receives an already redacted record", () => {
     const records: DiagnosticRecord[] = [];
     const dispose = setDiagnosticSink((record) => records.push(record));
+    const prefix = `${"x".repeat(2100)} `;
     createOpenBotLogger("automation", () => undefined).failure(
       "cli_resolve_failed",
-      "spawn /Users/ada/bin/codex failed with sk-ant-abcdefgh1234",
+      `${prefix}spawn /Users/ada/bin/codex failed with sk-ant-abcdefgh1234`,
     );
     dispose();
     expect(records).toHaveLength(1);
@@ -239,7 +240,7 @@ describe("the diagnostic sink", () => {
       code: "cli_resolve_failed",
       area: "automation",
       severity: "error",
-      message: "spawn ~/bin/codex failed with [redacted]",
+      message: `${prefix}spawn ~/bin/codex failed with [redacted]`,
     });
   });
 

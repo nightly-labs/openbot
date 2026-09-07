@@ -6,7 +6,7 @@
 import { mkdir, mkdtemp, readdir, readFile, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { DiagnosticRecord } from "@openbot/logging";
+import { createOpenBotLogger, type DiagnosticRecord, setDiagnosticSink } from "@openbot/logging";
 import { describe, expect, it } from "vitest";
 import { appendTextLog, createDiagnosticsLog } from "./diagnostics-log";
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
@@ -119,15 +119,22 @@ describe("createDiagnosticsLog", () => {
   it("retains distinct failures and links their repeat counts", async () => {
     const directory = join(await temporaryLogsTree(), "diagnostics");
     const log = createDiagnosticsLog({ directory, now: () => 1000 });
-    for (const message of ["Window position failed", "Browser storage failed"]) {
-      log.append({ code: "log_error", area: "main", message });
-      log.append({ code: "log_error", area: "main", message });
+    const logger = createOpenBotLogger("main", () => undefined);
+    const prefix = `${"x".repeat(2100)} `;
+    const dispose = setDiagnosticSink((record) => log.append(record));
+    try {
+      for (const message of ["Window position failed", "Browser storage failed"]) {
+        logger.error(`${prefix}${message}`);
+        logger.error(`${prefix}${message}`);
+      }
+    } finally {
+      dispose();
     }
     await log.flush();
     const records = await readRecords(directory);
     expect(records.slice(0, 2).map((record) => record.message)).toEqual([
-      "Window position failed",
-      "Browser storage failed",
+      `${prefix}Window position failed`,
+      `${prefix}Browser storage failed`,
     ]);
     expect(records[2]).toMatchObject({
       area: "main",
@@ -201,17 +208,25 @@ describe("createDiagnosticsLog", () => {
     await mkdir(join(logs, "remote"), { recursive: true });
     const aged = join(logs, "remote", "sunshine.log");
     const orphan = join(logs, "remote", "sunshine.txt");
+    await mkdir(directory, { recursive: true });
+    const previousLog = join(directory, "diagnostics.log");
+    await writeFile(previousLog, '{"code":"old_failure"}\n');
     await writeFile(aged, "old\n");
     await writeFile(orphan, "orphan\n");
     const staleSeconds = (Date.now() - 30 * 24 * 60 * 60 * 1000) / 1_000;
     await utimes(aged, staleSeconds, staleSeconds);
+    await utimes(previousLog, staleSeconds, staleSeconds);
 
     const log = createDiagnosticsLog({ directory });
-    log.append({ code: "log_error" });
-    await log.flush();
     await log.prune();
 
     expect(await readdir(join(logs, "remote"))).toEqual([]);
+    expect(await readdir(directory)).toEqual([]);
+    log.append({ code: "log_error", message: "New startup failure" });
+    await log.flush();
     expect(await readdir(directory)).toEqual(["diagnostics.log"]);
+    expect(await readRecords(directory)).toEqual([
+      expect.objectContaining({ code: "log_error", message: "New startup failure" }),
+    ]);
   });
 });

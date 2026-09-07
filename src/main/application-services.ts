@@ -208,6 +208,8 @@ export async function createApplicationServices({
     homeDirectory: homedir(),
     userDataDirectory: app.getPath("userData"),
   });
+  // Cleanup must finish before the sink or any service can write a new failure.
+  await diagnosticsLog.prune();
   // Analytics is built hundreds of lines below, after the services whose
   // startup failures this exists to catch. The buffer is what carries a
   // failure across that gap; `reach: "local"` records stay out of it, because
@@ -224,7 +226,6 @@ export async function createApplicationServices({
     releaseDiagnosticSink();
     await diagnosticsLog.flush();
   });
-  void diagnosticsLog.prune();
   const computerUseMacSetupService = new ComputerUseMacSetupService({
     getIconDataUrl: async (path) => (await app.getFileIcon(path, { size: "normal" })).toDataURL(),
   });

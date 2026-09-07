@@ -12,12 +12,13 @@ export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "silent";
 const LEVEL_RANK: Record<LogLevel, number> = { trace: 10, debug: 20, info: 30, warn: 40, error: 50, silent: 60 };
 const LOG_LEVELS: LogLevel[] = ["trace", "debug", "info", "warn", "error", "silent"];
 const MAX_PARAM_LENGTH = 2_000;
+
+function redactedParam(param: LogValue): string {
+  return typeof param === "string" ? redactText(param) : (JSON.stringify(redactValue(param)) ?? String(param));
+}
+
 function formatParam(param: LogValue): string {
-  if (typeof param === "string") {
-    const redacted = redactText(param);
-    return redacted.length > MAX_PARAM_LENGTH ? `${redacted.slice(0, MAX_PARAM_LENGTH)}…` : redacted;
-  }
-  const serialized = JSON.stringify(redactValue(param)) ?? String(param);
+  const serialized = redactedParam(param);
   return serialized.length > MAX_PARAM_LENGTH ? `${serialized.slice(0, MAX_PARAM_LENGTH)}…` : serialized;
 }
 
@@ -89,7 +90,8 @@ export function createOpenBotLogger(prefix: string, sink?: (line: string) => voi
 // The line a reader would have seen, minus the timestamp and the prefix the
 // record already carries as fields.
 function summarize(message: LogValue | undefined, params: LogValue[]): Pick<DiagnosticRecord, "message"> {
-  const parts = [message, ...params].flatMap((part) => (part === undefined ? [] : [formatParam(part)]));
+  // The diagnostic writer hashes the complete redacted message before applying its byte limit.
+  const parts = [message, ...params].flatMap((part) => (part === undefined ? [] : [redactedParam(part)]));
   const text = parts.join(" ").trim();
   return text ? { message: text } : {};
 }
