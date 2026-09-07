@@ -3795,6 +3795,7 @@ button.chat-action-target:active,
 .image-generation-failure-mark > svg {
   width: var(--openbot-control-xl);
   height: var(--openbot-control-xl);
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .image-generation-glow {
