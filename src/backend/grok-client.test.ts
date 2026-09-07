@@ -66,19 +66,35 @@ describe.sequential("GrokAgentClient", () => {
           text: "The final answer.",
         }),
       ]);
-      // Every streamed segment must be classified before its first delta reaches a consumer.
+      // Observe the final answer before turn completion, including its first partial delta.
+      // This catches buffering the answer in thinking and promoting it only at end_turn.
       const phases = new Map<string, string>();
+      const texts = new Map<string, string>();
+      const streamedAnswer: string[] = [];
       for (const notification of notifications) {
+        if (notification.method === "turn/completed") break;
         const params = notification.params;
         if (!isDynamicRecord(params)) continue;
-        if (notification.method === "item/started" && isDynamicRecord(params.item)) {
+        if (
+          (notification.method === "item/started" || notification.method === "item/completed") &&
+          isDynamicRecord(params.item)
+        ) {
           const { id, phase } = params.item;
           if (typeof id === "string" && typeof phase === "string") phases.set(id, phase);
         }
         if (notification.method === "item/agentMessage/delta") {
-          expect(phases.get(String(params.itemId))).toBe("commentary");
+          const id = String(params.itemId);
+          const text = (texts.get(id) ?? "") + String(params.delta);
+          texts.set(id, text);
+          if (text.startsWith("The final ")) {
+            expect(phases.get(id)).toBe("final_answer");
+            // Earlier segments have already left chat when the answer starts streaming.
+            expect([...phases.values()].filter((phase) => phase === "final_answer")).toHaveLength(1);
+            streamedAnswer.push(text);
+          }
         }
       }
+      expect(streamedAnswer).toEqual(["The final ", "The final answer."]);
     },
   );
 

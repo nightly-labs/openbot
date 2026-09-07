@@ -465,7 +465,7 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
           params: {
             threadId: thread.id,
             turnId: turn.id,
-            item: { id: turn.itemId, type: "agentMessage", phase: "commentary" },
+            item: { id: turn.itemId, type: "agentMessage", phase: "final_answer" },
           },
         });
       }
@@ -532,8 +532,8 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
     }
   }
 
-  // ACP message chunks do not identify a final answer. Keep each segment in thinking until
-  // another model step establishes it as intermediate, or end_turn establishes it as final.
+  // ACP message chunks do not identify a final answer in advance. Stream each segment in chat,
+  // then move it into thinking if a later model step establishes it as intermediate.
   #completeMessage(thread: GrokThread, turn: GrokTurn, phase: "commentary" | "final_answer"): void {
     if (!turn.text) return;
     const item = { id: turn.itemId, type: "agentMessage", phase, text: turn.text } satisfies ThreadItem;
