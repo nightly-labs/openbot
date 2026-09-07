@@ -41,7 +41,7 @@ export function openBotRootHead() {
       { name: "description", content: OPENBOT_SITE_DESCRIPTION },
       { name: "application-name", content: "OpenBot" },
       { name: "color-scheme", content: "dark" },
-      { name: "theme-color", content: "#070707" },
+      { name: "theme-color", content: "#1a1a1a" },
     ],
     links: [
       { rel: "icon", href: "/favicon.ico", sizes: "any" },
