@@ -4,7 +4,7 @@ import { OPENBOT_DOWNLOAD_LINKS, OPENBOT_LINKS } from "./landing-links";
 
 export const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
-const ANALYTICS_SCHEMA_VERSION = 6;
+const ANALYTICS_SCHEMA_VERSION = 7;
 
 export type LandingAcquisitionSource = "direct" | "search" | "social" | "github" | "other";
 
@@ -93,8 +93,7 @@ export class LandingAnalytics {
     if (isLikelyAutomation(document.defaultView?.navigator)) return () => undefined;
     if (!this.#ensureClient(hostname)) return () => undefined;
     this.#client?.setGlobalProperties({
-      acquisition_source: landingAcquisitionSource(document),
-      __referrer: landingReferrer(document.referrer, hostname),
+      ...landingAttribution(document, hostname),
     });
     this.#screenView("/");
     this.#track("landing_viewed", {});
@@ -110,8 +109,7 @@ export class LandingAnalytics {
     if (isLikelyAutomation(document.defaultView?.navigator)) return () => undefined;
     if (!this.#ensureClient(hostname)) return () => undefined;
     this.#client?.setGlobalProperties({
-      acquisition_source: landingAcquisitionSource(document),
-      __referrer: landingReferrer(document.referrer, hostname),
+      ...landingAttribution(document, hostname),
     });
     this.#screenView("/join");
     this.#track("join_page_action", { action: "view", valid_invite: options.validInvite });
@@ -251,19 +249,43 @@ export function landingReferrer(referrer: string, hostname: string): string {
   }
 }
 
-export function landingAcquisitionSource(document: Document): LandingAcquisitionSource {
+const SOURCE_PLATFORMS = [
+  { platform: "instagram", category: "social", domains: ["instagram.com"], tags: ["instagram", "ig"] },
+  { platform: "twitter", category: "social", domains: ["twitter.com", "x.com", "t.co"], tags: ["twitter", "x"] },
+  { platform: "reddit", category: "social", domains: ["reddit.com", "redd.it"], tags: ["reddit"] },
+  { platform: "facebook", category: "social", domains: ["facebook.com", "fb.com"], tags: ["facebook", "fb"] },
+  { platform: "linkedin", category: "social", domains: ["linkedin.com", "lnkd.in"], tags: ["linkedin"] },
+  { platform: "discord", category: "social", domains: ["discord.com", "discord.gg"], tags: ["discord"] },
+  { platform: "tiktok", category: "social", domains: ["tiktok.com"], tags: ["tiktok"] },
+  { platform: "youtube", category: "social", domains: ["youtube.com", "youtu.be"], tags: ["youtube"] },
+  { platform: "github", category: "github", domains: ["github.com"], tags: ["github"] },
+  { platform: "google", category: "search", domains: ["google.com"], tags: ["google"] },
+  { platform: "bing", category: "search", domains: ["bing.com"], tags: ["bing"] },
+  { platform: "duckduckgo", category: "search", domains: ["duckduckgo.com"], tags: ["duckduckgo"] },
+  { platform: "brave", category: "search", domains: ["search.brave.com"], tags: ["brave"] },
+  { platform: "yahoo", category: "search", domains: ["yahoo.com"], tags: ["yahoo"] },
+] as const;
+
+export function landingAttribution(document: Document, hostname: string) {
+  const referrer = landingReferrer(document.referrer, hostname);
   let campaignSource = "";
   try {
-    campaignSource = new URL(document.location.href).searchParams.get("utm_source")?.toLowerCase() ?? "";
+    campaignSource = new URL(document.location.href).searchParams.get("utm_source")?.trim().toLowerCase() ?? "";
   } catch {
-    // Invalid locations are treated as direct traffic.
+    // Missing campaign data leaves only the referring domain.
   }
-  const referrer = document.referrer.toLowerCase();
-  const source = `${campaignSource} ${referrer}`;
-  if (/github/u.test(source)) return "github";
-  if (/(?:google|bing|duckduckgo|brave|yahoo)/u.test(source)) return "search";
-  if (/(?:twitter|x\.com|linkedin|facebook|instagram|t\.co|reddit|discord|social)/u.test(source)) return "social";
-  return source.trim() ? "other" : "direct";
+  const tagged = SOURCE_PLATFORMS.find((source) => source.tags.some((tag) => campaignSource === tag));
+  const domain = referrer ? new URL(referrer).hostname : "";
+  const referred = SOURCE_PLATFORMS.find((source) =>
+    source.domains.some((candidate) => domain === candidate || domain.endsWith(`.${candidate}`)),
+  );
+  const source = tagged ?? referred;
+  const category: LandingAcquisitionSource = source?.category ?? (campaignSource || referrer ? "other" : "direct");
+  return {
+    acquisition_source: category,
+    source_platform: source?.platform ?? "unknown",
+    __referrer: referrer,
+  };
 }
 
 function landingPlacement(link: HTMLAnchorElement): LandingPlacement {
