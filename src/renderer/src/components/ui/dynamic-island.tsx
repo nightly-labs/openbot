@@ -284,6 +284,18 @@ export function DynamicIsland(props: DynamicIslandProps): JSX.Element {
     state: viewState,
     renderedState: renderedPanelState,
   });
+  onSettled(() => {
+    const resetHover = () => {
+      // Focus can leave the native overlay without a pointer-leave event.
+      // A pending hover must not reopen it after the surface has collapsed.
+      clearHoverTimers();
+      pointerInside = false;
+      hoverOpenedState = null;
+      setIsHovering(false);
+    };
+    window.addEventListener("blur", resetHover);
+    return () => window.removeEventListener("blur", resetHover);
+  });
   onCleanup(() => {
     clearHoverTimers();
     if (panelExitTimer !== undefined) clearTimeout(panelExitTimer);
@@ -552,6 +564,9 @@ function createSmoothSizeResize(options: SmoothSizeResizeOptions): void {
     ({ enabled, target }) => {
       sharedLeadingEnabled = enabled;
       targetSharedLeading = target;
+      // A status can become idle while expanded. Give the transform back to
+      // CSS so the idle icon does not keep the status avatar's panel position.
+      if (!enabled) options.sharedLeading()?.style.removeProperty("transform");
     },
   );
   createEffect(
@@ -562,6 +577,7 @@ function createSmoothSizeResize(options: SmoothSizeResizeOptions): void {
     ({ enabled, target }) => {
       sharedTrailingEnabled = enabled;
       targetSharedTrailing = target;
+      if (!enabled) options.sharedTrailing()?.style.removeProperty("transform");
     },
   );
   function finishAnimation(current?: Animation[]): void {
