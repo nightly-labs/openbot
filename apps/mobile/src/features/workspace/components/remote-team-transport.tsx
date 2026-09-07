@@ -9,6 +9,7 @@ import {
 } from "@openbot/team-client/remote-peer";
 import * as Crypto from "expo-crypto";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 
 import RemoteTeamBridge from "./remote-team-bridge.dom";
 
@@ -32,6 +33,7 @@ type RemoteTeamCommandInput =
 
 export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeamTransportProps>(
   function RemoteTeamTransport({ active: foreground, directory, onConnectionUpdate, onTeamEvent }, ref) {
+    const { refreshProfile } = useMobileSession();
     const [commands, setCommands] = useState<RemoteTeamCommand[]>([]);
     const mailboxRef = useRef<ReturnType<typeof createRemoteCommandMailbox> | null>(null);
     if (!mailboxRef.current) mailboxRef.current = createRemoteCommandMailbox(setCommands);
@@ -106,6 +108,7 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
         endSession={(sessionId) => directory.endSession(sessionId)}
         getBootstrap={(hostId, clientPublicKey) => directory.createBootstrap(hostId, clientPublicKey)}
         onCommandResult={handleCommandResult}
+        onAccountProfileChanged={refreshProfile}
         onConnectionUpdate={async (update) => onConnectionUpdate(update)}
         onTeamEvent={async (hostId, event) => onTeamEvent(hostId, event)}
       />

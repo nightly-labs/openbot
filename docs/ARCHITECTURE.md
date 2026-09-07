@@ -161,6 +161,33 @@ Mobile acknowledges rendered replies only in the foreground, focused chat at the
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
 host's SQLite and emit the same invalidation. Older hosts disable only this optional action.
+Mobile Settings uses one native form sheet with stable detents and a nested Expo Router stack.
+Inner pages push within the sheet and use native back navigation; standalone forms remain
+fit-to-content sheets. Both reuse SheetScrollView. General, Profile, Connections and About use HeroUI typography and shared
+form fields; the appearance picker remains a native Expo UI control. Appearance is device-local in SecureStore;
+Uniwind, navigation and native form hosts share the selected light/dark/system theme. Profile
+changes and account-session management use the existing account endpoints, with profile writes
+conditional on the stored credential still matching the initiating session.
+The mobile client uses the same `/v1/me/profile`, `/v1/me/avatar` and
+`/v1/mobile-auth/devices?includeDesktop=true` endpoints as desktop; the last route's historical
+name does not restrict it to phones. Avatar uploads send validated binary bytes directly through
+Expo fetch, without constructing a React Native Blob from a typed array. Profile reads, writes and their UI-state application
+are serialized together. A read queued after an edit can apply a newer remote profile; a read
+before a later edit cannot overwrite that edit. Results apply only to the initiating login.
+Account-session queries are scoped to each login without including credentials in query keys,
+cancel when abandoned, and are removed on account transitions. An HTTP 401 clears only its
+initiating credential; transport failures retain the session for retry.
+Account profile writes enqueue an `account-profile-changed` invalidation in the existing signed
+account-to-Signal outbox before returning. Worker `waitUntil` delivers notifications outside the
+profile-save response path, with a five-second timeout per request and outbox retries. Signal forwards the optional frame only to authenticated sockets for that
+user; the frame contains no profile or credential. Desktop and mobile fetch the profile through
+the account API on notification, foreground entry, or Signal reconnection, with no periodic polling.
+Older Signal clients ignore this optional event. API and Signal both need the event support for push;
+foreground refresh remains the fallback when Signal is unavailable. Unchanged responses do not
+publish a new identity. Desktop ignores reads overtaken by a local edit, sign-out or shutdown;
+its central-auth change event updates the renderer and host identity. The mobile drawer and Settings
+both display the session's name and resolve avatar paths against its account API.
+
 Mobile hidden/pinned chat preferences are device-local, persisted in SecureStore per account API,
 account ID and host ID; they are not part of the shared sidebar layout or conversation read state.
 Account/device and logical remote sessions deliberately have no time-based expiration; a finite

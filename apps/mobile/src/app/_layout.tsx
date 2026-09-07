@@ -6,13 +6,14 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-naviga
 import { Stack } from "expo-router/stack";
 import { StatusBar } from "expo-status-bar";
 import { HeroUINativeProvider } from "heroui-native/provider";
-import { useLayoutEffect } from "react";
-import { useColorScheme, View } from "react-native";
+import { useEffect, useLayoutEffect } from "react";
+import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
-import { withUniwind } from "uniwind";
+import { useUniwind, withUniwind } from "uniwind";
 
 import { MobileSessionProvider, useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { loadAppearance } from "@/features/settings/model/appearance";
 import { AppLoadingOverlayProvider, useAppLoadingOverlay } from "@/shared/components/app-loading-overlay";
 import { BloubAnimationProvider } from "@/shared/components/bloub-loader";
 import { isIOS } from "@/shared/lib/platform";
@@ -59,7 +60,10 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const { theme: colorScheme } = useUniwind();
+  useEffect(() => {
+    void loadAppearance().catch(() => undefined);
+  }, []);
 
   return (
     <UniwindGestureHandlerRootView className="flex-1">
@@ -67,7 +71,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <HeroUINativeProvider>
             <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-              <StatusBar style="auto" />
+              <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
               <BloubAnimationProvider>
                 <MobileSessionProvider>
                   <AppLoadingOverlayProvider>

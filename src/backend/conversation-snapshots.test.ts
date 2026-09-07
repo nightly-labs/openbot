@@ -1,8 +1,36 @@
 import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
-import { mergeProviderHistory } from "./conversation-snapshots";
+import { mergeProviderHistory, snapshotFromThread } from "./conversation-snapshots";
+
+import { decodeThreadResponse } from "./protocol";
 
 describe("provider conversation history", () => {
+  it("restores Codex reasoning as thinking while keeping the answer separate", () => {
+    const decoded = decodeThreadResponse({
+      thread: {
+        id: "thread-1",
+        turns: [
+          {
+            id: "turn-1",
+            status: "completed",
+            items: [
+              {
+                id: "reasoning-1",
+                type: "reasoning",
+                summary: ["First step.", "Second step."],
+                content: ["Raw content."],
+              },
+              { id: "answer-1", type: "agentMessage", phase: "final_answer", text: "Done." },
+            ],
+          },
+        ],
+      },
+    });
+    expect(snapshotFromThread("chief", decoded.thread, () => null).messages).toEqual([
+      expect.objectContaining({ id: "reasoning-1", itemType: "commentary", text: "First step.\n\nSecond step." }),
+      expect.objectContaining({ id: "answer-1", itemType: "final_answer", text: "Done." }),
+    ]);
+  });
   it("replaces provisional assistant IDs with canonical provider IDs", () => {
     const stored = snapshot([
       message("user-1", "user", "Plan the follow-ups"),

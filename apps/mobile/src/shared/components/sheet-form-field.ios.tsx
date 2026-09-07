@@ -1,5 +1,6 @@
 import { Host, TextInput } from "@expo/ui";
 import { useNativeState } from "@expo/ui/swift-ui";
+import { accessibilityLabel } from "@expo/ui/swift-ui/modifiers";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { useEffect } from "react";
@@ -12,12 +13,15 @@ export function SheetFormField({
   autoCorrect,
   autoFocus,
   editable,
-  multiline = false,
   hint,
   inputMode,
   isRequired = false,
   label,
   maxLength,
+  multiline = false,
+  appearance = "default",
+  hideLabel = false,
+  textAlign,
   onChangeText,
   onSubmitEditing,
   placeholder,
@@ -29,32 +33,37 @@ export function SheetFormField({
   useEffect(() => {
     nativeValue.set(value);
   }, [nativeValue, value]);
-  const height = multiline ? 144 : 54;
+  const height = multiline ? 108 : 54;
 
   return (
     <View className="gap-2">
-      <Typography type="body-sm" weight="semibold">
-        {label}
-        {isRequired ? " *" : ""}
-      </Typography>
+      {!hideLabel && (
+        <Typography type="body-sm" weight="semibold">
+          {label}
+          {isRequired ? " *" : ""}
+        </Typography>
+      )}
       <View
         style={{
           backgroundColor: surface,
           borderColor: border,
           borderCurve: "continuous",
           borderRadius: 16,
-          borderWidth: 1,
+          borderWidth: appearance === "soft" ? 0 : 1,
           height,
           overflow: "hidden",
         }}
       >
         <Host ignoreSafeArea="all" style={{ height }}>
           <TextInput
+            modifiers={[accessibilityLabel(label)]}
+            multiline={multiline}
+            numberOfLines={multiline ? 4 : 1}
+            textAlign={textAlign}
             autoCapitalize={autoCapitalize}
             autoCorrect={autoCorrect}
             autoFocus={autoFocus}
             editable={editable}
-            multiline={multiline}
             inputMode={inputMode}
             maxLength={maxLength}
             placeholder={placeholder}

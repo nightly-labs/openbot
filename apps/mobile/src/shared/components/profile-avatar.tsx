@@ -2,15 +2,19 @@ import { Image } from "expo-image";
 import { Typography } from "heroui-native";
 import { useState } from "react";
 import { View } from "react-native";
+import { useCSSVariable } from "uniwind";
 
 interface ProfileAvatarProps {
   name: string;
   imageUrl?: string | null;
   accent?: string;
   size?: number;
+  neutral?: boolean;
 }
 
-export function ProfileAvatar({ name, imageUrl, accent = "#cdadec", size = 48 }: ProfileAvatarProps) {
+export function ProfileAvatar({ name, imageUrl, accent = "#cdadec", size = 48, neutral = false }: ProfileAvatarProps) {
+  const neutralBackground = String(useCSSVariable("--openbot-border-grouped"));
+  const neutralForeground = String(useCSSVariable("--openbot-text-grouped-secondary"));
   const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
   const imageFailed = imageUrl === failedImageUrl;
 
@@ -25,9 +29,9 @@ export function ProfileAvatar({ name, imageUrl, accent = "#cdadec", size = 48 }:
     <View
       className="items-center justify-center overflow-hidden"
       style={{
-        backgroundColor: accent,
+        backgroundColor: neutral ? neutralBackground : accent,
         borderCurve: "continuous",
-        borderRadius: size * 0.32,
+        borderRadius: neutral ? size / 2 : size * 0.32,
         height: size,
         width: size,
       }}
@@ -36,7 +40,11 @@ export function ProfileAvatar({ name, imageUrl, accent = "#cdadec", size = 48 }:
     >
       <Typography
         weight="semibold"
-        style={{ fontSize: Math.max(12, size * 0.3), lineHeight: size * 0.4 }}
+        style={{
+          fontSize: Math.max(12, size * 0.3),
+          lineHeight: size * 0.4,
+          ...(neutral ? { color: neutralForeground } : {}),
+        }}
         className="text-[#100d12]"
       >
         {initials || "O"}

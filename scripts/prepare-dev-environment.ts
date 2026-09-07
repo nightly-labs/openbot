@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { type DevelopmentEnvOutcome, ensureDevelopmentEnvFile } from "./development-secrets";
 
 const scriptsRoot = dirname(fileURLToPath(import.meta.url));
 export const developmentProjectRoot = dirname(scriptsRoot);
@@ -16,10 +16,12 @@ export const supportedBunVersion = "1.4.0";
 
 export function prepareDevelopmentEnvironment(
   input: { projectRoot?: string; executable?: string; bunVersion?: string; run?: DevelopmentCommandRunner } = {},
-): void {
+): DevelopmentEnvOutcome {
   const projectRoot = input.projectRoot ?? developmentProjectRoot;
   assertSupportedBunVersion(input.bunVersion ?? process.versions.bun ?? "unknown");
-  assertDevelopmentSecrets(projectRoot);
+  // Before `bun install`, because a fresh clone has no `.env.dev` and both dev services load one.
+  // Only `.env.production` is still encrypted, so a fork needs no `.env.keys` to reach this point.
+  const envFile = ensureDevelopmentEnvFile(projectRoot);
 
   const executable = input.executable ?? process.execPath;
   const run = input.run ?? execDevelopmentCommand;
@@ -27,6 +29,7 @@ export function prepareDevelopmentEnvironment(
 
   run(executable, ["install", "--frozen-lockfile"], options);
   run(executable, ["run", "api:migrate:local"], options);
+  return envFile;
 }
 
 export function assertSupportedBunVersion(version: string): void {
@@ -37,25 +40,14 @@ export function assertSupportedBunVersion(version: string): void {
   );
 }
 
-export function assertDevelopmentSecrets(projectRoot: string): void {
-  const keyPath = join(projectRoot, ".env.keys");
-  let hasKeys = false;
-  try {
-    hasKeys = statSync(keyPath).isFile() && statSync(keyPath).size > 0;
-  } catch {
-    // The actionable error below is the same for a missing or unreadable key file.
-  }
-  if (!hasKeys) {
-    throw new Error(
-      "Missing or empty .env.keys. Add it to the local checkout so Codex can copy it through .worktreeinclude.",
-    );
-  }
-}
-
 function execDevelopmentCommand(executable: string, args: string[], options: { cwd: string; stdio: "inherit" }): void {
   execFileSync(executable, args, options);
 }
 
 if (import.meta.main) {
-  prepareDevelopmentEnvironment();
+  // Generating secrets without saying so leaves a contributor guessing where the file came from.
+  // stdout rather than a logger, because this runs before `bun install` on a fresh clone.
+  if (prepareDevelopmentEnvironment() === "created") {
+    process.stdout.write("Generated apps/auth-api/.env.dev for local development.\n");
+  }
 }

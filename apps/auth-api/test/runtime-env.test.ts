@@ -20,6 +20,24 @@ describe("local auth runtime variables", () => {
     });
   });
 
+  it("copies blank SMTP variables so local development can turn delivery off", () => {
+    expect(
+      readLocalRuntimeVars({
+        EMAIL_SMTP_HOST: "",
+        EMAIL_SMTP_PORT: "",
+        EMAIL_SMTP_USERNAME: "",
+        EMAIL_FROM: "",
+        EMAIL_SMTP_PASSWORD: "",
+      }),
+    ).toEqual({
+      EMAIL_SMTP_HOST: "",
+      EMAIL_SMTP_PORT: "",
+      EMAIL_SMTP_USERNAME: "",
+      EMAIL_FROM: "",
+      EMAIL_SMTP_PASSWORD: "",
+    });
+  });
+
   it("does not copy unrelated process variables", () => {
     expect(readLocalRuntimeVars({ OTHER_SECRET: "do-not-copy" })).toEqual({});
   });

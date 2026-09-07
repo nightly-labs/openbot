@@ -305,7 +305,9 @@ describe("email one-time codes", () => {
   it("signs in once and stores an OpenBot session", async () => {
     const repository = new MemoryAuthRepository();
     let deliveredCode = "";
+    const profileChanged = vi.fn(async (_userId: string) => undefined);
     const service = new AuthService({
+      profileChanged,
       repository,
       delivery: {
         async send(message) {
@@ -331,6 +333,15 @@ describe("email one-time codes", () => {
     await expect(service.updateName(session.sessionToken, "  No\u0308rbert\u00a0\u00a0Bot  ")).resolves.toMatchObject({
       name: "Nörbert Bot",
     });
+    expect(profileChanged).toHaveBeenLastCalledWith(session.user.id);
+    profileChanged.mockClear();
+    await service.updateName(session.sessionToken, "Nörbert Bot");
+    expect(profileChanged).not.toHaveBeenCalled();
+    profileChanged.mockRejectedValueOnce(new Error("Signal unavailable"));
+    await expect(service.updateName(session.sessionToken, "Saved despite Signal")).resolves.toMatchObject({
+      name: "Saved despite Signal",
+    });
+    await service.updateName(session.sessionToken, "Nörbert Bot");
     await expect(service.updateName(session.sessionToken, "   ")).rejects.toMatchObject({
       status: 400,
       code: "invalid_profile_name",
@@ -402,6 +413,36 @@ describe("email one-time codes", () => {
       { name: "Norbert’s iPhone", platform: "ios", connectedAt: 1_000 },
     ]);
     expect(await service.redeemMobileAuthTicket(mobileTicket.ticket, device, "203.0.113.5")).toBeNull();
+    const mobileToken = mobileSession?.sessionToken ?? "missing";
+    await expect(service.updateName(mobileToken, "Mobile name")).resolves.toMatchObject({ name: "Mobile name" });
+    await expect(service.authenticateDesktopSession(session.sessionToken)).resolves.toMatchObject({
+      name: "Mobile name",
+    });
+    await service.updateName(mobileToken, "Nörbert Bot");
+    await expect(service.updateAvatar(mobileToken, "/v1/avatars/user?v=mobile", null)).resolves.toMatchObject({
+      avatarUrl: "/v1/avatars/user?v=mobile",
+    });
+    await expect(service.updateAvatar(mobileToken, null, "/v1/avatars/user?v=mobile")).resolves.toMatchObject({
+      avatarUrl: null,
+    });
+    const accountSessions = await service.listAccountSessions(mobileToken);
+    expect(accountSessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "mobile", current: true, name: device.name }),
+        expect.objectContaining({ kind: "desktop", current: false }),
+      ]),
+    );
+    const tabletTicket = await service.issueMobileAuthTicket(session.sessionToken, "203.0.113.4");
+    const tablet = await service.redeemMobileAuthTicket(
+      tabletTicket.ticket,
+      { ...device, id: "22222222-2222-4222-8222-222222222222", name: "Tablet" },
+      "203.0.113.5",
+    );
+    const tabletDevice = (await service.listAccountSessions(mobileToken)).find((item) => item.name === "Tablet");
+    expect(tabletDevice).toBeDefined();
+    await service.revokeAccountSession(mobileToken, tabletDevice?.sessionId ?? "missing");
+    expect(await service.authenticateMobileSession(tablet?.sessionToken ?? "missing")).toBeNull();
+    expect(await service.authenticateMobileSession(mobileToken)).toMatchObject({ id: session.user.id });
     const connectedDevice = (await service.listMobileAuthDevices(session.sessionToken))[0];
     expect(connectedDevice).toBeDefined();
     await service.revokeMobileAuthDevice(session.sessionToken, connectedDevice?.sessionId ?? "missing");

@@ -5,12 +5,15 @@ export interface SheetFormFieldProps {
   autoCorrect?: boolean;
   autoFocus?: boolean;
   editable?: boolean;
-  multiline?: boolean;
   hint?: string;
   inputMode?: TextInputProps["inputMode"];
   isRequired?: boolean;
   label: string;
   maxLength?: number;
+  multiline?: boolean;
+  appearance?: "default" | "soft";
+  hideLabel?: boolean;
+  textAlign?: TextInputProps["textAlign"];
   onChangeText: (value: string) => void;
   onSubmitEditing?: () => void;
   placeholder?: string;

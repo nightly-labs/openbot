@@ -1,9 +1,11 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import type { AvatarHue } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useState } from "react";
-import { View } from "react-native";
+
+import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
@@ -12,10 +14,11 @@ export function AddAgentScreen() {
   const { createAgent } = useMobileWorkspace();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [initialMessage, setInitialMessage] = useState("");
+  const [avatarSeed, setAvatarSeed] = useState(() => `mobile:${Crypto.randomUUID().replaceAll("-", "")}`);
+  const [avatarHue, setAvatarHue] = useState<AvatarHue | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const valid = name.trim().length > 0 && description.trim().length > 0 && initialMessage.trim().length > 0;
+  const valid = name.trim().length > 0 && description.trim().length > 0;
 
   async function submit(): Promise<void> {
     if (!valid || saving) return;
@@ -25,9 +28,9 @@ export function AddAgentScreen() {
       await createAgent({
         name: name.trim(),
         description: description.trim(),
-        initialMessage: initialMessage.trim(),
-        avatarSeed: `mobile:${Crypto.randomUUID().replaceAll("-", "")}`,
-        avatarHue: null,
+        initialMessage: `Your ongoing role is: ${description.trim()}`,
+        avatarSeed,
+        avatarHue,
       });
       router.back();
     } catch (cause) {
@@ -38,41 +41,42 @@ export function AddAgentScreen() {
 
   return (
     <SheetScrollView
-      className="bg-background"
+      className="bg-sheet"
       contentContainerClassName="gap-5 px-5 pb-safe-offset-5 pt-5"
       contentInsetAdjustmentBehavior="automatic"
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
     >
-      <View className="gap-1">
-        <Typography.Heading type="h4">Create an agent</Typography.Heading>
-        <Typography.Paragraph className="text-text-secondary">
-          It will be created on the selected OpenBot server and appear on every connected device.
-        </Typography.Paragraph>
-      </View>
+      <AgentAppearancePicker
+        seed={avatarSeed}
+        hue={avatarHue}
+        name={name}
+        nameField={
+          <SheetFormField
+            autoCapitalize="words"
+            label="Name"
+            hideLabel
+            appearance="soft"
+            textAlign="center"
+            maxLength={INPUT_LIMITS.agentName}
+            placeholder="Name your agent"
+            value={name}
+            onChangeText={setName}
+          />
+        }
+        disabled={saving}
+        onSeedChange={setAvatarSeed}
+        onHueChange={setAvatarHue}
+      />
 
       <SheetFormField
-        autoCapitalize="words"
-        autoFocus
-        label="Name"
-        maxLength={INPUT_LIMITS.agentName}
-        placeholder="Research partner"
-        value={name}
-        onChangeText={setName}
-      />
-      <SheetFormField
-        label="Instructions"
+        label="What should this agent help with?"
+        appearance="soft"
+        multiline
         maxLength={INPUT_LIMITS.agentDescription}
-        placeholder="What should this agent be good at?"
+        placeholder="Plan trips, compare options, or help with everyday work."
         value={description}
         onChangeText={setDescription}
-      />
-      <SheetFormField
-        label="First task"
-        maxLength={4_000}
-        placeholder="Tell the agent what to work on first"
-        value={initialMessage}
-        onChangeText={setInitialMessage}
       />
 
       {error ? (

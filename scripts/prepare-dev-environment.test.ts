@@ -1,9 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  assertDevelopmentSecrets,
   assertSupportedBunVersion,
   type DevelopmentCommandRunner,
   prepareDevelopmentEnvironment,
@@ -24,15 +23,20 @@ describe("development environment preparation", () => {
     expect(() => assertSupportedBunVersion(version)).toThrow("OpenBot development requires stable Bun 1.4.0");
   });
 
-  it("fails with an actionable error when worktree secrets were not copied", () => {
+  it("generates the development env file before running any command", () => {
     const root = createTemporaryRoot();
+    const envFilePresent: boolean[] = [];
+    const run: DevelopmentCommandRunner = () =>
+      envFilePresent.push(existsSync(join(root, "apps", "auth-api", ".env.dev")));
 
-    expect(() => assertDevelopmentSecrets(root)).toThrow("Missing or empty .env.keys");
+    const outcome = prepareDevelopmentEnvironment({ projectRoot: root, executable: "bun", bunVersion: "1.4.0", run });
+
+    expect(envFilePresent).toEqual([true, true]);
+    expect(outcome).toBe("created");
   });
 
   it("installs dependencies and migrates the local API in order", () => {
     const root = createTemporaryRoot();
-    writeFileSync(join(root, ".env.keys"), "DOTENV_PRIVATE_KEY_TEST=value\n");
     const calls: string[][] = [];
     const run: DevelopmentCommandRunner = (_executable, args) => calls.push(args);
 
@@ -48,5 +52,6 @@ describe("development environment preparation", () => {
 function createTemporaryRoot(): string {
   const root = mkdtempSync(join(tmpdir(), "openbot-dev-prepare-"));
   temporaryRoots.push(root);
+  mkdirSync(join(root, "apps", "auth-api"), { recursive: true });
   return root;
 }

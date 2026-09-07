@@ -7,6 +7,7 @@ import type { CanUseTool, ModelInfo, SDKUserMessage, SessionMessage } from "@ant
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClaudeAgentClient } from "./claude-client";
+import { OPENBOT_DYNAMIC_TOOLS } from "./openbot-tools";
 import {
   decodeAccountRateLimitsReadResult,
   decodeAccountReadResult,
@@ -202,29 +203,16 @@ fi
       const openbotServer = mcpServers?.openbot;
       const serverInstance = isDynamicRecord(openbotServer) ? openbotServer.instance : null;
       const registeredTools = isDynamicRecord(serverInstance) ? serverInstance._registeredTools : null;
-      expect(isDynamicRecord(registeredTools) ? Object.keys(registeredTools) : []).toEqual(
-        expect.arrayContaining([
-          "attach_files_to_response",
-          "create_agent",
-          "list_sections",
-          "create_section",
-          "rename_section",
-          "delete_section",
-          "assign_agent_section",
-          "update_profile",
-          "remember",
-          "forget_memory",
-          "list_routines",
-          "create_routine",
-          "update_routine",
-          "delete_routine",
-          "test_routine",
-          "react_to_user_message",
-          "list_sites",
-          "publish_site",
-          "replace_site",
-          "delete_site",
-        ]),
+      // Codex and Grok read OPENBOT_DYNAMIC_TOOLS; Claude gets this hand-written MCP mirror, so the
+      // two lists drift unless the mirror is held to the catalogue. Set equality, not arrayContaining:
+      // a tool missing here is one the developer instructions promise and Claude cannot call, and a
+      // Claude-only tool is one no other provider or handler knows about.
+      const claudeOnlySdkTools = new Set(["ask_user"]); // Claude uses the SDK's AskUserQuestion instead.
+      const expectedTools = OPENBOT_DYNAMIC_TOOLS.tools
+        .map((dynamicTool) => dynamicTool.name)
+        .filter((name) => !claudeOnlySdkTools.has(name));
+      expect((isDynamicRecord(registeredTools) ? Object.keys(registeredTools) : []).toSorted()).toEqual(
+        expectedTools.toSorted(),
       );
       return generator;
     });

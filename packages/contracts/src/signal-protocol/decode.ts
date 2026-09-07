@@ -21,6 +21,8 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
   const version = SIGNAL_PROTOCOL_VERSION;
   const kind = value.type;
   switch (kind) {
+    case "account-profile-changed":
+      return { type: kind, version };
     case "ready":
       return {
         type: kind,

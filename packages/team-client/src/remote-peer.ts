@@ -95,6 +95,7 @@ export interface RemoteTeamConnectionUpdate {
 }
 
 export interface RemoteTeamPeerActions {
+  onAccountProfileChanged?: () => Promise<void>;
   getBootstrap: (hostId: string, clientPublicKey: string) => Promise<RemoteTeamBootstrapPayload>;
   endSession: (sessionId: string) => Promise<void>;
   onConnectionUpdate: (update: RemoteTeamConnectionUpdate) => Promise<void>;
@@ -293,6 +294,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
   function openSignal(state: PeerState, actions: ActionsRef): void {
     if (!active || state.closed || peer !== state || state.socket) return;
     const socket = new WebSocket(state.signalUrl);
+    let accountRefreshed = false;
     state.socket = socket;
     socket.onopen = () => {
       if (state.closed || peer !== state || state.socket !== socket) return;
@@ -322,6 +324,10 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
             return failPeer(state, error, actions, "protocol_error");
           }
           // A frame type this build does not know is a newer Signal service, not a broken connection.
+          if (message?.type === "ready" && !accountRefreshed) {
+            accountRefreshed = true;
+            void actions.current.onAccountProfileChanged?.().catch(() => undefined);
+          }
           if (message) await handleSignal(state, message, actions);
         })
         // Only what handling a frame this peer did read can throw -- an ICE or SDP operation the
@@ -339,6 +345,11 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
 
   async function handleSignal(state: PeerState, message: SignalServerMessage, actions: ActionsRef): Promise<void> {
     if (state.closed || peer !== state) return;
+    if (message.type === "account-profile-changed") {
+      // Profile refresh failure must never break the RTC connection.
+      void actions.current.onAccountProfileChanged?.().catch(() => undefined);
+      return;
+    }
     if (message.type === "error") throw new Error(message.message);
     if (message.type === "ready") {
       state.resumeToken = message.resumeToken;
