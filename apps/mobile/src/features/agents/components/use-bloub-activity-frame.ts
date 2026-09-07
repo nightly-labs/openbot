@@ -7,12 +7,12 @@ import { scheduleOnRN } from "react-native-worklets";
 
 import {
   type BloubActivityFrame,
-  bloubActivityFrames,
   bloubActivityGeometry,
   cycleEngine,
   FPS,
   FRAME_COUNT,
   nativeFrame,
+  prepareBloubActivityFrames,
   SETTLE,
 } from "../model/bloub-activity";
 
@@ -66,9 +66,12 @@ export function useBloubActivityFrame(seed: string, working: boolean) {
       playback.set({ frames: [rest], index: 0, loopStart: null });
     } else if (working) {
       // Reuse sampled paths across the header, activity row, and later working turns.
-      const frames = bloubActivityFrames(geometry);
-      playback.set({ frames, index: 0, loopStart: FRAME_COUNT });
-      setPlaying(true);
+      setPlaying(false);
+      playback.set({ frames: [rest], index: 0, loopStart: null });
+      return prepareBloubActivityFrames(geometry, (frames) => {
+        playback.set({ frames, index: 0, loopStart: FRAME_COUNT });
+        setPlaying(true);
+      });
     } else {
       const current = playback.get();
       if (current.loopStart === null) {

@@ -1,6 +1,11 @@
 import { BotEngine } from "@norbert_bodziony/bloub";
 import { describe, expect, it, vi } from "vitest";
-import { bloubActivityFrames, bloubActivityGeometry } from "../apps/mobile/src/features/agents/model/bloub-activity";
+import {
+  type BloubActivityFrame,
+  bloubActivityGeometry,
+  FRAME_COUNT,
+  prepareBloubActivityFrames,
+} from "../apps/mobile/src/features/agents/model/bloub-activity";
 import {
   type LoaderFrame,
   prepareLoaderFrames,
@@ -102,25 +107,100 @@ describe("loader frame preparation", () => {
   });
 });
 
-it("reuses sampled SVG data for separate presentations with the same avatar geometry", () => {
-  const header = bloubActivityFrames(bloubActivityGeometry("agent-test"));
-  const activity = bloubActivityFrames(bloubActivityGeometry("agent-test"));
-  expect(activity).toBe(header);
+function preparedActivity(geometry: ReturnType<typeof bloubActivityGeometry>) {
+  const idle = idleQueue();
+  let ready: BloubActivityFrame[] = [];
+  prepareBloubActivityFrames(
+    geometry,
+    (frames) => {
+      ready = frames;
+    },
+    idle.schedule,
+  );
+  while (idle.next()) {
+    /* Finish preparation. */
+  }
+  return ready;
+}
+
+it("shares pending avatar preparation without blocking activity startup or any idle batch", () => {
+  const geometry = bloubActivityGeometry("agent-test");
+  const idle = idleQueue();
+  const sample = vi.spyOn(BotEngine.prototype, "sample");
+  let header: BloubActivityFrame[] | undefined;
+  let activity: BloubActivityFrame[] | undefined;
+  try {
+    prepareBloubActivityFrames(
+      geometry,
+      (frames) => {
+        header = frames;
+      },
+      idle.schedule,
+    );
+    prepareBloubActivityFrames(
+      geometry,
+      (frames) => {
+        activity = frames;
+      },
+      idle.schedule,
+    );
+    expect(sample).not.toHaveBeenCalled();
+    expect(header).toBeUndefined();
+    let sampled = 0;
+    while (idle.next()) {
+      expect(sample.mock.calls.length).toBeLessThanOrEqual(4);
+      sampled += sample.mock.calls.length;
+      sample.mockClear();
+    }
+    expect(sampled).toBe(FRAME_COUNT * 2);
+    expect(header).toHaveLength(FRAME_COUNT * 2);
+    expect(activity).toBe(header);
+    expect(preparedActivity(geometry)).toBe(header);
+    expect(sample).not.toHaveBeenCalled();
+  } finally {
+    sample.mockRestore();
+  }
+});
+
+it("cancels abandoned avatar work while keeping preparation for remaining players", () => {
+  const geometry = bloubActivityGeometry("cancel-activity");
+  const idle = idleQueue();
+  const header = vi.fn();
+  const activity = vi.fn();
+  const cancelHeader = prepareBloubActivityFrames(geometry, header, idle.schedule);
+  const cancelActivity = prepareBloubActivityFrames(geometry, activity, idle.schedule);
+  idle.next();
+  cancelHeader();
+  expect(idle.next()).toBe(true);
+  cancelActivity();
+  expect(idle.next()).toBe(false);
+  expect(header).not.toHaveBeenCalled();
+  expect(activity).not.toHaveBeenCalled();
+
+  const cancelStale = prepareBloubActivityFrames(geometry, header, idle.schedule);
+  prepareBloubActivityFrames(geometry, activity, idle.schedule);
+  cancelStale();
+  while (idle.next()) {
+    /* The remaining player still needs its sequence. */
+  }
+  expect(header).not.toHaveBeenCalled();
+  expect(activity).toHaveBeenCalledOnce();
+  expect(activity.mock.calls[0][0]).toHaveLength(FRAME_COUNT * 2);
 });
 
 describe("activity sequence eviction", () => {
   it("keeps an existing player's frames valid when unused cached geometry is evicted", () => {
     const geometry = bloubActivityGeometry("eviction-test");
-    const mounted = bloubActivityFrames(geometry);
+    const mounted = preparedActivity(geometry);
     const firstPath = mounted[0].body.d;
     const geometries = new Map([[geometry.key, geometry]]);
     for (let index = 0; geometries.size < 10; index += 1) {
       const next = bloubActivityGeometry(`geometry-${index}`);
       if (geometries.has(next.key)) continue;
       geometries.set(next.key, next);
-      bloubActivityFrames(next);
+      preparedActivity(next);
     }
-    const remounted = bloubActivityFrames(geometry);
+    const remounted = preparedActivity(geometry);
     expect(remounted).not.toBe(mounted);
     expect(mounted[0].body.d).toBe(firstPath);
     expect(remounted).toEqual(mounted);
