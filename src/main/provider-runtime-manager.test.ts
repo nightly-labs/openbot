@@ -20,7 +20,7 @@ afterEach(async () => {
 describe("ProviderRuntimeManager", () => {
   it("streams a verified runtime and reports monotonic progress", async () => {
     const root = await temporaryRoot();
-    const executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.5\n${"# runtime\n".repeat(2_000)}`);
+    const executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.22\n${"# runtime\n".repeat(2_000)}`);
     const license = new TextEncoder().encode("license\n");
     const notices = new TextEncoder().encode("notices\n");
     const lock = parseAgentRuntimeLock(structuredClone(lockValue));
@@ -53,7 +53,7 @@ describe("ProviderRuntimeManager", () => {
     expect(accepted.providers.grok.phase).toBe("downloading");
     const snapshot = await finished;
 
-    expect(snapshot.providers.grok).toMatchObject({ phase: "ready", version: "1.0.5" });
+    expect(snapshot.providers.grok).toMatchObject({ phase: "ready", version: "1.0.22" });
     expect(progress.length).toBeGreaterThan(2);
     expect(progress.every((value, index) => index === 0 || value >= (progress[index - 1] ?? 0))).toBe(true);
     const installed = manager.executablePath("grok");
@@ -85,13 +85,13 @@ describe("ProviderRuntimeManager", () => {
     expect(snapshot.providers.claude.phase).toBe("not-downloaded");
     expect(snapshot.providers.codex.phase).toBe("downloading");
     expect(snapshot.providers.grok.phase).toBe("downloading");
-    await expect(access(join(root, ".downloads", "claude-darwin-arm64-2.1.246.partial"))).rejects.toThrow();
+    await expect(access(join(root, ".downloads", "claude-darwin-arm64-2.1.263.partial"))).rejects.toThrow();
     await manager.stop();
   });
 
   it("restarts a partial transfer when the vendor ETag changes", async () => {
     const root = await temporaryRoot();
-    const executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.5\n${"# runtime\n".repeat(1_000)}`);
+    const executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.22\n${"# runtime\n".repeat(1_000)}`);
     const license = new TextEncoder().encode("license\n");
     const notices = new TextEncoder().encode("notices\n");
     const lock = parseAgentRuntimeLock(structuredClone(lockValue));
@@ -349,7 +349,7 @@ function grokFixture(): {
   notices: Uint8Array;
   lock: ReturnType<typeof parseAgentRuntimeLock>;
 } {
-  const executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.5\n${"# runtime\n".repeat(1_000)}`);
+  const executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.22\n${"# runtime\n".repeat(1_000)}`);
   const license = new TextEncoder().encode("license\n");
   const notices = new TextEncoder().encode("notices\n");
   const lock = parseAgentRuntimeLock(structuredClone(lockValue));

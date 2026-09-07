@@ -19,7 +19,7 @@ describe.runIf(process.platform !== "win32")("bundled Grok installer", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-grok-runtime-test-"));
     temporaryPaths.push(root);
     const output = join(root, "output");
-    const executable = Buffer.from("#!/bin/sh\nprintf 'grok 1.0.5\\n'\n");
+    const executable = Buffer.from("#!/bin/sh\nprintf 'grok 1.0.22\\n'\n");
     const license = Buffer.from("Apache license fixture\n");
     const notices = Buffer.from("Third-party notices fixture\n");
     const lock = structuredClone(await loadAgentRuntimeLock());
@@ -42,7 +42,7 @@ describe.runIf(process.platform !== "win32")("bundled Grok installer", () => {
     await expect(installGrokRuntime({ outputRoot: output, target: "darwin-arm64", fetchImpl, lock })).resolves.toBe(
       "current",
     );
-    await expect(readFile(join(output, "mac/arm64/grok-package.json"), "utf8")).resolves.toContain('"1.0.5"');
+    await expect(readFile(join(output, "mac/arm64/grok-package.json"), "utf8")).resolves.toContain('"1.0.22"');
     await expect(readFile(join(output, "licenses/Grok-CLI-LICENSE"), "utf8")).resolves.toBe(license.toString());
     await chmod(join(output, "mac/arm64/bin/grok"), 0o755);
   });

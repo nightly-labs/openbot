@@ -1,7 +1,7 @@
 {
   "name": "openbot",
   "productName": "OpenBot",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "description": "A local-first multi-agent desktop workspace for Codex, Claude, and Grok.",
   "author": {
     "name": "Norbert Bodziony",
@@ -177,7 +177,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.4.0",
-    "@anthropic-ai/claude-agent-sdk": "0.3.246",
+    "@anthropic-ai/claude-agent-sdk": "0.3.263",
     "@anthropic-ai/sdk": "0.116.0",
     "@fontsource-variable/inter": "catalog:",
     "@kobalte/core": "catalog:",
