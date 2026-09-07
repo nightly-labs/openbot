@@ -38,11 +38,11 @@
   width: 30px;
   height: 30px;
   border-radius: var(--openbot-radius-md);
-  background: var(--openbot-settings-accent-soft);
+  background: var(--openbot-accent-soft);
 }
 
 .computer-use-permission-icon svg {
-  color: var(--openbot-settings-accent-text);
+  color: var(--openbot-accent-text);
 }
 
 .computer-use-helper-row .z-badge {
@@ -109,14 +109,14 @@
 .computer-use-compact-header p {
   margin: var(--openbot-space-0-5) 0 0;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
 }
 
 .computer-use-compact-header > span {
   flex: 0 0 auto;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-md);
 }
 
@@ -142,7 +142,7 @@
 
 .computer-use-compact .ui-item-description {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .computer-use-setup-surface {
@@ -170,8 +170,8 @@
   place-items: center;
   flex: 0 0 auto;
   border-radius: var(--openbot-radius-md);
-  background: var(--openbot-settings-accent-soft);
-  color: var(--openbot-settings-accent-text);
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
 }
 
 .computer-use-setup-permission-icon svg {
@@ -191,7 +191,7 @@
 .computer-use-setup-footer p {
   margin: var(--openbot-space-0-5) 0 0;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
 }
 
@@ -219,7 +219,7 @@
 }
 
 .computer-use-drag-card:hover {
-  border-color: var(--openbot-settings-accent-strong);
+  border-color: var(--openbot-accent-strong);
   background: var(--openbot-bg-control-hover);
   transform: translateY(-1px);
 }
@@ -268,7 +268,7 @@
 
 .computer-use-drag-card > span:last-child {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .computer-use-setup-footer {
@@ -307,7 +307,7 @@
 .computer-use-setup-error {
   margin: 0;
   color: var(--openbot-danger);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
   text-align: center;
 }

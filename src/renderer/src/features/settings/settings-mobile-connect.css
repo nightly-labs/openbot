@@ -78,8 +78,8 @@
   padding: var(--openbot-space-2);
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface-raised);
-  filter: drop-shadow(0 6px 16px var(--openbot-shadow-popover-key));
-  stroke-width: 1.75;
+  filter: drop-shadow(0 6px 16px var(--openbot-shadow-popover-ambient));
+  stroke-width: var(--openbot-icon-stroke);
   animation: settings-mobile-connect-success-pop 420ms var(--openbot-ease-out) both;
 }
 
@@ -100,7 +100,7 @@
 }
 
 .settings-mobile-connect-expiry {
-  color: var(--openbot-settings-accent-text);
+  color: var(--openbot-accent-text);
   font-variant-numeric: tabular-nums;
 }
 

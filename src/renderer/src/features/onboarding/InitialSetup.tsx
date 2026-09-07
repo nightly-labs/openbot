@@ -372,7 +372,7 @@ export function InitialSetup(props: InitialSetupProps) {
 
 function RouteArrow() {
   return (
-    <svg class="setup-route-arrow" viewBox="0 0 20 20" aria-hidden="true">
+    <svg class="setup-route-arrow ui-glyph-20" viewBox="0 0 20 20" aria-hidden="true">
       <path d="M4 10h11M11 6l4 4-4 4" />
     </svg>
   );

@@ -130,7 +130,7 @@
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   flex: 0 0 auto;
-  stroke-width: 1.75;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .server-settings-address-control[data-copied] {
@@ -225,7 +225,7 @@
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   flex: 0 0 auto;
-  stroke-width: 1.75;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .server-settings-role-select {

@@ -1,6 +1,6 @@
 import type { AttachmentSummary, ImageGenerationAspectRatio } from "@openbot/contracts/ipc";
 import { createEffect, createSignal, Show } from "solid-js";
-import { Button } from "../../components/ui";
+import { Button, X } from "../../components/ui";
 import { DownloadIcon } from "./ConversationIcons";
 
 export type ImageGenerationStatus = "generating" | "completed" | "failed" | "interrupted";
@@ -83,7 +83,7 @@ export function ImageGeneration(props: ImageGenerationProps) {
             when={!hasFailure()}
             fallback={
               <span class="image-generation-failure-mark" aria-hidden="true">
-                ×
+                <X />
               </span>
             }
           >
