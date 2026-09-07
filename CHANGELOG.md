@@ -5,8 +5,35 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-07
+
+### Added
+
+- Connect a phone to OpenBot. Pair a device from the desktop app, then read and answer agent chats
+  from the mobile app, with connection status on every server surface and profile changes synced to
+  each connected device.
+- Review and revoke account sessions and paired devices from Settings. A revoked credential ends the
+  remote sessions that used it immediately; other devices stay connected. Signing in again restores
+  the device.
+- Browser Automation V2: agents drive the built-in browser through native Chrome DevTools Protocol
+  control instead of injected scripts.
+- Create an agent through a guided setup with a customizable avatar, and manage agents and sidebar
+  sections by asking in a conversation.
+- Tag an agent or a skill directly in a chat message.
+- Show detailed live agent activity, including the provider's reasoning.
+- Import EML files as chat attachments.
+
 ### Changed
 
+- Retheme the desktop app onto one colour, type and icon system.
+- Rename an agent's **Description** to **Instructions**, and grow the field with its contents.
+- Remove the limit on sidebar agent pins.
+- Isolate the local team server per OpenBot account. The single-host file the previous build wrote is
+  imported on first launch and left in place; nothing is deleted.
+- Update the bundled provider runtimes: Codex to `0.153.4`, Claude Code to `2.1.263`
+  (`@anthropic-ai/claude-agent-sdk` `0.3.263`) and Grok to `1.0.22`. The runtimes are downloaded on
+  demand, so each one is fetched again the first time you use it after this update; the previous copy
+  stays on disk, and a system-installed CLI of your own is not touched.
 - Finish naming the product concept **agent** everywhere: identifiers, IPC channels, CSS, copy, the
   mobile app, and the instructions and tool parameters the models read. Existing agent identifiers are
   rewritten from `bot-<uuid>` to `agent-<uuid>` and every workspace moves from `~/OpenBot/Bots` to
@@ -19,7 +46,13 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Fixed
 
-- Import EML messages as single, unchanged chat attachments for agents to inspect directly.
+- Discover the available ChatGPT, Claude and Grok models automatically again.
+- Report weekly usage for the model that is actually active.
+- Recover a provider session the CLI no longer knows, instead of losing the conversation.
+- Keep chat table layout, message spacing and composer alignment consistent.
+- Restore the main window when you activate OpenBot on macOS.
+- Stop the Dynamic Island from clipping as it collapses, and idle avatars nobody is watching.
+- Fix sidebar search focus highlighting and drag overlap, and the mobile sidebar swipe over agent rows.
 
 ## [0.4.3] - 2026-09-02
 
