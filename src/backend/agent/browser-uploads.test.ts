@@ -183,6 +183,27 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
     expect(client.errors[0]?.error.message).toContain("A browser tab can retain files for up to 10 inputs.");
   });
 
+  it("keeps a page-controlled secret out of the error it sends back for a target it cannot resolve", async () => {
+    const { browser } = uploadBrowser();
+    // What a real ambiguous semantic target throws: it names the candidates by accessible name, and a
+    // page picks its own names. This one reaches the provider through the facade's error response
+    // rather than through `handleDynamicTool`, which redacts only what it returns.
+    browser.resolveUploadTarget = async () => {
+      throw new Error(
+        "Target is ambiguous (at least 2 matches). Candidates: main:12 button \u201cUpload password=hunter2\u201d",
+      );
+    };
+    const { client, threadId } = await startService(browser);
+    const source = join(root, "ambiguous.txt");
+    await writeFile(source, "ambiguous");
+
+    await upload(client, threadId, "ambiguous", { selector: "input", paths: [source] });
+
+    expect(client.errors).toHaveLength(1);
+    expect(client.errors[0]?.error.message).not.toContain("hunter2");
+    expect(client.errors[0]?.error.message).toContain("[redacted]");
+  });
+
   /**
    * Constructed directly rather than driven through the facade: the race is a takeover that starts
    * *after* the facade's pre-flight check and *before* the input is assigned, and only the

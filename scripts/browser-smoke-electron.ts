@@ -99,6 +99,27 @@ const server = createServer((request, response) => {
     );
     return;
   }
+  if (url.pathname === "/frame-files") {
+    const label = url.searchParams.get("file_label") ?? "Nested files";
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<input type="file" aria-label="${label}" /><output>${label} ready</output>`);
+    return;
+  }
+  // Its own page rather than more markup on `/v2`: that page's height and width are asserted against
+  // a 220x560 panel, and a block form plus a default-sized iframe put a scrollbar in it.
+  if (url.pathname === "/keys") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<!doctype html>
+      <form onsubmit="event.preventDefault();document.querySelector('output').textContent='form-submit:' + event.isTrusted"><input aria-label="Query" /><button type="submit" aria-label="Search">Search</button></form>
+      <div id="shadow-host"></div>
+      <iframe title="Trigger frame" src="/frame-files?file_label=Trigger+files"></iframe>
+      <output>ready</output>
+      <script>
+        document.querySelector('#shadow-host').attachShadow({ mode: 'open' }).innerHTML =
+          '<iframe title="Shadow frame" src="/frame-files?file_label=Shadow+frame+files"></iframe>';
+      </script>`);
+    return;
+  }
   if (url.pathname === "/diagnostic-error") {
     response.writeHead(503, { "content-type": "text/plain" });
     response.end("expected diagnostic failure");
@@ -700,6 +721,87 @@ async function main(): Promise<void> {
     if (editableValue !== "editable text appended") {
       throw new Error("V2 contenteditable target did not receive text.");
     }
+    // Chromium decides implicit form submission and text insertion from the *character* event, not
+    // the key event, so a named key dispatched without one reaches the page as a keydown nobody acts
+    // on: `submit: true` left a plain form unsubmitted and `press("Space")` typed nothing. Nothing is
+    // bound to this field, so only native submission can produce the form's output.
+    const keysTab = await browser.open(`${origin}/keys`, "smoke-thread", "smoke-bot");
+    const keysContents = webContents
+      .getAllWebContents()
+      .find((contents) => !contents.isDestroyed() && contents.getURL().startsWith(`${origin}/keys`));
+    if (!keysContents) throw new Error("Keys fixture web contents were not available.");
+    const typedIntoForm = await callBrowserTool(browser, "type", {
+      tabId: keysTab.id,
+      target: { kind: "css", selector: 'input[aria-label="Query"]' },
+      text: "open",
+      mode: "replace",
+    });
+    if (!typedIntoForm.success) throw new Error(`V2 form field typing failed: ${toolError(typedIntoForm)}`);
+    const spacePressed = await callBrowserTool(browser, "press", {
+      tabId: keysTab.id,
+      target: { kind: "css", selector: 'input[aria-label="Query"]' },
+      key: "Space",
+    });
+    const queryAfterSpace = await keysContents.executeJavaScript(
+      `document.querySelector('input[aria-label="Query"]').value`,
+      true,
+    );
+    if (!spacePressed.success || queryAfterSpace !== "open ") {
+      throw new Error(`V2 press did not insert a space: ${toolError(spacePressed)} (${queryAfterSpace})`);
+    }
+    const nativeSubmit = await callBrowserTool(browser, "type", {
+      tabId: keysTab.id,
+      target: { kind: "css", selector: 'input[aria-label="Query"]' },
+      text: "sesame",
+      mode: "append",
+      submit: true,
+    });
+    const nativeSubmitOutput = await keysContents.executeJavaScript(
+      "document.querySelector('output').textContent",
+      true,
+    );
+    if (!nativeSubmit.success || nativeSubmitOutput !== "form-submit:true") {
+      throw new Error(
+        `V2 submit did not reach native form submission: ${toolError(nativeSubmit)} (${nativeSubmitOutput})`,
+      );
+    }
+    // An input inside an iframe nested in a shadow root is reachable by target discovery, so its
+    // document has to be reachable by document enumeration too. If it is not, the next frame
+    // navigation reports the document as gone and frees the files the input is still holding.
+    const nestedUploadPath = join(temporaryRoot, "nested-frame-upload.txt");
+    await writeFile(nestedUploadPath, "nested frame upload fixture");
+    let shadowFrameDocumentId = "";
+    const shadowFrameUpload = await callBrowserTool(
+      browser,
+      "upload_files",
+      {
+        tabId: keysTab.id,
+        target: { kind: "role", role: "button", name: "Shadow frame files", exact: true },
+        paths: [nestedUploadPath],
+      },
+      { onUploadAssigned: (_inputId, documentId) => (shadowFrameDocumentId = documentId) },
+    );
+    if (!shadowFrameUpload.success || !shadowFrameDocumentId) {
+      throw new Error(`V2 shadow-root iframe upload failed: ${toolError(shadowFrameUpload)}`);
+    }
+    const changesBeforeTriggerNavigation = retainedDocumentChanges.length;
+    await keysContents.executeJavaScript(
+      `(() => {
+        document.querySelector('iframe[title="Trigger frame"]').src = '/frame-files?file_label=Reloaded+files';
+        return true;
+      })()`,
+      true,
+    );
+    await waitFor(async () =>
+      retainedDocumentChanges.slice(changesBeforeTriggerNavigation).some((change) => change.tabId === keysTab.id),
+    );
+    const retainedShadowFrame = retainedDocumentChanges
+      .slice(changesBeforeTriggerNavigation)
+      .some((change) => change.tabId === keysTab.id && change.documentIds.has(shadowFrameDocumentId));
+    if (!retainedShadowFrame) {
+      throw new Error("V2 document enumeration lost an upload document inside a shadow-root iframe.");
+    }
+    await browser.close(keysTab.id);
     // `submit: true` reached through a snapshot ref is the case that used to fail: typing changes a
     // contenteditable's visible text, so re-resolving the same ref to press Enter fingerprinted the
     // element against its pre-typing text and threw instead of submitting.

@@ -1990,7 +1990,7 @@ async function dispatchShortcut(send: SendCommand, shortcut: string, sessionId?:
     if (!modifier) throw new Error(`Invalid browser shortcut: ${shortcut}`);
     modifierNames.push(modifier);
   }
-  const keyInfo = normalizeKey(key);
+  const { text: keyText, ...keyInfo } = normalizeKey(key);
   const modifiers = modifierMask(modifierNames);
   const pressedModifiers: string[] = [];
   let keyPressed = false;
@@ -2010,8 +2010,11 @@ async function dispatchShortcut(send: SendCommand, shortcut: string, sessionId?:
     }
     await send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...keyInfo, modifiers }, sessionId);
     keyPressed = true;
-    if (key.length === 1 && modifiers === 0)
-      await send("Input.dispatchKeyEvent", { type: "char", ...keyInfo, text: key }, sessionId);
+    // A named key gets its character from the alias table; a single-character shortcut is its own.
+    // Modified shortcuts get none, because `Ctrl+S` is a command rather than an `s` in the document.
+    const character = keyText ?? (key.length === 1 ? key : undefined);
+    if (character !== undefined && modifiers === 0)
+      await send("Input.dispatchKeyEvent", { type: "char", ...keyInfo, text: character }, sessionId);
     await send("Input.dispatchKeyEvent", { type: "keyUp", ...keyInfo, modifiers }, sessionId);
     keyPressed = false;
   } finally {
@@ -2058,15 +2061,22 @@ function normalizeKey(key: string): {
   code: string;
   windowsVirtualKeyCode?: number;
   nativeVirtualKeyCode?: number;
+  text?: string;
 } {
-  const aliases: Record<string, [string, string, number?]> = {
-    enter: ["Enter", "Enter", 13],
+  // `text` is the character the key produces, and only the keys that produce one carry it. Chromium
+  // decides implicit form submission and text insertion from the character event, not the key event:
+  // without `\r` here, `press("Enter")` fires `keydown` and nothing else, so a plain `<form>` with no
+  // script never submits and a textarea never gains a line. `Tab` stays characterless on purpose --
+  // the browser moves focus on the key event, and a character dispatched afterwards would land in
+  // whatever gained focus.
+  const aliases: Record<string, [string, string, number?, string?]> = {
+    enter: ["Enter", "Enter", 13, "\r"],
     tab: ["Tab", "Tab", 9],
     escape: ["Escape", "Escape", 27],
     esc: ["Escape", "Escape", 27],
     backspace: ["Backspace", "Backspace", 8],
     delete: ["Delete", "Delete", 46],
-    space: [" ", "Space", 32],
+    space: [" ", "Space", 32, " "],
     arrowup: ["ArrowUp", "ArrowUp", 38],
     arrowdown: ["ArrowDown", "ArrowDown", 40],
     arrowleft: ["ArrowLeft", "ArrowLeft", 37],
@@ -2081,6 +2091,7 @@ function normalizeKey(key: string): {
     process.platform === "darwin" ? { ArrowUp: 126, ArrowDown: 125, Home: 115 }[alias?.[0] ?? ""] : undefined;
   if (alias)
     return {
+      ...(alias[3] === undefined ? {} : { text: alias[3] }),
       key: alias[0],
       code: alias[1],
       windowsVirtualKeyCode: alias[2],
@@ -2319,16 +2330,28 @@ function documentIdsExpression(documentIds: string[]): string {
     const pending = [document];
     const seen = new Set();
     const ids = [];
-    while (pending.length && seen.size < ${MAX_SNAPSHOT_SCANNED_NODES} && wanted.size > 0) {
-      const documentNode = pending.shift();
-      if (!documentNode || seen.has(documentNode)) continue;
-      seen.add(documentNode);
-      if (typeof documentNode[key] === 'string' && wanted.has(documentNode[key])) {
+    let scanned = 0;
+    // The same walk target discovery uses, because it has to reach the same documents: an upload can
+    // be assigned to an input in an iframe nested inside a shadow root, and \`querySelectorAll\` stops
+    // at the shadow boundary. A document this misses looks closed to the caller, which frees the
+    // staged files the still-open input is holding.
+    while (pending.length && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && wanted.size > 0) {
+      const root = pending.shift();
+      if (!root || seen.has(root)) continue;
+      seen.add(root);
+      const documentNode = root.nodeType === Node.DOCUMENT_NODE ? root : root.ownerDocument;
+      if (documentNode && typeof documentNode[key] === 'string' && wanted.has(documentNode[key])) {
         ids.push(documentNode[key]);
         wanted.delete(documentNode[key]);
       }
-      for (const frame of documentNode.querySelectorAll('iframe,frame')) {
-        try { if (frame.contentDocument) pending.push(frame.contentDocument); } catch {}
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+      let node;
+      while ((node = walker.nextNode()) && scanned < ${MAX_SNAPSHOT_SCANNED_NODES}) {
+        scanned++;
+        if (node.shadowRoot) pending.push(node.shadowRoot);
+        if (node.localName === 'iframe' || node.localName === 'frame') {
+          try { if (node.contentDocument) pending.push(node.contentDocument); } catch {}
+        }
       }
     }
     return ids;

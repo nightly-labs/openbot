@@ -5,6 +5,7 @@ import { basename, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { isString } from "@openbot/contracts/runtime-values";
+import { redactText } from "@openbot/logging";
 import { parseBrowserToolArguments } from "../browser-tools";
 import type { GeneratedAttachmentSource } from "../mailbox-store";
 import type { DynamicToolCallParams, DynamicToolResult } from "../protocol";
@@ -101,6 +102,19 @@ export class BrowserUploads {
   }
 
   async uploadFiles(agentId: string, params: DynamicToolCallParams): Promise<DynamicToolResult> {
+    try {
+      return await this.#stageAndAssign(agentId, params);
+    } catch (error) {
+      // `BrowserHost.handleDynamicTool` redacts what it *returns*, but everything this controller does
+      // around that call -- resolving the target, opening the sources, the quotas, staging -- throws
+      // past it to the facade, which forwards `String(error)` to the provider unchanged. The page picks
+      // some of that text: an ambiguous semantic target names both candidates by accessible name, so
+      // two inputs labelled `Upload password=hunter2` put the password in the error.
+      throw new Error(redactText(error instanceof Error ? error.message : String(error)));
+    }
+  }
+
+  async #stageAndAssign(agentId: string, params: DynamicToolCallParams): Promise<DynamicToolResult> {
     const args = parseBrowserToolArguments("upload_files", params.arguments);
     const tabId = args.tabId;
     const paths = args.paths;
