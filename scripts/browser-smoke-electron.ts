@@ -128,7 +128,7 @@ const server = createServer((request, response) => {
       <label><input type="checkbox" aria-label="Agree" />Agree</label>
       <label><input type="radio" name="choice" aria-label="Primary choice" checked />Primary</label>
       <label><input type="radio" name="choice" aria-label="Secondary choice" />Secondary</label>
-      <div contenteditable="true" role="textbox" aria-label="Notes"></div>
+      <div contenteditable="true" role="textbox" aria-label="Notes" onkeydown="if (event.key === 'Enter') document.querySelector('output').textContent='notes-submit:' + event.isTrusted"></div>
       <input type="number" aria-label="Quantity" value="12" />
       <button aria-label="Duplicate">One</button><button aria-label="Duplicate">Two</button>
       <button aria-label="Accessible override" onclick="document.querySelector('output').textContent='visible-text:' + event.isTrusted">Unique action text</button>
@@ -700,6 +700,25 @@ async function main(): Promise<void> {
     if (editableValue !== "editable text appended") {
       throw new Error("V2 contenteditable target did not receive text.");
     }
+    // `submit: true` reached through a snapshot ref is the case that used to fail: typing changes a
+    // contenteditable's visible text, so re-resolving the same ref to press Enter fingerprinted the
+    // element against its pre-typing text and threw instead of submitting.
+    const notesSnapshot = await browser.snapshot(v2Tab.id);
+    const notesRef = notesSnapshot.elements.find((element) => element.name === "Notes")?.ref;
+    if (!notesRef) throw new Error("V2 snapshot did not expose the contenteditable notes field.");
+    const submittedContentEditable = await callBrowserTool(browser, "type", {
+      tabId: v2Tab.id,
+      target: { kind: "ref", ref: notesRef, revision: notesSnapshot.revision },
+      text: "submitted text",
+      mode: "replace",
+      submit: true,
+    });
+    const submittedValue = await v2Contents.executeJavaScript("document.querySelector('output').textContent", true);
+    if (!submittedContentEditable.success || submittedValue !== "notes-submit:true") {
+      throw new Error(
+        `V2 type did not submit through the node it typed into: ${toolError(submittedContentEditable)} (${submittedValue})`,
+      );
+    }
     const appendedNumber = await callBrowserTool(browser, "type", {
       tabId: v2Tab.id,
       target: { kind: "role", role: "spinbutton", name: "Quantity", exact: true },
@@ -1127,6 +1146,16 @@ async function main(): Promise<void> {
     });
     if (thrownEvaluation.success || !toolError(thrownEvaluation).includes("evaluation-smoke-error")) {
       throw new Error("V2 page evaluation did not return a page exception.");
+    }
+    const leakyEvaluation = await callBrowserTool(browser, "evaluate", {
+      tabId: v2Tab.id,
+      expression: "(() => { throw new Error('page said password=hunter2'); })()",
+    });
+    if (leakyEvaluation.success || toolError(leakyEvaluation).includes("hunter2")) {
+      throw new Error(`V2 page exception carried a page secret to the provider: ${toolError(leakyEvaluation)}`);
+    }
+    if (!toolError(leakyEvaluation).includes("[redacted]")) {
+      throw new Error(`V2 page exception was not redacted: ${toolError(leakyEvaluation)}`);
     }
     const unserializableEvaluation = await callBrowserTool(browser, "evaluate", {
       tabId: v2Tab.id,

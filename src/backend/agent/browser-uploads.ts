@@ -53,6 +53,12 @@ export interface BrowserUploadsOptions {
   browser: BrowserUploadTarget;
   attachments: BrowserUploadSources;
   isStopping(): boolean;
+  /**
+   * Whether a browser takeover is pending for this agent. Staging runs outside the tab queue and can
+   * take as long as the files are large, so the caller's pre-flight check can be stale by the time
+   * the input is reached -- this is read again inside the queued operation.
+   */
+  hasTakeover(agentId: string): boolean;
 }
 
 /** Uploads read from anywhere on the disk; `AttachmentSourceScope` documents what that does and does not widen. */
@@ -83,6 +89,7 @@ export class BrowserUploads {
   readonly #browser: BrowserUploadTarget;
   readonly #attachments: BrowserUploadSources;
   readonly #isStopping: () => boolean;
+  readonly #hasTakeover: (agentId: string) => boolean;
   readonly #roots = new Map<string, Map<string, BrowserUploadRoot>>();
   readonly #reservations = new Map<string, Map<symbol, BrowserUploadReservation>>();
 
@@ -90,6 +97,7 @@ export class BrowserUploads {
     this.#browser = options.browser;
     this.#attachments = options.attachments;
     this.#isStopping = options.isStopping;
+    this.#hasTakeover = options.hasTakeover;
   }
 
   async uploadFiles(agentId: string, params: DynamicToolCallParams): Promise<DynamicToolResult> {
@@ -161,6 +169,14 @@ export class BrowserUploads {
           onUploadTargetResolved: (inputId, documentId) => {
             if (!reservation || reservation.invalidated) {
               throw new Error("The browser document changed while files were being staged.");
+            }
+            // Inside the tab queue, and the last point before the input is assigned. The caller
+            // checked takeover before staging began; a takeover that started during staging would
+            // otherwise let this write files into a page the user is holding, since `BrowserHost`
+            // checks tab ownership and not takeover.
+            if (this.#hasTakeover(agentId)) {
+              reservation.invalidated = true;
+              throw new Error("Browser tools are unavailable during user takeover.");
             }
             if (inputId !== uploadTarget.inputId || documentId !== uploadTarget.documentId) {
               reservation.invalidated = true;

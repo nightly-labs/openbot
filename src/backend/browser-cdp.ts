@@ -205,10 +205,11 @@ export class BrowserCdpEngine {
   async type(
     target: BrowserTarget,
     text: string,
-    mode: "replace" | "append" = "replace",
+    options: { mode?: "replace" | "append"; submit?: boolean } = {},
     deadline?: number,
     onDispatch?: ActionDispatch,
   ): Promise<void> {
+    const mode = options.mode ?? "replace";
     await this.#lease(async (send) => {
       const resolved = await this.#resolveTarget(send, target, deadline);
       if (!resolved.backendNodeId) throw new Error("Typing requires an element target.");
@@ -244,6 +245,14 @@ export class BrowserCdpEngine {
       if (useEndKey === true) await dispatchShortcut(send, "End", resolved.sessionId);
       assertBeforeDeadline(deadline);
       await send("Input.insertText", { text }, resolved.sessionId);
+      // Submitting is part of typing rather than a second action, because it has to reach the node
+      // this lease already resolved. Re-resolving a snapshot ref here would fingerprint the element
+      // against its pre-typing text, so a contenteditable would fail with "The target changed after
+      // the snapshot" and `submit: true` would insert the text without ever submitting it.
+      if (options.submit === true) {
+        assertBeforeDeadline(deadline);
+        await dispatchShortcut(send, "Enter", resolved.sessionId);
+      }
     });
   }
 

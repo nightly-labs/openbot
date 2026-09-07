@@ -292,6 +292,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       browser,
       attachments: this.#attachments,
       isStopping: () => this.#stopping,
+      hasTakeover: (agentId) => this.#attention.hasBrowserTakeoverForAgent(agentId),
     });
     this.#threads = new ThreadLifecycle({
       store,

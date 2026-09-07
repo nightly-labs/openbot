@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { readFile, writeFile } from "node:fs/promises";
+import { open, readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -13,6 +13,8 @@ import {
   stores,
   waitFor,
 } from "../agent-service-test-harness";
+import type { DynamicToolCallParams } from "../protocol";
+import { BrowserUploads } from "./browser-uploads";
 
 let root: string;
 let service: AgentService | null = null;
@@ -179,6 +181,63 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
     expect(client.errors[0]?.id).toBe("overflow");
     // `toContain` rather than `toBe`: the client transport prefixes the serialized error with "Error: ".
     expect(client.errors[0]?.error.message).toContain("A browser tab can retain files for up to 10 inputs.");
+  });
+
+  /**
+   * Constructed directly rather than driven through the facade: the race is a takeover that starts
+   * *after* the facade's pre-flight check and *before* the input is assigned, and only the
+   * controller's own `hasTakeover` boundary can be held at that instant deterministically.
+   */
+  it("refuses to assign files when a takeover starts while they are being staged", async () => {
+    const source = join(root, "during-takeover.txt");
+    await writeFile(source, "during takeover");
+    let takeoverPending = false;
+    const handed: string[] = [];
+    const uploads = new BrowserUploads({
+      attachments: { openSources: async () => [{ path: source, handle: await open(source, "r") }] },
+      isStopping: () => false,
+      hasTakeover: () => takeoverPending,
+      browser: {
+        resolveUploadTarget: async () => {
+          // The user reaches for control here, which is after the facade checked and before staging ends.
+          takeoverPending = true;
+          return { inputId: "input", documentId: "main-document" };
+        },
+        // `BrowserHost.handleDynamicTool` turns a throwing hook into a failed tool result, so the stub does too.
+        handleDynamicTool: async (params, hooks) => {
+          const paths =
+            isDynamicRecord(params.arguments) && Array.isArray(params.arguments.paths) ? params.arguments.paths : [];
+          for (const path of paths) handed.push(String(path));
+          try {
+            hooks?.onUploadTargetResolved?.("input", "main-document");
+            hooks?.onUploadAssigned?.("input", "main-document");
+            return { success: true, contentItems: [] };
+          } catch (error) {
+            return { success: false, contentItems: [{ type: "inputText", text: String(error) }] };
+          }
+        },
+      },
+    });
+    const params: DynamicToolCallParams = {
+      threadId: "thread-chief",
+      turnId: "turn-upload",
+      callId: "call-upload",
+      namespace: "openbot_browser",
+      tool: "upload_files",
+      arguments: { tabId: "tab", target: { kind: "css", selector: "input" }, paths: [source] },
+    };
+
+    const result = await uploads.uploadFiles("chief", params);
+
+    expect(result.success).toBe(false);
+    expect(result.contentItems[0]).toEqual({
+      type: "inputText",
+      text: "Error: Browser tools are unavailable during user takeover.",
+    });
+    // The refusal is worthless if the copies survive it: the user holds the page, and a staged
+    // directory left behind is a file the next document change would hand to a page they control.
+    for (const path of handed) await expect(readFile(path)).rejects.toThrow();
+    expect(handed).not.toHaveLength(0);
   });
 
   it("frees every staged copy when the service stops", async () => {

@@ -21,7 +21,7 @@ import type {
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import {
   app,
   BrowserWindow,
@@ -452,8 +452,7 @@ export class BrowserHost {
             break;
           case "type":
             if (!target) throw new Error("Legacy type requires a target.");
-            await tab.engine.type(target, action.text, "replace", deadline);
-            if (action.submit) await tab.engine.press("Enter", target, deadline);
+            await tab.engine.type(target, action.text, { mode: "replace", submit: action.submit === true }, deadline);
             break;
           case "key":
             await tab.engine.press(action.key, undefined, deadline);
@@ -655,8 +654,7 @@ export class BrowserHost {
               "type",
               target,
               async (tab, deadline, markDispatched) => {
-                await tab.engine.type(target, text, mode, deadline, markDispatched);
-                if (args.submit === true) await tab.engine.press("Enter", target, deadline, markDispatched);
+                await tab.engine.type(target, text, { mode, submit: args.submit === true }, deadline, markDispatched);
               },
               readTimeout(args),
             ),
@@ -872,7 +870,10 @@ export class BrowserHost {
     } catch (error) {
       return {
         success: false,
-        contentItems: [{ type: "inputText", text: String(error) }],
+        // The single place every browser tool failure reaches a provider. A page exception carries
+        // the page's own message -- `throw new Error("password=hunter2")` -- so this gets the same
+        // redaction the diagnostics ring applies, and the diagnostic copy stays the redacted one.
+        contentItems: [{ type: "inputText", text: redactText(String(error)) }],
       };
     } finally {
       this.#finishControl(params);
