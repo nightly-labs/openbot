@@ -34,7 +34,7 @@ import {
 } from "electron";
 import { BrowserCdpEngine, type BrowserUploadAssignment, type SnapshotReadResult } from "./browser-cdp";
 import { BrowserDiagnostics } from "./browser-diagnostics";
-import { embeddedBrowserUserAgent, embeddedBrowserUserAgentForUrl } from "./browser-identity";
+import { embeddedBrowserUserAgent } from "./browser-identity";
 import { BrowserRecorder } from "./browser-recorder";
 import { isCloseBrowserTabShortcut, isGlobalSearchShortcut, isToggleDevToolsShortcut } from "./browser-shortcuts";
 import {
@@ -360,9 +360,7 @@ export class BrowserHost {
 
   async navigate(tabId: string, direction: BrowserNavigationDirection): Promise<void> {
     await this.#enqueue(tabId, async (tab) => {
-      await navigateAndWait(tab.view.webContents, () =>
-        navigateHistory(tab.view.webContents, direction, this.#session.getUserAgent()),
-      );
+      await navigateAndWait(tab.view.webContents, () => navigateHistory(tab.view.webContents, direction));
     });
   }
 
@@ -476,9 +474,7 @@ export class BrowserHost {
               return;
             case "back":
             case "forward":
-              await navigateAndWait(tab.view.webContents, () =>
-                navigateHistory(tab.view.webContents, action.type, this.#session.getUserAgent()),
-              );
+              await navigateAndWait(tab.view.webContents, () => navigateHistory(tab.view.webContents, action.type));
               return;
             case "reload":
               await navigateAndWait(tab.view.webContents, () => {
@@ -628,9 +624,6 @@ export class BrowserHost {
                 if (url) {
                   const normalizedUrl = normalizeBrowserUrl(url);
                   tab.requestedUrl = normalizedUrl;
-                  tab.view.webContents.setUserAgent(
-                    embeddedBrowserUserAgentForUrl(this.#session.getUserAgent(), normalizedUrl),
-                  );
                   await navigateAndWait(
                     tab.view.webContents,
                     () => tab.view.webContents.loadURL(normalizedUrl, browserLoadOptions()),
@@ -648,7 +641,7 @@ export class BrowserHost {
                 } else if (direction) {
                   await navigateAndWait(
                     tab.view.webContents,
-                    () => navigateHistory(tab.view.webContents, direction, this.#session.getUserAgent()),
+                    () => navigateHistory(tab.view.webContents, direction),
                     operationTimeout,
                   );
                 }
@@ -1008,7 +1001,6 @@ export class BrowserHost {
   ): InternalTab {
     if (this.#destroyPromise) throw new Error("BrowserHost is shutting down.");
     const view = this.#createView();
-    view.webContents.setUserAgent(embeddedBrowserUserAgentForUrl(this.#session.getUserAgent(), requestedUrl));
     this.#mountView(view);
     const diagnostics = new BrowserDiagnostics();
     return {
@@ -1188,19 +1180,11 @@ export class BrowserHost {
       this.#schedulePersist();
     });
     contents.on("will-navigate", (event, url) => {
-      if (!isAllowedMainUrl(url)) {
-        event.preventDefault();
-        return;
-      }
-      contents.setUserAgent(embeddedBrowserUserAgentForUrl(this.#session.getUserAgent(), url));
+      if (!isAllowedMainUrl(url)) event.preventDefault();
     });
     contents.on("will-redirect", (event) => {
       if (!event.isMainFrame) return;
-      if (!isAllowedMainUrl(event.url)) {
-        event.preventDefault();
-        return;
-      }
-      contents.setUserAgent(embeddedBrowserUserAgentForUrl(this.#session.getUserAgent(), event.url));
+      if (!isAllowedMainUrl(event.url)) event.preventDefault();
     });
     contents.setWindowOpenHandler(({ url }) => {
       if (isAllowedMainUrl(url)) void this.open(url, tab.ownerThreadId, tab.ownerAgentId);
@@ -2145,17 +2129,12 @@ function optionalStringArray(value: DynamicRecord, key: string, maximum: number)
   return requiredStringArray(value, key, maximum, 64, "reject-empty");
 }
 
-function navigateHistory(
-  contents: WebContents,
-  direction: BrowserNavigationDirection,
-  sessionUserAgent: string,
-): boolean {
+function navigateHistory(contents: WebContents, direction: BrowserNavigationDirection): boolean {
   const history = contents.navigationHistory;
   const offset = direction === "back" ? -1 : 1;
   if (!history.canGoToOffset(offset)) return false;
   const entry = history.getEntryAtIndex(history.getActiveIndex() + offset);
   if (!entry?.url) return false;
-  contents.setUserAgent(embeddedBrowserUserAgentForUrl(sessionUserAgent, entry.url));
   history.goToOffset(offset);
   return true;
 }
