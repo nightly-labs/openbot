@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { access, mkdir, mkdtemp, open, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, open, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
@@ -624,6 +624,47 @@ describe("MailboxStore", () => {
     await restored.initialize();
 
     await expect(restored.resolveAttachment(draft.id)).resolves.toBeNull();
+  });
+
+  it("rejects deliveries during deletion and permits new work after release", async () => {
+    const release = store.blockAgentDeliveries("chief");
+    await expect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "sales" },
+        recipientAgentIds: ["chief", "sales"],
+        text: "Work",
+      }),
+    ).rejects.toThrow("The recipient is being deleted.");
+    expect(store.listQueue("chief").deliveries).toEqual([]);
+    expect(store.listQueue("sales").deliveries).toEqual([]);
+    release();
+    await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Retry" });
+    expect(store.listQueue("chief").deliveries).toMatchObject([{ text: "Retry", status: "queued" }]);
+  });
+
+  it("rejects prepared attachments after deletion finishes without restoring deleted deliveries", async () => {
+    const source = join(root, "overlapping.txt");
+    await writeFile(source, "Keep this draft available for retry.");
+    const [draft] = await store.prepareAttachments([source]);
+    const sending = store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Overlapping delivery",
+      draftIds: [draft.id],
+    });
+    // Enqueue has reached asynchronous attachment preparation, but cannot insert yet.
+    const release = store.blockAgentDeliveries("chief");
+    const rejected = expect(sending).rejects.toThrow("The recipient is being deleted.");
+    release();
+    await rejected;
+    await store.deleteAgentData("chief");
+    await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["sales"], text: "Unrelated write" });
+    expect(store.listQueue("chief").deliveries).toEqual([]);
+    expect(await readdir(join(root, "Shared", "Transfers"))).toEqual([]);
+    await expect(store.resolveAttachment(draft.id)).resolves.toBeTruthy();
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    expect(restored.listQueue("chief").deliveries).toEqual([]);
   });
 
   it("removes deleted agent deliveries while preserving messages visible to other agents", async () => {

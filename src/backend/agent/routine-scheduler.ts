@@ -57,10 +57,9 @@ export interface RoutineHooks {
   syncMailboxMessages(snapshot: ConversationSnapshot): void;
   listAgents(): AgentSummary[];
   /**
-   * Agents mid-duplication, which never fire: a half-copied agent is not yet a running one, and its
-   * routines would otherwise start against a workspace that is still being written.
+   * Agents being copied or deleted cannot run while their workspace is changing.
    */
-  pendingDuplicateAgents(): ReadonlySet<string>;
+  excludedAgents(): ReadonlySet<string>;
   /** The timer only arms while the service is initialized and not stopping. */
   isRunning(): boolean;
 }
@@ -109,7 +108,7 @@ export class RoutineScheduler {
 
   /** The scheduler's clause in the drain mute registry. */
   mayDrain(agentId: string): boolean {
-    return !this.#deletionAgents.has(agentId);
+    return !this.#deletionAgents.has(agentId) && !this.#hooks.excludedAgents().has(agentId);
   }
 
   list(agentId: string): Routine[] {
@@ -231,6 +230,8 @@ export class RoutineScheduler {
   }
 
   async test(input: TestRoutineInput): Promise<RoutineRun> {
+    if (!this.mayDrain(input.agentId))
+      throw new Error("Wait until the agent operation finishes before running a routine.");
     this.#conversation.requireKnownAgent(input.agentId);
     const routine = this.#routines.get(input.agentId, input.routineId);
     if (!routine) throw new Error("This routine no longer exists.");
@@ -412,7 +413,7 @@ export class RoutineScheduler {
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
     if (!this.#hooks.isRunning()) return;
-    const nextDueAt = this.#routines.nextDueAt(this.#hooks.pendingDuplicateAgents());
+    const nextDueAt = this.#routines.nextDueAt(this.#hooks.excludedAgents());
     if (!nextDueAt) return;
     const delay = Math.max(0, Math.min(new Date(nextDueAt).getTime() - Date.now(), 2_147_000_000));
     this.#timer = setTimeout(() => {
@@ -430,7 +431,9 @@ export class RoutineScheduler {
   async #processDue(now = new Date()): Promise<void> {
     const changedAgents = new Set<string>();
     try {
-      for (const due of this.#routines.due(now, this.#hooks.pendingDuplicateAgents())) {
+      for (const due of this.#routines.due(now, this.#hooks.excludedAgents())) {
+        // A previous enqueue can yield while another agent starts deletion.
+        if (this.#hooks.excludedAgents().has(due.routine.agentId)) continue;
         let scheduledFor = new Date(due.nextRunAt);
         let nextRunAt = nextRoutineOccurrence(due.schedule, due.routine.timezone, scheduledFor);
         while (nextRunAt.getTime() <= now.getTime()) {
@@ -455,8 +458,10 @@ export class RoutineScheduler {
   }
 
   async #enqueueRun(run: RoutineRun): Promise<void> {
+    const validateRecipient = this.#mailbox.prepareDelivery([run.agentId]);
     const agent = await this.#store.getOrCreate(run.agentId);
     try {
+      validateRecipient();
       const receipt = await this.#mailbox.enqueue({
         sender: {
           kind: "routine",
