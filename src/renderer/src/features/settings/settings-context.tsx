@@ -35,6 +35,7 @@ const Settings = createSimpleContext({
     const [skillsMarketplaceOpen, setSkillsMarketplaceOpen] = createSignal(false);
     const [appSettingsOpen, setAppSettingsOpen] = createSignal(false);
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>(DEFAULT_GENERAL_SETTINGS);
+    const [generalSettingsRequest, setGeneralSettingsRequest] = createSignal(0);
     let appSettingsRestoreTarget: HTMLElement | null = null;
     let analyticsOpened = false;
     let analyticsVersionRecorded = false;
@@ -140,7 +141,8 @@ const Settings = createSimpleContext({
     }
 
     /** Remembers what to focus when the dialog closes; the dialog itself restores it. */
-    function openAppSettings(trigger: HTMLElement): void {
+    function openAppSettings(trigger: HTMLElement, general = false): void {
+      if (general) setGeneralSettingsRequest((request) => request + 1);
       appSettingsRestoreTarget = trigger;
       setAppSettingsOpen(true);
     }
@@ -187,6 +189,7 @@ const Settings = createSimpleContext({
       setAppSettingsOpen,
       appSettingsRestoreTarget: () => appSettingsRestoreTarget,
       openAppSettings,
+      generalSettingsRequest,
       skillsMarketplaceOpen,
       setSkillsMarketplaceOpen,
     };

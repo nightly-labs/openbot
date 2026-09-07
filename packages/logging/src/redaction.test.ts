@@ -1,7 +1,17 @@
 // Automation and diagnostic logs must never leak tokens or emails,
 // even when a caller passes them as structured params.
 import { describe, expect, it, vi } from "vitest";
-import { createOpenBotLogger, type LogValue, redactText, redactValue, resolveLogLevel, toLogValue } from "./index";
+import {
+  createOpenBotLogger,
+  type DiagnosticRecord,
+  type LogValue,
+  redactedSummary,
+  redactText,
+  redactValue,
+  resolveLogLevel,
+  setDiagnosticSink,
+  toLogValue,
+} from "./index";
 
 describe("redactText", () => {
   it("redacts bearer tokens while keeping surrounding text", () => {
@@ -191,5 +201,64 @@ describe("createOpenBotLogger", () => {
     const error = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     createOpenBotLogger("automation").warn("careful");
     expect(error).toHaveBeenCalledOnce();
+  });
+});
+
+describe("home paths", () => {
+  it("abbreviates a home directory so the account name never survives", () => {
+    expect(redactText("spawn /Users/ada/.local/bin/codex failed")).toBe("spawn ~/.local/bin/codex failed");
+    expect(redactText("spawn /home/ada/.local/bin/codex failed")).toBe("spawn ~/.local/bin/codex failed");
+    expect(redactText("spawn C:\\Users\\ada\\codex.exe failed")).toBe("spawn ~\\codex.exe failed");
+  });
+
+  it("leaves a system path alone", () => {
+    expect(redactText("spawn /opt/homebrew/bin/codex failed")).toBe("spawn /opt/homebrew/bin/codex failed");
+  });
+});
+
+describe("redactedSummary", () => {
+  it("redacts, collapses whitespace and truncates", () => {
+    expect(redactedSummary("key sk-ant-abcdefgh1234\n  leaked")).toBe("key [redacted] leaked");
+    const summary = redactedSummary("x".repeat(500));
+    expect(summary).toHaveLength(200);
+    expect(summary.endsWith("…")).toBe(true);
+  });
+});
+
+describe("the diagnostic sink", () => {
+  it("receives an already redacted record", () => {
+    const records: DiagnosticRecord[] = [];
+    const dispose = setDiagnosticSink((record) => records.push(record));
+    const prefix = `${"x".repeat(2100)} `;
+    createOpenBotLogger("automation", () => undefined).failure(
+      "cli_resolve_failed",
+      `${prefix}spawn /Users/ada/bin/codex failed with sk-ant-abcdefgh1234`,
+    );
+    dispose();
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({
+      code: "cli_resolve_failed",
+      area: "automation",
+      severity: "error",
+      message: `${prefix}spawn ~/bin/codex failed with [redacted]`,
+    });
+  });
+
+  it("reports an ordinary logger error under one code with the prefix as area", () => {
+    const records: DiagnosticRecord[] = [];
+    const dispose = setDiagnosticSink((record) => records.push(record));
+    createOpenBotLogger("automation", () => undefined).error("boom");
+    dispose();
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ code: "log_error", area: "automation", message: "boom" });
+  });
+
+  it("records nothing when no sink is registered or the logger is silenced", () => {
+    createOpenBotLogger("automation", () => undefined).error("boom");
+    const records: DiagnosticRecord[] = [];
+    const dispose = setDiagnosticSink((record) => records.push(record));
+    createOpenBotLogger("automation", () => undefined, "silent").error("boom");
+    dispose();
+    expect(records).toHaveLength(0);
   });
 });

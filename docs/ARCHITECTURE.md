@@ -159,7 +159,20 @@ These are manual model evaluations, separate from the fake-provider lifecycle re
     secret-redacted, and redaction covers a serialized payload passed as one string, not only a
     structured param. `info` and above is written by default; `OPENBOT_LOG_LEVEL` lowers the
     threshold. Machine-readable stdout (piped JSON, tags, harness URLs) uses
-    `process.stdout.write` with a `// Machine-readable:` comment instead. Dev automation
+    `process.stdout.write` with a `// Machine-readable:` comment instead. The package also owns a
+    process-wide diagnostic sink: `logger.error`, `logger.failure` and a direct `recordDiagnostic`
+    call redact first and then reach whichever sink `setDiagnosticSink` holds. The main process is
+    the only registrant (`src/main/diagnostics-log.ts` plus `HostAnalytics`), so a failure recorded
+    anywhere gains a bounded local JSON line without that code depending on the main process.
+    The renderer has its own module copy and no sink, so it cannot write that file.
+    Analytics sends message summaries only for CLI resolution and runtime HTTP failures. Other
+    messages stay local. Local log records use byte limits and a hash of redacted failure identity
+    to keep separate failures distinct. Provider errors without an agent appear in a persistent
+    renderer notification. The notification closes on recovery or dismissal and belongs to one
+    server scope; it uses the existing agent events and provider status. Local notifications open
+    General settings when the workspace is available. During onboarding, the existing provider
+    controls remain available. Remote notifications name the server and have no local Settings action.
+    Dev automation
     (`scripts/dev-automation`, `bun run dev:automation`) drives the already-running dev app over its
     remote-debugging CDP port and never launches a second instance, seeds, or resets the dev profile.
     Because several worktrees run dev side by side, each instance publishes its worktree, profile,

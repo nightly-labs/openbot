@@ -1,3 +1,4 @@
+import type { FailureCode } from "@openbot/contracts/analytics-failures";
 import type { AgentStore } from "../agent-store";
 import { decodeRecordResponse, getRecord } from "../protocol";
 import { finiteNumberOrNull } from "./account-usage";
@@ -18,7 +19,7 @@ const CONTEXT_COMPACTION_TIMEOUT_MS = 120_000;
 export interface ContextCompactionOptions {
   store: AgentStore;
   providers: ProviderPort;
-  emitError(code: string, error: unknown, agentId?: string): void;
+  emitError(code: FailureCode, error: unknown, agentId?: string): void;
   scheduleDrain(agentId: string): void;
 }
 
@@ -35,7 +36,7 @@ export interface ContextCompactionOptions {
 export class ContextCompaction {
   readonly #store: AgentStore;
   readonly #providers: ProviderPort;
-  readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
+  readonly #emitError: (code: FailureCode, error: unknown, agentId?: string) => void;
   readonly #scheduleDrain: (agentId: string) => void;
   readonly #budgets = new Map<string, ThreadContextBudget>();
   readonly #compactingAgents = new Set<string>();

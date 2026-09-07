@@ -1,5 +1,6 @@
 import type { ChildProcess } from "node:child_process";
 import type { AgentProviderStatus } from "@openbot/contracts/ipc";
+import { recordDiagnostic } from "@openbot/logging";
 import type { AgentProvider } from "../agent-client";
 import { CodexCliError } from "../cli";
 
@@ -37,6 +38,16 @@ export function providerFailureStatus(
         error.code === "missing"
           ? `OpenBot's included ${label} runtime is missing. Reinstall OpenBot.`
           : `OpenBot could not start its included ${label} runtime. Update or reinstall OpenBot.`;
+      // The sentence the user reads names no cause, and the one that does used
+      // to be kept nowhere. `local_only`: the original is the CLI's own text.
+      recordDiagnostic({
+        code: "provider_status_masked",
+        severity: "error",
+        area: "provider",
+        stage: "provider_start",
+        message,
+        detail: { provider, errorCode: error.code, presentedMessage: bundledMessage },
+      });
       return { state: "error", version: version ?? null, message: bundledMessage };
     }
     if (error.code === "missing") {

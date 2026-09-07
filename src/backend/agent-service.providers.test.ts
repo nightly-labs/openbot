@@ -463,6 +463,20 @@ describe.sequential("AgentService: providers", () => {
     await expect(service.resolveWorkspaceFile("missing", page)).rejects.toThrow("Unknown agent");
   });
 
+  it.each(["error", "warning"])("preserves the released %s notification code and message", async (method) => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE");
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    client.emit("notification", notification(method, { message: "Provider notification" }));
+    await waitFor(() => events.some((event) => event.type === "error"));
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: "error", code: `agent_${method}`, message: "Provider notification" }),
+    );
+  });
+
   it("does not surface the skills context-budget notice as an agent error", async () => {
     process.env.OPENBOT_FAKE_WARNING = "Skill descriptions were shortened to fit the skills context budget.";
     const { store, mailbox } = stores(root);

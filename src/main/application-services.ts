@@ -31,7 +31,7 @@ import type {
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import { IPC_CHANNELS } from "@openbot/contracts/ipc";
-import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { createOpenBotLogger, type DiagnosticRecord, setDiagnosticSink, toLogValue } from "@openbot/logging";
 import { app, type BrowserWindow, safeStorage, screen, shell } from "electron";
 import electronUpdater from "electron-updater";
 import { AgentService } from "../backend/agent-service";
@@ -53,6 +53,7 @@ import {
   type DevelopmentRemoteRole,
   startDevelopmentRemoteRole,
 } from "./development-remote-bootstrap";
+import { createDiagnosticsLog } from "./diagnostics-log";
 import { performDynamicIslandCriticalAction } from "./dynamic-island-actions";
 import { DynamicIslandWindowController } from "./dynamic-island-window";
 import { HostService } from "./host-service";
@@ -101,6 +102,8 @@ const TEAM_FILE = "openbot-team-server-v1.json";
 /** One host per account. The v1 file above stays as the last build without accounts left it. */
 const TEAM_FILE_V2 = "openbot-team-server-v2.json";
 const REMOTE_SERVERS_FILE = "openbot-remote-servers-v1.json";
+/** Enough to carry a failed startup to the analytics client that is built after it. */
+const MAX_BUFFERED_STARTUP_FAILURES = 50;
 const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
 const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential-v1.json";
 const REMOTE_DESKTOP_RUNTIME_SECRET_FILE = "openbot-remote-desktop-runtime-v1.json";
@@ -121,6 +124,9 @@ const TEARDOWN_ORDER = {
   host: 90,
   teamWebRtcBridge: 100,
   service: 110,
+  // Last, so every service above has already reported whatever it fails on the
+  // way down before the trail is flushed and closed.
+  diagnosticsLog: 120,
 } as const;
 
 export interface ApplicationServiceContext {
@@ -194,6 +200,32 @@ export async function createApplicationServices({
   forwardVoiceModelStatus,
   prepareForUpdateInstall,
 }: ApplicationServiceContext): Promise<ApplicationServices> {
+  // First, before anything that can fail. The provider runtime and the agent
+  // service are built below and are exactly the startup failures this trail
+  // exists to capture, so a sink registered after them would miss them.
+  const diagnosticsLog = createDiagnosticsLog({
+    directory: join(app.getPath("userData"), "logs", "diagnostics"),
+    homeDirectory: homedir(),
+    userDataDirectory: app.getPath("userData"),
+  });
+  // Cleanup must finish before the sink or any service can write a new failure.
+  await diagnosticsLog.prune();
+  // Analytics is built hundreds of lines below, after the services whose
+  // startup failures this exists to catch. The buffer is what carries a
+  // failure across that gap; `reach: "local"` records stay out of it, because
+  // the agent service already reports itself through `handleAgentEvent`.
+  const pendingFailures: DiagnosticRecord[] = [];
+  let reportFailure: ((record: DiagnosticRecord) => void) | null = null;
+  const releaseDiagnosticSink = setDiagnosticSink((record) => {
+    diagnosticsLog.append(record);
+    if (record.reach === "local") return;
+    if (reportFailure) reportFailure(record);
+    else if (pendingFailures.length < MAX_BUFFERED_STARTUP_FAILURES) pendingFailures.push(record);
+  });
+  teardown.push(TEARDOWN_ORDER.diagnosticsLog, "the diagnostics log", async () => {
+    releaseDiagnosticSink();
+    await diagnosticsLog.flush();
+  });
   const computerUseMacSetupService = new ComputerUseMacSetupService({
     getIconDataUrl: async (path) => (await app.getFileIcon(path, { size: "normal" })).toDataURL(),
   });
@@ -481,6 +513,8 @@ export async function createApplicationServices({
   // Immediately after construction: this attributes buffered events to the current owner rather
   // than flushing a queue, so a later call would attribute them to nobody.
   analytics.flushPending();
+  reportFailure = (record) => analytics.recordFailure(record);
+  for (const record of pendingFailures.splice(0)) reportFailure(record);
   const remoteServers = new RemoteServerManager(
     join(app.getPath("userData"), REMOTE_SERVERS_FILE),
     {

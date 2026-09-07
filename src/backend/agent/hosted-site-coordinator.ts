@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { FailureCode } from "@openbot/contracts/analytics-failures";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentApproval,
@@ -63,7 +64,7 @@ export interface HostedSiteCoordinatorOptions {
   store: AgentStore;
   conversation: ConversationRuntime;
   hostedSites: AgentHostedSites | null;
-  emitError(code: string, error: unknown, agentId?: string): void;
+  emitError(code: FailureCode, error: unknown, agentId?: string): void;
   isStopping(): boolean;
 }
 
@@ -93,7 +94,7 @@ export class HostedSiteCoordinator {
   readonly #store: AgentStore;
   readonly #conversation: ConversationRuntime;
   readonly #hostedSites: AgentHostedSites | null;
-  readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
+  readonly #emitError: (code: FailureCode, error: unknown, agentId?: string) => void;
   readonly #isStopping: () => boolean;
   readonly #pendingTerminalEvents = new Map<string, PendingHostedSiteTerminalEvent>();
   readonly #pendingTerminalDeliveries = new Map<string, () => void>();

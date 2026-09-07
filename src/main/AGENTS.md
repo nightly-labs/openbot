@@ -87,6 +87,7 @@ Keep `index.ts` as the dispatcher and lifecycle module. Do not move these respon
 | `session-configuration.ts` | Renderer CSP, bundle protocol, permissions, attachment/avatar/logo protocols |
 | `renderer-forwarders.ts` | Service events sent to the renderer |
 | `ipc/*-handlers.ts` | IPC endpoints by domain |
+| `diagnostics-log.ts` | Bounded local logs, rotation, duplicate filtering, rate limits and startup cleanup |
 
 Keep `createApplicationServices` as one function that only constructs services. Event wiring,
 `registerIpcHandlers`, `loadRenderer` and `app.on("activate")` stay in `index.ts`. Register each

@@ -1,9 +1,10 @@
 import { EventEmitter } from "node:events";
-import { appendFile, mkdir, readdir, rename, rm, stat } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { UpdateBusyPhase, UpdateFailureCode, UpdateStatus } from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
+import { createDiagnosticsLog, type DiagnosticsLog } from "./diagnostics-log";
 
 /** Only the part of electron-updater's cancellation token this service depends on. */
 export type UpdateCancellationToken = {
@@ -81,7 +82,6 @@ export interface UpdateDiagnosticEvent {
 // more than a small GET while the app sits idle, and a user who leaves OpenBot open picks up a
 // release within minutes instead of hours.
 const DEFAULT_CHECK_INTERVAL = 4 * 60 * 1_000;
-const MAX_LOG_BYTES = 1024 * 1024;
 const MAX_DIAGNOSTIC_EVENTS = 20;
 
 /**
@@ -130,7 +130,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #installStarted = false;
   #operation: UpdateOperation = "check";
   #history: UpdateDiagnosticEvent[] = [];
-  #logWrite = Promise.resolve();
+  // The update trail is the same bounded, redacted writer the rest of the app
+  // uses. It used to be a second copy here that serialized correctly and
+  // redacted nothing.
+  readonly #log: DiagnosticsLog | null;
   #autoDownload: boolean;
   #downloadedVersion: string | null = null;
   #cancellationToken: UpdateCancellationToken | null = null;
@@ -147,6 +150,14 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     super();
     this.#updater = updater;
     this.#autoDownload = options.autoDownload;
+    this.#log = options.logDirectory
+      ? createDiagnosticsLog({
+          directory: options.logDirectory,
+          fileName: "update.log",
+          maxFileBytes: 1024 * 1024,
+          retainedGenerations: 1,
+        })
+      : null;
     this.#options = {
       ...options,
       platform: options.platform ?? process.platform,
@@ -364,6 +375,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     // install deadline has to survive that: it is the only thing that can release a restart which
     // never happens, and clearing it here would leave the app latched in "installing" forever.
     if (this.#status.phase !== "installing") this.#clearPhaseTimer();
+    void this.#log?.flush();
   }
 
   /** True while the download the service still believes in is the one events are reporting on. */
@@ -500,10 +512,11 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #recordStatus(): void {
     const event = { at: new Date().toISOString(), phase: this.#status.phase, errorCode: this.#status.errorCode };
     this.#history = [...this.#history.slice(-(MAX_DIAGNOSTIC_EVENTS - 1)), event];
-    const logDirectory = this.#options.logDirectory;
-    if (logDirectory) {
-      this.#logWrite = this.#logWrite.then(() => appendUpdateLog(logDirectory, event));
-    }
+    this.#log?.append({
+      at: event.at,
+      code: `update_${event.phase}`,
+      ...(event.errorCode ? { severity: "error", detail: { errorCode: event.errorCode } } : {}),
+    });
   }
 }
 
@@ -513,24 +526,6 @@ function errorMessage(code: UpdateFailureCode) {
   if (code === "download_failed") return "Could not download the update. Try again.";
   if (code === "install_failed") return INSTALL_FAILED_MESSAGE;
   return "Could not check for updates. Try again.";
-}
-
-async function appendUpdateLog(directory: string, event: UpdateDiagnosticEvent): Promise<void> {
-  try {
-    await mkdir(directory, { recursive: true, mode: 0o700 });
-    const path = join(directory, "update.log");
-    const rotatedPath = `${path}.1`;
-    const size = await stat(path)
-      .then((value) => value.size)
-      .catch(() => 0);
-    if (size >= MAX_LOG_BYTES) {
-      await rm(rotatedPath, { force: true });
-      await rename(path, rotatedPath);
-    }
-    await appendFile(path, `${JSON.stringify(event)}\n`, { encoding: "utf8", mode: 0o600 });
-  } catch {
-    // Update logging must not block updates.
-  }
 }
 
 export async function pruneShipItLogs(directory: string): Promise<void> {

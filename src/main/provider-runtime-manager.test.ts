@@ -6,6 +6,7 @@ import { access, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } fro
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ProviderRuntimeSnapshot } from "@openbot/contracts/ipc";
+import type { DiagnosticRecord } from "@openbot/logging";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import lockValue from "../../native-runtime.lock.json";
 import { parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
@@ -33,11 +34,13 @@ describe("ProviderRuntimeManager", () => {
     await mkdir(join(previousExecutable, ".."), { recursive: true });
     await writeFile(previousExecutable, "previous runtime");
     const progress: number[] = [];
+    const records: DiagnosticRecord[] = [];
     const manager = new ProviderRuntimeManager({
       root,
       platform: "darwin",
       architecture: "arm64",
       lock,
+      diagnostics: (record) => records.push(record),
       fetchImpl: async (input) => {
         const url = String(input);
         if (url.endsWith("/LICENSE")) return new Response(license);
@@ -51,6 +54,13 @@ describe("ProviderRuntimeManager", () => {
       version: "1.0.21",
       availableVersion: "1.0.22",
     });
+    expect(manager.executablePath("grok")).toBe(join(root, "grok", "darwin-arm64", lock.grok.version, "bin", "grok"));
+    expect(records).toContainEqual(
+      expect.objectContaining({
+        code: "provider_runtime_verify_failed",
+        detail: expect.objectContaining({ provider: "grok" }),
+      }),
+    );
     const finished = waitFor(manager, (snapshot) => snapshot.providers.grok.phase === "ready");
     manager.on("status", (snapshot) => {
       const value = snapshot.providers.grok.progress;
@@ -263,12 +273,14 @@ describe("ProviderRuntimeManager", () => {
     const root = await temporaryRoot();
     const fixture = grokFixture();
     fixture.lock.grok.artifacts["darwin-arm64"].assetSha256 = digest(new TextEncoder().encode("wrong"));
+    const records: DiagnosticRecord[] = [];
     const manager = new ProviderRuntimeManager({
       root,
       platform: "darwin",
       architecture: "arm64",
       lock: fixture.lock,
       fetchImpl: async () => chunkedResponse(fixture.executable, 512),
+      diagnostics: (record) => records.push(record),
     });
     await manager.initialize();
     const failed = waitFor(manager, (snapshot) => snapshot.providers.grok.phase === "download-error");
@@ -277,6 +289,14 @@ describe("ProviderRuntimeManager", () => {
     const snapshot = await failed;
 
     expect(snapshot.providers.grok.message).toContain("integrity check");
+    expect(records.map((record) => record.code)).toContain("provider_runtime_integrity_failed");
+    expect(records.find((record) => record.code === "provider_runtime_integrity_failed")?.detail).toMatchObject({
+      provider: "grok",
+      expectedSha256: fixture.lock.grok.artifacts["darwin-arm64"].assetSha256,
+      actualSha256: digest(fixture.executable),
+      expectedBytes: fixture.executable.byteLength,
+      actualBytes: fixture.executable.byteLength,
+    });
     await expect(
       access(join(root, ".downloads", `grok-darwin-arm64-${fixture.lock.grok.version}.partial`)),
     ).rejects.toThrow();
@@ -285,12 +305,14 @@ describe("ProviderRuntimeManager", () => {
   it("rejects a transfer before fetch when disk space is too small", async () => {
     const root = await temporaryRoot();
     const fetchImpl = vi.fn(async () => new Response());
+    const records: DiagnosticRecord[] = [];
     const manager = new ProviderRuntimeManager({
       root,
       platform: "darwin",
       architecture: "arm64",
       fetchImpl,
       availableDiskBytes: async () => 0,
+      diagnostics: (record) => records.push(record),
     });
     await manager.initialize();
     const failed = waitFor(manager, (snapshot) => snapshot.providers.codex.phase === "download-error");
@@ -299,6 +321,10 @@ describe("ProviderRuntimeManager", () => {
     const snapshot = await failed;
 
     expect(snapshot.providers.codex.message).toContain("free disk space");
+    expect(records.find((record) => record.code === "provider_runtime_disk_space_failed")?.detail).toMatchObject({
+      provider: "codex",
+      availableBytes: 0,
+    });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 

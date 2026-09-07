@@ -20,6 +20,7 @@ import { finished } from "node:stream/promises";
 import { promisify } from "node:util";
 import type { AgentProviderId, ProviderRuntimeSnapshot, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { type DiagnosticRecord, type DiagnosticSink, recordDiagnostic } from "@openbot/logging";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 
@@ -55,6 +56,7 @@ export interface ProviderRuntimeManagerOptions {
   fetchImpl?: Fetch;
   lock?: AgentRuntimeLock;
   availableDiskBytes?: () => Promise<number>;
+  diagnostics?: DiagnosticSink;
 }
 
 export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerEvents> {
@@ -63,6 +65,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #fetch: Fetch;
   readonly #lock: AgentRuntimeLock;
   readonly #availableDiskBytes: () => Promise<number>;
+  readonly #diagnostics: DiagnosticSink;
   readonly #statuses: Record<AgentProviderId, ProviderRuntimeStatus>;
   readonly #controllers = new Map<AgentProviderId, AbortController>();
   readonly #tasks = new Map<AgentProviderId, Promise<void>>();
@@ -76,6 +79,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     this.#target = runtimeTarget(options.platform ?? process.platform, options.architecture ?? process.arch);
     this.#fetch = options.fetchImpl ?? fetch;
     this.#lock = options.lock ?? parseAgentRuntimeLock(lockValue);
+    this.#diagnostics = options.diagnostics ?? recordDiagnostic;
     this.#availableDiskBytes =
       options.availableDiskBytes ??
       (async () => {
@@ -169,13 +173,24 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     await Promise.allSettled(this.#tasks.values());
   }
 
+  #report(record: Omit<DiagnosticRecord, "severity" | "area" | "stage">): void {
+    this.#diagnostics({ severity: "error", area: "provider", stage: "startup", ...record });
+  }
+
   async #inspect(provider: AgentProviderId): Promise<void> {
     if (!this.#target) return;
     const spec = runtimeSpec(provider, this.#target, this.#lock);
     try {
       await verifyInstalledRuntime(this.#installRoot(spec), spec, this.#lock);
       this.#statuses[provider] = readyStatus(spec.version);
-    } catch {
+    } catch (error) {
+      // Without this, a corrupt install is indistinguishable from one that was
+      // never downloaded.
+      this.#report({
+        code: "provider_runtime_verify_failed",
+        message: error instanceof Error ? error.message : String(error),
+        detail: { provider, version: spec.version, installRoot: this.#installRoot(spec) },
+      });
       this.#statuses[provider] = { ...emptyStatus(), version: await this.#previousVersion(spec) };
     }
   }
@@ -210,6 +225,16 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       response = await this.#fetchRuntime(spec, signal, 0, null);
     }
     if (!response.ok || (offset > 0 && response.status !== 206)) {
+      this.#report({
+        code: "provider_runtime_http_failed",
+        message: `HTTP ${response.status}`,
+        detail: {
+          provider: spec.provider,
+          status: response.status,
+          offset,
+          etagPresent: Boolean(previous.metadata?.etag),
+        },
+      });
       throw new Error(`Runtime download failed with HTTP ${response.status}.`);
     }
     if (!response.body) throw new Error("Runtime download returned no data.");
@@ -244,6 +269,17 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     }
     const digest = await sha256File(partialPath);
     if (digest !== spec.archiveSha256) {
+      this.#report({
+        code: "provider_runtime_integrity_failed",
+        detail: {
+          provider: spec.provider,
+          version: spec.version,
+          expectedSha256: spec.archiveSha256,
+          actualSha256: digest,
+          expectedBytes: spec.downloadBytes,
+          actualBytes: downloaded.size,
+        },
+      });
       await this.#removePartial(spec);
       throw new Error("The runtime download failed its integrity check.");
     }
@@ -378,7 +414,18 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     const available = await this.#availableDiskBytes();
     const existing = await fileSize(this.#partialPath(spec));
     const required = Math.max(0, spec.downloadBytes - existing) + spec.installedBytes + FREE_SPACE_HEADROOM;
-    if (available < required) throw new Error("There is not enough free disk space for this provider.");
+    if (available < required) {
+      this.#report({
+        code: "provider_runtime_disk_space_failed",
+        detail: {
+          provider: spec.provider,
+          availableBytes: available,
+          requiredBytes: required,
+          downloadBytes: spec.downloadBytes,
+        },
+      });
+      throw new Error("There is not enough free disk space for this provider.");
+    }
   }
 
   async #handleDownloadFailure(provider: AgentProviderId, error: unknown): Promise<void> {

@@ -190,7 +190,15 @@ describe("host analytics", () => {
 
     analytics.handleAgentEvent({ type: "error", code: "provider_error", message: "private" });
     owner = null;
-    analytics.handleAgentEvent({ type: "error", code: "provider_error", message: "pending-after-logout" });
+    // A turn, not a failure: a failure with no owner now reaches OpenPanel
+    // through the anonymous client, so it would no longer test the queue.
+    analytics.handleAgentEvent({
+      type: "turn-started",
+      agentId: AGENT.id,
+      threadId: AGENT.threadId ?? "",
+      turnId: "turn-after-logout",
+      origin: "user",
+    });
     analytics.clear();
     analytics.flushPending();
 
@@ -246,7 +254,11 @@ describe("host analytics", () => {
         },
         (options) => new OpenPanelBase(options),
       );
-      analytics.handleAgentEvent({ type: "error", code: "provider_error", message: "private" });
+      analytics.handleAgentEvent({
+        type: "error",
+        code: "provider_error",
+        message: "spawn /Users/ada/.local/bin/codex failed with sk-ant-abcdefgh1234",
+      });
 
       await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
       expect(isDynamicRecord(requests[0]) ? requests[0].type : undefined).toBe("identify");
@@ -268,6 +280,9 @@ describe("host analytics", () => {
           : undefined,
       ).toBe("owner-account");
       expect(JSON.stringify(trackRequest)).not.toContain("owner@example.com");
+      // The message now travels, so what it may not carry is the assertion.
+      expect(JSON.stringify(trackRequest)).not.toContain("sk-ant-abcdefgh1234");
+      expect(JSON.stringify(trackRequest)).not.toContain("/Users/ada");
     } finally {
       vi.unstubAllGlobals();
     }
@@ -452,7 +467,13 @@ describe("host analytics", () => {
     });
 
     owner = null;
-    analytics.handleAgentEvent({ type: "error", code: "provider_error", message: "private" });
+    analytics.handleAgentEvent({
+      type: "turn-started",
+      agentId: AGENT.id,
+      threadId: AGENT.threadId ?? "",
+      turnId: "turn-ownerless",
+      origin: "user",
+    });
     analytics.handleAgentEvent({
       type: "conversation",
       snapshot: {
@@ -472,7 +493,7 @@ describe("host analytics", () => {
 
     expect(client.track).toHaveBeenCalledTimes(2);
     expect(client.track).toHaveBeenLastCalledWith(
-      "system_operation_failed",
+      "system_turn_started",
       expect.objectContaining({ profileId: "owner-2" }),
     );
   });
@@ -496,10 +517,19 @@ describe("host analytics", () => {
       () => client,
     );
 
-    analytics.handleAgentEvent({ type: "error", code: "agent_initial", message: "private" });
+    analytics.handleAgentEvent({ type: "error", code: "interrupt_failed", message: "private" });
     owner = { id: "owner-2", email: "two@example.com" };
+    // Turns rather than failures: one failure code repeated 150 times is now
+    // one event with a repeat count, which is the point of the throttle and
+    // the opposite of the overflow this test is about.
     for (let index = 0; index < 150; index += 1) {
-      analytics.handleAgentEvent({ type: "error", code: `agent_${index}`, message: "private" });
+      analytics.handleAgentEvent({
+        type: "turn-started",
+        agentId: AGENT.id,
+        threadId: AGENT.threadId ?? "",
+        turnId: `turn-${index}`,
+        origin: "user",
+      });
     }
     releaseIdentify();
 
@@ -712,7 +742,13 @@ describe("host analytics", () => {
     analytics.handleAgentEvent({ type: "error", code: "provider_error", message: "before-logout" });
     owner = null;
     analytics.clear();
-    analytics.handleAgentEvent({ type: "error", code: "provider_error", message: "after-logout" });
+    analytics.handleAgentEvent({
+      type: "turn-started",
+      agentId: AGENT.id,
+      threadId: AGENT.threadId ?? "",
+      turnId: "turn-after-logout",
+      origin: "user",
+    });
     owner = { id: "owner-2", email: "two@example.com" };
     analytics.flushPending();
 
@@ -739,7 +775,12 @@ describe("host analytics", () => {
       },
       () => client,
     );
-    analytics.handleAgentEvent({ type: "error", agentId: AGENT.id, code: "interrupt_failed", message: "private" });
+    analytics.handleAgentEvent({
+      type: "error",
+      agentId: AGENT.id,
+      code: "interrupt_failed",
+      message: "could not interrupt sk-ant-abcdefgh1234 for owner@example.com",
+    });
 
     expect(client.track).toHaveBeenCalledWith("system_operation_failed", {
       provider: "codex",
@@ -749,6 +790,91 @@ describe("host analytics", () => {
       failure_code: "interrupt_failed",
       profileId: "owner-account",
     });
+  });
+
+  it("keeps provider output out of an event and reports a failure with no account", () => {
+    const client = fakeClient();
+    const analytics = new HostAnalytics(
+      {
+        enabled: true,
+        appVersion: "1.2.3",
+        platform: "darwin",
+        resolveOwner: () => null,
+        resolveAgent: () => AGENT,
+      },
+      () => client,
+    );
+
+    analytics.recordFailure({
+      code: "codex_diagnostic",
+      area: "provider",
+      message: "error: /Users/ada/work/secret-client failed",
+      detail: { provider: "codex", errno: "ENOENT" },
+    });
+
+    expect(client.track).toHaveBeenCalledWith(
+      "system_operation_failed",
+      expect.objectContaining({ failure_code: "codex_diagnostic", area: "provider", errno: "ENOENT" }),
+    );
+    const [, properties] = vi.mocked(client.track).mock.calls[0] ?? [];
+    expect(properties).not.toHaveProperty("message");
+    expect(properties).not.toHaveProperty("profileId");
+    expect(client.identify).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "agent_error",
+    "agent_warning",
+    "agent_notification_failed",
+    "agent_old_method",
+    "log_error",
+    "provider_connect_failed",
+    "provider_runtime_verify_failed",
+    "codex_start_failed",
+    "codex_exited",
+    "provider_message_masked",
+    "unknown",
+    undefined,
+  ])("keeps unverified messages local for %s", (code) => {
+    const message = "prompt fragment /work/customer/private.txt token abcdef123456";
+    const sanitized = sanitizeHostEvent("system_operation_failed", { failure_code: code, message });
+    expect(sanitized).not.toHaveProperty("message");
+  });
+
+  it.each(["cli_resolve_failed", "provider_runtime_http_failed"])(
+    "redacts and bounds a verified %s summary",
+    (code) => {
+      const sanitized = sanitizeHostEvent("system_operation_failed", {
+        failure_code: code,
+        message: `token=abcdefgh123456 owner@example.com /Users/ada ${"x".repeat(300)}`,
+      });
+      expect(sanitized.message).toBe(`${`token=[redacted] [redacted-email] ~ ${"x".repeat(300)}`.slice(0, 199)}…`);
+    },
+  );
+
+  it("counts a repeated failure instead of sending it again", () => {
+    const client = fakeClient();
+    const analytics = new HostAnalytics(
+      {
+        enabled: true,
+        appVersion: "1.2.3",
+        platform: "darwin",
+        resolveOwner: () => ({ id: "owner-account", email: "owner@example.com" }),
+        resolveAgent: () => AGENT,
+      },
+      () => client,
+    );
+
+    for (let index = 0; index < 40; index += 1) {
+      analytics.recordFailure({ code: "cli_resolve_failed", area: "provider", message: `attempt ${index}` });
+    }
+    analytics.recordFailure({ code: "cli_resolve_failed", area: "provider", message: "later" });
+
+    expect(client.track).toHaveBeenCalledTimes(3);
+    expect(client.track).toHaveBeenLastCalledWith(
+      "system_operation_failed",
+      expect.objectContaining({ failure_code: "cli_resolve_failed" }),
+    );
   });
 
   it("does not identify or emit lifecycle while tracking is disabled", () => {

@@ -1,5 +1,5 @@
 import type { AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
-import { flush, onSettled } from "solid-js";
+import { createEffect, flush, onSettled, untrack } from "solid-js";
 import { withoutAgent } from "../../app-message-projection";
 import { playCompletionSoundForAgentEvent } from "../../completion-sound";
 import { usePlatform } from "../../platform";
@@ -12,7 +12,10 @@ import { useConversation } from "../conversation/conversation-context";
 import { agentConversationKey, promptRequestKey } from "../conversation/conversation-keys";
 import { latestIncomingConversationMessage } from "../conversation/conversation-read-state";
 import { reconcileQueuesWithRuntimeWork } from "../dynamic-island/dynamic-island-coordinator";
+import { useSetup } from "../onboarding/onboarding-context";
+import { createProviderFailureNotifications } from "../provider-updates/provider-failure-notifications";
 import { useServers } from "../servers/servers-context";
+import { useSettings } from "../settings/settings-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { cleanAgentMessageText } from "./agent-message-text";
 import { reconcileAttentionApprovals, reconcileAttentionPrompts } from "./agent-runtime-snapshot";
@@ -37,10 +40,14 @@ import { useAgents } from "./agents-context";
  */
 export function AgentEventBridge() {
   const platform = usePlatform();
-  const { activeServerId } = useServers();
-  const { invalidateAccountUsage } = useAuth();
+  const { activeServerId, activeServer } = useServers();
+  const { openAppSettings } = useSettings();
+  const { invalidateAccountUsage, visibleSignedInAccount } = useAuth();
+  const { setupState } = useSetup();
+  const settingsAvailable = () => setupState()?.completed === true && visibleSignedInAccount() !== null;
   const { applyAgentStatus } = useProviders();
-  const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents, appendUiError } = useAgents();
+  const { agentStatus, agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents, appendUiError } =
+    useAgents();
   const {
     applyRuntimeMessages,
     conversations,
@@ -71,6 +78,21 @@ export function AgentEventBridge() {
   const { setBrowserControlState, applyBrowserChange } = useBrowserTabs();
   const { setSidebarLayout } = useSidebar();
   let readRefresh = 0;
+
+  const providerFailures = createProviderFailureNotifications({
+    serverId: activeServerId(),
+    settingsAvailable: () => untrack(settingsAvailable),
+    remoteName: () => untrack(() => (activeServer()?.kind === "remote" ? activeServer()?.name : undefined)),
+    openSettings: (event) => {
+      // Keep the notification available when Settings closes.
+      event.preventDefault();
+      if (event.currentTarget instanceof HTMLElement) openAppSettings(event.currentTarget, true);
+    },
+  });
+  createEffect(
+    () => ({ statuses: agentStatus().providers, settingsAvailable: settingsAvailable() }),
+    ({ statuses }) => providerFailures.sync(statuses ?? []),
+  );
 
   function handleAgentEvent(event: AgentEvent) {
     switch (event.type) {
@@ -244,6 +266,7 @@ export function AgentEventBridge() {
         return;
       case "error":
         if (event.agentId) appendUiError(event.agentId, event.message, "Error", activeServerId());
+        else providerFailures.handleError(event, agentStatus().providers ?? []);
     }
   }
 
@@ -269,6 +292,7 @@ export function AgentEventBridge() {
     return () => {
       readRefresh += 1;
       unsubscribe();
+      providerFailures.dispose();
       completedTurnByAgent.clear();
     };
   });

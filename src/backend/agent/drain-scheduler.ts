@@ -1,3 +1,4 @@
+import type { FailureCode } from "@openbot/contracts/analytics-failures";
 import type { AgentStore } from "../agent-store";
 import type { DeliveryContext, MailboxStore } from "../mailbox-store";
 import { decodeTurnResponse } from "../protocol";
@@ -13,7 +14,7 @@ import { isMissingProviderSessionError, isRequestTimeout, providerForAgent } fro
 import type { ThreadLifecycle } from "./thread-lifecycle";
 
 export interface DrainHooks {
-  emitError(code: string, error: unknown, agentId?: string): void;
+  emitError(code: FailureCode, error: unknown, agentId?: string): void;
   isStopping(): boolean;
 }
 

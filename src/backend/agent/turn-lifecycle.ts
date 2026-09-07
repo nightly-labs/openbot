@@ -1,3 +1,4 @@
+import type { FailureCode } from "@openbot/contracts/analytics-failures";
 import type {
   AgentEvent,
   AgentSummary,
@@ -43,7 +44,7 @@ export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTar
 
 export interface TurnHooks {
   emit(event: AgentEvent): void;
-  emitError(code: string, error: unknown, agentId?: string): void;
+  emitError(code: FailureCode, error: unknown, agentId?: string): void;
   emitRuntimeSnapshot(): void;
   scheduleDrain(agentId: string): void;
   listAgents(): AgentSummary[];

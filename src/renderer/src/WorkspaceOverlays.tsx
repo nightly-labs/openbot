@@ -196,8 +196,14 @@ function AppSettings(props: AccountProps) {
   const updates = useUpdates();
   const { agentStatus } = useAgents();
   const { activeServer } = useServers();
-  const { appSettingsOpen, setAppSettingsOpen, generalSettings, updateGeneralSettings, appSettingsRestoreTarget } =
-    useSettings();
+  const {
+    appSettingsOpen,
+    setAppSettingsOpen,
+    generalSettings,
+    updateGeneralSettings,
+    appSettingsRestoreTarget,
+    generalSettingsRequest,
+  } = useSettings();
   const {
     providerRuntimeStatuses,
     providerAvailableVersions,
@@ -215,6 +221,7 @@ function AppSettings(props: AccountProps) {
     <Loading>
       <SettingsModal
         open={appSettingsOpen()}
+        generalSettingsRequest={generalSettingsRequest()}
         onOpenChange={setAppSettingsOpen}
         value={generalSettings()}
         onValueChange={updateGeneralSettings}

@@ -1,3 +1,4 @@
+import type { FailureCode } from "@openbot/contracts/analytics-failures";
 import type { AgentEvent, AgentSummary, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { sortConversationMessages } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
@@ -8,7 +9,7 @@ import type { RoutineScheduler } from "./routine-scheduler";
 
 export interface MailboxSyncHooks {
   emit(event: AgentEvent): void;
-  emitError(code: string, error: unknown, agentId?: string): void;
+  emitError(code: FailureCode, error: unknown, agentId?: string): void;
 }
 
 export interface MailboxSyncOptions {

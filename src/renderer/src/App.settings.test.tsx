@@ -18,6 +18,53 @@ describe("OpenBot connected desktop shell", () => {
     installOpenbotStub();
   });
 
+  it("shows a startup provider failure and opens General from its notification", async () => {
+    const status = await window.openbot.agent.getStatus();
+    vi.mocked(window.openbot.agent.getStatus).mockResolvedValue({
+      ...status,
+      providers: status.providers?.map((provider) =>
+        provider.id === "codex"
+          ? { ...provider, state: "error" as const, message: "The ChatGPT runtime could not start." }
+          : provider,
+      ),
+    });
+    render(() => <App />);
+    expect(await screen.findByText("ChatGPT could not start")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+    const settings = await screen.findByRole("dialog", { name: "General" });
+    fireEvent.click(within(settings).getByRole("tab", { name: "Updates" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog", { name: "Updates" })).getByRole("button", { name: "Close settings" }),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Open Settings" }));
+    expect(await screen.findByRole("dialog", { name: "General" })).toBeInTheDocument();
+    emitAgentEvent?.({ type: "status", status });
+    await waitFor(() => expect(screen.queryByText("ChatGPT could not start")).not.toBeInTheDocument());
+  });
+
+  it("removes the previous server's provider notification on a server switch", async () => {
+    vi.mocked(window.openbot.servers.list).mockResolvedValue([
+      testServer("local", true),
+      testServer("remote-1", false),
+    ]);
+    vi.mocked(window.openbot.servers.select).mockResolvedValue([
+      testServer("local", false),
+      testServer("remote-1", true),
+    ]);
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "error", code: "codex_start_failed", message: "Local provider failure" });
+    expect(await screen.findByText("ChatGPT could not start")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Studio Mac server" }));
+    await waitFor(() => expect(window.openbot.servers.select).toHaveBeenCalledWith("remote-1"));
+    await waitFor(() => expect(screen.queryByText("Local provider failure")).not.toBeInTheDocument());
+    await waitFor(() => expect(window.openbot.agent.getStatus).toHaveBeenCalledTimes(2));
+    emitAgentEvent?.({ type: "error", code: "codex_start_failed", message: "Remote provider failure" });
+    expect(await screen.findByText("ChatGPT could not start on Studio Mac")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open Settings" })).not.toBeInTheDocument();
+  });
+
   it("opens the dock surfaces and closes them from their own controls", async () => {
     render(() => <App />);
     await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(1));

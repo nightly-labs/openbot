@@ -1,9 +1,10 @@
 import type { AgentProviderId, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
-import { createEffect, createSignal, createUniqueId, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, createUniqueId, onCleanup, onSettled, Show } from "solid-js";
 import { expect, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { ProviderPicker, type ProviderPickerOption } from "../src/components/ProviderPicker";
 import { Button, Checkbox, Heading, Text, Toaster } from "../src/components/ui";
+import { createProviderFailureNotifications } from "../src/features/provider-updates/provider-failure-notifications";
 import { type ProviderUpdate, providerUpdatesToAnnounce } from "../src/features/provider-updates/provider-update";
 import {
   dismissProviderUpdateToast,
@@ -239,5 +240,46 @@ export const UpdateFails: Story = {
     await expect(body.findByText("Claude update failed", undefined, { timeout: 8_000 })).resolves.toBeInTheDocument();
     await userEvent.click(await body.findByRole("button", { name: "Retry" }));
     await expect(body.findByText("Claude is up to date", undefined, { timeout: 8_000 })).resolves.toBeInTheDocument();
+  },
+};
+
+/** Failure and recovery use the same notification as the connected app. */
+export const ProviderStartFailure: Story = {
+  render: () => {
+    const failures = createProviderFailureNotifications({
+      serverId: "local",
+      remoteName: () => undefined,
+      openSettings: (event) => event.preventDefault(),
+    });
+    const fail = () =>
+      failures.sync([
+        {
+          id: "codex",
+          state: "error",
+          version: null,
+          message: "The ChatGPT runtime could not start. Open Settings to try again.",
+        },
+      ]);
+    onSettled(() => {
+      fail();
+      return () => failures.dispose();
+    });
+    return (
+      <>
+        <Toaster />
+        <Button onClick={fail}>Show provider failure</Button>
+        <Button onClick={() => failures.sync([{ id: "codex", state: "available", version: "0.149.1", message: null }])}>
+          Recover provider
+        </Button>
+      </>
+    );
+  },
+  play: async ({ canvasElement, userEvent }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(body.findByText("ChatGPT could not start")).resolves.toBeInTheDocument();
+    await userEvent.click(body.getByRole("button", { name: "Recover provider" }));
+    await waitFor(() => expect(body.queryByText("ChatGPT could not start")).not.toBeInTheDocument());
+    await userEvent.click(body.getByRole("button", { name: "Show provider failure" }));
+    await expect(body.findByRole("button", { name: "Open Settings" })).resolves.toBeEnabled();
   },
 };

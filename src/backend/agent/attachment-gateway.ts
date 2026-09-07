@@ -1,6 +1,7 @@
 import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
 import { isAbsolute } from "node:path";
+import type { FailureCode } from "@openbot/contracts/analytics-failures";
 import type { AgentEvent, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { sortConversationMessages } from "../conversation-snapshots";
 import type { GeneratedAttachmentSource, MailboxStore } from "../mailbox-store";
@@ -10,7 +11,7 @@ import { type OpenBotToolResponse, openBotToolResult } from "./routine-tools";
 
 export interface AttachmentGatewayHooks {
   emit(event: AgentEvent): void;
-  emitError(code: string, error: unknown, agentId?: string): void;
+  emitError(code: FailureCode, error: unknown, agentId?: string): void;
 }
 
 /**
