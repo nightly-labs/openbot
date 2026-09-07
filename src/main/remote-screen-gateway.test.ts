@@ -21,6 +21,34 @@ afterEach(async () => {
 });
 
 describe("RemoteScreenGateway", () => {
+  it.each(["darwin", "win32"] as const)(
+    "allows a %s host with runtime components to create a session",
+    async (platform) => {
+      const gateway = createGateway({ platform });
+      expect(gateway.capabilities().ready).toBe(true);
+      const session = await createSession(gateway, "http://127.0.0.1:9");
+      expect(session.phase).toBe("connecting");
+      await gateway.stop();
+    },
+  );
+
+  it.each(["darwin", "win32", "linux"] as const)(
+    "reports the setup failure for an unavailable %s host",
+    async (platform) => {
+      const gateway = createGateway({ platform, runtimeInstalled: false });
+      expect(gateway.capabilities().ready).toBe(false);
+      await expect(createSession(gateway, "http://127.0.0.1:9")).rejects.toMatchObject({
+        code: "host_unavailable",
+        message:
+          platform === "linux"
+            ? "Remote desktop hosting is not supported on Linux."
+            : "The Sunshine and Moonlight Web runtime is missing or is not supported on this host. Install the full OpenBot release on an Apple silicon Mac or Windows x64 host, then restart OpenBot.",
+      });
+      expect(gateway.list()).toEqual([]);
+      await gateway.stop();
+    },
+  );
+
   it("issues and consumes a one-time 60 second viewer grant", async () => {
     const gateway = createGateway();
     const { origin, close } = await serveGateway(gateway);
@@ -313,6 +341,8 @@ describe("RemoteScreenGateway", () => {
 
 function createGateway(
   options: {
+    platform?: "darwin" | "win32" | "linux";
+    runtimeInstalled?: boolean;
     now?: () => number;
     runtimeBaseUrl?: string;
     selectDisplay?: (displayId: string) => Promise<void>;
@@ -320,9 +350,12 @@ function createGateway(
   } = {},
 ): RemoteScreenGateway {
   return new RemoteScreenGateway({
-    platform: "darwin",
+    platform: options.platform ?? "darwin",
     unattended: true,
-    runtimePaths: { sunshine: "/sunshine", moonlightWebServer: "/web-server", moonlightStreamer: "/streamer" },
+    runtimePaths:
+      options.runtimeInstalled === false
+        ? null
+        : { sunshine: "/sunshine", moonlightWebServer: "/web-server", moonlightStreamer: "/streamer" },
     runtimeStateDirectory: "/tmp/openbot-test-runtime",
     getRuntimeCredentials: async () => ({ username: "openbot", password: "secret" }),
     getDisplays: () => displays,
