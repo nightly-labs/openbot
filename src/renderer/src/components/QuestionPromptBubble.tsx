@@ -84,11 +84,6 @@ function CompletedQuestionPrompt(props: { questions: AgentPromptQuestion[]; reso
           {props.resolution.status === "answered" ? <CircleCheck aria-hidden="true" /> : <X aria-hidden="true" />}
           <strong>{title()}</strong>
         </span>
-        <Show when={props.resolution.status === "answered"}>
-          <span class="question-prompt-complete-count">
-            {props.questions.length} of {props.questions.length}
-          </span>
-        </Show>
       </header>
 
       <Show when={props.resolution.status === "answered"}>
@@ -146,8 +141,6 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
   });
 
   queueMicrotask(() => {
-    const element = pageElements[0];
-    if (stage && element) stage.style.height = `${element.scrollHeight}px`;
     if (initialQuestion && !initialQuestion.options?.length) customInputs.get(initialQuestion.id)?.focus();
   });
 
@@ -160,7 +153,10 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
   );
 
   function transitionTo(content: PageContent, direction: "forward" | "back", after?: () => void): void {
-    if (transitioning()) return;
+    if (transitioning() || !stage) return;
+    const fromHeight = stage.getBoundingClientRect().height;
+    stage.dataset.preparing = "";
+    stage.style.height = `${fromHeight}px`;
     const fromSlot = activeSlot();
     const toSlot: 0 | 1 = fromSlot === 0 ? 1 : 0;
     const fromPageId = direction === "forward" ? 1 : 2;
@@ -181,10 +177,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
 
     queueMicrotask(() => {
       if (!stage) return;
-      stage.dataset.preparing = "";
-      const fromElement = pageElements[fromSlot];
       const toElement = pageElements[toSlot];
-      if (fromElement) stage.style.height = `${fromElement.scrollHeight}px`;
       void stage.offsetHeight;
       delete stage.dataset.preparing;
       if (toElement) stage.style.height = `${toElement.scrollHeight}px`;
@@ -199,6 +192,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
         });
         setTransitioning(false);
         transitionTimer = undefined;
+        stage?.style.removeProperty("height");
         after?.();
         const interaction = queuedInteraction;
         queuedInteraction = undefined;

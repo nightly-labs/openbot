@@ -5506,7 +5506,7 @@ button.chat-action-target:active,
 .composer-wrap {
   position: relative;
   flex: 0 0 auto;
-  padding: 0 12px 7px;
+  padding: 0 var(--openbot-space-1-5) var(--openbot-space-1-5);
 }
 
 .team-typing-dots {
@@ -5644,7 +5644,7 @@ button.chat-action-target:active,
 
 .composer[data-compact] {
   grid-template-columns: 28px minmax(0, 1fr) auto;
-  min-height: 46px;
+  min-height: 48px;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
@@ -7167,21 +7167,17 @@ button.chat-action-target:active,
   letter-spacing: var(--openbot-tracking-tight);
 }
 
-.question-prompt-complete-count {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-sm);
-  white-space: nowrap;
-}
-
 .question-prompt-complete-answers.ui-item-group {
-  border-radius: var(--openbot-radius-bubble-inset);
+  gap: var(--openbot-space-3);
+  border: 0;
+  border-radius: 0;
   background: transparent;
 }
 
 .question-prompt-complete-answers .ui-item {
-  min-height: 48px;
-  padding: var(--openbot-space-2) var(--openbot-space-3);
+  min-height: 0;
+  border: 0;
+  padding: 0;
 }
 
 .question-prompt-complete-answers .ui-item-title,
@@ -7189,6 +7185,7 @@ button.chat-action-target:active,
   overflow: visible;
   text-overflow: clip;
   white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .question-prompt-complete-answers .ui-item-title {
@@ -7277,17 +7274,19 @@ button.chat-action-target:active,
 }
 
 .question-prompt-stage {
-  --page-slide-distance: 6px;
-  --page-blur: 5px;
-
   min-width: 0;
   overflow: hidden;
   transition: height var(--page-slide-dur) var(--page-slide-ease);
 }
 
-.question-prompt-page {
+.question-prompt-stage .question-prompt-page {
+  bottom: auto;
   display: grid;
   gap: var(--openbot-space-3);
+}
+
+.question-prompt-stage:not([data-transitioning]) .question-prompt-page:not([aria-hidden="true"]) {
+  position: relative;
 }
 
 .question-prompt-stage[data-preparing],
