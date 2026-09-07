@@ -41,6 +41,47 @@ afterEach(async () => {
 });
 
 describe.sequential("GrokAgentClient", () => {
+  it.each(["end_turn", "cancelled", "max_tokens"])(
+    "keeps intermediate Grok steps in thinking when the turn ends with %s",
+    async (stopReason) => {
+      process.env.OPENBOT_FAKE_GROK_MODE = stopReason;
+      client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
+      const notifications: AppServerNotification[] = [];
+      client.on("notification", (notification) => notifications.push(notification));
+      client.start();
+      const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
+      await client.request(
+        "turn/start",
+        { threadId: thread.id, input: [{ type: "text", text: "Inspect and answer" }] },
+        decodeTurnResponse,
+      );
+      await waitFor(() => notifications.some((notification) => notification.method === "turn/completed"));
+      const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
+      const messages = history.thread.turns?.[0]?.items;
+      expect(messages).toEqual([
+        expect.objectContaining({ phase: "commentary", text: "Inspecting files." }),
+        expect.objectContaining({ phase: "commentary", text: "Checking results." }),
+        expect.objectContaining({
+          phase: stopReason === "end_turn" ? "final_answer" : "commentary",
+          text: "The final answer.",
+        }),
+      ]);
+      // Every streamed segment must be classified before its first delta reaches a consumer.
+      const phases = new Map<string, string>();
+      for (const notification of notifications) {
+        const params = notification.params;
+        if (!isDynamicRecord(params)) continue;
+        if (notification.method === "item/started" && isDynamicRecord(params.item)) {
+          const { id, phase } = params.item;
+          if (typeof id === "string" && typeof phase === "string") phases.set(id, phase);
+        }
+        if (notification.method === "item/agentMessage/delta") {
+          expect(phases.get(String(params.itemId))).toBe("commentary");
+        }
+      }
+    },
+  );
+
   it("reads the current weekly billing period and rejects a monthly period", async () => {
     client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
     client.start();
@@ -572,6 +613,21 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     return;
   }
   if (message.method === "session/prompt") {
+    if (["end_turn", "cancelled", "max_tokens"].includes(mode)) {
+      const updates = [
+        { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Inspecting files." } },
+        { sessionUpdate: "tool_call", toolCallId: "read-1", title: "Read files", status: "in_progress" },
+        { sessionUpdate: "tool_call_update", toolCallId: "read-1", status: "completed" },
+        { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Checking results." } },
+        { sessionUpdate: "tool_call", toolCallId: "read-2", title: "Check results", status: "in_progress" },
+        { sessionUpdate: "tool_call_update", toolCallId: "read-2", status: "completed" },
+        { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "The final " } },
+        { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "answer." } },
+      ];
+      for (const update of updates) write({ method: "session/update", params: { sessionId: message.params.sessionId, update } });
+      write({ id: message.id, result: { stopReason: mode } });
+      return;
+    }
     promptCounter += 1;
     log({ method: message.method, promptCounter, text: message.params.prompt.filter((block) => block.type === "text").map((block) => block.text).join("\n") });
     if (promptCounter === 1) {
