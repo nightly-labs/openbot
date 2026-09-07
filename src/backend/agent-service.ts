@@ -8,6 +8,7 @@ import type {
   AgentEvent,
   AgentMemory,
   AgentModelOption,
+  AgentProfileDraft,
   AgentRuntimeSnapshot,
   AgentStatus,
   AgentSummary,
@@ -26,6 +27,7 @@ import type {
   DeleteRoutineInput,
   DraftAttachment,
   DuplicateAgentResult,
+  GenerateAgentProfileInput,
   ListRoutineRunsInput,
   QueuedMessageReceipt,
   QueueSnapshot,
@@ -35,9 +37,12 @@ import type {
   RespondToPromptInput,
   Routine,
   RoutineRun,
+  SaveAgentProfileInput,
+  SaveAgentProfileResult,
   SendMessageInput,
   SetMessageReactionInput,
   SidebarLayoutSnapshot,
+  SidebarSection,
   SteerQueuedMessageInput,
   TestRoutineInput,
   UpdateAgentInput,
@@ -67,6 +72,8 @@ import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-sit
 import { isHostedSiteMutationTool } from "./agent/hosted-site-events";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { MailboxSync } from "./agent/mailbox-sync";
+import { generateProfile } from "./agent/profile-generation";
+import { ProfileSave } from "./agent/profile-save";
 import { type AgentClientFactory, ProviderRuntime } from "./agent/provider-runtime";
 import { type RoutineMutationOptions, RoutineScheduler } from "./agent/routine-scheduler";
 import { type OpenBotToolResponse, openBotToolResult } from "./agent/routine-tools";
@@ -81,6 +88,7 @@ import { type ConversationMarkerExclusions, ConversationReadStore } from "./conv
 import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
+import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePathFromInput } from "./workspace-paths";
 
 const logger = createOpenBotLogger("agent-service");
@@ -102,6 +110,8 @@ export interface ResolvedSharedFile {
 }
 
 export class AgentService extends EventEmitter<AgentServiceEvents> {
+  readonly #profileSave: ProfileSave;
+  readonly #profileClients = new Set<AgentClient>();
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
   readonly #browser: AgentBrowserHost;
@@ -141,6 +151,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ) {
     super();
     this.#store = store;
+    this.#profileSave = new ProfileSave(store, {
+      create: (input, configure) =>
+        this.createAgent({ ...input.draft, initialMessage: input.initialMessage ?? "" }, configure),
+      changed: (agent) => {
+        const session = this.#store.activeProviderSession(agent.id);
+        if (session) this.#conversation.unloadThread(session.externalSessionId);
+        this.#emit({ type: "agents-changed", agents: this.listAgents() });
+      },
+      delete: (agentId) => this.deleteAgent(agentId),
+    });
     this.#mailbox = mailbox;
     this.#browser = browser;
     this.#conversationReads = new ConversationReadStore(store.database);
@@ -454,7 +474,42 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.listModels();
   }
 
-  async createAgent(input: CreateAgentInput): Promise<AgentSummary> {
+  async generateProfile(input: GenerateAgentProfileInput, sections: SidebarSection[]): Promise<AgentProfileDraft> {
+    const agent = input.agentId ? this.listAgents().find((candidate) => candidate.id === input.agentId) : null;
+    if (input.agentId && !agent) throw new Error("This agent no longer exists.");
+    if (this.#stopping) throw new Error("OpenBot is shutting down.");
+    if (this.#profileClients.size >= 3) throw new Error("Profile generation is busy. Try again shortly.");
+    const provider = agent?.provider ?? this.#providers.preferredProvider();
+    await this.ensureProvider(provider);
+    const models = this.#providers.listModels();
+    const defaultModel = provider === "codex" ? "gpt-5.6-luna" : provider === "claude" ? "claude-opus-5" : null;
+    const model = agent
+      ? models.find((candidate) => candidate.id === agent.model && candidate.provider === provider)
+      : (models.find((candidate) => candidate.provider === provider && candidate.id === defaultModel) ??
+        models.find((candidate) => candidate.provider === provider));
+    if (!model) throw new Error("The selected provider has no available model.");
+    if (this.#stopping) throw new Error("OpenBot is shutting down.");
+    if (this.#profileClients.size >= 3) throw new Error("Profile generation is busy. Try again shortly.");
+    const client = this.#providers.createProfileClient(provider);
+    this.#profileClients.add(client);
+    try {
+      return await generateProfile(client, model, input, sections);
+    } finally {
+      this.#profileClients.delete(client);
+    }
+  }
+
+  saveProfile(
+    input: SaveAgentProfileInput,
+    sidebar: Pick<SidebarLayoutStore, "getSnapshot" | "withProfileAssignment">,
+  ): Promise<SaveAgentProfileResult> {
+    return this.#profileSave.save(input, sidebar);
+  }
+
+  async createAgent(
+    input: CreateAgentInput,
+    configure?: (agent: AgentSummary) => Promise<AgentSummary>,
+  ): Promise<AgentSummary> {
     const initialMessage = input.initialMessage.trim();
     if (!initialMessage) throw new Error("Initial message is required.");
     if (input.initialMessage.length > INPUT_LIMITS.messageText) throw new Error("Initial message is too long.");
@@ -477,6 +532,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           reasoningEffort: preferredModel.defaultReasoningEffort,
         });
       }
+      if (configure) agent = await configure(agent);
       await this.sendMessage({ agentId: agent.id, text: initialMessage, attachmentDraftIds: [] });
       return this.#store.list().find((candidate) => candidate.id === agent.id) ?? agent;
     } catch (error) {
@@ -733,7 +789,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#attention.clearPrompts();
     this.#attention.clearBrowserTakeovers();
     this.#attention.clearApprovals();
-    const clients = this.#providers.dispose();
+    const clients = [...this.#providers.dispose(), ...this.#profileClients];
+    this.#profileClients.clear();
     for (const [agentId, snapshot] of this.#conversation.activeSnapshots()) {
       if (!snapshot.activeTurnId) continue;
       const session = this.#store.activeProviderSession(agentId);

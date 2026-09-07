@@ -1,3 +1,9 @@
+import {
+  decodeAgentProfileDraft,
+  decodeSaveAgentProfileResult,
+  parseGenerateAgentProfile,
+  parseSaveAgentProfile,
+} from "@openbot/contracts/ipc";
 // An agent's core surface: status, agents, conversations, the queue and the prompts
 // a turn can raise. Memories, routines and attachments are their own registrars.
 // Every one of these routes to the local service or to a remote server by the
@@ -129,6 +135,29 @@ export function agentIpcHandlers({
             remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.actions, decodeSidebarLayoutSnapshot, {
               method: "POST",
               body: action,
+            }),
+        });
+      }),
+      generateProfile: payloadHandler(parseAgentRequest, (scoped) => {
+        const input = parseGenerateAgentProfile(scoped.payload);
+        return routeToServer(scoped.serverId, {
+          local: () => service.generateProfile(input, sidebarLayout.getSnapshot().sections),
+          remote: (serverId) =>
+            remoteServers.request(serverId, TEAM_API_ROUTES.agents.generateProfile, decodeAgentProfileDraft, {
+              method: "POST",
+              body: input,
+              timeoutMs: 150_000,
+            }),
+        });
+      }),
+      saveProfile: payloadHandler(parseAgentRequest, (scoped) => {
+        const input = parseSaveAgentProfile(scoped.payload);
+        return routeToServer(scoped.serverId, {
+          local: () => service.saveProfile(input, sidebarLayout),
+          remote: (serverId) =>
+            remoteServers.request(serverId, TEAM_API_ROUTES.agents.saveProfile, decodeSaveAgentProfileResult, {
+              method: "POST",
+              body: input,
             }),
         });
       }),

@@ -60,6 +60,7 @@ interface AgentSettingsPanelProps {
   maxWidth: () => number;
   onClose: () => void;
   onWidthChange: (width: number) => void;
+  onConfigureProfile?: () => void;
   onUpdateAgent: (agentId: string, updates: Omit<UpdateAgentInput, "agentId">) => Promise<void>;
   onUpdateRuntimeSettings: (
     agentId: string,
@@ -440,6 +441,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         onResize={setPanelWidth}
         onResizeEnd={(value) => savePanelWidth(SETTINGS_PANEL_STORAGE_KEY, value)}
       />
+      <Show when={props.onConfigureProfile}>
+        <Button variant="outline" onClick={props.onConfigureProfile}>
+          Generate from a prompt
+        </Button>
+      </Show>
       <Show when={!draft.routines.open}>
         <header class="agent-settings-header">
           <Button

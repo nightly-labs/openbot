@@ -12,6 +12,7 @@ import { useConnectionAppearance } from "@/features/workspace/components/use-con
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 
 interface BloubAvatarProps {
+  preview?: boolean;
   agentId: string;
   hue: AvatarHue | null;
   seed: string;
@@ -34,10 +35,10 @@ function AvatarDot({ frame, index, color }: { frame: DerivedValue<BloubActivityF
   return <AnimatedCircle fill={color} animatedProps={props} />;
 }
 
-export function BloubAvatar({ agentId, hue, seed, size = 54 }: BloubAvatarProps) {
+export function BloubAvatar({ agentId, hue, seed, size = 54, preview = false }: BloubAvatarProps) {
   const { agents, servers } = useMobileWorkspace();
   const serverId = agents.find((agent) => agent.id === agentId)?.serverId;
-  const disconnected = !servers.some((server) => server.id === serverId && server.state === "online");
+  const disconnected = !preview && !servers.some((server) => server.id === serverId && server.state === "online");
   const appearance = useConnectionAppearance(disconnected);
   const colorProps = useAnimatedProps(() => ({ values: [appearance.get().saturation] }));
   const appearanceProps = useAnimatedProps(() => ({ opacity: appearance.get().opacity }));

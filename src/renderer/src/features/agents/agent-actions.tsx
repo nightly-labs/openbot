@@ -1,3 +1,4 @@
+import type { SaveAgentProfileInput } from "@openbot/contracts/ipc";
 import { desktopAnalytics } from "../../analytics";
 import { toAgentProfile, withoutAgent } from "../../app-message-projection";
 import { createStoredProfile } from "../../app-stored-values";
@@ -100,6 +101,20 @@ const AgentActions = createSimpleContext({
       }
     }
 
+    async function saveReviewedProfile(input: SaveAgentProfileInput): Promise<void> {
+      const result = await window.openbot.agent.saveProfile(input);
+      if (!scopeIsCurrent()) return;
+      const profile = createStoredProfile(toAgentProfile(result.agent));
+      setAgentList((current) => [profile, ...current.filter((agent) => agent.id !== profile.id)]);
+      setSidebarLayout(result.layout);
+      toast.success(input.agentId ? "Agent profile saved" : "Agent created");
+      if (!input.agentId) {
+        setAgentSetupOpen(false);
+        clearDirectSelection();
+        setActiveAgentId(profile.id);
+      }
+    }
+
     function editAgent(agentId: string) {
       if (agentSetupOpen() && creatingAgent()) return;
       selectAgent(agentId);
@@ -189,7 +204,7 @@ const AgentActions = createSimpleContext({
       }
     }
 
-    return { createAgent, editAgent, duplicateAgent, deleteAgent };
+    return { createAgent, editAgent, duplicateAgent, deleteAgent, saveReviewedProfile };
   },
 });
 

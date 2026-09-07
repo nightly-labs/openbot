@@ -18,6 +18,7 @@ messaging in one desktop app.
 
 ## What works
 
+- Prompt-driven agent creation and editing on desktop and mobile, with editable instructions, avatar, and section review before saving.
 - Persistent agents backed by independent Codex, Claude, or Grok sessions and local workspaces.
 - Per-agent context monitoring with automatic compaction before long threads exhaust the model window.
 - FIFO message queues with pause, resume, cancellation, and crash-safe persistence.

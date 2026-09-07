@@ -41,6 +41,42 @@ afterEach(async () => {
 });
 
 describe.sequential("GrokAgentClient", () => {
+  it("starts profile generation with no built-in tools and denies approval requests", async () => {
+    client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000, true);
+    const requests: AppServerRequest[] = [];
+    client.on("request", (request) => requests.push(request));
+    client.start();
+    await client.request("initialize", {}, decodeRecordResponse);
+    const thread = await client.request("thread/start", { cwd: root, dynamicTools: [] }, decodeThreadResponse);
+    await client.request(
+      "turn/start",
+      { threadId: thread.thread.id, input: [{ type: "text", text: "Draft a profile" }] },
+      decodeTurnResponse,
+    );
+    await vi.waitFor(async () => expect(await readFile(logPath, "utf8")).toContain("permission-response"));
+    const log = (await readFile(logPath, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(log).toContainEqual(
+      expect.objectContaining({
+        event: "start",
+        args: [
+          "--no-auto-update",
+          "--tools",
+          "",
+          "--deny",
+          "*",
+          "--no-subagents",
+          "--disable-web-search",
+          "agent",
+          "stdio",
+        ],
+      }),
+    );
+    expect(log).toContainEqual(expect.objectContaining({ event: "permission-response", outcome: "cancelled" }));
+    expect(requests.some((request) => request.method.includes("requestApproval"))).toBe(false);
+  });
   it("reads the current weekly billing period and rejects a monthly period", async () => {
     client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
     client.start();
@@ -426,7 +462,7 @@ const modelConfig = () => {
 createInterface({ input: process.stdin }).on("line", (line) => {
   const message = JSON.parse(line);
   if (!message.method && message.id === "permission-1") {
-    log({ event: "permission-response", optionId: message.result?.outcome?.optionId });
+    log({ event: "permission-response", outcome: message.result?.outcome?.outcome, optionId: message.result?.outcome?.optionId });
     write({
       id: "elicitation-1",
       method: "elicitation/create",

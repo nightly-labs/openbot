@@ -11,6 +11,7 @@ import { isReasoningEffort } from "@openbot/contracts/ipc";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import { type AgentCliInfo, CodexCliError, type CodexCliInfo, resolveCodexCli } from "./../cli";
+import { GrokAgentClient } from "../grok-client";
 import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
@@ -219,6 +220,15 @@ export class ProviderRuntime implements ProviderPort {
 
   listModels(): AgentModelOption[] {
     return structuredClone(this.#models);
+  }
+
+  createProfileClient(provider: AgentProvider): AgentClient {
+    const cli = this.#cli.get(provider);
+    if (!cli || !this.#clients.has(provider))
+      throw new Error("Connect the selected provider before generating a profile.");
+    if (this.#clientFactory) return this.#clientFactory(provider, cli);
+    if (provider === "grok") return new GrokAgentClient(cli, this.#requestTimeoutMs, true);
+    return requireProviderDriver(provider).createClient(cli, this.#requestTimeoutMs);
   }
 
   preferredProvider(): AgentProvider {

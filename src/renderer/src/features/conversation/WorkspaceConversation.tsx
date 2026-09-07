@@ -1,10 +1,11 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
-import { createMemo } from "solid-js";
+import { createMemo, createSignal, Show } from "solid-js";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
 import { useTurns } from "../../turns";
 import { useAgents } from "../agents/agents-context";
+import { WorkspaceProfileSetup } from "../agents/WorkspaceProfileSetup";
 import { useBrowserTabs } from "../browser/browser-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { useServerSettings } from "../servers/server-settings";
@@ -27,6 +28,7 @@ import { useConversation } from "./conversation-context";
  * rather than captured once.
  */
 export function WorkspaceConversation(props: { account: () => CentralAuthUser }) {
+  const [profileTarget, setProfileTarget] = createSignal<{ agentId: string; serverId: string } | null>(null);
   const platform = usePlatform();
   const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { serverSettingsOpen } = useServerSettings();
@@ -103,83 +105,103 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   );
 
   return (
-    <Conversation
-      agentStatus={agentStatus()}
-      providerRuntimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
-      onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
-      onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
-      onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
-      agent={activeAgent()}
-      agents={agentList()}
-      availableRoutineIds={activeRoutineIds()}
-      modelOptions={modelOptions()}
-      messages={activeMessages()}
-      messageReferences={activeAgent() ? (conversationReferences()[activeAgent()?.id ?? ""] ?? {}) : {}}
-      unreadCount={activeAgent() ? (conversationReads()[activeAgent()?.id ?? ""]?.unreadCount ?? 0) : 0}
-      firstUnreadMessageId={
-        activeAgent() ? (conversationReads()[activeAgent()?.id ?? ""]?.firstUnreadMessageId ?? null) : null
-      }
-      loaded={activeAgent() ? conversationLoaded()[activeAgent()?.id ?? ""] === true : false}
-      hasOlder={
-        activeServerSupportsCapability("conversation-pagination") && activeAgent()
-          ? (conversationPages()[activeAgent()?.id ?? ""]?.hasOlder ?? false)
-          : false
-      }
-      discontinuous={activeAgent() ? conversationWindowModes()[activeAgent()?.id ?? ""] === "around" : false}
-      loadingOlder={activeAgent() ? conversationOlderLoading()[activeAgent()?.id ?? ""] === true : false}
-      olderError={activeAgent() ? (conversationOlderErrors()[activeAgent()?.id ?? ""] ?? null) : null}
-      queue={activeQueue()}
-      browserTabs={browserTabs()}
-      activeBrowserTabId={activeBrowserTabId()}
-      browserVisibilitySuspended={browserVisibilitySuspended()}
-      browserControlState={browserControlState()}
-      server={activeServer()}
-      presence={teamPresence()}
-      currentUserEmail={props.account().email}
-      browserEnabled={!platform.landingPreview && activeServerSupportsCapability("browser-control")}
-      remoteDesktopSessionActive={Boolean(activeRemoteDesktopSession())}
-      remoteDesktopVisible={remoteDesktopWorkspaceVisible()}
-      remoteDesktopEnabled={!platform.landingPreview && activeServerSupportsCapability("remote-desktop")}
-      prompt={activePrompt()}
-      approval={activeAgent() ? pendingApprovals()[activeAgent()?.id ?? ""] : undefined}
-      browserTakeover={activeBrowserTakeover()}
-      activeTurnId={activeAgent() ? activeTurns()[activeAgent()?.id ?? ""] : null}
-      activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}
-      skillsMarketplaceOpen={skillsMarketplaceOpen()}
-      globalOverlayOpen={
-        globalSearchOpen() || joinServerOpen() || serverSettingsOpen() || appSettingsOpen() || skillsMarketplaceOpen()
-      }
-      settingsRequest={settingsRequest()}
-      messageFocusRequest={messageFocusRequest()}
-      onSelectAgent={selectAgent}
-      onUpdateAgent={updateAgent}
-      onSetAgentAvatar={setAgentAvatar}
-      onSendMessage={sendMessage}
-      onMarkRead={() => markAgentMessagesRead()}
-      onLoadOlder={() => void loadOlderAgentMessages()}
-      onLoadLatest={() => (activeAgent() ? loadLatestAgentMessages(activeAgent()?.id ?? "") : Promise.resolve())}
-      onSearchMessages={(query) =>
-        activeAgent()
-          ? searchAgentMessages(activeAgent()?.id ?? "", query)
-          : Promise.resolve({ messageIds: [], total: 0 })
-      }
-      onOpenSearchMessage={(messageId) =>
-        activeAgent() ? openAgentMessage(activeAgent()?.id ?? "", messageId) : Promise.resolve()
-      }
-      onTypingChange={setTeamTyping}
-      onAnswerPrompt={answerPrompt}
-      onPromptResolutionPresented={presentPromptResolution}
-      onRespondToApproval={respondToApproval}
-      onRespondToBrowserTakeover={respondToBrowserTakeover}
-      onCancelQueuedMessage={cancelQueuedMessage}
-      onSteerQueuedMessage={steerQueuedMessage}
-      onUpdateQueuedMessage={updateQueuedMessage}
-      onReorderQueue={reorderQueue}
-      onActivateBrowserTab={activateBrowserTab}
-      onCloseBrowserTab={closeBrowserTab}
-      onOpenRemoteDesktop={openRemoteDesktopWorkspace}
-      onOpenAgentSetup={() => window.openbot.openExternal("agent-setup")}
-      onStop={stopActiveTurn}
-    />
+    <>
+      <Show
+        when={
+          profileTarget()?.serverId === activeServer()?.id &&
+          profileTarget()?.agentId === activeAgent()?.id &&
+          profileTarget()
+        }
+      >
+        {(target) => <WorkspaceProfileSetup agentId={target().agentId} onClose={() => setProfileTarget(null)} />}
+      </Show>
+      <Conversation
+        agentStatus={agentStatus()}
+        providerRuntimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
+        onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
+        onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
+        onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
+        agent={activeAgent()}
+        agents={agentList()}
+        availableRoutineIds={activeRoutineIds()}
+        modelOptions={modelOptions()}
+        messages={activeMessages()}
+        messageReferences={activeAgent() ? (conversationReferences()[activeAgent()?.id ?? ""] ?? {}) : {}}
+        unreadCount={activeAgent() ? (conversationReads()[activeAgent()?.id ?? ""]?.unreadCount ?? 0) : 0}
+        firstUnreadMessageId={
+          activeAgent() ? (conversationReads()[activeAgent()?.id ?? ""]?.firstUnreadMessageId ?? null) : null
+        }
+        loaded={activeAgent() ? conversationLoaded()[activeAgent()?.id ?? ""] === true : false}
+        hasOlder={
+          activeServerSupportsCapability("conversation-pagination") && activeAgent()
+            ? (conversationPages()[activeAgent()?.id ?? ""]?.hasOlder ?? false)
+            : false
+        }
+        discontinuous={activeAgent() ? conversationWindowModes()[activeAgent()?.id ?? ""] === "around" : false}
+        loadingOlder={activeAgent() ? conversationOlderLoading()[activeAgent()?.id ?? ""] === true : false}
+        olderError={activeAgent() ? (conversationOlderErrors()[activeAgent()?.id ?? ""] ?? null) : null}
+        queue={activeQueue()}
+        browserTabs={browserTabs()}
+        activeBrowserTabId={activeBrowserTabId()}
+        browserVisibilitySuspended={browserVisibilitySuspended()}
+        browserControlState={browserControlState()}
+        server={activeServer()}
+        presence={teamPresence()}
+        currentUserEmail={props.account().email}
+        browserEnabled={!platform.landingPreview && activeServerSupportsCapability("browser-control")}
+        remoteDesktopSessionActive={Boolean(activeRemoteDesktopSession())}
+        remoteDesktopVisible={remoteDesktopWorkspaceVisible()}
+        remoteDesktopEnabled={!platform.landingPreview && activeServerSupportsCapability("remote-desktop")}
+        prompt={activePrompt()}
+        approval={activeAgent() ? pendingApprovals()[activeAgent()?.id ?? ""] : undefined}
+        browserTakeover={activeBrowserTakeover()}
+        activeTurnId={activeAgent() ? activeTurns()[activeAgent()?.id ?? ""] : null}
+        activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}
+        skillsMarketplaceOpen={skillsMarketplaceOpen()}
+        globalOverlayOpen={
+          globalSearchOpen() || joinServerOpen() || serverSettingsOpen() || appSettingsOpen() || skillsMarketplaceOpen()
+        }
+        settingsRequest={settingsRequest()}
+        messageFocusRequest={messageFocusRequest()}
+        onSelectAgent={selectAgent}
+        onConfigureProfile={
+          activeServerSupportsCapability("agent-profile-generation")
+            ? () => {
+                const agent = activeAgent();
+                const server = activeServer();
+                if (agent && server) setProfileTarget({ agentId: agent.id, serverId: server.id });
+              }
+            : undefined
+        }
+        onUpdateAgent={updateAgent}
+        onSetAgentAvatar={setAgentAvatar}
+        onSendMessage={sendMessage}
+        onMarkRead={() => markAgentMessagesRead()}
+        onLoadOlder={() => void loadOlderAgentMessages()}
+        onLoadLatest={() => (activeAgent() ? loadLatestAgentMessages(activeAgent()?.id ?? "") : Promise.resolve())}
+        onSearchMessages={(query) =>
+          activeAgent()
+            ? searchAgentMessages(activeAgent()?.id ?? "", query)
+            : Promise.resolve({ messageIds: [], total: 0 })
+        }
+        onOpenSearchMessage={(messageId) =>
+          activeAgent() ? openAgentMessage(activeAgent()?.id ?? "", messageId) : Promise.resolve()
+        }
+        onTypingChange={setTeamTyping}
+        onAnswerPrompt={answerPrompt}
+        onPromptResolutionPresented={presentPromptResolution}
+        onRespondToApproval={respondToApproval}
+        onRespondToBrowserTakeover={respondToBrowserTakeover}
+        onCancelQueuedMessage={cancelQueuedMessage}
+        onSteerQueuedMessage={steerQueuedMessage}
+        onUpdateQueuedMessage={updateQueuedMessage}
+        onReorderQueue={reorderQueue}
+        onActivateBrowserTab={activateBrowserTab}
+        onCloseBrowserTab={closeBrowserTab}
+        onOpenRemoteDesktop={openRemoteDesktopWorkspace}
+        onOpenAgentSetup={() => window.openbot.openExternal("agent-setup")}
+        onStop={stopActiveTurn}
+      />
+    </>
   );
 }

@@ -1,3 +1,4 @@
+import { parseGenerateAgentProfile, parseSaveAgentProfile } from "@openbot/contracts/ipc";
 // Agents: the collection, the sidebar that arranges them, and everything under one agent's id.
 //
 // The order in this file is the one thing about it that is not free. The static collection paths -
@@ -43,7 +44,7 @@ export interface AgentRouteDependencies {
   // sub-modules that between them reach most of it. The narrowing that means something is theirs.
   agents: TeamApiAgents;
   skills?: TeamApiOptions["skills"];
-  sidebarLayout: Pick<TeamApiSidebarLayout, "getSnapshot" | "mutate" | "removeAgent">;
+  sidebarLayout: Pick<TeamApiSidebarLayout, "getSnapshot" | "mutate" | "removeAgent" | "withProfileAssignment">;
   duplicateAgent: (agentId: string, operationId: string) => Promise<DuplicateAgentResult>;
 }
 
@@ -53,6 +54,21 @@ export async function routeAgents(
 ): Promise<RouteOutcome> {
   const { method, url, request, response, member, capabilities, json, empty } = context;
 
+  if (
+    method === "POST" &&
+    (url.pathname === TEAM_API_ROUTES.agents.generateProfile || url.pathname === TEAM_API_ROUTES.agents.saveProfile)
+  ) {
+    if (!capabilities.has("agent-profile-generation"))
+      throw new HttpError(400, "Profile generation is not supported by this client.");
+    const body = await readJson(request);
+    if (url.pathname === TEAM_API_ROUTES.agents.generateProfile) {
+      return json(
+        200,
+        await agents.generateProfile(parseGenerateAgentProfile(body), sidebarLayout.getSnapshot().sections),
+      );
+    }
+    return json(200, await agents.saveProfile(parseSaveAgentProfile(body), sidebarLayout));
+  }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.messages.search) {
     const query = url.searchParams.get("q") ?? "";
     if (!query.trim() || query.length > INPUT_LIMITS.messageText) {

@@ -3,15 +3,16 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useState } from "react";
 import { View } from "react-native";
-
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { AgentProfileSetup } from "../components/agent-profile-setup";
 
 export function EditAgentScreen() {
   const { agentId } = useLocalSearchParams<{ agentId: string }>();
   const resolvedAgentId = Array.isArray(agentId) ? agentId[0] : agentId;
-  const { agents, updateAgent } = useMobileWorkspace();
+  const { agents, updateAgent, profileGenerationSupported, activeServer } = useMobileWorkspace();
+  const [profileServer, setProfileServer] = useState<string | null>(null);
   const agent = agents.find((candidate) => candidate.id === resolvedAgentId);
   const [name, setName] = useState(agent?.name ?? "");
   const [description, setDescription] = useState(agent?.description ?? "");
@@ -32,6 +33,20 @@ export function EditAgentScreen() {
     }
   }
 
+  if (profileServer === activeServer.id)
+    return (
+      <SheetScrollView
+        contentContainerClassName="gap-5 px-5 pb-safe-offset-5 pt-5"
+        contentInsetAdjustmentBehavior="automatic"
+      >
+        <AgentProfileSetup
+          agentId={resolvedAgentId}
+          onClose={() => setProfileServer(null)}
+          onSaved={() => router.back()}
+        />
+      </SheetScrollView>
+    );
+
   return (
     <SheetScrollView
       className="bg-background"
@@ -48,6 +63,11 @@ export function EditAgentScreen() {
               Changes are saved on the desktop server and sent live to connected devices.
             </Typography.Paragraph>
           </View>
+          {profileGenerationSupported ? (
+            <Button variant="secondary" onPress={() => setProfileServer(activeServer.id)}>
+              <Button.Label>Generate from a prompt</Button.Label>
+            </Button>
+          ) : null}
           <SheetFormField
             autoCapitalize="words"
             autoFocus

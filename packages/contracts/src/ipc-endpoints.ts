@@ -138,6 +138,8 @@ export const IPC_ENDPOINTS = {
     listInstalledSkills: request(IPC_CHANNELS.agentListInstalledSkills),
     getSidebarLayout: request(IPC_CHANNELS.agentGetSidebarLayout),
     mutateSidebarLayout: request(IPC_CHANNELS.agentMutateSidebarLayout),
+    generateProfile: request(IPC_CHANNELS.agentGenerateProfile),
+    saveProfile: request(IPC_CHANNELS.agentSaveProfile),
     create: request(IPC_CHANNELS.agentCreate),
     duplicate: request(IPC_CHANNELS.agentDuplicate),
     update: request(IPC_CHANNELS.agentUpdate),

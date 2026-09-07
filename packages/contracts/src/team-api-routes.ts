@@ -112,6 +112,8 @@ export const TEAM_API_ROUTES = {
     browserTakeover: "/v1/browser-takeovers/respond",
   },
   agents: {
+    generateProfile: "/v1/agents/profile/generate",
+    saveProfile: "/v1/agents/profile/save",
     // GET lists, POST creates.
     all: "/v1/agents",
     status: "/v1/agents/status",

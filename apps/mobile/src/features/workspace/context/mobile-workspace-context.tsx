@@ -3,7 +3,10 @@ import {
   type AgentSummary,
   type ConversationSnapshot,
   type CreateAgentInput,
+  decodeAgentProfileDraft,
+  decodeSaveAgentProfileResult,
   isAvatarHue,
+  isSidebarLayoutSnapshot,
   type TeamRealtimeEvent,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -543,6 +546,33 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         setActiveServerId(host.hostId);
         // Membership is already committed. Directory failure must not reuse the consumed invite.
         void refreshHosts().catch(() => undefined);
+      },
+      profileGenerationSupported:
+        serverCapabilities.current.get(activeServer.id)?.includes("agent-profile-generation") ?? false,
+      getProfileLayout: () =>
+        request("GET", TEAM_API_ROUTES.sidebarLayout.state, (value) => {
+          if (!isSidebarLayoutSnapshot(value)) throw new Error("The server returned invalid sections.");
+          return value;
+        }),
+      generateProfile: (input) =>
+        request("POST", TEAM_API_ROUTES.agents.generateProfile, decodeAgentProfileDraft, {
+          prompt: input.prompt,
+          ...(input.agentId ? { agentId: input.agentId } : {}),
+          ...(input.draft ? { draft: { ...input.draft } } : {}),
+        }),
+      saveProfile: async (input) => {
+        const generation = loadGeneration.current;
+        const result = await request("POST", TEAM_API_ROUTES.agents.saveProfile, decodeSaveAgentProfileResult, {
+          operationId: input.operationId,
+          draft: { ...input.draft },
+          ...(input.agentId ? { agentId: input.agentId } : {}),
+          ...(input.initialMessage ? { initialMessage: input.initialMessage } : {}),
+        });
+        if (generation !== loadGeneration.current) return;
+        setAgents((current) => [
+          ...current.filter((agent) => agent.id !== result.agent.id),
+          projectAgent(activeServer.id, result.agent),
+        ]);
       },
       createAgent: async (input: CreateAgentInput) => {
         const created = await request("POST", TEAM_API_ROUTES.agents.all, decodeAgent, {

@@ -214,3 +214,20 @@ for the division of labour and what each CI job covers.
 Changes to packaging, native modules, or Electron security also require the applicable macOS and
 Windows package verification commands. Live provider and team smoke tests use isolated temporary
 data and are manual because they can require local credentials.
+
+### Prompt-driven agent profiles
+
+Desktop and mobile can generate and review a profile through the optional
+`agent-profile-generation` Team API capability. The host uses the existing agent's
+provider/model, or the creation defaults, in a separate provider client with tools
+restricted and no OpenBot conversation. Only the setup prompt, current draft, and
+available sidebar section names/IDs are supplied. Provider output is validated
+before it reaches the editable review form. Cancelling review leaves the agent
+unchanged; late responses are discarded when the client leaves that scope.
+
+Reviewed instructions use the existing profile description. Profile saves coordinate
+SQLite with the separately stored sidebar layout, rolling back section assignment
+on failure. Updating an existing profile and its retry receipt shares a SQLite
+transaction. Creation follows the existing workspace/initial-message flow with
+cleanup on failure. Receipts make retries after a lost response return the saved
+agent. This does not introduce a schema migration or alter released protocol codecs.

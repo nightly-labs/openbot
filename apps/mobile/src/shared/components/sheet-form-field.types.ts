@@ -4,6 +4,8 @@ export interface SheetFormFieldProps {
   autoCapitalize?: TextInputProps["autoCapitalize"];
   autoCorrect?: boolean;
   autoFocus?: boolean;
+  editable?: boolean;
+  multiline?: boolean;
   hint?: string;
   inputMode?: TextInputProps["inputMode"];
   isRequired?: boolean;

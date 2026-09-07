@@ -72,6 +72,32 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
     });
   }
 
+  withProfileAssignment<T>(
+    sectionId: string | null,
+    operation: (assign: (agentId: string) => Promise<SidebarLayoutSnapshot>) => Promise<T>,
+  ): Promise<T> {
+    return this.#enqueue(async () => {
+      if (sectionId !== null) requireCustomSection(this.#layout, sectionId);
+      const previous = this.getSnapshot();
+      try {
+        return await operation(async (agentId) => {
+          const next = applySidebarLayoutAction(
+            this.#layout,
+            { type: "assign", agentId, sectionId },
+            new Set([agentId]),
+          );
+          if (next !== this.#layout) await this.#commit(next);
+          return this.getSnapshot();
+        });
+      } catch (error) {
+        if (this.#layout.revision !== previous.revision) {
+          await this.#commit({ ...previous, revision: this.#layout.revision + 1 });
+        }
+        throw error;
+      }
+    });
+  }
+
   removeAgent(agentId: string): Promise<SidebarLayoutSnapshot> {
     return this.#enqueue(async () => {
       if (!(agentId in this.#layout.agentAssignments) && !this.#layout.agentOrder.includes(agentId)) {

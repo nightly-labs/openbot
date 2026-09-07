@@ -53,6 +53,7 @@ interface ThreadConfig {
   developerInstructions: string;
   additionalDirectories: string[];
   persistSession: boolean;
+  profileGeneration: boolean;
 }
 
 interface ActiveTurn {
@@ -363,12 +364,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const input = new AsyncMessageQueue();
     const appliedEffort = this.#resolveEffort(config.model, config.effort);
     const canUseTool: CanUseTool = async (toolName, toolInput, options) => {
+      if (config.profileGeneration) return { behavior: "deny", message: "Profile generation has no tools." };
       if (toolName !== "AskUserQuestion") {
         return { behavior: "allow", updatedInput: toolInput } satisfies PermissionResult;
       }
       return this.#requestUserInput(threadId, toolInput, options.toolUseID ?? randomUUID());
     };
-    const mcpServers = this.#createOpenBotServers(threadId);
+    const mcpServers = config.profileGeneration ? {} : this.#createOpenBotServers(threadId);
     const claudeQuery = this.#createQuery({
       prompt: input,
       options: {
@@ -382,7 +384,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           preset: "claude_code",
           append: config.developerInstructions,
         },
-        settingSources: ["user", "project", "local"],
+        ...(config.profileGeneration ? { tools: [] } : {}),
+        settingSources: config.profileGeneration ? [] : ["user", "project", "local"],
         permissionMode: "default",
         includePartialMessages: true,
         persistSession: config.persistSession,
@@ -1060,6 +1063,7 @@ function readThreadConfig(params: unknown): ThreadConfig {
     developerInstructions: getString(params, "developerInstructions") ?? "",
     additionalDirectories: [...new Set([cwd, ...roots])],
     persistSession: !isRecord(params) || params.persistSession !== false,
+    profileGeneration: isRecord(params) && params.profileGeneration === true,
   };
 }
 

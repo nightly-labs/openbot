@@ -4,13 +4,14 @@ import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useState } from "react";
 import { View } from "react-native";
-
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { AgentProfileSetup } from "../components/agent-profile-setup";
 
 export function AddAgentScreen() {
-  const { createAgent } = useMobileWorkspace();
+  const { createAgent, profileGenerationSupported, activeServer } = useMobileWorkspace();
+  const [profileServer, setProfileServer] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [initialMessage, setInitialMessage] = useState("");
@@ -37,6 +38,16 @@ export function AddAgentScreen() {
     }
   }
 
+  if (profileServer === activeServer.id)
+    return (
+      <SheetScrollView
+        contentContainerClassName="gap-5 px-5 pb-safe-offset-5 pt-5"
+        contentInsetAdjustmentBehavior="automatic"
+      >
+        <AgentProfileSetup onClose={() => setProfileServer(null)} onSaved={() => router.back()} />
+      </SheetScrollView>
+    );
+
   return (
     <SheetScrollView
       className="bg-background"
@@ -52,6 +63,11 @@ export function AddAgentScreen() {
         </Typography.Paragraph>
       </View>
 
+      {profileGenerationSupported ? (
+        <Button variant="secondary" onPress={() => setProfileServer(activeServer.id)}>
+          <Button.Label>Generate from a prompt</Button.Label>
+        </Button>
+      ) : null}
       <SheetFormField
         autoCapitalize="words"
         autoFocus
