@@ -559,7 +559,7 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
         params: { threadId: thread.id, turnId: turn.id, item: thoughtItem },
       });
     }
-    this.#completeMessage(thread, turn, status === "completed" ? "final_answer" : "commentary");
+    this.#completeMessage(thread, turn, "final_answer");
     if (status === "failed" && error) {
       this.emit("notification", {
         method: "error",

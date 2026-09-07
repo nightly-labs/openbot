@@ -42,7 +42,7 @@ afterEach(async () => {
 
 describe.sequential("GrokAgentClient", () => {
   it.each(["end_turn", "cancelled", "max_tokens"])(
-    "keeps intermediate Grok steps in thinking when the turn ends with %s",
+    "preserves the streamed answer and separates intermediate steps when Grok ends with %s",
     async (stopReason) => {
       process.env.OPENBOT_FAKE_GROK_MODE = stopReason;
       client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
@@ -62,7 +62,7 @@ describe.sequential("GrokAgentClient", () => {
         expect.objectContaining({ phase: "commentary", text: "Inspecting files." }),
         expect.objectContaining({ phase: "commentary", text: "Checking results." }),
         expect.objectContaining({
-          phase: stopReason === "end_turn" ? "final_answer" : "commentary",
+          phase: "final_answer",
           text: "The final answer.",
         }),
       ]);
@@ -95,6 +95,7 @@ describe.sequential("GrokAgentClient", () => {
         }
       }
       expect(streamedAnswer).toEqual(["The final ", "The final answer."]);
+      expect([...phases.values()].filter((phase) => phase === "final_answer")).toHaveLength(1);
     },
   );
 
