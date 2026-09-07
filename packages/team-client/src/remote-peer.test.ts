@@ -20,6 +20,28 @@ afterEach(() => {
 });
 
 describe("browser remote peer recovery", () => {
+  it("refreshes the account on Signal invalidation without breaking the team connection if refresh fails", async () => {
+    const refreshProfile = vi.fn(async () => {
+      throw new Error("Account API offline");
+    });
+    const network = await setupNetwork({ onAccountProfileChanged: refreshProfile });
+    await network.connect();
+    try {
+      network.socket().receive({ type: "account-profile-changed", version: 1 });
+      await vi.waitFor(() => expect(refreshProfile).toHaveBeenCalledTimes(2));
+      const result = await network.runtime.execute({
+        id: "after-profile",
+        type: "request",
+        method: "GET",
+        path: "/v1/agents",
+        body: {},
+      });
+      expect(result).toMatchObject({ ok: true, status: 200, body: [] });
+    } finally {
+      await network.runtime.dispose();
+    }
+  });
+
   it("sends without delay when the data channel drains before the low-buffer listener is registered", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const network = await setupNetwork();
@@ -324,6 +346,7 @@ function deferred() {
 
 async function setupNetwork(
   options: {
+    onAccountProfileChanged?: () => Promise<void>;
     endSession?: () => Promise<void>;
     beforeBootstrap?: (hostId: string) => Promise<void>;
     beforeAnswer?: () => Promise<void>;
@@ -515,6 +538,7 @@ async function setupNetwork(
         };
       },
       endSession: options.endSession ?? (async () => {}),
+      onAccountProfileChanged: options.onAccountProfileChanged,
       onTeamEvent: async () => {},
       onConnectionUpdate: async (update) => {
         updates.push(update);

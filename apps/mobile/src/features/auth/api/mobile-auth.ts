@@ -1,3 +1,5 @@
+import { type AvatarMimeType, isValidAvatarImage } from "@openbot/contracts/avatar-images";
+import { AVATAR_IMAGE_LIMITS } from "@openbot/contracts/input-limits";
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import {
   isMobileConnectDevelopmentHost,
@@ -21,6 +23,13 @@ const MOBILE_DEVICE_ID_KEY = "openbot.mobile.device-id.v1";
 const MOBILE_AUTH_REQUEST_TIMEOUT_MS = 10_000;
 
 let mobileSessionStorageTail = Promise.resolve();
+let mobileProfileTail = Promise.resolve();
+
+export class MobileSessionExpiredError extends Error {
+  constructor() {
+    super("Your session has ended. Scan a new code from OpenBot on your desktop.");
+  }
+}
 
 export interface MobileSession {
   apiUrl: string;
@@ -111,7 +120,11 @@ async function readStoredSessionAndRevokeInvalid(requireRevocation: boolean): Pr
   }
 }
 
-export async function validateMobileSession(session: MobileSession): Promise<MobileSession | null> {
+export function validateMobileSession(session: MobileSession): Promise<MobileSession | null> {
+  return serializeMobileProfile(() => refreshMobileProfile(session));
+}
+
+async function refreshMobileProfile(session: MobileSession): Promise<MobileSession | null> {
   const { response, body } = await withMobileAuthRequestTimeout(async (signal) => {
     const request = await fetch(new URL("/v1/mobile-auth/session", session.apiUrl).toString(), {
       headers: { Authorization: `Bearer ${session.sessionToken}` },
@@ -127,6 +140,7 @@ export async function validateMobileSession(session: MobileSession): Promise<Mob
     throw new Error(apiErrorMessage(body) ?? "OpenBot could not verify this mobile session.");
   }
   const user = decodeUser(body);
+  if (user.id !== session.user.id) throw new Error("The account service returned an invalid user.");
   if (sameUser(user, session.user)) return session;
   const updated = { ...session, user };
   await saveMobileSessionIfCurrent(updated);
@@ -143,15 +157,19 @@ const accountSessionSchema = z.object({
 });
 export type MobileAccountSession = z.infer<typeof accountSessionSchema>;
 
-export async function listMobileAccountSessions(session: MobileSession): Promise<MobileAccountSession[]> {
+export async function listMobileAccountSessions(
+  session: MobileSession,
+  signal?: AbortSignal,
+): Promise<MobileAccountSession[]> {
   return withMobileAuthRequestTimeout(async (signal) => {
     const response = await fetch(new URL("/v1/mobile-auth/devices?includeDesktop=true", session.apiUrl).toString(), {
       headers: { Authorization: `Bearer ${session.sessionToken}` },
       signal,
     });
+    await checkMobileAuthorization(response, session);
     if (!response.ok) throw new Error("Could not load account sessions. Try again.");
     return z.object({ sessions: z.array(accountSessionSchema) }).parse(await response.json()).sessions;
-  });
+  }, signal);
 }
 
 export async function revokeMobileAccountSession(session: MobileSession, target: MobileAccountSession): Promise<void> {
@@ -168,15 +186,27 @@ export async function revokeMobileAccountSession(session: MobileSession, target:
         signal,
       },
     );
+    await checkMobileAuthorization(response, session);
     if (!response.ok) throw new Error("Could not disconnect this session. Refresh and try again.");
   });
 }
 
-export type MobileProfileChange = { name: string } | { avatar: Blob | null };
+export type MobileProfileChange = { name: string } | { avatar: { bytes: Uint8Array; mimeType: AvatarMimeType } | null };
 
-export async function updateMobileProfile(session: MobileSession, change: MobileProfileChange): Promise<MobileSession> {
+export function updateMobileProfile(session: MobileSession, change: MobileProfileChange): Promise<MobileSession> {
+  return serializeMobileProfile(() => writeMobileProfile(session, change));
+}
+
+async function writeMobileProfile(session: MobileSession, change: MobileProfileChange): Promise<MobileSession> {
   if ("name" in change && validateProfileName(change.name).error) {
     throw new Error("Enter a display name between 3 and 20 characters.");
+  }
+  if ("avatar" in change && change.avatar) {
+    if (change.avatar.bytes.byteLength > AVATAR_IMAGE_LIMITS.storedBytes)
+      throw new Error("Choose a photo smaller than 512 KB.");
+    if (!isValidAvatarImage(change.avatar.mimeType, change.avatar.bytes)) {
+      throw new Error("The selected photo is invalid. Choose another image.");
+    }
   }
   const isName = "name" in change;
   const { response, body } = await withMobileAuthRequestTimeout(async (signal) => {
@@ -187,15 +217,24 @@ export async function updateMobileProfile(session: MobileSession, change: Mobile
         ...(isName
           ? { "Content-Type": "application/json" }
           : change.avatar
-            ? { "Content-Type": change.avatar.type }
+            ? { "Content-Type": change.avatar.mimeType }
             : {}),
       },
-      body: isName ? JSON.stringify({ name: validateProfileName(change.name).name }) : change.avatar,
+      body: isName
+        ? JSON.stringify({ name: validateProfileName(change.name).name })
+        : change.avatar
+          ? new Uint8Array(change.avatar.bytes).buffer
+          : undefined,
       signal,
     });
     return { response: request, body: await readResponseBody(request, signal) };
   });
-  if (!response.ok) throw new Error("Could not save your profile. Check your connection and try again.");
+  await checkMobileAuthorization(response, session);
+  if (!response.ok) {
+    if (response.status === 429) throw new Error("Too many changes. Wait a moment and try again.");
+    if (response.status === 409) throw new Error("Your photo changed on another device. Try again.");
+    throw new Error("Could not save your profile. Check your connection and try again.");
+  }
   const user = decodeUser(body);
   if (user.id !== session.user.id) throw new Error("The account service returned an invalid user.");
   const updated = { ...session, user };
@@ -238,13 +277,37 @@ async function revokeMobileCredential(session: MobileCredential): Promise<void> 
   }
 }
 
-async function withMobileAuthRequestTimeout<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+// Serialize profile reads and writes so a foreground refresh cannot persist an older identity
+// after a successful edit. Credential revocation uses the independent storage queue.
+function serializeMobileProfile<T>(operation: () => Promise<T>): Promise<T> {
+  const result = mobileProfileTail.then(operation, operation);
+  mobileProfileTail = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+async function checkMobileAuthorization(response: Response, session: MobileSession): Promise<void> {
+  if (response.status !== 401) return;
+  await deleteMobileSessionIfCurrent(session.sessionToken);
+  throw new MobileSessionExpiredError();
+}
+
+async function withMobileAuthRequestTimeout<T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), MOBILE_AUTH_REQUEST_TIMEOUT_MS);
+  const abort = () => controller.abort();
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) controller.abort();
+  const timeout = setTimeout(abort, MOBILE_AUTH_REQUEST_TIMEOUT_MS);
   try {
     return await operation(controller.signal);
   } finally {
     clearTimeout(timeout);
+    signal?.removeEventListener("abort", abort);
   }
 }
 

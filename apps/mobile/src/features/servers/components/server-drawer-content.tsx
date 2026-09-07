@@ -61,7 +61,10 @@ export function ServerDrawerContent({
     ]);
   }
   const emailSeparatorIndex = session.user.email.indexOf("@");
-  const displayName = emailSeparatorIndex > 0 ? session.user.email.slice(0, emailSeparatorIndex) : session.user.email;
+  const displayName =
+    session.user.name ||
+    (emailSeparatorIndex > 0 ? session.user.email.slice(0, emailSeparatorIndex) : session.user.email);
+  const avatarUrl = session.user.avatarUrl ? new URL(session.user.avatarUrl, session.apiUrl).toString() : null;
   const mutedColor = String(muted);
 
   return (
@@ -172,7 +175,7 @@ export function ServerDrawerContent({
 
       <View className="mr-3 flex-row items-center gap-2 pt-2">
         <View className="min-h-14 min-w-0 flex-1 flex-row items-center gap-2.5 rounded-2xl px-2 py-2">
-          <ProfileAvatar name={displayName} imageUrl={session.user.avatarUrl} size={36} />
+          <ProfileAvatar neutral name={displayName} imageUrl={avatarUrl} size={36} />
           <View className="min-w-0 flex-1">
             <Typography.Paragraph type="body-sm" weight="semibold" numberOfLines={1}>
               {displayName}

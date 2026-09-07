@@ -3,6 +3,27 @@ import type { RemoteTicketClaims } from "../src/protocol";
 import { SignalService, type SignalSocket } from "../src/signal-service";
 
 describe("SignalService", () => {
+  it("notifies only authenticated devices of the changed account without disconnecting them", async () => {
+    const service = new SignalService(fakeTokens(), 8);
+    const host = socket("host");
+    const phone = socket("phone");
+    const tablet = socket("tablet");
+    const anonymous = socket("anonymous");
+    await hello(service, host, "host-ticket", "host");
+    await hello(service, phone, "client-ticket", "client");
+    await hello(service, tablet, "second-client-ticket", "client");
+    service.connect(anonymous);
+    for (const peer of [host, phone, tablet, anonymous]) peer.messages.length = 0;
+    service.profileChanged("user-1");
+    const event = JSON.stringify({ type: "account-profile-changed", version: 1 });
+    expect(phone.messages).toEqual([event]);
+    expect(tablet.messages).toEqual([event]);
+    expect(host.messages).toEqual([]);
+    expect(anonymous.messages).toEqual([]);
+    expect(phone.closed).toBe(false);
+    expect(tablet.closed).toBe(false);
+  });
+
   it("does not close active WebRTC when a Signal socket reconnects", async () => {
     const service = new SignalService(fakeTokens(), 8);
     const host = socket("host");

@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import {
   SettingsContent,
@@ -12,11 +12,21 @@ import {
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 
 export function ConnectionSettingsScreen() {
-  const { servers, activeServer, selectServer, leaveServer, refreshServers } = useMobileWorkspace();
+  const {
+    servers,
+    activeServer,
+    selectServer,
+    leaveServer,
+    refreshServers,
+    serverDirectoryState,
+    serverDirectoryError,
+  } = useMobileWorkspace();
+  const locked = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function perform(operation: () => Promise<void>) {
-    if (busy) return;
+    if (locked.current) return;
+    locked.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -24,12 +34,19 @@ export function ConnectionSettingsScreen() {
     } catch {
       setError("Could not update connections. Check your connection and try again.");
     } finally {
+      locked.current = false;
       setBusy(false);
     }
   }
   return (
     <SettingsContent>
       <SettingsSection title="Servers">
+        {serverDirectoryState === "loading" && servers.length === 0 ? (
+          <SettingsNote>Loading connections…</SettingsNote>
+        ) : null}
+        {serverDirectoryState === "ready" && servers.length === 0 ? (
+          <SettingsNote>No connected servers. Join a server with an invitation link.</SettingsNote>
+        ) : null}
         {servers.map((server) => (
           <SettingsRow
             disabled={busy}
@@ -47,7 +64,7 @@ export function ConnectionSettingsScreen() {
         <SettingsRow disabled={busy} onPress={() => router.push("/settings/add-server")}>
           <Typography.Paragraph type="body-sm">Join a server</Typography.Paragraph>
         </SettingsRow>
-        {error ? <SettingsNote>{error}</SettingsNote> : null}
+        {error || serverDirectoryError ? <SettingsNote>{error || serverDirectoryError}</SettingsNote> : null}
       </SettingsSection>
       {servers
         .filter((server) => server.kind === "remote")

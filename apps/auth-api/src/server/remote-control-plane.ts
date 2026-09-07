@@ -179,7 +179,7 @@ export class RemoteControlPlane {
     });
     this.#webhookUrl = bindings.REMOTE_AUTH_WEBHOOK_URL?.trim() || null;
     this.#webhookSecret = bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim() || null;
-    this.#fetch = options.fetch ?? fetch;
+    this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
     this.#now = options.now ?? Date.now;
   }
 
@@ -903,10 +903,25 @@ export class RemoteControlPlane {
   }
 }
 
+export async function notifyAccountProfileChanged(
+  bindings: Pick<WorkerBindings, "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_SECRET">,
+  userId: string,
+  fetcher: RemoteFetch = (input, init) => fetch(input, init),
+): Promise<void> {
+  if (!bindings.REMOTE_AUTH_WEBHOOK_URL?.trim() || !bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim()) return;
+  const now = Date.now();
+  await bindings.DB.prepare(
+    "INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at) VALUES (?, ?, ?, 0, ?)",
+  )
+    .bind(crypto.randomUUID(), JSON.stringify({ type: "account-profile-changed", userId }), now, now)
+    .run();
+  await deliverPendingRemoteAuthEvents(bindings, now, fetcher);
+}
+
 export async function deliverPendingRemoteAuthEvents(
   bindings: Pick<WorkerBindings, "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_SECRET">,
   now: number,
-  fetcher: RemoteFetch = fetch,
+  fetcher: RemoteFetch = (input, init) => fetch(input, init),
 ): Promise<void> {
   await deliverRemoteAuthEvents({
     database: bindings.DB,

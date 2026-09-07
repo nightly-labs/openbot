@@ -14,14 +14,20 @@ import {
   logoutMobileSession,
   type MobileProfileChange,
   type MobileSession,
+  MobileSessionExpiredError,
   readMobileSession,
   updateMobileProfile,
   validateMobileSession,
 } from "@/features/auth/api/mobile-auth";
 
+import { queryClient } from "@/shared/lib/query-client";
+
 interface MobileSessionContextValue {
   loading: boolean;
   session: MobileSession | null;
+  sessionScope: number;
+  refreshProfile: () => Promise<void>;
+  handleSessionError: (error: unknown, initiatingSession: MobileSession) => void;
   connect: (session: MobileSession) => void;
   signOut: () => Promise<void>;
   updateProfile: (change: MobileProfileChange) => Promise<void>;
@@ -32,11 +38,30 @@ const MobileSessionContext = createContext<MobileSessionContextValue | null>(nul
 export function MobileSessionProvider({ children }: PropsWithChildren) {
   const [sessionState, setSessionState] = useState<MobileSession | null | undefined>(undefined);
   const sessionRef = useRef<MobileSession | null>(null);
+  const sessionScope = useRef(0);
+  const refreshProfileRef = useRef<() => Promise<void>>(async () => undefined);
+  const refreshProfile = useCallback(() => refreshProfileRef.current(), []);
 
   const setCurrentSession = useCallback((session: MobileSession | null) => {
+    if (sessionRef.current?.sessionToken !== session?.sessionToken || sessionRef.current?.apiUrl !== session?.apiUrl) {
+      sessionScope.current += 1;
+      queryClient.removeQueries({ queryKey: ["account-sessions"] });
+    }
     sessionRef.current = session;
     setSessionState(session);
   }, []);
+
+  const handleSessionError = useCallback(
+    (error: unknown, initiatingSession: MobileSession) => {
+      if (
+        error instanceof MobileSessionExpiredError &&
+        sessionRef.current?.sessionToken === initiatingSession.sessionToken &&
+        sessionRef.current?.apiUrl === initiatingSession.apiUrl
+      )
+        setCurrentSession(null);
+    },
+    [setCurrentSession],
+  );
 
   useEffect(() => {
     let active = true;
@@ -65,21 +90,30 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let active = true;
     let checking = false;
+    let refreshAgain = false;
     let appState: AppStateStatus = AppState.currentState;
 
     async function checkSession(): Promise<void> {
       const current = sessionRef.current;
-      if (!active || checking || !current) return;
+      if (!active || appState !== "active" || !current) return;
+      if (checking) {
+        refreshAgain = true;
+        return;
+      }
       checking = true;
       try {
         const validated = await validateMobileSession(current);
-        if (active && sessionRef.current?.sessionToken === current.sessionToken) {
+        if (active && sessionRef.current === current) {
           setCurrentSession(validated);
         }
       } catch {
         // A temporary network failure must not sign the user out locally.
       } finally {
         checking = false;
+        if (refreshAgain) {
+          refreshAgain = false;
+          void checkSession();
+        }
       }
     }
 
@@ -88,6 +122,7 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       appState = nextAppState;
       if (resumed) void checkSession();
     });
+    refreshProfileRef.current = checkSession;
 
     return () => {
       active = false;
@@ -107,22 +142,35 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
   const updateProfile = useCallback(
     async (change: MobileProfileChange) => {
       const current = sessionRef.current;
-      if (!current) return;
-      const updated = await updateMobileProfile(current, change);
-      if (sessionRef.current?.sessionToken === current.sessionToken) setCurrentSession(updated);
+      if (!current) throw new MobileSessionExpiredError();
+      try {
+        const updated = await updateMobileProfile(current, change);
+        if (
+          sessionRef.current?.sessionToken === current.sessionToken &&
+          sessionRef.current?.apiUrl === current.apiUrl
+        ) {
+          setCurrentSession(updated);
+        }
+      } catch (error) {
+        handleSessionError(error, current);
+        throw error;
+      }
     },
-    [setCurrentSession],
+    [handleSessionError, setCurrentSession],
   );
 
   const value = useMemo<MobileSessionContextValue>(
     () => ({
       loading: sessionState === undefined,
       session: sessionState ?? null,
+      sessionScope: sessionScope.current,
+      refreshProfile,
+      handleSessionError,
       connect: setCurrentSession,
       signOut,
       updateProfile,
     }),
-    [sessionState, setCurrentSession, signOut, updateProfile],
+    [sessionState, setCurrentSession, signOut, updateProfile, handleSessionError, refreshProfile],
   );
 
   return <MobileSessionContext.Provider value={value}>{children}</MobileSessionContext.Provider>;

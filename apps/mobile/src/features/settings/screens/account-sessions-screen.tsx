@@ -1,9 +1,12 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useFocusEffect } from "expo-router";
 import { Typography } from "heroui-native";
+import { useCallback, useRef } from "react";
 import { Alert } from "react-native";
 import {
   listMobileAccountSessions,
   type MobileAccountSession,
+  MobileSessionExpiredError,
   revokeMobileAccountSession,
 } from "@/features/auth/api/mobile-auth";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
@@ -15,20 +18,45 @@ import {
 } from "@/features/settings/components/settings-content";
 
 export function AccountSessionsScreen() {
-  const { session } = useMobileSession();
+  const { session, sessionScope, handleSessionError } = useMobileSession();
+  const revoking = useRef(false);
   const sessions = useQuery({
-    queryKey: ["account-sessions", session?.apiUrl, session?.user.id],
+    queryKey: ["account-sessions", session?.apiUrl, session?.user.id, sessionScope],
     enabled: Boolean(session),
-    queryFn: () => (session ? listMobileAccountSessions(session) : Promise.resolve([])),
+    queryFn: async ({ signal }) => {
+      if (!session) return [];
+      try {
+        return await listMobileAccountSessions(session, signal);
+      } catch (error) {
+        handleSessionError(error, session);
+        throw error;
+      }
+    },
+    retry: (count, error) => !(error instanceof MobileSessionExpiredError) && count < 2,
   });
   const revoke = useMutation({
     mutationFn: async (target: MobileAccountSession) => {
-      if (session) await revokeMobileAccountSession(session, target);
+      if (!session) throw new MobileSessionExpiredError();
+      try {
+        await revokeMobileAccountSession(session, target);
+      } catch (error) {
+        handleSessionError(error, session);
+        throw error;
+      }
     },
     onSuccess: async () => {
       await sessions.refetch();
     },
+    onSettled: () => {
+      revoking.current = false;
+    },
   });
+  const { refetch } = sessions;
+  useFocusEffect(
+    useCallback(() => {
+      void refetch({ cancelRefetch: false });
+    }, [refetch]),
+  );
   return (
     <SettingsContent>
       <SettingsSection title="Signed-in devices">
@@ -47,6 +75,9 @@ export function AccountSessionsScreen() {
         {sessions.isError || revoke.isError ? (
           <SettingsNote>Could not update account sessions. Refresh and try again.</SettingsNote>
         ) : null}
+        {!sessions.isPending && !sessions.isError && sessions.data?.length === 0 ? (
+          <SettingsNote>No active account sessions.</SettingsNote>
+        ) : null}
         {sessions.data?.map((item) => (
           <SettingsRow
             disclosure={false}
@@ -62,7 +93,15 @@ export function AccountSessionsScreen() {
                       "This also ends the account’s active remote connections. The device can sign in again.",
                       [
                         { text: "Cancel", style: "cancel" },
-                        { text: "Disconnect", style: "destructive", onPress: () => revoke.mutate(item) },
+                        {
+                          text: "Disconnect",
+                          style: "destructive",
+                          onPress: () => {
+                            if (revoking.current) return;
+                            revoking.current = true;
+                            revoke.mutate(item);
+                          },
+                        },
                       ],
                     )
             }

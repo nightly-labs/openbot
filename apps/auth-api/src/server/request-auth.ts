@@ -15,6 +15,7 @@ import {
 } from "./marketplace-request-policy";
 import {
   deliverPendingRemoteAuthEvents,
+  notifyAccountProfileChanged,
   RemoteControlPlane,
   RemoteControlPlaneError,
   verifyRemoteServiceSignature,
@@ -30,6 +31,7 @@ export function requestAuthService(): AuthService {
     delivery: exposeDevelopmentCode ? null : createEmailCodeDelivery(bindings),
     exposeDevelopmentCode,
     flushSessionRevocations: () => deliverPendingRemoteAuthEvents(bindings, Date.now()),
+    profileChanged: (userId) => notifyAccountProfileChanged(bindings, userId),
   });
 }
 

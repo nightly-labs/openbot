@@ -41,6 +41,13 @@ export function ProfileSettingsScreen() {
   if (!session) return null;
   const validatedName = validateProfileName(name);
   const nameChanged = validatedName.name !== (session.user.name ?? "");
+  const profileError =
+    error ||
+    (editingName && nameChanged && validatedName.error
+      ? validatedName.error === "unsafe"
+        ? "Remove line breaks and control characters from your name."
+        : "Use 3–20 characters for your display name."
+      : null);
   const avatarUrl = session.user.avatarUrl ? new URL(session.user.avatarUrl, session.apiUrl).toString() : null;
 
   async function perform(operation: () => Promise<void>, success: string): Promise<void> {
@@ -80,10 +87,10 @@ export function ProfileSettingsScreen() {
     if (result.canceled) return;
     const asset = result.assets[0];
     const file = new File(asset.uri);
-    const mime = asset.mimeType || file.type;
+    const mime = isAvatarMimeType(file.type) ? file.type : asset.mimeType || "";
     if (!isAvatarMimeType(mime)) throw new Error("Choose a JPEG, PNG, or WebP photo.");
     if (file.size > AVATAR_IMAGE_LIMITS.storedBytes) throw new Error("Choose a photo smaller than 512 KB.");
-    const avatar = new Blob([await file.bytes()], { type: mime });
+    const avatar = { bytes: await file.bytes(), mimeType: mime };
     await updateProfile({ avatar });
   }
 
@@ -121,7 +128,12 @@ export function ProfileSettingsScreen() {
               <Host
                 colorScheme={theme === "dark" ? "dark" : "light"}
                 ignoreSafeArea="all"
-                style={{ height: 44, width: Math.min(nameWidth + 12, Math.max(44, nameRowWidth - 56)) }}
+                style={{
+                  height: 44,
+                  width: editingName
+                    ? Math.max(44, nameRowWidth - 56)
+                    : Math.min(nameWidth + 12, Math.max(44, nameRowWidth - 56)),
+                }}
               >
                 <TextInput
                   ref={nameInput}
@@ -228,9 +240,9 @@ export function ProfileSettingsScreen() {
       </SettingsSection>
 
       <View className="gap-3">
-        {error ? (
+        {profileError ? (
           <Typography.Paragraph accessibilityRole="alert" className="text-danger">
-            {error}
+            {profileError}
           </Typography.Paragraph>
         ) : null}
         {message ? <Typography.Paragraph accessibilityLiveRegion="polite">{message}</Typography.Paragraph> : null}
