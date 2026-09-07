@@ -1,5 +1,12 @@
 # Repository guidance
 
+## Communication
+
+Always use ASD-STE100 Simplified Technical English when you work in this repository or communicate
+with the user. Apply this rule to questions, progress updates, explanations, and final answers.
+Keep exact text unchanged in quotations, code, commands, file paths, identifiers, and required
+technical terms.
+
 Two tiers. **Non-negotiable** items protect user data, released contracts, or the security boundary;
 trade one away only on the developer's explicit decision. Everything else is a **default** their
 preference overrides — if they ask for something this file discourages, do it and say what you set
