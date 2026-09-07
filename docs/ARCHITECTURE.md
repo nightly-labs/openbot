@@ -172,6 +172,39 @@ Team API failures use a JSON error envelope with `error` and a stable `code`. Co
 
 Protocol support has no fixed time or release limit. Removal is an exceptional architecture decision. It requires a security issue, data-loss risk, semantics that cannot be kept, or technical cost that cannot be contained in an adapter. The decision must also include a changelog entry, update instructions, tests for old-client/new-host and new-client/old-host directions, and clear blocking UI.
 
+## Agent communication policy
+
+The shared developer instructions keep routine teammate exchanges out of user-facing narration.
+Agents incorporate replies into their work without reporting who said what or announcing each
+send, receipt, or acknowledgement. They still send results explicitly to requesting teammates.
+Progress focuses on meaningful outcomes, blockers, failures, user decisions and approvals, and
+completed work. Startup and resume continue the task without routine introductions, readiness
+announcements, setup narration, or exchange recaps. Users can request a detailed coordination report.
+
+This changes generated narration, not exchange history, tool visibility, or delivery. The backend
+supplies the shared policy on session start and resume, including after an application restart.
+Codex receives developer instructions, Claude receives appended system instructions, and Grok
+receives instruction text prepended to ordinary turn prompts. Already loaded sessions receive an
+updated policy when started or resumed; no conversation or agent reset is needed.
+
+Prompt adherence varies by provider and model, particularly when old conversation history contains
+verbose exchanges. Grok's text wrapper does not provide a separate system-instruction role.
+There is no output filter or guarantee of silence: errors, approvals, and results must remain visible.
+Deterministic tests verify instruction delivery, not model compliance.
+
+For behavioral evaluation, use isolated test agents with each supported provider (Codex, Claude,
+Grok), record the model/version and observed output, and repeat after application restart/resume:
+
+| Scenario | Expected behavior |
+| --- | --- |
+| Two teammates exchange routine suggestions and acknowledgements | Work continues without user-facing message-by-message recaps or acknowledgement loops. |
+| A teammate supplies a useful result | Requesting teammate receives the result; user receives its useful outcome without a transcript of the exchange. |
+| A teammate reports a failure or blocker | User sees the material impact and any required next step. |
+| Work requires a user decision or approval | The existing question or approval flow remains visible. |
+| Work completes | User receives a concise, useful completion report. |
+| A task starts or resumes | Agent proceeds without readiness announcements or routine startup/exchange recaps. |
+| User explicitly requests coordination details | Agent provides the requested detail. |
+
 ## Required verification
 
 Run the narrowest relevant test, then `bun run lint` and `bun run typecheck`; both are cheap enough

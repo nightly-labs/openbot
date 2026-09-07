@@ -207,6 +207,12 @@ describe.sequential("GrokAgentClient", () => {
         expect.objectContaining({ event: "elicitation-response", language: "TypeScript" }),
         expect.objectContaining({ event: "user-input-response" }),
         expect.objectContaining({ method: "session/cancel" }),
+        expect.objectContaining({
+          method: "session/prompt",
+          text: expect.stringContaining(
+            "<openbot-developer-instructions>\nUse OpenBot tools.\n</openbot-developer-instructions>",
+          ),
+        }),
       ]),
     );
 
@@ -215,11 +221,31 @@ describe.sequential("GrokAgentClient", () => {
     client.start();
     await client.request("initialize", {}, decodeRecordResponse);
     await expect(
-      client.request("thread/resume", { threadId, cwd: root, dynamicTools: [] }, decodeRecordResponse),
+      client.request(
+        "thread/resume",
+        { threadId, cwd: root, dynamicTools: [], developerInstructions: "Keep routine coordination internal." },
+        decodeRecordResponse,
+      ),
     ).resolves.toEqual(expect.any(Object));
     expect(await readLog()).toEqual(
       expect.arrayContaining([expect.objectContaining({ method: "session/load", sessionId: threadId })]),
     );
+    await client.request(
+      "turn/start",
+      { threadId, input: [{ type: "text", text: "Continue the task" }] },
+      decodeTurnResponse,
+    );
+    await vi.waitFor(async () => {
+      expect(
+        (await readLog()).some(
+          (entry) =>
+            entry.method === "session/prompt" &&
+            String(entry.text).includes(
+              "<openbot-developer-instructions>\nKeep routine coordination internal.\n</openbot-developer-instructions>",
+            ),
+        ),
+      ).toBe(true);
+    });
   });
 
   it("rediscovers Grok models without restarting and closes discovery sessions", async () => {

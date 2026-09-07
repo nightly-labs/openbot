@@ -339,6 +339,14 @@ describe.sequential("AgentService: providers", () => {
       expect(params.developerInstructions).toContain(
         "You may list, read, create, edit, move, and delete files and run local commands in both directories.",
       );
+      expect(params.developerInstructions).toContain(
+        "Keep routine teammate communication out of user-facing narration.",
+      );
+      expect(params.developerInstructions).toContain(
+        "blockers, failures, required user decisions or approvals, and completed work",
+      );
+      expect(params.developerInstructions).toContain("On conversation startup or resume, continue the task directly.");
+      expect(params.developerInstructions).not.toContain("When you receive a reply, summarize it for the user");
       expect(params.developerInstructions).toContain("For every browser task");
       expect(params.developerInstructions).toContain("Use the installed Computer Use plugin only");
       expect(params.developerInstructions).toContain("When you use openbot_browser");

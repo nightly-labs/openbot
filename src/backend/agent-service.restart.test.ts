@@ -81,7 +81,13 @@ describe.sequential("AgentService: restart", () => {
     expect(service.listQueue("chief").deliveries[0]?.status).toBe("interrupted");
     await service.sendMessage({ agentId: "chief", text: "Continue" });
     await waitFor(async () => (await protocolMessages(logPath)).some((message) => message.method === "thread/resume"));
-    const resume = (await protocolMessages(logPath)).find((message) => message.method === "thread/resume");
+    const requests = await protocolMessages(logPath);
+    const start = requests.find((message) => message.method === "thread/start");
+    const resume = requests.find((message) => message.method === "thread/resume");
+    const instructions = getString(resume?.params, "developerInstructions");
+    expect(instructions).toBe(getString(start?.params, "developerInstructions"));
+    expect(instructions).toContain("Keep routine teammate communication out of user-facing narration.");
+    expect(instructions).toContain("On conversation startup or resume, continue the task directly.");
     expect(resume?.params).toMatchObject({
       dynamicTools: expect.arrayContaining([
         expect.objectContaining({ type: "namespace", name: "openbot_browser" }),
