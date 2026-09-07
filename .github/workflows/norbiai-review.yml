@@ -32,13 +32,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
-    # The push path stays automatic and skips drafts. The comment path is an explicit
-    # request from someone who can already merge, so it runs on drafts too: `/norbiai review`
-    # means review it now. `github.event.issue.pull_request` is what separates a pull request
-    # comment from an issue comment, and `author_association` is a cheap pre-filter that
-    # keeps a drive-by comment from reaching the permission lookup below. The
-    # same-repository rule is enforced in the review job, because a comment payload carries
-    # no head repository to test here.
+    # The push path stays automatic, skips drafts, and stays same-repository: a fork's
+    # `pull_request` run gets a read-only `GITHUB_TOKEN` whatever the `permissions` block
+    # below says, so it could review and then fail to publish either the comment or the
+    # gate status — and nobody asked for it to try.
+    #
+    # The comment path is an explicit request from someone who can already merge, so it runs
+    # on drafts and on forks too: `/norbiai review` means review it now. `issue_comment`
+    # fires in the base repository, which is what gives that path the write token the push
+    # path cannot have on a fork. `github.event.issue.pull_request` is what separates a pull
+    # request comment from an issue comment, and `author_association` is a cheap pre-filter
+    # that keeps a drive-by comment from reaching the permission lookup below.
     if: >
       (github.event_name == 'pull_request' &&
         github.event.pull_request.head.repo.full_name == github.repository &&
@@ -130,19 +134,22 @@ jobs:
           base_sha=${EVENT_BASE_SHA:-}
           head_sha=${EVENT_HEAD_SHA:-}
 
-          # A comment payload carries no SHAs and no head repository, so those come from the
-          # API. The push path deliberately keeps the payload's SHAs: they are the commit the
-          # checkout is for, whereas the API answers with a newer head the moment another push
-          # lands, and the guard below would then fail on a commit this run never fetched.
+          # A comment payload carries no SHAs, so those come from the API. The push path
+          # deliberately keeps the payload's SHAs: they are the commit the checkout is for,
+          # whereas the API answers with a newer head the moment another push lands, and the
+          # guard below would then fail on a commit this run never fetched.
+          #
+          # The head repository is not tested. A fork reaching this job means a maintainer
+          # who can merge asked for it by comment, and the merge ref below is the base
+          # repository's own computation of that fork's head, so it resolves for a fork
+          # exactly as it does for a branch. What keeps the fork's own content from steering
+          # the review is downstream and unchanged: the prompt and the composer are read from
+          # the base commit, the composer runs with an empty bunfig and `--no-install`, and
+          # the reviewer is sandboxed read-only.
           if [ -z "$head_sha" ]; then
-            IFS=$'\t' read -r head_repo base_sha head_sha < <(
-              gh api "$api" --jq '[.head.repo.full_name // "", .base.sha, .head.sha] | @tsv'
+            IFS=$'\t' read -r base_sha head_sha < <(
+              gh api "$api" --jq '[.base.sha, .head.sha] | @tsv'
             )
-
-            if [ "$head_repo" != "$GITHUB_REPOSITORY" ]; then
-              echo "::error title=NorbiAI does not review forks::Head repository ${head_repo:-unknown} is not ${GITHUB_REPOSITORY}."
-              exit 1
-            fi
           fi
 
           for sha in "$base_sha" "$head_sha"; do
