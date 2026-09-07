@@ -24,6 +24,36 @@ const SOURCE_OPTIONS = [
 afterEach(() => vi.useRealTimers());
 
 describe("DynamicIslandSurface", () => {
+  it("cancels pending hover expansion when the main window takes focus and allows a new hover", async () => {
+    const mock = createQuestionMock(questionPresentation("focus-question", [sourceQuestion()]));
+    render(() => <DynamicIslandSurface />);
+    const island = await screen.findByRole("region", { name: "OpenBot question from AI" });
+    vi.useFakeTimers();
+
+    await fireEvent.mouseEnter(island);
+    await fireEvent(window, new Event("blur"));
+    await vi.runAllTimersAsync();
+
+    expect(screen.getByRole("button", { name: "Expand OpenBot question from AI" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.queryByRole("button", { name: "Official data. Use the public dataset" })).not.toBeInTheDocument();
+
+    await fireEvent(window, new Event("focus"));
+    await fireEvent.mouseEnter(island);
+    await vi.runAllTimersAsync();
+    expect(screen.getByRole("button", { name: "Official data. Use the public dataset" })).toBeVisible();
+
+    await fireEvent(window, new Event("blur"));
+    await vi.runAllTimersAsync();
+    expect(screen.getByRole("button", { name: "Expand OpenBot question from AI" })).toBeVisible();
+    await fireEvent.mouseEnter(island);
+    await vi.runAllTimersAsync();
+    expect(screen.getByRole("button", { name: "Official data. Use the public dataset" })).toBeVisible();
+    mock.dispose();
+  });
+
   it("hides only the idle island when that preference changes", async () => {
     const mock = createMockOpenBot();
     let updatePreference: ((preference: DynamicIslandPreference) => void) | undefined;
