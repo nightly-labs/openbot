@@ -115,7 +115,8 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
       this.#cli.executable,
       [
         "--no-auto-update",
-        ...(this.profileGeneration ? ["--tools", "", "--deny", "*", "--no-subagents", "--disable-web-search"] : []),
+        // Keep the empty value inside one argument: Windows shell launches discard empty argv entries.
+        ...(this.profileGeneration ? ["--tools=", "--deny", "*", "--no-subagents", "--disable-web-search"] : []),
         "agent",
         "stdio",
       ],

@@ -63,8 +63,7 @@ describe.sequential("GrokAgentClient", () => {
         event: "start",
         args: [
           "--no-auto-update",
-          "--tools",
-          "",
+          "--tools=",
           "--deny",
           "*",
           "--no-subagents",
