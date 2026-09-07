@@ -85,7 +85,7 @@
 .join-server-header-entry .ui-heading {
   font-size: var(--openbot-text-3xl);
   font-weight: var(--openbot-weight-bold);
-  line-height: var(--openbot-leading-2xl);
+  line-height: var(--openbot-leading-3xl);
 }
 
 .join-server-header-entry .ui-text {
@@ -135,7 +135,7 @@
 }
 
 .join-server-field .ui-field-error {
-  min-height: var(--openbot-leading-xs);
+  min-height: var(--openbot-leading-sm);
 }
 
 .join-server-identity-logo {
@@ -158,7 +158,7 @@
 .join-server-header-verified .ui-heading {
   font-size: var(--openbot-text-3xl);
   font-weight: var(--openbot-weight-bold);
-  line-height: var(--openbot-leading-2xl);
+  line-height: var(--openbot-leading-3xl);
 }
 
 .join-server-hostname.ui-text {
@@ -235,7 +235,7 @@
 
 .join-server-verified {
   color: var(--openbot-success);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
 }
 
@@ -255,7 +255,7 @@
 .join-server-preview dt,
 .join-server-preview p {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .join-server-preview dl {
@@ -274,12 +274,12 @@
 .join-server-preview dd {
   margin: 0;
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .join-server-preview p {
   margin: 0;
-  line-height: var(--openbot-leading-xs);
+  line-height: var(--openbot-leading-sm);
 }
 
 @keyframes join-server-backdrop-in {

@@ -1104,7 +1104,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 </ItemDescription>
               </ItemContent>
               <ItemActions class="server-settings-desktop-meta">
-                <Badge tone={props.hostStatus?.remoteDesktopReady ? "success" : "warning"} shape="pill" dot>
+                <Badge tone={props.hostStatus?.remoteDesktopReady ? "success" : "warning"} shape="pill">
                   {props.hostStatus?.remoteDesktopReady ? "Service ready" : "Host component not installed"}
                 </Badge>
                 <Text as="span" variant="caption" tone="muted">
@@ -1137,7 +1137,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             class="server-settings-desktop-status"
             tone={props.server.remoteDesktopAvailable ? "success" : "warning"}
             shape="pill"
-            dot
           >
             {props.server.remoteDesktopAvailable ? "Service available" : "Update required"}
           </Badge>

@@ -256,7 +256,7 @@
   background: var(--openbot-bg-surface-raised);
   padding: var(--openbot-space-1) var(--openbot-space-2);
   color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .conversation-story-frame {
@@ -559,7 +559,7 @@
   padding: 0 var(--openbot-space-4);
   background: var(--openbot-bg-glass);
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   backdrop-filter: blur(18px);
 }
 
@@ -637,7 +637,7 @@
 
 .dynamic-island-story-display-label span {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 @media (max-width: 1279px) {

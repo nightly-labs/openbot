@@ -41,9 +41,9 @@
 }
 
 :where(.ui-text)[data-variant="caption"] {
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-regular);
-  line-height: var(--openbot-leading-xs);
+  line-height: var(--openbot-leading-sm);
 }
 
 :where(.ui-text)[data-variant="label-sm"] {
@@ -83,11 +83,6 @@
 :where(.ui-heading)[data-size="lg"] {
   font-size: var(--openbot-text-2xl);
   line-height: var(--openbot-leading-2xl);
-}
-
-:where(.ui-heading)[data-size="display"] {
-  font-size: var(--openbot-text-display);
-  line-height: var(--openbot-leading-display);
 }
 
 :where(.ui-heading) {
@@ -137,7 +132,7 @@
 :where(.ui-button-size-xs) {
   height: var(--openbot-control-xs);
   padding-inline: var(--openbot-space-2);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 :where(.ui-button-size-sm) {
@@ -177,8 +172,8 @@
 }
 
 :where(.ui-button-variant-destructive) {
-  background: var(--openbot-button-destructive-soft);
-  color: var(--openbot-button-destructive);
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger);
 }
 
 :where(.ui-button-variant-destructive-ghost) {
@@ -211,13 +206,13 @@
   }
 
   :where(.ui-button-variant-destructive):hover:not(:disabled):not([data-disabled]) {
-    background: var(--openbot-button-destructive-hover);
-    color: var(--openbot-button-destructive);
+    background: var(--openbot-danger-soft-hover);
+    color: var(--openbot-danger);
   }
 
   :where(.ui-button-variant-destructive-ghost):hover:not(:disabled):not([data-disabled]) {
-    background: var(--openbot-button-destructive-soft);
-    color: var(--openbot-button-destructive);
+    background: var(--openbot-danger-soft);
+    color: var(--openbot-danger);
   }
 
   :where(.ui-button-variant-link):hover:not(:disabled):not([data-disabled]) {
@@ -236,16 +231,16 @@
 }
 
 :where(.ui-button-variant-destructive):focus-visible {
-  border-color: var(--openbot-button-destructive-focus);
+  border-color: var(--openbot-danger-focus);
 }
 
 :where(.ui-button-variant-destructive, .ui-button-variant-destructive-ghost):focus-visible {
-  box-shadow: 0 0 0 3px var(--openbot-button-destructive-focus);
+  box-shadow: 0 0 0 3px var(--openbot-danger-focus);
 }
 
 :where(.ui-button)[aria-invalid="true"] {
-  border-color: var(--openbot-button-destructive-border);
-  box-shadow: 0 0 0 3px var(--openbot-button-destructive-focus);
+  border-color: var(--openbot-danger-border);
+  box-shadow: 0 0 0 3px var(--openbot-danger-focus);
 }
 
 :where(.ui-button):disabled,
@@ -291,7 +286,7 @@
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
   flex: 0 0 auto;
-  stroke-width: 1.75;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 :where(.ui-button-size-icon-xs) svg {
@@ -336,7 +331,7 @@
 
 :where(.z-badge) {
   width: fit-content;
-  height: 20px;
+  height: 22px;
   min-width: 0;
   display: inline-flex;
   overflow: hidden;
@@ -347,9 +342,9 @@
   border: 1px solid transparent;
   border-radius: var(--openbot-radius-pill);
   padding: var(--openbot-space-0-5) var(--openbot-space-2);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
-  line-height: var(--openbot-leading-xs);
+  line-height: var(--openbot-leading-sm);
   transition:
     border-color var(--openbot-duration-fast) var(--openbot-ease-out),
     background-color var(--openbot-duration-fast) var(--openbot-ease-out),
@@ -373,14 +368,14 @@
 }
 
 :where(.z-badge)[data-size="sm"] {
-  min-height: 16px;
-  height: 16px;
+  min-height: 18px;
+  height: 18px;
   padding: 0 var(--openbot-space-1);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
 }
 
 :where(.z-badge)[data-size="md"] {
-  min-height: 20px;
+  min-height: 22px;
   padding: var(--openbot-space-0-5) var(--openbot-space-1-5);
 }
 
@@ -417,34 +412,40 @@
 }
 
 :where(.z-badge-variant-primary-light) {
-  border-color: var(--openbot-accent-strong);
   background: var(--openbot-accent-soft);
   color: var(--openbot-accent-text);
 }
 
 :where(.z-badge-variant-success-light) {
-  border-color: var(--openbot-success-soft);
   background: var(--openbot-success-soft);
   color: var(--openbot-success);
 }
 
 :where(.z-badge-variant-warning-light) {
-  border-color: var(--openbot-warning-soft);
   background: var(--openbot-warning-soft);
   color: var(--openbot-warning);
 }
 
 :where(.z-badge-variant-destructive),
 :where(.z-badge-variant-destructive-light) {
-  border-color: var(--openbot-danger-soft);
   background: var(--openbot-danger-soft);
   color: var(--openbot-danger);
 }
 
+/* The design's "New" chip. Not a --openbot-success or --openbot-accent variant: an
+ * announcement that something is newly available is neither a report that something
+ * succeeded nor an action the user can take. The heavier weight and the open tracking
+ * are part of the look, which is why this variant sets them and the others do not. */
+:where(.z-badge-variant-new) {
+  background: var(--openbot-badge-new-soft);
+  color: var(--openbot-badge-new);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: 0.01em;
+}
+
 :where(.z-badge-variant-info-light) {
-  border-color: var(--openbot-settings-accent-soft);
-  background: var(--openbot-settings-accent-soft);
-  color: var(--openbot-settings-accent-text);
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
 }
 
 :where(.z-badge-variant-primary-outline) {
@@ -474,7 +475,19 @@
 :where(.z-badge-variant-info-outline) {
   border-color: var(--openbot-border-strong);
   background: transparent;
-  color: var(--openbot-settings-accent-text);
+  color: var(--openbot-accent-text);
+}
+
+/* The hand-drawn SVGs, which are on a 20-unit viewBox where lucide's is 24. Feeding them
+ * --openbot-icon-stroke raw would paint them 20% heavier than every lucide icon beside
+ * them, so it is scaled to the smaller grid instead. These carried 1.35 to 1.6 by hand
+ * before, i.e. 1.08 to 1.43 device px against lucide's 1.0. */
+:where(.ui-glyph-20) {
+  stroke-width: calc(var(--openbot-icon-stroke) * 20 / 24);
+}
+
+:where(.ui-glyph-16) {
+  stroke-width: calc(var(--openbot-icon-stroke) * 16 / 24);
 }
 
 :where(.ui-checkbox) {
@@ -521,15 +534,9 @@
 .ui-checkbox-visual svg {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
+  /* Heavier than --openbot-icon-stroke deliberately: a tick is a state indicator, and the
+   * shared weight paints 0.75 device px inside this 12px box. */
   stroke-width: 2.5;
-}
-
-.z-badge-dot {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 auto;
-  border-radius: var(--openbot-radius-pill);
-  background: currentColor;
 }
 
 :where(.ui-input, .ui-textarea, .ui-native-select) {
@@ -701,7 +708,7 @@
   background: var(--openbot-bg-surface-raised);
   box-shadow:
     0 4px 6px -1px var(--openbot-shadow-popover-ambient),
-    0 2px 4px -2px var(--openbot-shadow-popover-key),
+    0 2px 4px -2px var(--openbot-shadow-popover-ambient),
     0 0 0 1px var(--openbot-border-strong);
   color: var(--openbot-text-primary);
   transform-origin: var(--kb-select-content-transform-origin);
@@ -823,8 +830,8 @@
 
 .ui-field-description,
 .ui-field-error {
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 .ui-field-description {
@@ -861,8 +868,8 @@
 }
 
 .ui-switch[data-invalid] {
-  border-color: var(--openbot-button-destructive-border);
-  box-shadow: 0 0 0 3px var(--openbot-button-destructive-focus);
+  border-color: var(--openbot-danger-border);
+  box-shadow: 0 0 0 3px var(--openbot-danger-focus);
 }
 
 .ui-switch:not([data-pointer-focus]):has(.ui-switch-input:focus-visible) {
@@ -871,8 +878,8 @@
 }
 
 .ui-switch[data-invalid]:not([data-pointer-focus]):has(.ui-switch-input:focus-visible) {
-  border-color: var(--openbot-button-destructive-border);
-  box-shadow: 0 0 0 3px var(--openbot-button-destructive-focus);
+  border-color: var(--openbot-danger-border);
+  box-shadow: 0 0 0 3px var(--openbot-danger-focus);
 }
 
 .ui-switch-field {
@@ -899,8 +906,8 @@
 
 .ui-switch-description {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 .ui-switch-input {
@@ -958,7 +965,7 @@
 
 .ui-card {
   border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-bg-surface);
 }
 
@@ -966,7 +973,7 @@
   display: grid;
   overflow: hidden;
   border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-bg-surface);
 }
 
@@ -1034,8 +1041,8 @@
   min-width: 0;
   overflow: hidden;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1078,7 +1085,7 @@
   display: flex;
   align-items: baseline;
   gap: var(--openbot-space-1);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
   line-height: var(--openbot-leading-sm);
 }
@@ -1102,7 +1109,7 @@
   display: -webkit-box;
   overflow: hidden;
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-regular);
   line-height: var(--openbot-leading-sm);
   overflow-wrap: anywhere;
@@ -1116,9 +1123,9 @@
   align-self: start;
   padding-top: 2px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
-  line-height: var(--openbot-leading-xs);
+  line-height: var(--openbot-leading-sm);
   white-space: nowrap;
 }
 
@@ -1131,9 +1138,9 @@
 .ui-questionnaire-progress {
   color: var(--openbot-text-muted);
   font-family: var(--openbot-font-mono);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
-  line-height: var(--openbot-leading-xs);
+  line-height: var(--openbot-leading-sm);
 }
 
 .ui-questionnaire-item {
@@ -1191,8 +1198,8 @@
 .ui-questionnaire-error {
   margin: 0;
   color: var(--openbot-danger);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 .ui-questionnaire-actions {
@@ -1313,8 +1320,8 @@
 
 .ui-alert-description {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 .ui-alert-actions {
@@ -1359,7 +1366,7 @@
 }
 
 .ui-radial-progress[data-tone="danger"] {
-  --ui-radial-progress-color: var(--openbot-danger-strong);
+  --ui-radial-progress-color: var(--openbot-danger);
 }
 
 .ui-radial-progress-chart {
@@ -1451,8 +1458,8 @@
 
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-description] {
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
   text-wrap: pretty;
 }
 
@@ -1493,7 +1500,7 @@
 .ui-toast-icon {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
-  stroke-width: 1.75;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .ui-toast-loading-icon {
@@ -1508,7 +1515,7 @@
   padding-inline: var(--openbot-space-3);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-sans);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
   transition:
     background-color var(--openbot-duration-normal) ease,
@@ -1667,7 +1674,7 @@
   padding-inline: var(--openbot-space-1);
   color: var(--openbot-text-muted);
   font-family: var(--openbot-font-mono);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 1;
 }
 
@@ -1741,7 +1748,7 @@
 
 .ui-dialog-content {
   border: 0;
-  border-radius: var(--openbot-radius-dialog);
+  border-radius: var(--openbot-radius-card);
   box-shadow: 0 0 0 1px var(--openbot-dialog-ring);
 }
 
@@ -1857,7 +1864,7 @@ button.ui-bubble-content {
 }
 
 .ui-bubble-variant-destructive > .ui-bubble-content {
-  border-color: var(--openbot-button-destructive-border);
+  border-color: var(--openbot-danger-border);
   background: var(--openbot-danger-soft);
 }
 
@@ -1967,7 +1974,7 @@ button.ui-bubble-content {
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface-raised);
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
 }
 
@@ -1995,7 +2002,7 @@ button.ui-bubble-content {
   gap: var(--openbot-space-2);
   padding: 0 var(--openbot-space-1);
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   line-height: 16px;
 }
 

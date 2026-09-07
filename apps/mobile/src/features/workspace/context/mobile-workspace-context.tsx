@@ -65,7 +65,10 @@ export type {
   ToggleAgentPinResult,
 } from "@/features/workspace/model/workspace-types";
 
-const SERVER_ACCENTS = ["#cdadec", "#6960f1", "#e3b866", "#5b9ce2", "#85c7a2"] as const;
+// Five distinct hues for the server rail, taken from the palette's categorical set
+// (--openbot-file-blue/-orange/-teal/-pink and --openbot-success). Hardcoded because
+// @openbot/brand ships tokens as CSS only, and these are picked per index in JS.
+const SERVER_ACCENTS = ["#74b9ff", "#f0a06a", "#6bc7d9", "#d98ac9", "#31cf76"] as const;
 type RemoteAgent = Pick<
   AgentSummary,
   "id" | "name" | "title" | "description" | "preview" | "updatedAt" | "avatarSeed" | "avatarHue"

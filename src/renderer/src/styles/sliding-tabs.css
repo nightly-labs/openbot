@@ -14,7 +14,7 @@
 .ui-sliding-tabs-trigger {
   position: relative;
   z-index: 1;
-  height: 30px;
+  height: var(--openbot-control-sm);
   appearance: none;
   border: 0;
   border-radius: var(--openbot-radius-sm);
@@ -23,7 +23,9 @@
   padding: 4px var(--openbot-space-3);
   color: var(--openbot-text-muted);
   font: inherit;
-  font-size: var(--openbot-text-sm);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-sm);
+  font-weight: var(--openbot-weight-medium);
   cursor: pointer;
   transition: color var(--sliding-tabs-duration) var(--sliding-tabs-ease);
 }
@@ -48,7 +50,7 @@
   left: 0;
   z-index: 0;
   width: 0;
-  height: 30px;
+  height: var(--openbot-control-sm);
   border-radius: var(--openbot-radius-sm);
   background: var(--openbot-tabs-pill-bg);
   pointer-events: none;

@@ -13,16 +13,13 @@ export const Scale: Story = {
   render: () => (
     <main class="foundation-story">
       <section class="foundation-story-stack">
-        <Heading as="h1" size="display">
-          OpenBot UI foundation
-        </Heading>
-        <Heading as="h2" size="lg">
+        <Heading as="h1" size="lg">
           Large section heading
         </Heading>
-        <Heading as="h3" size="md">
+        <Heading as="h2" size="md">
           Standard section heading
         </Heading>
-        <Heading as="h4" size="sm">
+        <Heading as="h3" size="sm">
           Compact section heading
         </Heading>
       </section>
