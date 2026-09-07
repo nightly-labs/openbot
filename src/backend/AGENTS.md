@@ -1,8 +1,8 @@
 # `src/backend`
 
-The stores, the SQLite database, the provider clients and `agent-service.ts`. The user's SQLite is
-the source of truth here, not a cache of something remote — which is what makes the first section
-below non-negotiable.
+The stores, the SQLite database (`openbot-database.ts` and the controllers under `database/`), the
+provider clients and `agent-service.ts`. The user's SQLite is the source of truth here, not a cache
+of something remote — which is what makes the first section below non-negotiable.
 
 ## Database migrations
 
@@ -44,7 +44,7 @@ offers, in order of preference:
 | Barrier | Use it for |
 | --- | --- |
 | `waitFor(predicate)` — `agent-service-test-harness.ts` | Anything driven by the fake provider process. Polls to a deadline and fails naming *the predicate that never held*, printing the source of the check. |
-| `nextRoutinesChanged(service, botId)` — same file | One named `AgentEvent`. Resolves on the event; the pattern generalizes to any other event you need. |
+| `nextRoutinesChanged(service, agentId)` — same file | One named `AgentEvent`. Resolves on the event; the pattern generalizes to any other event you need. |
 | `callOpenBotTool(...)` / `expectOpenBotToolError(...)` | A tool round trip. Both already contain the wait. |
 | `await service.someMethod()` | A promise the code under test already returns. Prefer it over observing a side effect of the same call. |
 | `vi.waitFor(() => expect(...))` | A spy or a fake reaching a count, where there is no domain event to hang off. |
@@ -63,5 +63,26 @@ wrong.
 
 ## Size
 
-`agent-service.ts` is the largest hand-written file in the repository by a wide margin. Do not add a
-new concern to it; extract one when a change gives you the excuse.
+`mailbox-store.ts` is the largest file in this directory, at about 1,700 lines.
+
+The two that used to be larger are both worth copying. `agent-service.ts` was split into one
+controller per concern, each constructed and owned by the service; `openbot-database.ts` was split
+into nine under `database/`, leaving a ~300-line facade that had to keep its class name, instance
+identity, constructor signature and public surface because callers reach past it into `connection`
+and `dispatch`. The shape in both: one class per file, kebab-case, `<Name>Options` + `<Name>`,
+`readonly #` fields, a constructor that only assigns, and a doc comment saying what the class
+**owns** and that it never imports the facade. No barrel file.
+
+Two rules those controllers depend on and a reader cannot infer. They hold the core object and read
+`.connection` at each use — a cached handle survives `initialize()` and then silently addresses a
+closed database after `close()`. And a projection controller does not open a transaction of its own.
+Four places do, and each is load-bearing: `dispatch` and `deleteEventsAndReceipt` open one only if
+they find none open, which is what lets a projector nest another dispatch inside the caller's, and
+`ThreadReplay.rebuildThreadProjection` and the facade's `persistConversationAndMailbox` open one
+unconditionally, which is what makes the dispatch inside each of them skip its own. Open an
+unconditional one anywhere else and a caller already in a transaction gets a nested `BEGIN` that
+SQLite rejects; remove one of these four and the replay or the mailbox write silently stops being
+atomic.
+
+Do not add a new concern to the biggest file you can see; extract one when a change gives you the
+excuse.

@@ -24,7 +24,7 @@
 }
 
 .ui-action-menu:not([data-menu-layout="grid"])
-  :is(.ui-action-menu-item, [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]) {
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]) {
   display: flex;
   width: 100%;
   height: var(--openbot-control-md);
@@ -49,7 +49,7 @@
 }
 
 .ui-action-menu:not([data-menu-layout="grid"])
-  :is(.ui-action-menu-item, [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]):is(
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]):is(
     :hover,
     :focus-visible,
     [data-highlighted],
@@ -60,14 +60,14 @@
 }
 
 .ui-action-menu:not([data-menu-layout="grid"])
-  :is(.ui-action-menu-item, [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"])[data-disabled] {
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"])[data-disabled] {
   color: var(--openbot-text-muted);
   cursor: default;
   opacity: 0.45;
 }
 
 .ui-action-menu:not([data-menu-layout="grid"])
-  :is(.ui-action-menu-item, [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"])
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"])
   > svg {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
@@ -77,8 +77,7 @@
 }
 
 .ui-action-menu > hr,
-.ui-action-menu [role="separator"],
-.ui-action-menu-separator {
+.ui-action-menu [role="separator"] {
   height: 1px;
   margin: var(--openbot-space-1) 0;
   border: 0;
@@ -86,20 +85,19 @@
 }
 
 .ui-action-menu:not([data-menu-layout="grid"])
-  :is(.ui-action-menu-item, [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]).ui-action-menu-danger,
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]).ui-action-menu-danger,
 .ui-action-menu:not([data-menu-layout="grid"])
-  :is(.ui-action-menu-item, [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]).ui-action-menu-danger
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]).ui-action-menu-danger
   > svg {
   color: var(--openbot-danger-strong);
 }
 
 .ui-action-menu:not([data-menu-layout="grid"])
-  :is(
-    .ui-action-menu-item,
-    [role="menuitem"],
-    [role="menuitemcheckbox"],
-    [role="menuitemradio"]
-  ).ui-action-menu-danger:is(:hover, :focus-visible, [data-highlighted]) {
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]).ui-action-menu-danger:is(
+    :hover,
+    :focus-visible,
+    [data-highlighted]
+  ) {
   background: var(--openbot-danger-soft);
   color: var(--openbot-danger-strong);
 }

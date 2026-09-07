@@ -6,7 +6,7 @@ import { isTrustedRendererUrl } from "./trusted-renderer";
 // convention: a registration that does not say how its payload decodes is a compile error, not a
 // hole for review to catch. The decoder is a plain `(value: unknown) => Payload`, so it can be a
 // hand-written parser, a zod `parse`, or anything else, without changing a call site.
-type PayloadDecoder<Payload> = (value: unknown) => Payload;
+export type PayloadDecoder<Payload> = (value: unknown) => Payload;
 
 // The implementation takes the two shapes as a tuple union so its length discriminates them. A
 // plain union of the second parameter would need a type assertion to call either arm, and asserting
@@ -23,7 +23,7 @@ type TrustedRegistration =
 // parameter tuple's own length rejects all three, and says why in the diagnostic.
 type ArityMessage = "this handler takes a payload, so it must be registered with a decoder for it";
 
-type TakesNoArguments<Handler> = Handler extends (...args: infer Args) => unknown
+export type TakesNoArguments<Handler> = Handler extends (...args: infer Args) => unknown
   ? Args["length"] extends 0
     ? unknown
     : ArityMessage
@@ -35,10 +35,10 @@ type TakesNoArguments<Handler> = Handler extends (...args: infer Args) => unknow
 // before the process decodes anything the caller sent. Without the slot the check can only run after
 // the decoder, which hands a caller already known to be rejected a payload-validation error to read
 // and makes it the decoder's allocations that answer first.
-type AuthorizeSender = (event: IpcMainInvokeEvent) => void;
+export type AuthorizeSender = (event: IpcMainInvokeEvent) => void;
 
 // The event is passed by the wrapper, not the renderer, so a handler may name it or ignore it.
-type TakesEventOnly<Handler> = Handler extends (...args: infer Args) => unknown
+export type TakesEventOnly<Handler> = Handler extends (...args: infer Args) => unknown
   ? Args["length"] extends 0 | 1
     ? unknown
     : ArityMessage

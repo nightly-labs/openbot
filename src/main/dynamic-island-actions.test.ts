@@ -11,7 +11,7 @@ describe("performDynamicIslandCriticalAction", () => {
       {
         type: "answer-prompt",
         serverId: "local",
-        botId: "chief",
+        agentId: "chief",
         requestId: "prompt-local",
         answers: { source: ["Official data"] },
       },
@@ -35,7 +35,7 @@ describe("performDynamicIslandCriticalAction", () => {
       {
         type: "answer-prompt",
         serverId: "server-eu",
-        botId: "research",
+        agentId: "research",
         requestId: "prompt-1",
         answers: { source: ["Official data"] },
       },
@@ -44,15 +44,10 @@ describe("performDynamicIslandCriticalAction", () => {
       decodeVoid,
     );
 
-    expect(remote.request).toHaveBeenCalledWith(
-      "/v1/prompts/respond",
-      {
-        method: "POST",
-        body: { requestId: "prompt-1", answers: { source: ["Official data"] } },
-      },
-      "server-eu",
-      decodeVoid,
-    );
+    expect(remote.request).toHaveBeenCalledWith("server-eu", "/v1/prompts/respond", decodeVoid, {
+      method: "POST",
+      body: { requestId: "prompt-1", answers: { source: ["Official data"] } },
+    });
     expect(local.respondToPrompt).not.toHaveBeenCalled();
   });
 
@@ -65,7 +60,7 @@ describe("performDynamicIslandCriticalAction", () => {
       {
         type: "respond-approval",
         serverId: "local",
-        botId: "chief",
+        agentId: "chief",
         requestId: "approval-local",
         decision: "accept",
       },
@@ -77,7 +72,7 @@ describe("performDynamicIslandCriticalAction", () => {
       {
         type: "respond-approval",
         serverId: "server-eu",
-        botId: "research",
+        agentId: "research",
         requestId: "approval-remote",
         decision: "decline",
       },
@@ -87,12 +82,10 @@ describe("performDynamicIslandCriticalAction", () => {
     );
 
     expect(local.respondToApproval).toHaveBeenCalledWith({ requestId: "approval-local", decision: "accept" });
-    expect(remote.request).toHaveBeenCalledWith(
-      "/v1/approvals/respond",
-      { method: "POST", body: { requestId: "approval-remote", decision: "decline" } },
-      "server-eu",
-      decodeVoid,
-    );
+    expect(remote.request).toHaveBeenCalledWith("server-eu", "/v1/approvals/respond", decodeVoid, {
+      method: "POST",
+      body: { requestId: "approval-remote", decision: "decline" },
+    });
   });
 });
 

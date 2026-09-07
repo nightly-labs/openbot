@@ -35,6 +35,7 @@ import type {
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type { AgentService } from "../backend/agent-service";
 import type { TeamChatStore } from "../backend/team-chat-store";
 import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
@@ -47,6 +48,8 @@ import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
 
 export const DEVELOPMENT_REMOTE_CLIENT_USERNAME = "openbot-dev-client";
+
+const logger = createOpenBotLogger("host-service");
 
 interface HostEvents {
   changed: [status: HostStatus];
@@ -540,6 +543,12 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.getStatus();
   }
 
+  // Where this host's Team API listens on this machine, which is not what `#status.apiUrl` reports:
+  // that is how a member reaches the host, and for a published one it is the Signal service.
+  #localApiUrl(): string | null {
+    return this.#api.port === null ? null : `http://localhost:${this.#api.port}`;
+  }
+
   async createDevelopmentConnection(): Promise<{
     serverId: string;
     serverName: string;
@@ -550,13 +559,23 @@ export class HostService extends EventEmitter<HostEvents> {
     sessionToken: string;
   }> {
     const identity = this.#options.store.getIdentity();
-    if (!identity || !this.#status.apiUrl) throw new Error("The local development host is not ready.");
+    const apiUrl = this.#localApiUrl();
+    if (!identity || !apiUrl) throw new Error("The local development host is not ready.");
     const username = DEVELOPMENT_REMOTE_CLIENT_USERNAME;
     const password = "openbot-local-development-client";
     let authenticated: AuthenticatedMember;
     try {
       authenticated = await this.#options.store.login(username, password);
     } catch {
+      // Publishing this host reconciles its members against the control plane, and the technical
+      // client is never in that list -- it is password-only, owned by no account -- so the
+      // reconciliation disables it. `login` skips a disabled member and `acceptInvite` refuses a
+      // username that already exists, so once the developer had published the host, every later
+      // `bun run dev:test-client` died at startup with "This username is already in use." and only
+      // editing the profile by hand brought it back. Replacing the member is what makes publishing
+      // a state the dev stack can leave: it is a fixture, and nothing outside this file reads it.
+      const existing = this.#options.store.listMembers().find((member) => member.username === username);
+      if (existing && existing.role !== "owner") await this.#options.store.removeMember(existing.id);
       const invite = await this.#options.store.createInvite("member");
       authenticated = await this.#options.store.acceptInvite(invite.token, username, password);
     }
@@ -564,7 +583,7 @@ export class HostService extends EventEmitter<HostEvents> {
     return {
       serverId: identity.serverId,
       serverName: identity.serverName,
-      apiUrl: this.#status.apiUrl,
+      apiUrl,
       fingerprint: identity.fingerprint,
       publicKey: identity.publicKey,
       username,
@@ -628,23 +647,28 @@ export class HostService extends EventEmitter<HostEvents> {
   }
 
   setTyping(input: SetTeamTypingInput): void {
-    this.#api.setLocalTyping(input.botId, input.typing);
+    this.#api.setLocalTyping(input.agentId, input.typing);
   }
 
-  readAgentConversation(botId: string): Promise<ConversationWithReadState> {
-    return this.#options.agents.readConversationFor(botId, this.#currentAgentReaderId());
+  readAgentConversation(agentId: string): Promise<ConversationWithReadState> {
+    return this.#options.agents.readConversationFor(agentId, this.#currentAgentReaderId());
   }
 
   readAgentConversationPage(
-    botId: string,
+    agentId: string,
     anchor: ConversationPageAnchor = { type: "latest" },
     limit = 50,
   ): Promise<ConversationPage> {
-    return this.#options.agents.readConversationPageFor(botId, this.#currentAgentReaderId(), anchor, limit);
+    return this.#options.agents.readConversationPageFor(agentId, this.#currentAgentReaderId(), anchor, limit);
   }
 
-  searchAgentConversationMessages(query: string, botId?: string, cursor?: string, limit = 100): ConversationSearchPage {
-    return this.#options.agents.searchConversationMessages(query, botId, cursor, limit);
+  searchAgentConversationMessages(
+    query: string,
+    agentId?: string,
+    cursor?: string,
+    limit = 100,
+  ): ConversationSearchPage {
+    return this.#options.agents.searchConversationMessages(query, agentId, cursor, limit);
   }
 
   listAgentConversationReads(): Record<string, ConversationReadState> {
@@ -652,7 +676,11 @@ export class HostService extends EventEmitter<HostEvents> {
   }
 
   markAgentConversationRead(input: MarkConversationReadInput): Promise<ConversationReadState> {
-    return this.#options.agents.markConversationRead(input.botId, this.#currentAgentReaderId(), input.throughMessageId);
+    return this.#options.agents.markConversationRead(
+      input.agentId,
+      this.#currentAgentReaderId(),
+      input.throughMessageId,
+    );
   }
 
   listDirectThreads(): DirectThreadSummary[] {
@@ -840,11 +868,17 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#assertStillActiveHost(identity.serverId);
       return result;
     }
-    if (!this.#status.apiUrl) throw new Error("Make this OpenBot public before creating an invite.");
+    // This branch mints a link to this machine's own Team API, so it asks the server where it
+    // listens rather than reading the status. They are the same URL for a host that is private or
+    // local-development, and for a published one the status carries the Signal service's `ws://`
+    // address -- which `createInviteUrl` rejects, so a developer who had published this host could
+    // not create an invite at all.
+    const localApiUrl = this.#localApiUrl();
+    if (!localApiUrl) throw new Error("Make this OpenBot public before creating an invite.");
     const invite = await this.#options.store.createInvite(input.role, input.email);
     const inviteUrl = createInviteUrl(
       {
-        apiUrl: this.#status.apiUrl,
+        apiUrl: localApiUrl,
         serverId: identity.serverId,
         fingerprint: identity.fingerprint,
         token: invite.token,
@@ -888,7 +922,7 @@ export class HostService extends EventEmitter<HostEvents> {
     try {
       await step();
     } catch (error) {
-      console.error("Unable to stop the host runtime while switching accounts:", error);
+      logger.error("Unable to stop the host runtime while switching accounts:", toLogValue(error));
     }
   }
 

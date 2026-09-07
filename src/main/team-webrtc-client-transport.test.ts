@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { isString } from "@openbot/contracts/runtime-values";
 import {
   decodeTeamProtocolV2AuthFrame,
+  decodeTeamProtocolV2RpcFrame,
   encodeTeamProtocolV2Frame,
   type TeamProtocolV2AuthFrame,
   teamProtocolV2AuthenticationTranscript,
@@ -90,6 +91,59 @@ function mockAuthenticatedSend(bridge: TeamWebRtcBridge, automaticallyConfirm = 
   };
 }
 
+// The control-plane half of the options is the same in every test and says nothing about any of
+// them. Only the bridge and the session calls differ, so they stay at the call site.
+function createTransport(
+  bridge: TeamWebRtcBridge,
+  overrides: Partial<ConstructorParameters<typeof TeamWebRtcClientTransport>[0]> = {},
+): TeamWebRtcClientTransport {
+  return new TeamWebRtcClientTransport({
+    bridge,
+    listHosts: async () => [listedHost],
+    startSession: async () => ({ sessionId: "session-1", hostId: "host-1", expiresAt: Date.now() + 86_400_000 }),
+    issueTicket: async (sessionId: string) => ({
+      ticket: sessionId,
+      expiresAt: Date.now() + 180_000,
+      signalUrl: "wss://signal.example.test/v1/signal",
+    }),
+    endSession: async () => undefined,
+    createInvite: async () => ({ inviteId: "invite", token: "token", expiresAt: Date.now() + 60_000 }),
+    listInvites: async () => [],
+    previewInvite: async () => ({
+      inviteId: "invite",
+      hostId: "host-1",
+      hostName: "Host",
+      role: "member",
+      expiresAt: Date.now() + 60_000,
+      emailBound: false,
+      devicePublicKey: null,
+    }),
+    acceptInvite: async () => ({ hostId: "host-1", membershipId: "member-1", role: "member" }),
+    revokeInvite: async () => undefined,
+    listMembers: async () => [],
+    updateMember: async () => undefined,
+    removeMember: async () => undefined,
+    getPrincipalId: () => "user-1",
+    controlPlaneUrl: "https://api.example.test",
+    downloadHostLogo: async () => ({ bytes: new Uint8Array(), mimeType: "image/png" }),
+    transferDirectory: join(tmpdir(), "openbot-webrtc-client-test"),
+    ...overrides,
+  });
+}
+
+function sentRequestId(send: { mock: { calls: unknown[][] } }): string | null {
+  for (const call of [...send.mock.calls].reverse()) {
+    if (call[1] !== "rpc" || !isString(call[2])) continue;
+    try {
+      const frame = decodeTeamProtocolV2RpcFrame(call[2]);
+      if (frame.type === "request") return frame.requestId;
+    } catch {
+      // An auth frame, which this is not looking for.
+    }
+  }
+  return null;
+}
+
 describe("TeamWebRtcClientTransport", () => {
   it("reuses the logical session after a WebRTC disconnect", async () => {
     const bridge = new TeamWebRtcBridge();
@@ -157,6 +211,9 @@ describe("TeamWebRtcClientTransport", () => {
     expect(bridge.send).not.toHaveBeenCalledWith("host-1", "events", expect.any(String));
     authentication.confirmNext();
     await initialConnection;
+    // What a caller asks before it decides whether the `connected` event it is waiting on is ever
+    // coming: `connect` resolves on a channel that was already up without announcing anything.
+    expect(transport.isConnected("host-1")).toBe(true);
     bridge.emit("data", "host-1", "events", JSON.stringify({ version: 2, type: "event-reset", nextSequence: 2_001 }));
     bridge.emit(
       "data",
@@ -174,6 +231,7 @@ describe("TeamWebRtcClientTransport", () => {
       }),
     );
     bridge.emit("disconnected", "host-1");
+    expect(transport.isConnected("host-1")).toBe(false);
     const reconnection = transport.connect("host-1");
     await vi.waitFor(() => expect(authentication.pendingConfirmations).toHaveLength(1));
     authentication.confirmNext();
@@ -207,6 +265,33 @@ describe("TeamWebRtcClientTransport", () => {
     await malformedRejection;
     expect(protocolError).toHaveBeenCalledWith("host-1", "protocol_error", expect.any(String));
     await vi.waitFor(() => expect(bridge.disconnect).toHaveBeenCalledWith("host-1"));
+    await transport.stop();
+  });
+
+  it("stays connected on a session that expires further out than a timer can be set", async () => {
+    const bridge = new TeamWebRtcBridge();
+    vi.spyOn(bridge, "connect").mockImplementation(async ({ peerId }) => {
+      queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
+    });
+    const disconnectBridge = vi.spyOn(bridge, "disconnect").mockResolvedValue();
+    mockAuthenticatedSend(bridge);
+    // What the control plane answers `startSession` with for every account session: the largest date
+    // JavaScript has. Scheduling the expiry for it directly overflows the timer range, and Node
+    // resolves an overflow by firing in a millisecond -- so the session that never expires used to
+    // be the one that hung up the moment it authenticated.
+    const transport = createTransport(bridge, {
+      startSession: async () => ({ sessionId: "session-1", hostId: "host-1", expiresAt: 8_640_000_000_000_000 }),
+    });
+    await transport.listHosts();
+    transport.pinHostKey("host-1", hostKeys.publicKey);
+    vi.useFakeTimers();
+    try {
+      await transport.connect("host-1");
+      await vi.advanceTimersByTimeAsync(5);
+      expect(disconnectBridge).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
     await transport.stop();
   });
 
@@ -382,6 +467,43 @@ describe("TeamWebRtcClientTransport", () => {
     expect(endSession).toHaveBeenCalledWith("session-1");
     await transport.stop();
     nowSpy.mockRestore();
+  });
+
+  // A response frame whose *body* the released V3 adapter refuses is the same failure as a frame
+  // that is not a response at all: the host is talking a protocol this build cannot read. It has to
+  // carry the same code, because an ordinary request error leaves the caller reconnecting to a host
+  // that will answer the next request with the same nonsense.
+  it("reports an undecodable response body as a protocol failure", async () => {
+    const bridge = new TeamWebRtcBridge();
+    vi.spyOn(bridge, "connect").mockImplementation(async ({ peerId }) => {
+      queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
+    });
+    const authentication = mockAuthenticatedSend(bridge);
+    vi.spyOn(bridge, "disconnect").mockResolvedValue();
+    const transport = createTransport(bridge);
+    await transport.listHosts();
+    transport.pinHostKey("host-1", hostKeys.publicKey);
+    await transport.connect("host-1");
+
+    // `GET /v1/agents/:id/usage` is one of the routes carried by the V3 codec, so its body is the
+    // adapter's to accept -- and a number where the shape says otherwise is not something it can.
+    const pending = transport.request("host-1", "/v1/agents/research/usage");
+    const rejection = expect(pending).rejects.toMatchObject({ code: "protocol_error" });
+    await vi.waitFor(() => expect(sentRequestId(authentication.send)).toBeTruthy());
+    bridge.emit(
+      "data",
+      "host-1",
+      "rpc",
+      JSON.stringify({
+        version: 2,
+        type: "response",
+        requestId: sentRequestId(authentication.send),
+        result: { status: 200, body: { totals: 7 } },
+      }),
+    );
+
+    await rejection;
+    await transport.stop();
   });
 
   it("rejects every concurrent caller when the bridge connection fails", async () => {

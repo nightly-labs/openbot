@@ -4,6 +4,10 @@ import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
 import {
+  type TeamProtocolV1CurrentEventControl,
+  toWireTeamProtocolV1ClientEvent,
+} from "@openbot/contracts/team-protocol/v1-adapter";
+import {
   decodeTeamProtocolV2AuthFrame,
   decodeTeamProtocolV2EventFrame,
   decodeTeamProtocolV2RpcFrame,
@@ -29,6 +33,9 @@ import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
 
 export const TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS = 10 * 60_000 + 30_000;
+
+/** Node clamps a longer `setTimeout` to one millisecond, and says so on stderr. */
+const MAXIMUM_TIMER_DELAY_MILLISECONDS = 2_147_483_647;
 
 interface TeamWebRtcClientTransportEvents {
   connected: [hostId: string];
@@ -179,8 +186,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     await this.#sendEventControl(hostId, { type: "runtime-snapshot-request" });
   }
 
-  async setTyping(hostId: string, botId: string | null, typing: boolean): Promise<void> {
-    await this.#sendEventControl(hostId, { type: "team-typing", botId, typing });
+  async setTyping(hostId: string, agentId: string | null, typing: boolean): Promise<void> {
+    await this.#sendEventControl(hostId, { type: "team-typing", agentId, typing });
   }
 
   async setDirectTyping(hostId: string, recipientMemberId: string, typing: boolean): Promise<void> {
@@ -189,6 +196,15 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
 
   connect(hostId: string): Promise<void> {
     return this.#ensureConnected(hostId);
+  }
+
+  /**
+   * Whether the data channel to this host is up and authenticated. `connect` resolves either way,
+   * and only the first of the two announces itself with a `connected` event, so a caller that has
+   * to reconcile its own state with the transport's needs to be able to ask.
+   */
+  isConnected(hostId: string): boolean {
+    return this.#active.get(hostId)?.connected === true;
   }
 
   async request(
@@ -264,11 +280,19 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       fileRecord && isString(fileRecord.transferId)
         ? await this.#files.consume(hostId, fileRecord.transferId)
         : undefined;
-    return {
-      status: envelope.status,
-      body: file ? null : decodeTeamProtocolV3WebRtcHttpResponse(method, path, envelope.status, envelope.body),
-      ...(file ? { file } : {}),
-    };
+    // The envelope check above catches a frame that is not shaped like a response. This catches a
+    // well-formed frame whose *body* the released V3 adapter refuses, which is the same kind of
+    // failure and has to carry the same code: a plain error here reads to the caller as an ordinary
+    // request failure, so the host stays healthy and reconnectable while talking nonsense.
+    let body: ReturnType<typeof decodeTeamProtocolV3WebRtcHttpResponse> = null;
+    if (!file) {
+      try {
+        body = decodeTeamProtocolV3WebRtcHttpResponse(method, path, envelope.status, envelope.body);
+      } catch {
+        throw new TeamWebRtcRequestError(502, "protocol_error", "The host returned an invalid response body.");
+      }
+    }
+    return { status: envelope.status, body, ...(file ? { file } : {}) };
   }
 
   async disconnect(hostId: string): Promise<void> {
@@ -432,29 +456,39 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     throw new Error("The remote connection was cancelled.");
   }
 
-  async #sendEventControl(
-    hostId: string,
-    control:
-      | { type: "runtime-snapshot-request" }
-      | { type: "team-typing"; botId: string | null; typing: boolean }
-      | { type: "team-direct-typing"; recipientMemberId: string; typing: boolean },
-  ): Promise<void> {
+  async #sendEventControl(hostId: string, control: TeamProtocolV1CurrentEventControl): Promise<void> {
     await this.#ensureConnected(hostId);
     await this.#options.bridge.send(
       hostId,
       "events",
-      encodeTeamProtocolV2Frame({ version: 2, type: "event-control", control }),
+      encodeTeamProtocolV2Frame({
+        version: 2,
+        type: "event-control",
+        control: toWireTeamProtocolV1ClientEvent(control),
+      }),
     );
   }
 
   #scheduleExpiration(hostId: string, active: ActiveHost): void {
     if (active.expirationTimer) clearTimeout(active.expirationTimer);
     if (!active.expiresAt) return;
-    const delay = Math.max(0, active.expiresAt - Date.now() - 30_000);
-    active.expirationTimer = setTimeout(() => {
-      active.expirationTimer = null;
-      if (this.#active.get(hostId) === active) void this.disconnect(hostId).catch(() => undefined);
-    }, delay);
+    const remaining = Math.max(0, active.expiresAt - Date.now() - 30_000);
+    // Wait in bounded steps, exactly as the host schedules its half of the same session in
+    // `#scheduleSessionExpiration`. An account session is persistent -- the control plane answers
+    // `startSession` with `PERSISTENT_SESSION_EXPIRES_AT`, the largest date JavaScript has -- so the
+    // delay is a quarter of a million years and overflows Node's signed 32-bit timer range. Node
+    // resolves that by firing in one millisecond, which disconnected the client roughly as fast as
+    // it finished authenticating: the channel closed under the first request, and the caller waited
+    // out the full ten-minute request timeout for a frame that had nowhere to go.
+    active.expirationTimer = setTimeout(
+      () => {
+        active.expirationTimer = null;
+        if (this.#active.get(hostId) !== active) return;
+        if (remaining > MAXIMUM_TIMER_DELAY_MILLISECONDS) this.#scheduleExpiration(hostId, active);
+        else void this.disconnect(hostId).catch(() => undefined);
+      },
+      Math.min(remaining, MAXIMUM_TIMER_DELAY_MILLISECONDS),
+    );
     active.expirationTimer.unref?.();
   }
 

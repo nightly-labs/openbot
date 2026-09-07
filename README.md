@@ -53,7 +53,7 @@ OpenBot supports macOS 13 or newer on Apple Silicon and Windows 10 or newer on x
 ### Agent setup
 
 OpenBot can download a supported provider runtime when you select `Download` in onboarding,
-Settings, Bot setup, or the model picker. A compatible system CLI remains the first choice.
+Settings, agent setup, or the model picker. A compatible system CLI remains the first choice.
 
 You can also install a CLI yourself.
 
@@ -143,12 +143,15 @@ Use `bun run dev:seed --dry-run` to inspect the target and fixture counts withou
 | `bun run api:deploy` | Build and deploy the account API to Cloudflare Workers. |
 | `bun run remote:up` | Build and start the self-hosted Signal, coturn, and ACME stack. |
 | `bun run remote:check` | Check the Remote API and both Docker Compose configurations. |
+| `bun run remote:check:compose` | Validate both Docker Compose configurations alone, without a running daemon. |
 | `bun run remote:update` | Update Signal, then drain and update the single coturn instance. |
 | `bun run dev:all` | Start the Auth API, Signal service, and single local Electron instance. |
 | `bun run dev:test-client` | Start the Auth API, Signal service, local instance, and an isolated second client for team testing. |
 | `bun run dev:seed` | Replace only the app development profile with deterministic showcase data. |
 | `bun run dev:reset` | Delete the local app, test-client, and legacy host development state. |
+| `bun run dev:automation` | Drive the running dev app over CDP: `instances`, `pages`, `snapshot`, `screenshot`, `click`/`type` by accessible role. `--page=<target-id\|url-substring>` aims at any window, including embedded browser views; `--wait-for=<role>,<name>` settles on an accessible target instead of polling; mutations need `--allow-mutations` and a named instance (this worktree's record, `--instance=<id>` or `--port=`). |
 | `bun run check` | Run Biome, both typechecks, offline tests, the browser smoke test, and the production build. |
+| `bun run check:ui` | Check the renderer against the design system: shared primitives, Kobalte and Lucide confined to `components/ui`, palette tokens instead of colour, size, radius and transition literals. Reads the whole renderer in 60 ms. |
 | `bun run test:backend` | Run backend tests only. |
 | `bun run test:browser` | Run the local embedded-browser smoke test. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
@@ -186,7 +189,7 @@ The normal `check` command is offline and uses a fake App Server. Manual smoke s
 signed-in subscription and must not run in CI.
 
 Local agents run with the providers' unrestricted execution modes. Each agent starts in its own
-persistent `~/OpenBot/Bots/<agent>` workspace and also receives `~/OpenBot/Shared`; routine command
+persistent `~/OpenBot/Agents/<agent-id>` workspace and also receives `~/OpenBot/Shared`; routine command
 and filesystem work in both locations runs without OpenBot adding another permission boundary.
 Because these modes are intentionally unrestricted, they also permit host access outside those
 directories when the provider and operating system allow it.
@@ -221,7 +224,9 @@ rules for new modules.
 
 ## Local data and network boundaries
 
-- `~/OpenBot/Bots/<bot-id>` — one working directory per agent.
+- `~/OpenBot/Agents/<agent-id>` — one working directory per agent. A profile written before the
+  bot-to-agent rename holds them under `~/OpenBot/Bots`; the app moves them on first launch, and a
+  workspace whose move could not run stays readable where it is.
 - `~/OpenBot/Shared` — files intentionally shared between agents.
 - `~/OpenBot/Shared/Transfers` — managed message snapshots and generated files. Each transfer has
   an `.openbot-transfer.json` manifest with ownership, recipients, size, and SHA-256 metadata.

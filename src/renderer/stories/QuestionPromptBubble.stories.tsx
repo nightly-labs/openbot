@@ -1,7 +1,6 @@
 import type { AgentPromptQuestion } from "@openbot/contracts/ipc";
 import { expect, fn, waitFor } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { AgentAvatar } from "../src/components/AgentAvatar";
 import { QuestionPromptBubble, type QuestionPromptBubbleProps } from "../src/components/QuestionPromptBubble";
 import {
   ArrowUp,
@@ -15,6 +14,7 @@ import {
   Plus,
   Textarea,
 } from "../src/components/ui";
+import { AgentAvatar } from "../src/features/agents/AgentAvatar";
 
 const singleQuestion: AgentPromptQuestion[] = [
   {
@@ -129,7 +129,7 @@ function QuestionPromptChatPreview(props: QuestionPromptBubbleProps) {
             </MessageContent>
           </Message>
 
-          <Message role="article" align="start" class="message-entry message-entry-bot" aria-label="Chief at 10:01">
+          <Message role="article" align="start" class="message-entry message-entry-agent" aria-label="Chief at 10:01">
             <MessageContent>
               <div class="message-shell">
                 <Bubble variant="muted">
@@ -143,7 +143,7 @@ function QuestionPromptChatPreview(props: QuestionPromptBubbleProps) {
           <Message
             role="article"
             align="start"
-            class="message-entry message-entry-bot question-prompt-chat-question"
+            class="message-entry message-entry-agent question-prompt-chat-question"
             aria-label="Chief asks questions at 10:01"
           >
             <MessageContent>

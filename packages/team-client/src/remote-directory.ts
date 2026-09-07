@@ -1,6 +1,7 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
-import { isMobileConnectDevelopmentHost, type MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
+import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
+import { decodeRemoteSession, decodeRemoteSessionTicket } from "@openbot/contracts/remote-control-plane";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 
 import type { TeamClientFetch } from "./index";
@@ -131,38 +132,16 @@ export class RemoteTeamDirectoryClient {
   }
 
   async createBootstrap(hostId: string, clientPublicKey: string): Promise<RemoteTeamBootstrap> {
-    const session = await this.#request("/v2/remote/sessions/", {
-      method: "POST",
-      body: { hostId },
-    });
-    if (
-      !isDynamicRecord(session) ||
-      !isString(session.sessionId) ||
-      !isNumber(session.expiresAt) ||
-      !Number.isSafeInteger(session.expiresAt)
-    ) {
-      throw new Error("The remote session is invalid.");
-    }
+    const session = decodeRemoteSession(
+      await this.#request("/v2/remote/sessions/", { method: "POST", body: { hostId } }),
+    );
     try {
-      const ticket = await this.#request(`/v2/remote/sessions/${encodeURIComponent(session.sessionId)}/ticket`, {
-        method: "POST",
-        body: { clientPublicKey },
-      });
-      if (
-        !isDynamicRecord(ticket) ||
-        !isString(ticket.ticket) ||
-        !isString(ticket.signalUrl) ||
-        !isNumber(ticket.expiresAt)
-      ) {
-        throw new Error("The connection ticket is invalid.");
-      }
-      const signalUrl = new URL(ticket.signalUrl);
-      if (
-        signalUrl.protocol !== "wss:" &&
-        !(signalUrl.protocol === "ws:" && isMobileConnectDevelopmentHost(signalUrl.hostname))
-      ) {
-        throw new Error("The Signal URL is invalid.");
-      }
+      const ticket = decodeRemoteSessionTicket(
+        await this.#request(`/v2/remote/sessions/${encodeURIComponent(session.sessionId)}/ticket`, {
+          method: "POST",
+          body: { clientPublicKey },
+        }),
+      );
       return {
         sessionId: session.sessionId,
         expiresAt: session.expiresAt,
@@ -170,6 +149,8 @@ export class RemoteTeamDirectoryClient {
         ticket: ticket.ticket,
       };
     } catch (error) {
+      // The session is account-scoped and the host refuses a second one, so a failure between
+      // creating it and holding a ticket has to give it back or the next attempt is locked out.
       await this.endSession(session.sessionId).catch(() => undefined);
       throw error;
     }

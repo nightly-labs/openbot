@@ -1,7 +1,14 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { createMemo, Loading, Show } from "solid-js";
-import { useAgents } from "./agents";
-import { useAuth } from "./auth";
+import { useAuth } from "./features/account/account-context";
+import { useAgents } from "./features/agents/agents-context";
+import { useSetup } from "./features/onboarding/onboarding-context";
+import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
+import { useServerSelection } from "./features/servers/server-selection";
+import { useServerSettings } from "./features/servers/server-settings";
+import { useServers } from "./features/servers/servers-context";
+import { useSettings } from "./features/settings/settings-context";
+import { useUpdates } from "./features/updates/updates-context";
 import {
   GlobalSearch,
   InitialSetup,
@@ -14,13 +21,6 @@ import {
 import { useNavigation } from "./navigation";
 import { usePlatform } from "./platform";
 import { useProviders } from "./providers";
-import { useRemoteDesktop } from "./remote-desktop";
-import { useServerSelection } from "./server-selection";
-import { useServerSettings } from "./server-settings";
-import { useServers } from "./servers";
-import { useSettings } from "./settings";
-import { useSetup } from "./setup";
-import { useUpdates } from "./updates";
 
 interface AccountProps {
   account: () => CentralAuthUser;
@@ -82,12 +82,12 @@ function PermissionsReview(props: AccountProps) {
 }
 
 /**
- * Skills and marketplace agents, which install into a Bot's workspace on this
+ * Skills and marketplace agents, which install into an Agent's workspace on this
  * machine, so the picker is empty for a remote server.
  */
 function SkillsMarketplace() {
   const { skillsMarketplaceOpen, setSkillsMarketplaceOpen } = useSettings();
-  const { botList, activeBot } = useAgents();
+  const { agentList, activeAgent } = useAgents();
   const { activeServer } = useServers();
   const { openInstalledMarketplaceAgent } = useServerSelection();
   const local = createMemo(() => activeServer()?.kind === "local");
@@ -97,8 +97,8 @@ function SkillsMarketplace() {
       <Loading>
         <SkillsMarketplaceModal
           open={true}
-          bots={local() ? botList() : []}
-          activeBotId={local() ? (activeBot()?.id ?? "") : ""}
+          agents={local() ? agentList() : []}
+          activeAgentId={local() ? (activeAgent()?.id ?? "") : ""}
           onOpenChange={setSkillsMarketplaceOpen}
           onAgentInstalled={openInstalledMarketplaceAgent}
         />
@@ -203,9 +203,7 @@ function AppSettings(props: AccountProps) {
     providerRuntimeDownloadsAvailable,
     downloadProviderRuntime,
     cancelProviderRuntimeDownload,
-    connectChatGPT,
-    connectClaude,
-    connectGrok,
+    connectProvider,
   } = useProviders();
   /** Provider downloads are the local machine's business, never a remote host's. */
   const localProviderDownloads = createMemo(
@@ -234,12 +232,7 @@ function AppSettings(props: AccountProps) {
         providerRuntimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
         onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
         onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
-        onConnectProvider={
-          localProviderDownloads()
-            ? (provider) =>
-                provider === "codex" ? connectChatGPT() : provider === "claude" ? connectClaude() : connectGrok()
-            : undefined
-        }
+        onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
         hostedSitesApi={window.openbot.hostedSites}
         restoreFocusTarget={appSettingsRestoreTarget()}
       />
@@ -249,8 +242,8 @@ function AppSettings(props: AccountProps) {
 
 /** Search across every conversation on the active server. */
 function GlobalMessageSearch() {
-  const { botList } = useAgents();
-  const { globalSearchOpen, searchGlobalMessages, setGlobalSearchVisibility, selectBot, selectGlobalSearchMessage } =
+  const { agentList } = useAgents();
+  const { globalSearchOpen, searchGlobalMessages, setGlobalSearchVisibility, selectAgent, selectGlobalSearchMessage } =
     useNavigation();
 
   return (
@@ -258,10 +251,10 @@ function GlobalMessageSearch() {
       <Loading>
         <GlobalSearch
           open={true}
-          bots={botList()}
+          agents={agentList()}
           onSearchMessages={searchGlobalMessages}
           onOpenChange={setGlobalSearchVisibility}
-          onSelectBot={selectBot}
+          onSelectAgent={selectAgent}
           onSelectMessage={selectGlobalSearchMessage}
         />
       </Loading>

@@ -130,6 +130,37 @@ describe("remote connection recovery", () => {
     recovery.dispose();
   });
 
+  // Ten seconds apart, five times, then every two minutes, for as long as the app is open -- all of
+  // it asking a service that would answer with the same unreadable frame.
+  it("stops retrying a failure a retry cannot fix, and tries once when the app comes back", async () => {
+    vi.useFakeTimers();
+    let attempts = 0;
+    const messages: Array<string | null> = [];
+    const recovery = createRemoteConnectionRecovery(
+      async () => {
+        attempts += 1;
+      },
+      () => {},
+      (status) => messages.push(remoteRecoveryMessage(status)),
+    );
+    recovery.setActive(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(attempts).toBe(1);
+
+    recovery.suspend(new Error("Signal returned an invalid message."));
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect(attempts).toBe(1);
+    expect(messages.at(-1)).toBe("Update OpenBot Mobile or the desktop app before connecting.");
+
+    // The desktop the user left to update is the reason the frame was unreadable, so returning to
+    // the app is the way out of this state.
+    recovery.setActive(false);
+    recovery.setActive(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(attempts).toBe(2);
+    recovery.dispose();
+  });
+
   it("does not overlap connection attempts and ignores a disposed server", async () => {
     vi.useFakeTimers();
     let resolve = () => {};
@@ -236,8 +267,8 @@ describe("remote connection recovery", () => {
 
 describe("conversation recovery after an event reset", () => {
   it("replaces stale cached conversations only for agents in the recovered server", async () => {
-    const snapshot = (botId: string, text: string, revision: number): ConversationSnapshot => ({
-      botId,
+    const snapshot = (agentId: string, text: string, revision: number): ConversationSnapshot => ({
+      agentId,
       threadId: null,
       activeTurnId: null,
       revision,
@@ -249,14 +280,14 @@ describe("conversation recovery after an event reset", () => {
     };
     const loaded: string[] = [];
     await resyncRemoteConversations({
-      botIds: ["local", "unopened"],
+      agentIds: ["local", "unopened"],
       cached,
       load: async (id) => {
         loaded.push(id);
         return snapshot(id, "missed response", 2);
       },
       apply: (value) => {
-        cached[value.botId] = value;
+        cached[value.agentId] = value;
       },
       isCurrent: () => true,
     });
@@ -266,11 +297,17 @@ describe("conversation recovery after an event reset", () => {
   });
   it("does not apply a recovery snapshot after switching servers", async () => {
     let current = true;
-    const old: ConversationSnapshot = { botId: "bot", threadId: null, activeTurnId: null, revision: 1, messages: [] };
+    const old: ConversationSnapshot = {
+      agentId: "agent",
+      threadId: null,
+      activeTurnId: null,
+      revision: 1,
+      messages: [],
+    };
     let displayed = old;
     await resyncRemoteConversations({
-      botIds: ["bot"],
-      cached: { bot: old },
+      agentIds: ["agent"],
+      cached: { agent: old },
       load: async () => {
         current = false;
         return { ...old, revision: 2 };
