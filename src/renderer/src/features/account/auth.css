@@ -396,6 +396,8 @@
   stroke-dashoffset: 24;
   stroke-linecap: round;
   stroke-linejoin: round;
+  /* Heavier than the shared glyph scale on purpose: this tick is drawn by animation and
+   * reads as a confirmation, the same exception the badge tick takes. */
   stroke-width: 2;
   animation: otp-check-draw 350ms var(--openbot-duration-fast) var(--openbot-ease-out) forwards;
 }
@@ -661,7 +663,6 @@
   stroke: var(--openbot-text-muted);
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.5;
   transition: transform var(--openbot-duration-hover) ease;
 }
 

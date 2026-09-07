@@ -604,7 +604,7 @@ function rectValue(rect: DOMRect): SelectionRect {
 
 function SelectionIcon(props: { children: SolidElement }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="selection-actions-icon">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 selection-actions-icon">
       {props.children}
     </svg>
   );

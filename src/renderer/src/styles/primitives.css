@@ -478,6 +478,18 @@
   color: var(--openbot-accent-text);
 }
 
+/* The hand-drawn SVGs, which are on a 20-unit viewBox where lucide's is 24. Feeding them
+ * --openbot-icon-stroke raw would paint them 20% heavier than every lucide icon beside
+ * them, so it is scaled to the smaller grid instead. These carried 1.35 to 1.6 by hand
+ * before, i.e. 1.08 to 1.43 device px against lucide's 1.0. */
+:where(.ui-glyph-20) {
+  stroke-width: calc(var(--openbot-icon-stroke) * 20 / 24);
+}
+
+:where(.ui-glyph-16) {
+  stroke-width: calc(var(--openbot-icon-stroke) * 16 / 24);
+}
+
 :where(.ui-checkbox) {
   position: relative;
   display: inline-flex;

@@ -333,10 +333,9 @@ function ServerRailButton(props: {
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 20 20"
-                  class="agent-context-icon"
+                  class="agent-context-icon ui-glyph-20"
                   fill="none"
                   stroke="currentColor"
-                  stroke-width="1.35"
                 >
                   <rect x="3" y="3" width="14" height="5" rx="1.5" />
                   <rect x="3" y="12" width="14" height="5" rx="1.5" />

@@ -2487,7 +2487,6 @@
   stroke: var(--openbot-text-muted);
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.45;
   transition: transform var(--openbot-duration-normal) ease;
 }
 
@@ -2708,6 +2707,8 @@
   stroke: var(--openbot-accent);
   stroke-linecap: round;
   stroke-linejoin: round;
+  /* Off the shared glyph scale on purpose, like the badge tick in primitives.css: a
+   * selected-state check is an indicator, and the scale value paints it too fine here. */
   stroke-width: 1.75;
 }
 
@@ -4504,7 +4505,6 @@ button.chat-action-target:active,
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.45;
 }
 
 .selection-actions-status,
