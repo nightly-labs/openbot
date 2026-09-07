@@ -2,50 +2,50 @@
   "schemaVersion": 1,
   "codex": {
     "repository": "https://github.com/openai/codex",
-    "version": "0.149.1",
-    "tag": "rust-v0.149.1",
+    "version": "0.153.4",
+    "tag": "rust-v0.153.4",
     "license": "Apache-2.0",
     "licenseSha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
     "artifacts": {
       "darwin-arm64": {
         "asset": "codex-package-aarch64-apple-darwin.tar.gz",
-        "assetSha256": "4cbb17468b5d86b4b182a28c016d62e9d273a241cec04885ccfae76e6983ae3f",
-        "downloadBytes": 110095583,
-        "installedBytes": 300000000,
+        "assetSha256": "35438da1fbf7a6db7ddb3bcec84448fa6015ba188461472a97d9d1da7d9c4353",
+        "downloadBytes": 111554884,
+        "installedBytes": 310000000,
         "executable": "bin/codex"
       },
       "win32-x64": {
         "asset": "codex-package-x86_64-pc-windows-msvc.tar.gz",
-        "assetSha256": "e302697785b0761833779fe2d7b65614d6d156e8e6b8b9fa9725b6503d552613",
-        "downloadBytes": 134545938,
-        "installedBytes": 350000000,
+        "assetSha256": "a6ef3442cb12766a88b39311d79244289e4f9763e2c53ff4fbebc2cb653cc5f3",
+        "downloadBytes": 136067504,
+        "installedBytes": 420000000,
         "executable": "bin/codex.exe"
       }
     }
   },
   "claude": {
     "registry": "https://registry.npmjs.org",
-    "sdkVersion": "0.3.246",
-    "version": "2.1.246",
+    "sdkVersion": "0.3.263",
+    "version": "2.1.263",
     "license": "Anthropic Legal Agreements",
     "licenseSha256": "8ce94b9478bb9868f9641f818e06cd722fbe55d4c22e2d2ed11971b20146173a",
     "artifacts": {
       "darwin-arm64": {
         "package": "@anthropic-ai/claude-agent-sdk-darwin-arm64",
-        "asset": "claude-agent-sdk-darwin-arm64-0.3.246.tgz",
-        "assetSha256": "da4a8698387517bc94f742297fba9707d2aca18a0c3fe6086436e0535b782ab4",
-        "binarySha256": "7b09f01cb76a38e0e3a7c47c5d698d382162a5ff26538fc778683770caf9218b",
-        "downloadBytes": 91782353,
+        "asset": "claude-agent-sdk-darwin-arm64-0.3.263.tgz",
+        "assetSha256": "d4abc03ae93e556996dbcefe32b01016dc2f9ae96fec2262f48d30177ce3fce4",
+        "binarySha256": "ef5d2909c8af49f31ab6d5487e90316777bc2fac170adfe8160716caa8aaf4f9",
+        "downloadBytes": 87267293,
         "installedBytes": 250000000,
         "executable": "claude",
         "platformDirectory": "mac"
       },
       "win32-x64": {
         "package": "@anthropic-ai/claude-agent-sdk-win32-x64",
-        "asset": "claude-agent-sdk-win32-x64-0.3.246.tgz",
-        "assetSha256": "54a98c7b891efff0cfd630a477a2290dad9ffb7f1d7d70b54c74ccadeea2d9c5",
-        "binarySha256": "9f07f1ecaf26231fc2fac489e7c5214140d38fd14764938a2c8c46f31931d204",
-        "downloadBytes": 104501831,
+        "asset": "claude-agent-sdk-win32-x64-0.3.263.tgz",
+        "assetSha256": "4be92606a0c3ecca92d011e4ae5424155ea7eed5cfa02f0d5ab43ae50245863d",
+        "binarySha256": "0b35df94c1307004f07b738390bfef8dfca5e9af29aaf6517f305bf086b95b03",
+        "downloadBytes": 99788277,
         "installedBytes": 280000000,
         "executable": "claude.exe",
         "platformDirectory": "win"
@@ -55,25 +55,25 @@
   "grok": {
     "repository": "https://github.com/xai-org/grok-build",
     "distribution": "https://x.ai/cli",
-    "version": "1.0.5",
-    "sourceCommit": "77cd7eb675ba911c225c3aaeeece3a20cbccc426",
+    "version": "1.0.22",
+    "sourceCommit": "72a61251fcffb464bcc687aeb5a998e5a98ec0c9",
     "license": "Apache-2.0",
     "licenseSha256": "116f7778b9802e569b7fa3a532b17bd80eb13c67837def01eed093d4ea472f28",
     "noticesSha256": "7b7c315403c596f9b7a13bb562553ee4fd4c05da8672f95bcaa02a125eea2947",
     "artifacts": {
       "darwin-arm64": {
-        "asset": "grok-1.0.5-macos-aarch64",
-        "assetSha256": "3dfa7f04fbb5427a8fbead286591543aaecb478b3a0ab222c4329eca1a3b2f86",
-        "downloadBytes": 134349648,
-        "installedBytes": 145000000,
+        "asset": "grok-1.0.22-macos-aarch64",
+        "assetSha256": "f17b8369d3283bb9ef3daa53bb95f68bfff91d605376eee1769dfbc798f7a9f6",
+        "downloadBytes": 137281360,
+        "installedBytes": 150000000,
         "executable": "grok",
         "platformDirectory": "mac"
       },
       "win32-x64": {
-        "asset": "grok-1.0.5-windows-x86_64.exe",
-        "assetSha256": "4b924daa801663ea20e96382408b1f2b5ba39efad62c14d20d88618a9eb0be64",
-        "downloadBytes": 142651720,
-        "installedBytes": 155000000,
+        "asset": "grok-1.0.22-windows-x86_64.exe",
+        "assetSha256": "d5df46a79986491cd75cfd92ff3c3112608b62f36056c22c3c1b4f5915f36e06",
+        "downloadBytes": 144350536,
+        "installedBytes": 160000000,
         "executable": "grok.exe",
         "platformDirectory": "win"
       }

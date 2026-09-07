@@ -38,7 +38,7 @@ describe.runIf(process.platform !== "win32")("bundled Claude installer", () => {
     await expect(installClaudeRuntime({ outputRoot: output, target: "darwin-arm64", fetchImpl, lock })).resolves.toBe(
       "current",
     );
-    await expect(readFile(join(output, "mac/arm64/claude-package.json"), "utf8")).resolves.toContain('"2.1.246"');
+    await expect(readFile(join(output, "mac/arm64/claude-package.json"), "utf8")).resolves.toContain('"2.1.263"');
     await expect(readFile(join(output, "licenses/Claude-Code-LICENSE.md"), "utf8")).resolves.toBe(
       license.toString("utf8"),
     );
@@ -66,11 +66,11 @@ async function createPackage(root: string): Promise<void> {
   const packageRoot = join(root, "package");
   await mkdir(packageRoot, { recursive: true });
   await Promise.all([
-    writeFile(join(packageRoot, "claude"), "#!/bin/sh\nprintf '2.1.246 (Claude Code)\\n'\n"),
+    writeFile(join(packageRoot, "claude"), "#!/bin/sh\nprintf '2.1.263 (Claude Code)\\n'\n"),
     writeFile(join(packageRoot, "LICENSE.md"), "Anthropic license fixture\n"),
     writeFile(
       join(packageRoot, "package.json"),
-      `${JSON.stringify({ name: "@anthropic-ai/claude-agent-sdk-darwin-arm64", version: "0.3.246" })}\n`,
+      `${JSON.stringify({ name: "@anthropic-ai/claude-agent-sdk-darwin-arm64", version: "0.3.263" })}\n`,
     ),
   ]);
   await chmod(join(packageRoot, "claude"), 0o755);
