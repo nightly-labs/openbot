@@ -1,8 +1,7 @@
-import * as Haptics from "expo-haptics";
 import { Link } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import Animated, {
   CurvedTransition,
   Easing,
@@ -14,8 +13,8 @@ import Animated, {
 import { useAgentContextMenu } from "@/features/agents/components/agent-context-menu";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
-import { isIOS } from "@/shared/lib/platform";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
@@ -34,6 +33,7 @@ export function PinnedAgentsStrip({ agents }: { agents: MobileAgent[] }) {
         <Animated.View exiting={PINNED_EXIT} style={{ width: "100%" }}>
           <ScrollView
             horizontal
+            alwaysBounceHorizontal={false}
             contentContainerStyle={{
               alignItems: "flex-start",
               flexGrow: 1,
@@ -60,15 +60,11 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
   const agentContextMenu = useAgentContextMenu(agent);
   const isUnread = unreadAgentIds.includes(agent.id);
 
-  const handleOpen = () => {
-    if (isIOS) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
-  };
-
   return (
     <Animated.View entering={PINNED_ENTER} exiting={PINNED_EXIT} layout={PINNED_ITEM_LAYOUT}>
-      <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild onPress={handleOpen}>
+      <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
         <Link.Trigger>
-          <Pressable
+          <ChatLinkPressable
             accessibilityLabel={`Open pinned chat with ${agent.name}`}
             accessibilityRole="button"
             className="w-20 items-center gap-2"
@@ -76,7 +72,7 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
           >
             <Link.AppleZoom>
               <AgentPinAvatar agentId={agent.id} location="pinned" size={76}>
-                <BloubAvatar hue={agent.avatarHue} seed={agent.avatarSeed} size={76} />
+                <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={76} />
                 {isUnread ? (
                   <View
                     className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"
@@ -93,7 +89,7 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
             >
               {agent.name}
             </Typography.Paragraph>
-          </Pressable>
+          </ChatLinkPressable>
         </Link.Trigger>
         {agentContextMenu}
       </Link>

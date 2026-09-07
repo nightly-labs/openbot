@@ -1,4 +1,12 @@
-import type { AvatarHue, ConversationSnapshot, CreateAgentInput, UpdateAgentInput } from "@openbot/contracts/ipc";
+import type {
+  AvatarHue,
+  ConversationSnapshot,
+  CreateAgentInput,
+  RespondToPromptInput,
+  UpdateAgentInput,
+} from "@openbot/contracts/ipc";
+import type { RemoteRecoveryStatus } from "@openbot/team-client";
+import type { MobileAgentActivities } from "./agent-activity";
 
 export type MobileServerKind = "local" | "remote";
 export type MobileServerState = "connecting" | "online" | "offline";
@@ -9,7 +17,9 @@ export interface MobileServer {
   name: string;
   kind: MobileServerKind;
   state: MobileServerState;
+  initialConnectionPending: boolean;
   connectionMessage: string | null;
+  recoveryStatus?: RemoteRecoveryStatus;
   address: string | null;
   accent: string;
   publicKey: string;
@@ -45,6 +55,7 @@ export interface MobileWorkspaceContextValue {
   pinnedAgentIds: string[];
   unreadAgentIds: string[];
   conversations: Record<string, ConversationSnapshot>;
+  activityByServer: Record<string, MobileAgentActivities>;
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
   refreshServers: () => Promise<void>;
@@ -54,6 +65,7 @@ export interface MobileWorkspaceContextValue {
   deleteAgent: (agentId: string) => Promise<void>;
   duplicateAgent: (agentId: string) => Promise<void>;
   loadConversation: (agentId: string) => Promise<ConversationSnapshot>;
+  respondToPrompt: (agentId: string, input: RespondToPromptInput) => Promise<void>;
   sendMessage: (agentId: string, text: string) => Promise<void>;
   hideAgent: (agentId: string) => void;
   unhideAgent: (agentId: string) => void;

@@ -50,6 +50,7 @@
       "fflate": "0.8.2",
       "jose": "6.2.10",
       "jsdom": "30.0.1",
+      "marked": "18.0.10",
       "tailwindcss": "4.3.3",
       "typescript": "7.0.2",
       "vite": "7.3.6",
@@ -198,7 +199,7 @@
     "fflate": "catalog:",
     "jose": "catalog:",
     "lucide-solid": "1.33.0",
-    "marked": "18.0.10",
+    "marked": "catalog:",
     "qrcode": "^1.5.4",
     "solid-js": "2.0.0-rc.0",
     "solid-sonner": "0.3.2",
@@ -235,6 +236,7 @@
     "lucide-solid@1.33.0": "patches/lucide-solid@1.33.0.patch",
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
     "dmg-builder@26.15.7": "patches/dmg-builder@26.15.7.patch",
-    "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch"
+    "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch",
+    "expo-router@57.0.17": "patches/expo-router@57.0.17.patch"
   }
 }

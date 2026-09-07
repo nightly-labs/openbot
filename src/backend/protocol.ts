@@ -129,6 +129,7 @@ export interface TurnResponse {
 export type ResponseDecoder<T> = (value: unknown) => T;
 
 export interface ModelListResponse {
+  nextCursor?: string;
   data: Array<{
     model?: string;
     displayName?: string;
@@ -140,7 +141,9 @@ export interface ModelListResponse {
 
 export function decodeModelListResponse(value: unknown): ModelListResponse {
   const data = getArray(value, "data");
+  const nextCursor = getString(value, "nextCursor");
   return {
+    ...(nextCursor ? { nextCursor } : {}),
     data: data.filter(isRecord).map((item) => ({
       ...(isString(item.model) ? { model: item.model } : {}),
       ...(isString(item.displayName) ? { displayName: item.displayName } : {}),

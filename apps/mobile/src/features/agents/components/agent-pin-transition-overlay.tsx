@@ -34,7 +34,12 @@ export function AgentPinTransitionOverlay({ progress, transition }: AgentPinTran
 
   return (
     <Animated.View pointerEvents="none" style={overlayStyle}>
-      <BloubAvatar hue={transition.avatarHue} seed={transition.avatarSeed} size={transition.from.width} />
+      <BloubAvatar
+        agentId={transition.agentId}
+        hue={transition.avatarHue}
+        seed={transition.avatarSeed}
+        size={transition.from.width}
+      />
     </Animated.View>
   );
 }

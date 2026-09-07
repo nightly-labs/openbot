@@ -1,8 +1,8 @@
 import { GlassView } from "expo-glass-effect";
 import { Link } from "expo-router";
 import { Typography } from "heroui-native";
-import { ArrowLeft, Monitor } from "lucide-react-native";
-import { Alert, View, type ViewStyle } from "react-native";
+import { ArrowLeft } from "lucide-react-native";
+import { View, type ViewStyle } from "react-native";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
@@ -61,7 +61,7 @@ export function ChatHeader({
         >
           <Link.AppleZoomTarget>
             <AgentPinAvatar agentId={agent.id} location="chat" size={28}>
-              <BloubAvatar hue={agent.avatarHue} seed={agent.avatarSeed} size={28} />
+              <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={28} />
             </AgentPinAvatar>
           </Link.AppleZoomTarget>
           <Typography.Paragraph className="min-w-0 shrink" weight="semibold" numberOfLines={1}>
@@ -70,15 +70,6 @@ export function ChatHeader({
         </GlassView>
 
         <View className="flex-1" />
-
-        <ChatGlassIconButton
-          accessibilityLabel="Open on desktop"
-          fallbackBackground={fallbackBackground}
-          liquidGlassAvailable={liquidGlassAvailable}
-          onPress={() => Alert.alert("Open on desktop", "Desktop handoff will be connected with the server API.")}
-        >
-          <Monitor color={iconColor} size={22} strokeWidth={1.9} />
-        </ChatGlassIconButton>
       </View>
       <SheetScrollEdgeEffect
         style={{ height: topInset + 82, left: 0, position: "absolute", right: 0, top: 0, zIndex: 10 }}
