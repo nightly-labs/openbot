@@ -150,8 +150,8 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
     await waitFor(() => missing(stagedPath));
   });
 
-  it("frees the previous copy when the same input is given different files", async () => {
-    const { browser, staged } = uploadBrowser();
+  it("keeps the previous copy readable when the same input is given different files", async () => {
+    const { browser, staged, documentChanged } = uploadBrowser();
     const { client, threadId } = await startService(browser);
     const first = join(root, "first.txt");
     const second = join(root, "second.txt");
@@ -161,8 +161,15 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
     await upload(client, threadId, "first", { selector: "input", paths: [first] });
     await upload(client, threadId, "second", { selector: "input", paths: [second] });
 
-    await waitFor(() => missing(staged[0]?.path ?? ""));
+    // Setting `input.files` again does not invalidate the `File` objects a page already took from it,
+    // which is how any "add another file" flow collects a selection, so the first copy has to survive
+    // the second upload -- and both go when the document that could read them does.
+    await expect(readFile(staged[0]?.path ?? "", "utf8")).resolves.toBe("first");
     await expect(readFile(staged[1]?.path ?? "", "utf8")).resolves.toBe("second");
+
+    documentChanged("tab", new Set(["some-other-document"]));
+    await waitFor(() => missing(staged[0]?.path ?? ""));
+    await waitFor(() => missing(staged[1]?.path ?? ""));
   });
 
   it("refuses an upload once the tab already holds files for ten inputs", async () => {

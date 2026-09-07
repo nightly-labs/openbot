@@ -11,7 +11,11 @@ import type { GeneratedAttachmentSource } from "../mailbox-store";
 import type { DynamicToolCallParams, DynamicToolResult } from "../protocol";
 import type { AttachmentSourceScope } from "./attachment-gateway";
 
-/** A staging directory a page's file input currently holds. Deleted once nothing can read it again. */
+/**
+ * A staging directory a page's file input has been given. Deleted once nothing can read it again --
+ * which is not when the input is reassigned: a page that collected the earlier `File` objects, as any
+ * "add another file" flow does, still holds handles on this directory after `input.files` moves on.
+ */
 interface BrowserUploadRoot {
   path: string;
   bytes: number;
@@ -72,8 +76,9 @@ const MAX_BROWSER_UPLOAD_BYTES_TOTAL = ATTACHMENT_LIMITS.totalBytes * 2;
 /**
  * Staging for `openbot_browser.upload_files`.
  *
- * A tab keeps a file input's selection until the page navigates, so the files behind it have to outlive
- * the tool call that set them. That is what makes this more than a pass-through: the agent names paths
+ * A tab keeps a file input's selection until the page navigates, and a page can keep the `File` objects
+ * it took from an earlier selection for just as long, so the files behind both have to outlive the tool
+ * call that set them. That is what makes this more than a pass-through: the agent names paths
  * anywhere on the disk, and handing those straight to the page would leave a renderer holding a live
  * handle on the user's own file for as long as the tab stays open.
  *
@@ -91,7 +96,7 @@ export class BrowserUploads {
   readonly #attachments: BrowserUploadSources;
   readonly #isStopping: () => boolean;
   readonly #hasTakeover: (agentId: string) => boolean;
-  readonly #roots = new Map<string, Map<string, BrowserUploadRoot>>();
+  readonly #roots = new Map<string, Map<string, BrowserUploadRoot[]>>();
   readonly #reservations = new Map<string, Map<symbol, BrowserUploadReservation>>();
 
   constructor(options: BrowserUploadsOptions) {
@@ -206,16 +211,19 @@ export class BrowserUploads {
             if (!stagingRoot || this.#isStopping() || !reservation || reservation.invalidated) {
               throw new Error("The browser document changed while files were being staged.");
             }
-            const roots = this.#roots.get(tabId) ?? new Map<string, BrowserUploadRoot>();
-            const previousRoot = roots.get(inputId);
-            roots.set(inputId, { path: stagingRoot, bytes: stagedBytes, documentId });
+            const roots = this.#roots.get(tabId) ?? new Map<string, BrowserUploadRoot[]>();
+            // Appended rather than replacing what the input held before. Setting `input.files` again
+            // does not invalidate the `File` objects a page already took from it, so deleting the
+            // earlier directory here would break a page that is accumulating attachments across
+            // selections -- it reads a file that is no longer there. The earlier copies stay until the
+            // document that could read them is gone, and their bytes keep counting against the quotas.
+            roots.set(inputId, [...(roots.get(inputId) ?? []), { path: stagingRoot, bytes: stagedBytes, documentId }]);
             this.#roots.set(tabId, roots);
             // Ownership moves from the reservation to the root here: the `finally` below must not delete
             // a directory the input is now reading from.
             reservation.root = null;
             stagingRoot = null;
             releaseReservation();
-            if (previousRoot) void rm(previousRoot.path, { recursive: true, force: true }).catch(() => undefined);
           },
           onUploadOperationStarted: (completion) => {
             uploadState.completion = completion;
@@ -258,10 +266,15 @@ export class BrowserUploads {
   retainDocuments(tabId: string, documentIds: ReadonlySet<string>): void {
     const roots = this.#roots.get(tabId);
     if (roots) {
-      for (const [inputId, root] of roots) {
-        if (documentIds.has(root.documentId)) continue;
-        roots.delete(inputId);
-        void rm(root.path, { recursive: true, force: true }).catch(() => undefined);
+      for (const [inputId, inputRoots] of roots) {
+        const retained = inputRoots.filter((root) => documentIds.has(root.documentId));
+        if (retained.length === inputRoots.length) continue;
+        if (retained.length === 0) roots.delete(inputId);
+        else roots.set(inputId, retained);
+        for (const root of inputRoots) {
+          if (retained.includes(root)) continue;
+          void rm(root.path, { recursive: true, force: true }).catch(() => undefined);
+        }
       }
       if (roots.size === 0) this.#roots.delete(tabId);
     }
@@ -279,7 +292,7 @@ export class BrowserUploads {
 
   /** Deletes every staging directory. Awaited, because after this the process is expected to exit. */
   async dispose(): Promise<void> {
-    const roots = [...this.#roots.values()].flatMap((values) => [...values.values()].map((root) => root.path));
+    const roots = [...this.#roots.values()].flatMap((values) => [...values.values()].flat().map((root) => root.path));
     const reserved = [...this.#reservations.values()].flatMap((values) =>
       [...values.values()].flatMap((reservation) => {
         reservation.invalidated = true;
@@ -302,14 +315,16 @@ export class BrowserUploads {
     if ((roots?.size ?? 0) + reservedNewInputs + additionalInput > MAX_BROWSER_UPLOAD_INPUTS_PER_TAB) {
       throw new Error(`A browser tab can retain files for up to ${MAX_BROWSER_UPLOAD_INPUTS_PER_TAB} inputs.`);
     }
-    // Replacing an input's selection frees what it held, so those bytes are not counted twice.
-    const replacedBytes = roots?.get(reservation.inputId)?.bytes ?? 0;
-    const retainedBytes = [...(roots?.values() ?? [])].reduce((total, root) => total + root.bytes, 0) - replacedBytes;
+    // Reassigning an input keeps what it held, so nothing is subtracted here: those bytes are still on
+    // disk for as long as the page could read them, and the quota is what bounds the accumulation.
+    const retainedBytes = [...(roots?.values() ?? [])].flat().reduce((total, root) => total + root.bytes, 0);
     const reservedBytes = [...reservations.values()].reduce((total, value) => total + value.bytes, 0);
     if (retainedBytes + reservedBytes + reservation.bytes > MAX_BROWSER_UPLOAD_BYTES_PER_TAB) {
       throw new Error(`A browser tab can retain up to ${MAX_BROWSER_UPLOAD_BYTES_PER_TAB} upload bytes.`);
     }
-    const totalRetainedBytes = this.#totalBytes(this.#roots, (root) => root.bytes) - replacedBytes;
+    const totalRetainedBytes = this.#totalBytes(this.#roots, (inputRoots) =>
+      inputRoots.reduce((total, root) => total + root.bytes, 0),
+    );
     const totalReservedBytes = this.#totalBytes(this.#reservations, (value) => value.bytes);
     if (totalRetainedBytes + totalReservedBytes + reservation.bytes > MAX_BROWSER_UPLOAD_BYTES_TOTAL) {
       throw new Error(`Browser uploads can retain up to ${MAX_BROWSER_UPLOAD_BYTES_TOTAL} bytes in total.`);
@@ -335,7 +350,7 @@ export class BrowserUploads {
   #discardTab(tabId: string): void {
     const roots = this.#roots.get(tabId);
     this.#roots.delete(tabId);
-    for (const root of roots?.values() ?? []) {
+    for (const root of [...(roots?.values() ?? [])].flat()) {
       void rm(root.path, { recursive: true, force: true }).catch(() => undefined);
     }
     const reservations = this.#reservations.get(tabId);
