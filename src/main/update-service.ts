@@ -76,7 +76,11 @@ export interface UpdateDiagnosticEvent {
   errorCode: UpdateFailureCode | null;
 }
 
-const DEFAULT_CHECK_INTERVAL = 4 * 60 * 60 * 1_000;
+// One manifest request every four minutes, because the loop stops by itself: checkForUpdates()
+// returns early in "downloading", "ready" and "installing", so a poll this frequent costs nothing
+// more than a small GET while the app sits idle, and a user who leaves OpenBot open picks up a
+// release within minutes instead of hours.
+const DEFAULT_CHECK_INTERVAL = 4 * 60 * 1_000;
 const MAX_LOG_BYTES = 1024 * 1024;
 const MAX_DIAGNOSTIC_EVENTS = 20;
 

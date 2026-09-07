@@ -137,7 +137,7 @@ The workflow:
 Users can verify a downloaded artifact with
 `gh attestation verify <file> --repo NorbertBodziony/openbot`.
 
-Installed OpenBot builds check for updates shortly after launch and every four hours. New versions
+Installed OpenBot builds check for updates shortly after launch and every four minutes. New versions
 download automatically while **Automatically download updates** is on, which is the default and is
 persisted per user in `openbot-update-preference-v1.json`; with the setting off, a download starts
 only on a user action. The account popover shows the current state and lets the user download an
