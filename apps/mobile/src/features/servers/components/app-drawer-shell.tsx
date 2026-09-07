@@ -4,7 +4,7 @@ import { type Href, router, usePathname } from "expo-router";
 import { useThemeColor } from "heroui-native/hooks";
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { Gesture, GestureDetector, type PanGesture } from "react-native-gesture-handler";
 import Animated, {
   interpolate,
   ReduceMotion,
@@ -23,6 +23,7 @@ import { isIOS } from "@/shared/lib/platform";
 interface AppDrawerContextValue {
   openDrawer: () => void;
   closeDrawer: () => void;
+  openingGesture: PanGesture;
 }
 
 const AppDrawerContext = createContext<AppDrawerContextValue | null>(null);
@@ -156,7 +157,10 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
     [closeDrawer],
   );
 
-  const contextValue = useMemo(() => ({ closeDrawer, openDrawer }), [closeDrawer, openDrawer]);
+  const contextValue = useMemo(
+    () => ({ closeDrawer, openDrawer, openingGesture }),
+    [closeDrawer, openDrawer, openingGesture],
+  );
 
   if (!session) {
     return <AppDrawerContext.Provider value={contextValue}>{children}</AppDrawerContext.Provider>;
