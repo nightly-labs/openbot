@@ -95,7 +95,11 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
   #signedIn = false;
   #stopping = false;
 
-  constructor(cli: GrokCliInfo, requestTimeoutMs = 30_000) {
+  constructor(
+    cli: GrokCliInfo,
+    requestTimeoutMs = 30_000,
+    private readonly profileGeneration = false,
+  ) {
     super();
     this.#cli = cli;
     this.#requestTimeoutMs = requestTimeoutMs;
@@ -108,12 +112,22 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
   start(): void {
     if (this.running) return;
     this.#stopping = false;
-    const child = spawn(this.#cli.executable, ["--no-auto-update", "agent", "stdio"], {
-      stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, GROK_OAUTH2_REFERRER: "openbot" },
-      shell: process.platform === "win32",
-      windowsHide: true,
-    });
+    const child = spawn(
+      this.#cli.executable,
+      [
+        "--no-auto-update",
+        // Keep the empty value inside one argument: Windows shell launches discard empty argv entries.
+        ...(this.profileGeneration ? ["--tools=", "--deny", "*", "--no-subagents", "--disable-web-search"] : []),
+        "agent",
+        "stdio",
+      ],
+      {
+        stdio: ["pipe", "pipe", "pipe"],
+        env: { ...process.env, GROK_OAUTH2_REFERRER: "openbot" },
+        shell: process.platform === "win32",
+        windowsHide: true,
+      },
+    );
     this.#process = child;
     const stream = ndJsonStream(
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: Node and DOM declare the same Web Stream ABI with incompatible generic variance.
@@ -580,6 +594,7 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
   }
 
   async #requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
+    if (this.profileGeneration) return { outcome: { outcome: "cancelled" } };
     const thread = this.#threads.get(params.sessionId);
     const turnId = thread?.activeTurn?.id ?? randomUUID();
     const kind =

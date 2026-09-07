@@ -82,7 +82,10 @@ describe.sequential("AgentService: restart", () => {
     await service.sendMessage({ agentId: "chief", text: "Continue" });
     await waitFor(async () => (await protocolMessages(logPath)).some((message) => message.method === "thread/resume"));
     const resume = (await protocolMessages(logPath)).find((message) => message.method === "thread/resume");
-    expect(resume?.params).toMatchObject({
+    expect(resume?.params).toMatchObject({ threadId: store.activeProviderSession("chief")?.externalSessionId });
+    // Codex fixes tools at session creation; resume ignores a dynamicTools field.
+    const start = (await protocolMessages(logPath)).find((message) => message.method === "thread/start");
+    expect(start?.params).toMatchObject({
       dynamicTools: expect.arrayContaining([
         expect.objectContaining({ type: "namespace", name: "openbot_browser" }),
         expect.objectContaining({ type: "namespace", name: "openbot" }),

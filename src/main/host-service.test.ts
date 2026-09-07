@@ -62,6 +62,7 @@ async function createHostService(
       getSnapshot: unimplemented,
       mutate: unimplemented,
       removeAgent: unimplemented,
+      withProfileAssignment: unimplemented,
       placeDuplicateAfter: unimplemented,
       on: () => undefined,
       off: () => undefined,

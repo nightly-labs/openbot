@@ -213,3 +213,11 @@ Review folders before deleting them and keep a backup of anything you need.
 Use [GitHub Discussions](https://github.com/NorbertBodziony/openbot/discussions) for privacy questions.
 Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), without attaching
 credentials, conversations, or unrelated private files.
+
+When you ask OpenBot to generate or revise an agent profile, it sends your setup
+prompt, the current profile draft (when present), and available sidebar section
+names and identifiers to the selected AI provider through its local CLI. This
+request does not include conversation history, saved memories, or workspace files.
+The draft is reviewed before OpenBot saves it; generating a draft does not create
+an OpenBot conversation or change an existing agent. The provider's own data and
+CLI retention policies still apply.

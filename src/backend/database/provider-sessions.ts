@@ -79,6 +79,12 @@ export class ProviderSessions {
     ).map((row) => toProviderSession(requiredSessionRow(row)));
   }
 
+  listExternalSessionIds(): string[] {
+    return databaseRows(
+      this.#core.connection.prepare("SELECT DISTINCT external_session_id FROM projection_provider_sessions").all(),
+    ).map((row) => requiredStringColumn(row, "external_session_id"));
+  }
+
   bindProviderSession(input: {
     threadId: string;
     provider: AgentProviderId;

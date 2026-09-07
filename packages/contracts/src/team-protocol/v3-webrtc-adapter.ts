@@ -1,4 +1,4 @@
-import { isConversationUnreadRoute } from "./current";
+import { isAgentProfileRoute, isConversationUnreadRoute } from "./current";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./v2";
 import {
   decodeTeamProtocolV2CurrentHttpRequest,
@@ -64,7 +64,7 @@ export function decodeTeamProtocolV3WebRtcHttpResponse(
 
 // The host's local HTTP protocol selection must match the WebRTC codec selection.
 export function isTeamProtocolV3OnlyRoute(method: string, path: string): boolean {
-  if (isConversationUnreadRoute(method, path)) return true;
+  if (isAgentProfileRoute(method, path) || isConversationUnreadRoute(method, path)) return true;
   const pathname = new URL(path, "http://openbot.invalid").pathname;
   return (
     (method === "POST" && /^\/v1\/agents\/[^/]+\/duplicate$/u.test(pathname)) ||

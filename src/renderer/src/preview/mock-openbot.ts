@@ -842,6 +842,27 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "sidebar-layout-changed", layout: sidebarLayout });
         return clone(sidebarLayout);
       },
+      generateProfile: async (input) => ({
+        name: input.draft?.name ?? "Research partner",
+        title: input.draft?.title ?? "Research assistant",
+        description: input.prompt.slice(0, 2000),
+        avatarSeed: input.draft?.avatarSeed ?? "profile:research",
+        avatarHue: input.draft?.avatarHue ?? 215,
+        sectionId: input.draft?.sectionId ?? null,
+      }),
+      saveProfile: async (input) => {
+        const agent = input.agentId
+          ? await api.agent.updateAgent({ agentId: input.agentId, ...input.draft })
+          : await api.agent.createAgent({ ...input.draft, initialMessage: input.initialMessage ?? "Hello" });
+        const updated = await api.agent.updateAgent({ agentId: agent.id, ...input.draft });
+        await api.agent.setAvatar({ agentId: agent.id, image: null });
+        const layout = await api.agent.mutateSidebarLayout({
+          type: "assign",
+          agentId: agent.id,
+          sectionId: input.draft.sectionId,
+        });
+        return { agent: { ...updated, avatarUrl: null }, layout };
+      },
       createAgent: async (input) => {
         const agent = createAgentSummary({
           name: input.name,

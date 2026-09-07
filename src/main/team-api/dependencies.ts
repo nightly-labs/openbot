@@ -34,6 +34,8 @@ type TeamApiAgentMethods = Pick<
   | "listModels"
   | "listAgents"
   | "listConversationReads"
+  | "generateProfile"
+  | "saveProfile"
   | "createAgent"
   | "committedAgentDuplication"
   | "duplicateAgent"
@@ -84,7 +86,7 @@ export type TeamApiAgents = TeamApiAgentMethods & {
 export type TeamApiMailbox = Pick<MailboxStore, "resolveAttachment">;
 export type TeamApiSidebarLayout = Pick<
   SidebarLayoutStore,
-  "getSnapshot" | "mutate" | "removeAgent" | "placeDuplicateAfter"
+  "getSnapshot" | "mutate" | "removeAgent" | "placeDuplicateAfter" | "withProfileAssignment"
 > & {
   on: (event: "changed", listener: (layout: SidebarLayoutSnapshot) => void) => void;
   off: (event: "changed", listener: (layout: SidebarLayoutSnapshot) => void) => void;

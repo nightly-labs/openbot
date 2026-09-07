@@ -250,6 +250,43 @@ Changes to packaging, native modules, or Electron security also require the appl
 Windows package verification commands. Live provider and team smoke tests use isolated temporary
 data and are manual because they can require local credentials.
 
+### Prompt-driven agent profiles
+
+Users create and edit agent profiles by asking an agent in the normal desktop or mobile
+conversation. `openbot.create_agent` creates a persistent teammate with instructions and a first
+task; `openbot.update_profile` changes an existing agent's name, title, instructions, or generated
+avatar. Both run through the existing agent service and validate arguments before changing state.
+Codex and Grok receive the dynamic tool definitions; Claude exposes the same operations through
+its SDK MCP bridge. There is no separate prompt-generation button or review dialog.
+
+Agents can organize teammates into flat sidebar sections through `list_sections`, `create_section`,
+`rename_section`, `delete_section`, and `assign_agent_section`. Assignment accepts a null section
+to ungroup an agent; deleting a section also ungroups its agents without deleting them. These tools
+use the same `SidebarLayoutStore` as manual sidebar edits, including persistence, validation,
+and change events delivered to desktop and connected clients.
+
+Codex fixes dynamic tools at provider-session creation; resume does not update them. A local
+`provider-toolsets` manifest records the tool fingerprint for each new Codex session. Sessions with
+missing or outdated fingerprints are replaced before the next turn, using the existing history
+handoff while retaining the public thread, agent identity, workspace, and stored conversation.
+Unchanged fingerprints resume the existing session. Pending history handoffs are written before
+the replacement is bound, reloaded after restart, and removed after a turn accepts the handoff.
+
+The optional `agent-profile-generation` Team API endpoints remain available. They use a separate
+provider client with tools restricted and validate drafts before returning them. Their save path
+retains its recovery and retry guarantees:
+
+A profile-creation marker is written before its workspace or agent row. Startup removes
+uncommitted creations before mailbox initialization and queue draining, while a committed
+retry receipt preserves the agent and its introduction. The existing sidebar reconciliation
+removes assignments for recovered incomplete agents.
+
+Reviewed instructions use the existing profile description. Profile saves coordinate
+SQLite with the separately stored sidebar layout, rolling back section assignment
+on failure. Updating an existing profile and its retry receipt shares a SQLite
+transaction. Creation follows the existing workspace/initial-message flow with
+cleanup on failure. Receipts make retries after a lost response return the saved
+agent. This does not introduce a schema migration or alter released protocol codecs.
 
 ## Website analytics
 

@@ -3,7 +3,7 @@
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ModelInfo, SDKUserMessage, SessionMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { CanUseTool, ModelInfo, SDKUserMessage, SessionMessage } from "@anthropic-ai/claude-agent-sdk";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClaudeAgentClient } from "./claude-client";
@@ -934,3 +934,34 @@ async function waitFor(check: () => boolean): Promise<void> {
     if (!check()) throw new Error("Timed out waiting for Claude adapter events.");
   });
 }
+
+it("disables tools, project settings and session persistence for profile generation", async () => {
+  const query = new TestQuery(new TestQueue<TestStreamMessage>());
+  let options: DynamicRecord | null = null;
+  let canUseTool: CanUseTool | undefined;
+  const client = new ClaudeAgentClient({ executable: "/bin/true", version: "2.1.251" }, (params) => {
+    if (isDynamicRecord(params.options)) options = params.options;
+    canUseTool = params.options?.canUseTool;
+    return query;
+  });
+  client.start();
+  try {
+    await client.request(
+      "thread/start",
+      { cwd: process.cwd(), profileGeneration: true, persistSession: false },
+      decodeThreadResponse,
+    );
+    expect(options).toMatchObject({ tools: [], settingSources: [], mcpServers: {}, persistSession: false });
+    expect(canUseTool).toBeDefined();
+    expect(
+      await canUseTool?.(
+        "Bash",
+        { command: "touch should-not-exist" },
+        { signal: new AbortController().signal, toolUseID: "tool-1", requestId: "request-1" },
+      ),
+    ).toMatchObject({ behavior: "deny" });
+  } finally {
+    await client.stop();
+  }
+  expect(query.closed).toBe(true);
+});

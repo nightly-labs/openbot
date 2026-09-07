@@ -6,7 +6,11 @@
 import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentMemory, AgentSummary, Routine, RoutineRun } from "@openbot/contracts/ipc";
-import { TEAM_APP_VERSION_HEADER, TEAM_PROTOCOL_VERSION_HEADER } from "@openbot/contracts/team-protocol/v1";
+import {
+  TEAM_APP_VERSION_HEADER,
+  TEAM_CAPABILITIES_HEADER,
+  TEAM_PROTOCOL_VERSION_HEADER,
+} from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
@@ -429,4 +433,59 @@ describe("TeamApiServer agents", () => {
     });
     expect(invalid.status).toBe(400);
   });
+});
+
+it("requires authentication and the profile capability before generating an editable draft", async () => {
+  const { root, start, signIn } = await createTeamApiFixture("profile-generation", { configure: true });
+  const sidebarLayout = new SidebarLayoutStore(join(root, "sidebar-layout.json"));
+  await sidebarLayout.initialize();
+  const draft = {
+    name: "Researcher",
+    title: "Science",
+    description: "Cite sources",
+    avatarSeed: "research",
+    avatarHue: 215,
+    sectionId: null,
+  } as const;
+  let prompt: string | undefined;
+  const { base } = await start({
+    sidebarLayout,
+    agents: createAgents({
+      generateProfile: async (input) => {
+        prompt = input.prompt;
+        return draft;
+      },
+    }),
+  });
+  const token = await signIn({ protocol: TEAM_PROTOCOL_V3 });
+  const headers = {
+    "Content-Type": "application/json",
+    [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V3),
+    [TEAM_APP_VERSION_HEADER]: "1.0.0",
+    [TEAM_CAPABILITIES_HEADER]: "agent-profile-generation",
+  };
+  const path = `${base}/v1/agents/profile/generate`;
+  const unauthorized = await fetch(path, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ prompt: "Research science" }),
+  });
+  expect(unauthorized.status).toBe(401);
+  expect(prompt).toBeUndefined();
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { ...headers, Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ prompt: "Research science" }),
+  });
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual(draft);
+  expect(prompt).toBe("Research science");
+  prompt = undefined;
+  const incompatible = await fetch(path, {
+    method: "POST",
+    headers: { ...headers, Authorization: `Bearer ${token}`, [TEAM_CAPABILITIES_HEADER]: "" },
+    body: JSON.stringify({ prompt: "Research science" }),
+  });
+  expect(incompatible.status).toBe(400);
+  expect(prompt).toBeUndefined();
 });

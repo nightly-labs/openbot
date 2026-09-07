@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
@@ -67,8 +70,35 @@ export class ThreadLifecycle {
     return this.#pendingHandoffs.get(threadId);
   }
 
-  deletePendingHandoff(threadId: string): void {
+  async deletePendingHandoff(threadId: string): Promise<void> {
+    if (!this.#pendingHandoffs.has(threadId)) return;
+    await rm(this.handoffPath(threadId), { force: true });
     this.#pendingHandoffs.delete(threadId);
+  }
+
+  async deleteProviderSessionFiles(sessionId: string): Promise<void> {
+    // Deletion also covers retired sessions and handoffs not loaded this run.
+    await rm(this.handoffPath(sessionId), { force: true });
+    await rm(this.toolManifestPath(sessionId), { force: true });
+    this.#pendingHandoffs.delete(sessionId);
+  }
+
+  async reconcileProviderSessionFiles(): Promise<void> {
+    const recorded = new Set(
+      this.#store.database.listExternalSessionIds().map((id) => createHash("sha256").update(id).digest("hex")),
+    );
+    for (const name of ["provider-handoffs", "provider-toolsets"]) {
+      const directory = join(this.#store.database.userDataPath, name);
+      const files = await readdir(directory, { withFileTypes: true }).catch((error: unknown) => {
+        if (error instanceof Error && "code" in error && error.code === "ENOENT") return [];
+        throw error;
+      });
+      for (const file of files) {
+        if (file.isFile() && /^[a-f0-9]{64}$/.test(file.name) && !recorded.has(file.name)) {
+          await rm(join(directory, file.name), { force: true });
+        }
+      }
+    }
   }
 
   dispose(): void {
@@ -81,6 +111,20 @@ export class ThreadLifecycle {
     const currentAgent = this.#store.list().find((candidate) => candidate.id === agent.id) ?? agent;
     const session = this.#store.activeProviderSession(agent.id);
     if (session) {
+      try {
+        const handoff = await readFile(this.handoffPath(session.externalSessionId), "utf8");
+        this.#pendingHandoffs.set(session.externalSessionId, handoff);
+      } catch (error) {
+        if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+      }
+      // Codex ignores dynamicTools on thread/resume. A replacement provider session is
+      // required when tools change; the public thread and its history stay intact.
+      if (client.provider === "codex" && !(await this.hasCurrentTools(session.externalSessionId))) {
+        const replacement = await this.startProviderThread(currentAgent, client, publicThreadId);
+        this.retireProviderSession(currentAgent, session.externalSessionId);
+        this.#hooks.logRecovery(currentAgent.id, client.provider, "replaced");
+        return replacement;
+      }
       if (this.#conversation.loadedClientFor(session.externalSessionId) !== client) {
         try {
           await this.resumeThread(currentAgent, client, session.externalSessionId);
@@ -117,13 +161,61 @@ export class ThreadLifecycle {
       decodeThreadResponse,
     );
     const externalThreadId = response.thread.id;
-    this.#store.bindProviderSession(agent.id, externalThreadId);
+    try {
+      if (client.provider === "codex") {
+        await mkdir(this.toolManifestDirectory(), { recursive: true, mode: 0o700 });
+        await writeFile(this.toolManifestPath(externalThreadId), this.toolFingerprint(), { mode: 0o600 });
+      }
+      const handoff = this.buildProviderHandoff(agent.id, publicThreadId);
+      if (handoff) {
+        await mkdir(join(this.#store.database.userDataPath, "provider-handoffs"), { recursive: true, mode: 0o700 });
+        // Persist before binding the replacement: a crash must not activate a session
+        // whose first turn can no longer recover the existing conversation context.
+        await writeFile(this.handoffPath(externalThreadId), handoff, { mode: 0o600 });
+        this.#pendingHandoffs.set(externalThreadId, handoff);
+      }
+      this.#store.bindProviderSession(agent.id, externalThreadId);
+    } catch (error) {
+      await this.deleteProviderSessionFiles(externalThreadId).catch((cleanupError: unknown) => {
+        throw new AggregateError([error, cleanupError], "Failed to prepare and clean up the provider session.");
+      });
+      throw error;
+    }
     this.#conversation.bindThread(externalThreadId, agent.id);
     this.#conversation.markThreadLoaded(externalThreadId, client);
     this.#conversation.ensureSnapshot(agent.id, publicThreadId);
-    const handoff = this.buildProviderHandoff(agent.id, publicThreadId);
-    if (handoff) this.#pendingHandoffs.set(externalThreadId, handoff);
     return externalThreadId;
+  }
+
+  private handoffPath(sessionId: string): string {
+    return join(
+      this.#store.database.userDataPath,
+      "provider-handoffs",
+      createHash("sha256").update(sessionId).digest("hex"),
+    );
+  }
+
+  private toolManifestDirectory(): string {
+    return join(this.#store.database.userDataPath, "provider-toolsets");
+  }
+
+  private toolManifestPath(sessionId: string): string {
+    return join(this.toolManifestDirectory(), createHash("sha256").update(sessionId).digest("hex"));
+  }
+
+  private toolFingerprint(): string {
+    return createHash("sha256")
+      .update(JSON.stringify([...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS]))
+      .digest("hex");
+  }
+
+  private async hasCurrentTools(sessionId: string): Promise<boolean> {
+    try {
+      return (await readFile(this.toolManifestPath(sessionId), "utf8")) === this.toolFingerprint();
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+      throw error;
+    }
   }
 
   async resumeThread(agent: AgentSummary, client: AgentClient, externalThreadId: string): Promise<void> {
@@ -136,7 +228,7 @@ export class ThreadLifecycle {
       approvalPolicy: "on-request",
       sandbox: "danger-full-access",
       developerInstructions: developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id)),
-      dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS],
+      ...(client.provider === "codex" ? {} : { dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS] }),
     };
 
     try {
@@ -201,7 +293,7 @@ export class ThreadLifecycle {
   }
 
   buildProviderHandoff(agentId: string, threadId: string): string | null {
-    if (this.#store.database.listProviderSessions(threadId).length < 2) return null;
+    if (this.#store.database.listProviderSessions(threadId).length < 1) return null;
     const persisted = this.#store.database.readConversation(agentId, threadId);
     const messages = mergeConversationSnapshots(persisted, {
       agentId,

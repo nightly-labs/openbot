@@ -18,6 +18,7 @@ import {
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { avatarFileExtension, isAvatarMimeType, isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import type { AgentProfileDraft } from "@openbot/contracts/ipc";
 import {
   AGENT_PROVIDERS,
   type AgentModelId,
@@ -27,18 +28,22 @@ import {
   type AvatarImageInput,
   type CreateAgentInput,
   type DuplicateAgentResult,
+  decodeAgentProfileDraft,
+  decodeSaveAgentProfileResult,
   isAgentModel,
   isAvatarHue,
   isAvatarSeed,
   isReasoningEffort,
   isSidebarLayoutSnapshot,
   providerForLegacyModel,
+  type SaveAgentProfileResult,
   type SidebarLayoutSnapshot,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { isGeneratedAgentId, isUuidV4, legacyAgentId } from "@openbot/contracts/validation";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { ProfileCreationRecovery } from "./agent/profile-creation-recovery";
 import { OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
 import { isRecord } from "./protocol";
 
@@ -105,6 +110,7 @@ export class AgentStore {
   readonly #downloadsRoot: string;
   readonly #avatarsRoot: string;
   readonly #duplicationsRoot: string;
+  readonly #profileCreationRecovery: ProfileCreationRecovery;
   readonly #database: OpenBotDatabase;
   #state: StoredState = { version: 2, examplesInitialized: false, agents: [] };
   #avatarUpdateQueue: Promise<void> = Promise.resolve();
@@ -120,6 +126,10 @@ export class AgentStore {
     this.#avatarsRoot = join(userDataPath, "avatars", "agents");
     this.#duplicationsRoot = join(userDataPath, "agent-duplications");
     this.#database = database;
+    this.#profileCreationRecovery = new ProfileCreationRecovery(
+      join(userDataPath, "agent-profile-creations"),
+      this.#agentsRoot,
+    );
   }
 
   get database(): OpenBotDatabase {
@@ -186,17 +196,23 @@ export class AgentStore {
     }
     await this.#reconcileLegacyDirectories();
     await this.#recoverPendingDuplications();
+    await this.#profileCreationRecovery.recover(this.#database, async (agentId) => {
+      await this.deleteAgent(agentId);
+    });
   }
 
   list(): AgentSummary[] {
     return this.#state.agents.map((agent) => ({ ...agent }));
   }
 
-  createAgent(input: Omit<CreateAgentInput, "initialMessage">): Promise<AgentSummary> {
-    return this.#enqueueCreation(() => this.#createAgent(input));
+  createAgent(input: Omit<CreateAgentInput, "initialMessage">, profileOperationId?: string): Promise<AgentSummary> {
+    return this.#enqueueCreation(() => this.#createAgent(input, profileOperationId));
   }
 
-  async #createAgent(input: Omit<CreateAgentInput, "initialMessage">): Promise<AgentSummary> {
+  async #createAgent(
+    input: Omit<CreateAgentInput, "initialMessage">,
+    profileOperationId?: string,
+  ): Promise<AgentSummary> {
     if (this.#state.agents.length >= INPUT_LIMITS.agents) {
       throw new Error(`A host can have up to ${INPUT_LIMITS.agents} agents.`);
     }
@@ -207,6 +223,7 @@ export class AgentStore {
     const record = this.#createRecord(`agent-${randomUUID()}`, name, "", description);
     record.avatarSeed = input.avatarSeed;
     record.avatarHue = input.avatarHue;
+    if (profileOperationId) await this.#profileCreationRecovery.begin(record.id, profileOperationId);
     await mkdir(record.workspacePath, { recursive: true, mode: 0o700 });
     this.#state.agents.unshift(record);
     try {
@@ -386,6 +403,58 @@ export class AgentStore {
       agent: { ...normalizeStoredAgent(receipt.result.agent) },
       layout: structuredClone(receipt.result.layout),
     };
+  }
+
+  saveReviewedProfile(agentId: string, draft: AgentProfileDraft): AgentSummary {
+    draft = decodeAgentProfileDraft(draft);
+    const agent = this.#requireAgent(agentId);
+    const previous = { ...agent };
+    Object.assign(agent, {
+      name: draft.name,
+      title: draft.title,
+      description: draft.description,
+      avatarSeed: draft.avatarSeed,
+      avatarHue: draft.avatarHue,
+      avatarUrl: null,
+      updatedAt: new Date().toISOString(),
+    });
+    try {
+      this.#persist("agent.updated");
+    } catch (error) {
+      Object.assign(agent, previous);
+      throw error;
+    }
+    return { ...agent };
+  }
+
+  commitReviewedProfile(
+    agentId: string,
+    draft: AgentProfileDraft,
+    commandId: string,
+    layout: SidebarLayoutSnapshot,
+  ): SaveAgentProfileResult {
+    const previous = { ...this.#requireAgent(agentId) };
+    try {
+      const result = this.#database.dispatch(
+        commandId,
+        [
+          {
+            aggregateType: "agent-profiles",
+            aggregateId: agentId,
+            eventType: "agent-profile.saved",
+            payload: { agentId },
+          },
+        ],
+        () => {
+          const agent = this.saveReviewedProfile(agentId, draft);
+          return { agent, layout };
+        },
+      );
+      return decodeSaveAgentProfileResult(result);
+    } catch (error) {
+      Object.assign(this.#requireAgent(agentId), previous);
+      throw error;
+    }
   }
 
   async updateAgent(input: UpdateAgentInput): Promise<AgentSummary> {
