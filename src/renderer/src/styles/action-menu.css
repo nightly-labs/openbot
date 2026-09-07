@@ -72,7 +72,24 @@
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
   flex: 0 0 auto;
+  /* fill and stroke belong here beside the colour and the weight: this rule owns how a
+   * menu icon paints. Lucide sets both as attributes, so every menu built out of the
+   * barrel looked right and hid the gap - until a hand-drawn SVG landed in one and took
+   * the SVG defaults instead, painting itself as an opaque filled shape with no outline. */
+  fill: none;
+  stroke: currentColor;
   color: var(--openbot-text-secondary);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Lucide ships stroke-width="2" as an attribute, so the weight has to be set here to tame
+ * it - but this selector outranks the zero-specificity :where(.ui-glyph-*) classes, and
+ * setting it unconditionally would undo their viewBox scaling for any hand-drawn icon in
+ * a menu. They are excluded and keep the weight their own grid asks for. */
+.ui-action-menu:not([data-menu-layout="grid"])
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"])
+  > svg:not(.ui-glyph-20, .ui-glyph-16) {
   stroke-width: var(--openbot-icon-stroke);
 }
 
