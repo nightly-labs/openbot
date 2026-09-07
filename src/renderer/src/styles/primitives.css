@@ -41,9 +41,9 @@
 }
 
 :where(.ui-text)[data-variant="caption"] {
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-regular);
-  line-height: var(--openbot-leading-xs);
+  line-height: var(--openbot-leading-sm);
 }
 
 :where(.ui-text)[data-variant="label-sm"] {
@@ -132,7 +132,7 @@
 :where(.ui-button-size-xs) {
   height: var(--openbot-control-xs);
   padding-inline: var(--openbot-space-2);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 :where(.ui-button-size-sm) {
@@ -342,9 +342,9 @@
   border: 1px solid transparent;
   border-radius: var(--openbot-radius-pill);
   padding: var(--openbot-space-0-5) var(--openbot-space-2);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
-  line-height: var(--openbot-leading-xs);
+  line-height: var(--openbot-leading-sm);
   transition:
     border-color var(--openbot-duration-fast) var(--openbot-ease-out),
     background-color var(--openbot-duration-fast) var(--openbot-ease-out),
@@ -371,7 +371,7 @@
   min-height: 18px;
   height: 18px;
   padding: 0 var(--openbot-space-1);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
 }
 
 :where(.z-badge)[data-size="md"] {
@@ -805,8 +805,8 @@
 
 .ui-field-description,
 .ui-field-error {
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 .ui-field-description {
@@ -881,8 +881,8 @@
 
 .ui-switch-description {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 .ui-switch-input {
@@ -1016,8 +1016,8 @@
   min-width: 0;
   overflow: hidden;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1060,7 +1060,7 @@
   display: flex;
   align-items: baseline;
   gap: var(--openbot-space-1);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
   line-height: var(--openbot-leading-sm);
 }
@@ -1084,7 +1084,7 @@
   display: -webkit-box;
   overflow: hidden;
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-regular);
   line-height: var(--openbot-leading-sm);
   overflow-wrap: anywhere;
@@ -1098,9 +1098,9 @@
   align-self: start;
   padding-top: 2px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
-  line-height: var(--openbot-leading-xs);
+  line-height: var(--openbot-leading-sm);
   white-space: nowrap;
 }
 
@@ -1113,9 +1113,9 @@
 .ui-questionnaire-progress {
   color: var(--openbot-text-muted);
   font-family: var(--openbot-font-mono);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
-  line-height: var(--openbot-leading-xs);
+  line-height: var(--openbot-leading-sm);
 }
 
 .ui-questionnaire-item {
@@ -1173,8 +1173,8 @@
 .ui-questionnaire-error {
   margin: 0;
   color: var(--openbot-danger);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 .ui-questionnaire-actions {
@@ -1295,8 +1295,8 @@
 
 .ui-alert-description {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 .ui-alert-actions {
@@ -1433,8 +1433,8 @@
 
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-description] {
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
   text-wrap: pretty;
 }
 
@@ -1490,7 +1490,7 @@
   padding-inline: var(--openbot-space-3);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-sans);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
   transition:
     background-color var(--openbot-duration-normal) ease,
@@ -1649,7 +1649,7 @@
   padding-inline: var(--openbot-space-1);
   color: var(--openbot-text-muted);
   font-family: var(--openbot-font-mono);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 1;
 }
 
@@ -1949,7 +1949,7 @@ button.ui-bubble-content {
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface-raised);
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
 }
 
@@ -1977,7 +1977,7 @@ button.ui-bubble-content {
   gap: var(--openbot-space-2);
   padding: 0 var(--openbot-space-1);
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   line-height: 16px;
 }
 

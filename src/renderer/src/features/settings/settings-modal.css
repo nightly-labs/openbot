@@ -132,9 +132,9 @@
 
 .settings-modal-title {
   margin: 0;
-  font-size: var(--openbot-text-settings-title);
+  font-size: var(--openbot-text-2xl);
   font-weight: var(--openbot-weight-semibold);
-  line-height: var(--openbot-leading-settings-title);
+  line-height: var(--openbot-leading-2xl);
   letter-spacing: var(--openbot-tracking-tight);
 }
 
@@ -361,11 +361,6 @@
 :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-header {
   align-items: center;
   padding: var(--openbot-space-4) var(--openbot-space-4) var(--openbot-space-6) var(--openbot-space-8);
-}
-
-:is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-title {
-  font-size: var(--openbot-text-2xl);
-  line-height: var(--openbot-leading-2xl);
 }
 
 :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-description {
@@ -759,7 +754,7 @@
     height: auto;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: var(--openbot-control-md) var(--openbot-leading-xs);
+    grid-template-rows: var(--openbot-control-md) var(--openbot-leading-sm);
     align-items: stretch;
     row-gap: var(--openbot-space-0-5);
   }

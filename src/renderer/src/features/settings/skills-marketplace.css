@@ -110,8 +110,8 @@
 }
 .skills-marketplace-heading h1 {
   margin: 0;
-  font-size: var(--openbot-text-4xl);
-  line-height: var(--openbot-leading-display);
+  font-size: var(--openbot-text-3xl);
+  line-height: var(--openbot-leading-3xl);
   letter-spacing: var(--openbot-tracking-tight);
 }
 .skills-marketplace-heading p {
@@ -211,7 +211,7 @@
 }
 .skills-marketplace-section-title span {
   color: var(--openbot-text-dim);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 .skills-marketplace-category-section + .skills-marketplace-category-section {
   margin-top: var(--openbot-space-8);
@@ -302,7 +302,7 @@
 .skills-submission-row p,
 .skills-submission-row small {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 .skills-marketplace-card-copy span {
   overflow: hidden;
@@ -487,7 +487,7 @@
 .skills-marketplace-detail-category {
   margin: 0 0 var(--openbot-space-1);
   color: var(--openbot-accent-text);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: var(--openbot-tracking-wide);
@@ -495,7 +495,7 @@
 .skills-marketplace-detail-hero h1 {
   margin: 0;
   font-size: var(--openbot-text-3xl);
-  line-height: var(--openbot-leading-display);
+  line-height: var(--openbot-leading-3xl);
   letter-spacing: var(--openbot-tracking-tight);
 }
 .skills-marketplace-detail-hero h1 + p {
@@ -510,7 +510,7 @@
   gap: var(--openbot-space-2) var(--openbot-space-4);
   margin-top: var(--openbot-space-3);
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 .skills-marketplace-detail-content {
   display: grid;
@@ -539,7 +539,7 @@
 .skills-marketplace-detail-package p {
   margin: var(--openbot-space-1) 0 var(--openbot-space-3);
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 .skills-marketplace-detail-package ul {
   display: grid;
@@ -552,7 +552,7 @@
   overflow: hidden;
   color: var(--openbot-text-secondary);
   font-family: var(--openbot-font-mono);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -717,7 +717,7 @@
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface);
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   text-transform: capitalize;
 }
 .skills-installed-state[data-state="installed"],
@@ -821,7 +821,7 @@
   background: var(--openbot-bg-control);
   color: var(--openbot-text-secondary);
   font-family: var(--openbot-font-mono);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-md);
   white-space: pre-wrap;
 }

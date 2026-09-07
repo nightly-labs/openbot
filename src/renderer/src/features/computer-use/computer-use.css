@@ -109,14 +109,14 @@
 .computer-use-compact-header p {
   margin: var(--openbot-space-0-5) 0 0;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
 }
 
 .computer-use-compact-header > span {
   flex: 0 0 auto;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-md);
 }
 
@@ -142,7 +142,7 @@
 
 .computer-use-compact .ui-item-description {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .computer-use-setup-surface {
@@ -191,7 +191,7 @@
 .computer-use-setup-footer p {
   margin: var(--openbot-space-0-5) 0 0;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
 }
 
@@ -268,7 +268,7 @@
 
 .computer-use-drag-card > span:last-child {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .computer-use-setup-footer {
@@ -307,7 +307,7 @@
 .computer-use-setup-error {
   margin: 0;
   color: var(--openbot-danger);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
   text-align: center;
 }

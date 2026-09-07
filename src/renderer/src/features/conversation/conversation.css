@@ -70,7 +70,7 @@
   align-items: center;
   gap: 4px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   line-height: 11px;
 }
 
@@ -94,7 +94,7 @@
   align-items: center;
   gap: 5px;
   color: var(--openbot-text-readable);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .direct-private-label svg {
@@ -134,7 +134,7 @@
 .direct-conversation-empty p {
   max-width: 290px;
   margin: 0;
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 17px;
 }
 
@@ -158,7 +158,7 @@
 
 .direct-message time {
   color: var(--openbot-text-readable);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .direct-message .ui-message-footer {
@@ -177,13 +177,13 @@
   gap: 7px;
   padding: 0 10px 4px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .direct-message-error {
   margin: 0 8px 6px;
   color: var(--openbot-danger);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .direct-composer {
@@ -449,7 +449,7 @@
   padding: 18px 20px 48px;
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-mono);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 1.55;
   tab-size: 2;
   white-space: pre;
@@ -501,7 +501,7 @@
 
 .file-preview-unsupported span {
   max-width: 260px;
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 1.45;
 }
 
@@ -517,7 +517,7 @@
   background: var(--openbot-bg-control);
   padding: 7px 12px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   text-align: center;
 }
 
@@ -640,7 +640,7 @@
   width: min(168px, 22vw);
   min-width: 112px;
   flex: 0 1 168px;
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .remote-desktop-display-select-content {
@@ -691,7 +691,7 @@
 .remote-desktop-overlay > span:not(.ui-spinner):not(.remote-desktop-empty-mark) {
   max-width: 330px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 16px;
 }
 
@@ -723,7 +723,7 @@
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-border);
   color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 600;
 }
 
@@ -867,7 +867,7 @@
   background: transparent;
   padding: 0 25px 0 8px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   text-align: left;
 }
 
@@ -1024,7 +1024,7 @@
   background: var(--openbot-hover);
   padding: 0 9px;
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .browser-address-bar input:focus {
@@ -1059,7 +1059,7 @@
 }
 
 .browser-empty-state span {
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .agent-settings-header {
@@ -1519,7 +1519,7 @@
 .agent-routine-run-row small,
 .agent-routine-run-row em {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-style: normal;
 }
 
@@ -1978,8 +1978,8 @@
 .agent-memory-meta {
   display: block;
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 .agent-memory-delete-button {
@@ -2275,7 +2275,7 @@
 .agent-settings-save-error {
   margin: -8px 2px 15px;
   color: var(--openbot-danger);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 16px;
 }
 
@@ -2311,7 +2311,7 @@
   max-width: 194px;
   margin-top: 2px;
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 15px;
 }
 
@@ -2606,7 +2606,7 @@
 .provider-model-heading span {
   margin-top: 1px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 16px;
 }
 
@@ -2695,7 +2695,7 @@
   background: var(--openbot-bg-sidebar);
   padding: 1px 5px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 500;
   line-height: 15px;
 }
@@ -2872,7 +2872,7 @@
   background: var(--openbot-unread-surface);
   padding: 0 12px;
   color: var(--openbot-unread-text);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 620;
   line-height: 16px;
   transition: background-color var(--openbot-duration-hover) var(--openbot-ease-out);
@@ -2890,7 +2890,7 @@
   inset: 0;
   width: 100%;
   padding: 0 12px;
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 620;
   line-height: 16px;
   text-align: left;
@@ -2901,7 +2901,7 @@
   z-index: 1;
   margin-left: auto;
   padding: 0;
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 680;
   line-height: 14px;
   text-decoration: underline;
@@ -2954,7 +2954,7 @@
   gap: 8px;
   margin: var(--openbot-space-1) 0 var(--openbot-space-2);
   color: var(--openbot-unread-divider);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 720;
   letter-spacing: 0.08em;
   line-height: 12px;
@@ -3518,7 +3518,7 @@
 
 .chat-action-marker-time {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .chat-action-target {
@@ -3684,7 +3684,7 @@ button.chat-action-target:active,
 
 .chat-action-agent-menu-status {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .chat-action-attachments {
@@ -3838,7 +3838,7 @@ button.chat-action-target:active,
   padding: 2px 7px;
   color: var(--openbot-text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   white-space: nowrap;
 }
 
@@ -3938,7 +3938,7 @@ button.chat-action-target:active,
   cursor: pointer;
   backdrop-filter: blur(12px) saturate(1.15);
   -webkit-backdrop-filter: blur(12px) saturate(1.15);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 650;
   opacity: 0;
   pointer-events: none;
@@ -4107,7 +4107,7 @@ button.chat-action-target:active,
 }
 
 .message-markdown-heading:is([data-level="3"], [data-level="4"], [data-level="5"], [data-level="6"]) {
-  font-size: var(--openbot-text-base);
+  font-size: var(--openbot-text-lg);
   line-height: var(--openbot-leading-lg);
 }
 
@@ -4352,7 +4352,7 @@ button.chat-action-target:active,
   background: transparent;
   padding: 0 10px 0 11px;
   color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 400;
   line-height: 28px;
   outline: 0;
@@ -4513,7 +4513,7 @@ button.chat-action-target:active,
   align-items: center;
   gap: 7px;
   padding: 0 10px;
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   white-space: nowrap;
 }
 
@@ -4706,7 +4706,7 @@ button.chat-action-target:active,
   background: var(--openbot-border);
   padding: 1px 6px;
   color: var(--openbot-text-readable);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
   line-height: 16px;
 }
@@ -4723,7 +4723,7 @@ button.chat-action-target:active,
   border-radius: var(--openbot-radius-sm);
   padding-inline: 7px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 16px;
 }
 
@@ -4823,7 +4823,7 @@ button.chat-action-target:active,
   flex: none;
   padding-right: 8px;
   color: var(--openbot-text-dim);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   text-align: right;
   user-select: none;
 }
@@ -5034,7 +5034,7 @@ button.chat-action-target:active,
   background: var(--openbot-bg-control-hover);
   padding: 0;
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 600;
   line-height: 1;
   text-decoration: none;
@@ -5066,7 +5066,7 @@ button.chat-action-target:active,
   background: var(--openbot-bg-surface-raised);
   padding: 6px 8px;
   color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 500;
   line-height: 15px;
   overflow-wrap: anywhere;
@@ -5236,7 +5236,7 @@ button.chat-action-target:active,
 .message-reply-context span {
   display: block;
   margin-bottom: 1px;
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 550;
   line-height: 14px;
 }
@@ -5244,7 +5244,7 @@ button.chat-action-target:active,
 .message-reply-context p {
   overflow: hidden;
   margin: 0;
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -5460,14 +5460,14 @@ button.chat-action-target:active,
 }
 
 .attachment-reference-visual > span {
-  font-size: var(--openbot-text-micro);
+  font-size: var(--openbot-glyph-sm);
   font-weight: 750;
   letter-spacing: -0.2px;
   line-height: 1;
 }
 
 .attachment-reference-visual[data-badge-length="4"] > span {
-  font-size: var(--openbot-text-nano);
+  font-size: var(--openbot-glyph-xs);
   letter-spacing: -0.4px;
 }
 
@@ -5636,7 +5636,7 @@ button.chat-action-target:active,
   background: var(--openbot-border);
   color: var(--openbot-text-muted);
   font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .choice-input {
@@ -5748,7 +5748,7 @@ button.chat-action-target:active,
 .composer-reply-preview span {
   display: block;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 550;
   line-height: 14px;
 }
@@ -5855,7 +5855,7 @@ button.chat-action-target:active,
 
 .voice-model-progress {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   white-space: nowrap;
 }
 
@@ -6163,7 +6163,7 @@ button.chat-action-target:active,
 .mention-picker-section {
   padding: 5px 9px 3px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 650;
   letter-spacing: 0.04em;
   line-height: 14px;
@@ -6276,14 +6276,14 @@ button.chat-action-target:active,
 
 .composer-attachment-copy strong {
   color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 500;
   line-height: 16px;
 }
 
 .composer-attachment-copy small {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   line-height: 14px;
 }
 
@@ -6297,7 +6297,7 @@ button.chat-action-target:active,
   border-radius: var(--openbot-radius-md);
   background: var(--file-reference-soft, var(--openbot-hover));
   color: var(--file-reference-color, var(--openbot-text-muted));
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 700;
   line-height: 1;
 }
@@ -6376,7 +6376,7 @@ button.chat-action-target:active,
   gap: 6px;
   padding: 8px 0 2px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   text-align: left;
 }
 
@@ -6457,7 +6457,7 @@ button.chat-action-target:active,
 
 .message-attachment small {
   color: var(--openbot-text-readable);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 15px;
 }
 
@@ -6696,7 +6696,7 @@ button.chat-action-target:active,
   background: var(--openbot-bg-canvas);
   color: var(--openbot-queue-action);
   font-family: var(--openbot-font-mono);
-  font-size: var(--openbot-text-nano);
+  font-size: var(--openbot-glyph-xs);
   line-height: 1;
 }
 
@@ -6727,7 +6727,7 @@ button.chat-action-target:active,
   min-width: 0;
   overflow: hidden;
   color: inherit;
-  font-size: var(--openbot-text-base);
+  font-size: var(--openbot-text-lg);
   line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -7014,7 +7014,7 @@ button.chat-action-target:active,
   border-radius: var(--openbot-radius-md);
   background: color-mix(in srgb, var(--danger) 10%, transparent);
   color: var(--openbot-danger);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .agent-setup-card {
@@ -7043,7 +7043,7 @@ button.chat-action-target:active,
 .agent-setup-card p {
   margin: 4px 0 0;
   color: var(--text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 16px;
 }
 
@@ -7054,7 +7054,7 @@ button.chat-action-target:active,
   background: var(--openbot-border);
   padding: 7px 10px;
   color: var(--text-primary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .agent-setup-card button:hover {
@@ -7166,14 +7166,14 @@ button.chat-action-target:active,
 .browser-takeover-preview-bar span {
   min-width: 0;
   flex: 1;
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
 }
 
 .browser-takeover-preview-bar small {
   max-width: 42%;
   color: var(--openbot-text-readable);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .browser-takeover-preview-viewport {
@@ -7228,7 +7228,7 @@ button.chat-action-target:active,
   max-width: 100%;
   overflow: hidden;
   color: var(--openbot-text-readable);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -7322,8 +7322,8 @@ button.chat-action-target:active,
 
 .question-prompt-complete-count {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
   white-space: nowrap;
 }
 
@@ -7603,8 +7603,8 @@ button.chat-action-target:active,
 .question-prompt-sending {
   gap: var(--openbot-space-1);
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
   white-space: nowrap;
 }
 
@@ -7645,8 +7645,8 @@ button.chat-action-target:active,
 
 .question-prompt-empty > span {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 .question-prompt-history-entry {
@@ -7732,7 +7732,7 @@ button.chat-action-target:active,
 .approval-card-header div > span {
   margin-top: 1px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 16px;
 }
 
@@ -7798,7 +7798,7 @@ button.chat-action-target:active,
   border: 0;
   border-radius: var(--openbot-radius-pill);
   padding: 5px 11px;
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 520;
   transition:
     background-color var(--openbot-duration-hover) ease,
@@ -7855,7 +7855,7 @@ button.chat-action-target:active,
   padding: 10px;
   color: var(--openbot-text-primary);
   font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 17px;
   white-space: pre-wrap;
   word-break: break-word;
@@ -7867,7 +7867,7 @@ button.chat-action-target:active,
   padding: 7px 10px;
   color: var(--openbot-text-muted);
   font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -7883,7 +7883,7 @@ button.chat-action-target:active,
 
 .approval-detail-label {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -7892,7 +7892,7 @@ button.chat-action-target:active,
   overflow: hidden;
   color: var(--openbot-text-primary);
   font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 520;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -7910,13 +7910,13 @@ button.chat-action-target:active,
   background: var(--openbot-bg-control);
   padding: 5px 8px;
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .approval-reason {
   margin: 0;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 16px;
 }
 
@@ -7938,7 +7938,7 @@ button.chat-action-target:active,
   background: transparent;
   padding: 4px 6px;
   color: var(--text-muted);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .media-caption button:hover {

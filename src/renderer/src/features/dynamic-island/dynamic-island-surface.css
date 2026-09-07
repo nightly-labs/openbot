@@ -218,9 +218,9 @@ body:has(.dynamic-island-surface),
   width: max-content;
   overflow: hidden;
   color: var(--openbot-island-compact-name);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
-  line-height: var(--openbot-leading-xs);
+  line-height: var(--openbot-leading-sm);
   text-align: left;
   text-overflow: ellipsis;
   transform: translateY(-50%);
@@ -391,9 +391,9 @@ body:has(.dynamic-island-surface),
 .dynamic-island-surface-row small {
   overflow: hidden;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-regular);
-  line-height: var(--openbot-leading-xs);
+  line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -405,10 +405,10 @@ body:has(.dynamic-island-surface),
 
 .dynamic-island-message-first-unread {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-regular);
   font-variant-numeric: tabular-nums;
-  line-height: var(--openbot-leading-xs);
+  line-height: var(--openbot-leading-sm);
 }
 
 .dynamic-island-message-first-footer {
@@ -467,8 +467,8 @@ body:has(.dynamic-island-surface),
 .dynamic-island-surface-command-meta span {
   overflow: hidden;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -486,7 +486,7 @@ body:has(.dynamic-island-surface),
   overflow: hidden;
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-mono);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -503,14 +503,14 @@ body:has(.dynamic-island-surface),
 .dynamic-island-surface-context-line small,
 .dynamic-island-surface-more {
   color: var(--openbot-text-dim);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 div.dynamic-island-surface-context-line span {
   overflow: hidden;
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -574,8 +574,8 @@ div.dynamic-island-surface-context-line span {
 .dynamic-island-surface-question-option-copy small {
   min-width: 0;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
-  line-height: var(--openbot-leading-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 .dynamic-island-surface-question-option-index {
@@ -587,7 +587,7 @@ div.dynamic-island-surface-context-line span {
   border-radius: var(--openbot-radius-sm);
   background: var(--openbot-question-option-hover);
   color: var(--openbot-question-option);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -641,9 +641,9 @@ div.dynamic-island-surface-context-line span {
   align-items: baseline;
   padding-top: 2px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
-  line-height: var(--openbot-leading-xs);
+  line-height: var(--openbot-leading-sm);
   white-space: nowrap;
 }
 

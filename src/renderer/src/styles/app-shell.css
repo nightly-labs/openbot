@@ -297,7 +297,7 @@
   align-items: center;
   gap: var(--openbot-space-1);
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .global-search-result-shortcut .ui-kbd {
@@ -1430,7 +1430,7 @@ textarea {
   place-items: center;
   border-radius: var(--openbot-radius-md);
   color: var(--openbot-success);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 680;
   letter-spacing: 0.02em;
 }
@@ -1488,7 +1488,7 @@ textarea {
   background: var(--openbot-text-primary);
   padding: 0 3px;
   color: var(--openbot-bg-sidebar);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 680;
 }
 
@@ -1612,7 +1612,7 @@ textarea {
   background: var(--openbot-text-primary);
   padding: 0 3px;
   color: var(--openbot-bg-sidebar);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 650;
   line-height: 12px;
   animation: sidebar-reply-in var(--openbot-duration-overlay) cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -1855,7 +1855,7 @@ textarea {
   gap: 10px;
   padding: 7px 10px 3px 13px;
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 590;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -1874,7 +1874,7 @@ textarea {
   background: transparent;
   padding: 0 9px;
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 540;
   transition-property: scale, background-color, color;
   transition-duration: var(--openbot-duration-normal), var(--openbot-duration-hover), var(--openbot-duration-hover);
@@ -1964,7 +1964,7 @@ textarea {
 
 .avatar-image-upload small {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   line-height: 14px;
 }
 
@@ -2049,7 +2049,7 @@ textarea {
   background: transparent;
   box-shadow: none;
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 650;
 }
 
@@ -2118,7 +2118,7 @@ textarea {
   background: var(--openbot-hover);
   padding: 2px 4px;
   color: var(--openbot-text-readable);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: 400;
   line-height: 16px;
   white-space: nowrap;
@@ -2456,7 +2456,7 @@ textarea {
 .account-dock-usage-chip > strong {
   min-width: 4ch;
   color: inherit;
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
   font-variant-numeric: tabular-nums;
   line-height: 14px;
@@ -2551,7 +2551,7 @@ textarea {
   font-weight: var(--openbot-weight-semibold);
   font-variant-numeric: tabular-nums;
   letter-spacing: var(--openbot-tracking-tight);
-  line-height: var(--openbot-leading-2xl);
+  line-height: var(--openbot-leading-3xl);
 }
 
 .account-usage-popover-reset {
@@ -2571,7 +2571,7 @@ textarea {
 
 .account-usage-popover-reset > span {
   overflow: hidden;
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2580,7 +2580,7 @@ textarea {
 .account-usage-popover-reset > strong {
   margin-left: auto;
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
   font-variant-numeric: tabular-nums;
   line-height: var(--openbot-leading-sm);
@@ -2619,7 +2619,7 @@ textarea {
   background: var(--openbot-danger-soft);
   padding: var(--openbot-space-2);
   color: var(--openbot-danger);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
 }
 
@@ -2769,7 +2769,7 @@ textarea {
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-control);
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
 }
 
@@ -2808,7 +2808,7 @@ textarea {
 
 .account-dock-copy > span:not(.sr-only) {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: 14px;
 }
 
@@ -2821,7 +2821,7 @@ textarea {
   background: var(--openbot-badge-new-soft);
   padding: 2px 7px;
   color: var(--openbot-badge-new);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   line-height: 16px;
   letter-spacing: 0.01em;
   font-weight: var(--openbot-weight-semibold);
@@ -2969,7 +2969,7 @@ textarea {
 .account-popover-error {
   margin: 3px 7px 5px;
   color: var(--openbot-danger);
-  font-size: var(--openbot-text-2xs);
+  font-size: var(--openbot-text-sm);
   line-height: 14px;
 }
 
