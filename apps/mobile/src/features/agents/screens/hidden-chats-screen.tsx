@@ -49,7 +49,7 @@ export function HiddenChatsScreen() {
                   className="min-w-0 flex-1 flex-row items-center gap-3 rounded-2xl px-1 py-1"
                   style={({ pressed }) => ({ opacity: pressed ? 0.58 : 1 })}
                 >
-                  <BloubAvatar hue={agent.avatarHue} seed={agent.avatarSeed} size={46} />
+                  <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={46} />
                   <Typography.Paragraph className="min-w-0 flex-1" weight="semibold" numberOfLines={1}>
                     {agent.name}
                   </Typography.Paragraph>

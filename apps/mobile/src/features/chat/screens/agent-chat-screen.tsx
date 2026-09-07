@@ -8,7 +8,9 @@ import { MobileChatView } from "@/features/chat/components/chat-view";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 
 export function AgentChatScreen() {
-  usePreventZoomTransitionDismissal();
+  usePreventZoomTransitionDismissal({
+    unstable_dismissalBoundsRect: { minX: 0, maxX: 24 },
+  });
 
   const { avatarTransition, agentId } = useLocalSearchParams<{ avatarTransition?: string; agentId: string }>();
   const { agents } = useMobileWorkspace();

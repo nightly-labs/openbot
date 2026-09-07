@@ -1,6 +1,5 @@
 import MaskedView from "@react-native-masked-view/masked-view";
 import { BlurView } from "expo-blur";
-import * as Haptics from "expo-haptics";
 import { Link } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -23,8 +22,8 @@ import { useAgentContextMenu } from "@/features/agents/components/agent-context-
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { type AgentAvatarLocation, useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
-import { isIOS } from "@/shared/lib/platform";
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -108,18 +107,21 @@ export function AgentListRow({
   const isUnpinTarget = transition?.agentId === agent.id && transition.target === "row";
   const avatar = (
     <AgentPinAvatar agentId={agent.id} location={avatarLocation} size={54}>
-      <BloubAvatar hue={agent.avatarHue} seed={agent.avatarSeed} size={54} />
+      <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={54} />
     </AgentPinAvatar>
   );
 
   const handleOpen = () => {
     if (dismissToChat) startAgentNavigationAnimated(agent.id, avatarLocation);
-    if (isIOS) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
   };
 
   const linkTrigger = (
     <Link.Trigger>
-      <Pressable accessibilityLabel={`Open chat with ${agent.name}`} accessibilityRole="button" className="w-full">
+      <ChatLinkPressable
+        accessibilityLabel={`Open chat with ${agent.name}`}
+        accessibilityRole="button"
+        className="w-full"
+      >
         {({ pressed }) => (
           <View
             className="min-h-20 w-full flex-row items-center gap-3 py-3"
@@ -149,7 +151,7 @@ export function AgentListRow({
             </AgentRowTextReveal>
           </View>
         )}
-      </Pressable>
+      </ChatLinkPressable>
     </Link.Trigger>
   );
 

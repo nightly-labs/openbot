@@ -3496,7 +3496,7 @@
 }
 
 .chat-action-marker {
-  width: var(--openbot-chat-marker-width);
+  width: min(var(--openbot-chat-marker-width), calc(100% - var(--openbot-space-6)));
   min-height: var(--openbot-chat-marker-height);
   justify-content: center;
   margin: 0 auto;
