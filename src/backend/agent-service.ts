@@ -728,6 +728,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
     const { wasPending, release } = this.#duplication.releaseForDelete(agentId);
     this.#deletingAgents.add(agentId);
+    const releaseDeliveries = this.#mailbox.blockAgentDeliveries(agentId);
     try {
       this.#routines.arm();
       await this.#deleteAgentData(agent ?? { id: agentId, threadId: null });
@@ -735,6 +736,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (!wasPending) this.#emit({ type: "agents-changed", agents: this.listAgents() });
     } finally {
       release();
+      releaseDeliveries();
       this.#deletingAgents.delete(agentId);
       this.#routines.arm();
       if (this.#store.list().some((candidate) => candidate.id === agentId)) this.#drain.scheduleDrain(agentId);
@@ -993,9 +995,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   async sendMessage(input: SendMessageInput): Promise<QueuedMessageReceipt> {
+    const validateRecipient = this.#mailbox.prepareDelivery([input.agentId]);
     if (this.#duplication.isPending(input.agentId)) throw new Error(`Unknown agent: ${input.agentId}`);
     const agent = await this.#store.getOrCreate(input.agentId);
     await this.ensureProvider(providerForAgent(agent));
+    validateRecipient();
     const receipt = await this.#mailbox.enqueue({
       sender: { kind: "user" },
       recipientAgentIds: [agent.id],

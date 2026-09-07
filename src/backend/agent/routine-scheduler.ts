@@ -458,8 +458,10 @@ export class RoutineScheduler {
   }
 
   async #enqueueRun(run: RoutineRun): Promise<void> {
+    const validateRecipient = this.#mailbox.prepareDelivery([run.agentId]);
     const agent = await this.#store.getOrCreate(run.agentId);
     try {
+      validateRecipient();
       const receipt = await this.#mailbox.enqueue({
         sender: {
           kind: "routine",

@@ -43,6 +43,7 @@ import {
   isMessageReaction,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
 import { OpenBotDatabase } from "./openbot-database";
 import { isRecord } from "./protocol";
 
@@ -177,6 +178,7 @@ export class MailboxStore {
   readonly #draftsRoot: string;
   readonly #transfersRoot: string;
   readonly #database: OpenBotDatabase;
+  readonly #deliveryGate = new MailboxDeliveryGate();
   readonly #stagedGeneratedAttachments = new Map<string, StoredGeneratedAttachment>();
   #state: StoredState = structuredClone(EMPTY_STATE);
 
@@ -320,6 +322,14 @@ export class MailboxStore {
     await rm(dirname(draft.path), { recursive: true, force: true });
   }
 
+  blockAgentDeliveries(agentId: string): () => void {
+    return this.#deliveryGate.block(agentId);
+  }
+
+  prepareDelivery(agentIds: string[]): () => void {
+    return this.#deliveryGate.prepare(agentIds);
+  }
+
   async enqueue(input: EnqueueInput): Promise<QueuedMessageReceipt> {
     if (input.idempotencyKey) {
       const existingMessageId = this.#state.idempotency[input.idempotencyKey];
@@ -327,6 +337,7 @@ export class MailboxStore {
     }
 
     const recipients = [...new Set(input.recipientAgentIds)];
+    const validateRecipients = this.prepareDelivery(recipients);
     if (recipients.length === 0) throw new Error("At least one recipient is required.");
     if (recipients.length > INPUT_LIMITS.messageRecipients) {
       throw new Error(`A message can have at most ${INPUT_LIMITS.messageRecipients} recipients.`);
@@ -365,6 +376,12 @@ export class MailboxStore {
       createdAt,
       sourcePaths,
     );
+    try {
+      validateRecipients();
+    } catch (error) {
+      await rm(join(this.#transfersRoot, messageId), { recursive: true, force: true });
+      throw error;
+    }
     const committedByDraftId = new Map(drafts.map((draft, index) => [draft.id, attachments[index]] as const));
     const message: StoredMessage = {
       id: messageId,

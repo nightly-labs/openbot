@@ -366,7 +366,7 @@ describe.sequential("AgentService: restart", () => {
     expect(events).toContainEqual({ type: "agents-changed", agents: service.listAgents() });
   });
 
-  it("holds due routines and queued work during deletion, then resumes after failure", async () => {
+  it("holds due routines and rejects messages during deletion, then resumes after failure", async () => {
     const { store, mailbox } = stores(root);
     service = new AgentService(
       store,
@@ -403,9 +403,10 @@ describe.sequential("AgentService: restart", () => {
       await expect(service.testRoutine({ agentId: agent.id, routineId: routine.id })).rejects.toThrow(
         "Wait until the agent operation finishes before running a routine.",
       );
-      await service.sendMessage({ agentId: agent.id, text: "Hold this work until cleanup finishes." });
-      await vi.advanceTimersByTimeAsync(0);
-      expect(service.listQueue(agent.id).deliveries).toMatchObject([{ status: "queued", turnId: null }]);
+      await expect(service.sendMessage({ agentId: agent.id, text: "Wait for cleanup." })).rejects.toThrow(
+        "The recipient is being deleted. Retry after deletion finishes.",
+      );
+      expect(service.listQueue(agent.id).deliveries).toEqual([]);
       expect(store.activeProviderSession(agent.id)).toBeNull();
       await expect(service.deleteAgent(agent.id)).rejects.toThrow("Agent deletion is already in progress.");
 
