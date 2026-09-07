@@ -1,4 +1,4 @@
-import { env } from "cloudflare:workers";
+import { env, waitUntil } from "cloudflare:workers";
 import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
 import { AuthService, AuthServiceError } from "./auth-service";
 import { D1AuthRepository } from "./d1-auth-repository";
@@ -31,7 +31,7 @@ export function requestAuthService(): AuthService {
     delivery: exposeDevelopmentCode ? null : createEmailCodeDelivery(bindings),
     exposeDevelopmentCode,
     flushSessionRevocations: () => deliverPendingRemoteAuthEvents(bindings, Date.now()),
-    profileChanged: (userId) => notifyAccountProfileChanged(bindings, userId),
+    profileChanged: (userId) => notifyAccountProfileChanged(bindings, userId, waitUntil),
   });
 }
 

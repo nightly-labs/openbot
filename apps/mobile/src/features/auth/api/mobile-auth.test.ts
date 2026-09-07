@@ -1,5 +1,6 @@
 import { createMobileConnectUrl } from "@openbot/contracts/mobile-connect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resolveSessionValidation } from "../context/session-validation";
 import {
   listMobileAccountSessions,
   logoutMobileSession,
@@ -365,6 +366,31 @@ describe("settings request lifecycle", () => {
     await save;
     expect((await refresh)?.user.name).toBe("Saved name");
     expect((await readMobileSession())?.user.name).toBe("Saved name");
+  });
+
+  it("applies expiry after an overlapping edit while protecting replacement logins and newer profiles", async () => {
+    const started = Promise.withResolvers<void>();
+    const response = Promise.withResolvers<Response>();
+    native.fetch.mockImplementationOnce(() => {
+      started.resolve();
+      return response.promise;
+    });
+    native.fetch.mockResolvedValueOnce(new Response(null, { status: 401 }));
+    const save = updateMobileProfile(session, { name: "Saved name" });
+    await started.promise;
+    const refresh = validateMobileSession(session);
+    response.resolve(Response.json({ ...session.user, name: "Saved name" }));
+    const edited = await save;
+    const validated = await refresh;
+    expect(validated).toBeNull();
+    expect(await readMobileSession()).toBeNull();
+    expect(resolveSessionValidation(edited, session, validated)).toBeNull();
+    const newLogin = { ...edited, sessionToken: "new-token" };
+    expect(resolveSessionValidation(newLogin, session, validated)).toBe(newLogin);
+    const otherApi = { ...edited, apiUrl: "https://another.example.com" };
+    expect(resolveSessionValidation(otherApi, session, validated)).toBe(otherApi);
+    expect(resolveSessionValidation(edited, session, session)).toBe(edited);
+    expect(resolveSessionValidation(null, session, session)).toBeNull();
   });
 
   it("rejects a refresh for another account without replacing the stored identity", async () => {

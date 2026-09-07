@@ -22,6 +22,8 @@ import {
 
 import { queryClient } from "@/shared/lib/query-client";
 
+import { resolveSessionValidation } from "./session-validation";
+
 interface MobileSessionContextValue {
   loading: boolean;
   session: MobileSession | null;
@@ -103,8 +105,9 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       checking = true;
       try {
         const validated = await validateMobileSession(current);
-        if (active && sessionRef.current === current) {
-          setCurrentSession(validated);
+        if (active) {
+          const next = resolveSessionValidation(sessionRef.current, current, validated);
+          if (next !== sessionRef.current) setCurrentSession(next);
         }
       } catch {
         // A temporary network failure must not sign the user out locally.

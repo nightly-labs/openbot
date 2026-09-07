@@ -143,7 +143,8 @@ Account-session queries are scoped to each login without including credentials i
 cancel when abandoned, and are removed on account transitions. An HTTP 401 clears only its
 initiating credential; transport failures retain the session for retry.
 Account profile writes enqueue an `account-profile-changed` invalidation in the existing signed
-account-to-Signal outbox. Signal forwards the optional frame only to authenticated sockets for that
+account-to-Signal outbox before returning. Worker `waitUntil` delivers notifications outside the
+profile-save response path, with a five-second timeout per request and outbox retries. Signal forwards the optional frame only to authenticated sockets for that
 user; the frame contains no profile or credential. Desktop and mobile fetch the profile through
 the account API on notification, foreground entry, or Signal reconnection, with no periodic polling.
 Older Signal clients ignore this optional event. API and Signal both need the event support for push;

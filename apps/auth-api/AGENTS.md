@@ -34,3 +34,7 @@ Wrap global `fetch` when storing it in a service or dependency object:
 `dependencies.fetch(...)` changes its receiver and throws `Illegal invocation` in workerd,
 even when Node tests pass. The remote account-event outbox covers this receiver constraint;
 keep profile and session notifications on the signed Signal path without polling.
+
+Profile writes await only the durable outbox insert. Schedule Signal delivery with Worker
+`waitUntil`, and bound each webhook request with a timeout so a slow Signal cannot turn a
+successful profile save into a client timeout. Failed delivery stays in the existing retry outbox.

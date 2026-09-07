@@ -58,53 +58,77 @@ describe("remote control plane migration", () => {
 });
 
 describe("account profile invalidation outbox", () => {
-  it("signs profile invalidations and retains failed delivery for retry", async () => {
-    const database = new DatabaseSync(":memory:");
-    try {
-      const migrations = new URL("../migrations/", import.meta.url);
-      for (const name of readdirSync(migrations)
-        .filter((name) => name.endsWith(".sql"))
-        .sort()) {
-        database.exec(readFileSync(new URL(name, migrations), "utf8"));
+  it.each(["unavailable", "timeout"])(
+    "returns after persisting and retries a signed notification when Signal is %s",
+    async (failure) => {
+      const database = new DatabaseSync(":memory:");
+      try {
+        const migrations = new URL("../migrations/", import.meta.url);
+        for (const name of readdirSync(migrations)
+          .filter((name) => name.endsWith(".sql"))
+          .sort()) {
+          database.exec(readFileSync(new URL(name, migrations), "utf8"));
+        }
+        const bindings = {
+          DB: sqliteD1(database),
+          REMOTE_AUTH_WEBHOOK_URL: "https://signal.example.test/internal/auth-events",
+          REMOTE_AUTH_WEBHOOK_SECRET: "s".repeat(32),
+        };
+        const payload = JSON.stringify({ type: "account-profile-changed", userId: "owner" });
+        let deliveredBody: RequestInit["body"];
+        let deliveredHeaders = new Headers();
+        let finishDelivery: ((response: Response) => void) | undefined;
+        let background: Promise<void> | undefined;
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        vi.spyOn(AbortSignal, "timeout").mockImplementation((milliseconds) => {
+          const controller = new AbortController();
+          setTimeout(() => controller.abort(new DOMException("Timed out", "TimeoutError")), milliseconds);
+          return controller.signal;
+        });
+        // workerd's global fetch rejects being invoked as a dependency object's method.
+        vi.stubGlobal(
+          "fetch",
+          async function (this: typeof globalThis | undefined, _url: string | URL | Request, init?: RequestInit) {
+            if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+            deliveredBody = init?.body;
+            deliveredHeaders = new Headers(init?.headers);
+            return new Promise<Response>((resolve, reject) => {
+              finishDelivery = resolve;
+              init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+            });
+          },
+        );
+        await notifyAccountProfileChanged(bindings, "owner", (delivery) => {
+          background = delivery;
+        });
+        expect(database.prepare("SELECT payload, attempts FROM remote_auth_events").all()).toEqual([
+          { payload, attempts: 0 },
+        ]);
+        await vi.waitFor(() => expect(deliveredBody).toBe(payload));
+        expect(deliveredHeaders.get("OpenBot-Signature")).toBe(
+          createHmac("sha256", bindings.REMOTE_AUTH_WEBHOOK_SECRET)
+            .update(`${deliveredHeaders.get("OpenBot-Timestamp")}.${payload}`)
+            .digest("base64url"),
+        );
+        if (failure === "unavailable") finishDelivery?.(new Response(null, { status: 503 }));
+        else await vi.advanceTimersByTimeAsync(5_000);
+        await background;
+        expect(database.prepare("SELECT payload, attempts FROM remote_auth_events").all()).toEqual([
+          { payload, attempts: 1 },
+        ]);
+        await deliverPendingRemoteAuthEvents(bindings, Date.now() + 3_600_000, async (_url, init) => {
+          expect(init?.body).toBe(payload);
+          return new Response(null, { status: 204 });
+        });
+        expect(database.prepare("SELECT payload FROM remote_auth_events").all()).toEqual([]);
+      } finally {
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+        vi.useRealTimers();
+        database.close();
       }
-      const bindings = {
-        DB: sqliteD1(database),
-        REMOTE_AUTH_WEBHOOK_URL: "https://signal.example.test/internal/auth-events",
-        REMOTE_AUTH_WEBHOOK_SECRET: "s".repeat(32),
-      };
-      const payload = JSON.stringify({ type: "account-profile-changed", userId: "owner" });
-      let deliveredBody: RequestInit["body"];
-      let deliveredHeaders = new Headers();
-      // workerd's global fetch rejects being invoked as a dependency object's method.
-      vi.stubGlobal(
-        "fetch",
-        async function (this: typeof globalThis | undefined, _url: string | URL | Request, init?: RequestInit) {
-          if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
-          deliveredBody = init?.body;
-          deliveredHeaders = new Headers(init?.headers);
-          return new Response(null, { status: 503 });
-        },
-      );
-      await notifyAccountProfileChanged(bindings, "owner");
-      expect(deliveredBody).toBe(payload);
-      expect(deliveredHeaders.get("OpenBot-Signature")).toBe(
-        createHmac("sha256", bindings.REMOTE_AUTH_WEBHOOK_SECRET)
-          .update(`${deliveredHeaders.get("OpenBot-Timestamp")}.${payload}`)
-          .digest("base64url"),
-      );
-      expect(database.prepare("SELECT payload, attempts FROM remote_auth_events").all()).toEqual([
-        { payload, attempts: 1 },
-      ]);
-      await deliverPendingRemoteAuthEvents(bindings, Date.now() + 3_600_000, async (_url, init) => {
-        expect(init?.body).toBe(payload);
-        return new Response(null, { status: 204 });
-      });
-      expect(database.prepare("SELECT payload FROM remote_auth_events").all()).toEqual([]);
-    } finally {
-      vi.unstubAllGlobals();
-      database.close();
-    }
-  });
+    },
+  );
 });
 
 describe("RemoteTicketSigner", () => {

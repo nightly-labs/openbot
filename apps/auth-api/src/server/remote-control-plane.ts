@@ -906,6 +906,7 @@ export class RemoteControlPlane {
 export async function notifyAccountProfileChanged(
   bindings: Pick<WorkerBindings, "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_SECRET">,
   userId: string,
+  waitUntil: (delivery: Promise<void>) => void,
   fetcher: RemoteFetch = (input, init) => fetch(input, init),
 ): Promise<void> {
   if (!bindings.REMOTE_AUTH_WEBHOOK_URL?.trim() || !bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim()) return;
@@ -915,7 +916,7 @@ export async function notifyAccountProfileChanged(
   )
     .bind(crypto.randomUUID(), JSON.stringify({ type: "account-profile-changed", userId }), now, now)
     .run();
-  await deliverPendingRemoteAuthEvents(bindings, now, fetcher);
+  waitUntil(deliverPendingRemoteAuthEvents(bindings, now, fetcher));
 }
 
 export async function deliverPendingRemoteAuthEvents(
@@ -958,6 +959,7 @@ async function deliverRemoteAuthEvents(input: {
           "OpenBot-Signature": signature,
         },
         body: event.payload,
+        signal: AbortSignal.timeout(5_000),
       });
       if (!response.ok) throw new Error("Remote Signal rejected the authorization event.");
       await input.database.prepare("DELETE FROM remote_auth_events WHERE event_id = ?").bind(event.event_id).run();
