@@ -222,6 +222,30 @@ describe.sequential("GrokAgentClient", () => {
     );
   });
 
+  it("rediscovers Grok models without restarting and closes discovery sessions", async () => {
+    process.env.OPENBOT_FAKE_GROK_MODE = "refresh-models";
+    client = new GrokAgentClient({ executable, version: "1.0.13" }, 5_000);
+    client.start();
+    await client.request("initialize", {}, decodeRecordResponse);
+    const models = await client.request("model/list", {}, decodeModelListResponse);
+    expect(models.data).toContainEqual(expect.objectContaining({ model: "grok-future-2", displayName: "Future Grok" }));
+    expect(await readLog()).toContainEqual({ method: "session/close", sessionId: "grok-session-2" });
+    await expect(client.request("model/list", {}, decodeModelListResponse)).rejects.toThrow("Discovery unavailable");
+    const refreshed = await client.request("model/list", {}, decodeModelListResponse);
+    expect(refreshed.data.map((model) => model.model)).toEqual(["grok-4.5", "grok-fast", "grok-future-4"]);
+    expect(await readLog()).toContainEqual({ method: "session/close", sessionId: "grok-session-4" });
+  });
+
+  it("bounds Grok model discovery by the caller timeout", async () => {
+    process.env.OPENBOT_FAKE_GROK_MODE = "hung-models";
+    client = new GrokAgentClient({ executable, version: "1.0.13" }, 5_000);
+    client.start();
+    await client.request("initialize", {}, decodeRecordResponse);
+    await expect(client.request("model/list", {}, decodeModelListResponse, 10)).rejects.toThrow(
+      "Grok request timed out: model/list",
+    );
+  });
+
   it("uses one neutral effort when thought_level is not advertised", async () => {
     process.env.OPENBOT_FAKE_GROK_MODE = "no-thought";
     client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
@@ -384,6 +408,7 @@ const modelConfig = () => {
       { value: "grok-fast", name: "Grok Fast", description: "Fast" },
     ],
   }];
+  if (mode === "refresh-models" && sessionCounter > 1) options[0].options.push({ value: "grok-future-" + sessionCounter, name: "Future Grok" });
   if (mode !== "no-thought") options.push({
     id: "thought",
     name: "Thought level",
@@ -476,6 +501,11 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   }
   if (message.method === "session/new") {
     sessionCounter += 1;
+    if (mode === "hung-models" && sessionCounter > 1) return;
+    if (mode === "refresh-models" && sessionCounter === 3) {
+      write({ id: message.id, error: { code: -32603, message: "Discovery unavailable" } });
+      return;
+    }
     const sessionId = "grok-session-" + sessionCounter;
     log({ method: message.method, sessionId, mcpAuthorization: message.params.mcpServers?.some((server) => server.headers?.some((header) => header.name.toLowerCase() === "authorization" && header.value.startsWith("Bearer "))) });
     const result = mode === "model-metadata"

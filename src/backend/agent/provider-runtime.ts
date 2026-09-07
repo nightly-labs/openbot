@@ -1079,7 +1079,7 @@ export class ProviderRuntime implements ProviderPort {
         BUILT_IN_PROVIDER_DRIVERS.map(async ({ id: provider }): Promise<AgentModelOption[]> => {
           const previous = this.#models.filter((model) => model.provider === provider);
           const client = this.#clients.get(provider);
-          if (!client) return provider === "grok" ? [] : previous;
+          if (!client) return previous;
           try {
             const serverModels = new Map<string, ModelListResponse["data"][number]>();
             const cursors = new Set<string>();
@@ -1123,7 +1123,7 @@ export class ProviderRuntime implements ProviderPort {
             }
             return models;
           } catch {
-            return client.provider === "grok" ? [] : previous;
+            return previous;
           }
         }),
       )

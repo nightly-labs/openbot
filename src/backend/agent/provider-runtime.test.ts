@@ -113,13 +113,14 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(service.listModels()).toEqual(fallback);
   });
 
-  it.each(["codex", "claude"] as const)(
+  it.each(["codex", "claude", "grok"] as const)(
     "discovers and refreshes %s models without losing the catalog on failure",
     async (provider) => {
       process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+      process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
       const { store, mailbox } = stores(root);
       const client = new FakeAgentClient(provider);
-      const id = provider === "codex" ? "gpt-6-astra" : "claude-future-model";
+      const id = provider === "codex" ? "gpt-6-astra" : `${provider}-future-model`;
       let response: unknown = {
         data: [
           {
