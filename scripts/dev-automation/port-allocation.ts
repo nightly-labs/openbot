@@ -1,44 +1,9 @@
-// One machine, several worktrees, one range of default dev ports. Reading the
-// stack registry is not enough on its own: a stack publishes its ports only
-// after it has chosen them, so two allocators running at the same moment still
-// both read an empty registry. This lock makes the read-choose-publish
-// sequence one at a time across every worktree on the machine.
-//
-// Ownership is a generation, not a path. Taking the lock means creating the
-// *next* numbered file with an exclusive create, so the only step that decides
-// who owns it is one the kernel makes atomic. That is the whole reason for the
-// numbering. With a single lock path, recovering one whose holder has died has
-// to `unlink`, and `unlink` cannot be made conditional on what the path holds:
-// two waiters that read the same dead holder both delete, the first publishes a
-// lock of its own and starts allocating, and the second deletes that
-// replacement and starts beside it.
-//
-// One rule carries that, and it is the one to keep when changing this file:
-// **once a lock path exists, it stays, and nothing ever frees it.** Releasing
-// replaces its contents with a released marker - one `rename` onto the same
-// path, so the path is occupied on both sides of it - and a lock a crashed
-// holder left behind is superseded where it lies.
-//
-// The reason is that an allocator asks for the highest generation it saw plus
-// one, and its scan, its read of that file and its create are separate steps
-// the scheduler is free to pull apart. Anything that frees a lock path lets
-// that number be handed out a second time, to a later arrival, while a plan
-// already made against it is still in flight - and once the two are on
-// different numbers the exclusive create no longer makes them collide, so both
-// allocate. Three ways in, all of them shut now: deleting the superseded
-// files; deleting our own on release; and renaming ours out of the way on
-// release, which keeps the *number* spoken for but leaves the path - the thing
-// `link` arbitrates over - free for the next asker.
-//
-// So the state of a lock lives in its contents, at a path that never goes
-// away. `bind` probes cost milliseconds and the files are tens of bytes, in
-// the per-user temporary directory that the system clears. Nothing here
-// removes one, because removing one is precisely what lets an allocator in
-// beside another.
-//
-// The critical section is a handful of `bind` probes and one file write, so it
-// is milliseconds long. Everything slow - `bun install`, electron-vite, the
-// Worker runtime - happens after the lock is released.
+// Serialize registry reads, port selection and publication across worktrees.
+// Each acquisition atomically creates the next numbered lock with link().
+// Never remove a generation path: a delayed allocator can still attempt to
+// acquire that number. Release replaces its contents with a released marker.
+// Only released, abandoned or stale unreadable locks can be superseded.
+// Keep slow startup work outside the critical section.
 
 import {
   closeSync,
@@ -131,27 +96,9 @@ function lockFileAgeMs(path: string, now: number): number | null {
   }
 }
 
-// A lock to move past. Three states, and a *live* holder is none of them:
-//
-//   - released. Its holder is finished with it, and the generation above it is
-//     the one to ask for.
-//   - unreadable contents. `link` publishes the lock and its holder in one
-//     step, so a lock file always parses the moment it exists. Garbage is a
-//     leftover from an older runner or from a developer's `touch` - moved past
-//     only once it is older than the stale window, because nothing may assume
-//     a file it cannot read is abandoned.
-//   - a holder that is no longer running. `verifyRecordedProcess` reads that
-//     off the process start time, so a pid recycled since the lock was taken
-//     counts as gone rather than as a live holder - which is what stops one
-//     recycled pid from wedging every dev start on the machine.
-//
-// How long a live holder has held it does not enter into it. An allocation is
-// milliseconds of work, so a lock held for a minute means something is wrong,
-// but "wrong" is not "finished": the holder may be stopped in a debugger and
-// about to step into the critical section. Moving past it would hand both
-// allocators the same ports, which is the collision this whole file exists to
-// stop, so the developer gets an error naming the pid instead. `unverified` -
-// a holder this machine cannot date - is treated as live for the same reason.
+// A live or unverifiable holder is never superseded, even after the timeout.
+// Atomic publication prevents half-written locks; stale unreadable files may
+// come from an older runner or manual changes.
 function isAbandonedLock(lock: HeldLock, now: number, staleMs: number, fileAgeMs = lockFileAgeMs): boolean {
   if (lock.state.kind === "released") return true;
   if (lock.state.kind === "unreadable") {
@@ -254,14 +201,8 @@ function isExistingPathError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "EEXIST";
 }
 
-// Fill the file first, then publish it under the lock name with `link`, which
-// is atomic and fails with EEXIST when that generation is taken. Creating the
-// lock with `wx` and writing to it afterwards leaves a window - short, but a
-// window - where the file exists and holds nothing, and a waiter that reads it
-// there sees an anonymous file and takes it for litter.
-//
-// Neither `open` with `wx` nor `link` follows a symlink somebody left at the
-// path, so a planted link cannot redirect either half of this.
+// Publish complete contents with an atomic link; EEXIST means another
+// allocator owns this generation. Exclusive creation also rejects symlinks.
 function tryCreateLock(path: string, holder: LockHolder): boolean {
   const staging = `${path}.${process.pid}.tmp`;
   rmSync(staging, { force: true });
@@ -282,16 +223,8 @@ function tryCreateLock(path: string, holder: LockHolder): boolean {
   }
 }
 
-// Give up the claim without giving up the path. `rename` onto our own lock
-// path replaces its contents in one step, so the path is occupied before and
-// after and no allocator can ever be handed that generation again - which
-// removing the file allowed, and so did renaming it aside, however briefly
-// either looked safe.
-//
-// Only our own lock. Contents that are not ours belong to something else - a
-// hand-planted lock, or a future change that reintroduces some way of taking
-// one in place - and releasing theirs would let a third allocator in beside
-// them.
+// Replace our lock contents without freeing its path for another acquisition.
+// Leave a different owner's claim or unreadable contents alone.
 function releaseLock(path: string, holder: LockHolder): void {
   const state = readLockState(path);
   if (state.kind === "held" && (state.holder.pid !== holder.pid || state.holder.acquiredAt !== holder.acquiredAt)) {

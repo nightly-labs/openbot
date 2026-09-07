@@ -87,19 +87,8 @@ function ownedProcess(pid: number): OwnedProcess {
   return { pid, exitCode: null };
 }
 
-// Signal only what this machine can still prove is ours.
-//
-// `isProcessAlive` says a pid is taken, not by what: a supervisor killed with
-// SIGKILL leaves its record behind, and the system reuses pids. Sending
-// SIGTERM on that evidence alone is how a stop command kills a stranger's
-// program. `verifyRecordedProcess` compares the process start time against the
-// record and answers "gone" for a recycled pid - or "unverified" when the
-// start time cannot be read at all, which is not permission to signal.
-//
-// A supervisor that is still alive tears its own children down, which is the
-// clean path. One that is already gone left its detached children holding the
-// ports, and those are signalled by group, because the group is what holds
-// them.
+// Verify process identity before signalling. A live supervisor stops its own
+// children; otherwise stop only child groups whose leaders are verified.
 async function stopDevStack(record: DevStackRecord): Promise<boolean> {
   let unresolved = false;
   const refuse = (pid: number, what: string): void => {
@@ -156,22 +145,11 @@ async function stopDevStack(record: DevStackRecord): Promise<boolean> {
   return true;
 }
 
-// What an instance record on disk is, seen from a stack record about to be
-// forgotten. A pid is not an identity - it is a name the kernel reuses - and
-// an instance record is stored at `<service>-<pid>.json`, so the app that
-// recycles a pid writes over the record of the app that had it. `another` is
-// that case: the file names a pid this stack recorded, and belongs to somebody
-// else now.
+// A recycled pid can refer to another instance record at the same file path.
 export type DevInstanceClaim = "ours" | "another" | "unverified";
 
-// The record dates itself, which is what makes this exact: its `startedAt` is
-// when *that* instance published, and `verifyRecordedProcess` holds it against
-// the start time the kernel reports for the pid. So a live instance is never
-// this dead stack's, whatever pid it holds, and no timestamp has to be carried
-// from the supervisor through electron-vite into the Electron main process to
-// find that out - those are two different events and would date differently.
-// The worktree is checked as well, because it is the cheaper half of the same
-// question and it answers on a machine that cannot date a pid at all.
+// Keep live or unverifiable instances and records from other worktrees.
+// Only a dead instance recorded by this stack can be removed.
 export function claimOnDevInstance(
   instance: DevInstanceRecord,
   record: DevStackRecord,

@@ -8,7 +8,7 @@ export function readDevelopmentProfile(value: string | undefined): DevelopmentPr
 
 export function readDevelopmentInstanceId(value: string | undefined): string | null {
   const trimmed = value?.trim();
-  return trimmed && /^\d{4,5}$/u.test(trimmed) ? trimmed : null;
+  return trimmed && /^(?:\d{4,5}|wt-[a-f0-9]{64})$/u.test(trimmed) ? trimmed : null;
 }
 
 // The remote-debugging switch is development-only, and the port must be one
@@ -19,19 +19,10 @@ export function readDevelopmentRemoteDebuggingPort(value: string | undefined): s
   return Number.isInteger(port) && port >= 1_024 && port <= 65_535 ? String(port) : null;
 }
 
-// An instance id keyed to the worktree, for `bun run dev --isolated`. Without
-// it the suffix comes from whichever renderer port the instance won, so the
-// same worktree lands on `OpenBot Dev` one morning and `OpenBot Dev 5175` the
-// next, depending on which sibling started first - and its conversations move
-// with the suffix. This keeps one worktree on one profile for as long as it
-// sits at that path.
-//
-// Five digits because `readDevelopmentInstanceId` accepts four or five, which
-// is what a port-derived id needs. Two worktrees can collide, and then they
-// share a profile: the same thing the default does for every worktree.
+// Keep isolated profiles stable across port changes. The prefix separates them
+// from existing numeric instance ids; the full digest avoids the old five-digit collisions.
 export function developmentInstanceIdForWorktree(projectRoot: string): string {
-  const digest = createHash("sha256").update(projectRoot).digest();
-  return String(10_000 + (digest.readUInt32BE(0) % 90_000));
+  return `wt-${createHash("sha256").update(projectRoot).digest("hex")}`;
 }
 
 export function developmentUserDataName(profile: DevelopmentProfile, instanceId: string | null = null): string {
