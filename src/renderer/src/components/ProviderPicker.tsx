@@ -113,7 +113,10 @@ export function ProviderPicker(props: ProviderPickerProps) {
               return runtime ? providerVersionLabel(runtime) : null;
             };
             const visualState = () => providerVisualState(state(), connecting(), runtimeStatus(), updatable());
-            const runtimeAction = () => providerRuntimeAction(state(), connecting(), runtimeStatus());
+            const runtimeAction = () =>
+              updatable() && props.onUpdateProvider && runtimeStatus()?.phase === "not-downloaded"
+                ? undefined
+                : providerRuntimeAction(state(), connecting(), runtimeStatus());
             const inputId = () => `${pickerId}-${option().id}`;
             return (
               <div
@@ -157,7 +160,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                     <Show when={version()}>
                       {(installed) => <small class="provider-picker-version">{installed()}</small>}
                     </Show>
-                    <Show when={runtimeStatus()?.phase !== "not-downloaded"}>
+                    <Show when={runtimeStatus()?.phase !== "not-downloaded" || updatable()}>
                       <Badge
                         class={`provider-picker-status provider-picker-status-${visualState()}`}
                         tone={providerStatusTone(visualState())}

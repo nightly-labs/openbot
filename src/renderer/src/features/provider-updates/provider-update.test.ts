@@ -25,7 +25,9 @@ describe("presentProviderUpdate", () => {
   ] as const satisfies readonly (readonly [ProviderRuntimeStatus["phase"], string | undefined, boolean])[])(
     "offers the right action in the %s phase",
     (phase, actionLabel, busy) => {
-      const presentation = presentProviderUpdate(update({ runtime: runtime({ phase }) }));
+      const presentation = presentProviderUpdate(
+        update({ runtime: runtime({ phase, version: phase === "not-downloaded" ? null : "2.1.246" }) }),
+      );
       expect(presentation.actionLabel).toBe(actionLabel);
       expect(presentation.busy).toBe(busy);
     },

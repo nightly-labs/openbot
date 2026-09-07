@@ -4,6 +4,7 @@ import type {
   AgentEvent,
   AgentMemory,
   AgentModelOption,
+  AgentProviderId,
   AgentStatus,
   AgentSubmission,
   AgentSummary,
@@ -38,6 +39,8 @@ import type {
   OpenBotDesktopApi,
   OpenSharedFileInput,
   OpenWorkspaceFileInput,
+  ProviderRuntimeSnapshot,
+  ProviderRuntimeStatus,
   QueueDelivery,
   QueueSnapshot,
   RemoteDesktopSession,
@@ -104,6 +107,8 @@ import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 type Listener<T> = (value: T) => void;
 
 export interface MockOpenBotOptions {
+  providerRuntimeSnapshot?: ProviderRuntimeSnapshot;
+  providerRuntimeFailure?: boolean;
   appInfo?: AppInfo;
   analyticsPreference?: AnalyticsPreference;
   authState?: CentralAuthState;
@@ -245,6 +250,24 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let messageCounter = 10;
   let directMessageCounter = 10;
 
+  const runtimeSnapshot: ProviderRuntimeSnapshot = clone(
+    options.providerRuntimeSnapshot ?? {
+      revision: 0,
+      providers: {
+        codex: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
+        claude: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
+        grok: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
+      },
+    },
+  );
+  let failRuntimeDownload = options.providerRuntimeFailure ?? false;
+  const runtimeListeners = new Set<Listener<ProviderRuntimeSnapshot>>();
+  const runtimeTransfers = new Map<AgentProviderId, symbol>();
+  const setRuntimeStatus = (provider: AgentProviderId, status: ProviderRuntimeStatus) => {
+    runtimeSnapshot.providers[provider] = status;
+    runtimeSnapshot.revision += 1;
+    for (const listener of runtimeListeners) listener(clone(runtimeSnapshot));
+  };
   const agentListeners = new Set<Listener<AgentEvent>>();
   const browserDisplayListeners = new Set<Listener<{ tabs: BrowserTab[]; activeTabId: string | null }>>();
   const browserPictureInPictureListeners = new Set<Listener<BrowserPictureInPictureEvent>>();
@@ -497,17 +520,59 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     connectProvider: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
     providerRuntimes: {
-      getStatus: async () => ({
-        revision: 0,
-        providers: {
-          codex: { phase: "not-downloaded", progress: null, message: null, version: null },
-          claude: { phase: "not-downloaded", progress: null, message: null, version: null },
-          grok: { phase: "not-downloaded", progress: null, message: null, version: null },
-        },
-      }),
-      download: async () => api.providerRuntimes.getStatus(),
-      cancel: async () => api.providerRuntimes.getStatus(),
-      onEvent: () => () => undefined,
+      getStatus: async () => clone(runtimeSnapshot),
+      download: async (provider) => {
+        const installed = runtimeSnapshot.providers[provider];
+        if (runtimeTransfers.has(provider) || (installed.phase === "ready" && !installed.availableVersion))
+          return clone(runtimeSnapshot);
+        const transfer = Symbol(provider);
+        runtimeTransfers.set(provider, transfer);
+        setRuntimeStatus(provider, { ...installed, phase: "downloading", progress: 0, message: null });
+        const advance = (progress: number) => {
+          if (runtimeTransfers.get(provider) !== transfer) return;
+          if (failRuntimeDownload && progress >= 50) {
+            failRuntimeDownload = false;
+            runtimeTransfers.delete(provider);
+            setRuntimeStatus(provider, {
+              ...installed,
+              phase: "download-error",
+              progress: null,
+              message: "The update was interrupted.",
+            });
+            return;
+          }
+          if (progress < 100) {
+            setRuntimeStatus(provider, { ...installed, phase: "downloading", progress, message: null });
+            schedule(() => advance(progress + 25), 300);
+            return;
+          }
+          setRuntimeStatus(provider, { ...installed, phase: "finishing", progress: null, message: null });
+          schedule(() => {
+            if (runtimeTransfers.get(provider) !== transfer) return;
+            runtimeTransfers.delete(provider);
+            setRuntimeStatus(provider, {
+              phase: "ready",
+              progress: 100,
+              message: null,
+              version: installed.availableVersion ?? installed.version ?? "preview",
+              availableVersion: null,
+            });
+          }, 300);
+        };
+        schedule(() => advance(25), 300);
+        return clone(runtimeSnapshot);
+      },
+      cancel: async (provider) => {
+        const current = runtimeSnapshot.providers[provider];
+        if (current.phase !== "downloading") return clone(runtimeSnapshot);
+        runtimeTransfers.delete(provider);
+        setRuntimeStatus(provider, { ...current, phase: "not-downloaded", progress: null, message: null });
+        return clone(runtimeSnapshot);
+      },
+      onEvent: (listener) => {
+        runtimeListeners.add(listener);
+        return () => runtimeListeners.delete(listener);
+      },
     },
     openUrl: async () => undefined,
     voice: {
@@ -1694,6 +1759,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     dispose: () => {
       for (const timer of timers) clearTimeout(timer);
       timers.clear();
+      runtimeListeners.clear();
+      runtimeTransfers.clear();
       agentListeners.clear();
       authListeners.clear();
       presenceListeners.clear();

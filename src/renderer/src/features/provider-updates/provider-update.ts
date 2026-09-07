@@ -46,7 +46,11 @@ export interface ProviderUpdatePresentation {
 
 /** An installed runtime with a different version waiting is the whole trigger. */
 export function providerUpdateAvailable(runtime: ProviderRuntimeStatus, availableVersion: string | null): boolean {
-  return runtime.phase === "ready" && availableVersion !== null && availableVersion !== runtime.version;
+  return (
+    (runtime.phase === "ready" || (runtime.phase === "not-downloaded" && runtime.version !== null)) &&
+    availableVersion !== null &&
+    availableVersion !== runtime.version
+  );
 }
 
 export function presentProviderUpdate(update: ProviderUpdate): ProviderUpdatePresentation {

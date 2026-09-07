@@ -104,7 +104,15 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   getStatus(): ProviderRuntimeSnapshot {
-    return { revision: this.#revision, providers: structuredClone(this.#statuses) };
+    const providers = structuredClone(this.#statuses);
+    if (this.#target) {
+      for (const provider of PROVIDERS) {
+        const version = runtimeSpec(provider, this.#target, this.#lock).version;
+        const installed = providers[provider].version;
+        providers[provider].availableVersion = installed && olderVersion(installed, version) ? version : null;
+      }
+    }
+    return { revision: this.#revision, providers };
   }
 
   executablePath(provider: AgentProviderId): string | null {
@@ -122,7 +130,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     const controller = new AbortController();
     this.#controllers.set(provider, controller);
     this.#cancelled.delete(provider);
-    this.#setStatus(provider, { phase: "downloading", progress: 0, message: null, version: null });
+    this.#setStatus(provider, {
+      phase: "downloading",
+      progress: 0,
+      message: null,
+      version: this.#statuses[provider].version,
+    });
     const task = this.#runDownload(spec, controller.signal)
       .catch((error: unknown) => {
         this.#controllers.delete(provider);
@@ -145,7 +158,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     this.#controllers.get(provider)?.abort();
     await task;
     if (this.#target) await this.#removePartial(runtimeSpec(provider, this.#target, this.#lock));
-    this.#setStatus(provider, emptyStatus());
+    await this.#inspect(provider);
+    this.#setStatus(provider, this.#statuses[provider]);
     return this.getStatus();
   }
 
@@ -162,8 +176,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       await verifyInstalledRuntime(this.#installRoot(spec), spec, this.#lock);
       this.#statuses[provider] = readyStatus(spec.version);
     } catch {
-      this.#statuses[provider] = emptyStatus();
+      this.#statuses[provider] = { ...emptyStatus(), version: await this.#previousVersion(spec) };
     }
+  }
+
+  // This is display metadata only. Only the pinned, verified runtime is executable.
+  async #previousVersion(spec: RuntimeSpec): Promise<string | null> {
+    const targetRoot = dirname(this.#installRoot(spec));
+    const entries = await readdir(targetRoot, { withFileTypes: true }).catch(() => []);
+    const versions = entries
+      .filter((entry) => entry.isDirectory() && olderVersion(entry.name, spec.version))
+      .map((entry) => entry.name)
+      .sort((a, b) => b.localeCompare(a, "en", { numeric: true }));
+    for (const version of versions) {
+      const executable = await stat(join(targetRoot, version, "bin", spec.executableName)).catch(() => null);
+      if (executable?.isFile()) return version;
+    }
+    return null;
   }
 
   async #runDownload(spec: RuntimeSpec, signal: AbortSignal): Promise<void> {
@@ -194,11 +223,21 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     await streamResponse(response, partialPath, offset, signal, (received) => {
       const progress = Math.min(99, Math.floor((received / spec.downloadBytes) * 100));
       if (progress !== this.#statuses[spec.provider].progress) {
-        this.#setStatus(spec.provider, { phase: "downloading", progress, message: null, version: null });
+        this.#setStatus(spec.provider, {
+          phase: "downloading",
+          progress,
+          message: null,
+          version: this.#statuses[spec.provider].version,
+        });
       }
     });
 
-    this.#setStatus(spec.provider, { phase: "finishing", progress: null, message: null, version: null });
+    this.#setStatus(spec.provider, {
+      phase: "finishing",
+      progress: null,
+      message: null,
+      version: this.#statuses[spec.provider].version,
+    });
     const downloaded = await stat(partialPath);
     if (downloaded.size !== spec.downloadBytes) {
       throw new Error("The runtime download has an unexpected size.");
@@ -350,7 +389,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       : error instanceof Error
         ? error.message
         : "Download failed. Try again.";
-    this.#setStatus(provider, { phase: "download-error", progress: null, message, version: null });
+    this.#setStatus(provider, {
+      phase: "download-error",
+      progress: null,
+      message,
+      version: this.#statuses[provider].version,
+    });
   }
 
   #setStatus(provider: AgentProviderId, status: ProviderRuntimeStatus): void {
@@ -406,6 +450,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       .map((entry) => entry.name);
     const keep = new Set([
       spec.version,
+      this.#statuses[spec.provider].version,
       ...versions
         .filter((version) => version !== spec.version)
         .sort()
@@ -685,4 +730,9 @@ function abortError(): Error {
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
+}
+
+function olderVersion(installed: string, target: string): boolean {
+  if (!/^\d+\.\d+\.\d+$/.test(installed) || !/^\d+\.\d+\.\d+$/.test(target)) return false;
+  return installed.localeCompare(target, "en", { numeric: true }) < 0;
 }

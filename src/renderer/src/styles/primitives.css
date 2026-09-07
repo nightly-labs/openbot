@@ -2062,3 +2062,8 @@ button.ui-bubble-content {
 .ui-message[data-align="end"] .ui-message-footer {
   justify-content: flex-end;
 }
+
+/* Keep notification actions usable while a Kobalte modal blocks the page. */
+.ui-toast-layer {
+  pointer-events: auto;
+}

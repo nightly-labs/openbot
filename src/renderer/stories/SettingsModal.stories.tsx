@@ -10,6 +10,7 @@ import { createSignal, onCleanup } from "solid-js";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { Button, Heading, Text, Toaster, toast } from "../src/components/ui";
+import { createProviderRuntimeStore } from "../src/features/provider-updates/provider-runtime-store";
 import { DEFAULT_GENERAL_SETTINGS } from "../src/features/settings/app-settings";
 import { SettingsModal } from "../src/features/settings/SettingsModal";
 import { createMockOpenBot } from "./mock-openbot";
@@ -73,10 +74,9 @@ const providerUpdateAgentStatus: AgentStatus = {
 };
 const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   codex: { phase: "ready", progress: 100, message: null, version: "0.149.1" },
-  claude: { phase: "ready", progress: 100, message: null, version: "2.1.246" },
+  claude: { phase: "ready", progress: 100, message: null, version: "2.1.246", availableVersion: "2.1.250" },
   grok: { phase: "ready", progress: 100, message: null, version: "1.0.5" },
 };
-const providerAvailableVersions = { codex: "0.149.1", claude: "2.1.250", grok: null } as const;
 
 function SettingsModalStory(props: {
   initialOpen: boolean;
@@ -84,10 +84,17 @@ function SettingsModalStory(props: {
   mockDownloadUpdate?: boolean;
   providerDownloads?: boolean;
   providerUpdate?: boolean;
+  providerUpdateFailure?: boolean;
   simulateMobileConnection?: boolean;
 }) {
   const previousApi = window.openbot;
-  const mock = createMockOpenBot();
+  const mock = createMockOpenBot({
+    providerRuntimeSnapshot: props.providerUpdate
+      ? { revision: 0, providers: providerUpdateRuntimeStatuses }
+      : undefined,
+    providerRuntimeFailure: props.providerUpdateFailure,
+  });
+  const runtimes = createProviderRuntimeStore(props.providerUpdate ? mock.api.providerRuntimes : undefined);
   window.openbot = mock.api;
   onCleanup(() => {
     mock.dispose();
@@ -193,15 +200,19 @@ function SettingsModalStory(props: {
           }
           providerRuntimeStatuses={
             props.providerUpdate
-              ? providerUpdateRuntimeStatuses
+              ? runtimes.providerRuntimeStatuses()
               : props.providerDownloads
                 ? providerRuntimeStatuses
                 : undefined
           }
-          providerAvailableVersions={props.providerUpdate ? providerAvailableVersions : undefined}
-          onUpdateProvider={props.providerUpdate ? fn() : undefined}
-          onDownloadProvider={props.providerDownloads || props.providerUpdate ? fn() : undefined}
-          onCancelProviderDownload={props.providerDownloads || props.providerUpdate ? fn() : undefined}
+          providerAvailableVersions={props.providerUpdate ? runtimes.providerAvailableVersions() : undefined}
+          onUpdateProvider={props.providerUpdate ? runtimes.downloadProviderRuntime : undefined}
+          onDownloadProvider={
+            props.providerUpdate ? runtimes.downloadProviderRuntime : props.providerDownloads ? fn() : undefined
+          }
+          onCancelProviderDownload={
+            props.providerUpdate ? runtimes.cancelProviderRuntimeDownload : props.providerDownloads ? fn() : undefined
+          }
           onConnectProvider={props.providerDownloads || props.providerUpdate ? fn() : undefined}
         />
       </main>
@@ -276,6 +287,20 @@ export const ProviderUpdateAvailable: Story = {
     const body = within(document.body);
     await expect(body.findByRole("button", { name: "Update Claude to 2.1.250" })).resolves.toBeEnabled();
   },
+};
+
+export const ProviderUpdateFromSettings: Story = {
+  render: () => <SettingsModalStory initialOpen providerUpdate />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("button", { name: "Update Claude to 2.1.250" }));
+    await expect(body.findByText("Updating Claude")).resolves.toBeInTheDocument();
+    await expect(body.findByText("Claude is up to date", undefined, { timeout: 8_000 })).resolves.toBeInTheDocument();
+  },
+};
+
+export const ProviderUpdateRetry: Story = {
+  render: () => <SettingsModalStory initialOpen providerUpdate providerUpdateFailure />,
 };
 
 export const Profile: Story = {

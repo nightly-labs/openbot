@@ -31,7 +31,9 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
         checkError: agent?.checkError,
         availableVersion: props.providerAvailableVersions?.[provider] ?? null,
         runtimeStatus:
-          runtime?.phase === "not-downloaded" && (agent?.state === "available" || agent?.state === "sign-in-required")
+          runtime?.phase === "not-downloaded" &&
+          !runtime.availableVersion &&
+          (agent?.state === "available" || agent?.state === "sign-in-required")
             ? { ...runtime, phase: "ready", version: agent.version ?? null }
             : runtime,
       };

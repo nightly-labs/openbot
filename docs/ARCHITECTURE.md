@@ -339,3 +339,15 @@ For download-click reports, `platform` means the requested macOS or Windows down
 Use them to compare click counts, not as a shared visit-to-click funnel breakdown.
 The invitation-page funnel is separate: `join_page_action` with `action=view` followed by
 `action=download` or `action=open_app`.
+
+### Managed provider updates
+
+The main process offers provider versions pinned in `native-runtime.lock.json`. An older managed
+installation is display metadata until the pinned runtime passes the existing download and install
+checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
+preload decoder. Cancellation and failure preserve the previous installation and its update offer.
+
+Settings starts the shared renderer runtime store. An explicit update opens one notification;
+revisioned snapshots move it through progress, failure, retry, and completion. Closing the
+notification does not cancel the download, and later reports do not reopen it. Fresh provider
+downloads retain their existing flow. These actions apply only to the local desktop host.

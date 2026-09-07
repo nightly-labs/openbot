@@ -1,8 +1,8 @@
-import type { AgentProviderId, AgentStatus, ProviderRuntimeSnapshot } from "@openbot/contracts/ipc";
+import type { AgentProviderId, AgentStatus } from "@openbot/contracts/ipc";
 import { createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "./analytics";
-import { FALLBACK_PROVIDER_RUNTIMES } from "./app-defaults";
 import { useAgents } from "./features/agents/agents-context";
+import { createProviderRuntimeStore } from "./features/provider-updates/provider-runtime-store";
 import { createSimpleContext } from "./simple-context";
 
 /**
@@ -29,8 +29,7 @@ const Providers = createSimpleContext({
   init: () => {
     const { agentStatus, setAgentStatus } = useAgents();
     const [refreshingProviders, setRefreshingProviders] = createSignal(false);
-    const [providerRuntimeSnapshot, setProviderRuntimeSnapshot] =
-      createSignal<ProviderRuntimeSnapshot>(FALLBACK_PROVIDER_RUNTIMES);
+    const runtimes = createProviderRuntimeStore(window.openbot.providerRuntimes);
     /** Connect attempts still waiting for the status that says how they ended. */
     const pendingProviderConnections = new Map<AgentProviderId, ReturnType<typeof desktopAnalytics.scope>>();
 
@@ -72,60 +71,6 @@ const Providers = createSimpleContext({
     function openProviderSignInGuide(provider: AgentProviderId): Promise<void> {
       if (provider === "claude") return window.openbot.openExternal("claude-sign-in");
       return connectProvider(provider);
-    }
-
-    /** Revisioned, because the pushed event and the awaited call can land out of order. */
-    function applyProviderRuntimeSnapshot(snapshot: ProviderRuntimeSnapshot): void {
-      setProviderRuntimeSnapshot((current) => {
-        if (snapshot.revision < current.revision) return current;
-        for (const provider of ["codex", "claude", "grok"] as const) {
-          const previousPhase = current.providers[provider].phase;
-          const nextPhase = snapshot.providers[provider].phase;
-          if (previousPhase !== "downloading" && previousPhase !== "finishing") continue;
-          if (nextPhase === "ready") {
-            desktopAnalytics.scope().track("provider_action", {
-              provider,
-              action: "download_completed",
-              result: "succeeded",
-            });
-          } else if (nextPhase === "download-error") {
-            desktopAnalytics.scope().track("provider_action", {
-              provider,
-              action: "download_completed",
-              result: "failed",
-              failure_code: "runtime_download_failed",
-            });
-          }
-        }
-        return snapshot;
-      });
-    }
-
-    async function downloadProviderRuntime(provider: AgentProviderId): Promise<void> {
-      if (!window.openbot.providerRuntimes) throw new Error("Provider downloads are unavailable.");
-      const analytics = desktopAnalytics.scope();
-      analytics.track("provider_action", { provider, action: "download_started", result: "succeeded" });
-      try {
-        applyProviderRuntimeSnapshot(await window.openbot.providerRuntimes.download(provider));
-      } catch (error) {
-        analytics.track("provider_action", {
-          provider,
-          action: "download_completed",
-          result: "failed",
-          failure_code: "download_failed",
-        });
-        throw error;
-      }
-    }
-
-    async function cancelProviderRuntimeDownload(provider: AgentProviderId): Promise<void> {
-      if (!window.openbot.providerRuntimes) throw new Error("Provider downloads are unavailable.");
-      applyProviderRuntimeSnapshot(await window.openbot.providerRuntimes.cancel(provider));
-      desktopAnalytics.scope().track("provider_action", {
-        provider,
-        action: "download_cancelled",
-        result: "succeeded",
-      });
     }
 
     async function connectProvider(provider: AgentProviderId): Promise<void> {
@@ -171,29 +116,16 @@ const Providers = createSimpleContext({
     }
 
     onSettled(() => {
-      const unsubscribe =
-        window.openbot.providerRuntimes?.onEvent((snapshot) => {
-          flush(() => applyProviderRuntimeSnapshot(snapshot));
-        }) ?? (() => undefined);
-      void window.openbot.providerRuntimes
-        ?.getStatus()
-        .then(applyProviderRuntimeSnapshot)
-        .catch(() => undefined);
       return () => {
-        unsubscribe();
         pendingProviderConnections.clear();
       };
     });
 
     return {
-      providerRuntimeStatuses: () => providerRuntimeSnapshot().providers,
-      providerRuntimeDownloadsAvailable: () => Boolean(window.openbot.providerRuntimes),
+      ...runtimes,
       refreshingProviders,
       applyAgentStatus,
-      applyProviderRuntimeSnapshot,
       connectProvider,
-      downloadProviderRuntime,
-      cancelProviderRuntimeDownload,
       openProviderInstallGuide,
       openProviderSignInGuide,
       refreshAgentProviders,
