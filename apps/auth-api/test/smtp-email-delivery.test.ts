@@ -493,4 +493,16 @@ describe("Private Email SMTP delivery", () => {
       }),
     ).toThrow("SMTP email delivery configuration is incomplete.");
   });
+
+  it("treats blank SMTP variables as no delivery method", () => {
+    expect(
+      createEmailCodeDelivery({
+        EMAIL_SMTP_HOST: "",
+        EMAIL_SMTP_PORT: "",
+        EMAIL_SMTP_USERNAME: "",
+        EMAIL_SMTP_PASSWORD: "",
+        EMAIL_FROM: "",
+      }),
+    ).toBeNull();
+  });
 });

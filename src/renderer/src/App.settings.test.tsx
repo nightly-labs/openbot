@@ -885,7 +885,7 @@ describe("OpenBot connected desktop shell", () => {
     }
     expect(screen.getByRole("textbox", { name: "Agent title" })).toBe(title);
 
-    const description = screen.getByRole("textbox", { name: "Agent description" });
+    const description = screen.getByRole("textbox", { name: "Agent instructions" });
     description.focus();
     draft = "";
     for (const character of "Tracks every research request.") {
@@ -902,6 +902,6 @@ describe("OpenBot connected desktop shell", () => {
       });
       expect(description).toHaveValue(draft);
     }
-    expect(screen.getByRole("textbox", { name: "Agent description" })).toBe(description);
+    expect(screen.getByRole("textbox", { name: "Agent instructions" })).toBe(description);
   });
 });

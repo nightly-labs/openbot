@@ -65,7 +65,7 @@ export function createSidebarScope(props: SidebarProps) {
   } = createSidebarPendingStore({ customSectionById, props });
   let agentList: HTMLElement | undefined;
 
-  const dragState = createSidebarDragStateStore({ agentPinnedItems, sectionAcceptsAgent });
+  const dragState = createSidebarDragStateStore({ sectionAcceptsAgent });
   const { assignAgentSection, commitSidebarDrop, movePersonByKeyboard, movePinnedItem, moveSection } =
     createSidebarLayoutActions({
       agentPinnedItems,
@@ -89,7 +89,6 @@ export function createSidebarScope(props: SidebarProps) {
     dropSidebarNativeDrag,
     endAgentDragging,
     handleListDragLeave,
-    handlePinnedTransitionEnd,
     sidebarClickIsSuppressed,
     startAgentDragging,
     startNativeItemDragging,
@@ -160,7 +159,6 @@ export function createSidebarScope(props: SidebarProps) {
     filteredAgentsBySection,
     filteredPeople,
     handleListDragLeave,
-    handlePinnedTransitionEnd,
     layoutMutable,
     movePersonByKeyboard,
     movePinnedItem,

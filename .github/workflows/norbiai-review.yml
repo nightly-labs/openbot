@@ -8,6 +8,15 @@ on:
   # code to satisfy it.
   issue_comment:
     types: [created]
+  # One click instead of a typed comment, and the only shape that can be either. The
+  # `pull_request_review` events cannot: GitHub groups them with `pull_request`, running the
+  # workflow file from the pull request's own merge commit and handing a fork a read-only
+  # token, so an approval would review and then fail to publish exactly as the push path
+  # would — and a fork's edited copy of this file would be what ran, on the self-hosted
+  # runner. `pull_request_target` is the counterpart built for this: the base branch's
+  # workflow, with a write token.
+  pull_request_target:
+    types: [labeled]
 
 concurrency:
   # A comment must never cancel a review, running or queued. Concurrency is resolved for the
@@ -20,7 +29,13 @@ concurrency:
   # each comment run gets a group of its own, where it can neither cancel nor be cancelled;
   # the reviews themselves still serialize on the self-hosted runner. Push runs keep the
   # shared group, where cancelling a review of superseded code is what we want.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event.comment.id }}
+  #
+  # A labelled run needs that same private group and does not inherit it: its payload
+  # carries `pull_request`, so the number resolves and it would land in the shared push
+  # group, where the next push cancels the review it asked for. Keyed on the run rather than
+  # the event, which is unique for every request path and empty only on a push. Written as a
+  # negation because `cond && '' || x` picks `x` every time — the empty string is falsy.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event_name != 'pull_request' && github.run_id || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -32,13 +47,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
-    # The push path stays automatic and skips drafts. The comment path is an explicit
-    # request from someone who can already merge, so it runs on drafts too: `/norbiai review`
-    # means review it now. `github.event.issue.pull_request` is what separates a pull request
-    # comment from an issue comment, and `author_association` is a cheap pre-filter that
-    # keeps a drive-by comment from reaching the permission lookup below. The
-    # same-repository rule is enforced in the review job, because a comment payload carries
-    # no head repository to test here.
+    # The push path stays automatic, skips drafts, and stays same-repository: a fork's
+    # `pull_request` run gets a read-only `GITHUB_TOKEN` whatever the `permissions` block
+    # below says, so it could review and then fail to publish either the comment or the
+    # gate status — and nobody asked for it to try.
+    #
+    # The comment and label paths are an explicit request from someone who can already
+    # merge, so they run on drafts and on forks too: `/norbiai review`, or the label, means
+    # review it now. `issue_comment` and `pull_request_target` both run the base
+    # repository's own copy of this file, which is what gives them the write token the push
+    # path cannot have on a fork. `github.event.issue.pull_request` is what separates a pull
+    # request comment from an issue comment, and `author_association` is a cheap pre-filter
+    # that keeps a drive-by comment from reaching the permission lookup below.
+    #
+    # The label path needs no such pre-filter and cannot use one: `author_association` in
+    # that payload describes the pull request's author, not whoever applied the label.
+    # GitHub is the pre-filter instead — applying a label already requires triage or above,
+    # which is a narrower gate than any association, and the lookup below is what turns that
+    # into the permission to merge.
     if: >
       (github.event_name == 'pull_request' &&
         github.event.pull_request.head.repo.full_name == github.repository &&
@@ -46,18 +72,21 @@ jobs:
       (github.event_name == 'issue_comment' &&
         github.event.issue.pull_request != null &&
         contains(github.event.comment.body, '/norbiai review') &&
-        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request_target' &&
+        github.event.label.name == 'norbiai')
 
     permissions:
       contents: read
 
     steps:
-      - name: Verify the commenter can merge
-        if: github.event_name == 'issue_comment'
+      - name: Verify the requester can merge
+        if: github.event_name != 'pull_request'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          COMMENTER: ${{ github.event.comment.user.login }}
+          # The commenter, or whoever applied the label.
+          REQUESTER: ${{ github.event.comment.user.login || github.event.sender.login }}
         run: |
           set -euo pipefail
 
@@ -65,22 +94,22 @@ jobs:
           # with an unknown permission. `maintain` answers `write` here and `triage`
           # answers `read`, so `admin` and `write` are exactly the roles that can merge.
           if ! permission=$(
-            gh api "repos/${GITHUB_REPOSITORY}/collaborators/${COMMENTER}/permission" \
+            gh api "repos/${GITHUB_REPOSITORY}/collaborators/${REQUESTER}/permission" \
               --jq '.permission' 2>/dev/null
           ); then
-            echo "::error title=NorbiAI could not authorize the request::Could not read the repository permission of @${COMMENTER}."
+            echo "::error title=NorbiAI could not authorize the request::Could not read the repository permission of @${REQUESTER}."
             exit 1
           fi
 
           case "$permission" in
             admin | write) ;;
             *)
-              echo "::error title=NorbiAI ignored the request::@${COMMENTER} has ${permission:-no} access to ${GITHUB_REPOSITORY}. Only someone who can merge the pull request can ask for a finding to be rechecked."
+              echo "::error title=NorbiAI ignored the request::@${REQUESTER} has ${permission:-no} access to ${GITHUB_REPOSITORY}. Only someone who can merge the pull request can ask for a review or for a finding to be rechecked."
               exit 1
               ;;
           esac
 
-          echo "@${COMMENTER} has ${permission} access."
+          echo "@${REQUESTER} has ${permission} access."
 
   review:
     # Gated by `authorize`, which carries the event filter: a skipped or refused
@@ -101,19 +130,27 @@ jobs:
 
     env:
       PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
-      # Empty on a comment run. Both are SHAs, not free text.
-      EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      # Empty on a comment or label run, which resolves the pair from the API instead. A
+      # labelled payload does carry both, and honouring them would be wrong: they are the
+      # head as of the label, while the checkout below is the merge ref fetched now. A push
+      # landing in between would leave this run reviewing the superseded commit and
+      # publishing the gate status on it — and on a fork that push gets no run of its own to
+      # correct the newest commit. Both are SHAs, not free text.
+      EVENT_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+      EVENT_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
       STATUS_CONTEXT: NorbiAI review
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # A comment run has no pull request ref of its own and would land on the default
-          # branch, where neither the base nor the head commit need exist. The merge ref is
-          # what the push path already gets by default, and it reaches both parents.
-          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/merge', github.event.issue.number) || '' }}
+          # A comment or label run has no pull request ref of its own and would land on the
+          # default branch, where neither the base nor the head commit need exist. The merge
+          # ref is what the push path already gets by default, and it reaches both parents.
+          # Written as a negation so the push path keeps the empty default: an expression of
+          # the form `cond && '' || format(...)` picks the format branch every time, because
+          # the empty string is falsy.
+          ref: ${{ github.event_name != 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number || github.event.issue.number) || '' }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -130,19 +167,22 @@ jobs:
           base_sha=${EVENT_BASE_SHA:-}
           head_sha=${EVENT_HEAD_SHA:-}
 
-          # A comment payload carries no SHAs and no head repository, so those come from the
-          # API. The push path deliberately keeps the payload's SHAs: they are the commit the
-          # checkout is for, whereas the API answers with a newer head the moment another push
-          # lands, and the guard below would then fail on a commit this run never fetched.
+          # A comment payload carries no SHAs, so those come from the API. The push path
+          # deliberately keeps the payload's SHAs: they are the commit the checkout is for,
+          # whereas the API answers with a newer head the moment another push lands, and the
+          # guard below would then fail on a commit this run never fetched.
+          #
+          # The head repository is not tested. A fork reaching this job means a maintainer
+          # who can merge asked for it by comment, and the merge ref below is the base
+          # repository's own computation of that fork's head, so it resolves for a fork
+          # exactly as it does for a branch. What keeps the fork's own content from steering
+          # the review is downstream and unchanged: the prompt and the composer are read from
+          # the base commit, the composer runs with an empty bunfig and `--no-install`, and
+          # the reviewer is sandboxed read-only.
           if [ -z "$head_sha" ]; then
-            IFS=$'\t' read -r head_repo base_sha head_sha < <(
-              gh api "$api" --jq '[.head.repo.full_name // "", .base.sha, .head.sha] | @tsv'
+            IFS=$'\t' read -r base_sha head_sha < <(
+              gh api "$api" --jq '[.base.sha, .head.sha] | @tsv'
             )
-
-            if [ "$head_repo" != "$GITHUB_REPOSITORY" ]; then
-              echo "::error title=NorbiAI does not review forks::Head repository ${head_repo:-unknown} is not ${GITHUB_REPOSITORY}."
-              exit 1
-            fi
           fi
 
           for sha in "$base_sha" "$head_sha"; do
@@ -726,3 +766,25 @@ jobs:
             -f description="$description" \
             -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" \
             > /dev/null
+
+      - name: Remove the request label
+        # Left in place, the label makes every re-run two clicks: remove, then re-apply.
+        # Removing it here means one click asks for a review, every time. `always()` so a
+        # timed-out or refused review is still re-requestable — the gate step above fails
+        # the job on an unresolved finding, and that must not strand the label.
+        if: always() && github.event_name == 'pull_request_target'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LABEL: ${{ github.event.label.name }}
+        run: |
+          set -uo pipefail
+
+          # A warning, not a failure. The label is a request that has now been served, so
+          # losing the race with someone removing it by hand changes nothing about the
+          # review that already published.
+          if ! gh api --method DELETE \
+            "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/labels/${LABEL}" > /dev/null 2>&1
+          then
+            echo "::warning title=NorbiAI could not remove the label::Remove \`${LABEL}\` by hand before asking for another review."
+          fi
