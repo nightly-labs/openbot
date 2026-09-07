@@ -4,7 +4,7 @@ import { Button } from "heroui-native";
 import { type ReactNode, useMemo, useState } from "react";
 import { View } from "react-native";
 
-import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
+import { BloubAvatarPreview, BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 
 interface AgentAppearancePickerProps {
   seed: string;
@@ -55,7 +55,7 @@ export function AgentAppearancePicker({
             isDisabled={disabled}
             onPress={() => onSeedChange(candidate)}
           >
-            <BloubAvatarPreview seed={candidate} hue={hue} size={48} />
+            <BloubAvatarThumbnail seed={candidate} hue={hue} size={48} />
           </Button>
         ))}
       </View>

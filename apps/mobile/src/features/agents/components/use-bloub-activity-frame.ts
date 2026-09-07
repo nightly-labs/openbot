@@ -39,6 +39,7 @@ export function useBloubActivityFrame(seed: string, working: boolean, animateIdl
     [geometry],
   );
   const playback = useSharedValue<Playback>({ frames: [rest], index: 0, loopStart: null });
+  const elapsed = useSharedValue(0);
   const idleFrames = useRef<BloubActivityFrame[] | null>(null);
   const startIdle = useCallback(() => {
     const frames = idleFrames.current;
@@ -57,8 +58,13 @@ export function useBloubActivityFrame(seed: string, working: boolean, animateIdl
   }, [playback, startIdle]);
   const clock = useFrameCallback(({ timeSincePreviousFrame }) => {
     const current = playback.get();
+    if (current.loopStart === null && current.index >= current.frames.length - 1) return;
     const fps = current.idle ? IDLE_FPS : FPS;
-    let index = current.index + (Math.min(timeSincePreviousFrame ?? 0, 64) * fps) / 1000;
+    const accumulated = elapsed.get() + Math.min(timeSincePreviousFrame ?? 0, 64);
+    const advance = Math.floor((accumulated * fps) / 1000);
+    elapsed.set(accumulated - (advance * 1000) / fps);
+    if (advance === 0) return;
+    let index = current.index + advance;
     if (current.loopStart !== null && index >= current.frames.length) {
       index = current.loopStart + ((index - current.loopStart) % (current.frames.length - current.loopStart));
     } else if (current.loopStart === null) index = Math.min(index, current.frames.length - 1);

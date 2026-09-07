@@ -1,11 +1,11 @@
-import { COLOR_BY_ID } from "@norbert_bodziony/bloub";
+import { BotEngine, COLOR_BY_ID } from "@norbert_bodziony/bloub";
 import { bloubAvatarProfile } from "@openbot/brand/bloub-avatar";
 import type { AvatarHue } from "@openbot/contracts/ipc";
-import { useId } from "react";
+import { memo, useId, useMemo } from "react";
 import Animated, { type DerivedValue, useAnimatedProps } from "react-native-reanimated";
 import Svg, { Circle, Defs, FeColorMatrix, Filter, G, Mask, Path, Rect } from "react-native-svg";
 import { useBloubActivityFrame } from "@/features/agents/components/use-bloub-activity-frame";
-import type { BloubActivityFrame } from "@/features/agents/model/bloub-activity";
+import { type BloubActivityFrame, bloubActivityGeometry } from "@/features/agents/model/bloub-activity";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
@@ -50,7 +50,7 @@ export function BloubAvatar({ agentId, hue, seed, size = 54 }: BloubAvatarProps)
   );
 }
 
-export function BloubAvatarPreview({
+export const BloubAvatarPreview = memo(function BloubAvatarPreview({
   hue,
   seed,
   size = 54,
@@ -94,7 +94,38 @@ export function BloubAvatarPreview({
       </AnimatedGroup>
     </Svg>
   );
-}
+});
+
+// Choices show the same idle pose without mounting animation clocks, worklets,
+// filters, or masks for every item in the picker.
+export const BloubAvatarThumbnail = memo(function BloubAvatarThumbnail({
+  seed,
+  hue,
+  size = 48,
+}: Omit<BloubAvatarProps, "agentId">) {
+  const frame = useMemo(() => {
+    const geometry = bloubActivityGeometry(seed);
+    return new BotEngine(100, "idle", geometry.radii, geometry.expression).sample(0);
+  }, [seed]);
+  return (
+    <Svg
+      accessibilityElementsHidden
+      accessible={false}
+      height={size}
+      pointerEvents="none"
+      viewBox="-158 -158 316 316"
+      width={size}
+    >
+      <Path d={frame.bodyPath} fill={getBloubAvatarColor(seed, hue)} opacity={frame.bodyAlpha} />
+      {(["left", "right"] as const).map((side) => {
+        const eye = frame.eyes[side === "left" ? 0 : 1];
+        return eye ? (
+          <Path key={side} d={eye.d} fill={AVATAR_PAPER} opacity={eye.alpha} transform={eye.matrix} />
+        ) : null;
+      })}
+    </Svg>
+  );
+});
 
 export function getBloubAvatarColor(seed: string, hue: AvatarHue | null): string {
   const profile = bloubAvatarProfile(seed, hue);
