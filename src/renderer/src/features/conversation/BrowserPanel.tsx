@@ -79,6 +79,10 @@ interface BrowserPanelProps {
   onEnterPip: () => void;
 }
 
+function diagnosticErrorLabel(count: number): string {
+  return `${count} browser diagnostic ${count === 1 ? "error" : "errors"}`;
+}
+
 export default function BrowserPanel(props: BrowserPanelProps) {
   const actingControl = () => (props.activeControl?.phase === "acting" ? props.activeControl : undefined);
   const defaultPanelWidth = () =>
@@ -306,15 +310,17 @@ export default function BrowserPanel(props: BrowserPanelProps) {
               <CircleDot /> REC
             </span>
           </Show>
-          <Show when={(props.activeTab?.diagnosticErrorCount ?? 0) > 0}>
-            <span
-              class="browser-diagnostic-status"
-              role="status"
-              title={`${props.activeTab?.diagnosticErrorCount} browser diagnostic errors`}
-              aria-label={`${props.activeTab?.diagnosticErrorCount} browser diagnostic errors`}
-            >
-              <TriangleAlert /> {props.activeTab?.diagnosticErrorCount}
-            </span>
+          <Show when={props.activeTab?.diagnosticErrorCount}>
+            {(errorCount) => (
+              <span
+                class="browser-diagnostic-status"
+                role="status"
+                title={diagnosticErrorLabel(errorCount())}
+                aria-label={diagnosticErrorLabel(errorCount())}
+              >
+                <TriangleAlert /> {errorCount()}
+              </span>
+            )}
           </Show>
           <Button
             variant="ghost"

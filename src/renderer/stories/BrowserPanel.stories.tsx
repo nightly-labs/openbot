@@ -99,6 +99,24 @@ export const RecordingWithDiagnosticErrors: Story = {
   },
 };
 
+/**
+ * Exactly one diagnostic error. The count reaches the chip's label as well as its text, and this is
+ * the case that read "1 browser diagnostic errors" until the label learned to count.
+ */
+export const SingleDiagnosticError: Story = {
+  args: {
+    activeTab: {
+      ...tab,
+      environment: {
+        viewport: { mode: "fill", width: 1200, height: 800, deviceScaleFactor: 1, preset: null },
+        colorScheme: "system",
+        reducedMotion: false,
+      },
+      diagnosticErrorCount: 1,
+    },
+  },
+};
+
 /** The same three chips in a panel narrow enough to prove they never push the address bar out. */
 export const NarrowPanel: Story = {
   args: {
