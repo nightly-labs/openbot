@@ -513,7 +513,7 @@ export const DragStress: Story = {
     await expect(canvasElement.querySelectorAll("[data-section-id]").length).toBeGreaterThanOrEqual(7);
     await expect(canvasElement.querySelectorAll("[data-agent-id]").length).toBeGreaterThanOrEqual(24);
     const source = canvasElement.querySelector<HTMLElement>("[data-agent-id]");
-    const list = canvasElement.querySelector<HTMLElement>(".bot-list");
+    const list = within(canvasElement).getByRole("navigation", { name: "Chat list" });
     const DataTransferConstructor = canvasElement.ownerDocument.defaultView?.DataTransfer;
     if (!source || !list || !DataTransferConstructor) throw new Error("Agent drag stress fixture is unavailable.");
     const section = source.closest<HTMLElement>("[data-section-id]");
