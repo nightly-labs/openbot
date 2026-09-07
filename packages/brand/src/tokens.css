@@ -96,9 +96,16 @@
   --openbot-logo-preview: var(--openbot-success);
   --openbot-unread-surface: #74b9ff;
   --openbot-unread-text: #07131f;
-  --openbot-success: #61c985;
-  --openbot-success-soft: rgba(97, 201, 133, 0.12);
-  --openbot-success-wash: rgba(97, 201, 133, 0.045);
+  /* The last hue that had not been retuned with the rest. #61c985 was OKLCH chroma
+     0.139 while accent, warning and danger now average 0.205, so green was the one
+     family member that still read as a disabled tint beside them. Matching 0.205 is
+     not possible: sRGB tops out at 0.195 along this hue, and that ceiling value
+     (#00d271) is a neon with no headroom, which every renderer clips differently.
+     0.180 is the usable step, and lightness is held at the old 0.756 so contrast on
+     the canvas is unchanged at 8.5:1 and no text legibility moves. */
+  --openbot-success: #31cf76;
+  --openbot-success-soft: rgba(49, 207, 118, 0.12);
+  --openbot-success-wash: rgba(49, 207, 118, 0.045);
   /* Both warning marks in the reference measure hue 33 at full saturation (#ff9917 on
      the triangle, #ff9412 on the heading). The palette's #e3b866 was a desaturated gold
      at hue 39, which reads as a disabled state rather than as something needing attention. */
