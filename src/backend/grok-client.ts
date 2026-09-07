@@ -466,7 +466,7 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
           params: {
             threadId: thread.id,
             turnId: turn.id,
-            item: { id: turn.itemId, type: "agentMessage", phase: "final_answer" },
+            item: { id: turn.itemId, type: "agentMessage", phase: "commentary" },
           },
         });
       }
@@ -533,8 +533,8 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
     }
   }
 
-  // ACP message chunks do not identify a final answer in advance. Stream each segment in chat,
-  // then move it into thinking if a later model step establishes it as intermediate.
+  // ACP cannot identify final text while streaming. Keep live segments in activity and
+  // promote only the remaining segment to an answer when the prompt finishes.
   #completeMessage(thread: GrokThread, turn: GrokTurn, phase: "commentary" | "final_answer"): void {
     if (!turn.text) return;
     const item = { id: turn.itemId, type: "agentMessage", phase, text: turn.text } satisfies ThreadItem;

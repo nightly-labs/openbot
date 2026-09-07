@@ -42,7 +42,7 @@ afterEach(async () => {
 
 describe.sequential("GrokAgentClient", () => {
   it.each(["end_turn", "cancelled", "max_tokens"])(
-    "preserves the streamed answer and separates intermediate steps when Grok ends with %s",
+    "shows only the final segment in chat when Grok ends with %s",
     async (stopReason) => {
       process.env.OPENBOT_FAKE_GROK_MODE = stopReason;
       client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
@@ -68,11 +68,10 @@ describe.sequential("GrokAgentClient", () => {
           text: "The final answer.",
         }),
       ]);
-      // Observe the final answer before turn completion, including its first partial delta.
-      // This catches buffering the answer in thinking and promoting it only at end_turn.
+      // Every live delta stays in activity; only the completed final segment enters chat.
       const phases = new Map<string, string>();
       const texts = new Map<string, string>();
-      const streamedAnswer: string[] = [];
+      const completedAnswers: string[] = [];
       const streamedThoughts: string[] = [];
       for (const notification of notifications) {
         if (notification.method === "turn/completed") break;
@@ -84,26 +83,26 @@ describe.sequential("GrokAgentClient", () => {
         ) {
           const { id, phase } = params.item;
           if (typeof id === "string" && typeof phase === "string") phases.set(id, phase);
+          if (phase === "final_answer") {
+            expect(notification.method).toBe("item/completed");
+            completedAnswers.push(String(params.item.text));
+          }
         }
         if (notification.method === "item/agentMessage/delta") {
           const id = String(params.itemId);
           const text = (texts.get(id) ?? "") + String(params.delta);
           texts.set(id, text);
+          expect(phases.get(id)).toBe("commentary");
+          expect([...phases.values()]).not.toContain("final_answer");
           if (text === "Reviewing findings.") {
             const latestCommentaryId = [...phases].filter(([, phase]) => phase === "commentary").at(-1)?.[0];
             expect(texts.get(latestCommentaryId ?? "")).toBe("Reviewing findings.");
             streamedThoughts.push(text);
           }
-          if (text.startsWith("The final ")) {
-            expect(phases.get(id)).toBe("final_answer");
-            // Earlier segments have already left chat when the answer starts streaming.
-            expect([...phases.values()].filter((phase) => phase === "final_answer")).toHaveLength(1);
-            streamedAnswer.push(text);
-          }
         }
       }
       expect(streamedThoughts).toEqual(["Reviewing findings."]);
-      expect(streamedAnswer).toEqual(["The final ", "The final answer."]);
+      expect(completedAnswers).toEqual(["The final answer."]);
       expect([...phases.values()].filter((phase) => phase === "final_answer")).toHaveLength(1);
     },
   );
