@@ -29,9 +29,10 @@ describe("development environment preparation", () => {
     const run: DevelopmentCommandRunner = () =>
       envFilePresent.push(existsSync(join(root, "apps", "auth-api", ".env.dev")));
 
-    prepareDevelopmentEnvironment({ projectRoot: root, executable: "bun", bunVersion: "1.4.0", run });
+    const outcome = prepareDevelopmentEnvironment({ projectRoot: root, executable: "bun", bunVersion: "1.4.0", run });
 
     expect(envFilePresent).toEqual([true, true]);
+    expect(outcome).toBe("created");
   });
 
   it("installs dependencies and migrates the local API in order", () => {
