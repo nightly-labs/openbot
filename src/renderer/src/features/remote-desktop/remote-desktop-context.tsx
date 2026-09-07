@@ -145,10 +145,12 @@ const RemoteDesktop = createSimpleContext({
     async function openRemoteDesktopWorkspace(serverId: string, trigger: HTMLElement): Promise<void> {
       const server = servers().find((item) => item.id === serverId);
       const existingSession = latestRemoteDesktopSession(serverId);
+      // Availability is a cached probe. A fresh session request checks the host and returns
+      // the setup error, so a failed probe must not prevent the user from trying again.
       if (
         server?.kind !== "remote" ||
         !serverSupportsCapability(server, "remote-desktop") ||
-        (!existingSession && (server.state !== "online" || !server.remoteDesktopAvailable))
+        (!existingSession && server.state !== "online")
       ) {
         return;
       }

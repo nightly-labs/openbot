@@ -70,6 +70,14 @@ the `media-attachments` capability; released protocol adapters keep their existi
   in-flight attachments keep their existing controller lifetime. The conversation view scope
   composes behavior stores. Search requests, highlights, timers, and cleanup belong to the search store.
 
+## Browser tool execution
+
+`browser-tools.ts` defines provider schemas and parses each call into a typed tool and its arguments.
+`browser-tool-actions.ts` maps input tools to CDP operations. It does not own tabs or import the host.
+`BrowserHost` owns tab access checks, operation queues, focus, deadlines, and persistent browser state.
+Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
+it checks local file access.
+
 ## Agent communication policy
 
 The shared developer instructions keep routine teammate exchanges internal by default. Agents

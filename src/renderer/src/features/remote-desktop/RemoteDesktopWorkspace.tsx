@@ -221,9 +221,6 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
           <Show when={props.server.state !== "online"}>
             <DesktopEmptyState title="Host is offline" message="Reconnect to the host before you open its desktop." />
           </Show>
-          <Show when={props.server.state === "online" && !props.server.remoteDesktopAvailable}>
-            <DesktopEmptyState title="Update required" message="This host requires Sunshine remote control support." />
-          </Show>
           <Show when={effectiveState() === "connecting"}>
             <div class="remote-desktop-overlay" role="status">
               <AgentAvatar
