@@ -805,6 +805,48 @@ describe("AgentStore", () => {
     ]);
   });
 
+  it("retains the agent across reload after partial file deletion and permits retry", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
+    temporaryRoots.push(root);
+    const userData = join(root, "user-data");
+    const home = join(root, "home");
+    const store = new AgentStore(userData, home);
+    await store.initialize();
+    const agent = await store.createAgent(AGENT_PROFILE_INPUT);
+    const marker = join(userData, "agent-duplications", `${agent.id}.pending`);
+    // A directory at the marker path makes unlink fail after workspace removal.
+    await mkdir(marker, { recursive: true });
+    await expect(store.deleteAgent(agent.id)).rejects.toThrow();
+    expect(store.list().map((entry) => entry.id)).toEqual([agent.id]);
+
+    const restored = new AgentStore(userData, home);
+    await restored.initialize();
+    expect(restored.list().map((entry) => entry.id)).toEqual([agent.id]);
+    await rm(marker, { recursive: true });
+    await restored.deleteAgent(agent.id);
+    // Older releases could leave managed files after removing the record.
+    await mkdir(agent.workspacePath, { recursive: true });
+    await writeFile(join(agent.workspacePath, "leftover.txt"), "owned data");
+    await restored.deleteAgent(agent.id);
+    expect(restored.list()).toEqual([]);
+    await expect(readdir(agent.workspacePath)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("keeps the in-memory roster when the deletion transaction fails", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
+    temporaryRoots.push(root);
+    const store = new AgentStore(join(root, "user-data"), join(root, "home"));
+    await store.initialize();
+    const agent = await store.createAgent(AGENT_PROFILE_INPUT);
+    vi.spyOn(store.database, "hardDeleteAgent").mockImplementationOnce(() => {
+      throw new Error("Database write failed");
+    });
+    await expect(store.deleteAgent(agent.id)).rejects.toThrow("Database write failed");
+    expect(store.list().map((entry) => entry.id)).toEqual([agent.id]);
+    await store.deleteAgent(agent.id);
+    expect(store.list()).toEqual([]);
+  });
+
   it("deletes agents persistently without reseeding examples", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
     temporaryRoots.push(root);

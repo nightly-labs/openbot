@@ -717,7 +717,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async deleteAgent(agentId: string): Promise<void> {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-    if (!agent) throw new Error(`Unknown agent: ${agentId}`);
     const hasPendingWork = this.#mailbox
       .listQueue(agentId)
       .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
@@ -727,7 +726,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
     const { wasPending, release } = this.#duplication.releaseForDelete(agentId);
     try {
-      await this.#deleteAgentData(agent);
+      await this.#deleteAgentData(agent ?? { id: agentId, threadId: null });
     } finally {
       release();
     }
@@ -736,20 +735,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#routines.arm();
   }
 
-  async #deleteAgentData(agent: AgentSummary): Promise<void> {
+  async #deleteAgentData(agent: Pick<AgentSummary, "id" | "threadId">): Promise<void> {
     const providerSessions = agent.threadId ? this.#store.database.listProviderSessions(agent.threadId) : [];
-    // Keep session records available for a retry if removing private transcript files fails.
-    for (const session of providerSessions) await this.#threads.deleteProviderSessionFiles(session.externalSessionId);
-    const errors: unknown[] = [];
+    let stage = "provider-files";
     try {
+      // Keep session records available if private file removal needs a retry.
+      for (const session of providerSessions) await this.#threads.deleteProviderSessionFiles(session.externalSessionId);
+      stage = "mailbox";
       await this.#mailbox.deleteAgentData(agent.id);
-    } catch (error) {
-      errors.push(error);
-    }
-    try {
+      stage = "agent-files-and-record";
       await this.#store.deleteAgent(agent.id);
-    } catch (error) {
-      errors.push(error);
+    } catch {
+      // File-system errors can contain private paths. Log only the failed stage.
+      logger.warn("Agent deletion failed.", { stage });
+      throw new Error("The agent data could not be removed completely. Retry deleting the agent.");
     }
     this.#conversation.forgetAgent(agent.id);
     this.#turn.forgetAgent(agent.id);
@@ -763,7 +762,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       }
     }
     this.#compaction.forgetAgent(agent.id);
-    if (errors.length > 0) throw new AggregateError(errors, "The agent data could not be removed completely.");
   }
 
   async initialize(): Promise<void> {

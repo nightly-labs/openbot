@@ -320,6 +320,7 @@ describe.sequential("AgentService: restart", () => {
     });
     expect(store.database.pendingHostedSiteTerminalEvents()).toHaveLength(1);
     await service.deleteAgent("sales-outbound");
+    await expect(service.deleteAgent("sales-outbound")).resolves.toBeUndefined();
     expect(service.listAgents().some((agent) => agent.id === "sales-outbound")).toBe(false);
     expect(store.database.pendingHostedSiteTerminalEvents()).toEqual([]);
     expect(
@@ -345,6 +346,24 @@ describe.sequential("AgentService: restart", () => {
       "Stop the agent and cancel its queued messages before deleting it.",
     );
     expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(true);
+  });
+
+  it("keeps an agent available for retry when mailbox deletion fails", async () => {
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser());
+    await service.initialize();
+    const agent = await store.getOrCreate("delete-retry");
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    vi.spyOn(mailbox, "deleteAgentData").mockRejectedValueOnce(new Error("private/path secret"));
+
+    await expect(service.deleteAgent(agent.id)).rejects.toThrow("The agent data could not be removed completely.");
+    expect(service.listAgents().some((entry) => entry.id === agent.id)).toBe(true);
+    expect(events.filter((event) => event.type === "agents-changed")).toEqual([]);
+
+    await service.deleteAgent(agent.id);
+    expect(service.listAgents().some((entry) => entry.id === agent.id)).toBe(false);
+    expect(events).toContainEqual({ type: "agents-changed", agents: service.listAgents() });
   });
 
   it("queues independent manual routine runs and renders routine metadata", async () => {
