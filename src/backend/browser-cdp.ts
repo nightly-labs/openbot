@@ -183,21 +183,23 @@ export class BrowserCdpEngine {
       const point = await this.#targetPoint(send, target, true, true, deadline);
       const { sessionId, ...coordinates } = point;
       const button = options.button ?? "left";
-      const clickCount = options.clickCount ?? 1;
+      const totalClicks = options.clickCount ?? 1;
       const modifiers = modifierMask(options.modifiers ?? []);
       assertBeforeDeadline(deadline);
       onDispatch?.();
       await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...coordinates, modifiers }, sessionId);
-      await send(
-        "Input.dispatchMouseEvent",
-        { type: "mousePressed", ...coordinates, button, clickCount, modifiers },
-        sessionId,
-      );
-      await send(
-        "Input.dispatchMouseEvent",
-        { type: "mouseReleased", ...coordinates, button, clickCount, modifiers },
-        sessionId,
-      );
+      for (let clickCount = 1; clickCount <= totalClicks; clickCount += 1) {
+        await send(
+          "Input.dispatchMouseEvent",
+          { type: "mousePressed", ...coordinates, button, clickCount, modifiers },
+          sessionId,
+        );
+        await send(
+          "Input.dispatchMouseEvent",
+          { type: "mouseReleased", ...coordinates, button, clickCount, modifiers },
+          sessionId,
+        );
+      }
     });
   }
 

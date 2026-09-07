@@ -134,7 +134,7 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
     await expect(readFile(source, "utf8")).resolves.toBe("receipt bytes");
   });
 
-  it("keeps a staged copy while its document holds the input and frees it once the document is gone", async () => {
+  it("keeps shared files readable after the source document navigates", async () => {
     const { browser, staged, documentChanged } = uploadBrowser();
     const { client, threadId } = await startService(browser);
     const source = join(root, "kept.txt");
@@ -147,6 +147,9 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
     await expect(readFile(stagedPath, "utf8")).resolves.toBe("kept");
 
     documentChanged("tab", new Set(["some-other-document"]));
+    await upload(client, threadId, "parent-upload", { selector: "parent-input", paths: [source] });
+    await expect(readFile(stagedPath, "utf8")).resolves.toBe("kept");
+    await service?.stop();
     await waitFor(() => missing(stagedPath));
   });
 
@@ -163,11 +166,15 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
 
     // Setting `input.files` again does not invalidate the `File` objects a page already took from it,
     // which is how any "add another file" flow collects a selection, so the first copy has to survive
-    // the second upload -- and both go when the document that could read them does.
+    // the second upload and a later navigation.
     await expect(readFile(staged[0]?.path ?? "", "utf8")).resolves.toBe("first");
     await expect(readFile(staged[1]?.path ?? "", "utf8")).resolves.toBe("second");
 
     documentChanged("tab", new Set(["some-other-document"]));
+    await upload(client, threadId, "parent-upload", { selector: "parent-input", paths: [first] });
+    await expect(readFile(staged[0]?.path ?? "", "utf8")).resolves.toBe("first");
+    await expect(readFile(staged[1]?.path ?? "", "utf8")).resolves.toBe("second");
+    await service?.stop();
     await waitFor(() => missing(staged[0]?.path ?? ""));
     await waitFor(() => missing(staged[1]?.path ?? ""));
   });

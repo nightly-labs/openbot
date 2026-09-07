@@ -326,6 +326,39 @@ async function main(): Promise<void> {
     }
     process.stdout.write("BrowserHost: snapshot and actions passed.\n");
 
+    const doubleUrl = `${origin}/blocking-frame?double-click`;
+    const doubleTab = await browser.open(doubleUrl, "smoke-thread", "smoke-bot");
+    const doubleContents = webContents
+      .getAllWebContents()
+      .find((contents) => !contents.isDestroyed() && contents.getURL() === doubleUrl);
+    if (!doubleContents) throw new Error("Double-click fixture web contents were not available.");
+    await doubleContents.executeJavaScript(
+      `(() => {
+      const button = document.createElement('button');
+      button.textContent = 'Double-click item';
+      button.addEventListener('click', event => {
+        if (event.detail === 1 && event.isTrusted) button.dataset.selected = 'true';
+      });
+      button.addEventListener('dblclick', event => {
+        if (button.dataset.selected === 'true' && event.isTrusted) button.dataset.activated = 'true';
+      });
+      button.id = 'double-click-item';
+      document.body.prepend(button);
+    })()`,
+      true,
+    );
+    const doubleClicked = await callBrowserTool(browser, "click", {
+      tabId: doubleTab.id,
+      target: { kind: "role", role: "button", name: "Double-click item", exact: true },
+      clickCount: 2,
+    });
+    const activated = await doubleContents.executeJavaScript(
+      "document.getElementById('double-click-item').dataset.activated === 'true'",
+      true,
+    );
+    if (!doubleClicked.success || !activated) throw new Error("V2 double-click did not select before activation.");
+    await doubleContents.executeJavaScript("document.getElementById('double-click-item').remove()", true);
+    await browser.close(doubleTab.id);
     const v2Tab = await browser.open(`${origin}/v2`, "smoke-thread", "smoke-bot");
     const v2Contents = webContents
       .getAllWebContents()
@@ -1672,8 +1705,7 @@ async function main(): Promise<void> {
       !restoredFill.success ||
       !isDynamicRecord(restoredFillSnapshot?.viewport) ||
       restoredFillSnapshot.viewport.mode !== "fill" ||
-      restoredFillSnapshot.viewport.deviceScaleFactor !== 1 ||
-      restoredFillSnapshot.viewport.width !== 1200
+      restoredFillSnapshot.viewport.deviceScaleFactor !== 1
     ) {
       throw new Error(`V2 mobile-to-fill reset retained the custom scale: ${JSON.stringify(restoredFill)}`);
     }

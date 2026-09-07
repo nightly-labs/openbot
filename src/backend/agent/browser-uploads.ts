@@ -11,15 +11,10 @@ import type { GeneratedAttachmentSource } from "../mailbox-store";
 import type { DynamicToolCallParams, DynamicToolResult } from "../protocol";
 import type { AttachmentSourceScope } from "./attachment-gateway";
 
-/**
- * A staging directory a page's file input has been given. Deleted once nothing can read it again --
- * which is not when the input is reassigned: a page that collected the earlier `File` objects, as any
- * "add another file" flow does, still holds handles on this directory after `input.files` moves on.
- */
+/** A file copy assigned to a page. Other documents can retain its File objects after navigation. */
 interface BrowserUploadRoot {
   path: string;
   bytes: number;
-  documentId: string;
 }
 
 /**
@@ -83,9 +78,9 @@ const MAX_BROWSER_UPLOAD_BYTES_TOTAL = ATTACHMENT_LIMITS.totalBytes * 2;
  * handle on the user's own file for as long as the tab stays open.
  *
  * Owns a private `0o700` copy of every file an agent hands to a page, and the whole lifetime of that
- * copy: it is created before the input is set, retained while the input still holds it, and deleted when
- * the document changes, the tab closes, or the service stops. The page therefore never reads the user's
- * original file, and a staging directory can never outlive the input that justified it.
+ * copy: it is created before the input is set, retained across document changes, and deleted when
+ * the tab closes or the service stops. A parent page can retain a File from an iframe that navigated,
+ * so removing the source document does not prove the copy is unused.
  *
  * Owns the two quotas as well -- inputs per tab, bytes per tab and bytes across every tab -- because a
  * retained copy is disk the user did not ask to spend and nothing else counts it. Reservations are
@@ -207,7 +202,7 @@ export class BrowserUploads {
               throw new Error("The browser upload target changed while files were being staged.");
             }
           },
-          onUploadAssigned: (inputId, documentId) => {
+          onUploadAssigned: (inputId) => {
             if (!stagingRoot || this.#isStopping() || !reservation || reservation.invalidated) {
               throw new Error("The browser document changed while files were being staged.");
             }
@@ -216,8 +211,8 @@ export class BrowserUploads {
             // does not invalidate the `File` objects a page already took from it, so deleting the
             // earlier directory here would break a page that is accumulating attachments across
             // selections -- it reads a file that is no longer there. The earlier copies stay until the
-            // document that could read them is gone, and their bytes keep counting against the quotas.
-            roots.set(inputId, [...(roots.get(inputId) ?? []), { path: stagingRoot, bytes: stagedBytes, documentId }]);
+            // tab closes, and their bytes keep counting against the quotas.
+            roots.set(inputId, [...(roots.get(inputId) ?? []), { path: stagingRoot, bytes: stagedBytes }]);
             this.#roots.set(tabId, roots);
             // Ownership moves from the reservation to the root here: the `finally` below must not delete
             // a directory the input is now reading from.
@@ -259,25 +254,10 @@ export class BrowserUploads {
   }
 
   /**
-   * Frees every staged directory whose document is gone. A navigation clears the input that justified
-   * the copy, and an in-flight reservation for a document that no longer exists is abandoned rather than
-   * delivered.
+   * Cancels staging for a removed document. Assigned files stay: a surviving parent document can
+   * retain File objects from the document that navigated. The byte quotas continue to bound them.
    */
   retainDocuments(tabId: string, documentIds: ReadonlySet<string>): void {
-    const roots = this.#roots.get(tabId);
-    if (roots) {
-      for (const [inputId, inputRoots] of roots) {
-        const retained = inputRoots.filter((root) => documentIds.has(root.documentId));
-        if (retained.length === inputRoots.length) continue;
-        if (retained.length === 0) roots.delete(inputId);
-        else roots.set(inputId, retained);
-        for (const root of inputRoots) {
-          if (retained.includes(root)) continue;
-          void rm(root.path, { recursive: true, force: true }).catch(() => undefined);
-        }
-      }
-      if (roots.size === 0) this.#roots.delete(tabId);
-    }
     const reservations = this.#reservations.get(tabId);
     if (reservations) {
       for (const [id, reservation] of reservations) {
