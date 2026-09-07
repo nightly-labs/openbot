@@ -113,7 +113,7 @@ export function PixelBlastBackground({ active }: { active: boolean }) {
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(0);
   const brandColor = String(useCSSVariable("--openbot-logo-production") ?? "#cdadec");
-  const accentColor = String(useCSSVariable("--openbot-accent") ?? "#6960f1");
+  const accentColor = String(useCSSVariable("--openbot-accent") ?? "#007cf7");
 
   useEffect(() => {
     cancelAnimation(progress);
