@@ -1,16 +1,23 @@
 # OpenBot architecture
 
-OpenBot is a Bun workspace with one packaged desktop application, one cloud application, and small
-packages for code that has more than one consumer.
+OpenBot is a Bun workspace with a desktop application, a mobile application, two Cloudflare Workers,
+a self-hosted Signal service, and shared packages.
 
 ## Workspace map
 
 ```text
 apps/
-  auth-api/          Cloudflare Worker, account login, remote membership, and connection tickets
+  auth-api/          Cloudflare Worker for public web, accounts, memberships, and connection tickets
+  mobile/            Expo React Native client for remote team hosts
+  site-router/       Cloudflare Worker that serves published sites from private R2 storage
 packages/
+  brand/             Shared logos, avatars, and design tokens
   contracts/         Process and network boundary types, limits, and pure validation
   logging/           ts-log Logger interface plus the redacting console/file implementation
+  team-client/       Shared team connection, recovery, and WebRTC framing code
+remote/
+  api/               Bun Signal service for SDP, ICE, ticket checks, and TURN credentials
+  scripts/           Bun checks and update commands for Signal and coturn
 src/
   backend/           Agent runtime, provider adapters, event storage, queues, and browser host
   main/              Electron lifecycle, trusted IPC, host server, and operating-system adapters
@@ -297,7 +304,7 @@ Protocol support has no fixed time or release limit. Removal is an exceptional a
 ## Required verification
 
 Run the narrowest relevant test, then `bun run lint` and `bun run typecheck`; both are cheap enough
-to run whole, and CI owns the minutes-long suites. See `AGENTS.md` "CI owns the minutes-long suites"
+to run whole, and CI owns the minutes-long suites. See [AGENTS.md, Checks](../AGENTS.md#checks)
 for the division of labour and what each CI job covers.
 Changes to packaging, native modules, or Electron security also require the applicable macOS and
 Windows package verification commands. Live provider and team smoke tests use isolated temporary
