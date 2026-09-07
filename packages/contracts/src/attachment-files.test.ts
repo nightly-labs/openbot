@@ -24,12 +24,19 @@ describe("attachment file whitelist", () => {
     expect(ATTACHMENT_FILE_ACCEPT).toContain(".eml");
   });
 
+  it.each(["recording.MP3", "Screen Recording.mov"])("accepts %s in the picker", (name) => {
+    expect(isSupportedAttachmentName(name)).toBe(true);
+    expect(ATTACHMENT_FILE_ACCEPT).toContain(`.${name.split(".").at(-1)?.toLowerCase()}`);
+  });
+
   it("assigns stable MIME types to supported formats", () => {
     expect(attachmentMimeTypeForName("README.md")).toBe("text/markdown");
     expect(attachmentMimeTypeForName("report.pdf")).toBe("application/pdf");
     expect(attachmentMimeTypeForName("report.docx")).toBe(
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     );
+    expect(attachmentMimeTypeForName("recording.mp3")).toBe("audio/mpeg");
+    expect(attachmentMimeTypeForName("recording.mov")).toBe("video/quicktime");
     expect(attachmentMimeTypeForName("message.eml")).toBe("message/rfc822");
     expect(attachmentMimeTypeForName("bundle.zip")).toBe("application/octet-stream");
   });
