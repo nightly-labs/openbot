@@ -459,6 +459,7 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
     const update = notification.update;
     if (!turn) return;
     if (update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {
+      if (update.content.text) this.#completeThought(thread, turn);
       if (!turn.text && update.content.text) {
         this.emit("notification", {
           method: "item/started",
@@ -543,22 +544,24 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
     turn.itemId = `${turn.id}:assistant:${turn.messages.length}`;
   }
 
+  #completeThought(thread: GrokThread, turn: GrokTurn): void {
+    if (!turn.thoughtStarted) return;
+    const item = {
+      id: turn.thoughtItemId,
+      type: "agentMessage",
+      phase: "commentary",
+      text: turn.thought,
+    } satisfies ThreadItem;
+    turn.messages.push(item);
+    this.emit("notification", { method: "item/completed", params: { threadId: thread.id, turnId: turn.id, item } });
+    turn.thought = "";
+    turn.thoughtStarted = false;
+    turn.thoughtItemId = `${turn.id}:thought:${turn.messages.length}`;
+  }
+
   #completeTurn(thread: GrokThread, turn: GrokTurn, status: string, error: unknown): void {
     if (thread.activeTurn !== turn) return;
-    const thoughtItem = turn.thoughtStarted
-      ? ({
-          id: turn.thoughtItemId,
-          type: "agentMessage",
-          phase: "commentary",
-          text: turn.thought,
-        } satisfies ThreadItem)
-      : null;
-    if (thoughtItem) {
-      this.emit("notification", {
-        method: "item/completed",
-        params: { threadId: thread.id, turnId: turn.id, item: thoughtItem },
-      });
-    }
+    this.#completeThought(thread, turn);
     this.#completeMessage(thread, turn, "final_answer");
     if (status === "failed" && error) {
       this.emit("notification", {
@@ -570,7 +573,7 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
       method: "turn/completed",
       params: { threadId: thread.id, turn: { id: turn.id, status } },
     });
-    thread.turns.push({ id: turn.id, status, items: thoughtItem ? [thoughtItem, ...turn.messages] : turn.messages });
+    thread.turns.push({ id: turn.id, status, items: turn.messages });
     thread.activeTurn = null;
   }
 

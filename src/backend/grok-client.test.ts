@@ -59,7 +59,9 @@ describe.sequential("GrokAgentClient", () => {
       const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
       const messages = history.thread.turns?.[0]?.items;
       expect(messages).toEqual([
+        expect.objectContaining({ phase: "commentary", text: "Planning inspection." }),
         expect.objectContaining({ phase: "commentary", text: "Inspecting files." }),
+        expect.objectContaining({ phase: "commentary", text: "Reviewing findings." }),
         expect.objectContaining({ phase: "commentary", text: "Checking results." }),
         expect.objectContaining({
           phase: "final_answer",
@@ -71,6 +73,7 @@ describe.sequential("GrokAgentClient", () => {
       const phases = new Map<string, string>();
       const texts = new Map<string, string>();
       const streamedAnswer: string[] = [];
+      const streamedThoughts: string[] = [];
       for (const notification of notifications) {
         if (notification.method === "turn/completed") break;
         const params = notification.params;
@@ -86,6 +89,11 @@ describe.sequential("GrokAgentClient", () => {
           const id = String(params.itemId);
           const text = (texts.get(id) ?? "") + String(params.delta);
           texts.set(id, text);
+          if (text === "Reviewing findings.") {
+            const latestCommentaryId = [...phases].filter(([, phase]) => phase === "commentary").at(-1)?.[0];
+            expect(texts.get(latestCommentaryId ?? "")).toBe("Reviewing findings.");
+            streamedThoughts.push(text);
+          }
           if (text.startsWith("The final ")) {
             expect(phases.get(id)).toBe("final_answer");
             // Earlier segments have already left chat when the answer starts streaming.
@@ -94,6 +102,7 @@ describe.sequential("GrokAgentClient", () => {
           }
         }
       }
+      expect(streamedThoughts).toEqual(["Reviewing findings."]);
       expect(streamedAnswer).toEqual(["The final ", "The final answer."]);
       expect([...phases.values()].filter((phase) => phase === "final_answer")).toHaveLength(1);
     },
@@ -632,9 +641,11 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   if (message.method === "session/prompt") {
     if (["end_turn", "cancelled", "max_tokens"].includes(mode)) {
       const updates = [
+        { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "Planning inspection." } },
         { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Inspecting files." } },
         { sessionUpdate: "tool_call", toolCallId: "read-1", title: "Read files", status: "in_progress" },
         { sessionUpdate: "tool_call_update", toolCallId: "read-1", status: "completed" },
+        { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "Reviewing findings." } },
         { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Checking results." } },
         { sessionUpdate: "tool_call", toolCallId: "read-2", title: "Check results", status: "in_progress" },
         { sessionUpdate: "tool_call_update", toolCallId: "read-2", status: "completed" },
