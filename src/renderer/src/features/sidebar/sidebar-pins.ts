@@ -9,7 +9,6 @@ export type SidebarPinnedItem = Readonly<{
 export type SidebarPinsByServer = Record<string, SidebarPinnedItem[]>;
 
 export const SIDEBAR_PINS_STORAGE_KEY = "openbot:sidebar-pins:v1";
-export const MAX_SIDEBAR_PINNED_ITEMS = 6;
 
 type SidebarPinStorage = Pick<Storage, "getItem" | "setItem">;
 
@@ -35,7 +34,6 @@ export function normalizeSidebarPinnedItems(value: readonly SidebarPinnedItem[])
     if (seen.has(key)) continue;
     seen.add(key);
     items.push({ kind: candidate.kind, id: candidate.id });
-    if (items.length === MAX_SIDEBAR_PINNED_ITEMS) break;
   }
   return items;
 }
@@ -43,8 +41,8 @@ export function normalizeSidebarPinnedItems(value: readonly SidebarPinnedItem[])
 /**
  * Points pins a released build wrote at the agents that own them now. Migration v13 renamed agents inside
  * the host's database, but these pins live in browser storage it never touched, so every pinned agent
- * looks deleted after the upgrade -- it vanishes from the pinned group while still holding one of the six
- * slots. An id still in the roster answers for itself: v13 declines to rename onto an id that is taken, so
+ * looks deleted after the upgrade -- it vanishes from the pinned group while remaining in saved pins.
+ * An id still in the roster answers for itself: v13 declines to rename onto an id that is taken, so
  * `bot-<uuid>` can be sitting beside the `agent-<uuid>` it would have become. A pin that matches nobody is
  * left exactly as found, because an agent can be absent for reasons that have nothing to do with the
  * rename.
@@ -60,7 +58,7 @@ export function reownSidebarPinnedItems(
   }
   // Reowning can land two pins on one agent -- a stale `bot-<uuid>` pin beside an `agent-<uuid>` one the
   // user made after the upgrade -- so the result goes back through the normalizer. A duplicate that
-  // reached storage would show the agent twice and burn two of the six slots.
+  // reached storage would show the agent twice and duplicate it in saved pins.
   return normalizeSidebarPinnedItems(
     items.map((item) => {
       if (item.kind !== "agent" || agentIds.has(item.id)) return item;

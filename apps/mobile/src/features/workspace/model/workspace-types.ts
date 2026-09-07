@@ -28,9 +28,7 @@ export interface MobileAgent {
   avatarHue: AvatarHue | null;
 }
 
-export const MAX_PINNED_AGENTS = 6;
-
-export type ToggleAgentPinResult = "limit" | "pinned" | "unpinned" | "error";
+export type ToggleAgentPinResult = "pinned" | "unpinned" | "error";
 
 interface AddRemoteServerInput {
   inviteUrl: string;

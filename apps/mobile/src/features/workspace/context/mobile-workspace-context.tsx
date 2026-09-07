@@ -47,12 +47,11 @@ import {
   type RemoteTeamTransportRef,
 } from "@/features/workspace/components/remote-team-transport";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
-import {
-  MAX_PINNED_AGENTS,
-  type MobileAgent,
-  type MobileServer,
-  type MobileServerDirectoryState,
-  type MobileWorkspaceContextValue,
+import type {
+  MobileAgent,
+  MobileServer,
+  MobileServerDirectoryState,
+  MobileWorkspaceContextValue,
 } from "@/features/workspace/model/workspace-types";
 
 export type {
@@ -64,7 +63,6 @@ export type {
   MobileWorkspaceContextValue,
   ToggleAgentPinResult,
 } from "@/features/workspace/model/workspace-types";
-export { MAX_PINNED_AGENTS } from "@/features/workspace/model/workspace-types";
 
 const SERVER_ACCENTS = ["#cdadec", "#6960f1", "#e3b866", "#5b9ce2", "#85c7a2"] as const;
 type RemoteAgent = Pick<
@@ -580,11 +578,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             ? "unpinned"
             : "error";
         }
-        const agent = agents.find((item) => item.id === agentId);
-        const pinnedOnServer = pinnedAgentIds.filter((id) =>
-          agents.some((item) => item.id === id && item.serverId === agent?.serverId),
-        );
-        if (pinnedOnServer.length >= MAX_PINNED_AGENTS) return "limit";
         return updatePreferences(activeServer.id, (current) => ({
           ...current,
           pinned: [...new Set([...current.pinned, agentId])],

@@ -17,7 +17,7 @@ import {
   type SidebarDropTarget,
   ZERO_DRAG_OFFSET,
 } from "../sidebar-drag-model";
-import { MAX_SIDEBAR_PINNED_ITEMS, type SidebarPinnedItem } from "../sidebar-pins";
+import type { SidebarPinnedItem } from "../sidebar-pins";
 
 /** Everything `createSidebarDragEngine` may do to the drag store, and deliberately nothing more. */
 export interface SidebarDragWriters {
@@ -29,11 +29,8 @@ export interface SidebarDragWriters {
   setEmptyPinnedDropVisible: (visible: boolean) => void;
 }
 
-export function createSidebarDragStateStore(deps: {
-  agentPinnedItems: () => SidebarPinnedItem[];
-  sectionAcceptsAgent: (sectionId: string) => boolean;
-}) {
-  const { agentPinnedItems, sectionAcceptsAgent } = deps;
+export function createSidebarDragStateStore(deps: { sectionAcceptsAgent: (sectionId: string) => boolean }) {
+  const { sectionAcceptsAgent } = deps;
 
   const [drag, setDrag] = createStore<SidebarDrag>({
     emptyPinnedDropVisible: false,
@@ -97,7 +94,7 @@ export function createSidebarDragStateStore(deps: {
    * `pinDraggedSidebarItem` call it untracked. A memo would answer both, but only one correctly.
    */
   function canPinDraggedSidebarItem(): boolean {
-    return draggedSidebarItem() !== null && agentPinnedItems().length < MAX_SIDEBAR_PINNED_ITEMS;
+    return draggedSidebarItem() !== null;
   }
 
   /** The pinned group highlights only while an agent from the list could actually land in it. */
