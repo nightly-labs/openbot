@@ -66,11 +66,11 @@
     --openbot-bg-control: #212121;
     --openbot-bg-control-active: #2a2a2a;
     --openbot-bg-overlay: rgba(26, 26, 26, 0.92);
-    --openbot-border: rgba(255, 255, 255, 0.055);
-    --openbot-border-strong: rgba(255, 255, 255, 0.11);
+    --openbot-border: rgba(255, 255, 255, 0.035);
+    --openbot-border-strong: rgba(255, 255, 255, 0.045);
     --openbot-text-primary: #ffffff;
-    --openbot-text-secondary: #c5c5c5;
-    --openbot-text-muted: #888888;
+    --openbot-text-secondary: #dcdcdc;
+    --openbot-text-muted: #979797;
     --openbot-text-dim: #6a6a6a;
     --openbot-text-on-accent: #ffffff;
     --openbot-text-on-status: #07130c;
