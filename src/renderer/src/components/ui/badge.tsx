@@ -19,6 +19,7 @@ export const badgeVariants = cva("z-badge", {
       "success-light": "z-badge-variant-success-light",
       "warning-light": "z-badge-variant-warning-light",
       "info-light": "z-badge-variant-info-light",
+      new: "z-badge-variant-new",
       "primary-outline": "z-badge-variant-primary-outline",
       "destructive-outline": "z-badge-variant-destructive-outline",
       "success-outline": "z-badge-variant-success-outline",

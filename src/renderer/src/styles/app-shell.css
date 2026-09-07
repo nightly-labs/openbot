@@ -2812,19 +2812,8 @@ textarea {
   line-height: 14px;
 }
 
-/* The design's "New" badge. Not --openbot-success: an update being available is an
- * announcement, not the report of something that succeeded. */
+/* Placement only. The colours are the shared `new` badge variant. */
 .sidebar-update-pill {
-  flex: 0 0 auto;
-  border: 1px solid var(--openbot-badge-new-border);
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-badge-new-soft);
-  padding: 2px 7px;
-  color: var(--openbot-badge-new);
-  font-size: var(--openbot-text-sm);
-  line-height: 16px;
-  letter-spacing: 0.01em;
-  font-weight: var(--openbot-weight-semibold);
   justify-self: end;
 }
 

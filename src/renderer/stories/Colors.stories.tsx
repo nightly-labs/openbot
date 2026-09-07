@@ -82,12 +82,11 @@ export const Accents: Story = {
         </Heading>
         <Text tone="muted">The vibrant colours are text on a soft fill, which is where they read brightest.</Text>
         <div class="foundation-story-row">
-          <Badge variant="primary-light">New</Badge>
+          <Badge variant="new">New</Badge>
           <Badge variant="info-light">Beta</Badge>
           <Badge variant="success-light">Connected</Badge>
           <Badge variant="warning-light">Paused</Badge>
           <Badge variant="destructive-light">Failed</Badge>
-          <span class="z-badge sidebar-update-pill">Update</span>
         </div>
       </section>
     </main>

@@ -436,6 +436,18 @@
   color: var(--openbot-danger);
 }
 
+/* The design's "New" chip. Not a --openbot-success or --openbot-accent variant: an
+ * announcement that something is newly available is neither a report that something
+ * succeeded nor an action the user can take. The heavier weight and the open tracking
+ * are part of the look, which is why this variant sets them and the others do not. */
+:where(.z-badge-variant-new) {
+  border-color: var(--openbot-badge-new-border);
+  background: var(--openbot-badge-new-soft);
+  color: var(--openbot-badge-new);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: 0.01em;
+}
+
 :where(.z-badge-variant-info-light) {
   border-color: var(--openbot-accent-soft);
   background: var(--openbot-accent-soft);
