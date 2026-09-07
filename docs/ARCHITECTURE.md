@@ -58,6 +58,12 @@ the `media-attachments` capability; released protocol adapters keep their existi
 
 - `openbot.db` is the source of truth for OpenBot agents, conversations, queues, reactions,
   attachments, and provider-session bindings.
+- `MailboxStore` owns attachment records, staged generated attachments, mailbox commits, and the
+  file-deletion outbox. `AttachmentFiles` owns draft and transfer files: copying, size limits,
+  hashes, manifests, managed-path checks, and cleanup. It does not read or write the database.
+  Generated response attachments become visible only after the conversation and mailbox commit
+  succeeds. Agent deletion and queue edits record file removals in the mailbox transaction; the
+  deletion outbox retries failed removals.
 - `~/.codex`, `~/.claude`, and `~/.grok` are provider-owned login and resume state. They are not OpenBot
   conversation storage.
 - D1 is the source of truth for central accounts, remote membership, invitations, and logical sessions.
@@ -311,6 +317,14 @@ Protocol support has no fixed time or release limit. Removal is an exceptional a
 Run the narrowest relevant test, then `bun run lint` and `bun run typecheck`; both are cheap enough
 to run whole, and CI owns the minutes-long suites. See [AGENTS.md, Checks](../AGENTS.md#checks)
 for the division of labour and what each CI job covers.
+
+The Storybook CI job builds all stories with `OPENBOT_STORYBOOK_CHECK=true`. This skips Solid's
+automatic prop documentation analysis. The job checks compilation and does not publish its output.
+Local Storybook keeps this analysis. Both paths use one Solid compiler plugin.
+
+The browser smoke check also supports `--scenario=wait-deadlines`. These checks wait for the tab's
+operation queue to clear before measuring a new deadline. A timed-out call can return while its
+CDP commands still need to finish, and that cleanup is outside the next operation's deadline.
 
 Each TypeScript project writes its own ignored `.tsbuildinfo` cache beside its configuration.
 Each worktree starts with no cache. The first check creates these files; later checks reuse them

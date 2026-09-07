@@ -225,8 +225,10 @@ void main().catch((error) => {
 
 async function main(): Promise<void> {
   const scenario = process.argv.find((argument) => argument.startsWith("--scenario="))?.slice("--scenario=".length);
-  if (scenario !== undefined && !["controls", "tool-boundary", "evaluation"].includes(scenario)) {
-    throw new Error(`Unknown browser smoke scenario: ${scenario}. Use controls, tool-boundary, or evaluation.`);
+  if (scenario !== undefined && !["controls", "tool-boundary", "evaluation", "wait-deadlines"].includes(scenario)) {
+    throw new Error(
+      `Unknown browser smoke scenario: ${scenario}. Use controls, tool-boundary, evaluation, or wait-deadlines.`,
+    );
   }
   const googleLive = process.argv.includes("--google-live");
   const xLive = process.argv.includes("--x-live");
@@ -289,6 +291,8 @@ async function main(): Promise<void> {
               await runDragAction(browser, tab.id, contents);
               await runDoubleClickScenario(browser, origin);
               await runKeyboardScenario(browser, origin, temporaryRoot);
+            } else if (scenario === "wait-deadlines") {
+              await runWaitDeadlines(browser, tab.id, contents);
             } else {
               await runEvaluationScenario(browser, tab.id, contents);
             }
@@ -1134,98 +1138,7 @@ async function main(): Promise<void> {
     if (removedRefWait.success || !toolError(removedRefWait).includes("timed out")) {
       throw new Error("V2 ref wait matched an element after it was removed.");
     }
-    await v2Contents.executeJavaScript(
-      "(() => { const container = Object.assign(document.createElement('div'), { innerHTML: Array.from({ length: 200 }, (_, index) => '<button aria-label=\"Bulk ' + index + '\">Bulk ' + index + '</button>').join('') }); container.dataset.bulkTargets = ''; document.body.appendChild(container); return true; })()",
-      true,
-    );
-    const semanticWaitStarted = Date.now();
-    const boundedSemanticWait = await callBrowserTool(browser, "wait_for", {
-      tabId: v2Tab.id,
-      target: { kind: "role", role: "button", name: "Missing bulk target", exact: true },
-      timeoutMs: 5,
-    });
-    if (
-      boundedSemanticWait.success ||
-      !toolError(boundedSemanticWait).includes("timed out") ||
-      Date.now() - semanticWaitStarted > 1_000
-    ) {
-      throw new Error("V2 semantic wait did not enforce its collection deadline.");
-    }
-    const boundedWaitSnapshot = await callBrowserTool(browser, "wait_for", {
-      tabId: v2Tab.id,
-      url: "/v2",
-      timeoutMs: 5,
-    });
-    if (boundedWaitSnapshot.success || !toolError(boundedWaitSnapshot).includes("timed out")) {
-      throw new Error("V2 wait snapshot did not share the condition deadline.");
-    }
-    await v2Contents.executeJavaScript("document.querySelector('[data-bulk-targets]').remove(); true", true);
-    await v2Contents.executeJavaScript(
-      `(() => {
-        const container = document.createElement('div');
-        container.dataset.bulkText = '';
-        container.innerHTML = Array.from({ length: 6000 }, (_, index) => '<span>Bounded text ' + index + '</span>').join('');
-        document.body.appendChild(container);
-      })()`,
-      true,
-    );
-    const textWaitStarted = Date.now();
-    const boundedTextWait = await callBrowserTool(browser, "wait_for", {
-      tabId: v2Tab.id,
-      text: "Missing bounded text target",
-      timeoutMs: 5,
-    });
-    if (
-      boundedTextWait.success ||
-      !toolError(boundedTextWait).includes("timed out") ||
-      Date.now() - textWaitStarted > 1_000
-    ) {
-      throw new Error("V2 text wait did not enforce its scan deadline.");
-    }
-    await v2Contents.executeJavaScript(`document.querySelector('[data-bulk-text]').remove()`, true);
-    const boundedActionPoint = await v2Contents.executeJavaScript(
-      `(() => {
-        const bounds = document.querySelector('[aria-label="SPA"]').getBoundingClientRect();
-        return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
-      })()`,
-      true,
-    );
-    if (!isDynamicRecord(boundedActionPoint) || !isNumber(boundedActionPoint.x) || !isNumber(boundedActionPoint.y)) {
-      throw new Error("V2 bounded action point fixture was not available.");
-    }
-    await v2Contents.executeJavaScript(
-      "globalThis.__openbotNoise = setInterval(() => document.querySelector('output').toggleAttribute('data-noise'), 10); true",
-      true,
-    );
-    const actionTimeoutStarted = Date.now();
-    const boundedAction = await callBrowserTool(browser, "click", {
-      tabId: v2Tab.id,
-      target: { kind: "point", x: boundedActionPoint.x, y: boundedActionPoint.y },
-      timeoutMs: 250,
-    });
-    const boundedActionPayload = toolTextPayload(boundedAction);
-    if (
-      !boundedAction.success ||
-      !Array.isArray(boundedActionPayload?.actions) ||
-      !boundedActionPayload.actions.some(
-        (entry) => isDynamicRecord(entry) && String(entry.detail).includes("Action completed"),
-      ) ||
-      Date.now() - actionTimeoutStarted > 1_000
-    ) {
-      throw new Error("V2 dispatched action did not report success when settling exceeded its deadline.");
-    }
-    const quietWait = await callBrowserTool(browser, "wait_for", {
-      tabId: v2Tab.id,
-      state: "dom-quiet",
-      timeoutMs: 200,
-    });
-    if (quietWait.success || !toolError(quietWait).includes("timed out")) {
-      throw new Error("V2 DOM-quiet wait suppressed its timeout.");
-    }
-    await v2Contents.executeJavaScript(
-      "clearInterval(globalThis.__openbotNoise); delete globalThis.__openbotNoise; true",
-      true,
-    );
+    await runWaitDeadlines(browser, v2Tab.id, v2Contents);
     await v2Contents.executeJavaScript(
       "globalThis.__openbotSlowNoise = setInterval(() => document.body.toggleAttribute('data-slow-noise'), 10); setTimeout(() => { clearInterval(globalThis.__openbotSlowNoise); delete globalThis.__openbotSlowNoise; }, 1200); true",
       true,
@@ -1868,6 +1781,106 @@ async function main(): Promise<void> {
     if (!configuredRoot) await rm(temporaryRoot, { recursive: true, force: true });
     app.quit();
   }
+}
+
+async function runWaitDeadlines(browser: BrowserHost, tabId: string, v2Contents: WebContents): Promise<void> {
+  // A timeout returns before its CDP commands finish unwinding. A queued snapshot waits for
+  // that cleanup, so the next measurement covers its own deadline rather than the prior queue.
+  await browser.snapshot(tabId);
+  await v2Contents.executeJavaScript(
+    "(() => { const container = Object.assign(document.createElement('div'), { innerHTML: Array.from({ length: 200 }, (_, index) => '<button aria-label=\"Bulk ' + index + '\">Bulk ' + index + '</button>').join('') }); container.dataset.bulkTargets = ''; document.body.appendChild(container); return true; })()",
+    true,
+  );
+  const semanticWaitStarted = Date.now();
+  const boundedSemanticWait = await callBrowserTool(browser, "wait_for", {
+    tabId: tabId,
+    target: { kind: "role", role: "button", name: "Missing bulk target", exact: true },
+    timeoutMs: 5,
+  });
+  if (
+    boundedSemanticWait.success ||
+    !toolError(boundedSemanticWait).includes("timed out") ||
+    Date.now() - semanticWaitStarted > 1_000
+  ) {
+    throw new Error("V2 semantic wait did not enforce its collection deadline.");
+  }
+  const boundedWaitSnapshot = await callBrowserTool(browser, "wait_for", {
+    tabId: tabId,
+    url: "/v2",
+    timeoutMs: 5,
+  });
+  if (boundedWaitSnapshot.success || !toolError(boundedWaitSnapshot).includes("timed out")) {
+    throw new Error("V2 wait snapshot did not share the condition deadline.");
+  }
+  await v2Contents.executeJavaScript("document.querySelector('[data-bulk-targets]').remove(); true", true);
+  await browser.snapshot(tabId);
+  await v2Contents.executeJavaScript(
+    `(() => {
+      const container = document.createElement('div');
+      container.dataset.bulkText = '';
+      container.innerHTML = Array.from({ length: 6000 }, (_, index) => '<span>Bounded text ' + index + '</span>').join('');
+      document.body.appendChild(container);
+    })()`,
+    true,
+  );
+  const textWaitStarted = Date.now();
+  const boundedTextWait = await callBrowserTool(browser, "wait_for", {
+    tabId: tabId,
+    text: "Missing bounded text target",
+    timeoutMs: 5,
+  });
+  if (
+    boundedTextWait.success ||
+    !toolError(boundedTextWait).includes("timed out") ||
+    Date.now() - textWaitStarted > 1_000
+  ) {
+    throw new Error("V2 text wait did not enforce its scan deadline.");
+  }
+  await v2Contents.executeJavaScript(`document.querySelector('[data-bulk-text]').remove()`, true);
+  await browser.snapshot(tabId);
+  const boundedActionPoint = await v2Contents.executeJavaScript(
+    `(() => {
+      const bounds = document.querySelector('[aria-label="SPA"]').getBoundingClientRect();
+      return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+    })()`,
+    true,
+  );
+  if (!isDynamicRecord(boundedActionPoint) || !isNumber(boundedActionPoint.x) || !isNumber(boundedActionPoint.y)) {
+    throw new Error("V2 bounded action point fixture was not available.");
+  }
+  await v2Contents.executeJavaScript(
+    "globalThis.__openbotNoise = setInterval(() => document.querySelector('output').toggleAttribute('data-noise'), 10); true",
+    true,
+  );
+  const actionTimeoutStarted = Date.now();
+  const boundedAction = await callBrowserTool(browser, "click", {
+    tabId: tabId,
+    target: { kind: "point", x: boundedActionPoint.x, y: boundedActionPoint.y },
+    timeoutMs: 250,
+  });
+  const boundedActionPayload = toolTextPayload(boundedAction);
+  if (
+    !boundedAction.success ||
+    !Array.isArray(boundedActionPayload?.actions) ||
+    !boundedActionPayload.actions.some(
+      (entry) => isDynamicRecord(entry) && String(entry.detail).includes("Action completed"),
+    ) ||
+    Date.now() - actionTimeoutStarted > 1_000
+  ) {
+    throw new Error("V2 dispatched action did not report success when settling exceeded its deadline.");
+  }
+  const quietWait = await callBrowserTool(browser, "wait_for", {
+    tabId: tabId,
+    state: "dom-quiet",
+    timeoutMs: 200,
+  });
+  if (quietWait.success || !toolError(quietWait).includes("timed out")) {
+    throw new Error("V2 DOM-quiet wait suppressed its timeout.");
+  }
+  await v2Contents.executeJavaScript(
+    "clearInterval(globalThis.__openbotNoise); delete globalThis.__openbotNoise; true",
+    true,
+  );
 }
 
 async function runDoubleClickScenario(browser: BrowserHost, origin: string): Promise<void> {

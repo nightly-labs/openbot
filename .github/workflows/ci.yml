@@ -130,6 +130,9 @@ jobs:
 
       - name: Build Storybook
         run: bun run build-storybook
+        env:
+          # This output is not published. Skip Solid's per-component docgen analysis.
+          OPENBOT_STORYBOOK_CHECK: "true"
 
   preview:
     name: Cloudflare preview

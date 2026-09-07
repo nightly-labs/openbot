@@ -374,7 +374,8 @@ describe.sequential("AgentService: restart", () => {
       fakeBrowser(),
       30_000,
       "codex",
-      (provider) => new FakeAgentClient(provider),
+      // Keep the resumed turn running until the test can observe it.
+      (provider) => new FakeAgentClient(provider, "", false),
     );
     await service.initialize();
     const agent = await store.getOrCreate("delete-routine");
