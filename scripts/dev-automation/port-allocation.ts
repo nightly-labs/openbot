@@ -8,7 +8,7 @@
 // is milliseconds long. Everything slow - `bun install`, electron-vite, the
 // Worker runtime - happens after the lock is released.
 
-import { closeSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, linkSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import { isProcessAlive } from "./registry-files";
@@ -39,6 +39,45 @@ export interface DevPortAllocationOptions {
   wait?: (milliseconds: number) => Promise<void>;
   readRecords?: () => DevStackRecord[];
   onWait?: (holderPid: number) => void;
+}
+
+// How long the lock file has sat there, for the one case where its contents
+// say nothing. Null when it is already gone.
+function lockFileAgeMs(path: string, now: number): number | null {
+  try {
+    return now - statSync(path).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+// A lock nobody provable holds. Each arm is a state a *correct* holder can
+// never be in:
+//
+//   - unreadable contents. `link` publishes the lock and its holder in one
+//     step, so a file at this path always parses the moment it exists. Garbage
+//     is a leftover from an older runner or from a developer's `touch` - still
+//     breakable, but only once it is older than the stale window, because
+//     nothing else may assume a file it cannot read is abandoned.
+//   - a holder that is no longer running.
+//   - a holder that has kept it far longer than an allocation takes.
+//
+// A live holder inside the window is *not* breakable, however long this
+// process has waited. Taking its lock would put two allocators in the critical
+// section, which is the collision this whole file exists to stop.
+function isBreakableLock(
+  path: string,
+  holder: LockHolder | null,
+  now: number,
+  staleMs: number,
+  fileAgeMs = lockFileAgeMs,
+): boolean {
+  if (holder === null) {
+    const age = fileAgeMs(path, now);
+    return age === null || age > staleMs;
+  }
+  if (!isProcessAlive(holder.pid)) return true;
+  return now - holder.acquiredAt > staleMs;
 }
 
 interface LockHolder {
@@ -91,8 +130,7 @@ export async function withDevPortAllocation<T>(
   for (;;) {
     if (tryCreateLock(path, holder)) break;
     const current = readLockHolder(path);
-    const expired = current !== null && now() - current.acquiredAt > staleMs;
-    if (current === null || expired || !isProcessAlive(current.pid) || now() >= deadline) {
+    if (isBreakableLock(path, current, now(), staleMs)) {
       breakAttempts += 1;
       if (breakAttempts > MAX_BREAK_ATTEMPTS) {
         throw new Error(
@@ -103,7 +141,16 @@ export async function withDevPortAllocation<T>(
       rmSync(path, { force: true });
       continue;
     }
-    onWait?.(current.pid);
+    // Waited out a holder that is alive and inside its window. Something is
+    // wrong with it, but it is not this process's to guess about: allocating
+    // beside it would hand both of us the same ports.
+    if (now() >= deadline) {
+      throw new Error(
+        `The dev port allocation lock at ${path} is still held by pid ${current?.pid ?? "unknown"}. ` +
+          "Check `bun run dev:status` and stop that dev stack, or wait for it to finish starting.",
+      );
+    }
+    onWait?.(current?.pid ?? 0);
     await wait(Math.min(pollIntervalMs, Math.max(deadline - now(), 1)));
   }
 
@@ -120,22 +167,33 @@ function isExistingPathError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "EEXIST";
 }
 
+// Fill the file first, then publish it under the lock name with `link`, which
+// is atomic and fails with EEXIST when the lock is taken. Creating the lock
+// with `wx` and writing to it afterwards leaves a window - short, but a window
+// - where the path exists and holds nothing, and a waiter that reads it there
+// sees an anonymous file and takes it for an abandoned one. Both allocators
+// then proceed, which is the same collision as having no lock at all.
+//
+// Neither `open` with `wx` nor `link` follows a symlink somebody left at the
+// path, so a planted link cannot redirect either half of this.
 function tryCreateLock(path: string, holder: LockHolder): boolean {
-  let handle: number;
-  try {
-    // `wx` is the whole mechanism: exclusive creation is atomic, and it refuses
-    // to follow a symlink somebody left at the path.
-    handle = openSync(path, "wx", 0o600);
-  } catch (error) {
-    if (isExistingPathError(error)) return false;
-    throw error;
-  }
+  const staging = `${path}.${process.pid}.tmp`;
+  rmSync(staging, { force: true });
+  const handle = openSync(staging, "wx", 0o600);
   try {
     writeFileSync(handle, `${JSON.stringify(holder)}\n`, "utf8");
   } finally {
     closeSync(handle);
   }
-  return true;
+  try {
+    linkSync(staging, path);
+    return true;
+  } catch (error) {
+    if (isExistingPathError(error)) return false;
+    throw error;
+  } finally {
+    rmSync(staging, { force: true });
+  }
 }
 
 // Only remove a lock this process still holds. A waiter that decided ours was

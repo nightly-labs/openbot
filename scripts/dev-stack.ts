@@ -6,13 +6,14 @@
 // is a lookup rather than a pattern.
 
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import {
   describeDevInstance,
   readDevInstanceRecords,
   removeDevInstanceRecord,
 } from "./dev-automation/instance-registry";
-import { isLiveRecordedProcess } from "./dev-automation/registry-files";
+import { isProcessGroupAlive, type RecordedProcessState, verifyRecordedProcess } from "./dev-automation/registry-files";
 import {
   type DevStackPort,
   type DevStackRecord,
@@ -27,17 +28,21 @@ import { type OwnedProcess, stopOwnedProcesses } from "./dev-services";
 
 const logger = createOpenBotLogger("dev-stack", (line) => process.stderr.write(`${line}\n`));
 
-const USAGE = "Usage: bun scripts/dev-stack.ts <status|stop> [--all] [--pid=<supervisor pid>]";
+const USAGE = "Usage: bun scripts/dev-stack.ts <status|stop|forget> [--all] [--pid=<supervisor pid>]";
 
 export interface DevStackInvocation {
-  command: "status" | "stop";
+  // `forget` drops a record without signalling anything. It is the way out of
+  // the one state `stop` refuses to resolve on its own: a recorded pid that is
+  // alive but that this machine cannot date, which `stop` will not signal
+  // because the pid may since have been recycled by an unrelated program.
+  command: "status" | "stop" | "forget";
   all: boolean;
   pid: number | null;
 }
 
 export function parseDevStackInvocation(args: string[]): DevStackInvocation {
   const command = args.find((argument) => !argument.startsWith("--"));
-  if (command !== "status" && command !== "stop") throw new Error(USAGE);
+  if (command !== "status" && command !== "stop" && command !== "forget") throw new Error(USAGE);
   const raw = args.find((argument) => argument.startsWith("--pid="))?.slice("--pid=".length);
   const pid = raw === undefined ? null : Number(raw);
   if (pid !== null && (!Number.isInteger(pid) || pid <= 0)) throw new Error("--pid must be a positive integer.");
@@ -52,9 +57,15 @@ export function parseDevStackInvocation(args: string[]): DevStackInvocation {
 
 export type DevStackScope = { kind: "all" } | { kind: "pid"; pid: number } | { kind: "worktree"; projectRoot: string };
 
+// Reading and killing get different defaults on purpose. `status` answers
+// "what is on this machine", and the sibling stack holding the port this
+// worktree wanted is the whole reason to ask - a report scoped to this
+// worktree would leave it out and show nothing at all. `stop` and `forget`
+// touch other people's processes, so they stay on this worktree until the
+// developer names another one.
 export function devStackScope(invocation: DevStackInvocation, projectRoot: string): DevStackScope {
-  if (invocation.all) return { kind: "all" };
   if (invocation.pid !== null) return { kind: "pid", pid: invocation.pid };
+  if (invocation.all || invocation.command === "status") return { kind: "all" };
   return { kind: "worktree", projectRoot };
 }
 
@@ -73,36 +84,77 @@ function ownedProcess(pid: number): OwnedProcess {
   return { pid, exitCode: null };
 }
 
-// Two rounds, for the two ways a stack ends up needing this. A supervisor that
-// is still alive tears its own children down when it gets SIGTERM, which is
-// the clean path and the one that removes the instance records. A supervisor
-// that is already gone left its detached children holding the ports, and those
-// have to be signalled directly.
-async function stopDevStack(record: DevStackRecord): Promise<void> {
-  // The recorded check, not a bare `kill(pid, 0)`: a supervisor pid the system
-  // has since recycled belongs to some unrelated program, and this command
-  // must never send it a signal.
-  if (isLiveRecordedProcess({ pid: record.supervisorPid, startedAt: record.startedAt })) {
+// Signal only what this machine can still prove is ours.
+//
+// `isProcessAlive` says a pid is taken, not by what: a supervisor killed with
+// SIGKILL leaves its record behind, and the system reuses pids. Sending
+// SIGTERM on that evidence alone is how a stop command kills a stranger's
+// program. `verifyRecordedProcess` compares the process start time against the
+// record and answers "gone" for a recycled pid - or "unverified" when the
+// start time cannot be read at all, which is not permission to signal.
+//
+// A supervisor that is still alive tears its own children down, which is the
+// clean path. One that is already gone left its detached children holding the
+// ports, and those are signalled by group, because the group is what holds
+// them.
+async function stopDevStack(record: DevStackRecord): Promise<boolean> {
+  let unresolved = false;
+  const refuse = (pid: number, what: string): void => {
+    logger.error(
+      `Cannot confirm pid ${pid} is still ${what} of this stack, so it was not signalled. ` +
+        "Stop it yourself, then drop the record with `bun run dev:forget`.",
+    );
+    unresolved = true;
+  };
+
+  const supervisor: RecordedProcessState = verifyRecordedProcess({
+    pid: record.supervisorPid,
+    startedAt: record.startedAt,
+  });
+  if (supervisor === "live") {
     // "process", not its group: the supervisor sits in whatever group the
     // shell or `bun run` that started it leads, so a group signal would go to
     // that job instead of to the runner.
-    await stopOwnedProcesses([ownedProcess(record.supervisorPid)], "SIGTERM", {
-      scope: "process",
-      timeoutMs: 5_000,
-    });
+    await stopOwnedProcesses([ownedProcess(record.supervisorPid)], "SIGTERM", { scope: "process", timeoutMs: 5_000 });
+  } else if (supervisor === "unverified") {
+    refuse(record.supervisorPid, "the runner");
   }
-  // Whatever the supervisor did not take with it. These were spawned detached,
-  // so each leads a group and the group is what holds the ports: Electron's
-  // helpers and the Vite worker outlive their parent otherwise.
-  const survivors = record.processes.filter(isLiveRecordedProcess);
-  if (survivors.length > 0) {
-    logger.info(`Stopping ${survivors.length} process group(s) the supervisor left behind.`);
-    await stopOwnedProcesses(
-      survivors.map((entry) => ownedProcess(entry.pid)),
-      "SIGTERM",
-      { scope: "group", timeoutMs: 5_000 },
-    );
+
+  const groups: OwnedProcess[] = [];
+  for (const entry of record.processes) {
+    const state = verifyRecordedProcess(entry);
+    if (state === "live") {
+      groups.push(ownedProcess(entry.pid));
+    } else if (state === "unverified") {
+      refuse(entry.pid, `the ${entry.name} process`);
+    } else if (isProcessGroupAlive(entry.pid)) {
+      // The leader is gone and its group is not. Something it started - the
+      // Electron behind electron-vite - still holds the port, but the pid that
+      // named the group belongs to nobody now, so signalling it would be
+      // signalling a group this record can no longer claim.
+      logger.error(
+        `The ${entry.name} process group ${entry.pid} outlived its leader and cannot be attributed to this stack. ` +
+          `Find what holds ${record.ports.map((port) => port.port).join(", ")} with lsof, and stop it yourself.`,
+      );
+      unresolved = true;
+    }
   }
+  if (groups.length > 0) {
+    logger.info(`Stopping ${groups.length} process group(s) the supervisor left behind.`);
+    await stopOwnedProcesses(groups, "SIGTERM", { scope: "group", timeoutMs: 5_000 });
+  }
+
+  // Last, and only when nothing was left unresolved: while this record exists,
+  // its ports stay reserved and `dev:status` still names the pids. Dropping it
+  // over something this command refused to touch would turn a visible problem
+  // into an invisible one.
+  if (unresolved) return false;
+  forgetDevStack(record);
+  return true;
+}
+
+// A stack record is a note about pids, so removing it removes nothing else.
+function forgetDevStack(record: DevStackRecord): void {
   removeDevStackRecord(record);
   // A stack the supervisor never got to clean up leaves its instance records
   // behind too. They would be pruned on the next read, but only once `ps`
@@ -116,7 +168,11 @@ interface ReportableDevStackProcess {
   name: DevStackService;
   pid: number;
   startedAt: number;
-  live: boolean;
+  // "live" is this stack's process. "unverified" is a pid this machine cannot
+  // date, which `stop` refuses to signal. "gone" with `groupLive` is a
+  // survivor of a dead leader, still holding the port.
+  state: RecordedProcessState;
+  groupLive: boolean;
 }
 
 export interface ReportableDevStack {
@@ -142,7 +198,11 @@ function reportableStack(record: DevStackRecord, projectRoot: string): Reportabl
     worktree: isSameWorktree(record, projectRoot),
     orphaned: isOrphanedDevStack(record),
     startedAt: new Date(record.startedAt).toISOString(),
-    processes: record.processes.map((entry) => ({ ...entry, live: isLiveRecordedProcess(entry) })),
+    processes: record.processes.map((entry) => ({
+      ...entry,
+      state: verifyRecordedProcess(entry),
+      groupLive: isProcessGroupAlive(entry.pid),
+    })),
   };
 }
 
@@ -173,30 +233,55 @@ async function main(): Promise<void> {
       logger.info(
         `No dev stack belongs to this worktree. Live elsewhere:\n${records.map((record) => `- ${describeDevStack(record)}`).join("\n")}`,
       );
-      logger.info("Stop one of those with --pid=<supervisor pid>, or every stack with --all.");
+      logger.info(`Name one of those with --pid=<supervisor pid>, or every stack with --all.`);
       return;
     }
     logger.info("No dev stack is running.");
     return;
   }
+  const settled: DevStackRecord[] = [];
   for (const record of selected) {
+    if (invocation.command === "forget") {
+      logger.info(`Forgetting ${describeDevStack(record)}. Nothing was signalled.`);
+      forgetDevStack(record);
+      settled.push(record);
+      continue;
+    }
     logger.info(`Stopping ${describeDevStack(record)}`);
-    await stopDevStack(record);
+    if (await stopDevStack(record)) settled.push(record);
   }
+  // A record this command refused to touch is the whole reason to fail: the
+  // exit code is what a script driving `dev:stop` reads, and a silent success
+  // there would let it start a stack on a port somebody still holds.
+  if (settled.length < selected.length) process.exitCode = 1;
   const remaining = readDevInstanceRecords();
   if (remaining.length > 0) {
     logger.info(`Still published:\n${remaining.map((record) => `- ${describeDevInstance(record)}`).join("\n")}`);
   }
   process.stdout.write(
     `${JSON.stringify(
-      { stopped: selected.map((record) => ({ supervisorPid: record.supervisorPid, services: record.services })) },
+      {
+        [invocation.command === "forget" ? "forgotten" : "stopped"]: settled.map((record) => ({
+          supervisorPid: record.supervisorPid,
+          services: record.services,
+        })),
+        unresolved: selected
+          .filter((record) => !settled.includes(record))
+          .map((record) => ({ supervisorPid: record.supervisorPid, services: record.services })),
+      },
       null,
       2,
     )}\n`,
   );
 }
 
-void main().catch((error) => {
-  logger.error(error instanceof Error ? error.message : toLogValue(error));
-  process.exitCode = 1;
-});
+// Only when run as a command, like its siblings. Importing this file - a test
+// covering the scope rules, an editor's language server - must never signal a
+// process or delete a record as a side effect of the import.
+const invokedFile = process.argv[1] ? resolve(process.argv[1]) : "";
+if (invokedFile === fileURLToPath(import.meta.url)) {
+  void main().catch((error) => {
+    logger.error(error instanceof Error ? error.message : toLogValue(error));
+    process.exitCode = 1;
+  });
+}

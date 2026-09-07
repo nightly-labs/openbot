@@ -8,7 +8,7 @@
 // No test here waits on the clock. The second allocator's `onWait` fires when
 // it has seen the lock held, and that is the observable condition the first one
 // waits for before it publishes.
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -99,8 +99,24 @@ describe("withDevPortAllocation", () => {
     expect(waited).toEqual([process.pid]);
   });
 
-  it("breaks a lock left behind half-written", async () => {
+  it("waits out a lock it cannot read instead of assuming nobody holds it", async () => {
+    // A file that parses as nothing is not a file nobody holds. `link`
+    // publishes the lock and its contents in one step, so the only way to see
+    // this is a leftover from an older runner - or a lock in the moment before
+    // its holder's write lands, if a future change ever reintroduces one. Both
+    // are worth waiting for; taking it would put two allocators on one port.
     writeFileSync(lockPath, '{"pid": 4');
+
+    await expect(
+      withDevPortAllocation(async () => {}, { directory, readRecords: () => [], waitMs: 0 }),
+    ).rejects.toThrow("still held by pid unknown");
+    expect(readFileSync(lockPath, "utf8")).toBe('{"pid": 4');
+  });
+
+  it("breaks a lock it cannot read once it has sat there past the stale window", async () => {
+    writeFileSync(lockPath, '{"pid": 4');
+    const longAgo = new Date(Date.now() - 60_000);
+    utimesSync(lockPath, longAgo, longAgo);
     let entered = false;
 
     await withDevPortAllocation(
@@ -112,6 +128,20 @@ describe("withDevPortAllocation", () => {
 
     expect(entered).toBe(true);
     expect(existsSync(lockPath)).toBe(false);
+  });
+
+  it("gives up rather than take the lock from a holder that is alive and still allocating", async () => {
+    // This process, taken a moment ago: the one state where waiting is the
+    // only correct answer. An allocator that ran its wait out and then helped
+    // itself would hand both stacks the same ports - the collision the lock
+    // exists to stop - so the developer gets the error and the holder's pid.
+    const holder = JSON.stringify({ pid: process.pid, acquiredAt: Date.now() });
+    writeFileSync(lockPath, holder);
+
+    await expect(
+      withDevPortAllocation(async () => {}, { directory, readRecords: () => [], waitMs: 0 }),
+    ).rejects.toThrow(`still held by pid ${process.pid}`);
+    expect(readFileSync(lockPath, "utf8")).toBe(holder);
   });
 
   it("breaks a lock whose holder never released it", async () => {

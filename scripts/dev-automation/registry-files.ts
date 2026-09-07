@@ -123,10 +123,12 @@ export function isRecordedProcess(record: { startedAt: number }, processStartedA
 }
 
 // Wall-clock start of a live process, or null when it cannot be read. `lstart`
-// is a full local timestamp on both macOS and Linux; `ps` on Windows is not
-// this program at all, so it is not asked.
+// is a full local timestamp on both macOS and Linux; Windows has no `ps` of
+// this kind, so PowerShell answers the same question there. A stop command
+// refuses to signal a pid this cannot date, so returning null is safe but not
+// free: it costs the developer the command.
 export function readProcessStartedAt(pid: number): number | null {
-  if (process.platform === "win32") return null;
+  if (process.platform === "win32") return readWindowsProcessStartedAt(pid);
   try {
     const reported = execFileSync("ps", ["-p", String(pid), "-o", "lstart="], {
       encoding: "utf8",
@@ -143,4 +145,56 @@ export function readProcessStartedAt(pid: number): number | null {
 export function isLiveRecordedProcess(entry: { pid: number; startedAt: number }): boolean {
   if (!isProcessAlive(entry.pid)) return false;
   return isRecordedProcess(entry, readProcessStartedAt(entry.pid));
+}
+
+function readWindowsProcessStartedAt(pid: number): number | null {
+  try {
+    const reported = execFileSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        `(Get-Process -Id ${pid}).StartTime.ToUniversalTime().ToString('o')`,
+      ],
+      { encoding: "utf8", timeout: 5_000, stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
+    const parsed = Date.parse(reported);
+    return Number.isNaN(parsed) ? null : parsed;
+  } catch {
+    return null;
+  }
+}
+
+export type RecordedProcessState = "live" | "gone" | "unverified";
+
+// The fail-closed half of `isRecordedProcess`, for the caller that is about to
+// *signal* the pid rather than read it. Discovery can accept an unknown start
+// time and be wrong about which app it drives; a stop command cannot, because
+// being wrong there means sending SIGTERM to whatever unrelated program
+// inherited that pid. "unverified" is not "live": it is the answer the caller
+// has to handle, by leaving the process alone and saying so.
+export function verifyRecordedProcess(
+  entry: { pid: number; startedAt: number },
+  readStartedAt: (pid: number) => number | null = readProcessStartedAt,
+): RecordedProcessState {
+  if (!isProcessAlive(entry.pid)) return "gone";
+  const startedAt = readStartedAt(entry.pid);
+  if (startedAt === null) return "unverified";
+  return isRecordedProcess(entry, startedAt) ? "live" : "gone";
+}
+
+// Whether *anything* is left in the process group a detached child leads. A
+// group outlives its leader: electron-vite exits, and the Electron it started
+// keeps the renderer port. Signal 0 to the negated pid asks about the group,
+// and EPERM is a yes - the group exists and belongs to somebody else.
+export function isProcessGroupAlive(pid: number, platform: NodeJS.Platform = process.platform): boolean {
+  // Windows has no process groups to ask about.
+  if (platform === "win32") return false;
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch (error) {
+    return error instanceof Error && "code" in error && error.code === "EPERM";
+  }
 }

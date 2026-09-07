@@ -15,7 +15,7 @@ import {
   selectDevInstance,
   writeDevInstanceRecord,
 } from "./instance-registry";
-import { assertOwnerOnlyDirectory, isRecordedProcess } from "./registry-files";
+import { assertOwnerOnlyDirectory, isRecordedProcess, verifyRecordedProcess } from "./registry-files";
 
 function record(overrides: Partial<DevInstanceRecord> = {}): DevInstanceRecord {
   return {
@@ -170,6 +170,28 @@ describe("isRecordedProcess", () => {
     // readings, so a start marginally later than the record still matches.
     expect(isRecordedProcess(record({ startedAt: 100_000 }), 101_000)).toBe(true);
     expect(isRecordedProcess(record({ startedAt: 100_000 }), null)).toBe(true);
+  });
+});
+
+// The same question, asked by a caller that is about to signal the pid rather
+// than read it. Discovery may accept an unknown start time; `dev:stop` may not,
+// because being wrong there means SIGTERM to a stranger's program.
+describe("verifyRecordedProcess", () => {
+  const started = (at: number) => (): number => at;
+
+  it("refuses to confirm a live pid it cannot date", () => {
+    // `ps` denied, or absent. Neither is evidence that this pid is still ours.
+    expect(verifyRecordedProcess({ pid: process.pid, startedAt: Date.now() }, () => null)).toBe("unverified");
+  });
+
+  it("separates the recorded process from one that inherited its pid", () => {
+    expect(verifyRecordedProcess({ pid: process.pid, startedAt: 100_000 }, started(99_000))).toBe("live");
+    expect(verifyRecordedProcess({ pid: process.pid, startedAt: 100_000 }, started(160_000))).toBe("gone");
+  });
+
+  it("reports a pid nothing holds as gone", () => {
+    // Above the maximum pid on every platform this runs on, so it is free.
+    expect(verifyRecordedProcess({ pid: 0x3fffffff, startedAt: 1_000 }, started(1_000))).toBe("gone");
   });
 });
 

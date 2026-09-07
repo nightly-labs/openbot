@@ -148,9 +148,14 @@ which of these your change touched.**
 3. **Killing processes by pattern.** `pkill -f electron` or `pkill -f bun` kills other sessions' work
    mid-write. `bun run dev:status` lists every stack live on this machine with its ports, pids and
    worktree, and `bun run dev:stop` stops this worktree's stack and the children it left behind from
-   the registry - a lookup, not a pattern. Another worktree's stack takes `--pid=<supervisor pid>`,
-   and every stack takes `--all`, so stopping someone else's work is a thing you say rather than a
-   side effect. Anything not in the registry: target a PID you started, or ask.
+   the registry - a lookup, not a pattern. `dev:status` reports every stack, because the one holding
+   the port this worktree wanted is a sibling's; `dev:stop` acts on this worktree only. Another
+   worktree's stack takes `--pid=<supervisor pid>`, and every stack takes `--all`, so stopping
+   someone else's work is a thing you say rather than a side effect. A pid is signalled only while
+   its start time still matches the record, so a recycled pid is left alone: `dev:stop` reports what
+   it could not confirm, keeps the record and exits non-zero, and `bun run dev:forget` drops such a
+   record once you have dealt with the process yourself. Anything not in the registry: target a PID
+   you started, or ask.
 
 ## Words we use
 

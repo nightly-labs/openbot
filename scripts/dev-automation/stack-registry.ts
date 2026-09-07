@@ -20,6 +20,7 @@ import {
   assertRegistryDirectoryOwnership,
   ensureOwnerOnlyDirectory,
   isLiveRecordedProcess,
+  isProcessGroupAlive,
   writeRegistryFile,
 } from "./registry-files";
 
@@ -151,13 +152,22 @@ export function removeDevStackRecord(
 // `dev:stop` clears them.
 export type RecordedProcessLiveness = (entry: { pid: number; startedAt: number }) => boolean;
 
+// A recorded child is worth keeping while it runs *or* while anything it
+// started does. Each child was spawned detached and leads its own group, and
+// the group outlives it: electron-vite exits, the Electron it started keeps
+// 5173 and 9333. Pruning the record then would drop the only note of which
+// pids those are, and hand a bound port to the next worktree as free.
+export function holdsDevStackResources(entry: { pid: number; startedAt: number }): boolean {
+  return isLiveRecordedProcess(entry) || isProcessGroupAlive(entry.pid);
+}
+
 function supervisor(record: DevStackRecord): { pid: number; startedAt: number } {
   return { pid: record.supervisorPid, startedAt: record.startedAt };
 }
 
 export function isDevStackLive(
   record: DevStackRecord,
-  isLive: RecordedProcessLiveness = isLiveRecordedProcess,
+  isLive: RecordedProcessLiveness = holdsDevStackResources,
 ): boolean {
   return isLive(supervisor(record)) || record.processes.some((entry) => isLive(entry));
 }
@@ -167,7 +177,7 @@ export function isDevStackLive(
 // only thing that still knows which pids they are.
 export function isOrphanedDevStack(
   record: DevStackRecord,
-  isLive: RecordedProcessLiveness = isLiveRecordedProcess,
+  isLive: RecordedProcessLiveness = holdsDevStackResources,
 ): boolean {
   return !isLive(supervisor(record)) && record.processes.some((entry) => isLive(entry));
 }

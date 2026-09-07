@@ -5,14 +5,17 @@
 // a record outlives the supervisor for as long as its detached children hold
 // the ports, and the conflict query separates a second `bun run dev` in this
 // worktree from the sibling worktrees that are supposed to run beside it.
+import { spawn } from "node:child_process";
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { isProcessAlive } from "./registry-files";
 import {
   conflictingDevStacks,
   type DevStackRecord,
   heldDevStackPorts,
+  holdsDevStackResources,
   isDevStackLive,
   isOrphanedDevStack,
   isSameWorktree,
@@ -74,6 +77,28 @@ describe("dev stack liveness", () => {
 
     expect(isDevStackLive(record, both)).toBe(true);
     expect(isOrphanedDevStack(record, both)).toBe(false);
+  });
+
+  it("keeps a stack whose recorded leader is gone and whose process group still holds the ports", async () => {
+    // Nothing here is fakeable, because the reason this record must survive is
+    // an operating system behaviour: electron-vite exits and the Electron it
+    // started keeps the renderer port, in the group the exited leader named.
+    // Pruning the record there frees a port that is still bound, and the next
+    // worktree takes it and fails to bind. `sh` plays the leader, `sleep` the
+    // survivor.
+    const leader = spawn("sh", ["-c", "sleep 30 &"], { detached: true, stdio: "ignore" });
+    const pid = leader.pid ?? 0;
+    await new Promise<void>((resolveExit) => leader.once("exit", () => resolveExit()));
+    try {
+      expect(isProcessAlive(pid)).toBe(false);
+      expect(holdsDevStackResources({ pid, startedAt: Date.now() })).toBe(true);
+      // A pid above the maximum on every platform this runs on, so the
+      // supervisor is provably gone and the group is the only thing left.
+      const record = stack({ supervisorPid: 0x3fffffff, processes: [{ name: "app", pid, startedAt: Date.now() }] });
+      expect(isDevStackLive(record)).toBe(true);
+    } finally {
+      process.kill(-pid, "SIGKILL");
+    }
   });
 
   it("lets a stack go once nothing it recorded is running", () => {
