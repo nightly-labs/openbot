@@ -20,6 +20,12 @@ describe("embeddedBrowserUserAgentForUrl", () => {
     );
   });
 
+  it("uses a standard Chromium identity for WhatsApp Web, which refuses an unknown product", () => {
+    expect(embeddedBrowserUserAgentForUrl(userAgent, "https://web.whatsapp.com/")).toBe(
+      "Mozilla/5.0 AppleWebKit/537.36 Chrome/152.0.7977.54 Safari/537.36",
+    );
+  });
+
   it("keeps the embedded app identity for other sites", () => {
     expect(embeddedBrowserUserAgentForUrl(userAgent, "https://accounts.google.com/")).toContain("OpenBot/0.3.5");
   });
