@@ -248,7 +248,7 @@
   --openbot-radius-sm: 6px;
   --openbot-radius-md: 8px;
   --openbot-radius-lg: 12px;
-  --openbot-radius-dialog: 14px;
+  --openbot-radius-card: 14px;
   --openbot-radius-xl: 20px;
   --openbot-radius-bubble: 22px;
   --openbot-radius-bubble-inset: calc(var(--openbot-radius-bubble) - var(--openbot-space-3) - 1px);
@@ -263,7 +263,13 @@
   --openbot-control-xl: 40px;
   /* Unitless on purpose. Lucide icons carry viewBox="0 0 24 24", so CSS stroke-width
    * resolves in user units, not px: a literal 1px paints 1 * (16/24) = 0.67 device px at
-   * the 16px default size and reads blurry. 1.5 user units is the 1px the design asks for. */
+   * the 16px default size and reads blurry. 1.5 user units is the 1px the design asks for.
+   *
+   * Which is also why three kinds of SVG keep a weight of their own rather than reading
+   * this: the hand-written icons under src/renderer/src/features draw on a 16- or 20-unit
+   * viewBox, so the same number paints a different device weight there; the onboarding
+   * computer is a drawing, not an icon; and the checkbox tick would come out at 0.75
+   * device px inside its 12px box. Every lucide icon in the renderer reads this token. */
   --openbot-icon-stroke: 1.5;
   --openbot-icon-xs: 12px;
   --openbot-icon-sm: 14px;

@@ -73,7 +73,7 @@
   height: var(--openbot-icon-md);
   flex: 0 0 auto;
   color: var(--openbot-text-secondary);
-  stroke-width: 1.6;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .ui-action-menu > hr,

@@ -85,11 +85,6 @@
   line-height: var(--openbot-leading-2xl);
 }
 
-:where(.ui-heading)[data-size="display"] {
-  font-size: var(--openbot-text-display);
-  line-height: var(--openbot-leading-display);
-}
-
 :where(.ui-heading) {
   font-weight: var(--openbot-weight-semibold);
   letter-spacing: var(--openbot-tracking-tight);
@@ -291,7 +286,7 @@
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
   flex: 0 0 auto;
-  stroke-width: 1.75;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 :where(.ui-button-size-icon-xs) svg {
@@ -336,7 +331,7 @@
 
 :where(.z-badge) {
   width: fit-content;
-  height: 20px;
+  height: 22px;
   min-width: 0;
   display: inline-flex;
   overflow: hidden;
@@ -373,14 +368,14 @@
 }
 
 :where(.z-badge)[data-size="sm"] {
-  min-height: 16px;
-  height: 16px;
+  min-height: 18px;
+  height: 18px;
   padding: 0 var(--openbot-space-1);
   font-size: var(--openbot-text-2xs);
 }
 
 :where(.z-badge)[data-size="md"] {
-  min-height: 20px;
+  min-height: 22px;
   padding: var(--openbot-space-0-5) var(--openbot-space-1-5);
 }
 
@@ -521,6 +516,8 @@
 .ui-checkbox-visual svg {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
+  /* Heavier than --openbot-icon-stroke deliberately: a tick is a state indicator, and the
+   * shared weight paints 0.75 device px inside this 12px box. */
   stroke-width: 2.5;
 }
 
@@ -943,7 +940,7 @@
 
 .ui-card {
   border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-bg-surface);
 }
 
@@ -951,7 +948,7 @@
   display: grid;
   overflow: hidden;
   border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-bg-surface);
 }
 
@@ -1478,7 +1475,7 @@
 .ui-toast-icon {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
-  stroke-width: 1.75;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .ui-toast-loading-icon {
@@ -1726,7 +1723,7 @@
 
 .ui-dialog-content {
   border: 0;
-  border-radius: var(--openbot-radius-dialog);
+  border-radius: var(--openbot-radius-card);
   box-shadow: 0 0 0 1px var(--openbot-dialog-ring);
 }
 

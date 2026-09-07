@@ -238,7 +238,7 @@ body:has(.dynamic-island-surface),
 }
 
 .dynamic-island-surface-status-badge-icon {
-  stroke-width: 2.25;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .dynamic-island-surface-question-badge {
@@ -433,7 +433,7 @@ body:has(.dynamic-island-surface),
 .dynamic-island-message-first-footer svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
-  stroke-width: 2;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .dynamic-island-surface-attention-panel {
@@ -621,7 +621,7 @@ div.dynamic-island-surface-context-line span {
 .dynamic-island-surface-actions svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
-  stroke-width: 2;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .dynamic-island-surface-attention-panel .ui-button {

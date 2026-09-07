@@ -3,7 +3,7 @@ import { omit } from "solid-js";
 import { cx } from "./utils";
 
 export type TextVariant = "caption" | "label-sm" | "label" | "body-sm" | "body";
-export type HeadingSize = "sm" | "md" | "lg" | "display";
+export type HeadingSize = "sm" | "md" | "lg";
 export type TextTone = "primary" | "secondary" | "muted" | "danger" | "success" | "warning";
 
 type TextElement = "span" | "p" | "div" | "small" | "strong" | "label";

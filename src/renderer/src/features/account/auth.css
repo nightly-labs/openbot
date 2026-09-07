@@ -536,7 +536,7 @@
   stroke: currentcolor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.5;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .initial-setup-eyebrow {
@@ -621,7 +621,7 @@
   stroke: currentcolor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.4;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .setup-route-icon i {

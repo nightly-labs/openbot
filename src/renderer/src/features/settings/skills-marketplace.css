@@ -51,10 +51,13 @@
   color: var(--openbot-text-muted);
 }
 .skills-marketplace-tab {
-  height: 28px;
+  height: var(--openbot-control-sm);
   padding-inline: var(--openbot-space-3);
-  border-radius: var(--openbot-radius-lg);
+  border-radius: var(--openbot-radius-sm);
   color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-sm);
+  font-weight: var(--openbot-weight-medium);
 }
 .skills-marketplace-kind-tab[data-active],
 .skills-marketplace-tab[data-active] {

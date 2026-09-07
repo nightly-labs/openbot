@@ -125,7 +125,7 @@
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
   flex: 0 0 auto;
-  stroke-width: 1.65;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .global-search-control .global-search-input {
@@ -524,7 +524,7 @@
   height: 20px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.35;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .server-rail-tooltip {
@@ -791,7 +791,7 @@ textarea {
 .sidebar-marketplace-button > svg {
   width: 18px;
   height: 18px;
-  stroke-width: 1.8;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .sidebar-search-wrap {
@@ -1600,7 +1600,7 @@ textarea {
   height: 10px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.8;
+  stroke-width: var(--openbot-icon-stroke);
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -1663,9 +1663,9 @@ textarea {
   margin: 0;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-2xl);
-  line-height: 25px;
-  font-weight: 600;
-  letter-spacing: -0.25px;
+  line-height: var(--openbot-leading-2xl);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-tight);
 }
 
 .agent-delete-dialog > p {
@@ -1943,7 +1943,7 @@ textarea {
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
-  stroke-width: 1.5;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .avatar-image-upload-preview .agent-avatar {
@@ -2403,7 +2403,7 @@ textarea {
 .account-dock-icon-button > svg {
   width: 18px;
   height: 18px;
-  stroke-width: 2.35;
+  stroke-width: var(--openbot-icon-stroke);
   transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
@@ -2450,7 +2450,7 @@ textarea {
 .account-dock-usage-chip > svg {
   width: 15px;
   height: 15px;
-  stroke-width: 2.35;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .account-dock-usage-chip > strong {
@@ -2529,7 +2529,7 @@ textarea {
   height: var(--openbot-icon-md);
   flex: 0 0 auto;
   color: var(--openbot-text-primary);
-  stroke-width: 2;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .account-usage-popover-title {
@@ -2605,7 +2605,7 @@ textarea {
 .account-usage-refresh > svg {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
-  stroke-width: 2.5;
+  stroke-width: var(--openbot-icon-stroke);
   transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
@@ -2812,16 +2812,19 @@ textarea {
   line-height: 14px;
 }
 
+/* The design's "New" badge. Not --openbot-success: an update being available is an
+ * announcement, not the report of something that succeeded. */
 .sidebar-update-pill {
   flex: 0 0 auto;
+  border: 1px solid var(--openbot-badge-new-border);
   border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-success-soft);
+  background: var(--openbot-badge-new-soft);
   padding: 2px 7px;
-  color: var(--openbot-success);
+  color: var(--openbot-badge-new);
   font-size: var(--openbot-text-2xs);
   line-height: 16px;
   letter-spacing: 0.01em;
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
   justify-self: end;
 }
 
@@ -2831,7 +2834,7 @@ textarea {
   grid-column: 4;
   fill: none;
   stroke: currentcolor;
-  stroke-width: 1.5;
+  stroke-width: var(--openbot-icon-stroke);
   stroke-linecap: round;
   stroke-linejoin: round;
   color: var(--openbot-text-muted);
@@ -2947,7 +2950,7 @@ textarea {
   flex: 0 0 auto;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: var(--openbot-icon-stroke);
   stroke-linecap: round;
   stroke-linejoin: round;
   color: var(--openbot-text-primary);

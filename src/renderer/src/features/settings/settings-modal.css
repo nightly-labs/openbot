@@ -84,7 +84,7 @@
 .settings-modal-nav-item svg {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
-  stroke-width: 1.75;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .settings-modal-nav-item[aria-current="page"] {
@@ -331,7 +331,7 @@
   width: min(920px, calc(100vw - 48px));
   height: min(640px, calc(100dvh - 48px));
   grid-template-columns: 196px minmax(0, 1fr);
-  border-radius: var(--openbot-radius-dialog);
+  border-radius: var(--openbot-radius-card);
   box-shadow:
     var(--openbot-shadow-raised),
     0 0 0 1px var(--openbot-dialog-ring);

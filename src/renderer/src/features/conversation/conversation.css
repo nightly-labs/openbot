@@ -104,7 +104,7 @@
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.2;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .direct-message-list {
@@ -284,7 +284,7 @@
   height: var(--openbot-icon-md);
   flex: 0 0 auto;
   margin-left: 11px;
-  stroke-width: 1.7;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .chat-search .chat-search-input {
@@ -336,7 +336,7 @@
 .chat-search-button svg {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
-  stroke-width: 1.7;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .chat-search .chat-search-close {
@@ -422,7 +422,7 @@
   height: 15px;
   flex: 0 0 auto;
   color: var(--openbot-text-muted);
-  stroke-width: 1.7;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .file-preview-content {
@@ -714,7 +714,7 @@
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.25;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .remote-desktop-overlay > button {
@@ -1111,7 +1111,7 @@
 .agent-settings-nav-button > svg {
   width: 16px;
   height: 16px;
-  stroke-width: 1.5;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .agent-settings-nav-button:hover {
@@ -1290,7 +1290,7 @@
 .agent-settings-link-value svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
-  stroke-width: 1.7;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1399,7 +1399,7 @@
 .agent-routine-status-icon-paused > svg {
   width: 14px;
   height: 14px;
-  stroke-width: 1.8;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1768,7 +1768,7 @@
 .agent-routine-run-icon > svg {
   width: 16px;
   height: 16px;
-  stroke-width: 1.8;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .agent-routine-run-icon-succeeded {
@@ -2833,7 +2833,7 @@
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.8;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .scroll-to-latest-button:focus-visible {
@@ -3079,7 +3079,7 @@
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.25;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .message-action-button svg circle:not(:first-child),
@@ -3167,7 +3167,7 @@
 .message-reaction-pill {
   display: flex;
   min-width: 0;
-  height: var(--openbot-leading-lg);
+  height: var(--openbot-icon-lg);
   align-items: center;
   justify-content: center;
   border: 0;
@@ -3200,7 +3200,7 @@
 }
 
 .ui-bubble-reactions.message-reaction-anchor:has(> .message-reaction-pill:only-child) > .message-reaction-pill {
-  width: var(--openbot-leading-lg);
+  width: var(--openbot-icon-lg);
   border-radius: var(--openbot-radius-pill);
 }
 
@@ -3272,7 +3272,7 @@
   width: 14px;
   height: 14px;
   flex: 0 0 14px;
-  stroke-width: 1.5;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .thinking-label {
@@ -3788,9 +3788,13 @@ button.chat-action-target:active,
   background: var(--openbot-danger-soft);
   box-shadow: 0 0 0 5px var(--openbot-danger-soft);
   color: var(--openbot-danger);
-  font-size: var(--openbot-text-5xl);
-  font-weight: 350;
-  line-height: 1;
+}
+
+/* Was a 40px U+00D7 sized off a type token, which is why the scale carried a step no
+ * copy in the app used. */
+.image-generation-failure-mark > svg {
+  width: var(--openbot-control-xl);
+  height: var(--openbot-control-xl);
 }
 
 .image-generation-glow {
@@ -4778,7 +4782,7 @@ button.chat-action-target:active,
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.5;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .message-code-scroll {
@@ -4815,7 +4819,7 @@ button.chat-action-target:active,
 }
 
 .message-code-line-number {
-  width: 34px;
+  width: 40px;
   flex: none;
   padding-right: 8px;
   color: var(--openbot-text-dim);
@@ -5020,8 +5024,8 @@ button.chat-action-target:active,
 
 .message-citation-mark {
   display: inline-flex;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   align-items: center;
   justify-content: center;
   margin: 0 2px;
@@ -5120,7 +5124,7 @@ button.chat-action-target:active,
 }
 
 .message-citation-ref .message-citation-mark {
-  flex: 0 0 16px;
+  flex: 0 0 18px;
   margin: 0;
 }
 
@@ -5162,7 +5166,7 @@ button.chat-action-target:active,
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.8;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .message-citation-ref:hover,
@@ -5474,7 +5478,7 @@ button.chat-action-target:active,
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.35;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 [data-slot="bubble"][data-author="user"] .message-file-reference {
@@ -5534,7 +5538,7 @@ button.chat-action-target:active,
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.45;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .choice-card {
@@ -6480,7 +6484,7 @@ button.chat-action-target:active,
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.45;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .attachment-open-button:focus-visible,
@@ -6678,7 +6682,7 @@ button.chat-action-target:active,
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.5;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .agent-queue-attachment {
@@ -6711,7 +6715,7 @@ button.chat-action-target:active,
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.5;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .agent-queue-icon-button .conversation-more-icon {
@@ -7098,7 +7102,7 @@ button.chat-action-target:active,
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
   flex: 0 0 auto;
-  stroke-width: 2;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .browser-takeover-copy {
@@ -7149,7 +7153,7 @@ button.chat-action-target:active,
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   flex: 0 0 auto;
-  stroke-width: 1.6;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .browser-takeover-preview-bar span,
@@ -7207,7 +7211,7 @@ button.chat-action-target:active,
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
   margin-bottom: var(--openbot-space-1);
-  stroke-width: 1.4;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .browser-takeover-preview-fallback strong {
@@ -7302,7 +7306,7 @@ button.chat-action-target:active,
   height: var(--openbot-icon-sm);
   flex: 0 0 auto;
   color: var(--openbot-success);
-  stroke-width: 1.7;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .question-prompt-complete:not([data-state="answered"]) .question-prompt-complete-status svg {
@@ -7411,7 +7415,7 @@ button.chat-action-target:active,
 .question-prompt-navigation-button svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
-  stroke-width: 1.6;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .question-prompt-navigation .ui-questionnaire-progress {
@@ -7513,7 +7517,7 @@ button.chat-action-target:active,
 .question-prompt-choice-arrow svg {
   width: 100%;
   height: 100%;
-  stroke-width: 1.5;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .question-prompt-options
@@ -7756,7 +7760,7 @@ button.chat-action-target:active,
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .approval-card-footer {
@@ -7784,7 +7788,7 @@ button.chat-action-target:active,
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.4;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .approval-button {
