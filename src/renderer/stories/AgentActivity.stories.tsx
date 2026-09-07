@@ -1,5 +1,6 @@
 import { createSignal, onSettled } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { Button } from "../src/components/ui/button";
 import { AgentActivityIndicator, ThinkingDisclosure } from "../src/features/conversation/AgentActivity";
 import { STORY_AGENTS } from "./fixtures";
 
@@ -99,6 +100,35 @@ export const ThinkingDetails: IndicatorStory = {
         open={open()}
         onOpenChange={setOpen}
       />
+    );
+  },
+};
+
+/** The same live-to-settled disclosure used by Codex, Claude, and Grok. */
+export const ReasoningSettles: IndicatorStory = {
+  args: Working.args,
+  render: () => {
+    const [working, setWorking] = createSignal(true);
+    const [open, setOpen] = createSignal<boolean | undefined>(undefined);
+    return (
+      <div>
+        <ThinkingDisclosure
+          message={{
+            id: "reasoning-reference",
+            author: "agent",
+            body: "",
+            time: "10:00",
+            kind: "thinking",
+            items: THINKING_STEPS.slice(0, 2),
+          }}
+          working={working()}
+          open={open()}
+          onOpenChange={setOpen}
+        />
+        <Button onClick={() => setWorking((value) => !value)}>
+          {working() ? "Finish reasoning" : "Start reasoning"}
+        </Button>
+      </div>
     );
   },
 };

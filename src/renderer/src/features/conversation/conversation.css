@@ -3236,7 +3236,7 @@
 }
 
 .thinking-disclosure {
-  width: min(620px, 88%);
+  width: min(380px, 100%);
 }
 
 .thinking-summary {
@@ -3260,8 +3260,7 @@
 }
 
 .thinking-summary:hover,
-.thinking-summary:focus-visible,
-.thinking-disclosure[data-expanded="true"] .thinking-summary {
+.thinking-summary:focus-visible {
   background: var(--openbot-hover);
   color: var(--openbot-text-secondary);
   outline: none;
@@ -3275,7 +3274,13 @@
   stroke-width: 1.5;
 }
 
+.thinking-mark {
+  fill: currentColor;
+  stroke-width: 0;
+}
+
 .thinking-label {
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -3329,10 +3334,10 @@
 .thinking-details {
   position: relative;
   margin: 3px 0 4px 12px;
-  padding: 3px 0 3px 13px;
+  padding: 3px 0 3px 18px;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 18px;
+  line-height: 1.6;
 }
 
 .thinking-details::before {
@@ -3347,13 +3352,14 @@
 
 .thinking-step {
   margin: 0;
+  overflow-wrap: anywhere;
   white-space: pre-line;
   animation: thinking-step-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
   animation-delay: calc(var(--thinking-step-index) * 80ms);
 }
 
 .thinking-step + .thinking-step {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 @keyframes thinking-label-shimmer {

@@ -1,7 +1,7 @@
 import type { StateId } from "@norbert_bodziony/bloub";
-import { For } from "solid-js";
+import { createEffect, createSignal, For } from "solid-js";
 import { Button } from "../../components/ui/button";
-import { ChevronDown, Sparkles } from "../../components/ui/icons";
+import { ChevronDown, Sparkle } from "../../components/ui/icons";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
 
@@ -100,12 +100,26 @@ export function ThinkingDisclosure(props: {
   onOpenChange: (open: boolean) => void;
 }) {
   const steps = () => props.message.items?.filter((item) => item.trim()) ?? [];
+  const [seconds, setSeconds] = createSignal<number>();
+  let startedAt: number | undefined;
+  createEffect(
+    () => props.working,
+    (working) => {
+      if (working) {
+        startedAt = Date.now();
+        setSeconds(undefined);
+      } else if (startedAt !== undefined) {
+        setSeconds(Math.max(1, Math.round((Date.now() - startedAt) / 1_000)));
+        startedAt = undefined;
+      }
+    },
+  );
   /* Open while the agent reasons so the trace reads as it arrives, closed once it has answered —
      until the reader decides otherwise. */
   const expanded = () => props.open ?? props.working;
   return (
     <article class="thinking-entry">
-      <div class="thinking-disclosure" data-expanded={expanded()}>
+      <div class="thinking-disclosure" data-expanded={expanded() ? "true" : "false"}>
         <Button
           variant="ghost"
           size="xs"
@@ -114,19 +128,23 @@ export function ThinkingDisclosure(props: {
           aria-label={expanded() ? "Hide thinking details" : "Show thinking details"}
           onClick={() => props.onOpenChange(!expanded())}
         >
-          <Sparkles class="thinking-mark" aria-hidden="true" />
-          <span class="thinking-label" role="status" data-working={props.working}>
-            {props.working ? "Thinking" : "Thought it through"}
+          <Sparkle class="thinking-mark" aria-hidden="true" />
+          <span class="thinking-label" role="status" data-working={props.working ? "true" : "false"}>
+            {props.working
+              ? "Thinking"
+              : seconds() === undefined
+                ? "Thought it through"
+                : `Thought for ${seconds()} ${seconds() === 1 ? "second" : "seconds"}`}
           </span>
           <ChevronDown class="thinking-chevron" aria-hidden="true" />
         </Button>
         <div class="thinking-panel" aria-hidden={expanded() ? undefined : "true"}>
           <div class="thinking-panel-clip">
             <div class="thinking-details">
-              <For each={steps()}>
-                {(item, index) => (
-                  <p class="thinking-step" style={{ "--thinking-step-index": String(index()) }}>
-                    {item}
+              <For each={steps().map((_, index) => index)}>
+                {(index) => (
+                  <p class="thinking-step" style={{ "--thinking-step-index": String(index) }}>
+                    {steps()[index]}
                   </p>
                 )}
               </For>

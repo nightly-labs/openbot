@@ -474,6 +474,7 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("keeps active commentary expanded and groups it into a settled thinking disclosure", async () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now());
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     emitAgentEvent?.({
@@ -516,6 +517,7 @@ describe("OpenBot connected desktop shell", () => {
 
     const disclosure = await screen.findByRole("button", { name: "Hide thinking details" });
     expect(disclosure.getAttribute("aria-expanded")).toBe("true");
+    clock.mockReturnValue(Date.now() + 4_000);
 
     emitAgentEvent?.({
       type: "conversation",
@@ -565,6 +567,8 @@ describe("OpenBot connected desktop shell", () => {
     });
     await waitFor(() => expect(disclosure.getAttribute("aria-expanded")).toBe("false"));
     expect(disclosure).toHaveAccessibleName("Show thinking details");
+    expect(await screen.findByText("Thought for 4 seconds")).toBeVisible();
+    clock.mockRestore();
     expect(await screen.findByText("Opened x.com.")).toBeVisible();
     expect(screen.getByText("I’ll open x.com in the OpenBot browser.")).toBeInTheDocument();
     expect(screen.getByText("Checking that the page loaded.")).toBeInTheDocument();
