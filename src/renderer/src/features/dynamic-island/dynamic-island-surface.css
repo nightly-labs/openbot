@@ -198,8 +198,7 @@ body:has(.dynamic-island-surface),
 }
 
 .dynamic-island-surface-avatar {
-  --agent-avatar-optical-offset: -2px;
-  --agent-avatar-optical-offset-x: 1px;
+  --agent-avatar-optical-offset: -3px;
   width: 20px;
   height: 20px;
   flex: 0 0 auto;
