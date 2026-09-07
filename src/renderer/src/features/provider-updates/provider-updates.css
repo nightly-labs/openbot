@@ -100,11 +100,13 @@
   background: var(--openbot-provider-grok);
 }
 
-/* The download percentage. The digits themselves are animated by the `t-digit-*` classes in
-   `styles/transitions.css`, the same ones the dock's app updater uses, so an OpenBot update and a CLI
-   update move alike. Tabular figures stop the leading digits shuffling sideways as the number climbs,
-   and the fixed width stops the bar beside them resizing when the number reaches three characters. */
+/* A short movement leaves most of each 400 ms display interval still and readable.
+   Move the whole value together; staggered digits make fast changes hard to read. */
 .provider-update-toast-percent {
+  --digit-dur: var(--openbot-duration-fast);
+  --digit-distance: var(--openbot-space-1);
+  --digit-blur: 0px;
+  --digit-ease: ease-out;
   display: inline-flex;
   justify-content: flex-end;
   width: 4ch;

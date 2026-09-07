@@ -1,7 +1,7 @@
 import { ProviderLogo } from "@openbot/brand";
 import type { AgentProviderId } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createRoot, createSignal, For, Show } from "solid-js";
+import { createEffect, createRoot, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { Progress, TOAST_DURATION, toast } from "../../components/ui";
 import { type ProviderUpdate, type ProviderUpdatePresentation, presentProviderUpdate } from "./provider-update";
 
@@ -46,49 +46,39 @@ function providerIcon(provider: AgentProviderId): JSX.Element {
   return <ProviderLogo provider={provider} class="provider-update-toast-logo" />;
 }
 
-/**
- * The percentage, animated the way the dock's app updater animates its own.
- *
- * Same `t-digit-*` classes, so the two kinds of update in this product move alike: each change
- * replays `t-digit-pop-in`, and the last two characters follow the first by `--digit-stagger`.
- * Replaying an animation needs a node that outlives the change, which is what holding one toast open
- * buys.
- *
- * The digits are hidden from assistive technology, because the bar beside them is a progressbar that
- * already carries the value. The toast list is a live region that reads text out as it changes, and a
- * spelled out percentage would talk over itself several times a second.
+/** Batch rapid progress events so the number has time to settle between changes.
+ * The progressbar still reports the current value to assistive technology.
  */
 function ProviderUpdatePercent(props: { percent: number }): JSX.Element {
+  const [displayed, setDisplayed] = createSignal(untrack(() => props.percent));
+  let latest = untrack(() => props.percent);
+  let timer: ReturnType<typeof setTimeout> | undefined;
   let digitGroup: HTMLSpanElement | undefined;
-  const characters = () => `${props.percent}%`.split("");
 
   createEffect(
     () => props.percent,
-    () => {
-      if (!digitGroup) return;
-
-      digitGroup.classList.remove("is-animating");
-      void digitGroup.offsetHeight;
-      digitGroup.classList.add("is-animating");
+    (percent) => {
+      latest = percent;
+      if (timer !== undefined || percent === untrack(displayed)) return;
+      // Use the newest value, not a queue of obsolete download events.
+      timer = setTimeout(() => {
+        timer = undefined;
+        setDisplayed(latest);
+      }, 400);
     },
   );
+  onCleanup(() => clearTimeout(timer));
+
+  createEffect(displayed, () => {
+    if (!digitGroup) return;
+    digitGroup.classList.remove("is-animating");
+    void digitGroup.offsetHeight;
+    digitGroup.classList.add("is-animating");
+  });
 
   return (
     <span ref={digitGroup} class="provider-update-toast-percent t-digit-group" aria-hidden="true">
-      <For each={characters()}>
-        {(character, index) => {
-          const stagger = () => {
-            if (index() === characters().length - 2) return "1";
-            if (index() === characters().length - 1) return "2";
-            return undefined;
-          };
-          return (
-            <span class="t-digit" data-stagger={stagger()}>
-              {character}
-            </span>
-          );
-        }}
-      </For>
+      <span class="t-digit">{displayed()}%</span>
     </span>
   );
 }
