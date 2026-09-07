@@ -427,23 +427,10 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     scheduleSidebarDragTarget(point);
   }
 
-  /**
-   * The pinned group finished growing or shrinking, so every slot below it has moved. Re-measures
-   * and re-resolves at the last known point. Together with `handleListDragLeave` this is the whole
-   * reason the markup never has to reach into the imperative half of the drag.
-   */
-  function handlePinnedTransitionEnd(event: TransitionEvent & { currentTarget: HTMLElement }): void {
-    if (event.target !== event.currentTarget || event.propertyName !== "grid-template-rows") return;
-    if (!dragSession) return;
-    measureSidebarDragTargets();
-    if (dragPoint) scheduleSidebarDragTarget(dragPoint);
-  }
-
   return {
     dropSidebarNativeDrag,
     endAgentDragging,
     handleListDragLeave,
-    handlePinnedTransitionEnd,
     sidebarClickIsSuppressed,
     startAgentDragging,
     startNativeItemDragging,

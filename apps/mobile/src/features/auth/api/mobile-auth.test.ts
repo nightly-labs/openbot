@@ -1,6 +1,17 @@
 import { createMobileConnectUrl } from "@openbot/contracts/mobile-connect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { logoutMobileSession, type MobileSession, readMobileSession, redeemMobileConnectUrl } from "./mobile-auth";
+import { resolveSessionValidation } from "../context/session-validation";
+import {
+  listMobileAccountSessions,
+  logoutMobileSession,
+  type MobileSession,
+  MobileSessionExpiredError,
+  readMobileSession,
+  redeemMobileConnectUrl,
+  revokeMobileAccountSession,
+  updateMobileProfile,
+  validateMobileSession,
+} from "./mobile-auth";
 
 // The native Keychain and HTTP transport are the boundary; exercise the real session storage logic.
 const native = vi.hoisted(() => ({ storage: new Map<string, string>(), fetch: vi.fn<typeof fetch>() }));
@@ -260,3 +271,213 @@ function failNextLogout(failure: "network" | "timeout" | 500 | 401): void {
     return Response.json({ error: { message: "Server failure" } }, { status: failure });
   });
 }
+
+describe("mobile profile updates", () => {
+  it("persists the updated identity for the next launch", async () => {
+    const user = { ...session.user, name: "New name" };
+    native.fetch.mockResolvedValueOnce(Response.json(user));
+    const updated = await updateMobileProfile(session, { name: " New name " });
+    expect(updated.user).toEqual(user);
+    expect((await readMobileSession())?.user).toEqual(user);
+    expect(native.fetch).toHaveBeenCalledWith(
+      "https://api.openbot.run/v1/me/profile",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ name: "New name" }) }),
+    );
+  });
+
+  it("does not overwrite a newer login with an old profile response", async () => {
+    const newer = { ...session, sessionToken: "new-token" };
+    native.fetch.mockImplementationOnce(async () => {
+      native.storage.set(key, JSON.stringify(newer));
+      return Response.json({ ...session.user, name: "Old request" });
+    });
+    await updateMobileProfile(session, { name: "Old request" });
+    expect(await readMobileSession()).toEqual(newer);
+  });
+
+  it("retains the profile when saving fails or returns another account", async () => {
+    native.fetch.mockResolvedValueOnce(new Response(null, { status: 500 }));
+    await expect(updateMobileProfile(session, { name: "New name" })).rejects.toThrow("Could not save");
+    native.fetch.mockResolvedValueOnce(Response.json({ ...session.user, id: "other-account" }));
+    await expect(updateMobileProfile(session, { name: "New name" })).rejects.toThrow("invalid user");
+    expect(await readMobileSession()).toEqual(session);
+  });
+
+  it("uploads and removes the profile photo through the existing account API", async () => {
+    const user = { ...session.user, avatarUrl: "/v1/avatars/user?v=photo" };
+    const avatar = { bytes: new Uint8Array([0xff, 0xd8, 0xff, 0x00]), mimeType: "image/jpeg" as const };
+    native.fetch.mockResolvedValueOnce(Response.json(user));
+    await updateMobileProfile(session, { avatar });
+    expect((await readMobileSession())?.user.avatarUrl).toBe(user.avatarUrl);
+    expect(native.fetch).toHaveBeenLastCalledWith(
+      "https://api.openbot.run/v1/me/avatar",
+      expect.objectContaining({
+        method: "PUT",
+        body: avatar.bytes.buffer,
+        headers: { Authorization: "Bearer test-session-token", "Content-Type": "image/jpeg" },
+      }),
+    );
+    native.fetch.mockResolvedValueOnce(Response.json(session.user));
+    await updateMobileProfile(session, { avatar: null });
+    expect((await readMobileSession())?.user.avatarUrl).toBeNull();
+    expect(native.fetch).toHaveBeenLastCalledWith(
+      "https://api.openbot.run/v1/me/avatar",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+});
+
+it("lists account sessions and only disconnects other devices", async () => {
+  const current = {
+    sessionId: "11111111-1111-4111-8111-111111111111",
+    name: "Phone",
+    kind: "mobile",
+    current: true,
+    connectedAt: 1,
+    lastActiveAt: 2,
+  };
+  native.fetch.mockResolvedValueOnce(Response.json({ sessions: [current] }));
+  const [item] = await listMobileAccountSessions(session);
+  expect(item).toEqual(current);
+  await expect(revokeMobileAccountSession(session, item)).rejects.toThrow("Use Sign out");
+  native.fetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
+  await revokeMobileAccountSession(session, { ...item, current: false });
+  expect(native.fetch).toHaveBeenLastCalledWith(
+    `https://api.openbot.run/v1/mobile-auth/devices/${current.sessionId}?includeDesktop=true`,
+    expect.objectContaining({ method: "DELETE", headers: { Authorization: "Bearer test-session-token" } }),
+  );
+});
+
+describe("settings request lifecycle", () => {
+  it.each(["edit-first", "read-first", "restore-original"] as const)(
+    "applies profile state in queue order (%s)",
+    async (order) => {
+      const started = Promise.withResolvers<void>();
+      const firstResponse = Promise.withResolvers<Response>();
+      let visible: MobileSession | null = session;
+      const apply = (updated: MobileSession | null) => {
+        visible = resolveSessionValidation(visible, session, updated);
+      };
+      native.fetch.mockImplementationOnce(() => {
+        started.resolve();
+        return firstResponse.promise;
+      });
+      const remoteUser = order === "restore-original" ? session.user : { ...session.user, name: "Newer remote name" };
+      const editedUser = { ...session.user, name: "Saved name" };
+      native.fetch.mockResolvedValueOnce(Response.json(order !== "read-first" ? remoteUser : editedUser));
+      const first =
+        order !== "read-first"
+          ? updateMobileProfile(session, { name: "Saved name" }, apply)
+          : validateMobileSession(session, apply);
+      await started.promise;
+      const second =
+        order !== "read-first"
+          ? validateMobileSession(session, apply)
+          : updateMobileProfile(session, { name: "Saved name" }, apply);
+      firstResponse.resolve(Response.json(order !== "read-first" ? editedUser : session.user));
+      await Promise.all([first, second]);
+      const expected = order !== "read-first" ? remoteUser : editedUser;
+      expect(visible?.user).toEqual(expected);
+      expect((await readMobileSession())?.user).toEqual(expected);
+    },
+  );
+
+  it("applies expiry after an overlapping edit while protecting replacement logins and newer profiles", async () => {
+    const started = Promise.withResolvers<void>();
+    const response = Promise.withResolvers<Response>();
+    native.fetch.mockImplementationOnce(() => {
+      started.resolve();
+      return response.promise;
+    });
+    native.fetch.mockResolvedValueOnce(new Response(null, { status: 401 }));
+    const save = updateMobileProfile(session, { name: "Saved name" });
+    await started.promise;
+    const refresh = validateMobileSession(session);
+    response.resolve(Response.json({ ...session.user, name: "Saved name" }));
+    const edited = await save;
+    const validated = await refresh;
+    expect(validated).toBeNull();
+    expect(await readMobileSession()).toBeNull();
+    expect(resolveSessionValidation(edited, session, validated)).toBeNull();
+    const newLogin = { ...edited, sessionToken: "new-token" };
+    expect(resolveSessionValidation(newLogin, session, validated)).toBe(newLogin);
+    const otherApi = { ...edited, apiUrl: "https://another.example.com" };
+    expect(resolveSessionValidation(otherApi, session, validated)).toBe(otherApi);
+    expect(resolveSessionValidation(null, session, session)).toBeNull();
+  });
+
+  it("rejects a refresh for another account without replacing the stored identity", async () => {
+    native.fetch.mockResolvedValueOnce(Response.json({ ...session.user, id: "another-user" }));
+    await expect(validateMobileSession(session)).rejects.toThrow("invalid user");
+    expect(await readMobileSession()).toEqual(session);
+  });
+
+  it.each(["profile", "sessions", "revoke"] as const)(
+    "clears only the rejected credential after %s returns 401",
+    async (operation) => {
+      const target = {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        name: "Desktop",
+        kind: "desktop" as const,
+        current: false,
+        connectedAt: 1,
+        lastActiveAt: 2,
+      };
+      const request = () =>
+        operation === "profile"
+          ? updateMobileProfile(session, { name: "New name" })
+          : operation === "sessions"
+            ? listMobileAccountSessions(session)
+            : revokeMobileAccountSession(session, target);
+      native.fetch.mockResolvedValueOnce(new Response(null, { status: 401 }));
+      await expect(request()).rejects.toBeInstanceOf(MobileSessionExpiredError);
+      expect(await readMobileSession()).toBeNull();
+      const newer = { ...session, sessionToken: "new-login" };
+      native.storage.set(key, JSON.stringify(newer));
+      native.fetch.mockResolvedValueOnce(new Response(null, { status: 401 }));
+      await expect(request()).rejects.toBeInstanceOf(MobileSessionExpiredError);
+      expect(await readMobileSession()).toEqual(newer);
+    },
+  );
+
+  it("cancels an account session read when its screen no longer needs the result", async () => {
+    const started = Promise.withResolvers<void>();
+    let requestSignal: AbortSignal | null | undefined;
+    native.fetch.mockImplementationOnce(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          requestSignal = init?.signal;
+          init?.signal?.addEventListener("abort", () => reject(new Error("Request aborted")), { once: true });
+          started.resolve();
+        }),
+    );
+    const controller = new AbortController();
+    const request = listMobileAccountSessions(session, controller.signal);
+    const rejected = expect(request).rejects.toThrow("Request aborted");
+    await started.promise;
+    controller.abort();
+    expect(requestSignal?.aborted).toBe(true);
+    await rejected;
+    expect(await readMobileSession()).toEqual(session);
+  });
+
+  it("rejects invalid and oversized photos before uploading", async () => {
+    await expect(
+      updateMobileProfile(session, { avatar: { bytes: new Uint8Array([1, 2, 3]), mimeType: "image/jpeg" } }),
+    ).rejects.toThrow("selected photo is invalid");
+    await expect(
+      updateMobileProfile(session, { avatar: { bytes: new Uint8Array(512 * 1024 + 1), mimeType: "image/png" } }),
+    ).rejects.toThrow("smaller than 512 KB");
+    expect(native.fetch).not.toHaveBeenCalled();
+    expect(await readMobileSession()).toEqual(session);
+  });
+
+  it("allows retry after rate limiting without losing the existing profile", async () => {
+    native.fetch.mockResolvedValueOnce(new Response(null, { status: 429 }));
+    await expect(updateMobileProfile(session, { name: "New name" })).rejects.toThrow("Too many changes");
+    expect(await readMobileSession()).toEqual(session);
+    native.fetch.mockResolvedValueOnce(Response.json({ ...session.user, name: "New name" }));
+    await updateMobileProfile(session, { name: "New name" });
+    expect((await readMobileSession())?.user.name).toBe("New name");
+  });
+});

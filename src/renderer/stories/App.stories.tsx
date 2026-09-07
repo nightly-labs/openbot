@@ -64,13 +64,13 @@ export const SettingsTyping: Story = {
     const title = canvas.getByRole("textbox", { name: "Agent title" });
     await userEvent.clear(title);
     await userEvent.type(title, "Every character remains");
-    const description = canvas.getByRole("textbox", { name: "Agent description" });
+    const description = canvas.getByRole("textbox", { name: "Agent instructions" });
     await userEvent.clear(description);
     await userEvent.type(description, "Drafts survive reactive profile updates.");
 
     await expect(canvas.getByRole("textbox", { name: "Agent name" })).toHaveValue("Rapid name editing");
     await expect(canvas.getByRole("textbox", { name: "Agent title" })).toHaveValue("Every character remains");
-    await expect(canvas.getByRole("textbox", { name: "Agent description" })).toHaveValue(
+    await expect(canvas.getByRole("textbox", { name: "Agent instructions" })).toHaveValue(
       "Drafts survive reactive profile updates.",
     );
   },

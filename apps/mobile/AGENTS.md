@@ -22,6 +22,40 @@ Read and follow [`DESIGN.md`](./DESIGN.md) before changing mobile UI.
 - If neither an existing OpenBot component nor HeroUI Native fits an application-content need, verify that before creating a reusable component. If native APIs cannot satisfy a system-chrome requirement, document the constraint in the change before using a fallback.
 - Do not add status badges, warnings, or operational guidance unless the application state and repository behavior support the claim. Verify lifecycle and connectivity copy against the implementation before presenting it to users.
 
+## Sheets
+
+Follow [DESIGN.md — Sheets](./DESIGN.md#sheets) and inspect the current route options in
+`src/app/(app)/_layout.tsx` before adding or changing a sheet.
+
+- Use native `formSheet`, `sheetAllowedDetents: "fitToContents"`, and a visible grabber for ordinary
+  standalone forms. Settings and other multi-page flows use ONE outer sheet with a nested native
+  stack: inner routes use `presentation: "card"` and the native back button, never another sheet.
+  Use stable detents (`[0.85]` for settings) for that navigator; it cannot measure intrinsic
+  content height. Do not put a navigator or `flex: 1` wrapper inside a fit-to-content sheet.
+- Use `SheetScrollView` as the screen's scroll container. It owns header clearance, safe-area
+  behavior and scroll-edge effects. Do not add screen-local header padding or another inset layer.
+- Content that fits must stay still: `SheetScrollView` disables bounce/overscroll, and the route
+  stack disables `sheetExpandsWhenScrolledToEdge`. Settings uses a single detent; longer content
+  scrolls inside it. Do not add an expansion detent just to handle overflow.
+- On iOS, native sheet headers use transparent backgrounds, `headerTransparent: true`,
+  `headerBlurEffect: "none"`, and `scrollEdgeEffects: { top: "soft" }`. On Android, use the sheet
+  background and a non-transparent header. Do not layer a custom blur beneath a native header.
+- Match the native container to `--openbot-bg-sheet` and the scroll content to `bg-sheet`.
+  Use `bg-grouped`, `rounded-grouped`, `text-grouped-secondary` and `bg-grouped-border` for grouped
+  content. Do not substitute canvas/control colors or desktop radius utilities.
+- Reuse `SettingsContent`/`SettingsSection`/`SettingsRow` for settings and `SheetFormField` for
+  fields. Use HeroUI `Typography` for content and native Expo UI for platform controls.
+  Keep groups flat, separators inset, and chevrons for navigation rather than destructive actions.
+- Do not add a redundant Done/close button to a dismissible sheet. Add explicit actions only when
+  the flow requires them, such as Save or Cancel for unsaved work.
+- Follow [DESIGN.md — Profile and About](./DESIGN.md#profile-and-about) for these settings pages:
+  centered avatar/name/email, inline name editing with an adjacent pencil, and Save only for
+  changed input. Keep the action area compact and stable so editing does not shift the layout.
+  About reuses the interactive `AppLogo` and displays the app version/build without a subtitle.
+- Check initial header clearance, scrolling under the header, the last action, keyboard visibility,
+  and light/dark appearance. Typecheck does not establish visual correctness. Report which device
+  checks actually ran; the execution limits above still apply.
+
 ## Expo has changed — do not trust your training data
 
 Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:

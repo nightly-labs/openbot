@@ -18,7 +18,6 @@ export function SidebarPinnedGroup() {
     dragOffset,
     dragOverPinnedKey,
     draggedPinnedKey,
-    handlePinnedTransitionEnd,
     movePinnedItem,
     pinnedDropActive,
     props,
@@ -37,7 +36,6 @@ export function SidebarPinnedGroup() {
           },
         ]}
         aria-label="Pinned chats"
-        onTransitionEnd={handlePinnedTransitionEnd}
       >
         <ul class="sidebar-pinned-list" data-dragging={draggedPinnedKey() ? "" : undefined}>
           <Show when={emptyPinnedDropVisible()}>

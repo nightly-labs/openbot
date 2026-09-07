@@ -5,6 +5,7 @@ import type { SignalService, SignalSocket } from "./signal-service";
 import { verifyWebhookSignature } from "./tokens";
 
 const authEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("account-profile-changed"), userId: z.string().min(1) }),
   z.object({
     type: z.literal("remote-auth-changed"),
     hostId: z.string().min(1),
@@ -35,9 +36,9 @@ export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalServic
         return { error: { code: "invalid_event", message: "The auth event is invalid." } };
       }
       if (event.type === "remote-auth-changed") signal.revoke(event.hostId, event.authEpoch);
+      else if (event.type === "account-profile-changed") signal.profileChanged(event.userId);
       else signal.revokeSession(event.sessionId);
-      set.status = 204;
-      return;
+      return new Response(null, { status: 204 });
     })
     .ws("/v1/signal", {
       idleTimeout: 120,

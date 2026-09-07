@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  MAX_SIDEBAR_PINNED_ITEMS,
   normalizeSidebarPinnedItems,
   readSidebarPins,
   reownSidebarPinnedItems,
@@ -27,7 +26,7 @@ describe("sidebar pins", () => {
     ];
 
     // These pins live in browser storage, which the id migration never touched, so a pinned agent looks
-    // deleted after the upgrade: it disappears from the pinned group while still holding one of six slots.
+    // deleted after the upgrade: it disappears from the pinned group while remaining in saved pins.
     expect(reownSidebarPinnedItems(items, new Set([`agent-${uuid}`, "chief"]))).toEqual([
       { kind: "agent", id: `agent-${uuid}` },
       { kind: "agent", id: "chief" },
@@ -40,8 +39,7 @@ describe("sidebar pins", () => {
     expect(reownSidebarPinnedItems(items, new Set(["chief"]))).toEqual(items);
 
     // Both spellings can be pinned at once -- the user pinned the agent before the upgrade and its twin
-    // after it -- and once the twin is gone they name one agent. Storing it twice shows it twice and
-    // spends two of the six slots on it.
+    // after it -- and once the twin is gone they name one agent. Storing it twice shows it twice.
     expect(
       reownSidebarPinnedItems([...items, { kind: "agent", id: `agent-${uuid}` }], new Set([`agent-${uuid}`])),
     ).toEqual([
@@ -50,13 +48,22 @@ describe("sidebar pins", () => {
     ]);
   });
 
-  it("keeps at most six items", () => {
-    const items = Array.from({ length: MAX_SIDEBAR_PINNED_ITEMS + 2 }, (_, index) => ({
+  it("preserves every pinned agent when saving and restoring more than six", () => {
+    const items = Array.from({ length: 12 }, (_, index) => ({
       kind: "agent" as const,
       id: `agent-${index}`,
     }));
 
-    expect(normalizeSidebarPinnedItems(items)).toEqual(items.slice(0, MAX_SIDEBAR_PINNED_ITEMS));
+    expect(normalizeSidebarPinnedItems(items)).toEqual(items);
+    let saved = "";
+    const storage = {
+      getItem: () => saved,
+      setItem: (_key: string, value: string) => {
+        saved = value;
+      },
+    };
+    writeSidebarPins({ local: items }, storage);
+    expect(readSidebarPins(storage)).toEqual({ local: items });
   });
 
   it("reads separate server lists and ignores invalid entries", () => {

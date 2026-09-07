@@ -248,6 +248,31 @@ export async function createApplicationServices({
   // listener therefore runs on the next line with most of this function's services still unbuilt.
   centralAuth.on("changed", forwardCentralAuth);
   const centralAuthInitialization = centralAuth.initialize();
+  let profileRefreshActive = true;
+  let profileRefreshing = false;
+  let profileRefreshAgain = false;
+  const refreshAccountProfile = async () => {
+    if (!profileRefreshActive) return;
+    if (profileRefreshing) {
+      profileRefreshAgain = true;
+      return;
+    }
+    profileRefreshing = true;
+    try {
+      do {
+        profileRefreshAgain = false;
+        await centralAuth.refreshProfile();
+      } while (profileRefreshAgain && profileRefreshActive);
+    } finally {
+      profileRefreshing = false;
+    }
+  };
+  mainWindow.on("focus", refreshAccountProfile);
+  teardown.push(TEARDOWN_ORDER.updater, "account profile refresh", () => {
+    profileRefreshActive = false;
+    mainWindow.removeListener("focus", refreshAccountProfile);
+    centralAuth.stopProfileRefresh();
+  });
   const store = new AgentStore(app.getPath("userData"), homedir());
   await store.initialize();
   const managedSkills = new ManagedSkillService(
@@ -268,6 +293,7 @@ export async function createApplicationServices({
     developmentUrl,
     iceTransportPolicy: developmentUrl && process.env.OPENBOT_DEV_ICE_TRANSPORT_POLICY === "relay" ? "relay" : "all",
   });
+  teamWebRtcBridge.on("accountProfileChanged", refreshAccountProfile);
   teardown.push(TEARDOWN_ORDER.teamWebRtcBridge, "the team WebRTC bridge", () => teamWebRtcBridge.stop());
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE));
   teardown.push(TEARDOWN_ORDER.browser, "the browser", () => browser.destroy());

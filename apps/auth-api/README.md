@@ -8,34 +8,45 @@ and team authentication tickets.
 
 ## Local development
 
-The repository contains encrypted `.env.dev` and `.env.production` files. The
-private keys stay in the ignored root `.env.keys` file. Dotenvx decrypts the
-selected file only in process memory. The explicit development flag returns the
-code in the API response. It never writes the code to logs.
+`.env.dev` is generated, not committed. `bun run dev` and `bun run dev:api` call
+`scripts/development-secrets.ts`, which writes one on first run: a fresh ES256
+ticket key pair plus random admin, report and webhook secrets, all local to the
+checkout. Nothing in it is shared with production or with another machine, so a
+fork needs no key from anyone. Delete the file and rerun to get a fresh set.
+
+`.env.production` is the only encrypted file, and its private key stays in the
+ignored root `.env.keys`. Dotenvx decrypts it only in process memory, and only
+the deploy and secret-rotation commands read it.
 
 ```bash
 bun run api:migrate:local
 bun run dev:api
 ```
 
-The local address is `http://127.0.0.1:3100`.
+The local address is `http://127.0.0.1:3100`. The explicit development flag
+returns the sign-in code in the API response. It never writes the code to logs.
 
-Update and validate the encrypted files with these commands:
+Update and validate the encrypted production file with these commands:
 
 ```bash
-bunx dotenvx set AUTH_EXPOSE_DEVELOPMENT_CODE true -f apps/auth-api/.env.dev -fk .env.keys
 printf '%s' '<APP_PASSWORD>' | bun run env:set:smtp
-bun run env:validate:dev
 bun run env:validate:prod
 ```
 
-Commit `.env.dev` and `.env.production`. Never commit `.env.keys`.
+Commit `.env.production`. Never commit `.env.keys` or `.env.dev`.
 
 ## Email delivery
 
 Private Email SMTP is the primary delivery method. Use a separate app password.
-Do not use the mailbox password. For local development, put the values in the
-ignored `.dev.vars` file:
+Do not use the mailbox password.
+
+Local development sends no email at all. `.env.dev` blanks all five SMTP
+variables, which is what turns delivery off - `wrangler.jsonc` sets four of them
+in the top-level `vars` that local `vite dev` reads, and four out of five is the
+partial configuration `readSmtpConfig` rejects. The team-invitation endpoint then
+answers `503 email_delivery_not_configured`; login never reaches SMTP at all,
+because `AUTH_EXPOSE_DEVELOPMENT_CODE` returns its code in the API response. To
+exercise real delivery locally, put a full set in the ignored `.dev.vars` file:
 
 ```dotenv
 EMAIL_SMTP_HOST=mail.privateemail.com
@@ -43,8 +54,9 @@ EMAIL_SMTP_PORT=465
 EMAIL_SMTP_USERNAME=hello@openbot.run
 EMAIL_SMTP_PASSWORD=<PRIVATE_EMAIL_APP_PASSWORD>
 EMAIL_FROM=hello@openbot.run
-SITE_REPORT_HASH_SECRET=<AT_LEAST_32_RANDOM_CHARACTERS>
 ```
+
+`bun run env:set:smtp` encrypts the app password into `.env.production` only.
 
 For a deployed Worker, `bun run api:deploy` decrypts `.env.production`. It sends
 `EMAIL_SMTP_PASSWORD`, `SKILLS_ADMIN_TOKEN`, `REMOTE_TICKET_PRIVATE_JWK`,

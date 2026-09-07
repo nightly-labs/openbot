@@ -25,6 +25,13 @@ const iceCandidate = {
 };
 
 describe("decodeSignalServerMessage", () => {
+  it("accepts account invalidation without transporting profile data", () => {
+    expect(decodeSignalServerMessage({ type: "account-profile-changed", version: 1 })).toEqual({
+      type: "account-profile-changed",
+      version: 1,
+    });
+  });
+
   it("accepts a peer joining", () => {
     expect(decodeSignalServerMessage(peerReady)).toMatchObject({
       type: "peer-ready",
