@@ -519,7 +519,7 @@
     grid-template-columns: 16px 18px minmax(0, 1fr);
   }
 
-  .onboarding-provider .provider-picker-status {
+  .onboarding-provider .provider-picker-state {
     grid-column: 3;
     justify-self: start;
   }
