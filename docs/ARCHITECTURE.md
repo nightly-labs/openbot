@@ -146,6 +146,14 @@ OpenBot Mobile uses the same ticket, authentication transcript, framing, RPC cod
 In Expo Go, an Expo DOM component owns the browser `RTCPeerConnection` inside a hidden WebView and
 passes only serializable, validated commands and events to the native React UI; no native WebRTC
 module or development build is required.
+Mobile server labels in the drawer and connection settings describe the authenticated application
+connection, not membership or Signal presence. Only the selected server has a live connection;
+unselected/unobserved servers show Unknown. Switching servers or backgrounding clears the previous
+status. Connecting becomes Online after compatibility and workspace synchronization succeed;
+transport failures and reconnect attempts show Offline, and protocol failures show Connection error.
+The existing RTC connection updates and recovery controller are the source of truth; the indicator
+adds no polling or health requests. Foreground resume, invite selection and manual refresh reuse
+that controller. RTC disconnection/failure events clear Online and drive recovery after network loss.
 The native/DOM mailbox carries concurrent commands by ID. Switching or disconnecting cancels
 pending callers immediately; peer generations reject late callbacks from a superseded host.
 The persisted hosting preference is restored on startup in both the normal desktop and the
