@@ -4,6 +4,7 @@ import {
   isLikelyAutomation,
   LandingAnalytics,
   landingAcquisitionSource,
+  landingReferrer,
   OPENPANEL_API_URL,
   shouldEnableLandingAnalytics,
 } from "../src/lib/analytics";
@@ -49,7 +50,7 @@ describe("landing analytics", () => {
       __referrer: "",
       surface: "landing",
       environment: "production",
-      event_schema_version: 5,
+      event_schema_version: 6,
     });
     expect(client.trackScreenView).toHaveBeenCalledOnce();
     expect(client.trackScreenView).toHaveBeenCalledWith("/");
@@ -162,6 +163,55 @@ describe("landing analytics", () => {
     expect(landingAcquisitionSource(document)).toBe("github");
     expect(isLikelyAutomation({ userAgent: "HeadlessChrome", webdriver: false })).toBe(true);
     expect(isLikelyAutomation({ userAgent: "Mozilla/5.0", webdriver: false })).toBe(false);
+  });
+
+  it.each([
+    ["https://l.instagram.com/private?token=secret#hidden", "https://l.instagram.com/"],
+    ["https://user:password@t.co:8443/private?token=secret#hidden", "https://t.co/"],
+    ["http://www.twitter.com/post/123", "https://www.twitter.com/"],
+    ["https://openbot.run/join?invite=secret", ""],
+    ["https://docs.openbot.run/private", ""],
+    ["https://openbot.run.example.org/path", "https://openbot.run.example.org/"],
+    ["", ""],
+    ["invalid", ""],
+    ["file:///private/secret", ""],
+    ["javascript:alert(1)", ""],
+  ])("keeps only an external web domain from %s", (referrer, expected) => {
+    expect(landingReferrer(referrer, "openbot.run")).toBe(expected);
+  });
+
+  it.each(["landing", "join"])("sends domain-only attribution on the %s page", async (page) => {
+    const referrer = vi
+      .spyOn(document, "referrer", "get")
+      .mockReturnValue("https://l.instagram.com/private?token=referrer-secret#hidden");
+    const requests: unknown[] = [];
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push(JSON.parse(String(init?.body)));
+      return new Response(null, { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.history.replaceState({}, "", "/");
+    let cleanup = () => {};
+    try {
+      const analytics = new LandingAnalytics(undefined, true);
+      cleanup =
+        page === "join"
+          ? analytics.startJoin(document, "openbot.run", { validInvite: true, platform: "macos" })
+          : analytics.start(document, "openbot.run");
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      for (const request of requests) {
+        expect(request).toMatchObject({
+          payload: { properties: { __referrer: "https://l.instagram.com/", acquisition_source: "social" } },
+        });
+      }
+      expect(JSON.stringify(requests)).not.toContain("private");
+      expect(JSON.stringify(requests)).not.toContain("referrer-secret");
+      expect(JSON.stringify(requests)).not.toContain("hidden");
+    } finally {
+      cleanup();
+      referrer.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 
   it("does not let initialization failures escape", () => {

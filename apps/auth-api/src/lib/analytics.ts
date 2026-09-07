@@ -4,7 +4,7 @@ import { OPENBOT_DOWNLOAD_LINKS, OPENBOT_LINKS } from "./landing-links";
 
 export const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
-const ANALYTICS_SCHEMA_VERSION = 5;
+const ANALYTICS_SCHEMA_VERSION = 6;
 
 export type LandingAcquisitionSource = "direct" | "search" | "social" | "github" | "other";
 
@@ -92,7 +92,10 @@ export class LandingAnalytics {
   start(document: Document, hostname: string): () => void {
     if (isLikelyAutomation(document.defaultView?.navigator)) return () => undefined;
     if (!this.#ensureClient(hostname)) return () => undefined;
-    this.#client?.setGlobalProperties({ acquisition_source: landingAcquisitionSource(document) });
+    this.#client?.setGlobalProperties({
+      acquisition_source: landingAcquisitionSource(document),
+      __referrer: landingReferrer(document.referrer, hostname),
+    });
     this.#screenView("/");
     this.#track("landing_viewed", {});
     const handleClick = (event: MouseEvent) => this.#handleClick(event);
@@ -106,7 +109,10 @@ export class LandingAnalytics {
   ): () => void {
     if (isLikelyAutomation(document.defaultView?.navigator)) return () => undefined;
     if (!this.#ensureClient(hostname)) return () => undefined;
-    this.#client?.setGlobalProperties({ acquisition_source: landingAcquisitionSource(document) });
+    this.#client?.setGlobalProperties({
+      acquisition_source: landingAcquisitionSource(document),
+      __referrer: landingReferrer(document.referrer, hostname),
+    });
     this.#screenView("/join");
     this.#track("join_page_action", { action: "view", valid_invite: options.validInvite });
     const handleClick = (event: MouseEvent) => {
@@ -233,6 +239,18 @@ export function isLikelyAutomation(navigator: Pick<Navigator, "userAgent" | "web
   return navigator.webdriver || /(?:bot|crawler|spider|headless|lighthouse|preview)/iu.test(navigator.userAgent);
 }
 
+// OpenPanel expects a URL. Keep only the domain, never credentials, ports or URL contents.
+export function landingReferrer(referrer: string, hostname: string): string {
+  try {
+    const url = new URL(referrer);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return "";
+    if (url.hostname === hostname || url.hostname.endsWith(`.${hostname}`)) return "";
+    return `https://${url.hostname}/`;
+  } catch {
+    return "";
+  }
+}
+
 export function landingAcquisitionSource(document: Document): LandingAcquisitionSource {
   let campaignSource = "";
   try {
@@ -244,7 +262,7 @@ export function landingAcquisitionSource(document: Document): LandingAcquisition
   const source = `${campaignSource} ${referrer}`;
   if (/github/u.test(source)) return "github";
   if (/(?:google|bing|duckduckgo|brave|yahoo)/u.test(source)) return "search";
-  if (/(?:twitter|x\.com|linkedin|facebook|reddit|discord|social)/u.test(source)) return "social";
+  if (/(?:twitter|x\.com|linkedin|facebook|instagram|t\.co|reddit|discord|social)/u.test(source)) return "social";
   return source.trim() ? "other" : "direct";
 }
 

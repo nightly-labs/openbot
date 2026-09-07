@@ -30,8 +30,9 @@ actions can be associated with the account that started them. The email is store
 profile and is not copied into individual event properties. Agent lifecycle events are emitted once
 by the local host and associated with the host owner's account; clients that observe a remote host do
 not emit the lifecycle again. Sign-in attempts and website activity remain anonymous until an account
-has been verified. Landing-page attribution is reduced to an allowlisted source category and never
-includes a raw referrer or campaign URL. OpenPanel can also derive session, device, browser,
+has been verified. Landing-page attribution includes an allowlisted source category and the referring domain when
+available. It excludes referrer paths, query parameters, fragments, credentials, ports, and raw
+campaign URLs. Referrals from openbot.run and its subdomains are omitted. OpenPanel can also derive session, device, browser,
 operating-system, network, and approximate geographic metadata from a request. The analytics service
 runs on OpenBot's self-hosted infrastructure and receives events through `analytics.openbot.run`.
 Analytics is enabled in production by default. Desktop users can disable it under **Settings →
