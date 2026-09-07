@@ -1,14 +1,16 @@
 import type {
+  AccountSession,
   AccountUsage,
   AgentEvent,
+  AgentMemory,
   AgentModelOption,
   AgentStatus,
+  AgentSubmission,
+  AgentSummary,
   AnalyticsPreference,
   AppInfo,
   AppSetupState,
   AttachmentImportEvent,
-  BotMemory,
-  BotSummary,
   BrowserControlState,
   BrowserOpenInput,
   BrowserPictureInPictureEvent,
@@ -27,7 +29,9 @@ import type {
   DirectTypingRealtimeEvent,
   DynamicIslandPreference,
   DynamicIslandPresentation,
+  HostedSiteSummary,
   HostStatus,
+  InstalledSkill,
   InviteSummary,
   JoinServerInput,
   OpenAttachmentInput,
@@ -41,20 +45,21 @@ import type {
   RespondToPromptInput,
   Routine,
   RoutineRun,
+  RoutineSchedule,
   SendDirectMessageInput,
   SendMessageInput,
   ServerSummary,
   SetAgentAvatarInput,
   SetMessageReactionInput,
   SetTeamTypingInput,
-  SidebarLayoutAction,
   SidebarLayoutSnapshot,
+  SkillSubmission,
   SteerQueuedMessageInput,
   TeamInviteSummary,
   TeamMemberSummary,
   TeamPresenceSnapshot,
   TeamSessionSummary,
-  UpdateBotInput,
+  UpdateAgentInput,
   UpdateQueuedMessageInput,
   UpdateStatus,
   UpdateTeamMemberInput,
@@ -67,24 +72,34 @@ import {
 import browserTakeoverPreviewUrl from "../../stories/assets/browser-takeover-preview.svg";
 import {
   STORY_AGENT_STATUS,
+  STORY_AGENT_SUBMISSIONS,
+  STORY_AGENT_SUMMARIES,
   STORY_APP_INFO,
-  STORY_BOT_SUMMARIES,
   STORY_BROWSER_CONTROL,
   STORY_BROWSER_TABS,
   STORY_DIRECT_SNAPSHOTS,
   STORY_DIRECT_THREADS,
   STORY_HOST_STATUS,
+  STORY_HOSTED_SITES,
+  STORY_INSTALLED_SKILLS,
   STORY_INVITES,
+  STORY_MARKETPLACE_AGENT_DETAILS,
+  STORY_MARKETPLACE_AGENTS,
+  STORY_MARKETPLACE_SKILL_DETAILS,
+  STORY_MARKETPLACE_SKILLS,
   STORY_MODELS,
   STORY_PRESENCE,
   STORY_REMOTE_DESKTOP_SESSION,
   STORY_SERVERS,
   STORY_SESSIONS,
+  STORY_SKILL_PACKAGE_PREVIEW,
+  STORY_SKILL_SUBMISSIONS,
   STORY_SNAPSHOTS,
   STORY_TEAM_MEMBERS,
   STORY_UPDATE_STATUS,
   STORY_USAGE,
 } from "./fixtures";
+import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 
 type Listener<T> = (value: T) => void;
 
@@ -95,7 +110,7 @@ export interface MockOpenBotOptions {
   setupState?: AppSetupState;
   agentStatus?: AgentStatus;
   usage?: AccountUsage;
-  bots?: BotSummary[];
+  agents?: AgentSummary[];
   models?: AgentModelOption[];
   snapshots?: Record<string, ConversationSnapshot>;
   browserTabs?: BrowserTab[];
@@ -111,17 +126,20 @@ export interface MockOpenBotOptions {
   sessions?: TeamSessionSummary[];
   remoteDesktopSessions?: RemoteDesktopSession[];
   updateStatus?: UpdateStatus;
-  memories?: Record<string, BotMemory[]>;
+  memories?: Record<string, AgentMemory[]>;
   routines?: Record<string, Routine[]>;
 }
 
 export interface MockOpenBotControls {
   api: OpenBotDesktopApi;
   emitAgentEvent: (event: AgentEvent) => void;
-  onLatestConversationOpened: (listener: (botId: string) => void) => () => void;
+  onLatestConversationOpened: (listener: (agentId: string) => void) => () => void;
   onLatestDirectConversationOpened: (listener: (memberId: string) => void) => () => void;
-  readConversationSnapshot: (botId: string) => ConversationSnapshot;
-  updateConversationSnapshot: (botId: string, update: (snapshot: ConversationSnapshot) => void) => ConversationSnapshot;
+  readConversationSnapshot: (agentId: string) => ConversationSnapshot;
+  updateConversationSnapshot: (
+    agentId: string,
+    update: (snapshot: ConversationSnapshot) => void,
+  ) => ConversationSnapshot;
   readDirectConversationSnapshot: (memberId: string) => DirectConversationSnapshot;
   updateDirectConversationSnapshot: (
     memberId: string,
@@ -130,7 +148,7 @@ export interface MockOpenBotControls {
   emitConversationDelta: (
     event: Omit<Extract<AgentEvent, { type: "conversation-delta" }>, "type" | "revision">,
   ) => void;
-  setQueueSnapshot: (botId: string, deliveries: QueueDelivery[]) => QueueSnapshot;
+  setQueueSnapshot: (agentId: string, deliveries: QueueDelivery[]) => QueueSnapshot;
   emitAuthState: (state: CentralAuthState) => void;
   emitPresence: (snapshot: TeamPresenceSnapshot) => void;
   emitDirectMessage: (event: DirectMessageRealtimeEvent) => void;
@@ -162,7 +180,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let dynamicIslandPreference: DynamicIslandPreference = { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
   let dynamicIslandPresentation: DynamicIslandPresentation = { serverId: "local", mode: "idle" };
   const agentStatus = clone(options.agentStatus ?? STORY_AGENT_STATUS);
-  let bots = clone(options.bots ?? STORY_BOT_SUMMARIES);
+  let agents = clone(options.agents ?? STORY_AGENT_SUMMARIES);
   let sidebarLayout: SidebarLayoutSnapshot = {
     revision: 0,
     sections: [],
@@ -187,10 +205,43 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let teamMembers = clone(options.teamMembers ?? STORY_TEAM_MEMBERS);
   let invites = clone(options.invites ?? STORY_INVITES);
   let sessions = clone(options.sessions ?? STORY_SESSIONS);
+  let accountSessions: AccountSession[] = [
+    {
+      sessionId: "22222222-2222-4222-8222-222222222222",
+      name: "This desktop",
+      kind: "desktop",
+      current: true,
+      connectedAt: Date.now() - 86_400_000,
+      lastActiveAt: Date.now(),
+    },
+    {
+      sessionId: "33333333-3333-4333-8333-333333333333",
+      name: "Desktop",
+      kind: "desktop",
+      current: false,
+      connectedAt: Date.now() - 172_800_000,
+      lastActiveAt: Date.now() - 3_600_000,
+    },
+    {
+      sessionId: "11111111-1111-4111-8111-111111111111",
+      name: "Norbert’s iPhone",
+      kind: "mobile",
+      current: false,
+      connectedAt: Date.now() - 86_400_000,
+      lastActiveAt: Date.now() - 60_000,
+    },
+  ];
   let remoteDesktopSessions = clone(options.remoteDesktopSessions ?? [STORY_REMOTE_DESKTOP_SESSION]);
   let updateStatus = clone(options.updateStatus ?? STORY_UPDATE_STATUS);
   const usage = clone(options.usage ?? STORY_USAGE);
-  let botCounter = bots.length;
+  const usageTarget = agents[0];
+  const usageTargetKey = usageTarget ? `${usageTarget.provider}:${usageTarget.model}` : null;
+  let agentCounter = agents.length;
+  const marketplaceSkills = clone(STORY_MARKETPLACE_SKILLS);
+  let skillSubmissions = clone(STORY_SKILL_SUBMISSIONS);
+  const installedSkills = new Map(Object.entries(clone(STORY_INSTALLED_SKILLS)));
+  let hostedSites = clone(STORY_HOSTED_SITES);
+  let marketplaceAgentSubmissions = clone(STORY_AGENT_SUBMISSIONS);
   let messageCounter = 10;
   let directMessageCounter = 10;
 
@@ -220,9 +271,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     }, delay);
     timers.add(timer);
   };
-  const emptyQueue = (botId: string): QueueSnapshot => ({ botId, deliveries: [] });
-  const queues = new Map<string, QueueSnapshot>(bots.map((bot) => [bot.id, emptyQueue(bot.id)]));
-  const memories = new Map<string, BotMemory[]>(Object.entries(clone(options.memories ?? {})));
+  const emptyQueue = (agentId: string): QueueSnapshot => ({ agentId, deliveries: [] });
+  const queues = new Map<string, QueueSnapshot>(agents.map((agent) => [agent.id, emptyQueue(agent.id)]));
+  const memories = new Map<string, AgentMemory[]>(Object.entries(clone(options.memories ?? {})));
   const routines = new Map<string, Routine[]>(Object.entries(clone(options.routines ?? {})));
   const routineRuns = new Map<string, RoutineRun[]>();
 
@@ -288,11 +339,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     emit(remoteDesktopListeners, sessionsValue);
   }
 
-  function getSnapshot(botId: string): ConversationSnapshot {
+  function getSnapshot(agentId: string): ConversationSnapshot {
     return (
-      snapshots[botId] ?? {
-        botId,
-        threadId: `thread-${botId}`,
+      snapshots[agentId] ?? {
+        agentId,
+        threadId: `thread-${agentId}`,
         activeTurnId: null,
         revision: 0,
         messages: [],
@@ -300,45 +351,45 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     );
   }
 
-  function updateSnapshot(botId: string, update: (snapshot: ConversationSnapshot) => void): void {
-    const snapshot = getSnapshot(botId);
+  function updateSnapshot(agentId: string, update: (snapshot: ConversationSnapshot) => void): void {
+    const snapshot = getSnapshot(agentId);
     update(snapshot);
     snapshot.revision += 1;
-    snapshots[botId] = snapshot;
+    snapshots[agentId] = snapshot;
     emitAgentEvent({ type: "conversation", snapshot });
   }
 
-  function readConversationSnapshot(botId: string): ConversationSnapshot {
-    return clone(getSnapshot(botId));
+  function readConversationSnapshot(agentId: string): ConversationSnapshot {
+    return clone(getSnapshot(agentId));
   }
 
   function updateConversationSnapshot(
-    botId: string,
+    agentId: string,
     update: (snapshot: ConversationSnapshot) => void,
   ): ConversationSnapshot {
-    updateSnapshot(botId, update);
-    return readConversationSnapshot(botId);
+    updateSnapshot(agentId, update);
+    return readConversationSnapshot(agentId);
   }
 
   function emitConversationDelta(
     event: Omit<Extract<AgentEvent, { type: "conversation-delta" }>, "type" | "revision">,
   ): void {
-    const snapshot = getSnapshot(event.botId);
+    const snapshot = getSnapshot(event.agentId);
     snapshot.revision += 1;
-    snapshots[event.botId] = snapshot;
+    snapshots[event.agentId] = snapshot;
     emitAgentEvent({ ...event, type: "conversation-delta", revision: snapshot.revision });
   }
 
-  function setQueueSnapshot(botId: string, deliveries: QueueDelivery[]): QueueSnapshot {
-    const snapshot = { botId, deliveries: clone(deliveries) };
-    queues.set(botId, snapshot);
+  function setQueueSnapshot(agentId: string, deliveries: QueueDelivery[]): QueueSnapshot {
+    const snapshot = { agentId, deliveries: clone(deliveries) };
+    queues.set(agentId, snapshot);
     emitAgentEvent({ type: "queue-changed", snapshot });
     return clone(snapshot);
   }
 
-  function createBotSummary(input: Partial<BotSummary> = {}): BotSummary {
-    botCounter += 1;
-    const id = input.id ?? `mock-agent-${botCounter}`;
+  function createAgentSummary(input: Partial<AgentSummary> = {}): AgentSummary {
+    agentCounter += 1;
+    const id = input.id ?? `mock-agent-${agentCounter}`;
     return {
       id,
       provider: input.provider ?? "codex",
@@ -349,12 +400,51 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       model: input.model ?? "gpt-5.6-luna",
       reasoningEffort: input.reasoningEffort ?? "medium",
       threadId: input.threadId ?? `thread-${id}`,
-      workspacePath: input.workspacePath ?? `/mock/OpenBot/Bots/${id}`,
+      workspacePath: input.workspacePath ?? `/mock/OpenBot/Agents/${id}`,
       preview: input.preview ?? "No messages yet",
       updatedAt: input.updatedAt ?? null,
       avatarSeed: input.avatarSeed ?? id,
       avatarHue: input.avatarHue ?? null,
       avatarUrl: input.avatarUrl ?? null,
+      ...(input.marketplaceSource ? { marketplaceSource: input.marketplaceSource } : {}),
+    };
+  }
+
+  function matchesQuery(text: string, query: string | undefined): boolean {
+    return !query || text.toLowerCase().includes(query.toLowerCase());
+  }
+
+  function readInstalledSkills(agentId: string): InstalledSkill[] {
+    return installedSkills.get(agentId) ?? [];
+  }
+
+  function createRoutineRecord(input: {
+    agentId: string;
+    name: string;
+    instruction: string;
+    active: boolean;
+    timezone: string;
+    schedule: RoutineSchedule;
+  }): Routine {
+    const now = new Date().toISOString();
+    const routineId = crypto.randomUUID();
+    return {
+      id: routineId,
+      agentId: input.agentId,
+      name: input.name.trim(),
+      instruction: input.instruction.trim(),
+      active: input.active,
+      timezone: input.timezone,
+      trigger: {
+        id: crypto.randomUUID(),
+        routineId,
+        schedule: input.schedule,
+        nextRunAt: new Date(Date.now() + 3_600_000).toISOString(),
+        createdAt: now,
+        updatedAt: now,
+      },
+      createdAt: now,
+      updatedAt: now,
     };
   }
 
@@ -404,9 +494,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     revealComputerUseHelper: async () => undefined,
     closeComputerUsePermissionSetup: async () => undefined,
     openExternal: async () => undefined,
-    connectChatGPT: async () => clone(agentStatus),
-    connectClaude: async () => clone(agentStatus),
-    connectGrok: async () => clone(agentStatus),
+    connectProvider: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
     providerRuntimes: {
       getStatus: async () => ({
@@ -473,16 +561,25 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           "openbot://mobile-connect?api=https%3A%2F%2Fapi.openbot.run&ticket=preview-mobile-ticket_1234567890abcdef",
         expiresAt: Date.now() + 120_000,
       }),
-      listMobileConnectedDevices: async () => [
-        {
-          sessionId: "11111111-1111-4111-8111-111111111111",
-          name: "Norbert’s iPhone",
-          platform: "ios",
-          connectedAt: Date.now() - 86_400_000,
-          lastActiveAt: Date.now() - 60_000,
-        },
-      ],
-      revokeMobileConnectedDevice: async () => undefined,
+      listMobileConnectedDevices: async () =>
+        accountSessions
+          .filter((session) => session.kind === "mobile")
+          .map((session) => ({
+            sessionId: session.sessionId,
+            name: session.name,
+            platform: "ios",
+            connectedAt: session.connectedAt,
+            lastActiveAt: session.lastActiveAt,
+          })),
+      revokeMobileConnectedDevice: async (sessionId) => {
+        accountSessions = accountSessions.filter(
+          (session) => session.kind !== "mobile" || session.sessionId !== sessionId,
+        );
+      },
+      listAccountSessions: async () => clone(accountSessions),
+      revokeAccountSession: async (sessionId) => {
+        accountSessions = accountSessions.filter((session) => session.sessionId !== sessionId);
+      },
       logout: async () => {
         authState = { status: "signed_out" };
         emitAuthState(authState);
@@ -494,87 +591,284 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     skills: {
-      list: async () => ({ skills: [], nextCursor: null }),
-      get: async () => {
-        throw new Error("Skill not found");
+      list: async (query) => {
+        const matches = marketplaceSkills.filter(
+          (skill) =>
+            matchesQuery(`${skill.name} ${skill.description}`, query?.query) &&
+            (!query?.category || skill.category === query.category) &&
+            (query?.featured !== true || skill.featured),
+        );
+        return clone({ skills: matches, nextCursor: null });
       },
-      listMine: async () => [],
-      choosePackage: async () => null,
-      submit: async () => {
-        throw new Error("Skill submission is unavailable in preview mode.");
+      get: async (skillId) => {
+        const detail = STORY_MARKETPLACE_SKILL_DETAILS[skillId];
+        if (!detail) throw new Error("Skill not found");
+        return clone(detail);
       },
-      listInstalled: async () => [],
-      install: async () => {
-        throw new Error("Skill installation is unavailable in preview mode.");
+      listMine: async () => clone(skillSubmissions),
+      choosePackage: async () => clone(STORY_SKILL_PACKAGE_PREVIEW),
+      submit: async (input) => {
+        const preview = STORY_SKILL_PACKAGE_PREVIEW;
+        const submission: SkillSubmission = {
+          id: `submission-${preview.slug}-${skillSubmissions.length + 1}`,
+          skillId: input.skillId ?? `skill-${preview.slug}`,
+          slug: preview.slug,
+          name: preview.name,
+          description: preview.description,
+          category: input.category,
+          version: 1,
+          status: "pending",
+          rejectionNote: null,
+          iconUrl: null,
+          createdAt: new Date().toISOString(),
+        };
+        skillSubmissions = [submission, ...skillSubmissions];
+        return clone(submission);
       },
-      uninstall: async () => undefined,
+      listInstalled: async (agentId) => clone(readInstalledSkills(agentId)),
+      install: async ({ agentId, skillId }) => {
+        const skill = marketplaceSkills.find((candidate) => candidate.id === skillId);
+        if (!skill) throw new Error("Skill not found");
+        const installed: InstalledSkill = {
+          skillId: skill.id,
+          slug: skill.slug,
+          name: skill.name,
+          installedVersion: skill.version,
+          availableVersion: skill.version,
+          state: "installed",
+        };
+        installedSkills.set(agentId, [
+          ...readInstalledSkills(agentId).filter((item) => item.skillId !== skillId),
+          installed,
+        ]);
+        return clone(installed);
+      },
+      uninstall: async ({ agentId, skillId }) => {
+        installedSkills.set(
+          agentId,
+          readInstalledSkills(agentId).filter((item) => item.skillId !== skillId),
+        );
+      },
     },
     hostedSites: {
-      list: async () => [],
-      chooseDirectory: async () => null,
-      publish: async () => {
-        throw new Error("Site hosting is unavailable in preview mode.");
+      list: async () => clone(hostedSites),
+      chooseDirectory: async () => "/mock/OpenBot/Sites/launch-notes",
+      publish: async (input) => {
+        const hostname = `${input.title.toLowerCase().replaceAll(/[^a-z0-9]+/gu, "-")}.openbot.site`;
+        const site: HostedSiteSummary = {
+          id: `site-${hostedSites.length + 1}`,
+          hostname,
+          url: `https://${hostname}`,
+          title: input.title,
+          description: input.description,
+          framework: "vanilla",
+          status: "active",
+          fileCount: 12,
+          size: 786_432,
+          expiresAt: null,
+          updatedAt: new Date().toISOString(),
+        };
+        hostedSites = [site, ...hostedSites];
+        return clone(site);
       },
-      replace: async () => {
-        throw new Error("Site hosting is unavailable in preview mode.");
+      replace: async (input) => {
+        const existing = hostedSites.find((site) => site.id === input.siteId);
+        if (!existing) throw new Error("Site not found");
+        const replaced: HostedSiteSummary = {
+          ...existing,
+          title: input.title,
+          description: input.description,
+          updatedAt: new Date().toISOString(),
+        };
+        hostedSites = hostedSites.map((site) => (site.id === input.siteId ? replaced : site));
+        return clone(replaced);
       },
-      delete: async () => undefined,
+      delete: async ({ siteId }) => {
+        hostedSites = hostedSites.filter((site) => site.id !== siteId);
+      },
     },
     marketplaceAgents: {
-      list: async () => ({ agents: [], nextCursor: null }),
-      get: async () => {
-        throw new Error("Agent not found");
+      list: async (query) => {
+        const matches = STORY_MARKETPLACE_AGENTS.filter(
+          (agent) =>
+            matchesQuery(`${agent.name} ${agent.title} ${agent.description}`, query?.query) &&
+            (query?.featured !== true || agent.featured),
+        );
+        return clone({ agents: matches, nextCursor: null });
       },
-      listMine: async () => [],
-      preview: async () => {
-        throw new Error("Agent publishing is unavailable in preview mode.");
+      get: async (listingId) => {
+        const detail = STORY_MARKETPLACE_AGENT_DETAILS[listingId];
+        if (!detail) throw new Error("Agent not found");
+        return clone(detail);
       },
-      submit: async () => {
-        throw new Error("Agent publishing is unavailable in preview mode.");
+      listMine: async () => clone(marketplaceAgentSubmissions),
+      preview: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return clone({
+          agentId: agent.id,
+          name: agent.name,
+          title: agent.title,
+          description: agent.description,
+          avatarSeed: agent.avatarSeed,
+          avatarHue: agent.avatarHue,
+          avatarUrl: agent.avatarUrl,
+          skills: readInstalledSkills(agent.id).map((skill) => ({
+            skillId: skill.skillId,
+            versionId: `${skill.skillId}-v${skill.installedVersion}`,
+            slug: skill.slug,
+            name: skill.name,
+            version: skill.installedVersion,
+          })),
+          routines: (routines.get(agent.id) ?? []).map((routine) => ({
+            name: routine.name,
+            instruction: routine.instruction,
+            active: routine.active,
+            schedule: routine.trigger.schedule,
+          })),
+        });
       },
-      install: async () => {
-        throw new Error("Agent installation is unavailable in preview mode.");
+      submit: async (input) => {
+        const agent = agents.find((candidate) => candidate.id === input.agentId);
+        if (!agent) throw new Error("Agent not found");
+        const submission: AgentSubmission = {
+          id: `agent-submission-${agent.id}-${marketplaceAgentSubmissions.length + 1}`,
+          listingId: input.listingId ?? `listing-${agent.id}`,
+          name: agent.name,
+          title: agent.title,
+          description: agent.description,
+          version: 1,
+          status: "pending",
+          rejectionNote: null,
+          avatarSeed: agent.avatarSeed,
+          avatarHue: agent.avatarHue,
+          avatarUrl: agent.avatarUrl,
+          skillCount: readInstalledSkills(agent.id).length,
+          routineCount: (routines.get(agent.id) ?? []).length,
+          activeRoutineCount: (routines.get(agent.id) ?? []).filter((routine) => routine.active).length,
+          createdAt: new Date().toISOString(),
+        };
+        marketplaceAgentSubmissions = [submission, ...marketplaceAgentSubmissions];
+        return clone(submission);
+      },
+      install: async ({ listingId, agentId, timezone }) => {
+        const detail = STORY_MARKETPLACE_AGENT_DETAILS[listingId];
+        if (!detail) throw new Error("Agent not found");
+        // Installing over an existing agent updates it in place, the way the real service does:
+        // a second install of the same listing has to change the agent, not add a second copy.
+        const existing = agentId ? agents.find((candidate) => candidate.id === agentId) : undefined;
+        if (agentId && !existing) throw new Error("The installed agent no longer exists.");
+        if (existing && existing.marketplaceSource?.listingId !== detail.id) {
+          throw new Error("This local agent was installed from a different marketplace agent.");
+        }
+        const previousRoutineIds = existing?.marketplaceSource?.routineIds ?? [];
+        const previousSkillIds = existing?.marketplaceSource?.skillIds ?? [];
+        const target =
+          existing ??
+          createAgentSummary({
+            name: detail.name,
+            title: detail.title,
+            description: detail.description,
+            avatarSeed: detail.avatarSeed,
+            avatarHue: detail.avatarHue,
+          });
+        const created = detail.routines.map((routine) =>
+          createRoutineRecord({
+            agentId: target.id,
+            name: routine.name,
+            instruction: routine.instruction,
+            active: routine.active,
+            timezone,
+            schedule: routine.schedule,
+          }),
+        );
+        const agent: AgentSummary = {
+          ...target,
+          name: detail.name,
+          title: detail.title,
+          description: detail.description,
+          avatarSeed: detail.avatarSeed,
+          avatarHue: detail.avatarHue,
+          marketplaceSource: {
+            listingId: detail.id,
+            versionId: detail.versionId,
+            version: detail.version,
+            skillIds: detail.skills.map((skill) => skill.skillId),
+            routineIds: created.map((routine) => routine.id),
+          },
+        };
+        agents = existing
+          ? agents.map((candidate) => (candidate.id === agent.id ? agent : candidate))
+          : [...agents, agent];
+        if (!existing) queues.set(agent.id, emptyQueue(agent.id));
+        // Reinstalling drops only the skills this listing installed and has since dropped. A
+        // skill the user installed themselves is not the marketplace's to remove.
+        const listingSkillIds = new Set(detail.skills.map((skill) => skill.skillId));
+        const kept = readInstalledSkills(agent.id).filter(
+          (skill) => !listingSkillIds.has(skill.skillId) && !previousSkillIds.includes(skill.skillId),
+        );
+        installedSkills.set(agent.id, [
+          ...detail.skills.map((skill) => ({
+            skillId: skill.skillId,
+            slug: skill.slug,
+            name: skill.name,
+            installedVersion: skill.version,
+            availableVersion: skill.version,
+            state: "installed" as const,
+          })),
+          ...kept,
+        ]);
+        routines.set(agent.id, [
+          ...created,
+          ...(routines.get(agent.id) ?? []).filter((routine) => !previousRoutineIds.includes(routine.id)),
+        ]);
+        emitAgentEvent({ type: "agents-changed", agents });
+        emitAgentEvent({ type: "routines-changed", agentId: agent.id });
+        return clone({ agent });
       },
     },
     agent: {
       getStatus: async () => clone(agentStatus),
-      getUsage: async () => clone(usage),
+      getUsage: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        return clone(agent && `${agent.provider}:${agent.model}` === usageTargetKey ? usage : { limits: [] });
+      },
       listModels: async () => clone(models),
-      listBots: async () => clone(bots),
-      listInstalledSkills: async () => [],
+      listAgents: async () => clone(agents),
+      listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
       getSidebarLayout: async () => clone(sidebarLayout),
       mutateSidebarLayout: async (action) => {
         sidebarLayout = applySidebarLayoutAction(sidebarLayout, action);
         emitAgentEvent({ type: "sidebar-layout-changed", layout: sidebarLayout });
         return clone(sidebarLayout);
       },
-      createBot: async (input) => {
-        const bot = createBotSummary({
+      createAgent: async (input) => {
+        const agent = createAgentSummary({
           name: input.name,
           title: "",
           description: input.description,
           avatarSeed: input.avatarSeed,
           avatarHue: input.avatarHue,
         });
-        bots = [...bots, bot];
-        queues.set(bot.id, emptyQueue(bot.id));
-        emitAgentEvent({ type: "bots-changed", bots });
+        agents = [...agents, agent];
+        queues.set(agent.id, emptyQueue(agent.id));
+        emitAgentEvent({ type: "agents-changed", agents });
         try {
-          await api.agent.sendMessage({ botId: bot.id, text: input.initialMessage, attachmentDraftIds: [] });
-          return clone(bot);
+          await api.agent.sendMessage({ agentId: agent.id, text: input.initialMessage, attachmentDraftIds: [] });
+          return clone(agent);
         } catch (error) {
-          bots = bots.filter((candidate) => candidate.id !== bot.id);
-          queues.delete(bot.id);
-          delete snapshots[bot.id];
-          emitAgentEvent({ type: "bots-changed", bots });
+          agents = agents.filter((candidate) => candidate.id !== agent.id);
+          queues.delete(agent.id);
+          delete snapshots[agent.id];
+          emitAgentEvent({ type: "agents-changed", agents });
           throw error;
         }
       },
-      duplicateBot: async (botId) => {
-        const source = bots.find((bot) => bot.id === botId);
+      duplicateAgent: async (agentId) => {
+        const source = agents.find((agent) => agent.id === agentId);
         if (!source) throw new Error("Agent not found");
-        const bot = {
-          ...createBotSummary({
+        const agent = {
+          ...createAgentSummary({
             ...source,
             id: undefined,
             name: `${source.name} copy`,
@@ -584,32 +878,32 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           }),
           threadId: null,
         };
-        bots = [...bots, bot];
-        queues.set(bot.id, emptyQueue(bot.id));
-        snapshots[bot.id] = {
-          botId: bot.id,
+        agents = [...agents, agent];
+        queues.set(agent.id, emptyQueue(agent.id));
+        snapshots[agent.id] = {
+          agentId: agent.id,
           threadId: null,
           messages: [],
           activeTurnId: null,
           revision: 0,
         };
         memories.set(
-          bot.id,
-          (memories.get(botId) ?? []).map((memory) => ({
+          agent.id,
+          (memories.get(agentId) ?? []).map((memory) => ({
             ...memory,
             id: crypto.randomUUID(),
-            botId: bot.id,
+            agentId: agent.id,
             sourceTurnId: null,
           })),
         );
         routines.set(
-          bot.id,
-          (routines.get(botId) ?? []).map((routine) => {
+          agent.id,
+          (routines.get(agentId) ?? []).map((routine) => {
             const routineId = crypto.randomUUID();
             return {
               ...routine,
               id: routineId,
-              botId: bot.id,
+              agentId: agent.id,
               trigger: {
                 ...routine.trigger,
                 id: crypto.randomUUID(),
@@ -619,113 +913,94 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
             };
           }),
         );
-        const sourceSectionId = sidebarLayout.agentAssignments[botId] ?? null;
-        const orderWithoutBot = sidebarLayout.agentOrder.filter((agentId) => agentId !== bot.id);
-        const sourceIndex = orderWithoutBot.indexOf(botId);
-        const beforeAgentId = sourceIndex < 0 ? null : (orderWithoutBot[sourceIndex + 1] ?? null);
+        const sourceSectionId = sidebarLayout.agentAssignments[agentId] ?? null;
+        const orderWithoutAgent = sidebarLayout.agentOrder.filter((agentId) => agentId !== agent.id);
+        const sourceIndex = orderWithoutAgent.indexOf(agentId);
+        const beforeAgentId = sourceIndex < 0 ? null : (orderWithoutAgent[sourceIndex + 1] ?? null);
         sidebarLayout = applySidebarLayoutAction(sidebarLayout, {
           type: "move-agent",
-          agentId: bot.id,
+          agentId: agent.id,
           sectionId: sourceSectionId,
           beforeAgentId,
         });
-        emitAgentEvent({ type: "bots-changed", bots });
+        emitAgentEvent({ type: "agents-changed", agents });
         emitAgentEvent({ type: "sidebar-layout-changed", layout: sidebarLayout });
-        return clone({ bot, layout: sidebarLayout });
+        return clone({ agent, layout: sidebarLayout });
       },
-      updateBot: async (input: UpdateBotInput) => {
-        const current = bots.find((bot) => bot.id === input.botId);
+      updateAgent: async (input: UpdateAgentInput) => {
+        const current = agents.find((agent) => agent.id === input.agentId);
         if (!current) throw new Error("Agent not found");
-        const { botId: _botId, ...updates } = input;
+        const { agentId: _agentId, ...updates } = input;
         const updated = { ...current, ...updates };
-        bots = bots.map((bot) => (bot.id === updated.id ? updated : bot));
-        emitAgentEvent({ type: "bots-changed", bots });
+        agents = agents.map((agent) => (agent.id === updated.id ? updated : agent));
+        emitAgentEvent({ type: "agents-changed", agents });
         return clone(updated);
       },
       setAvatar: async (input: SetAgentAvatarInput) => {
-        const current = bots.find((bot) => bot.id === input.botId);
+        const current = agents.find((agent) => agent.id === input.agentId);
         if (!current) throw new Error("Agent not found");
         const updated = {
           ...current,
-          avatarUrl: input.image ? `mock-avatar://${input.botId}` : null,
+          avatarUrl: input.image ? `mock-avatar://${input.agentId}` : null,
         };
-        bots = bots.map((bot) => (bot.id === updated.id ? updated : bot));
-        emitAgentEvent({ type: "bots-changed", bots });
+        agents = agents.map((agent) => (agent.id === updated.id ? updated : agent));
+        emitAgentEvent({ type: "agents-changed", agents });
         return clone(updated);
       },
-      deleteBot: async (botId) => {
-        bots = bots.filter((bot) => bot.id !== botId);
-        queues.delete(botId);
-        memories.delete(botId);
-        routines.delete(botId);
-        emitAgentEvent({ type: "bots-changed", bots });
+      deleteAgent: async (agentId) => {
+        agents = agents.filter((agent) => agent.id !== agentId);
+        queues.delete(agentId);
+        memories.delete(agentId);
+        routines.delete(agentId);
+        emitAgentEvent({ type: "agents-changed", agents });
       },
-      listMemories: async (botId) => clone(memories.get(botId) ?? []),
+      listMemories: async (agentId) => clone(memories.get(agentId) ?? []),
       createMemory: async (input) => {
         const now = new Date().toISOString();
-        const memory: BotMemory = {
+        const memory: AgentMemory = {
           id: crypto.randomUUID(),
-          botId: input.botId,
+          agentId: input.agentId,
           text: input.text.trim(),
           origin: "manual",
           sourceTurnId: null,
           createdAt: now,
           updatedAt: now,
         };
-        memories.set(input.botId, [...(memories.get(input.botId) ?? []), memory]);
-        emitAgentEvent({ type: "memories-changed", botId: input.botId });
+        memories.set(input.agentId, [...(memories.get(input.agentId) ?? []), memory]);
+        emitAgentEvent({ type: "memories-changed", agentId: input.agentId });
         return clone(memory);
       },
       updateMemory: async (input) => {
-        const current = memories.get(input.botId)?.find((memory) => memory.id === input.memoryId);
+        const current = memories.get(input.agentId)?.find((memory) => memory.id === input.memoryId);
         if (!current) throw new Error("Memory not found");
         const updated = { ...current, text: input.text.trim(), updatedAt: new Date().toISOString() };
         memories.set(
-          input.botId,
-          (memories.get(input.botId) ?? []).map((memory) => (memory.id === input.memoryId ? updated : memory)),
+          input.agentId,
+          (memories.get(input.agentId) ?? []).map((memory) => (memory.id === input.memoryId ? updated : memory)),
         );
-        emitAgentEvent({ type: "memories-changed", botId: input.botId });
+        emitAgentEvent({ type: "memories-changed", agentId: input.agentId });
         return clone(updated);
       },
       deleteMemory: async (input) => {
         memories.set(
-          input.botId,
-          (memories.get(input.botId) ?? []).filter((memory) => memory.id !== input.memoryId),
+          input.agentId,
+          (memories.get(input.agentId) ?? []).filter((memory) => memory.id !== input.memoryId),
         );
-        emitAgentEvent({ type: "memories-changed", botId: input.botId });
+        emitAgentEvent({ type: "memories-changed", agentId: input.agentId });
       },
-      clearMemories: async (botId) => {
-        memories.delete(botId);
-        emitAgentEvent({ type: "memories-changed", botId });
+      clearMemories: async (agentId) => {
+        memories.delete(agentId);
+        emitAgentEvent({ type: "memories-changed", agentId });
       },
-      listRoutines: async (botId) => clone(routines.get(botId) ?? []),
+      listRoutines: async (agentId) => clone(routines.get(agentId) ?? []),
       createRoutine: async (input) => {
-        const now = new Date().toISOString();
-        const routineId = crypto.randomUUID();
-        const routine: Routine = {
-          id: routineId,
-          botId: input.botId,
-          name: input.name.trim(),
-          instruction: input.instruction.trim(),
-          active: input.active,
-          timezone: input.timezone,
-          trigger: {
-            id: crypto.randomUUID(),
-            routineId,
-            schedule: input.schedule,
-            nextRunAt: new Date(Date.now() + 3_600_000).toISOString(),
-            createdAt: now,
-            updatedAt: now,
-          },
-          createdAt: now,
-          updatedAt: now,
-        };
-        routines.set(input.botId, [routine, ...(routines.get(input.botId) ?? [])]);
-        emitAgentEvent({ type: "routines-changed", botId: input.botId });
+        const routine = createRoutineRecord(input);
+        routines.set(input.agentId, [routine, ...(routines.get(input.agentId) ?? [])]);
+        emitAgentEvent({ type: "routines-changed", agentId: input.agentId });
         return clone(routine);
       },
       updateRoutine: async (input) => {
-        const current = routines.get(input.botId)?.find((routine) => routine.id === input.routineId);
+        const current = routines.get(input.agentId)?.find((routine) => routine.id === input.routineId);
         if (!current) throw new Error("Routine not found");
         const updated: Routine = {
           ...current,
@@ -747,27 +1022,27 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           updatedAt: new Date().toISOString(),
         };
         routines.set(
-          input.botId,
-          (routines.get(input.botId) ?? []).map((routine) => (routine.id === current.id ? updated : routine)),
+          input.agentId,
+          (routines.get(input.agentId) ?? []).map((routine) => (routine.id === current.id ? updated : routine)),
         );
-        emitAgentEvent({ type: "routines-changed", botId: input.botId });
+        emitAgentEvent({ type: "routines-changed", agentId: input.agentId });
         return clone(updated);
       },
       deleteRoutine: async (input) => {
         routines.set(
-          input.botId,
-          (routines.get(input.botId) ?? []).filter((routine) => routine.id !== input.routineId),
+          input.agentId,
+          (routines.get(input.agentId) ?? []).filter((routine) => routine.id !== input.routineId),
         );
-        emitAgentEvent({ type: "routines-changed", botId: input.botId });
+        emitAgentEvent({ type: "routines-changed", agentId: input.agentId });
       },
       testRoutine: async (input) => {
-        const routine = routines.get(input.botId)?.find((candidate) => candidate.id === input.routineId);
+        const routine = routines.get(input.agentId)?.find((candidate) => candidate.id === input.routineId);
         if (!routine) throw new Error("Routine not found");
         const now = new Date().toISOString();
         const run: RoutineRun = {
           id: crypto.randomUUID(),
           routineId: routine.id,
-          botId: input.botId,
+          agentId: input.agentId,
           triggerId: null,
           kind: "manual",
           scheduledFor: now,
@@ -780,19 +1055,19 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           updatedAt: now,
         };
         routineRuns.set(routine.id, [run, ...(routineRuns.get(routine.id) ?? [])]);
-        emitAgentEvent({ type: "routines-changed", botId: input.botId });
+        emitAgentEvent({ type: "routines-changed", agentId: input.agentId });
         return clone(run);
       },
       listRoutineRuns: async (input) => clone((routineRuns.get(input.routineId) ?? []).slice(0, input.limit)),
-      readConversation: async (botId) => ({
-        ...clone(getSnapshot(botId)),
+      readConversation: async (agentId) => ({
+        ...clone(getSnapshot(agentId)),
         readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },
       }),
       readConversationPage: async (input) => {
         if (!input.anchor || input.anchor.type === "latest") {
-          emit(latestConversationListeners, input.botId);
+          emit(latestConversationListeners, input.agentId);
         }
-        const snapshot = clone(getSnapshot(input.botId));
+        const snapshot = clone(getSnapshot(input.agentId));
         const messages = snapshot.messages.slice(-Math.min(input.limit ?? 50, 100));
         return {
           ...snapshot,
@@ -804,10 +1079,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       searchConversationMessages: async (input) => {
         const query = input.query.trim().toLocaleLowerCase();
-        const results = bots.flatMap((bot) =>
-          getSnapshot(bot.id)
+        const results = agents.flatMap((agent) =>
+          getSnapshot(agent.id)
             .messages.filter((message) => message.text.toLocaleLowerCase().includes(query))
-            .map((message) => ({ botId: bot.id, message: clone(message) })),
+            .map((message) => ({ agentId: agent.id, message: clone(message) })),
         );
         return { results: results.slice(0, input.limit ?? 100), total: results.length, nextCursor: null };
       },
@@ -858,7 +1133,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         const delivery: QueueDelivery = {
           id: deliveryId,
           messageId,
-          recipientBotId: input.botId,
+          recipientAgentId: input.agentId,
           sender: { kind: "user" },
           text: input.text,
           attachments: [],
@@ -869,20 +1144,27 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           error: null,
           createdAt,
         };
-        updateSnapshot(input.botId, (snapshot) => {
+        updateSnapshot(input.agentId, (snapshot) => {
           snapshot.activeTurnId = turnId;
           snapshot.messages = [...snapshot.messages, userMessage];
         });
-        queues.set(input.botId, { botId: input.botId, deliveries: [delivery] });
+        queues.set(input.agentId, { agentId: input.agentId, deliveries: [delivery] });
         emitAgentEvent({
           type: "queue-changed",
-          snapshot: queues.get(input.botId) ?? emptyQueue(input.botId),
+          snapshot: queues.get(input.agentId) ?? emptyQueue(input.agentId),
         });
         emitAgentEvent({
           type: "turn-started",
-          botId: input.botId,
-          threadId: getSnapshot(input.botId).threadId ?? `thread-${input.botId}`,
+          agentId: input.agentId,
+          threadId: getSnapshot(input.agentId).threadId ?? `thread-${input.agentId}`,
           turnId,
+        });
+        emitAgentEvent({
+          type: "turn-progress",
+          agentId: input.agentId,
+          threadId: getSnapshot(input.agentId).threadId ?? `thread-${input.agentId}`,
+          turnId,
+          detail: "Reviewing your request…",
         });
 
         schedule(() => {
@@ -891,26 +1173,26 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
             turnId,
             author: "assistant",
             source: "assistant",
-            text: `Mock reply from ${bots.find((bot) => bot.id === input.botId)?.name ?? "agent"}: I received “${input.text}” and added it to the working context.`,
+            text: `Mock reply from ${agents.find((agent) => agent.id === input.agentId)?.name ?? "agent"}: I received “${input.text}” and added it to the working context.`,
             createdAt: new Date().toISOString(),
             status: "completed",
           };
-          updateSnapshot(input.botId, (snapshot) => {
+          updateSnapshot(input.agentId, (snapshot) => {
             snapshot.activeTurnId = null;
             snapshot.messages = [...snapshot.messages, assistantMessage];
           });
-          queues.set(input.botId, {
-            botId: input.botId,
+          queues.set(input.agentId, {
+            agentId: input.agentId,
             deliveries: [{ ...delivery, status: "completed" }],
           });
           emitAgentEvent({
             type: "queue-changed",
-            snapshot: queues.get(input.botId) ?? emptyQueue(input.botId),
+            snapshot: queues.get(input.agentId) ?? emptyQueue(input.agentId),
           });
           emitAgentEvent({
             type: "turn-completed",
-            botId: input.botId,
-            threadId: getSnapshot(input.botId).threadId ?? `thread-${input.botId}`,
+            agentId: input.agentId,
+            threadId: getSnapshot(input.agentId).threadId ?? `thread-${input.agentId}`,
             turnId,
             status: "completed",
           });
@@ -918,11 +1200,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
 
         return {
           messageId,
-          deliveries: [{ id: deliveryId, recipientBotId: input.botId, status: "running", position: null }],
+          deliveries: [{ id: deliveryId, recipientAgentId: input.agentId, status: "running", position: null }],
         };
       },
       setMessageReaction: async (input: SetMessageReactionInput) => {
-        updateSnapshot(input.botId, (snapshot) => {
+        updateSnapshot(input.agentId, (snapshot) => {
           const message = snapshot.messages.find((candidate) => candidate.id === input.messageId);
           if (message) {
             message.reaction = input.emoji;
@@ -933,49 +1215,49 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           }
         });
       },
-      listQueue: async (botId) => clone(queues.get(botId) ?? emptyQueue(botId)),
+      listQueue: async (agentId) => clone(queues.get(agentId) ?? emptyQueue(agentId)),
       acknowledgeFailedTurn: async () => undefined,
       cancelQueuedMessage: async (input) => {
-        const queue = queues.get(input.botId) ?? emptyQueue(input.botId);
+        const queue = queues.get(input.agentId) ?? emptyQueue(input.agentId);
         queue.deliveries = queue.deliveries.map((delivery) =>
           delivery.id === input.deliveryId ? { ...delivery, status: "cancelled" } : delivery,
         );
-        queues.set(input.botId, queue);
+        queues.set(input.agentId, queue);
         emitAgentEvent({ type: "queue-changed", snapshot: queue });
       },
       steerQueuedMessage: async (input: SteerQueuedMessageInput) => {
-        const queue = queues.get(input.botId) ?? emptyQueue(input.botId);
+        const queue = queues.get(input.agentId) ?? emptyQueue(input.agentId);
         queue.deliveries = queue.deliveries.map((delivery) =>
           delivery.id === input.deliveryId
             ? { ...delivery, status: "running", turnId: input.expectedTurnId, position: null }
             : delivery,
         );
-        queues.set(input.botId, queue);
+        queues.set(input.agentId, queue);
         emitAgentEvent({ type: "queue-changed", snapshot: queue });
       },
       updateQueuedMessage: async (input: UpdateQueuedMessageInput) => {
-        const queue = queues.get(input.botId) ?? emptyQueue(input.botId);
+        const queue = queues.get(input.agentId) ?? emptyQueue(input.agentId);
         queue.deliveries = queue.deliveries.map((delivery) =>
           delivery.id === input.deliveryId ? { ...delivery, text: input.text } : delivery,
         );
-        queues.set(input.botId, queue);
+        queues.set(input.agentId, queue);
         emitAgentEvent({ type: "queue-changed", snapshot: queue });
       },
       reorderQueue: async (input: ReorderQueueInput) => {
-        const queue = queues.get(input.botId) ?? emptyQueue(input.botId);
+        const queue = queues.get(input.agentId) ?? emptyQueue(input.agentId);
         const byId = new Map(queue.deliveries.map((delivery) => [delivery.id, delivery]));
         queue.deliveries = input.deliveryIds.flatMap((deliveryId, index) => {
           const delivery = byId.get(deliveryId);
           return delivery ? [{ ...delivery, position: index + 1 }] : [];
         });
-        queues.set(input.botId, queue);
+        queues.set(input.agentId, queue);
         emitAgentEvent({ type: "queue-changed", snapshot: queue });
       },
       interrupt: async (input) => {
         emitAgentEvent({
           type: "turn-completed",
-          botId: input.botId,
-          threadId: getSnapshot(input.botId).threadId ?? `thread-${input.botId}`,
+          agentId: input.agentId,
+          threadId: getSnapshot(input.agentId).threadId ?? `thread-${input.agentId}`,
           turnId: input.turnId,
           status: "interrupted",
         });
@@ -1001,7 +1283,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           url: input.url,
           loading: false,
           ownerThreadId: input.ownerThreadId ?? null,
-          ownerBotId: input.ownerBotId ?? null,
+          ownerAgentId: input.ownerAgentId ?? null,
+          // `toPublicTab` in `browser-host.ts` fills all three on every tab it reports, so a mock that
+          // left them undefined would be the only surface where a freshly opened tab has no environment.
+          // These are `defaultBrowserEnvironment()` -- a fill viewport, which the real host then reports
+          // at the view's measured size.
+          environment: {
+            viewport: { mode: "fill", width: 1200, height: 800, deviceScaleFactor: 1, preset: null },
+            colorScheme: "system",
+            reducedMotion: false,
+          },
+          recording: false,
+          diagnosticErrorCount: 0,
         };
         browserTabs = [...browserTabs, tab];
         activeBrowserTabId = tab.id;
@@ -1093,7 +1386,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       list: async () => clone(servers),
       select: async (serverId) => {
         servers = servers.map((server) => ({ ...server, active: server.id === serverId }));
-        emitAgentEvent({ type: "bots-changed", bots });
+        emitAgentEvent({ type: "agents-changed", agents });
         return clone(servers);
       },
       reorder: async ({ serverIds }) => {
@@ -1395,65 +1688,4 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       void appInfo;
     },
   };
-}
-
-function applySidebarLayoutAction(layout: SidebarLayoutSnapshot, action: SidebarLayoutAction): SidebarLayoutSnapshot {
-  const revision = layout.revision + 1;
-  if (action.type === "create") {
-    const id = crypto.randomUUID();
-    return {
-      ...layout,
-      revision,
-      sections: [...layout.sections, { id, name: action.name.trim() }],
-      order: [...layout.order, id],
-      agentAssignments: action.agentId
-        ? { ...layout.agentAssignments, [action.agentId]: id }
-        : { ...layout.agentAssignments },
-      agentOrder: [...layout.agentOrder],
-    };
-  }
-  if (action.type === "rename") {
-    return {
-      ...layout,
-      revision,
-      sections: layout.sections.map((section) =>
-        section.id === action.sectionId ? { ...section, name: action.name.trim() } : section,
-      ),
-    };
-  }
-  if (action.type === "delete") {
-    return {
-      ...layout,
-      revision,
-      sections: layout.sections.filter((section) => section.id !== action.sectionId),
-      order: layout.order.filter((sectionId) => sectionId !== action.sectionId),
-      agentAssignments: Object.fromEntries(
-        Object.entries(layout.agentAssignments).filter(([, sectionId]) => sectionId !== action.sectionId),
-      ),
-      agentOrder: [...layout.agentOrder],
-    };
-  }
-  if (action.type === "move") {
-    const order = [...layout.order];
-    const index = order.indexOf(action.sectionId);
-    const target = index + (action.direction === "up" ? -1 : 1) * (action.steps ?? 1);
-    if (index >= 0 && target >= 0 && target < order.length) {
-      const [movedSectionId] = order.splice(index, 1);
-      if (movedSectionId) order.splice(target, 0, movedSectionId);
-    }
-    return { ...layout, revision, order };
-  }
-  if (action.type === "move-agent") {
-    const agentOrder = layout.agentOrder.filter((agentId) => agentId !== action.agentId);
-    const insertionIndex = action.beforeAgentId === null ? agentOrder.length : agentOrder.indexOf(action.beforeAgentId);
-    agentOrder.splice(insertionIndex < 0 ? agentOrder.length : insertionIndex, 0, action.agentId);
-    const agentAssignments = { ...layout.agentAssignments };
-    if (action.sectionId === null) delete agentAssignments[action.agentId];
-    else agentAssignments[action.agentId] = action.sectionId;
-    return { ...layout, revision, agentAssignments, agentOrder };
-  }
-  const agentAssignments = { ...layout.agentAssignments };
-  if (action.sectionId === null) delete agentAssignments[action.agentId];
-  else agentAssignments[action.agentId] = action.sectionId;
-  return { ...layout, revision, agentAssignments };
 }

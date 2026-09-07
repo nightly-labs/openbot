@@ -14,12 +14,14 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type DynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { z } from "zod";
 import type { AgentProvider } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import type { ClaudeCliInfo } from "./cli";
 import {
+  type AccountRateLimitsReadResult,
+  type AccountRateLimitWindowResult,
   type AccountReadResult,
   type AppServerNotification,
   type AppServerRequest,
@@ -28,6 +30,7 @@ import {
   type RequestId,
   type ResponseDecoder,
   type RpcError,
+  type ThreadItem,
   type ThreadResponse,
   type TurnResponse,
 } from "./protocol";
@@ -56,8 +59,14 @@ interface ThreadConfig {
 interface ActiveTurn {
   id: string;
   itemId: string;
+  reasoningItemId: string;
   text: string;
+  thinking: string;
+  thinkingStarted: boolean;
+  thinkingStreamId: string | null;
   assistantMessages: Map<string, string>;
+  thinkingMessages: Map<string, string>;
+  toolCalls: Map<string, string>;
 }
 
 interface ThreadRuntime {
@@ -93,26 +102,37 @@ interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
   supportedModels(): Promise<ModelInfo[]>;
   setModel(model?: string): Promise<void>;
   applyFlagSettings(settings: { effortLevel?: ClaudeEffort | null }): Promise<void>;
+  usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET?(): Promise<unknown>;
   close(): void;
 }
 
 type QueryFactory = (params: Parameters<typeof query>[0]) => ClaudeQuery;
+type SessionHistoryReader = typeof getSessionMessages;
 type ClaudeEffortCapability = { supported: ClaudeEffort[]; defaultEffort: ClaudeEffort } | null;
 
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly provider: AgentProvider = "claude";
   readonly #cli: ClaudeCliInfo;
   readonly #createQuery: QueryFactory;
+  readonly #readSessionMessages: SessionHistoryReader;
+  readonly #requestTimeoutMs: number;
   readonly #threads = new Map<string, ThreadRuntime>();
   readonly #pendingServerRequests = new Map<RequestId, PendingServerRequest>();
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
   readonly #modelSdkValues = new Map<string, string>();
   #running = false;
 
-  constructor(cli: ClaudeCliInfo, createQuery: QueryFactory = query) {
+  constructor(
+    cli: ClaudeCliInfo,
+    createQuery: QueryFactory = query,
+    readSessionMessages: SessionHistoryReader = getSessionMessages,
+    requestTimeoutMs = 30_000,
+  ) {
     super();
     this.#cli = cli;
     this.#createQuery = createQuery;
+    this.#readSessionMessages = readSessionMessages;
+    this.#requestTimeoutMs = requestTimeoutMs;
   }
 
   get running(): boolean {
@@ -137,8 +157,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#pendingServerRequests.clear();
   }
 
-  request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, _timeoutMs?: number): Promise<T>;
-  async request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, _timeoutMs?: number): Promise<T> {
+  request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T>;
+  async request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T> {
     if (!this.#running) throw new Error("Claude Agent SDK is not running.");
 
     switch (method) {
@@ -147,9 +167,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       case "account/read":
         return decoder(await this.#readAccount());
       case "account/rateLimits/read":
-        return decoder({ rateLimits: null, rateLimitsByLimitId: null });
+        return decoder(await this.#readUsage(getString(params, "model"), timeoutMs ?? this.#requestTimeoutMs));
       case "model/list":
-        return decoder({ data: await this.#listModels(_timeoutMs) });
+        return decoder({ data: await this.#listModels(timeoutMs) });
       case "plugin/list":
         return decoder({ marketplaces: [] });
       case "thread/start": {
@@ -281,6 +301,40 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
   }
 
+  async #readUsage(model: string | null, timeoutMs: number): Promise<AccountRateLimitsReadResult> {
+    const input = new AsyncMessageQueue();
+    const claudeQuery = this.#createQuery({
+      prompt: input,
+      options: {
+        cwd: process.cwd(),
+        pathToClaudeCodeExecutable: this.#cli.executable,
+        settingSources: ["user", "project", "local"],
+        persistSession: false,
+        env: { ...claudeEnvironment(this.#cli), CLAUDE_AGENT_SDK_CLIENT_APP: "openbot/0.1.0" },
+      },
+    });
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const readUsage = claudeQuery.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET;
+      if (!readUsage) return { rateLimits: null, rateLimitsByLimitId: null };
+      const usage = await Promise.race([
+        readUsage.call(claudeQuery),
+        new Promise<unknown>((_, reject) => {
+          timeout = setTimeout(() => {
+            input.close();
+            claudeQuery.close();
+            reject(new Error("Claude request timed out: account/rateLimits/read"));
+          }, timeoutMs);
+        }),
+      ]);
+      return claudeRateLimits(usage, model);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+      input.close();
+      claudeQuery.close();
+    }
+  }
+
   async #readAccount(): Promise<AccountReadResult> {
     try {
       const { stdout } = await execFileAsync(this.#cli.executable, ["auth", "status", "--json"], {
@@ -381,8 +435,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const activeTurn = {
       id: turnId,
       itemId: `${turnId}:assistant`,
+      reasoningItemId: `${turnId}:reasoning`,
       text: "",
+      thinking: "",
+      thinkingStarted: false,
+      thinkingStreamId: null,
       assistantMessages: new Map<string, string>(),
+      thinkingMessages: new Map<string, string>(),
+      toolCalls: new Map<string, string>(),
     };
     runtime.activeTurn = activeTurn;
     this.emit("notification", {
@@ -442,15 +502,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (message.type === "stream_event" && message.parent_tool_use_id === null) {
       const event = message.event;
       const delta = isRecord(event) ? event.delta : null;
-      if (
-        event &&
-        isRecord(event) &&
-        event.type === "content_block_delta" &&
-        isRecord(delta) &&
-        delta.type === "text_delta" &&
-        isString(delta.text)
-      ) {
-        this.#appendDelta(runtime, delta.text);
+      if (event && isRecord(event) && event.type === "content_block_delta" && isRecord(delta)) {
+        if (delta.type === "text_delta" && isString(delta.text)) this.#appendDelta(runtime, delta.text);
+        else if (delta.type === "thinking_delta" && isString(delta.thinking)) {
+          this.#appendThinkingDelta(runtime, delta.thinking, message.uuid);
+        }
       }
       return;
     }
@@ -459,11 +515,37 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (message.parent_tool_use_id !== null) return;
       const turn = runtime.activeTurn;
       const text = messageText(message.message);
-      if (!turn || !text || !message.uuid) return;
+      if (!turn || !message.uuid) return;
+      const thinking = messageThinking(message.message);
+      if (thinking) {
+        turn.thinkingMessages.set(message.uuid, thinking);
+        const completeThinking = [...turn.thinkingMessages.values()].join("\n");
+        if (completeThinking.startsWith(turn.thinking)) {
+          this.#appendThinkingDelta(runtime, completeThinking.slice(turn.thinking.length));
+        }
+      }
+      for (const toolCall of messageToolCalls(message.message)) {
+        if (turn.toolCalls.has(toolCall.id)) continue;
+        turn.toolCalls.set(toolCall.id, toolCall.name);
+        this.#emitToolCall(runtime, toolCall.id, toolCall.name, false);
+      }
+      if (!text) return;
       turn.assistantMessages.set(message.uuid, text);
       const completeText = [...turn.assistantMessages.values()].join("");
       if (completeText.startsWith(turn.text)) {
         this.#appendDelta(runtime, completeText.slice(turn.text.length));
+      }
+      return;
+    }
+
+    if (message.type === "user") {
+      const turn = runtime.activeTurn;
+      if (!turn) return;
+      for (const toolCallId of messageToolResults(message.message)) {
+        const name = turn.toolCalls.get(toolCallId);
+        if (!name) continue;
+        turn.toolCalls.delete(toolCallId);
+        this.#emitToolCall(runtime, toolCallId, name, true);
       }
       return;
     }
@@ -473,6 +555,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const errors = message.errors ?? [];
     const turn = runtime.activeTurn;
     if (turn) {
+      for (const [toolCallId, name] of turn.toolCalls) {
+        this.#emitToolCall(runtime, toolCallId, name, true);
+      }
+      turn.toolCalls.clear();
       const completeText = [...turn.assistantMessages.values()].join("");
       if (completeText) turn.text = completeText;
       else if (!turn.text && fallback) this.#appendDelta(runtime, fallback);
@@ -483,6 +569,49 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       errors.some((error) => /interrupt|abort/i.test(error));
     const status = interrupted ? "interrupted" : message.subtype === "success" ? "completed" : "failed";
     this.#completeTurn(runtime, status, errors.length > 0 ? errors.join("\n") : null);
+  }
+
+  #emitToolCall(runtime: ThreadRuntime, id: string, name: string, completed: boolean): void {
+    const turn = runtime.activeTurn;
+    if (!turn) return;
+    this.emit("notification", {
+      method: completed ? "item/completed" : "item/started",
+      params: {
+        threadId: runtime.id,
+        turnId: turn.id,
+        item: { id, type: "toolCall", name, status: completed ? "completed" : "in_progress" },
+      },
+    });
+  }
+
+  /* Claude streams reasoning as its own content block; the app-server vocabulary carries it as a
+     separate agentMessage item whose `commentary` phase becomes the thinking disclosure. */
+  #appendThinkingDelta(runtime: ThreadRuntime, delta: string, streamId?: string): void {
+    const turn = runtime.activeTurn;
+    if (!turn || !delta) return;
+    if (!turn.thinkingStarted) {
+      turn.thinkingStarted = true;
+      this.emit("notification", {
+        method: "item/started",
+        params: {
+          threadId: runtime.id,
+          turnId: turn.id,
+          item: { id: turn.reasoningItemId, type: "agentMessage", phase: "commentary" },
+        },
+      });
+    }
+    const nextDelta = streamId && turn.thinkingStreamId && streamId !== turn.thinkingStreamId ? `\n${delta}` : delta;
+    if (streamId) turn.thinkingStreamId = streamId;
+    turn.thinking += nextDelta;
+    this.emit("notification", {
+      method: "item/agentMessage/delta",
+      params: {
+        threadId: runtime.id,
+        turnId: turn.id,
+        itemId: turn.reasoningItemId,
+        delta: nextDelta,
+      },
+    });
   }
 
   #appendDelta(runtime: ThreadRuntime, delta: string): void {
@@ -503,6 +632,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   #completeTurn(runtime: ThreadRuntime, status: string, error: unknown): void {
     const turn = runtime.activeTurn;
     if (!turn) return;
+    if (turn.thinkingStarted) {
+      this.emit("notification", {
+        method: "item/completed",
+        params: {
+          threadId: runtime.id,
+          turnId: turn.id,
+          item: { id: turn.reasoningItemId, type: "agentMessage", phase: "commentary", text: turn.thinking },
+        },
+      });
+    }
     this.emit("notification", {
       method: "item/completed",
       params: {
@@ -526,9 +665,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 
   async #readThread(threadId: string): Promise<ThreadResponse> {
     const runtime = this.#threads.get(threadId);
-    const messages = await getSessionMessages(threadId, runtime?.config.cwd ? { dir: runtime.config.cwd } : undefined);
+    const messages = await this.#readSessionMessages(
+      threadId,
+      runtime?.config.cwd ? { dir: runtime.config.cwd } : undefined,
+    );
     const turns: NonNullable<ThreadResponse["thread"]["turns"]> = [];
     let current: (typeof turns)[number] | null = null;
+    let currentThinking: ThreadItem | null = null;
     for (const message of messages) {
       if (message.parent_tool_use_id) continue;
       const text = messageText(message.message);
@@ -547,12 +690,29 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ],
         };
         turns.push(current);
-      } else if (message.type === "assistant" && text) {
+        currentThinking = null;
+      } else if (message.type === "assistant") {
+        const thinking = messageThinking(message.message);
+        if (!thinking && !text) continue;
         if (!current) {
           current = { id: message.uuid, status: "completed", items: [] };
           turns.push(current);
+          currentThinking = null;
         }
-        current.items?.push({ id: message.uuid, type: "agentMessage", text });
+        if (thinking) {
+          if (currentThinking) {
+            currentThinking.text = `${currentThinking.text ?? ""}\n${thinking}`;
+          } else {
+            currentThinking = {
+              id: `${current.id}:reasoning`,
+              type: "agentMessage",
+              phase: "commentary",
+              text: thinking,
+            };
+            current.items?.push(currentThinking);
+          }
+        }
+        if (text) current.items?.push({ id: message.uuid, type: "agentMessage", text });
       }
     }
     return { thread: { id: threadId, turns } };
@@ -618,15 +778,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ),
           tool(
             "list_routines",
-            "List routines for this agent, or for another local agent when botId is provided.",
-            { botId: z.string().min(1).max(INPUT_LIMITS.identifier).optional() },
+            "List routines for this agent, or for another local agent when agentId is provided.",
+            { agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional() },
             (args) => call("openbot", "list_routines", args),
           ),
           tool(
             "create_routine",
-            "Create a scheduled routine for this agent, or for another local agent when botId is provided.",
+            "Create a scheduled routine for this agent, or for another local agent when agentId is provided.",
             {
-              botId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+              agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
               name: z.string().min(1).max(INPUT_LIMITS.routineName),
               instruction: z.string().min(1).max(INPUT_LIMITS.routineInstruction),
               schedule: routineScheduleZodSchema,
@@ -637,9 +797,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ),
           tool(
             "update_routine",
-            "Update, pause, or resume an existing routine for this agent, or for another local agent when botId is provided.",
+            "Update, pause, or resume an existing routine for this agent, or for another local agent when agentId is provided.",
             {
-              botId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+              agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
               routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
               name: z.string().min(1).max(INPUT_LIMITS.routineName).optional(),
               instruction: z.string().min(1).max(INPUT_LIMITS.routineInstruction).optional(),
@@ -650,18 +810,18 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ),
           tool(
             "delete_routine",
-            "Delete an existing routine for this agent, or for another local agent when botId is provided.",
+            "Delete an existing routine for this agent, or for another local agent when agentId is provided.",
             {
-              botId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+              agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
               routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
             },
             (args) => call("openbot", "delete_routine", args),
           ),
           tool(
             "test_routine",
-            "Queue one manual test run of an existing routine for this agent, or for another local agent when botId is provided.",
+            "Queue one manual test run of an existing routine for this agent, or for another local agent when agentId is provided.",
             {
-              botId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+              agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
               routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
             },
             (args) => call("openbot", "test_routine", args),
@@ -691,7 +851,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             "send_message",
             "Send an asynchronous message or local files to OpenBot teammates.",
             {
-              recipientBotIds: z.array(z.string()).min(1).max(32),
+              recipientAgentIds: z.array(z.string()).min(1).max(32),
               text: z.string().min(1).max(100_000),
               paths: z.array(z.string()).max(10).optional(),
               replyToMessageId: z.string().nullable().optional(),
@@ -783,6 +943,55 @@ function claudeEnvironment(cli: ClaudeCliInfo): NodeJS.ProcessEnv {
   };
 }
 
+function claudeRateLimits(value: unknown, model: string | null): AccountRateLimitsReadResult {
+  if (!isDynamicRecord(value) || value.rate_limits_available !== true || !isDynamicRecord(value.rate_limits)) {
+    return { rateLimits: null, rateLimitsByLimitId: null };
+  }
+  const rateLimits = value.rate_limits;
+  const primary = claudeUsageWindow(rateLimits.five_hour, 300);
+  const secondary = claudeModelWeeklyWindow(rateLimits, model) ?? claudeUsageWindow(rateLimits.seven_day, 10_080);
+  if (!primary && !secondary) return { rateLimits: null, rateLimitsByLimitId: null };
+  return {
+    rateLimits: { limitId: "claude", primary, secondary },
+    rateLimitsByLimitId: null,
+  };
+}
+
+function claudeModelWeeklyWindow(rateLimits: DynamicRecord, model: string | null): AccountRateLimitWindowResult | null {
+  if (!model) return null;
+  const familyKey = model.toLowerCase().includes("opus")
+    ? "seven_day_opus"
+    : model.toLowerCase().includes("sonnet")
+      ? "seven_day_sonnet"
+      : null;
+  if (familyKey) {
+    const family = claudeUsageWindow(rateLimits[familyKey], 10_080);
+    if (family) return family;
+  }
+  return null;
+}
+
+function claudeUsageWindow(value: unknown, windowDurationMins: number): AccountRateLimitWindowResult | null {
+  if (!isDynamicRecord(value)) return null;
+  const usedPercent = numberValue(value.utilization) ?? numberValue(value.percent);
+  if (usedPercent === null) return null;
+  const reset = stringValue(value.resets_at) ?? stringValue(value.resetsAt);
+  const resetMilliseconds = reset ? Date.parse(reset) : Number.NaN;
+  return {
+    usedPercent,
+    windowDurationMins,
+    resetsAt: Number.isFinite(resetMilliseconds) ? resetMilliseconds / 1_000 : null,
+  };
+}
+
+function stringValue(value: unknown): string | null {
+  return isString(value) && value.trim() ? value.trim() : null;
+}
+
+function numberValue(value: unknown): number | null {
+  return isNumber(value) && Number.isFinite(value) ? value : null;
+}
+
 class AsyncMessageQueue implements AsyncIterable<SDKUserMessage> {
   readonly #values: SDKUserMessage[] = [];
   readonly #waiters: Array<(result: IteratorResult<SDKUserMessage>) => void> = [];
@@ -852,6 +1061,34 @@ function messageText(message: unknown): string {
     .filter((block) => block.type === "text" && isString(block.text))
     .map((block) => block.text)
     .join("\n");
+}
+
+function messageThinking(message: unknown): string {
+  if (!isRecord(message) || !Array.isArray(message.content)) return "";
+  return message.content
+    .filter(isRecord)
+    .filter((block) => block.type === "thinking")
+    .map((block) => getString(block, "thinking"))
+    .filter(isString)
+    .join("\n");
+}
+
+function messageToolCalls(message: unknown): Array<{ id: string; name: string }> {
+  if (!isRecord(message) || !Array.isArray(message.content)) return [];
+  return message.content.filter(isRecord).flatMap((block) => {
+    const id = getString(block, "id");
+    const name = getString(block, "name");
+    return block.type === "tool_use" && id && name ? [{ id, name }] : [];
+  });
+}
+
+function messageToolResults(message: unknown): string[] {
+  if (!isRecord(message) || !Array.isArray(message.content)) return [];
+  return message.content
+    .filter(isRecord)
+    .filter((block) => block.type === "tool_result")
+    .map((block) => getString(block, "tool_use_id"))
+    .filter(isString);
 }
 
 function dynamicContent(value: unknown): CallToolResult["content"] {

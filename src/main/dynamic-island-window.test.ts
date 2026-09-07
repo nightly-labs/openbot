@@ -10,10 +10,12 @@ import {
   type DynamicIslandPresentation,
   IPC_CHANNELS,
 } from "@openbot/contracts/ipc";
+import { createOpenBotLogger } from "@openbot/logging";
 import type { BrowserWindow, Display, Rectangle } from "electron";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as preferenceStore from "./dynamic-island-preference-store";
 import {
+  DYNAMIC_ISLAND_COLLAPSE_SETTLE_MS,
   DynamicIslandWindowController,
   dynamicIslandNotchSizeForDisplay,
   dynamicIslandWindowBounds,
@@ -36,9 +38,9 @@ function criticalPresentation(
   mode: "approval" | "question",
   requestId: string,
   serverId = "local",
-  botId = "chief",
+  agentId = "chief",
 ): DynamicIslandPresentation {
-  const bot = { id: botId, name: "Chief", avatarSeed: botId, avatarHue: 215 as const, avatarUrl: null };
+  const agent = { id: agentId, name: "Chief", avatarSeed: agentId, avatarHue: 215 as const, avatarUrl: null };
   if (mode === "approval") {
     return {
       serverId,
@@ -46,7 +48,7 @@ function criticalPresentation(
       remainingCount: 0,
       item: {
         requestId,
-        bot,
+        agent,
         title: "Approve",
         detail: "Review the request.",
         truncated: false,
@@ -67,7 +69,7 @@ function criticalPresentation(
     remainingCount: 0,
     item: {
       requestId,
-      bot,
+      agent,
       title: "Choose",
       detail: "Choose an option.",
       questions: [{ id: "choice", header: "Choose", question: "Choose an option.", isSecret: false, options: null }],
@@ -76,6 +78,7 @@ function criticalPresentation(
 }
 
 afterEach(async () => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
@@ -148,13 +151,26 @@ describe("dynamic island window geometry", () => {
       loadWindow: async () => undefined,
       getDisplays: () => displays,
       getMainWindow: () => null,
+      presentMainWindow: () => undefined,
       performHaptic: () => undefined,
       performCriticalAction: async () => undefined,
     });
 
     await controller.initialize();
     expect(windows).toHaveLength(2);
+    expect(windows[0]?.bounds).toEqual({ x: 449, y: 0, width: 614, height: 50 });
+    expect(windows[1]?.bounds).toEqual({ x: 2165, y: -120, width: 614, height: 50 });
     expect(controller.overlayRendererIds).toEqual(new Set([42, 43]));
+    expect(windows[0]?.excludedFromShownWindowsMenu).toBe(true);
+    expect(windows[1]?.excludedFromShownWindowsMenu).toBe(true);
+    expect(windows[0]?.setVisibleOnAllWorkspaces).toHaveBeenCalledWith(true, {
+      skipTransformProcessType: true,
+      visibleOnFullScreen: true,
+    });
+    expect(windows[1]?.setVisibleOnAllWorkspaces).toHaveBeenCalledWith(true, {
+      skipTransformProcessType: true,
+      visibleOnFullScreen: true,
+    });
     expect(windows[0]?.setHiddenInMissionControl).toHaveBeenCalledWith(true);
     expect(windows[1]?.setHiddenInMissionControl).toHaveBeenCalledWith(true);
 
@@ -166,6 +182,7 @@ describe("dynamic island window geometry", () => {
     controller.setInteractive(43, true);
     expect(windows[0]?.setFocusable).not.toHaveBeenCalledWith(true);
     expect(windows[1]?.setFocusable).toHaveBeenCalledWith(true);
+    expect(windows[1]?.setBounds).toHaveBeenCalledWith({ x: 2165, y: -120, width: 614, height: 380 }, false);
 
     displays = [
       display({
@@ -178,6 +195,14 @@ describe("dynamic island window geometry", () => {
     await controller.reconcileWindow();
     expect(windows[0]?.destroy).toHaveBeenCalledOnce();
     expect(windows[1]?.setBounds).toHaveBeenCalledWith({ x: 1793, y: 20, width: 614, height: 380 }, false);
+
+    // The window is the only thing clipping the island, so it keeps the tall bounds until the
+    // renderer's collapse animation has landed - otherwise the lower half is cut off at once.
+    vi.useFakeTimers();
+    controller.setInteractive(43, false);
+    expect(windows[1]?.setBounds).not.toHaveBeenCalledWith({ x: 1793, y: 20, width: 614, height: 50 }, false);
+    await vi.advanceTimersByTimeAsync(DYNAMIC_ISLAND_COLLAPSE_SETTLE_MS);
+    expect(windows[1]?.setBounds).toHaveBeenCalledWith({ x: 1793, y: 20, width: 614, height: 50 }, false);
   });
 
   it("publishes updated geometry without reloading an existing overlay", async () => {
@@ -197,6 +222,7 @@ describe("dynamic island window geometry", () => {
       loadWindow,
       getDisplays: () => displays,
       getMainWindow: () => null,
+      presentMainWindow: () => undefined,
       performHaptic: () => undefined,
       performCriticalAction: async () => undefined,
     });
@@ -238,6 +264,7 @@ describe("dynamic island window geometry", () => {
       loadWindow: async () => undefined,
       getDisplays: () => displays,
       getMainWindow: () => null,
+      presentMainWindow: () => undefined,
       performHaptic: () => undefined,
       performCriticalAction: async () => undefined,
     });
@@ -261,10 +288,11 @@ describe("dynamic island window geometry", () => {
   it("continues loading other displays when one overlay fails", async () => {
     const root = await temporaryRoot();
     const windows: FakeWindow[] = [];
-    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const lines: string[] = [];
     const controller = new DynamicIslandWindowController({
       platform: "darwin",
       preferencePath: join(root, "preference.json"),
+      logger: createOpenBotLogger("test", (line) => lines.push(line)),
       createWindow: (bounds) => {
         const window = new FakeWindow(80 + windows.length, bounds);
         windows.push(window);
@@ -276,6 +304,7 @@ describe("dynamic island window geometry", () => {
       },
       getDisplays: () => [display({ id: 1 }), display({ id: 2, internal: false })],
       getMainWindow: () => null,
+      presentMainWindow: () => undefined,
       performHaptic: () => undefined,
       performCriticalAction: async () => undefined,
     });
@@ -285,7 +314,7 @@ describe("dynamic island window geometry", () => {
     expect(windows).toHaveLength(2);
     expect(windows[0]?.destroy).toHaveBeenCalledOnce();
     expect(controller.overlayRendererIds).toEqual(new Set([81]));
-    expect(error).toHaveBeenCalledWith("Unable to load Dynamic Island on display 1:", expect.any(Error));
+    expect(lines.some((line) => line.includes("Unable to load Dynamic Island on display 1:"))).toBe(true);
   });
 
   it("does not recreate overlays when disabling during display loading", async () => {
@@ -315,6 +344,7 @@ describe("dynamic island window geometry", () => {
       },
       getDisplays: () => [display({ id: 1, internal: true }), display({ id: 2, internal: false })],
       getMainWindow: () => null,
+      presentMainWindow: () => undefined,
       performHaptic: () => undefined,
       performCriticalAction: async () => undefined,
     });
@@ -347,6 +377,7 @@ describe("dynamic island window geometry", () => {
       loadWindow: async () => undefined,
       getDisplays: () => [],
       getMainWindow: () => null,
+      presentMainWindow: () => undefined,
       performHaptic: () => undefined,
       performCriticalAction: async () => undefined,
     });
@@ -382,6 +413,7 @@ describe("dynamic island window geometry", () => {
       loadWindow: async () => undefined,
       getDisplays: () => [display({ id: 1 }), display({ id: 2, internal: false })],
       getMainWindow: () => null,
+      presentMainWindow: () => undefined,
       performHaptic,
       performCriticalAction: async () => undefined,
     });
@@ -418,6 +450,7 @@ describe("dynamic island window geometry", () => {
       loadWindow: async () => undefined,
       getDisplays: () => [display({ id: 1 }), display({ id: 2, internal: false })],
       getMainWindow: () => null,
+      presentMainWindow: () => undefined,
       performHaptic: () => undefined,
       performCriticalAction: async () => undefined,
     });
@@ -440,6 +473,7 @@ describe("dynamic island window geometry", () => {
       loadWindow: async () => undefined,
       getDisplays: () => [display({})],
       getMainWindow: () => null,
+      presentMainWindow: () => undefined,
       performHaptic: () => undefined,
       performCriticalAction: async () => undefined,
     });
@@ -452,6 +486,7 @@ describe("dynamic island window geometry", () => {
     // biome-ignore lint/nursery/noUnsafeTypeAssertion: the test double implements the controller's BrowserWindow surface.
     const ensureMainWindow = vi.fn(async () => mainWindow as unknown as BrowserWindow);
     const performCriticalAction = vi.fn(async () => undefined);
+    const presentMainWindow = vi.fn();
     const controller = new DynamicIslandWindowController({
       platform: "darwin",
       preferencePath: "/tmp/dynamic-island-preference.json",
@@ -461,6 +496,7 @@ describe("dynamic island window geometry", () => {
       loadWindow: async () => undefined,
       getDisplays: () => [],
       getMainWindow: () => null,
+      presentMainWindow,
       ensureMainWindow,
       performHaptic: () => undefined,
       performCriticalAction,
@@ -468,7 +504,7 @@ describe("dynamic island window geometry", () => {
     const action: DynamicIslandAction = {
       type: "answer-prompt",
       serverId: "local",
-      botId: "research",
+      agentId: "research",
       requestId: "prompt-1",
       answers: { source: ["Official data"] },
     };
@@ -478,6 +514,7 @@ describe("dynamic island window geometry", () => {
 
     expect(performCriticalAction).toHaveBeenCalledWith(action);
     expect(ensureMainWindow).toHaveBeenCalledOnce();
+    expect(presentMainWindow).not.toHaveBeenCalled();
     expect(mainWindow.webContents.send).toHaveBeenCalledWith("dynamic-island:action", action);
     expect(mainWindow.show).not.toHaveBeenCalled();
     expect(mainWindow.focus).not.toHaveBeenCalled();
@@ -502,13 +539,14 @@ describe("dynamic island window geometry", () => {
       getDisplays: () => [],
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: the test double implements the controller's BrowserWindow surface.
       getMainWindow: () => mainWindow as unknown as BrowserWindow,
+      presentMainWindow: () => undefined,
       performHaptic: () => undefined,
       performCriticalAction,
     });
     const action = {
       type: "answer-prompt",
       serverId: "local",
-      botId: "chief",
+      agentId: "chief",
       requestId: "prompt-shared",
       answers: { source: ["Official data"] },
     } satisfies DynamicIslandAction;
@@ -539,6 +577,7 @@ describe("dynamic island window geometry", () => {
       getDisplays: () => [],
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: the test double implements the controller's BrowserWindow surface.
       getMainWindow: () => mainWindow as unknown as BrowserWindow,
+      presentMainWindow: () => undefined,
       performHaptic: () => undefined,
       performCriticalAction,
     });
@@ -547,7 +586,7 @@ describe("dynamic island window geometry", () => {
     const action = {
       type: "answer-prompt",
       serverId: "local",
-      botId: "chief",
+      agentId: "chief",
       requestId: "prompt-pinned",
       answers: { source: ["Official data"] },
     } satisfies DynamicIslandAction;
@@ -569,6 +608,7 @@ describe("dynamic island window geometry", () => {
       getDisplays: () => [],
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: the test double implements the controller's BrowserWindow surface.
       getMainWindow: () => mainWindow as unknown as BrowserWindow,
+      presentMainWindow: () => undefined,
       performHaptic: () => undefined,
       performCriticalAction: async () => {
         throw new Error("The request is no longer active.");
@@ -577,7 +617,7 @@ describe("dynamic island window geometry", () => {
     const action: DynamicIslandAction = {
       type: "answer-prompt",
       serverId: "remote",
-      botId: "research",
+      agentId: "research",
       requestId: "prompt-stale",
       answers: { source: ["Official data"] },
     };
@@ -590,6 +630,7 @@ describe("dynamic island window geometry", () => {
 
   it("keeps a navigation action retryable while the main renderer reloads", async () => {
     const mainWindow = new FakeWindow(75, { x: 0, y: 0, width: 1200, height: 800 });
+    const presentMainWindow = vi.fn();
     const controller = new DynamicIslandWindowController({
       platform: "darwin",
       preferencePath: "/tmp/dynamic-island-preference.json",
@@ -600,13 +641,14 @@ describe("dynamic island window geometry", () => {
       getDisplays: () => [],
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: the test double implements the controller's BrowserWindow surface.
       getMainWindow: () => mainWindow as unknown as BrowserWindow,
+      presentMainWindow,
       performHaptic: () => undefined,
       performCriticalAction: async () => undefined,
     });
     const action = {
       type: "open-failure",
       serverId: "local",
-      botId: "research",
+      agentId: "research",
       turnId: "turn-failed",
     } satisfies DynamicIslandAction;
     mainWindow.webContents.isLoadingMainFrame.mockReturnValue(true);
@@ -616,6 +658,8 @@ describe("dynamic island window geometry", () => {
 
     mainWindow.webContents.isLoadingMainFrame.mockReturnValue(false);
     await expect(controller.performAction(action)).resolves.toBeUndefined();
+    expect(presentMainWindow).toHaveBeenCalledTimes(2);
+    expect(presentMainWindow).toHaveBeenCalledWith(mainWindow);
     expect(mainWindow.webContents.send).toHaveBeenCalledWith(IPC_CHANNELS.dynamicIslandAction, action);
   });
 
@@ -632,6 +676,7 @@ describe("dynamic island window geometry", () => {
 });
 
 class FakeWindow extends EventEmitter {
+  excludedFromShownWindowsMenu = false;
   readonly webContents: EventEmitter & {
     id: number;
     send: ReturnType<typeof vi.fn>;

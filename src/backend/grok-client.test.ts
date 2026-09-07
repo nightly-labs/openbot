@@ -4,11 +4,12 @@ import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GrokAgentClient } from "./grok-client";
 import {
   type AppServerNotification,
   type AppServerRequest,
+  decodeAccountRateLimitsReadResult,
   decodeAccountReadResult,
   decodeModelListResponse,
   decodeRecordResponse,
@@ -40,6 +41,50 @@ afterEach(async () => {
 });
 
 describe.sequential("GrokAgentClient", () => {
+  it("reads the current weekly billing period and rejects a monthly period", async () => {
+    client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
+    client.start();
+    await client.request("initialize", {}, decodeRecordResponse);
+    await expect(
+      client.request("account/rateLimits/read", { model: "grok-4.5" }, decodeAccountRateLimitsReadResult),
+    ).resolves.toMatchObject({
+      rateLimits: {
+        secondary: { usedPercent: 8, windowDurationMins: 10_080, resetsAt: 1_788_825_600 },
+      },
+    });
+    await client.stop();
+
+    process.env.OPENBOT_FAKE_GROK_MODE = "monthly-billing";
+    client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
+    client.start();
+    await client.request("initialize", {}, decodeRecordResponse);
+    await expect(
+      client.request("account/rateLimits/read", { model: "grok-4.5" }, decodeAccountRateLimitsReadResult),
+    ).resolves.toEqual({ rateLimits: null, rateLimitsByLimitId: null });
+  });
+
+  it("reports unavailable usage for a unified weekly billing period without quota values", async () => {
+    process.env.OPENBOT_FAKE_GROK_MODE = "unified-billing";
+    client = new GrokAgentClient({ executable, version: "1.0.13" }, 5_000);
+    client.start();
+    await client.request("initialize", {}, decodeRecordResponse);
+
+    await expect(
+      client.request("account/rateLimits/read", { model: "grok-4.5" }, decodeAccountRateLimitsReadResult),
+    ).resolves.toEqual({ rateLimits: null, rateLimitsByLimitId: null });
+  });
+
+  it("times out a billing request that stops responding", async () => {
+    process.env.OPENBOT_FAKE_GROK_MODE = "hung-billing";
+    client = new GrokAgentClient({ executable, version: "1.0.13" }, 1_000);
+    client.start();
+    await client.request("initialize", {}, decodeRecordResponse);
+
+    await expect(
+      client.request("account/rateLimits/read", { model: "grok-4.5" }, decodeAccountRateLimitsReadResult),
+    ).rejects.toThrow("Grok request timed out: account/rateLimits/read");
+  });
+
   it("discovers ACP models, configures a session, streams, steers, asks, approves, cancels, and resumes", async () => {
     client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
     const notifications: AppServerNotification[] = [];
@@ -118,6 +163,24 @@ describe.sequential("GrokAgentClient", () => {
         expect.objectContaining({ method: "turn/completed" }),
       ]),
     );
+    // A thought only reaches the thinking disclosure while it is phased as commentary; without the
+    // phase it arrives as an ordinary agent message and renders as a chat bubble.
+    expect(notifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: "item/started",
+          params: expect.objectContaining({
+            item: expect.objectContaining({ type: "agentMessage", phase: "commentary" }),
+          }),
+        }),
+        expect.objectContaining({
+          method: "item/completed",
+          params: expect.objectContaining({
+            item: expect.objectContaining({ phase: "commentary", text: "GROK_THOUGHT" }),
+          }),
+        }),
+      ]),
+    );
 
     const secondTurn = await client.request(
       "turn/start",
@@ -156,6 +219,30 @@ describe.sequential("GrokAgentClient", () => {
     ).resolves.toEqual(expect.any(Object));
     expect(await readLog()).toEqual(
       expect.arrayContaining([expect.objectContaining({ method: "session/load", sessionId: threadId })]),
+    );
+  });
+
+  it("rediscovers Grok models without restarting and closes discovery sessions", async () => {
+    process.env.OPENBOT_FAKE_GROK_MODE = "refresh-models";
+    client = new GrokAgentClient({ executable, version: "1.0.13" }, 5_000);
+    client.start();
+    await client.request("initialize", {}, decodeRecordResponse);
+    const models = await client.request("model/list", {}, decodeModelListResponse);
+    expect(models.data).toContainEqual(expect.objectContaining({ model: "grok-future-2", displayName: "Future Grok" }));
+    expect(await readLog()).toContainEqual({ method: "session/close", sessionId: "grok-session-2" });
+    await expect(client.request("model/list", {}, decodeModelListResponse)).rejects.toThrow("Discovery unavailable");
+    const refreshed = await client.request("model/list", {}, decodeModelListResponse);
+    expect(refreshed.data.map((model) => model.model)).toEqual(["grok-4.5", "grok-fast", "grok-future-4"]);
+    expect(await readLog()).toContainEqual({ method: "session/close", sessionId: "grok-session-4" });
+  });
+
+  it("bounds Grok model discovery by the caller timeout", async () => {
+    process.env.OPENBOT_FAKE_GROK_MODE = "hung-models";
+    client = new GrokAgentClient({ executable, version: "1.0.13" }, 5_000);
+    client.start();
+    await client.request("initialize", {}, decodeRecordResponse);
+    await expect(client.request("model/list", {}, decodeModelListResponse, 10)).rejects.toThrow(
+      "Grok request timed out: model/list",
     );
   });
 
@@ -286,12 +373,12 @@ function parseLogLine(line: string): DynamicRecord {
 }
 
 async function waitFor(predicate: () => boolean, timeoutMs = 3_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (predicate()) return;
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-  throw new Error("Timed out waiting for the fake Grok ACP process.");
+  await vi.waitFor(
+    () => {
+      if (!predicate()) throw new Error("Timed out waiting for the fake Grok ACP process.");
+    },
+    { timeout: timeoutMs },
+  );
 }
 
 const FAKE_GROK_ACP = String.raw`#!/usr/bin/env node
@@ -321,6 +408,7 @@ const modelConfig = () => {
       { value: "grok-fast", name: "Grok Fast", description: "Fast" },
     ],
   }];
+  if (mode === "refresh-models" && sessionCounter > 1) options[0].options.push({ value: "grok-future-" + sessionCounter, name: "Future Grok" });
   if (mode !== "no-thought") options.push({
     id: "thought",
     name: "Thought level",
@@ -375,6 +463,13 @@ createInterface({ input: process.stdin }).on("line", (line) => {
       method: "session/update",
       params: {
         sessionId: pendingPrompt.sessionId,
+        update: { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "GROK_THOUGHT" } },
+      },
+    });
+    write({
+      method: "session/update",
+      params: {
+        sessionId: pendingPrompt.sessionId,
         update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "GROK_DONE" } },
       },
     });
@@ -406,6 +501,11 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   }
   if (message.method === "session/new") {
     sessionCounter += 1;
+    if (mode === "hung-models" && sessionCounter > 1) return;
+    if (mode === "refresh-models" && sessionCounter === 3) {
+      write({ id: message.id, error: { code: -32603, message: "Discovery unavailable" } });
+      return;
+    }
     const sessionId = "grok-session-" + sessionCounter;
     log({ method: message.method, sessionId, mcpAuthorization: message.params.mcpServers?.some((server) => server.headers?.some((header) => header.name.toLowerCase() === "authorization" && header.value.startsWith("Bearer "))) });
     const result = mode === "model-metadata"
@@ -462,6 +562,28 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   if (message.method === "session/close") {
     log({ method: message.method, sessionId: message.params.sessionId });
     write({ id: message.id, result: {} });
+    return;
+  }
+  if (message.method === "_x.ai/billing") {
+    log({ method: message.method });
+    if (mode === "hung-billing") return;
+    write({
+      id: message.id,
+      result: {
+        config: {
+          ...(mode === "unified-billing"
+            ? { onDemandCap: {}, onDemandUsed: {}, prepaidBalance: {}, isUnifiedBillingUser: true }
+            : { creditUsagePercent: 8 }),
+          currentPeriod: mode === "monthly-billing"
+            ? { periodType: "USAGE_PERIOD_TYPE_MONTHLY", start: "2026-09-01T00:00:00Z", end: "2026-10-01T00:00:00Z" }
+            : {
+                type: mode === "unified-billing" ? "USAGE_PERIOD_TYPE_WEEKLY" : undefined,
+                start: "2026-09-01T00:00:00Z",
+                end: "2026-09-08T00:00:00Z",
+              },
+        },
+      },
+    });
     return;
   }
   if (message.method === "session/set_config_option") {

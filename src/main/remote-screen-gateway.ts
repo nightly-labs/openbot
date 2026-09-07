@@ -10,6 +10,7 @@ import type {
   RemoteDesktopIceServer,
   RemoteDesktopSession,
 } from "@openbot/contracts/ipc";
+import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type * as Ws from "ws";
 import { z } from "zod";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
@@ -52,6 +53,8 @@ export interface RemoteScreenRuntime {
   start(): Promise<SunshineMoonlightRuntimeState>;
   selectDisplay(displayId: string): Promise<void>;
   stop(): Promise<void>;
+  // Optional: only the real runtime reads the operating system's answer.
+  screenCaptureDenied?(): boolean;
 }
 
 export interface RemoteScreenAuditEvent {
@@ -139,6 +142,24 @@ export class RemoteScreenGateway {
       throw new RemoteScreenError(503, "host_unavailable", "The Sunshine and Moonlight Web runtime is not installed.");
     }
     await this.#ensureRuntime();
+    // The runtime starts and answers either way, so this is the only place the refusal can become a
+    // failure the member sees. Without it the session is created, the stream never starts, and the
+    // viewer sits at "connecting" until the member gives up.
+    if (this.#runtime?.screenCaptureDenied?.()) {
+      // "Then try again" has to mean something. Sunshine reads the screen recording grant when it
+      // starts and `screenCaptureDenied` reports only what it has said since, so the refusal outlives
+      // the grant unless the process does too -- and neither `start` restarts anything, both return
+      // the state they already hold. Dropping the runtime is what makes the next attempt a fresh
+      // Sunshine that reads the new grant. A live session shares this runtime and is already being
+      // shown nothing, but ending it belongs to whoever owns it rather than to another member's
+      // failed create, and `closeSession` drops the runtime when the last one goes.
+      if (this.#sessions.size === 0) await this.#stopRuntime();
+      throw new RemoteScreenError(
+        503,
+        "host_permissions_required",
+        "The host has not allowed OpenBot to record its screen. Grant screen recording on the host, then try again.",
+      );
+    }
     const id = randomUUID();
     const usedStreamerSlots = new Set([...this.#sessions.values()].map((session) => session.streamerSlot));
     const streamerSlot = [1, 2, 3, 4].find((slot) => !usedStreamerSlots.has(slot));
@@ -155,7 +176,7 @@ export class RemoteScreenGateway {
     const snapshot: RemoteDesktopSession = {
       id,
       serverId: input.serverId,
-      viewerUrl: `${input.publicHttpBaseUrl}/v1/remote-screen/sessions/${id}/viewer`,
+      viewerUrl: `${input.publicHttpBaseUrl}${TEAM_API_ROUTES.remoteScreen.viewer(id)}`,
       viewerGrant,
       displays: structuredClone(this.#availableDisplays()),
       selectedDisplayId: this.#selectedDisplayId,
@@ -274,7 +295,7 @@ export class RemoteScreenGateway {
       const cookiePolicy =
         request.headers["x-forwarded-proto"] === "https" ? "; Secure; SameSite=None" : "; SameSite=Strict";
       response.writeHead(204, {
-        "Set-Cookie": `${VIEWER_COOKIE}=${cookie}; HttpOnly${cookiePolicy}; Path=/v1/remote-screen/sessions/${session.snapshot.id}/; Max-Age=86400`,
+        "Set-Cookie": `${VIEWER_COOKIE}=${cookie}; HttpOnly${cookiePolicy}; Path=${TEAM_API_ROUTES.remoteScreen.session(session.snapshot.id)}/; Max-Age=86400`,
         "Cache-Control": "no-store",
       });
       response.end();
@@ -394,11 +415,7 @@ export class RemoteScreenGateway {
     session.clientSocket?.close(4403, reason);
     session.upstreamSocket?.close();
     this.#audit(session, "ended", reason);
-    if (this.#sessions.size === 0) {
-      await this.#runtime?.stop();
-      this.#runtime = null;
-      this.#runtimeState = null;
-    }
+    if (this.#sessions.size === 0) await this.#stopRuntime();
   }
 
   async closeMemberSession(id: string, memberId: string): Promise<boolean> {
@@ -426,9 +443,7 @@ export class RemoteScreenGateway {
 
   async stop(): Promise<void> {
     await Promise.all([...this.#sessions.keys()].map((id) => this.closeSession(id, "session_revoked")));
-    await this.#runtime?.stop();
-    this.#runtime = null;
-    this.#runtimeState = null;
+    await this.#stopRuntime();
     this.#pendingStreamStarts.splice(0);
     if (this.#activeStreamStart) clearTimeout(this.#activeStreamStart.timeout);
     this.#activeStreamStart = null;
@@ -458,6 +473,14 @@ export class RemoteScreenGateway {
     const timeout = setTimeout(() => this.#finishStreamStart(next.sessionId), 10_000);
     this.#activeStreamStart = { sessionId: next.sessionId, timeout };
     next.start();
+  }
+
+  // Both halves together, always: a cleared `#runtimeState` beside a live `#runtime` is what latched
+  // the screen capture refusal past the grant that fixed it.
+  async #stopRuntime(): Promise<void> {
+    await this.#runtime?.stop();
+    this.#runtime = null;
+    this.#runtimeState = null;
   }
 
   async #ensureRuntime(): Promise<SunshineMoonlightRuntimeState> {
@@ -493,7 +516,7 @@ export class RemoteScreenGateway {
     if (upstreamPath === "/config.js") {
       response.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" });
       response.end(
-        `export default ${JSON.stringify({ path_prefix: `/v1/remote-screen/sessions/${session.snapshot.id}/moonlight` })}`,
+        `export default ${JSON.stringify({ path_prefix: `${TEAM_API_ROUTES.remoteScreen.session(session.snapshot.id)}/moonlight` })}`,
       );
       return;
     }
@@ -570,7 +593,7 @@ function sendViewer(
   streamerSlot: number,
   runtime: SunshineMoonlightRuntimeState,
 ): void {
-  const sessionPath = `/v1/remote-screen/sessions/${sessionId}`;
+  const sessionPath = TEAM_API_ROUTES.remoteScreen.session(sessionId);
   const hostId = runtime.hostIds[streamerSlot - 1] ?? runtime.hostId;
   const target = `${sessionPath}/moonlight/stream.html?hostId=${hostId}&appId=${runtime.desktopAppId}`;
   const html = `<!doctype html><meta charset="utf-8"><title>OpenBot Moonlight Remote</title><meta name="color-scheme" content="dark"><style>html,body{margin:0;width:100%;height:100%;background:#090b0c;color:#fff;font:14px system-ui}main{display:grid;place-items:center;height:100%}</style><main>Connecting…</main><script type="module">const grant=new URL(location.href).hash.slice(1);history.replaceState(null,"",location.pathname);const response=await fetch(${JSON.stringify(`${sessionPath}/authorize`)},{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({grant})});if(!response.ok){document.querySelector("main").textContent="Remote access expired";throw new Error("grant rejected")}location.replace(${JSON.stringify(target)});</script>`;

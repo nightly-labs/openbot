@@ -4,11 +4,12 @@ import { homedir } from "node:os";
 import { dirname, join, parse, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
-import type { AttachmentSummary, BotSummary, ConversationMessage, Routine } from "@openbot/contracts/ipc";
+import type { AgentSummary, AttachmentSummary, ConversationMessage, Routine } from "@openbot/contracts/ipc";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
 import { AgentMemoryStore } from "../src/backend/agent-memory-store";
 import { AgentRoutineStore } from "../src/backend/agent-routine-store";
-import { BotStore } from "../src/backend/bot-store";
+import { AgentStore } from "../src/backend/agent-store";
 import { sortConversationMessages } from "../src/backend/conversation-snapshots";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
@@ -19,7 +20,11 @@ import { resolveDevelopmentAppDataRoot } from "./development-state-paths";
 
 export const DEVELOPMENT_SEED_MANIFEST_FILE = "openbot-dev-seed-v1.json";
 
-const TEAM_FILE = "openbot-team-server-v1.json";
+const logger = createOpenBotLogger("seed-dev-state");
+
+const TEAM_FILE = "openbot-team-server-v2.json";
+/** Read only, exactly as the app reads it: the file a build without accounts owns. */
+const LEGACY_TEAM_FILE = "openbot-team-server-v1.json";
 const SETUP_FILE = "openbot-setup-v2.json";
 const SEED_VERSION = 1;
 const SEEDED_AT = "2026-08-21T10:00:00.000Z";
@@ -199,86 +204,86 @@ async function buildSeedProfile(
   homeDirectory: string,
   transferDirectories: string[],
 ): Promise<void> {
-  const botStore = new BotStore(profilePath, homeDirectory);
-  await botStore.initialize();
-  const mailbox = new MailboxStore(profilePath, botStore.sharedRoot, botStore.database);
+  const agentStore = new AgentStore(profilePath, homeDirectory);
+  await agentStore.initialize();
+  const mailbox = new MailboxStore(profilePath, agentStore.sharedRoot, agentStore.database);
   await mailbox.initialize();
 
   try {
-    const bots = await seedAgents(botStore);
-    const attachments = await seedAttachments(mailbox, bots, transferDirectories);
-    seedMemories(botStore);
-    await seedRoutines(botStore, mailbox);
+    const agents = await seedAgents(agentStore);
+    const attachments = await seedAttachments(mailbox, agents, transferDirectories);
+    seedMemories(agentStore);
+    await seedRoutines(agentStore, mailbox);
     await seedAgentExchanges(mailbox);
-    await seedConversations(botStore, mailbox, bots, attachments);
-    await seedTeam(profilePath, botStore);
+    await seedConversations(agentStore, mailbox, agents, attachments);
+    await seedTeam(profilePath, agentStore);
     await writeSetupState(join(profilePath, SETUP_FILE), "codex");
     await writeSeedManifest(profilePath, transferDirectories);
   } finally {
-    botStore.database.close();
+    agentStore.database.close();
   }
 }
 
-function seedMemories(botStore: BotStore): void {
-  const memories = new AgentMemoryStore(botStore.database);
+function seedMemories(agentStore: AgentStore): void {
+  const memories = new AgentMemoryStore(agentStore.database);
   for (const fixture of [
     {
-      botId: "chief",
+      agentId: "chief",
       text: "The user prefers concise status updates with clear owners and next steps.",
       origin: "manual" as const,
     },
     {
-      botId: "chief",
+      agentId: "chief",
       text: "Use Europe/Warsaw when presenting launch dates and times.",
       origin: "manual" as const,
     },
     {
-      botId: "chief",
+      agentId: "chief",
       text: "The current priority is a traceable OpenBot launch plan.",
       origin: "automatic" as const,
       sourceTurnId: "dev-seed-turn-chief-plan",
     },
     {
-      botId: "research",
+      agentId: "research",
       text: "Prioritize primary sources and call out claims that still need verification.",
       origin: "manual" as const,
     },
     {
-      botId: "research",
+      agentId: "research",
       text: "The launch evidence map contains one claim that still needs a primary source.",
       origin: "automatic" as const,
       sourceTurnId: "dev-seed-turn-research-evidence",
     },
     {
-      botId: "builder",
+      agentId: "builder",
       text: "Implementation plans should include typecheck, tests, and a rollback step.",
       origin: "manual" as const,
     },
     {
-      botId: "launch",
+      agentId: "launch",
       text: "Use calm, evidence-based release messaging and review final assets before publication.",
       origin: "manual" as const,
     },
   ]) {
     if (fixture.origin === "automatic") {
       memories.saveAutomatic({
-        botId: fixture.botId,
+        agentId: fixture.agentId,
         text: fixture.text,
         sourceTurnId: fixture.sourceTurnId,
       });
     } else {
-      memories.createManual(fixture.botId, fixture.text);
+      memories.createManual(fixture.agentId, fixture.text);
     }
   }
 }
 
-async function seedRoutines(botStore: BotStore, mailbox: MailboxStore): Promise<void> {
-  const routines = new AgentRoutineStore(botStore.database);
+async function seedRoutines(agentStore: AgentStore, mailbox: MailboxStore): Promise<void> {
+  const routines = new AgentRoutineStore(agentStore.database);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const now = new Date();
   const morningBrief = routines.create(
     {
-      botId: "chief",
+      agentId: "chief",
       name: "Morning launch brief",
       instruction: "Summarize launch progress, blockers, owners, and the next decision in five bullets.",
       active: true,
@@ -289,7 +294,7 @@ async function seedRoutines(botStore: BotStore, mailbox: MailboxStore): Promise<
   );
   routines.create(
     {
-      botId: "chief",
+      agentId: "chief",
       name: "Friday launch review",
       instruction: "Prepare the weekly launch review with decisions, risks, and unresolved ownership gaps.",
       active: true,
@@ -300,7 +305,7 @@ async function seedRoutines(botStore: BotStore, mailbox: MailboxStore): Promise<
   );
   const sourceCheck = routines.create(
     {
-      botId: "research",
+      agentId: "research",
       name: "Daily source check",
       instruction: "Recheck open launch claims against primary sources and report only material changes.",
       active: true,
@@ -311,7 +316,7 @@ async function seedRoutines(botStore: BotStore, mailbox: MailboxStore): Promise<
   );
   routines.create(
     {
-      botId: "builder",
+      agentId: "builder",
       name: "Dependency health check",
       instruction: "Review dependency health and prepare a short risk report without changing the codebase.",
       active: false,
@@ -322,7 +327,7 @@ async function seedRoutines(botStore: BotStore, mailbox: MailboxStore): Promise<
   );
   routines.create(
     {
-      botId: "launch",
+      agentId: "launch",
       name: "Release readiness pulse",
       instruction: "Check release assets, messaging, and approvals, then list anything blocking publication.",
       active: true,
@@ -363,7 +368,7 @@ async function seedRoutineRun(
       routineName: routine.name,
       scheduledFor,
     },
-    recipientBotIds: [routine.botId],
+    recipientAgentIds: [routine.agentId],
     text: routine.instruction,
     idempotencyKey: `dev-seed:routine-run:${run.id}`,
   });
@@ -380,12 +385,12 @@ function hoursBefore(date: Date, hours: number): string {
   return new Date(date.getTime() - hours * 60 * 60 * 1_000).toISOString();
 }
 
-async function seedAgents(botStore: BotStore): Promise<Map<string, BotSummary>> {
-  const bots = new Map<string, BotSummary>();
+async function seedAgents(agentStore: AgentStore): Promise<Map<string, AgentSummary>> {
+  const agents = new Map<string, AgentSummary>();
   for (const fixture of AGENTS) {
-    await botStore.getOrCreate(fixture.id, fixture.name, fixture.title);
-    const bot = await botStore.updateBot({
-      botId: fixture.id,
+    await agentStore.getOrCreate(fixture.id, fixture.name, fixture.title);
+    const agent = await agentStore.updateAgent({
+      agentId: fixture.id,
       name: fixture.name,
       title: fixture.title,
       description: fixture.description,
@@ -394,30 +399,30 @@ async function seedAgents(botStore: BotStore): Promise<Map<string, BotSummary>> 
       avatarSeed: fixture.id,
       avatarHue: fixture.avatarHue,
     });
-    await botStore.ensureThreadId(fixture.id);
-    await botStore.updatePreview(fixture.id, fixture.preview);
-    bots.set(fixture.id, botStore.list().find((candidate) => candidate.id === fixture.id) ?? bot);
+    await agentStore.ensureThreadId(fixture.id);
+    await agentStore.updatePreview(fixture.id, fixture.preview);
+    agents.set(fixture.id, agentStore.list().find((candidate) => candidate.id === fixture.id) ?? agent);
   }
-  return bots;
+  return agents;
 }
 
 async function seedAttachments(
   mailbox: MailboxStore,
-  bots: Map<string, BotSummary>,
+  agents: Map<string, AgentSummary>,
   transferDirectories: string[],
 ): Promise<Record<"brief" | "metrics" | "evidence" | "image", AttachmentSummary>> {
-  const chief = requireBot(bots, "chief");
-  const research = requireBot(bots, "research");
-  const launch = requireBot(bots, "launch");
+  const chief = requireAgent(agents, "chief");
+  const research = requireAgent(agents, "research");
+  const launch = requireAgent(agents, "launch");
   async function store(
-    owner: BotSummary,
+    owner: AgentSummary,
     input:
       | { name: string; mimeType: string; bytes: Uint8Array }
       | { name: string; mimeType: string; sourcePath: string },
   ): Promise<AttachmentSummary> {
     const attachment = await mailbox.storeGeneratedAttachment({
       ...input,
-      ownerBotId: owner.id,
+      ownerAgentId: owner.id,
       ownerThreadId: owner.threadId,
     });
     transferDirectories.push(`generated/${attachment.id}`);
@@ -449,9 +454,9 @@ async function seedAttachments(
 }
 
 async function seedConversations(
-  botStore: BotStore,
+  agentStore: AgentStore,
   mailbox: MailboxStore,
-  bots: Map<string, BotSummary>,
+  agents: Map<string, AgentSummary>,
   attachments: Record<"brief" | "metrics" | "evidence" | "image", AttachmentSummary>,
 ): Promise<void> {
   const conversations: Record<string, ConversationMessage[]> = {
@@ -559,15 +564,15 @@ async function seedConversations(
     ],
   };
 
-  for (const [botId, messages] of Object.entries(conversations)) {
-    const bot = requireBot(bots, botId);
-    const persistedMessages = [...messages, ...mailbox.conversationMessages(botId)];
+  for (const [agentId, messages] of Object.entries(conversations)) {
+    const agent = requireAgent(agents, agentId);
+    const persistedMessages = [...messages, ...mailbox.conversationMessages(agentId)];
     sortConversationMessages(persistedMessages);
-    botStore.database.persistConversation(
-      { botId, threadId: bot.threadId, activeTurnId: null, revision: 0, messages: persistedMessages },
+    agentStore.database.persistConversation(
+      { agentId, threadId: agent.threadId, activeTurnId: null, revision: 0, messages: persistedMessages },
       "dev-seed.created",
       { seedVersion: SEED_VERSION },
-      `dev-seed:conversation:${botId}`,
+      `dev-seed:conversation:${agentId}`,
     );
   }
   await mailbox.setReaction("chief", "chief-assistant-plan", { kind: "user" }, "🎉");
@@ -576,8 +581,8 @@ async function seedConversations(
 
 async function seedAgentExchanges(mailbox: MailboxStore): Promise<void> {
   const completed = await mailbox.enqueue({
-    sender: { kind: "bot", botId: "chief" },
-    recipientBotIds: ["research", "builder"],
+    sender: { kind: "agent", agentId: "chief" },
+    recipientAgentIds: ["research", "builder"],
     text: "Please verify the launch evidence and implementation checklist.",
     replyToMessageId: "chief-assistant-plan",
     idempotencyKey: "dev-seed:exchange:completed",
@@ -589,8 +594,8 @@ async function seedAgentExchanges(mailbox: MailboxStore): Promise<void> {
   }
 
   const failed = await mailbox.enqueue({
-    sender: { kind: "bot", botId: "research" },
-    recipientBotIds: ["launch"],
+    sender: { kind: "agent", agentId: "research" },
+    recipientAgentIds: ["launch"],
     text: "I could not verify the final launch claim. Please keep it out of the release note.",
     idempotencyKey: "dev-seed:exchange:failed",
   });
@@ -601,8 +606,8 @@ async function seedAgentExchanges(mailbox: MailboxStore): Promise<void> {
   await mailbox.markTerminal(failedDelivery.id, "failed", "The primary source was not available.");
 }
 
-async function seedTeam(profilePath: string, botStore: BotStore): Promise<void> {
-  const team = new TeamStore(join(profilePath, TEAM_FILE));
+async function seedTeam(profilePath: string, agentStore: AgentStore): Promise<void> {
+  const team = new TeamStore(join(profilePath, TEAM_FILE), join(profilePath, LEGACY_TEAM_FILE));
   await team.initialize();
   const owner = {
     id: "openbot-dev-owner",
@@ -610,7 +615,7 @@ async function seedTeam(profilePath: string, botStore: BotStore): Promise<void> 
     name: "Dev Owner",
     avatarUrl: null,
   };
-  await team.configureWithAccount("OpenBot Dev Team", owner);
+  const teamIdentity = await team.configureWithAccount("OpenBot Dev Team", owner);
   const joined = [];
   for (const member of [
     { id: "openbot-dev-alice", email: "alice@example.com", name: "Alice Chen", role: "admin" as const },
@@ -629,11 +634,11 @@ async function seedTeam(profilePath: string, botStore: BotStore): Promise<void> 
   }
   await team.createInvite("member", "new-person@example.com");
   const ownerSession = await team.loginWithAccount(owner);
-  await team.setEnabledOnLaunch(true);
+  await team.setEnabledOnLaunch(teamIdentity.serverId, true);
 
   const [alice, jon, maya] = joined;
   if (!alice || !jon || !maya) throw new Error("The development team members could not be created.");
-  const chat = new TeamChatStore(botStore.database);
+  const chat = new TeamChatStore(agentStore.database);
   chat.sendMessage({
     clientMessageId: "dev-seed-dm-owner-alice-1",
     senderMemberId: ownerSession.member.id,
@@ -678,10 +683,10 @@ async function replaceDevelopmentProfile(target: string, staging: string, homeDi
   try {
     await cleanupSeedOwnedTransfers(backup, homeDirectory);
   } catch (error) {
-    console.warn(`The new seed is ready, but old seed files could not be removed: ${errorMessage(error)}`);
+    logger.warn(`The new seed is ready, but old seed files could not be removed: ${errorMessage(error)}`);
   } finally {
     await rm(backup, { recursive: true, force: true }).catch((error: unknown) => {
-      console.warn(`The new seed is ready, but its temporary backup could not be removed: ${errorMessage(error)}`);
+      logger.warn(`The new seed is ready, but its temporary backup could not be removed: ${errorMessage(error)}`);
     });
   }
 }
@@ -746,10 +751,10 @@ function timestamp(minuteOffset: number): string {
   return new Date(Date.parse(SEEDED_AT) + minuteOffset * 60_000).toISOString();
 }
 
-function requireBot(bots: Map<string, BotSummary>, botId: string): BotSummary {
-  const bot = bots.get(botId);
-  if (!bot?.threadId) throw new Error(`Seed agent ${botId} does not have a thread.`);
-  return bot;
+function requireAgent(agents: Map<string, AgentSummary>, agentId: string): AgentSummary {
+  const agent = agents.get(agentId);
+  if (!agent?.threadId) throw new Error(`Seed agent ${agentId} does not have a thread.`);
+  return agent;
 }
 
 function bytes(value: string): Uint8Array {
@@ -791,26 +796,26 @@ async function main(): Promise<void> {
     dryRun,
     instanceId: readDevelopmentInstanceId(process.env.OPENBOT_DEV_INSTANCE_ID),
   });
-  console.log(dryRun ? "OpenBot development seed dry run:" : "OpenBot development state seeded:");
-  console.log(`- profile: ${summary.targetProfile}`);
-  console.log(`- profile active: ${summary.profileActive ? "yes" : "no"}`);
-  console.log(`- agents: ${summary.agents}`);
-  console.log(`- conversations: ${summary.conversations}`);
-  console.log(`- managed attachments: ${summary.attachments}`);
-  console.log(`- team members: ${summary.teamMembers}`);
-  console.log(`- active invites: ${summary.activeInvites}`);
-  console.log(`- direct threads: ${summary.directThreads}`);
-  console.log(`- queued deliveries: ${summary.queuedDeliveries}`);
-  console.log(`- memories: ${summary.memories}`);
-  console.log(`- routines: ${summary.routines}`);
-  console.log(`- routine runs: ${summary.routineRuns}`);
-  if (dryRun) console.log("No files were changed.");
-  else console.log("Run `bun run dev` to open the seeded showcase.");
+  logger.info(dryRun ? "OpenBot development seed dry run:" : "OpenBot development state seeded:");
+  logger.info(`- profile: ${summary.targetProfile}`);
+  logger.info(`- profile active: ${summary.profileActive ? "yes" : "no"}`);
+  logger.info(`- agents: ${summary.agents}`);
+  logger.info(`- conversations: ${summary.conversations}`);
+  logger.info(`- managed attachments: ${summary.attachments}`);
+  logger.info(`- team members: ${summary.teamMembers}`);
+  logger.info(`- active invites: ${summary.activeInvites}`);
+  logger.info(`- direct threads: ${summary.directThreads}`);
+  logger.info(`- queued deliveries: ${summary.queuedDeliveries}`);
+  logger.info(`- memories: ${summary.memories}`);
+  logger.info(`- routines: ${summary.routines}`);
+  logger.info(`- routine runs: ${summary.routineRuns}`);
+  if (dryRun) logger.info("No files were changed.");
+  else logger.info("Run `bun run dev` to open the seeded showcase.");
 }
 
 if (isMainModule()) {
   main().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
+    logger.error(toLogValue(error));
     process.exitCode = 1;
   });
 }

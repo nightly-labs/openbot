@@ -1,6 +1,8 @@
 import { EventEmitter } from "node:events";
 import { join } from "node:path";
 import type { RemoteDesktopIceServer } from "@openbot/contracts/ipc";
+import type { IceServer } from "@openbot/contracts/signal-protocol/messages";
+import type { RemoteMemberRole } from "@openbot/contracts/signal-protocol/ticket";
 import { BrowserWindow, MessageChannelMain, type MessagePortMain } from "electron";
 import { z } from "zod";
 
@@ -11,11 +13,12 @@ interface TeamWebRtcBridgeEvents {
   incoming: [
     peerId: string,
     connection: {
+      hostId: string;
       connectionId: string;
       sessionId: string;
       userId: string;
       membershipId: string;
-      role: "owner" | "admin" | "member";
+      role: RemoteMemberRole;
       sessionExpiresAt: number;
     },
   ];
@@ -33,16 +36,22 @@ interface TeamWebRtcBridgeOptions {
   iceTransportPolicy?: "all" | "relay";
 }
 
+// The envelope the hidden peer window posts back, not the Signal protocol - it is one flat bag
+// because a single `port.on("message")` handler dispatches every reply and event on it, and the
+// discriminated Signal union it carries fragments of has already been decoded on the other side.
+// The schema stays zod and stays strict about it: this is the renderer-to-main trust boundary, and
+// the only thing shared with the wire contract is the shape of what crosses it, tied below.
 const iceServerSchema = z.object({
   urls: z.union([z.string(), z.array(z.string())]),
   username: z.string().optional(),
   credential: z.string().optional(),
-});
+}) satisfies z.ZodType<IceServer>;
 const bridgeMessageSchema = z
   .object({
     type: z.string().optional(),
     commandId: z.string().optional(),
     peerId: z.string().optional(),
+    hostId: z.string().optional(),
     channel: z.enum(["rpc", "events", "files", "desktop"]).optional(),
     data: z.union([z.string(), z.instanceof(ArrayBuffer)]).optional(),
     path: z.enum(["p2p", "relay"]).optional(),
@@ -218,6 +227,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     if (!message.peerId) return;
     if (
       message.type === "incoming-peer" &&
+      message.hostId &&
       message.connectionId &&
       message.sessionId &&
       message.userId &&
@@ -226,6 +236,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
       message.sessionExpiresAt
     ) {
       this.emit("incoming", message.peerId, {
+        hostId: message.hostId,
         connectionId: message.connectionId,
         sessionId: message.sessionId,
         userId: message.userId,

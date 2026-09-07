@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { INPUT_LIMITS } from "./input-limits";
 import {
   AGENT_RUNTIME_ATTENTION_LIMIT,
   AGENT_RUNTIME_TEXT_LIMIT,
@@ -6,14 +7,22 @@ import {
   hostedSiteConversationEvent,
   hostedSiteConversationEventItemType,
   hostedSiteConversationEventText,
+  isAccountUsage,
   isAgentEvent,
+  isAgentMemory,
+  isAgentModelOption,
+  isAgentStatus,
+  isAgentSummary,
+  isAttachmentSummary,
   isAvatarHue,
   isAvatarSeed,
-  isBotMemory,
   isConversationMessage,
+  isConversationWithReadState,
   isDynamicIslandAction,
   isHostedSiteConversationEventUrl,
   isMessageReaction,
+  isQueuedMessageReceipt,
+  isQueueSnapshot,
   parseHostedSiteConversationEventItemType,
   parseRoutineConversationEventItemType,
   parseRoutineRunConversationEventItemType,
@@ -28,7 +37,7 @@ describe("Dynamic Island action validation", () => {
     const action = {
       type: "respond-approval",
       serverId: "local",
-      botId: "chief",
+      agentId: "chief",
       requestId: "approval-1",
       decision: "accept",
     };
@@ -170,7 +179,7 @@ describe("sidebar layout event validation", () => {
 describe("runtime snapshot event validation", () => {
   it("accepts a complete snapshot and rejects malformed collections", () => {
     const snapshot = {
-      bots: [],
+      agents: [],
       activeTurns: [],
       work: [],
       latestMessages: [],
@@ -183,14 +192,14 @@ describe("runtime snapshot event validation", () => {
     expect(isAgentEvent({ type: "runtime-snapshot", snapshot })).toBe(true);
     expect(isAgentEvent({ type: "runtime-snapshot", snapshot: { ...snapshot, attentionComplete: null } })).toBe(false);
     expect(isAgentEvent({ type: "runtime-snapshot", snapshot: { ...snapshot, failedTurns: null } })).toBe(false);
-    expect(isAgentEvent({ type: "runtime-snapshot", snapshot: { ...snapshot, bots: [{}] } })).toBe(false);
+    expect(isAgentEvent({ type: "runtime-snapshot", snapshot: { ...snapshot, agents: [{}] } })).toBe(false);
     expect(isAgentEvent({ type: "runtime-snapshot", snapshot: { ...snapshot, work: [{}] } })).toBe(false);
     expect(
       isAgentEvent({
         type: "runtime-snapshot",
         snapshot: {
           ...snapshot,
-          bots: [
+          agents: [
             {
               id: "chief",
               name: "Chief",
@@ -214,7 +223,7 @@ describe("runtime snapshot event validation", () => {
             { length: AGENT_RUNTIME_WORKING_ITEMS_LIMIT + AGENT_RUNTIME_ATTENTION_LIMIT + 1 },
             (_, index) => ({
               id: `delivery-${index}`,
-              botId: `bot-${index}`,
+              agentId: `bot-${index}`,
               text: "Work",
               status: "running",
               turnId: `turn-${index}`,
@@ -232,7 +241,7 @@ describe("runtime snapshot event validation", () => {
           pendingPrompts: [
             {
               requestId: "prompt-1",
-              botId: "chief",
+              agentId: "chief",
               threadId: "thread-1",
               turnId: "turn-1",
               questions: [null],
@@ -252,7 +261,7 @@ describe("runtime snapshot event validation", () => {
           ...snapshot,
           pendingBrowserTakeovers: Array.from({ length: AGENT_RUNTIME_ATTENTION_LIMIT + 1 }, (_, index) => ({
             requestId: `takeover-${index}`,
-            botId: `bot-${index}`,
+            agentId: `bot-${index}`,
             threadId: `thread-${index}`,
             turnId: `turn-${index}`,
             tabId: `tab-${index}`,
@@ -265,18 +274,18 @@ describe("runtime snapshot event validation", () => {
 
 describe("agent input resolution event validation", () => {
   it("accepts bounded prompt and approval resolutions", () => {
-    expect(isAgentEvent({ type: "agent-input-resolved", kind: "prompt", requestId: "prompt-1", botId: "chief" })).toBe(
-      true,
-    );
-    expect(isAgentEvent({ type: "agent-input-resolved", kind: "approval", requestId: 1, botId: "chief" })).toBe(true);
-    expect(isAgentEvent({ type: "agent-input-resolved", kind: "other", requestId: 1, botId: "chief" })).toBe(false);
+    expect(
+      isAgentEvent({ type: "agent-input-resolved", kind: "prompt", requestId: "prompt-1", agentId: "chief" }),
+    ).toBe(true);
+    expect(isAgentEvent({ type: "agent-input-resolved", kind: "approval", requestId: 1, agentId: "chief" })).toBe(true);
+    expect(isAgentEvent({ type: "agent-input-resolved", kind: "other", requestId: 1, agentId: "chief" })).toBe(false);
   });
 });
 
 describe("conversation event validation", () => {
   it("accepts complete snapshots and rejects malformed messages", () => {
     const snapshot = {
-      botId: "chief",
+      agentId: "chief",
       threadId: "thread-1",
       activeTurnId: null,
       revision: 1,
@@ -306,8 +315,8 @@ describe("conversation event validation", () => {
     ).toBe(true);
     expect(isAgentEvent({ type: "conversation", snapshot: {} })).toBe(false);
     expect(isAgentEvent({ type: "conversation", snapshot: { ...snapshot, messages: [null] } })).toBe(false);
-    expect(isAgentEvent({ type: "conversation-invalidated", botId: "chief", revision: 2 })).toBe(true);
-    expect(isAgentEvent({ type: "queue-invalidated", botId: "chief" })).toBe(true);
+    expect(isAgentEvent({ type: "conversation-invalidated", agentId: "chief", revision: 2 })).toBe(true);
+    expect(isAgentEvent({ type: "queue-invalidated", agentId: "chief" })).toBe(true);
     expect(
       isAgentEvent({
         type: "conversation-page",
@@ -524,24 +533,228 @@ describe("hosted site conversation events", () => {
 });
 
 describe("memory event validation", () => {
-  it("accepts only a memory event with a bot id", () => {
-    expect(isAgentEvent({ type: "memories-changed", botId: "chief" })).toBe(true);
-    expect(isAgentEvent({ type: "memories-changed", botId: "" })).toBe(false);
+  it("accepts only a memory event with an agent id", () => {
+    expect(isAgentEvent({ type: "memories-changed", agentId: "chief" })).toBe(true);
+    expect(isAgentEvent({ type: "memories-changed", agentId: "" })).toBe(false);
     expect(isAgentEvent({ type: "memories-changed" })).toBe(false);
   });
 
   it("validates memory identifiers, text, and origin", () => {
     const memory = {
       id: "memory-1",
-      botId: "chief",
+      agentId: "chief",
       text: "Uses metric units.",
       origin: "manual",
       sourceTurnId: null,
       createdAt: "2026-08-25T12:00:00.000Z",
       updatedAt: "2026-08-25T12:00:00.000Z",
     };
-    expect(isBotMemory(memory)).toBe(true);
-    expect(isBotMemory({ ...memory, text: "" })).toBe(false);
-    expect(isBotMemory({ ...memory, origin: "imported" })).toBe(false);
+    expect(isAgentMemory(memory)).toBe(true);
+    expect(isAgentMemory({ ...memory, text: "" })).toBe(false);
+    expect(isAgentMemory({ ...memory, origin: "imported" })).toBe(false);
+  });
+});
+
+describe("renderer-to-main boundary guards", () => {
+  const status = {
+    phase: "ready",
+    cliVersion: "1.4.0",
+    auth: { kind: "chatgpt", email: "pilot@example.com" },
+    capabilities: { chat: "ready", browser: "setup-required", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  };
+
+  const agent = {
+    id: "bot-1",
+    name: "Chief",
+    title: "Lead engineer",
+    description: "Runs the shop.",
+    notifications: true,
+    provider: "codex",
+    model: "gpt-5-codex",
+    reasoningEffort: "high",
+    threadId: null,
+    workspacePath: "/Users/pilot/OpenBot/Agents/bot-1",
+    preview: "Done",
+    updatedAt: "2026-08-29T10:00:00.000Z",
+    avatarSeed: "chief-1",
+    avatarHue: 215,
+    avatarUrl: null,
+  };
+
+  const attachment = {
+    id: "attachment-1",
+    name: "notes.pdf",
+    size: 2048,
+    kind: "file",
+    mimeType: "application/pdf",
+    previewKind: "pdf",
+    previewUrl: null,
+  };
+
+  const snapshot = {
+    agentId: "bot-1",
+    threadId: "thread-1",
+    activeTurnId: null,
+    revision: 3,
+    messages: [
+      {
+        id: "message-1",
+        author: "assistant",
+        text: "Done",
+        createdAt: "2026-08-29T10:00:00.000Z",
+        status: "completed",
+      },
+    ],
+    readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: "message-1" },
+  };
+
+  it("narrows the agent phase and capability states to their unions", () => {
+    expect(isAgentStatus(status)).toBe(true);
+    expect(isAgentStatus({ ...status, phase: "sleeping" })).toBe(false);
+    expect(isAgentStatus({ ...status, capabilities: { ...status.capabilities, chat: "yes" } })).toBe(false);
+  });
+
+  it("keeps the agent auth kind open so a newer remote server still reports status", () => {
+    expect(isAgentStatus({ ...status, auth: { kind: "passkey" } })).toBe(true);
+    expect(isAgentStatus({ ...status, auth: "chatgpt" })).toBe(false);
+  });
+
+  it("keeps provider entries open so one unknown provider field does not reject the whole status", () => {
+    const providers = [
+      { id: "codex", state: "available", version: "1.0.0", message: null },
+      { id: "gemini", state: "rate-limited", version: null, message: null, connectionState: "reconnecting" },
+    ];
+    expect(isAgentStatus({ ...status, providers })).toBe(true);
+    expect(isAgentStatus({ ...status, providers: "codex" })).toBe(false);
+    // Open about values, not about shape: the renderer reads `id` and `state` off every entry.
+    expect(isAgentStatus({ ...status, providers: [null] })).toBe(false);
+    expect(isAgentStatus({ ...status, providers: [{ id: "codex" }] })).toBe(false);
+  });
+
+  it("requires an agent provider and a well-formed avatar on every agent summary", () => {
+    expect(isAgentSummary(agent)).toBe(true);
+    const { provider, ...withoutProvider } = agent;
+    expect(isAgentSummary(withoutProvider)).toBe(false);
+    expect(isAgentSummary({ ...agent, provider: "gemini" })).toBe(false);
+    expect(isAgentSummary({ ...agent, avatarSeed: "Not A Seed!" })).toBe(false);
+    expect(isAgentSummary({ ...agent, avatarHue: 7 })).toBe(false);
+  });
+
+  it("validates every message inside a conversation, not just the array", () => {
+    expect(isConversationWithReadState(snapshot)).toBe(true);
+    expect(isConversationWithReadState({ ...snapshot, messages: [{ id: "message-1" }] })).toBe(false);
+    expect(isConversationWithReadState({ ...snapshot, readState: { unreadCount: -1 } })).toBe(false);
+    const { readState, ...withoutReadState } = snapshot;
+    expect(isConversationWithReadState(withoutReadState)).toBe(true);
+  });
+
+  it("narrows attachment kind and preview kind", () => {
+    expect(isAttachmentSummary(attachment)).toBe(true);
+    expect(isAttachmentSummary({ ...attachment, kind: "video" })).toBe(false);
+    expect(isAttachmentSummary({ ...attachment, previewKind: "html" })).toBe(false);
+  });
+
+  it("validates the usage windows inside an account usage limit", () => {
+    const usage = {
+      limits: [
+        {
+          id: "codex",
+          primary: { usedPercent: 25, windowDurationMins: 300, resetsAt: null },
+          secondary: null,
+        },
+      ],
+    };
+    expect(isAccountUsage(usage)).toBe(true);
+    expect(isAccountUsage({ limits: [{ ...usage.limits[0], primary: { usedPercent: "25" } }] })).toBe(false);
+    // A window that is numeric but not finite renders as "NaN% remaining"; the released Team v1
+    // validator rejects these for the same payload, so this guard has to agree with it.
+    const window = usage.limits[0].primary;
+    expect(isAccountUsage({ limits: [{ ...usage.limits[0], primary: { ...window, usedPercent: Number.NaN } }] })).toBe(
+      false,
+    );
+    expect(isAccountUsage({ limits: [{ ...usage.limits[0], primary: { ...window, windowDurationMins: -1 } }] })).toBe(
+      false,
+    );
+    expect(
+      isAccountUsage({
+        limits: [{ ...usage.limits[0], primary: { ...window, resetsAt: Number.POSITIVE_INFINITY } }],
+      }),
+    ).toBe(false);
+  });
+
+  it("validates every delivery inside a queue snapshot and a queued message receipt", () => {
+    const delivery = {
+      id: "delivery-1",
+      messageId: "message-1",
+      recipientAgentId: "bot-1",
+      sender: { kind: "user" },
+      text: "Ship it",
+      attachments: [attachment],
+      replyToMessageId: null,
+      status: "queued",
+      position: 1,
+      turnId: null,
+      error: null,
+      createdAt: "2026-08-29T10:00:00.000Z",
+    };
+    expect(isQueueSnapshot({ agentId: "bot-1", deliveries: [delivery] })).toBe(true);
+    expect(isQueueSnapshot({ agentId: "bot-1", deliveries: [{ ...delivery, status: "pending" }] })).toBe(false);
+
+    const receipt = {
+      messageId: "message-1",
+      deliveries: [{ id: "delivery-1", recipientAgentId: "bot-1", status: "queued", position: 1 }],
+    };
+    expect(isQueuedMessageReceipt(receipt)).toBe(true);
+    expect(isQueuedMessageReceipt({ ...receipt, deliveries: [{ id: "delivery-1" }] })).toBe(false);
+  });
+
+  it("requires the provider on every agent model option", () => {
+    const model = {
+      provider: "claude",
+      id: "claude-sonnet-5",
+      name: "Sonnet 5",
+      description: "Balanced reasoning.",
+      defaultReasoningEffort: "medium",
+      supportedReasoningEfforts: ["low", "medium", "high"],
+    };
+    expect(isAgentModelOption(model)).toBe(true);
+    const { provider, ...withoutProvider } = model;
+    expect(isAgentModelOption(withoutProvider)).toBe(false);
+    expect(isAgentModelOption({ ...model, supportedReasoningEfforts: ["low", "extreme"] })).toBe(false);
+  });
+
+  // The same argument one field over. Every model id is minted by a provider CLI, not by OpenBot, and
+  // the Claude CLI reports its 1M-context Fable variant as `claude-fable-5-1[1m]`. Both list decoders
+  // read this guard, so a charset without square brackets did not just hide that one model — it
+  // emptied the local picker and took a remote server offline for every route.
+  it("accepts a model id in the bracketed form a provider CLI reports", () => {
+    const model = {
+      provider: "claude",
+      id: "claude-fable-5-1[1m]",
+      name: "Fable",
+      description: "Claude model discovered from the local CLI.",
+      defaultReasoningEffort: "high",
+      supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+    };
+    expect(isAgentModelOption(model)).toBe(true);
+    expect(isAgentModelOption({ ...model, id: "claude fable 5" })).toBe(false);
+    expect(isAgentModelOption({ ...model, id: "" })).toBe(false);
+  });
+
+  // A model name is a CLI's `displayName`, which nothing bounds, and the released Team v1 adapter
+  // accepts 160 — so anything shorter here rejects a whole model list a shipped peer may send.
+  it("accepts a model name up to the length the released protocol allows", () => {
+    const model = {
+      provider: "claude",
+      id: "claude-sonnet-5",
+      name: "Sonnet 5",
+      description: "Balanced reasoning.",
+      defaultReasoningEffort: "medium",
+      supportedReasoningEfforts: ["low", "medium", "high"],
+    };
+    expect(isAgentModelOption({ ...model, name: "S".repeat(INPUT_LIMITS.modelName) })).toBe(true);
+    expect(isAgentModelOption({ ...model, name: "S".repeat(INPUT_LIMITS.modelName + 1) })).toBe(false);
   });
 });

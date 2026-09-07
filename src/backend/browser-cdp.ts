@@ -5,6 +5,7 @@ import type {
   BrowserDiagnosticEntry,
   BrowserElement,
   BrowserEnvironment,
+  BrowserJsonValue,
   BrowserSnapshot,
   BrowserTarget,
 } from "@openbot/contracts/ipc";
@@ -796,7 +797,7 @@ export class BrowserCdpEngine {
     });
   }
 
-  async evaluate(expression: string, awaitPromise = true, timeoutMs = ACTION_TIMEOUT_MS): Promise<unknown> {
+  async evaluate(expression: string, awaitPromise = true, timeoutMs = ACTION_TIMEOUT_MS): Promise<BrowserJsonValue> {
     return this.#lease(async (send) => {
       await send("Runtime.enable");
       const result = await send("Runtime.evaluate", {
@@ -825,7 +826,10 @@ export class BrowserCdpEngine {
       if (bytes > MAX_RESULT_BYTES) {
         throw new Error(`Browser evaluation result exceeds 64 KB (${bytes} bytes).`);
       }
-      return value;
+      // `serialized` is the value the caller receives, so parse that rather than asserting over
+      // `value`: JSON.stringify already dropped anything a JSON value cannot hold.
+      const jsonValue: BrowserJsonValue = JSON.parse(serialized);
+      return jsonValue;
     });
   }
 

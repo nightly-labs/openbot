@@ -1,13 +1,13 @@
 import { expect, fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { MessageBody } from "../src/components/conversation/MessageRendering";
 import { Bubble, BubbleContent, type BubbleVariant } from "../src/components/ui";
-import type { BotMessage } from "../src/data";
-import { STORY_ATTACHMENTS, STORY_BOTS } from "./fixtures";
+import type { AgentMessage } from "../src/data";
+import { MessageBody } from "../src/features/conversation/MessageRendering";
+import { STORY_AGENTS, STORY_ATTACHMENTS } from "./fixtures";
 
-const message: BotMessage = {
+const message: AgentMessage = {
   id: "message-body-1",
-  author: "bot",
+  author: "agent",
   body: "Here is the latest brief. You can also review https://openbot.run/docs or ask @Research.",
   time: "10:00",
   status: "Ready to review",
@@ -17,7 +17,7 @@ const message: BotMessage = {
 const args: Parameters<typeof MessageBody>[0] = {
   message,
   referencedMessage: undefined,
-  bots: STORY_BOTS,
+  agents: STORY_AGENTS,
   onSelectAgent: fn(),
   onOpenLink: fn(),
   onPreview: fn(),
@@ -81,7 +81,7 @@ export const WithSelectedTextInstruction: Story = {
     },
     referencedMessage: {
       id: "message-reference",
-      author: "bot",
+      author: "agent",
       body: "A longer agent response containing the selected sentence and supporting context.",
       time: "09:55",
     },
@@ -131,8 +131,8 @@ export const WorkspaceFileLinks: Story = {
       body: [
         "Pliki:",
         "",
-        "- [page.tsx](/Users/test/OpenBot/Bots/builder/app/page.tsx)",
-        "- [globals.css](/Users/test/OpenBot/Bots/builder/app/globals.css)",
+        "- [page.tsx](/Users/test/OpenBot/Agents/builder/app/page.tsx)",
+        "- [globals.css](/Users/test/OpenBot/Agents/builder/app/globals.css)",
         "",
         "Gotowe: [otwórz tablicę Lutra w HTML](< lutra-brand-board.html >)",
       ].join("\n"),
@@ -155,7 +155,7 @@ export const WorkspaceFileLinks: Story = {
     htmlLink.click();
     await expect(storyArgs.onOpenWorkspaceFile).toHaveBeenNthCalledWith(
       1,
-      "/Users/test/OpenBot/Bots/builder/app/page.tsx",
+      "/Users/test/OpenBot/Agents/builder/app/page.tsx",
     );
     await expect(storyArgs.onOpenWorkspaceFile).toHaveBeenNthCalledWith(2, "lutra-brand-board.html");
   },
@@ -248,10 +248,10 @@ export const DataTableNarrow: Story = {
       ...message,
       id: "message-data-table-narrow",
       body: [
-        "| Model | Provider | Context | Input | Output | Released |",
-        "| --- | --- | ---: | ---: | ---: | --- |",
-        "| gpt-4o | OpenAI | 128k | $5.00 | $15.00 | May 2024 |",
-        "| claude-3.5 | Anthropic | 200k | $3.00 | $15.00 | June 2024 |",
+        "| Fixture | Market odds H/D/A | Implied H/D/A | Scenario | Pick |",
+        "| --- | ---: | ---: | ---: | --- |",
+        "| Ipswich–Liverpool | 5.25 / 4.60 / 1.57 | 18% / 21% / 61% | 20% / 22% / 58% | Liverpool win |",
+        "| Newcastle–Bournemouth | 2.20 / 3.70 / 3.00 | 43% / 26% / 32% | 45% / 27% / 28% | Newcastle, cautiously |",
       ].join("\n"),
       status: undefined,
       attachments: [],
@@ -261,6 +261,8 @@ export const DataTableNarrow: Story = {
   play: async ({ canvas }) => {
     const region = canvas.getByRole("region", { name: "Data table" });
     await expect(region.scrollWidth).toBeGreaterThan(region.clientWidth);
+    const longFixture = canvas.getByText("Newcastle–Bournemouth");
+    await expect(getComputedStyle(longFixture).textOverflow).toBe("clip");
   },
 };
 

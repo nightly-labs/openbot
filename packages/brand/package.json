@@ -5,23 +5,30 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./logo.css": "./src/logo.css"
+    "./bloub-avatar": "./src/bloub-avatar.ts",
+    "./logo.css": "./src/logo.css",
+    "./tokens.css": "./src/tokens.css",
+    "./tokens-native.css": "./src/tokens-native.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --config vitest.config.ts"
   },
+  "dependencies": {
+    "@norbert_bodziony/bloub": "catalog:",
+    "@openbot/contracts": "workspace:*"
+  },
   "peerDependencies": {
-    "@solidjs/web": "2.0.0-rc.0",
+    "@solidjs/web": "catalog:",
     "solid-js": "2.0.0-rc.0"
   },
   "devDependencies": {
-    "@solidjs/testing-library": "1.0.0-beta.2",
-    "@solidjs/vite-plugin": "3.0.0-next.28",
-    "@testing-library/jest-dom": "7.0.1",
-    "jsdom": "30.0.1",
-    "typescript": "7.0.2",
-    "vite": "7.3.6",
-    "vitest": "4.1.10"
+    "@solidjs/testing-library": "catalog:",
+    "@solidjs/vite-plugin": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "jsdom": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

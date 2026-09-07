@@ -88,3 +88,20 @@ export const ProviderDownloadsOpen: Story = {
   },
   play: Opens.play,
 };
+
+export const DiscoveredModels: Story = {
+  args: {
+    modelOptions: [
+      ...STORY_MODELS,
+      {
+        provider: "codex",
+        id: "gpt-6-astra",
+        name: "GPT-6 Astra",
+        description: "Codex model discovered from the local CLI.",
+        defaultReasoningEffort: "medium",
+        supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max", "ultra"],
+      },
+    ],
+  },
+  play: Opens.play,
+};

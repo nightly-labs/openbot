@@ -1,16 +1,21 @@
+import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import {
+  REMOTE_TICKET_AUDIENCE,
+  REMOTE_TICKET_PROTOCOL_VERSION,
+  type RemoteMemberRole,
+  type RemoteTicketClaims,
+} from "@openbot/contracts/signal-protocol/ticket";
 import { importJWK, type JWK, SignJWT } from "jose";
+import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import type { AuthUser, WorkerBindings } from "./types";
 
-const TICKET_AUDIENCE = "openbot-remote";
 const TICKET_TTL_SECONDS = 180;
-const SESSION_TTL_SECONDS = 24 * 60 * 60;
-const HOST_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const LEGACY_SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u;
 const AUTH_EVENT_RETRY_MS = 60_000;
 const MAX_OUTSTANDING_INVITES_PER_HOST = 50;
 
-export type RemoteMemberRole = "owner" | "admin" | "member";
+export type { RemoteMemberRole };
 
 export class RemoteControlPlaneError extends Error {
   constructor(
@@ -47,15 +52,13 @@ interface RemoteSessionRow extends RemoteMembershipRow {
   auth_epoch: number;
 }
 
-export interface RemoteResumeClaims {
-  sessionId: string;
-  hostId: string;
-  userId: string;
-  membershipId: string;
-  role: "host" | RemoteMemberRole;
-  authEpoch: number;
-  sessionExpiresAt: number;
-}
+// What a resume token has to prove it still stands for. The Signal service holds the token; this
+// is the subset of the ticket it hands back for re-validation, derived so a claim renamed in the
+// contract cannot be silently dropped from the check.
+export type RemoteResumeClaims = Pick<
+  RemoteTicketClaims,
+  "sessionId" | "hostId" | "userId" | "membershipId" | "role" | "authEpoch" | "sessionExpiresAt"
+>;
 
 interface RemoteInviteRow {
   invite_id: string;
@@ -121,6 +124,8 @@ export class RemoteTicketSigner {
   }): Promise<{ ticket: string; expiresAt: number }> {
     const issuedAt = Math.floor(input.now / 1_000);
     const expiresAt = Math.min(issuedAt + TICKET_TTL_SECONDS, Math.floor(input.sessionExpiresAt / 1_000));
+    // `aud`, `jti`, `iat` and `exp` are set by the builder below, so they are the four claims this
+    // literal leaves out - the `satisfies` covers the rest against what the two verifiers read.
     const ticket = await new SignJWT({
       sessionId: input.sessionId,
       hostId: input.hostId,
@@ -128,16 +133,16 @@ export class RemoteTicketSigner {
       membershipId: input.membershipId,
       role: input.role,
       authEpoch: input.authEpoch,
-      protocolMinimum: 2,
-      protocolMaximum: 2,
+      protocolMinimum: REMOTE_TICKET_PROTOCOL_VERSION,
+      protocolMaximum: REMOTE_TICKET_PROTOCOL_VERSION,
       sessionExpiresAt: Math.floor(input.sessionExpiresAt / 1_000),
       ...(input.clientPublicKey ? { clientPublicKey: input.clientPublicKey } : {}),
-    })
+    } satisfies Omit<RemoteTicketClaims, "aud" | "jti" | "iat" | "exp">)
       .setProtectedHeader({ alg: "ES256", typ: "JWT", kid: this.#keyId })
       .setJti(crypto.randomUUID())
       .setIssuedAt(issuedAt)
       .setExpirationTime(expiresAt)
-      .setAudience(TICKET_AUDIENCE)
+      .setAudience(REMOTE_TICKET_AUDIENCE)
       .sign(await this.#key);
     return { ticket, expiresAt: expiresAt * 1_000 };
   }
@@ -616,6 +621,22 @@ export class RemoteControlPlane {
     await this.#flushAuthEvents();
   }
 
+  async validateMobileConnectHost(userId: string, binding: MobileConnectHostBinding): Promise<void> {
+    const host = await this.#host(binding.hostId);
+    if (
+      !host ||
+      host.owner_user_id !== userId ||
+      !host.device_public_key ||
+      (await sha256(host.device_public_key)) !== binding.fingerprint
+    ) {
+      throw new RemoteControlPlaneError(
+        409,
+        "mobile_host_mismatch",
+        "The Mobile Connect host identity does not match.",
+      );
+    }
+  }
+
   async startSession(userId: string, hostId: string, authSessionHash: string) {
     const membership = await this.#requireRole(hostId, userId, ["owner", "admin", "member"]);
     const now = this.#now();
@@ -629,39 +650,54 @@ export class RemoteControlPlane {
       .prepare(
         `SELECT session_id, expires_at FROM remote_sessions
          WHERE host_id = ? AND user_id = ? AND membership_id = ? AND ended_at IS NULL AND expires_at > ?
+           AND auth_session_hash = ?
            AND EXISTS(
              SELECT 1 FROM auth_sessions
               WHERE token_hash = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?
            )
          ORDER BY started_at DESC LIMIT 1`,
       )
-      .bind(hostId, userId, membership.membership_id, now, authSessionHash, userId, now)
+      .bind(hostId, userId, membership.membership_id, now, authSessionHash, authSessionHash, userId, now)
       .first<{ session_id: string; expires_at: number }>();
     if (existing) return { sessionId: existing.session_id, hostId, expiresAt: existing.expires_at };
     const sessionId = crypto.randomUUID();
-    const expiresAt = now + SESSION_TTL_SECONDS * 1_000;
+    // Deliberate product policy: device sessions do not expire with time. Logout
+    // or explicit revocation ends only this credential's sessions, not other phones.
+    const expiresAt = PERSISTENT_SESSION_EXPIRES_AT;
     await this.#database
       .prepare(
-        `INSERT OR IGNORE INTO remote_sessions(session_id, host_id, user_id, membership_id, started_at, expires_at)
-         SELECT ?, ?, ?, ?, ?, ?
+        `INSERT OR IGNORE INTO remote_sessions(session_id, host_id, user_id, membership_id, started_at, expires_at, auth_session_hash)
+         SELECT ?, ?, ?, ?, ?, ?, ?
           WHERE EXISTS(
             SELECT 1 FROM auth_sessions
              WHERE token_hash = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?
           )`,
       )
-      .bind(sessionId, hostId, userId, membership.membership_id, now, expiresAt, authSessionHash, userId, now)
+      .bind(
+        sessionId,
+        hostId,
+        userId,
+        membership.membership_id,
+        now,
+        expiresAt,
+        authSessionHash,
+        authSessionHash,
+        userId,
+        now,
+      )
       .run();
     const active = await this.#database
       .prepare(
         `SELECT session_id, expires_at FROM remote_sessions
          WHERE host_id = ? AND user_id = ? AND ended_at IS NULL AND expires_at > ?
+           AND auth_session_hash = ?
            AND EXISTS(
              SELECT 1 FROM auth_sessions
               WHERE token_hash = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?
            )
          ORDER BY started_at DESC LIMIT 1`,
       )
-      .bind(hostId, userId, now, authSessionHash, userId, now)
+      .bind(hostId, userId, now, authSessionHash, authSessionHash, userId, now)
       .first<{ session_id: string; expires_at: number }>();
     if (!active) throw new RemoteControlPlaneError(401, "auth_session_revoked", "The account session has ended.");
     return { sessionId: active.session_id, hostId, expiresAt: active.expires_at };
@@ -707,25 +743,13 @@ export class RemoteControlPlane {
 
   async endAccountSession(userId: string, authSessionHash: string): Promise<void> {
     const now = this.#now();
-    const results = await this.#database.batch([
-      this.#database
-        .prepare(
-          `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
-           SELECT lower(hex(randomblob(16))),
-                  json_object('type', 'remote-session-ended', 'hostId', host_id, 'sessionId', session_id),
-                  ?, 0, ?
-             FROM remote_sessions
-            WHERE user_id = ? AND ended_at IS NULL`,
-        )
-        .bind(now, now, userId),
-      this.#database
-        .prepare("UPDATE remote_sessions SET ended_at = ? WHERE user_id = ? AND ended_at IS NULL")
-        .bind(now, userId),
-      this.#database
-        .prepare("UPDATE auth_sessions SET revoked_at = ? WHERE token_hash = ? AND user_id = ? AND revoked_at IS NULL")
-        .bind(now, authSessionHash, userId),
-    ]);
-    if ((results[2]?.meta.changes ?? 0) !== 1) {
+    // The database trigger revokes the bound remote sessions and writes the
+    // disconnect outbox atomically with logout, including concurrent starts.
+    const result = await this.#database
+      .prepare("UPDATE auth_sessions SET revoked_at = ? WHERE token_hash = ? AND user_id = ? AND revoked_at IS NULL")
+      .bind(now, authSessionHash, userId)
+      .run();
+    if ((result.meta.changes ?? 0) !== 1) {
       throw new RemoteControlPlaneError(401, "auth_session_revoked", "The account session has ended.");
     }
     await this.#flushAuthEvents();
@@ -751,9 +775,12 @@ export class RemoteControlPlane {
            FROM remote_sessions s
            JOIN remote_memberships m ON m.membership_id = s.membership_id
            JOIN remote_hosts h ON h.host_id = s.host_id
-          WHERE s.session_id = ? LIMIT 1`,
+          WHERE s.session_id = ? AND (s.auth_session_hash IS NULL OR EXISTS(
+            SELECT 1 FROM auth_sessions a WHERE a.token_hash = s.auth_session_hash
+              AND a.user_id = s.user_id AND a.revoked_at IS NULL AND a.expires_at > ?
+          )) LIMIT 1`,
       )
-      .bind(claims.sessionId)
+      .bind(claims.sessionId, now)
       .first<RemoteSessionRow>();
     return Boolean(
       session &&
@@ -779,9 +806,12 @@ export class RemoteControlPlane {
          FROM remote_sessions s
          JOIN remote_memberships m ON m.membership_id = s.membership_id
          JOIN remote_hosts h ON h.host_id = s.host_id
-         WHERE s.session_id = ? AND s.user_id = ? LIMIT 1`,
+         WHERE s.session_id = ? AND s.user_id = ? AND (s.auth_session_hash IS NULL OR EXISTS(
+           SELECT 1 FROM auth_sessions a WHERE a.token_hash = s.auth_session_hash
+             AND a.user_id = s.user_id AND a.revoked_at IS NULL AND a.expires_at > ?
+         )) LIMIT 1`,
       )
-      .bind(sessionId, userId)
+      .bind(sessionId, userId, now)
       .first<RemoteSessionRow>();
     if (!session || session.ended_at || session.expires_at <= now || session.status !== "active") {
       throw new RemoteControlPlaneError(403, "session_inactive", "The remote session is not active.");
@@ -811,7 +841,7 @@ export class RemoteControlPlane {
       membershipId: `${hostId}:host`,
       role: "host",
       authEpoch: host.auth_epoch,
-      sessionExpiresAt: this.#now() + HOST_SESSION_TTL_SECONDS * 1_000,
+      sessionExpiresAt: PERSISTENT_SESSION_EXPIRES_AT,
       now: this.#now(),
     });
   }

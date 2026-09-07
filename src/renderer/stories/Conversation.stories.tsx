@@ -5,26 +5,23 @@ import type {
   AvatarImageInput,
   DraftAttachment,
   QueueSnapshot,
-  UpdateBotInput,
+  UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { Portal } from "@solidjs/web";
 import { createEffect, createSignal, onCleanup, onSettled, Show } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { clipboardFiles } from "../../preload/clipboard-files";
-import {
-  Conversation,
-  ConversationControllerProvider,
-  createConversationController,
-} from "../src/components/Conversation";
-import { BrowserTakeoverCard } from "../src/components/ConversationPrompts";
-import { ConversationView } from "../src/components/ConversationView";
-import type { BotMessage as RendererBotMessage } from "../src/data";
+import type { AgentMessage as RendererAgentMessage } from "../src/data";
+import { Conversation, createConversationController } from "../src/features/conversation/Conversation";
+import { BrowserTakeoverCard } from "../src/features/conversation/ConversationPrompts";
+import { ConversationView } from "../src/features/conversation/ConversationView";
+import { ConversationControllerProvider } from "../src/features/conversation/conversation-controller-context";
 import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
 import {
   STORY_AGENT_STATUS,
+  STORY_AGENTS,
   STORY_ATTACHMENTS,
-  STORY_BOTS,
   STORY_CONVERSATION_MESSAGES,
   STORY_MODELS,
   STORY_PRESENCE,
@@ -33,16 +30,16 @@ import {
 } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
-const messages: RendererBotMessage[] = STORY_CONVERSATION_MESSAGES.map((message) => ({
+const messages: RendererAgentMessage[] = STORY_CONVERSATION_MESSAGES.map((message) => ({
   id: message.id,
-  author: message.author === "user" ? "you" : "bot",
+  author: message.author === "user" ? "you" : "agent",
   body:
     message.id === "message-agent-1"
       ? `${message.text}\n\nPlease review ${serializeAttachmentReference(STORY_ATTACHMENTS[0].name, STORY_ATTACHMENTS[0].id)} before editing the implementation notes.\n\nTransformers scale well with data and compute [1], though attention is quadratic in sequence length [2].`
       : message.text,
   time: "10:00",
   itemType: message.itemType,
-  senderBotId: message.senderBotId,
+  senderAgentId: message.senderAgentId,
   replyToMessageId: message.replyToMessageId,
   attachments: message.attachments,
   citations:
@@ -67,12 +64,12 @@ const messages: RendererBotMessage[] = STORY_CONVERSATION_MESSAGES.map((message)
   kind: message.exchange ? "exchange" : "text",
 }));
 
-const unreadStoryMessages: RendererBotMessage[] = [
+const unreadStoryMessages: RendererAgentMessage[] = [
   ...Array.from(
     { length: 12 },
-    (_, index): RendererBotMessage => ({
+    (_, index): RendererAgentMessage => ({
       id: `unread-history-${index + 1}`,
-      author: index % 2 === 0 ? "you" : "bot",
+      author: index % 2 === 0 ? "you" : "agent",
       body:
         index % 2 === 0
           ? `Historical project update ${index + 1}: please check the owner and due date.`
@@ -83,9 +80,9 @@ const unreadStoryMessages: RendererBotMessage[] = [
   ),
   ...Array.from(
     { length: 8 },
-    (_, index): RendererBotMessage => ({
+    (_, index): RendererAgentMessage => ({
       id: `unread-story-new-${index + 1}`,
-      author: "bot",
+      author: "agent",
       body: `New update ${index + 1}: I reviewed the launch plan, verified the supporting notes, and added a concrete next action for the team. This message intentionally has enough detail to keep the unread boundary above the visible viewport when the conversation opens at the bottom.`,
       time: `09:${String(40 + index).padStart(2, "0")}`,
       kind: "text",
@@ -93,7 +90,7 @@ const unreadStoryMessages: RendererBotMessage[] = [
   ),
 ];
 
-const imageGenerationMessages: RendererBotMessage[] = [
+const imageGenerationMessages: RendererAgentMessage[] = [
   ...messages,
   {
     id: "image-generation-user",
@@ -104,7 +101,7 @@ const imageGenerationMessages: RendererBotMessage[] = [
   },
   {
     id: "image-generation-in-chat",
-    author: "bot",
+    author: "agent",
     body: "",
     time: "10:02",
     turnId: "turn-image-generation",
@@ -187,10 +184,10 @@ const supportedContextAttachments: AttachmentSummary[] = [
     previewUrl: null,
   },
 ];
-const sentContextFileMessages: RendererBotMessage[] = [
+const sentContextFileMessages: RendererAgentMessage[] = [
   {
     id: "sent-context-request",
-    author: "bot",
+    author: "agent",
     body: "Podeślij materiały, na których mam oprzeć podsumowanie.",
     time: "10:04",
     kind: "text",
@@ -205,7 +202,7 @@ const sentContextFileMessages: RendererBotMessage[] = [
   },
 ];
 
-const completedImageGenerationMessages: RendererBotMessage[] = imageGenerationMessages.map((message) =>
+const completedImageGenerationMessages: RendererAgentMessage[] = imageGenerationMessages.map((message) =>
   message.id === "image-generation-in-chat"
     ? {
         ...message,
@@ -218,21 +215,21 @@ const completedImageGenerationMessages: RendererBotMessage[] = imageGenerationMe
 const completedImageGenerationPresence = {
   ...STORY_PRESENCE,
   members: STORY_PRESENCE.members.map((member) =>
-    member.typingBotId === "chief" ? { ...member, typingBotId: null } : member,
+    member.typingAgentId === "chief" ? { ...member, typingAgentId: null } : member,
   ),
 };
 
-const botMessageGalleryMessages: RendererBotMessage[] = [
+const agentMessageGalleryMessages: RendererAgentMessage[] = [
   {
-    id: "bot-gallery-user",
+    id: "agent-gallery-user",
     author: "you",
     body: "Show every message surface and interaction in one thread.",
     time: "10:00",
     kind: "text",
   },
   {
-    id: "bot-gallery-plain",
-    author: "bot",
+    id: "agent-gallery-plain",
+    author: "agent",
     body: "Plain assistant text uses the muted Bubble surface and keeps its actions aligned with the bottom edge.",
     time: "10:01",
     kind: "text",
@@ -240,14 +237,14 @@ const botMessageGalleryMessages: RendererBotMessage[] = [
     reactionSummary: { emojis: ["👍", "🚀"], overflowCount: 2 },
   },
   {
-    id: "bot-gallery-links",
-    author: "bot",
+    id: "agent-gallery-links",
+    author: "agent",
     body: [
       "## Links and references",
       "",
       "Review [OpenBot documentation](https://openbot.run/docs), the [Kobalte guide](https://kobalte.dev/docs/core/overview/introduction), and https://zaidan.carere.dev/docs/components/kobalte/bubble.",
       "",
-      "You can also open [ConversationView.tsx](/Users/test/OpenBot/src/renderer/src/components/ConversationView.tsx), ask @Research, or inspect the attached source file below.",
+      "You can also open [ConversationView.tsx](/Users/test/OpenBot/src/renderer/src/features/conversation/ConversationView.tsx), ask @Research, or inspect the attached source file below.",
       "",
       `Attachment reference: ${serializeAttachmentReference(STORY_ATTACHMENTS[0].name, STORY_ATTACHMENTS[0].id)}.`,
       "",
@@ -274,17 +271,17 @@ const botMessageGalleryMessages: RendererBotMessage[] = [
     reactionSummary: { emojis: ["👀", "🔥", "✅"], overflowCount: 1 },
   },
   {
-    id: "bot-gallery-reply",
-    author: "bot",
+    id: "agent-gallery-reply",
+    author: "agent",
     body: "This Bubble includes a reply context without changing how reactions or message actions are positioned.",
     time: "10:03",
     kind: "text",
-    replyToMessageId: "bot-gallery-user",
+    replyToMessageId: "agent-gallery-user",
     reaction: "❤️",
   },
   {
-    id: "bot-gallery-markdown",
-    author: "bot",
+    id: "agent-gallery-markdown",
+    author: "agent",
     body: [
       "## Markdown response",
       "",
@@ -299,14 +296,14 @@ const botMessageGalleryMessages: RendererBotMessage[] = [
     reaction: "🎉",
   },
   {
-    id: "bot-gallery-code",
-    author: "bot",
+    id: "agent-gallery-code",
+    author: "agent",
     body: [
       "Run the focused verification:",
       "",
       "```bash verify-chat.sh",
       "bun run typecheck:renderer",
-      "bunx vitest run src/renderer/src/components/conversation/MessageRendering.test.tsx",
+      "bunx vitest run src/renderer/src/features/conversation/MessageRendering.test.tsx",
       "```",
     ].join("\n"),
     time: "10:05",
@@ -315,8 +312,8 @@ const botMessageGalleryMessages: RendererBotMessage[] = [
     reactionSummary: { emojis: ["✅", "🚀"] },
   },
   {
-    id: "bot-gallery-data-table",
-    author: "bot",
+    id: "agent-gallery-data-table",
+    author: "agent",
     body: [
       "Current message surfaces:",
       "",
@@ -331,8 +328,8 @@ const botMessageGalleryMessages: RendererBotMessage[] = [
     reaction: "🚀",
   },
   {
-    id: "bot-gallery-comparison-table",
-    author: "bot",
+    id: "agent-gallery-comparison-table",
+    author: "agent",
     body: [
       "Feature matrix:",
       "",
@@ -348,8 +345,8 @@ const botMessageGalleryMessages: RendererBotMessage[] = [
     reaction: "💯",
   },
   {
-    id: "bot-gallery-attachment-with-text",
-    author: "bot",
+    id: "agent-gallery-attachment-with-text",
+    author: "agent",
     body: "The supporting files are ready. This example keeps an attachment inside a regular text Bubble.",
     time: "10:08",
     kind: "text",
@@ -357,8 +354,8 @@ const botMessageGalleryMessages: RendererBotMessage[] = [
     reaction: "👏",
   },
   {
-    id: "bot-gallery-attachment-only",
-    author: "bot",
+    id: "agent-gallery-attachment-only",
+    author: "agent",
     body: "",
     time: "10:09",
     kind: "text",
@@ -366,8 +363,8 @@ const botMessageGalleryMessages: RendererBotMessage[] = [
     reaction: "🔥",
   },
   {
-    id: "bot-gallery-image",
-    author: "bot",
+    id: "agent-gallery-image",
+    author: "agent",
     body: "",
     time: "10:10",
     kind: "text",
@@ -382,8 +379,8 @@ const botMessageGalleryMessages: RendererBotMessage[] = [
     reactionSummary: { emojis: ["😮", "🎉"], overflowCount: 3 },
   },
   {
-    id: "bot-gallery-failed",
-    author: "bot",
+    id: "agent-gallery-failed",
+    author: "agent",
     body: "I could not finish the remote verification. The message still exposes reply, copy, and reaction actions.",
     time: "10:11",
     kind: "text",
@@ -391,8 +388,8 @@ const botMessageGalleryMessages: RendererBotMessage[] = [
     reaction: "🤔",
   },
   {
-    id: "bot-gallery-streaming",
-    author: "bot",
+    id: "agent-gallery-streaming",
+    author: "agent",
     body: [
       "Streaming response with an open code fence:",
       "",
@@ -401,38 +398,40 @@ const botMessageGalleryMessages: RendererBotMessage[] = [
     ].join("\n"),
     time: "10:12",
     kind: "text",
-    turnId: "bot-gallery-stream",
+    turnId: "agent-gallery-stream",
     status: "streaming",
     streaming: true,
   },
 ];
 
-const dataTableMessages: RendererBotMessage[] = [
+const dataTableMessages: RendererAgentMessage[] = [
   {
     id: "data-table-user",
     author: "you",
-    body: "Compare the available models by context window and input price.",
+    body: "Compare the upcoming Premier League fixtures.",
     time: "10:02",
     kind: "text",
   },
   {
     id: "data-table-agent",
-    author: "bot",
+    author: "agent",
     body: [
-      "Here’s a compact comparison:",
+      "Here’s a compact comparison based on the current market:",
       "",
-      "| Model | Context | $/1M in |",
-      "| --- | --- | ---: |",
-      "| gpt-4o | 128k | $5.00 |",
-      "| claude-3.5 | 200k | $3.00 |",
-      "| llama-3.1 | 128k | $0.90 |",
+      "| Fixture | Market odds H/D/A | Implied H/D/A | Scenario | Pick |",
+      "| --- | ---: | ---: | ---: | --- |",
+      "| Ipswich–Liverpool | 5.25 / 4.60 / 1.57 | 18% / 21% / 61% | 20% / 22% / 58% | Liverpool win |",
+      "| Newcastle–Bournemouth | 2.20 / 3.70 / 3.00 | 43% / 26% / 32% | 45% / 27% / 28% | Newcastle, cautiously |",
+      "| Brighton–Leeds | 1.90 / 3.60 / 4.00 | 50% / 26% / 24% | 48% / 27% / 25% | Brighton win |",
+      "",
+      "Long values should remain readable by scrolling the table, and the message actions should stay aligned with the bottom of the response.",
     ].join("\n"),
     time: "10:03",
     kind: "text",
   },
 ];
 
-const codeBlockMessages: RendererBotMessage[] = [
+const codeBlockMessages: RendererAgentMessage[] = [
   {
     id: "code-block-user",
     author: "you",
@@ -442,7 +441,7 @@ const codeBlockMessages: RendererBotMessage[] = [
   },
   {
     id: "code-block-agent",
-    author: "bot",
+    author: "agent",
     body: [
       "Run this from the repository root:",
       "",
@@ -457,14 +456,14 @@ const codeBlockMessages: RendererBotMessage[] = [
   },
   {
     id: "code-block-follow-up",
-    author: "bot",
+    author: "agent",
     body: "The checks should complete before release.",
     time: "10:04",
     kind: "text",
   },
 ];
 
-const markdownMessages: RendererBotMessage[] = [
+const markdownMessages: RendererAgentMessage[] = [
   {
     id: "markdown-user",
     author: "you",
@@ -474,7 +473,7 @@ const markdownMessages: RendererBotMessage[] = [
   },
   {
     id: "markdown-agent",
-    author: "bot",
+    author: "agent",
     body: [
       "## Recommendation",
       "",
@@ -501,7 +500,7 @@ const markdownMessages: RendererBotMessage[] = [
   },
   {
     id: "markdown-follow-up",
-    author: "bot",
+    author: "agent",
     body: "I can prepare the migration checklist next.",
     time: "10:04",
     kind: "text",
@@ -546,7 +545,7 @@ const streamingMarkdownChunks = [
   ].join("\n"),
 ] as const;
 
-function streamingMarkdownMessages(chunkIndex: number): RendererBotMessage[] {
+function streamingMarkdownMessages(chunkIndex: number): RendererAgentMessage[] {
   return [
     {
       id: "streaming-markdown-user",
@@ -557,7 +556,7 @@ function streamingMarkdownMessages(chunkIndex: number): RendererBotMessage[] {
     },
     {
       id: "streaming-markdown-agent",
-      author: "bot",
+      author: "agent",
       body: streamingMarkdownChunks[chunkIndex],
       time: "10:03",
       kind: "text",
@@ -565,7 +564,7 @@ function streamingMarkdownMessages(chunkIndex: number): RendererBotMessage[] {
     },
     {
       id: "streaming-markdown-follow-up",
-      author: "bot",
+      author: "agent",
       body: "This message must stay below the growing response.",
       time: "10:04",
       kind: "text",
@@ -605,7 +604,7 @@ function StreamingMarkdownConversation(props: { args: Parameters<typeof Conversa
   return <MockedConversation args={{ ...props.args, activeTurnId: "streaming-markdown" }} messages={stableMessages} />;
 }
 
-const comparisonTableMessages: RendererBotMessage[] = [
+const comparisonTableMessages: RendererAgentMessage[] = [
   {
     id: "comparison-table-user",
     author: "you",
@@ -615,7 +614,7 @@ const comparisonTableMessages: RendererBotMessage[] = [
   },
   {
     id: "comparison-table-agent",
-    author: "bot",
+    author: "agent",
     body: [
       "Here’s the feature breakdown:",
       "",
@@ -634,7 +633,7 @@ const comparisonTableMessages: RendererBotMessage[] = [
 const prompt: Extract<AgentEvent, { type: "prompt" }> = {
   type: "prompt",
   requestId: "prompt-1",
-  botId: "chief",
+  agentId: "chief",
   threadId: "thread-chief",
   turnId: "turn-prompt",
   questions: [
@@ -653,7 +652,7 @@ const prompt: Extract<AgentEvent, { type: "prompt" }> = {
 
 const browserTakeover: Extract<AgentEvent, { type: "browser-takeover-requested" }>["request"] = {
   requestId: "takeover-1",
-  botId: "chief",
+  agentId: "chief",
   threadId: "thread-chief",
   turnId: "turn-takeover",
   tabId: "tab-login",
@@ -662,7 +661,7 @@ const browserTakeover: Extract<AgentEvent, { type: "browser-takeover-requested" 
 const promptQuestions: Extract<AgentEvent, { type: "prompt" }> = {
   type: "prompt",
   requestId: "prompt-questions",
-  botId: "chief",
+  agentId: "chief",
   threadId: "thread-chief",
   turnId: "turn-prompt-questions",
   questions: [
@@ -701,7 +700,7 @@ const promptQuestions: Extract<AgentEvent, { type: "prompt" }> = {
   ],
 };
 
-const promptChatMessages: RendererBotMessage[] = [
+const promptChatMessages: RendererAgentMessage[] = [
   {
     id: "prompt-chat-user",
     author: "you",
@@ -711,7 +710,7 @@ const promptChatMessages: RendererBotMessage[] = [
   },
   {
     id: "prompt-chat-agent",
-    author: "bot",
+    author: "agent",
     body: "I have a few decisions to confirm before I finish the setup.",
     time: "10:01",
     kind: "text",
@@ -719,12 +718,12 @@ const promptChatMessages: RendererBotMessage[] = [
 ];
 
 const queue: QueueSnapshot = {
-  botId: "chief",
+  agentId: "chief",
   deliveries: [
     {
       id: "queued-1",
       messageId: "queued-message-1",
-      recipientBotId: "chief",
+      recipientAgentId: "chief",
       sender: { kind: "user" },
       text: "Add a final checklist.",
       attachments: [],
@@ -773,7 +772,7 @@ const referenceQueue: QueueSnapshot = {
 
 function MockedConversation(props: {
   args: Parameters<typeof Conversation>[0];
-  messages?: RendererBotMessage[];
+  messages?: RendererAgentMessage[];
   initialAttachments?: DraftAttachment[];
   voiceModelProgress?: number;
   takeoverStateGallery?: boolean;
@@ -784,11 +783,11 @@ function MockedConversation(props: {
   const previewUrls = new Set<string>();
   let storyFrameElement: HTMLDivElement | undefined;
   let takeoverGalleryScrollTimer: number | undefined;
-  const initialBotId = props.args.bot?.id;
-  if (initialBotId && props.initialAttachments?.length) {
+  const initialAgentId = props.args.agent?.id;
+  if (initialAgentId && props.initialAttachments?.length) {
     onSettled(() => {
       controller.setDrafts({
-        [initialBotId]: { text: "", attachments: props.initialAttachments ?? [], replyToMessageId: null },
+        [initialAgentId]: { text: "", attachments: props.initialAttachments ?? [], replyToMessageId: null },
       });
     });
   }
@@ -822,11 +821,11 @@ function MockedConversation(props: {
     const files = clipboardFiles(event.clipboardData).filter((file) => file.type.startsWith("image/"));
     if (files.length === 0) return;
 
-    const botId = props.args.bot?.id;
-    if (!botId) return;
+    const agentId = props.args.agent?.id;
+    if (!agentId) return;
     event.preventDefault();
     const requestId = crypto.randomUUID();
-    const currentDraft = controller.drafts()[botId] ?? { text: "", attachments: [], replyToMessageId: null };
+    const currentDraft = controller.drafts()[agentId] ?? { text: "", attachments: [], replyToMessageId: null };
     const attachments: DraftAttachment[] = files
       .slice(0, Math.max(0, 10 - currentDraft.attachments.length))
       .map((file, index) => {
@@ -844,7 +843,7 @@ function MockedConversation(props: {
       });
     controller.setDrafts((current) => ({
       ...current,
-      [botId]: { ...currentDraft, attachments: [...currentDraft.attachments, ...attachments] },
+      [agentId]: { ...currentDraft, attachments: [...currentDraft.attachments, ...attachments] },
     }));
   };
   const setStoryFrameElement = (element: HTMLDivElement) => {
@@ -877,7 +876,7 @@ function MockedConversation(props: {
         <Portal mount={takeoverGalleryMount() ?? undefined}>
           <div class="browser-takeover-story-states">
             <BrowserTakeoverCard
-              botName={props.args.bot?.name ?? "the agent"}
+              agentName={props.args.agent?.name ?? "the agent"}
               tab={props.args.browserTabs[0]}
               preview={{ dataUrl: browserTakeoverPreviewUrl, width: 960, height: 600 }}
               previewStatus="ready"
@@ -886,7 +885,7 @@ function MockedConversation(props: {
               onCancel={async () => false}
             />
             <BrowserTakeoverCard
-              botName={props.args.bot?.name ?? "the agent"}
+              agentName={props.args.agent?.name ?? "the agent"}
               tab={props.args.browserTabs[0]}
               preview={{ dataUrl: browserTakeoverPreviewUrl, width: 960, height: 600 }}
               previewStatus="ready"
@@ -930,8 +929,8 @@ function RecordingConversation(props: { args: Parameters<typeof Conversation>[0]
 
 const args: Parameters<typeof Conversation>[0] = {
   agentStatus: STORY_AGENT_STATUS,
-  bot: STORY_BOTS[0],
-  bots: STORY_BOTS,
+  agent: STORY_AGENTS[0],
+  agents: STORY_AGENTS,
   modelOptions: STORY_MODELS,
   messages,
   unreadCount: 0,
@@ -955,8 +954,8 @@ const args: Parameters<typeof Conversation>[0] = {
   approval: undefined,
   browserTakeover: undefined,
   onSelectAgent: fn(),
-  onUpdateBot: async (_botId: string, _updates: Omit<UpdateBotInput, "botId">) => undefined,
-  onSetAgentAvatar: async (_botId: string, _image: AvatarImageInput | null) => undefined,
+  onUpdateAgent: async (_agentId: string, _updates: Omit<UpdateAgentInput, "agentId">) => undefined,
+  onSetAgentAvatar: async (_agentId: string, _image: AvatarImageInput | null) => undefined,
   onSendMessage: async (_body: string, _attachmentDraftIds: string[], _replyToMessageId: string | null) => true,
   onMarkRead: async () => undefined,
   onTypingChange: fn(),
@@ -992,11 +991,11 @@ type Story = StoryObj<typeof meta>;
 
 export const RichConversation: Story = {};
 
-export const AllBotMessageTypes: Story = {
-  name: "All bot message types",
+export const AllAgentMessageTypes: Story = {
+  name: "All agent message types",
   args: {
-    messages: botMessageGalleryMessages,
-    activeTurnId: "bot-gallery-stream",
+    messages: agentMessageGalleryMessages,
+    activeTurnId: "agent-gallery-stream",
     presence: completedImageGenerationPresence,
   },
 };
@@ -1151,9 +1150,17 @@ export const DataTableInChat: Story = {
     messages: dataTableMessages,
   },
   play: async ({ canvas }) => {
-    await expect(canvas.getByText("Compare the available models by context window and input price.")).toBeVisible();
-    await expect(canvas.getByRole("table")).toBeVisible();
-    await expect(canvas.getAllByRole("columnheader")).toHaveLength(3);
+    await expect(canvas.getByText("Compare the upcoming Premier League fixtures.")).toBeVisible();
+    const table = canvas.getByRole("table");
+    await expect(table).toBeVisible();
+    await expect(canvas.getAllByRole("columnheader")).toHaveLength(5);
+    const bubble = table.closest<HTMLElement>(".ui-bubble");
+    const actions = canvas.getByRole("toolbar", { name: "Agent message actions" });
+    if (!bubble) throw new Error("The data table message bubble is missing.");
+    await expect(bubble).toHaveAttribute("data-variant", "muted");
+    await expect(
+      Math.abs(actions.getBoundingClientRect().bottom - bubble.getBoundingClientRect().bottom),
+    ).toBeLessThanOrEqual(2);
   },
 };
 
@@ -1247,7 +1254,7 @@ export const ComparisonTableInChat: Story = {
 export const ImageGenerationUnavailableWithClaude: Story = {
   name: "Image generation unavailable with Claude",
   args: {
-    bot: { ...STORY_BOTS[0], model: "claude-sonnet-5" },
+    agent: { ...STORY_AGENTS[0], model: "claude-sonnet-5" },
     messages: [],
   },
 };
@@ -1259,12 +1266,28 @@ export const Thinking: Story = {
       ...messages,
       {
         id: "thinking-1",
-        author: "bot",
+        author: "agent",
         body: "",
         time: "10:01",
         kind: "thinking",
         items: ["Read the project brief", "Compared the milestone owners", "Drafting the next action"],
         streaming: true,
+      },
+    ],
+  },
+};
+
+export const ThinkingSettled: Story = {
+  args: {
+    messages: [
+      ...messages,
+      {
+        id: "thinking-2",
+        author: "agent",
+        body: "",
+        time: "10:01",
+        kind: "thinking",
+        items: ["Read the project brief", "Compared the milestone owners", "Drafted the next action"],
       },
     ],
   },
@@ -1285,7 +1308,7 @@ export const BrowserTakeover: Story = {
         url: "https://example.com/login",
         loading: false,
         ownerThreadId: "thread-chief",
-        ownerBotId: "chief",
+        ownerAgentId: "chief",
       },
     ],
     activeBrowserTabId: "tab-login",
@@ -1385,7 +1408,7 @@ export const SevenQueuedMessages: Story = {
           {
             id,
             messageId: `${id}-message`,
-            recipientBotId: current.botId,
+            recipientAgentId: current.agentId,
             sender: { kind: "user" },
             text: body,
             attachments: [],
@@ -1503,7 +1526,7 @@ export const Empty: Story = {
   args: { messages: [], loaded: true, queue: undefined },
 };
 
-const actionMarkerMessages: RendererBotMessage[] = [
+const actionMarkerMessages: RendererAgentMessage[] = [
   {
     id: "spacing-user-1",
     author: "you",
@@ -1512,15 +1535,15 @@ const actionMarkerMessages: RendererBotMessage[] = [
     kind: "text",
   },
   {
-    id: "spacing-bot-1",
-    author: "bot",
+    id: "spacing-agent-1",
+    author: "agent",
     body: "Done. One claim still needs a primary source, so I invoked the daily source check.",
     time: "22:48",
     kind: "text",
   },
   {
     id: "spacing-routine-run",
-    author: "bot",
+    author: "agent",
     body: "Recheck open launch claims against the tracked sources and report only material changes.",
     time: "22:49",
     kind: "text",
@@ -1542,7 +1565,7 @@ const actionMarkerMessages: RendererBotMessage[] = [
   },
   {
     id: "spacing-marker-incoming",
-    author: "bot",
+    author: "agent",
     body: "",
     time: "22:49",
     kind: "exchange",
@@ -1550,8 +1573,8 @@ const actionMarkerMessages: RendererBotMessage[] = [
     exchange: {
       direction: "incoming",
       messageId: "spacing-marker-incoming",
-      senderBotId: "chief",
-      recipientBotIds: ["research"],
+      senderAgentId: "chief",
+      recipientAgentIds: ["research"],
       replyToMessageId: null,
       deliveries: [],
     },
@@ -1568,15 +1591,15 @@ const actionMarkerMessages: RendererBotMessage[] = [
   },
   {
     id: "spacing-marker-outgoing",
-    author: "bot",
+    author: "agent",
     body: "",
     time: "22:49",
     kind: "exchange",
     exchange: {
       direction: "outgoing",
       messageId: "spacing-marker-outgoing",
-      senderBotId: "chief",
-      recipientBotIds: ["research", "sales"],
+      senderAgentId: "chief",
+      recipientAgentIds: ["research", "sales"],
       replyToMessageId: null,
       deliveries: [],
     },
@@ -1596,7 +1619,7 @@ const actionMarkerMessages: RendererBotMessage[] = [
   },
   {
     id: "spacing-marker-lifecycle",
-    author: "bot",
+    author: "agent",
     body: "",
     time: "22:50",
     kind: "action-marker",
@@ -1612,7 +1635,7 @@ const actionMarkerMessages: RendererBotMessage[] = [
   },
   {
     id: "spacing-marker-site",
-    author: "bot",
+    author: "agent",
     body: "",
     time: "22:50",
     kind: "action-marker",
@@ -1631,7 +1654,7 @@ const actionMarkerMessages: RendererBotMessage[] = [
   },
   {
     id: "spacing-marker-unavailable",
-    author: "bot",
+    author: "agent",
     body: "",
     time: "22:50",
     kind: "action-marker",
@@ -1642,16 +1665,16 @@ const actionMarkerMessages: RendererBotMessage[] = [
     },
   },
   {
-    id: "spacing-bot-error",
-    author: "bot",
+    id: "spacing-agent-error",
+    author: "agent",
     body: "I could not reach the tracked source index.",
     time: "22:50",
     kind: "text",
     status: "Failed",
   },
   {
-    id: "spacing-bot-stream",
-    author: "bot",
+    id: "spacing-agent-stream",
+    author: "agent",
     body: "Publishing the summary now, then I will report the remaining open claim.",
     time: "22:51",
     kind: "text",

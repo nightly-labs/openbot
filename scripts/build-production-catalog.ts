@@ -3,10 +3,13 @@ import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, parse, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type BotAvatarHue, isAvatarHue, isSkillCategory, type SkillCategory } from "@openbot/contracts/ipc";
+import { type AvatarHue, isAvatarHue, isSkillCategory, type SkillCategory } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { unzipSync, zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
+
+const logger = createOpenBotLogger("build-production-catalog");
 
 const scriptRoot = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptRoot, "..");
@@ -33,7 +36,7 @@ interface AgentSpec {
   name: string;
   title: string;
   description: string;
-  avatarHue: BotAvatarHue;
+  avatarHue: AvatarHue;
   skills: string[];
 }
 
@@ -404,7 +407,7 @@ if (import.meta.main) {
   buildProductionCatalog(parseArguments(process.argv.slice(2)))
     .then((output) => process.stdout.write(`Built production marketplace artifacts at ${output}.\n`))
     .catch((error) => {
-      console.error(error instanceof Error ? error.message : "Production catalog generation failed.");
+      logger.error("Production catalog generation failed.", toLogValue(error));
       process.exitCode = 1;
     });
 }

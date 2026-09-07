@@ -1,7 +1,7 @@
 import { createSignal, onSettled } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { AgentActivityIndicator, ThinkingDisclosure } from "../src/components/conversation/AgentActivity";
-import { STORY_BOTS } from "./fixtures";
+import { AgentActivityIndicator, ThinkingDisclosure } from "../src/features/conversation/AgentActivity";
+import { STORY_AGENTS } from "./fixtures";
 
 const indicatorMeta = {
   title: "Conversation/AgentActivityIndicator",
@@ -14,21 +14,21 @@ type IndicatorStory = StoryObj<typeof indicatorMeta>;
 
 export const Working: IndicatorStory = {
   args: {
-    bot: STORY_BOTS[0],
+    agent: STORY_AGENTS[0],
     presentation: { animation: "orbit", label: "Connecting the dots…" },
   },
 };
 
 export const Playful: IndicatorStory = {
   args: {
-    bot: STORY_BOTS[1],
+    agent: STORY_AGENTS[1],
     presentation: { animation: "comet", label: "Tiny gears are turning…" },
   },
 };
 
 export const TransitionLoop: IndicatorStory = {
   args: {
-    bot: STORY_BOTS[0],
+    agent: STORY_AGENTS[0],
     presentation: { animation: "wide", label: "Putting the answer together…" },
   },
   render: (args) => {
@@ -44,23 +44,58 @@ export const TransitionLoop: IndicatorStory = {
   },
 };
 
-export const ThinkingDetails: IndicatorStory = {
+const THINKING_STEPS = [
+  "Summer demand spikes for stone-fruit flavors — peach and apricot lead.",
+  "I should check cone inventory before promoting a waffle-bowl special.",
+  "Joy Cone ships in two days, so the special can start on Friday.",
+];
+
+/* Streaming: the header shimmers while the answer is still coming. */
+export const ThinkingLive: IndicatorStory = {
   args: {
-    bot: STORY_BOTS[0],
+    agent: STORY_AGENTS[0],
     presentation: { animation: "thinking", label: "Thinking it through…" },
   },
   render: () => {
-    const [open, setOpen] = createSignal(false);
+    const [open, setOpen] = createSignal<boolean | undefined>(undefined);
+    return (
+      <ThinkingDisclosure
+        message={{
+          id: "thinking-live",
+          author: "agent",
+          body: "",
+          time: "10:00",
+          kind: "thinking",
+          streaming: true,
+          items: THINKING_STEPS,
+        }}
+        working={true}
+        open={open()}
+        onOpenChange={setOpen}
+      />
+    );
+  },
+};
+
+/* Settled: the trace collapses and reopens on demand. */
+export const ThinkingDetails: IndicatorStory = {
+  args: {
+    agent: STORY_AGENTS[0],
+    presentation: { animation: "thinking", label: "Thinking it through…" },
+  },
+  render: () => {
+    const [open, setOpen] = createSignal<boolean | undefined>(undefined);
     return (
       <ThinkingDisclosure
         message={{
           id: "thinking-story",
-          author: "bot",
+          author: "agent",
           body: "",
           time: "10:00",
           kind: "thinking",
-          items: ["Read the brief", "Compared owners", "Drafted next steps"],
+          items: THINKING_STEPS,
         }}
+        working={false}
         open={open()}
         onOpenChange={setOpen}
       />

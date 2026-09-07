@@ -14,6 +14,53 @@ afterEach(async () => {
 });
 
 describe("CentralAuthManager", () => {
+  it("accepts a private-LAN Signal URL for local Mobile Connect development", async () => {
+    const root = await createRoot();
+    const storagePath = join(root, "session.bin");
+    await writeFile(storagePath, "session-secret");
+    const serverId = "00000000-0000-4000-8000-000000000000";
+    let signalUrl = "ws://192.168.1.143:3101/v1/signal";
+    const manager = new CentralAuthManager({
+      apiUrl: "http://127.0.0.1:3100",
+      storagePath,
+      encrypt: (value) => Buffer.from(value),
+      decrypt: (value) => value.toString(),
+      fetch: vi.fn(async (input: string | URL | Request) => {
+        const path = new URL(input.toString()).pathname;
+        if (path === "/v1/me") {
+          return Response.json({ id: "user-1", email: "person@example.com", name: null, avatarUrl: null });
+        }
+        if (path === "/v2/remote/hosts/register") {
+          return Response.json({
+            hostId: serverId,
+            name: "Studio",
+            membershipId: "membership-1",
+            authEpoch: 1,
+            machineToken: "machine-token-1234567890abcdefghijklmnop",
+          });
+        }
+        return Response.json({
+          ticket: "remote-ticket",
+          expiresAt: Date.now() + 60_000,
+          signalUrl,
+        });
+      }),
+    });
+
+    await manager.initialize();
+    await manager.registerRemoteHost({
+      hostId: serverId,
+      name: "Studio",
+      ownerMembershipId: "membership-1",
+    });
+
+    await expect(manager.issueRemoteHostTicket(serverId)).resolves.toMatchObject({
+      signalUrl: "ws://192.168.1.143:3101/v1/signal",
+    });
+    signalUrl = "ws://signal.example.com/v1/signal";
+    await expect(manager.issueRemoteHostTicket(serverId)).rejects.toThrow("Invalid Remote Signal URL.");
+  });
+
   it("requests an email code, verifies it, and restores an encrypted session", async () => {
     const root = await createRoot();
     const storagePath = join(root, "session.bin");
@@ -51,6 +98,19 @@ describe("CentralAuthManager", () => {
         });
       }
       if (url.pathname === "/v1/mobile-auth/devices" && init?.method === "GET") {
+        if (url.searchParams.get("includeDesktop") === "true")
+          return Response.json({
+            sessions: [
+              {
+                sessionId: "11111111-1111-4111-8111-111111111111",
+                name: "Desktop",
+                kind: "desktop",
+                current: false,
+                connectedAt: 1000,
+                lastActiveAt: 2000,
+              },
+            ],
+          });
         return Response.json({
           devices: [
             {
@@ -96,9 +156,9 @@ describe("CentralAuthManager", () => {
     expect(await manager.redeemTeamAuthTicket("one-time-ticket", serverId)).toMatchObject({
       email: "person@example.com",
     });
-    expect(await manager.createMobileConnect()).toMatchObject({
+    expect(await manager.createMobileConnect({ hostId: serverId, fingerprint: "a".repeat(43) })).toMatchObject({
       qrData: expect.stringMatching(
-        /^openbot:\/\/mobile-connect\?api=http%3A%2F%2F192\.168\.1\.143%3A3100&ticket=mobile-ticket_1234567890abcdefghijklmnop$/u,
+        /^openbot:\/\/mobile-connect\?api=http%3A%2F%2F192\.168\.1\.143%3A3100&ticket=mobile-ticket_1234567890abcdefghijklmnop&host=00000000-0000-4000-8000-000000000000&fingerprint=a{43}$/u,
       ),
     });
     expect(await manager.listMobileConnectedDevices()).toEqual([
@@ -111,6 +171,23 @@ describe("CentralAuthManager", () => {
       },
     ]);
     await manager.revokeMobileConnectedDevice("11111111-1111-4111-8111-111111111111");
+    expect(await manager.listAccountSessions()).toEqual([
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        name: "Desktop",
+        kind: "desktop",
+        current: false,
+        connectedAt: 1000,
+        lastActiveAt: 2000,
+      },
+    ]);
+    await manager.revokeAccountSession("11111111-1111-4111-8111-111111111111");
+    const [revokeUrl, revokeOptions] = fetchMock.mock.calls.at(-1) ?? [];
+    expect(revokeUrl?.toString()).toBe(
+      "http://127.0.0.1:3100/v1/mobile-auth/devices/11111111-1111-4111-8111-111111111111?includeDesktop=true",
+    );
+    expect(revokeOptions?.method).toBe("DELETE");
+    expect(new Headers(revokeOptions?.headers).get("Authorization")).toBe("Bearer session-secret");
     await manager.sendTeamInviteEmail({
       email: "alice@example.com",
       serverName: "Studio Mac",
@@ -141,7 +218,7 @@ describe("CentralAuthManager", () => {
       path: "/v1/mobile-auth/devices/11111111-1111-4111-8111-111111111111",
       authorization: "Bearer session-secret",
     });
-    expect(requests[8]).toMatchObject({
+    expect(requests.at(-1)).toMatchObject({
       path: "/v1/team-invitations/email",
       authorization: "Bearer session-secret",
     });
@@ -693,6 +770,124 @@ describe("CentralAuthManager", () => {
       user: { avatarUrl: null },
     });
     expect(requests.at(-1)?.method).toBe("DELETE");
+  });
+
+  it("does not file a host credential under the account that signed in while it was issued", async () => {
+    const root = await createRoot();
+    const storagePath = join(root, "session.bin");
+    let releaseRegistration: () => void = () => undefined;
+    const registrationHeld = new Promise<void>((resolve) => {
+      releaseRegistration = resolve;
+    });
+    let registrationStarted: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => {
+      registrationStarted = resolve;
+    });
+    let verifications = 0;
+    const manager = new CentralAuthManager({
+      apiUrl: "https://api.openbot.run",
+      storagePath,
+      encrypt: (value) => Buffer.from(value),
+      decrypt: (value) => value.toString(),
+      fetch: vi.fn(async (input: string | URL | Request) => {
+        const url = new URL(input.toString());
+        if (url.pathname.endsWith("/start")) {
+          return Response.json({ challengeId: "challenge-1", expiresAt: 10_000 });
+        }
+        if (url.pathname.endsWith("/verify")) {
+          verifications += 1;
+          return Response.json({
+            sessionToken: verifications === 1 ? "session-one" : "session-two",
+            user: {
+              id: `user-${verifications}`,
+              email: `person${verifications}@example.com`,
+              name: null,
+              avatarUrl: null,
+            },
+          });
+        }
+        registrationStarted();
+        await registrationHeld;
+        return Response.json({
+          hostId: "8f1c1f2e-1d9a-4a1a-9d1e-2f7c6b5a4d3c",
+          name: "Studio Mac",
+          membershipId: "member-1",
+          authEpoch: 1,
+          machineToken: "machine-token-for-the-first-account-0001",
+        });
+      }),
+    });
+    await manager.requestEmailCode("person1@example.com");
+    await manager.verifyEmailCode("challenge-1", "ABCD-EFGH");
+
+    const pending = manager.registerRemoteHost({
+      hostId: "8f1c1f2e-1d9a-4a1a-9d1e-2f7c6b5a4d3c",
+      name: "Studio Mac",
+      ownerMembershipId: "member-1",
+    });
+    // Attach the rejection handler before the switch, so settling it raises no unhandled error.
+    const settled = pending.catch(() => undefined);
+    await started;
+    await manager.requestEmailCode("person2@example.com");
+    await manager.verifyEmailCode("challenge-1", "ABCD-EFGH");
+    releaseRegistration();
+    await settled;
+
+    await expect(pending).rejects.toThrow("signed-in account changed");
+    const stored = await readFile(storagePath, "utf8");
+    expect(Buffer.from(stored, "base64").toString()).not.toContain("machine-token-for-the-first-account");
+  });
+
+  it("does not keep one account's host credential beside the next account's session", async () => {
+    const root = await createRoot();
+    const storagePath = join(root, "session.bin");
+    let verifications = 0;
+    const manager = new CentralAuthManager({
+      apiUrl: "https://api.openbot.run",
+      storagePath,
+      encrypt: (value) => Buffer.from(value),
+      decrypt: (value) => value.toString(),
+      fetch: vi.fn(async (input: string | URL | Request) => {
+        const url = new URL(input.toString());
+        if (url.pathname.endsWith("/start")) {
+          return Response.json({ challengeId: "challenge-1", expiresAt: 10_000 });
+        }
+        if (url.pathname.endsWith("/verify")) {
+          verifications += 1;
+          return Response.json({
+            sessionToken: verifications === 1 ? "session-one" : "session-two",
+            user: {
+              id: `user-${verifications}`,
+              email: `person${verifications}@example.com`,
+              name: null,
+              avatarUrl: null,
+            },
+          });
+        }
+        return Response.json({
+          hostId: "8f1c1f2e-1d9a-4a1a-9d1e-2f7c6b5a4d3c",
+          name: "Studio Mac",
+          membershipId: "member-1",
+          authEpoch: 1,
+          machineToken: "machine-token-for-the-first-account-0001",
+        });
+      }),
+    });
+    await manager.requestEmailCode("person1@example.com");
+    await manager.verifyEmailCode("challenge-1", "ABCD-EFGH");
+    await manager.registerRemoteHost({
+      hostId: "8f1c1f2e-1d9a-4a1a-9d1e-2f7c6b5a4d3c",
+      name: "Studio Mac",
+      ownerMembershipId: "member-1",
+    });
+
+    // Signing in as somebody else without signing out first.
+    await manager.requestEmailCode("person2@example.com");
+    await manager.verifyEmailCode("challenge-1", "ABCD-EFGH");
+
+    const stored = Buffer.from(await readFile(storagePath, "utf8"), "base64").toString();
+    expect(stored).toContain("session-two");
+    expect(stored).not.toContain("machine-token-for-the-first-account");
   });
 
   it("updates the signed-in account name", async () => {

@@ -11,6 +11,7 @@ import type {
   BrowserControlState,
   BrowserEnvironment,
   BrowserImageMode,
+  BrowserJsonValue,
   BrowserNavigationDirection,
   BrowserPreview,
   BrowserSnapshot,
@@ -20,6 +21,7 @@ import type {
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import {
   app,
   BrowserWindow,
@@ -35,7 +37,17 @@ import { BrowserDiagnostics } from "./browser-diagnostics";
 import { embeddedBrowserUserAgent, embeddedBrowserUserAgentForUrl } from "./browser-identity";
 import { BrowserRecorder } from "./browser-recorder";
 import { isCloseBrowserTabShortcut, isGlobalSearchShortcut, isToggleDevToolsShortcut } from "./browser-shortcuts";
-import { persistentBrowserUrl } from "./browser-state";
+import {
+  type BrowserTabOwner,
+  defaultBrowserEnvironment,
+  isPersistableBrowserUrl,
+  isSafeViewportSize,
+  MAX_PHYSICAL_VIEWPORT_PIXELS,
+  persistentBrowserUrl,
+  reownStoredBrowserTab,
+  type StoredBrowserTab,
+  storedBrowserTab,
+} from "./browser-state";
 import { browserTargetSchema, parseBrowserToolArguments } from "./browser-tools";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
@@ -54,7 +66,6 @@ interface BrowserDynamicToolHooks {
 
 type KeepQueueBlocked = (promise: Promise<unknown>) => void;
 
-const MAX_PHYSICAL_VIEWPORT_PIXELS = 8_388_608;
 const MAX_ENCODED_CAPTURE_PIXELS = 4_194_304;
 const ACTION_POST_DISPATCH_TIMEOUT_MS = 10_000;
 
@@ -64,12 +75,14 @@ interface BrowserConsoleMessageDetails {
   sourceId: string;
 }
 
+const logger = createOpenBotLogger("browser-host");
+
 interface InternalTab {
   id: string;
   view: WebContentsView;
   requestedUrl: string;
   ownerThreadId: string | null;
-  ownerBotId: string | null;
+  ownerAgentId: string | null;
   revision: number;
   queue: Promise<unknown>;
   focusOnVisible: boolean;
@@ -79,27 +92,14 @@ interface InternalTab {
   recording: boolean;
 }
 
-interface StoredBrowserStateV1 {
-  version: 1;
-  activeTabId: string | null;
-  tabs: Array<{
-    id: string;
-    url: string;
-    ownerThreadId: string | null;
-    ownerBotId: string | null;
-  }>;
-}
-
+/**
+ * The file is always rewritten as v2. A v1 file is still read -- `storedBrowserTab` accepts both owner
+ * spellings, and a tab that arrives without an environment is given the default rather than dropped.
+ */
 interface StoredBrowserStateV2 {
   version: 2;
   activeTabId: string | null;
-  tabs: Array<{
-    id: string;
-    url: string;
-    ownerThreadId: string | null;
-    ownerBotId: string | null;
-    environment: BrowserEnvironment;
-  }>;
+  tabs: Array<StoredBrowserTab & { environment: BrowserEnvironment }>;
 }
 
 type BrowserAction =
@@ -110,8 +110,6 @@ type BrowserAction =
   | { type: "back" }
   | { type: "forward" }
   | { type: "reload" };
-
-export { BROWSER_DYNAMIC_TOOLS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 
 export class BrowserHost {
   static readonly CONTROL_IDLE_GRACE_MS = 1_200;
@@ -171,22 +169,30 @@ export class BrowserHost {
     this.#configureSession();
   }
 
-  async restore(): Promise<void> {
+  /**
+   * `agents` is the roster as it stands after the migrations have run, and is what points a tab a
+   * pre-rename build wrote at the agent that owns it now. Without it the owner and thread ids in the file
+   * name an agent that no longer answers to them, and every tool call against the tab is refused.
+   */
+  async restore(agents: readonly BrowserTabOwner[] = []): Promise<void> {
     const state = await readBrowserState(this.#statePath);
     if (state.tabs.length === 0) return;
 
-    const tabs = state.tabs.slice(0, INPUT_LIMITS.browserTabs).map((stored) => {
-      const tab = this.#createTab(
-        stored.id,
-        stored.url,
-        stored.ownerThreadId,
-        stored.ownerBotId,
-        "environment" in stored ? stored.environment : defaultBrowserEnvironment(),
-      );
-      this.#tabs.set(tab.id, tab);
-      this.#bindTabEvents(tab);
-      return tab;
-    });
+    const tabs = state.tabs
+      .slice(0, INPUT_LIMITS.browserTabs)
+      .map((tab) => reownStoredBrowserTab(tab, agents))
+      .map((stored) => {
+        const tab = this.#createTab(
+          stored.id,
+          stored.url,
+          stored.ownerThreadId,
+          stored.ownerAgentId,
+          stored.environment,
+        );
+        this.#tabs.set(tab.id, tab);
+        this.#bindTabEvents(tab);
+        return tab;
+      });
     this.#activeTabId = this.#tabs.has(state.activeTabId ?? "") ? state.activeTabId : (tabs[0]?.id ?? null);
     this.#syncAttachedView();
     this.#emitChanged();
@@ -283,7 +289,7 @@ export class BrowserHost {
   async open(
     url: string,
     ownerThreadId: string | null = null,
-    ownerBotId: string | null = null,
+    ownerAgentId: string | null = null,
     focus = false,
   ): Promise<BrowserTab> {
     if (this.#tabs.size >= INPUT_LIMITS.browserTabs) {
@@ -295,7 +301,7 @@ export class BrowserHost {
       focusedContents && ![...this.#tabs.values()].some((candidate) => candidate.view.webContents === focusedContents)
         ? focusedContents
         : null;
-    const tab = this.#createTab(randomUUID(), normalizedUrl, ownerThreadId, ownerBotId);
+    const tab = this.#createTab(randomUUID(), normalizedUrl, ownerThreadId, ownerAgentId);
 
     this.#tabs.set(tab.id, tab);
     this.#bindTabEvents(tab);
@@ -529,7 +535,7 @@ export class BrowserHost {
       switch (params.tool) {
         case "open": {
           const url = requiredString(args, "url", INPUT_LIMITS.browserUrl);
-          const tab = await this.open(url, params.threadId, params.ownerBotId ?? null);
+          const tab = await this.open(url, params.threadId, params.ownerAgentId ?? null);
           this.#updateControlTab(params, tab.id);
           return textResult({ tab });
         }
@@ -854,6 +860,12 @@ export class BrowserHost {
           await this.close(tabId);
           return textResult({ closed: true });
         }
+        case "request_takeover":
+          // Published in BROWSER_TOOL_DEFINITIONS like every other tool, but answered by the agent
+          // service, which intercepts the namespace before the call reaches a host. Reaching here
+          // means a caller bypassed that, and silently succeeding would tell the model the user had
+          // been asked for control when nobody was.
+          throw new Error("Browser takeover is handled by the agent service, not the browser host.");
         default:
           throw new Error(`Unknown browser tool: ${params.tool}`);
       }
@@ -923,8 +935,8 @@ export class BrowserHost {
     id: string,
     requestedUrl: string,
     ownerThreadId: string | null,
-    ownerBotId: string | null,
-    environment = defaultBrowserEnvironment(),
+    ownerAgentId: string | null,
+    environment: BrowserEnvironment = defaultBrowserEnvironment(),
   ): InternalTab {
     if (this.#destroyPromise) throw new Error("BrowserHost is shutting down.");
     const view = this.#createView();
@@ -936,7 +948,7 @@ export class BrowserHost {
       view,
       requestedUrl,
       ownerThreadId,
-      ownerBotId,
+      ownerAgentId,
       revision: 0,
       queue: Promise.resolve(),
       focusOnVisible: false,
@@ -1112,7 +1124,7 @@ export class BrowserHost {
       contents.setUserAgent(embeddedBrowserUserAgentForUrl(this.#session.getUserAgent(), event.url));
     });
     contents.setWindowOpenHandler(({ url }) => {
-      if (isAllowedMainUrl(url)) void this.open(url, tab.ownerThreadId, tab.ownerBotId);
+      if (isAllowedMainUrl(url)) void this.open(url, tab.ownerThreadId, tab.ownerAgentId);
       return { action: "deny" };
     });
   }
@@ -1264,7 +1276,12 @@ export class BrowserHost {
     return result;
   }
 
-  async #runEvaluation(tabId: string, expression: string, awaitPromise: boolean, timeoutMs: number): Promise<unknown> {
+  async #runEvaluation(
+    tabId: string,
+    expression: string,
+    awaitPromise: boolean,
+    timeoutMs: number,
+  ): Promise<BrowserJsonValue> {
     const tab = this.#requireTab(tabId);
     const started = tab.queue.then(() => {
       const deadline = Date.now() + timeoutMs;
@@ -1397,7 +1414,7 @@ export class BrowserHost {
   #canUseToolTab(params: DynamicToolCallParams, tab: BrowserTab): boolean {
     return (
       tab.ownerThreadId === params.threadId &&
-      (tab.ownerBotId === null || tab.ownerBotId === (params.ownerBotId ?? null))
+      (tab.ownerAgentId === null || tab.ownerAgentId === (params.ownerAgentId ?? null))
     );
   }
 
@@ -1480,7 +1497,7 @@ export class BrowserHost {
 
   #schedulePersist(): void {
     void this.#persistState().catch((error) => {
-      console.error("Unable to persist browser tabs:", error);
+      logger.error("Unable to persist browser tabs:", toLogValue(error));
     });
   }
 
@@ -1492,7 +1509,7 @@ export class BrowserHost {
         id: tab.id,
         url: persistentBrowserUrl(currentTabUrl(tab)),
         ownerThreadId: tab.ownerThreadId,
-        ownerBotId: tab.ownerBotId,
+        ownerAgentId: tab.ownerAgentId,
         environment: tab.environment,
       })),
     };
@@ -1671,14 +1688,16 @@ async function readBrowserState(path: string): Promise<StoredBrowserStateV2> {
       return { version: 2, activeTabId: null, tabs: [] };
     }
     const tabs = Array.isArray(parsed.tabs)
-      ? parsed.tabs.filter(isStoredBrowserTab).map((tab) => ({
-          ...tab,
-          url: persistentBrowserUrl(tab.url),
-          environment:
-            parsed.version === 2 && isBrowserEnvironment(tab.environment)
-              ? tab.environment
-              : defaultBrowserEnvironment(),
-        }))
+      ? parsed.tabs
+          .map(storedBrowserTab)
+          .filter((tab) => tab !== null)
+          .map((tab) => ({
+            ...tab,
+            url: persistentBrowserUrl(tab.url),
+            // A v1 file never wrote an environment, so anything sitting under that key in one is not
+            // ours to trust -- the tab starts from the default instead.
+            environment: (parsed.version === 2 ? tab.environment : undefined) ?? defaultBrowserEnvironment(),
+          }))
       : [];
     return {
       version: 2,
@@ -1693,44 +1712,12 @@ async function readBrowserState(path: string): Promise<StoredBrowserStateV2> {
   }
 }
 
-function isStoredBrowserTab(value: unknown): value is StoredBrowserStateV1["tabs"][number] & { environment?: unknown } {
-  if (
-    !isRecord(value) ||
-    !isString(value.id) ||
-    !value.id ||
-    value.id.length > INPUT_LIMITS.identifier ||
-    !isString(value.url) ||
-    value.url.length > INPUT_LIMITS.browserUrl
-  ) {
-    return false;
-  }
-  if (
-    value.ownerThreadId !== null &&
-    (!isString(value.ownerThreadId) || value.ownerThreadId.length > INPUT_LIMITS.identifier)
-  ) {
-    return false;
-  }
-  if (value.ownerBotId !== null && (!isString(value.ownerBotId) || value.ownerBotId.length > INPUT_LIMITS.identifier)) {
-    return false;
-  }
-  return isPersistableBrowserUrl(value.url);
-}
-
 function isMissingFile(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function isAllowedMainUrl(value: string): boolean {
   return value === "about:blank" || isPersistableBrowserUrl(value);
-}
-
-function isPersistableBrowserUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
 }
 
 function diagnosticUrl(value: string): string | undefined {
@@ -1774,7 +1761,7 @@ function toPublicTab(tab: InternalTab): BrowserTab {
     url: currentTabUrl(tab),
     loading: tab.view.webContents.isLoading(),
     ownerThreadId: tab.ownerThreadId,
-    ownerBotId: tab.ownerBotId,
+    ownerAgentId: tab.ownerAgentId,
     environment,
     recording: tab.recording,
     diagnosticErrorCount: tab.diagnostics.errorCount,
@@ -1805,40 +1792,6 @@ function readConsoleMessage(args: unknown[]): BrowserConsoleMessageDetails | nul
     message,
     sourceId: isString(sourceId) ? sourceId : "",
   };
-}
-
-function defaultBrowserEnvironment(): BrowserEnvironment {
-  return {
-    viewport: { mode: "fill", width: 1200, height: 800, deviceScaleFactor: 1, preset: null },
-    colorScheme: "system",
-    reducedMotion: false,
-  };
-}
-
-function isBrowserEnvironment(value: unknown): value is BrowserEnvironment {
-  if (!isRecord(value) || !isRecord(value.viewport)) return false;
-  const viewport = value.viewport;
-  const minimumWidth = viewport.mode === "fill" ? 1 : 320;
-  const minimumHeight = viewport.mode === "fill" ? 1 : 240;
-  return (
-    (viewport.mode === "fill" || viewport.mode === "custom") &&
-    isNumber(viewport.width) &&
-    viewport.width >= minimumWidth &&
-    viewport.width <= INPUT_LIMITS.browserDimension &&
-    isNumber(viewport.height) &&
-    viewport.height >= minimumHeight &&
-    viewport.height <= INPUT_LIMITS.browserDimension &&
-    isNumber(viewport.deviceScaleFactor) &&
-    viewport.deviceScaleFactor >= 0.5 &&
-    viewport.deviceScaleFactor <= 4 &&
-    isSafeViewportSize(viewport.width, viewport.height, viewport.deviceScaleFactor) &&
-    (viewport.preset === null ||
-      viewport.preset === "desktop" ||
-      viewport.preset === "tablet" ||
-      viewport.preset === "mobile") &&
-    (value.colorScheme === "light" || value.colorScheme === "dark" || value.colorScheme === "system") &&
-    isBoolean(value.reducedMotion)
-  );
 }
 
 function parseEnvironment(
@@ -1899,10 +1852,6 @@ function parseEnvironment(
     colorScheme: optionalEnum(value, "colorScheme", ["light", "dark", "system"] as const) ?? current.colorScheme,
     reducedMotion: value.reducedMotion === undefined ? current.reducedMotion : requiredBoolean(value, "reducedMotion"),
   };
-}
-
-function isSafeViewportSize(width: number, height: number, deviceScaleFactor: number): boolean {
-  return width * height * deviceScaleFactor * deviceScaleFactor <= MAX_PHYSICAL_VIEWPORT_PIXELS;
 }
 
 function boundedCaptureDataUrl(image: NativeImage): string {

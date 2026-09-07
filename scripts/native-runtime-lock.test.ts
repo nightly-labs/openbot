@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { parseAgentRuntimeLock } from "./agent-runtime-lock";
 import {
   createRemoteDesktopInputDigest,
   createRemoteDesktopReleaseTag,
@@ -8,6 +9,7 @@ import {
   loadNativeRuntimeLock,
   parseNativeRuntimeLock,
 } from "./native-runtime-lock";
+import { pinRuntimeLockDocument } from "./pin-remote-desktop-runtime";
 
 describe("native runtime lock", () => {
   it("loads pinned native dependencies", async () => {
@@ -55,6 +57,22 @@ describe("native runtime lock", () => {
     expect(() => parseNativeRuntimeLock(value)).toThrow("input digest does not match");
   });
 
+  it("keeps the provider runtimes a remote desktop pin does not own", async () => {
+    // Two schemas share this one file, and each drops the other's sections when it parses. A pin
+    // that writes back what it parsed takes the provider CLI pins with it -- assets, digests and
+    // licence hashes that `src/main/provider-runtime-manager.ts` needs to bundle Codex, Claude and
+    // Grok -- and the release it produces installs a desktop app with no agents in it.
+    const source = await readFile(resolve("native-runtime.lock.json"), "utf8");
+    const release = await releaseLockValue();
+
+    const pinned = JSON.parse(pinRuntimeLockDocument(source, release.remoteDesktop));
+
+    const agents = parseAgentRuntimeLock(pinned);
+    expect(agents).toEqual(parseAgentRuntimeLock(JSON.parse(source)));
+    expect(pinned.remoteDesktop.artifactRelease.tag).toBe(release.remoteDesktop.artifactRelease.tag);
+    expect(pinned.remoteDesktop.sunshine).toEqual(JSON.parse(source).remoteDesktop.sunshine);
+  });
+
   it("keeps the embedded runtime on WebRTC without audio or WebSocket media", async () => {
     const patch = await readFile(
       resolve("vendor/remote-desktop/patches/moonlight-web-stream-v2.10.0-openbot.patch"),
@@ -95,7 +113,7 @@ async function releaseLockValue() {
         repository: "NorbertBodziony/openbot",
         tag: createRemoteDesktopReleaseTag(digest),
         inputDigest: digest,
-        manifestAsset: "remote-desktop-runtime-manifest.json",
+        manifestAsset: "remote-desktop-runtime-manifest.json" as const,
         manifestSha256: "a".repeat(64),
       },
       releaseArtifacts: {

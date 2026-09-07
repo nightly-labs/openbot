@@ -1,21 +1,14 @@
-import type {
-  BotSummary,
-  ConversationMessage,
-  ConversationReadState,
-  QueueDeliveryStatus,
-} from "@openbot/contracts/ipc";
+import type { AgentSummary, ConversationMessage, QueueDeliveryStatus } from "@openbot/contracts/ipc";
 import {
   hostedSiteConversationEvent,
-  isHostedSiteConversationEventMarker,
-  isRoutineRunConversationEventMarker,
-  ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   routineConversationEvent,
   routineRunConversationEvent,
 } from "@openbot/contracts/ipc";
-import { cleanAgentMessageText } from "./agent-message-text";
-import type { AgentDeliveryMarkerStatus, BotMessage, BotProfile, ChatActionMarkerModel } from "./data";
+import type { AgentDeliveryMarkerStatus, AgentMessage, AgentProfile, ChatActionMarkerModel } from "./data";
+import { cleanAgentMessageText } from "./features/agents/agent-message-text";
+import { isRoutineEventItem } from "./features/conversation/conversation-read-state";
 
-export function toBotProfile(stored: BotSummary): BotProfile {
+export function toAgentProfile(stored: AgentSummary): AgentProfile {
   return {
     id: stored.id,
     name: stored.name,
@@ -36,8 +29,8 @@ export function toBotProfile(stored: BotSummary): BotProfile {
   };
 }
 
-export function toBotMessage(message: ConversationMessage, ownerAgentId?: string): BotMessage {
-  const exchangeSenderId = message.senderBotId ?? message.exchange?.senderBotId;
+export function toAgentMessage(message: ConversationMessage, ownerAgentId?: string): AgentMessage {
+  const exchangeSenderId = message.senderAgentId ?? message.exchange?.senderAgentId;
   const routineEvent = routineConversationEvent(message);
   const routineRunEvent = routineRunConversationEvent(message);
   const hostedSiteEvent = hostedSiteConversationEvent(message);
@@ -45,14 +38,14 @@ export function toBotMessage(message: ConversationMessage, ownerAgentId?: string
   return {
     id: message.id,
     turnId: message.turnId,
-    author: message.author === "user" ? "you" : "bot",
+    author: message.author === "user" ? "you" : "agent",
     body: message.author === "user" ? message.text : cleanAgentMessageText(message.text),
     time: formatTime(message.createdAt),
     createdAt: message.createdAt,
     streaming: message.status === "streaming",
     itemType: message.itemType,
     kind: message.questionPrompt ? "question" : actionMarker ? "action-marker" : "text",
-    senderBotId: exchangeSenderId,
+    senderAgentId: exchangeSenderId,
     replyToMessageId: message.replyToMessageId,
     attachments: message.attachments,
     imageGeneration: message.imageGeneration,
@@ -78,15 +71,15 @@ export function toBotMessage(message: ConversationMessage, ownerAgentId?: string
   };
 }
 
-export function toBotMessages(messages: ConversationMessage[], ownerAgentId?: string): BotMessage[] {
-  const result: BotMessage[] = [];
-  const thinkingByTurn = new Map<string, BotMessage>();
+export function toAgentMessages(messages: ConversationMessage[], ownerAgentId?: string): AgentMessage[] {
+  const result: AgentMessage[] = [];
+  const thinkingByTurn = new Map<string, AgentMessage>();
   for (const message of messages) {
     if ((message.delivery?.status === "queued" || message.delivery?.status === "cancelled") && !message.routine) {
       continue;
     }
     if (message.author !== "assistant" || message.itemType !== "commentary") {
-      result.push(toBotMessage(message, ownerAgentId));
+      result.push(toAgentMessage(message, ownerAgentId));
       continue;
     }
 
@@ -94,23 +87,25 @@ export function toBotMessages(messages: ConversationMessage[], ownerAgentId?: st
     const existing = thinkingByTurn.get(key);
     if (existing) {
       const text = cleanAgentMessageText(message.text);
-      if (text.trim()) existing.items = [...(existing.items ?? []), text];
+      existing.items = [...(existing.items ?? []), text];
+      existing.itemIds = [...(existing.itemIds ?? []), message.id];
       existing.streaming = existing.streaming || message.status === "streaming";
       continue;
     }
 
     const text = cleanAgentMessageText(message.text);
-    const thinking: BotMessage = {
+    const thinking: AgentMessage = {
       id: `thinking:${key}`,
       turnId: message.turnId,
-      author: "bot",
+      author: "agent",
       body: "",
       time: formatTime(message.createdAt),
       createdAt: message.createdAt,
       streaming: message.status === "streaming",
       itemType: "commentary",
       kind: "thinking",
-      items: text.trim() ? [text] : [],
+      items: [text],
+      itemIds: [message.id],
     };
     thinkingByTurn.set(key, thinking);
     result.push(thinking);
@@ -118,32 +113,7 @@ export function toBotMessages(messages: ConversationMessage[], ownerAgentId?: st
   return result;
 }
 
-export function readStateForMessages(
-  state: ConversationReadState,
-  messages: ConversationMessage[],
-): ConversationReadState {
-  const throughIndex = state.throughMessageId
-    ? messages.findIndex((message) => message.id === state.throughMessageId)
-    : -1;
-  const unread = messages
-    .slice(throughIndex + 1)
-    .filter(
-      (message) =>
-        message.author !== "user" &&
-        message.itemType !== "commentary" &&
-        message.itemType !== "agent_attachment" &&
-        !message.itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX) &&
-        !isRoutineRunConversationEventMarker(message.itemType) &&
-        !isHostedSiteConversationEventMarker(message.itemType),
-    );
-  return {
-    ...state,
-    unreadCount: unread.length,
-    firstUnreadMessageId: unread[0]?.id ?? null,
-  };
-}
-
-export function botProfilesEqual(left: BotProfile, right: BotProfile): boolean {
+export function agentProfilesEqual(left: AgentProfile, right: AgentProfile): boolean {
   return (
     left.id === right.id &&
     left.name === right.name &&
@@ -165,12 +135,12 @@ export function botProfilesEqual(left: BotProfile, right: BotProfile): boolean {
 }
 
 function marketplaceSourcesEqual(
-  left: BotProfile["marketplaceSource"],
-  right: BotProfile["marketplaceSource"],
+  left: AgentProfile["marketplaceSource"],
+  right: AgentProfile["marketplaceSource"],
 ): boolean {
   if (!left || !right) return left === right;
   return (
-    left.agentId === right.agentId &&
+    left.listingId === right.listingId &&
     left.versionId === right.versionId &&
     left.version === right.version &&
     stringArraysEqual(left.skillIds, right.skillIds) &&
@@ -182,7 +152,7 @@ function stringArraysEqual(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-export function botMessagesEqual(left: BotMessage, right: BotMessage): boolean {
+export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boolean {
   return (
     left.id === right.id &&
     left.turnId === right.turnId &&
@@ -193,7 +163,7 @@ export function botMessagesEqual(left: BotMessage, right: BotMessage): boolean {
     left.streaming === right.streaming &&
     left.itemType === right.itemType &&
     left.status === right.status &&
-    left.senderBotId === right.senderBotId &&
+    left.senderAgentId === right.senderAgentId &&
     left.replyToMessageId === right.replyToMessageId &&
     left.reaction === right.reaction &&
     JSON.stringify(left.reactions) === JSON.stringify(right.reactions) &&
@@ -203,7 +173,8 @@ export function botMessagesEqual(left: BotMessage, right: BotMessage): boolean {
     JSON.stringify(left.exchange) === JSON.stringify(right.exchange) &&
     JSON.stringify(left.routine) === JSON.stringify(right.routine) &&
     JSON.stringify(left.actionMarker) === JSON.stringify(right.actionMarker) &&
-    JSON.stringify(left.items) === JSON.stringify(right.items)
+    JSON.stringify(left.items) === JSON.stringify(right.items) &&
+    JSON.stringify(left.itemIds) === JSON.stringify(right.itemIds)
   );
 }
 
@@ -216,7 +187,7 @@ function chatActionMarker(
 ): ChatActionMarkerModel | null {
   if (message.exchange) {
     const targetDeliveries = message.exchange.deliveries.map((delivery) => ({
-      agentId: delivery.recipientBotId,
+      agentId: delivery.recipientAgentId,
       status: delivery.status,
     }));
     const status =
@@ -226,7 +197,7 @@ function chatActionMarker(
     return {
       kind: "agent-message",
       direction: message.exchange.direction,
-      sourceAgentId: message.exchange.senderBotId,
+      sourceAgentId: message.exchange.senderAgentId,
       targetDeliveries,
       status,
       timestamp: message.createdAt,
@@ -281,11 +252,7 @@ function chatActionMarker(
       timestamp: message.createdAt,
     };
   }
-  if (
-    message.itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX) ||
-    isRoutineRunConversationEventMarker(message.itemType) ||
-    isHostedSiteConversationEventMarker(message.itemType)
-  ) {
+  if (isRoutineEventItem(message)) {
     return { kind: "unavailable", label: "Action unavailable", timestamp: message.createdAt };
   }
   return null;
@@ -312,7 +279,7 @@ function deliveryStatus(status: QueueDeliveryStatus | undefined): Exclude<AgentD
   return status;
 }
 
-export function retainThinkingMessages(previous: BotMessage[], next: BotMessage[]): BotMessage[] {
+export function retainThinkingMessages(previous: AgentMessage[], next: AgentMessage[]): AgentMessage[] {
   const result = [...next];
   const nextIds = new Set(result.map((message) => message.id));
   for (const thinking of previous) {
@@ -320,7 +287,7 @@ export function retainThinkingMessages(previous: BotMessage[], next: BotMessage[
     const sameTurnIndexes = result.flatMap((message, index) => (message.turnId === thinking.turnId ? [index] : []));
     if (sameTurnIndexes.length === 0) continue;
     const finalAnswerIndex = result.findIndex(
-      (message) => message.turnId === thinking.turnId && message.author === "bot" && message.kind !== "thinking",
+      (message) => message.turnId === thinking.turnId && message.author === "agent" && message.kind !== "thinking",
     );
     const insertionIndex = finalAnswerIndex >= 0 ? finalAnswerIndex : (sameTurnIndexes.at(-1) ?? result.length - 1) + 1;
     result.splice(insertionIndex, 0, { ...thinking, streaming: false });
@@ -329,9 +296,9 @@ export function retainThinkingMessages(previous: BotMessage[], next: BotMessage[
   return result;
 }
 
-export function withoutBot<T>(values: Record<string, T>, botId: string): Record<string, T> {
+export function withoutAgent<T>(values: Record<string, T>, agentId: string): Record<string, T> {
   const next = { ...values };
-  delete next[botId];
+  delete next[agentId];
   return next;
 }
 

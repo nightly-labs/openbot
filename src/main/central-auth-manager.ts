@@ -10,8 +10,19 @@ import type {
   MobileConnectedDevice,
   MobileConnectTicket,
 } from "@openbot/contracts/ipc";
-import { createMobileConnectUrl } from "@openbot/contracts/mobile-connect";
+import { createMobileConnectUrl, type MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
+import {
+  decodeRemoteSession,
+  decodeRemoteSessionTicket,
+  type RemoteSession,
+  type RemoteSessionTicket,
+} from "@openbot/contracts/remote-control-plane";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import {
+  REMOTE_TICKET_AUDIENCE,
+  type RemoteMemberRole,
+  type RemoteTicketClaims,
+} from "@openbot/contracts/signal-protocol/ticket";
 import { createLocalJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
 
@@ -78,22 +89,20 @@ export interface RegisteredRemoteHost {
   machineToken: string | null;
 }
 
-export interface RemoteConnectionBootstrap {
-  ticket: string;
-  expiresAt: number;
-  signalUrl: string;
-}
+// The account API answers the same shape for a host credential and for a member session, so both
+// paths below decode it with the one function in `@openbot/contracts/remote-control-plane`.
+export type RemoteConnectionBootstrap = RemoteSessionTicket;
 
-export interface VerifiedRemoteSessionTicket {
-  sessionId: string;
-  hostId: string;
-  userId: string;
-  membershipId: string;
-  role: "owner" | "admin" | "member";
-  authEpoch: number;
-  sessionExpiresAt: number;
+// The claims this host reads off a client's ticket, derived from the contract the account API mints
+// against. `clientPublicKey` is optional there because a host ticket carries none; a client that
+// reached this check without one is rejected below, so it is required here.
+export type VerifiedRemoteSessionTicket = Pick<
+  RemoteTicketClaims,
+  "sessionId" | "hostId" | "userId" | "membershipId" | "authEpoch" | "sessionExpiresAt"
+> & {
+  role: RemoteMemberRole;
   clientPublicKey: string;
-}
+};
 
 export interface RemoteHostSummary {
   hostId: string;
@@ -139,6 +148,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   #state: CentralAuthState = { status: "loading" };
   #sessionToken: string | null = null;
   readonly #teamHostTokens = new Map<string, string>();
+  #sessionWriteChain: Promise<void> = Promise.resolve();
+  /** The account the stored host credentials were issued to, or none while signed out. */
+  #sessionAccountId: string | null = null;
   #remoteTicketJwks: Promise<z.infer<typeof remoteTicketJwksSchema>> | null = null;
   #initializationPromise: Promise<CentralAuthState> | null = null;
   #emailCodeRequest: EmailCodeRequest | null = null;
@@ -207,13 +219,21 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     return result.ticket;
   }
 
-  async createMobileConnect(): Promise<MobileConnectTicket> {
-    const result = await this.#authorizedRequest("/v1/mobile-auth/ticket", { method: "POST" }, decodeTicketResponse);
+  async createMobileConnect(host: MobileConnectHostBinding): Promise<MobileConnectTicket> {
+    const result = await this.#authorizedRequest(
+      "/v1/mobile-auth/ticket",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ host }),
+      },
+      decodeTicketResponse,
+    );
     if (!result.ticket || !Number.isFinite(result.expiresAt) || result.expiresAt <= Date.now()) {
       throw new Error("The account service returned an invalid Mobile Connect ticket.");
     }
     return {
-      qrData: createMobileConnectUrl({ apiUrl: this.#options.mobileConnectApiUrl, ticket: result.ticket }),
+      qrData: createMobileConnectUrl({ apiUrl: this.#options.mobileConnectApiUrl, ticket: result.ticket, host }),
       expiresAt: result.expiresAt,
     };
   }
@@ -225,6 +245,37 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       decodeMobileConnectedDevices,
     );
     return result.devices;
+  }
+
+  async listAccountSessions() {
+    const result = await this.#authorizedRequest(
+      "/v1/mobile-auth/devices?includeDesktop=true",
+      { method: "GET" },
+      (value) =>
+        z
+          .object({
+            sessions: z.array(
+              z.object({
+                sessionId: z.string().uuid(),
+                name: z.string(),
+                kind: z.enum(["desktop", "mobile"]),
+                current: z.boolean(),
+                connectedAt: z.number().finite(),
+                lastActiveAt: z.number().finite(),
+              }),
+            ),
+          })
+          .parse(value),
+    );
+    return result.sessions;
+  }
+
+  async revokeAccountSession(sessionId: string): Promise<void> {
+    await this.#authorizedRequest(
+      `/v1/mobile-auth/devices/${encodeURIComponent(sessionId)}?includeDesktop=true`,
+      { method: "DELETE" },
+      () => undefined,
+    );
   }
 
   async revokeMobileConnectedDevice(sessionId: string): Promise<void> {
@@ -241,6 +292,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     ownerMembershipId: string;
     devicePublicKey?: string | null;
   }): Promise<RegisteredRemoteHost> {
+    const sessionToken = this.#sessionToken;
     const storedMachineToken = this.#teamHostTokens.get(input.hostId.toLowerCase());
     const result = await this.#authorizedRequest(
       "/v2/remote/hosts/register",
@@ -255,6 +307,12 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       },
       decodeRegisteredRemoteHost,
     );
+    if (this.#sessionToken !== sessionToken) {
+      // The credential belongs to the account that asked for it. Writing it now would file
+      // it under whichever session is stored next, so the caller is told the registration
+      // no longer applies instead.
+      throw new Error("The signed-in account changed while this server was being registered.");
+    }
     if (result.machineToken) this.#teamHostTokens.set(input.hostId.toLowerCase(), result.machineToken);
     await this.#writeStoredSession();
     return result;
@@ -266,11 +324,11 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     return this.#request(
       `/v2/remote/hosts/${encodeURIComponent(hostId)}/ticket`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
-      decodeRemoteConnectionBootstrap,
+      decodeRemoteSessionTicket,
     );
   }
 
-  async startRemoteSession(hostId: string): Promise<{ sessionId: string; hostId: string; expiresAt: number }> {
+  async startRemoteSession(hostId: string): Promise<RemoteSession> {
     return this.#authorizedRequest(
       "/v2/remote/sessions/",
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hostId }) },
@@ -290,7 +348,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clientPublicKey }),
       },
-      decodeRemoteConnectionBootstrap,
+      decodeRemoteSessionTicket,
     );
   }
 
@@ -299,7 +357,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       if (!this.#remoteTicketJwks) this.#remoteTicketJwks = this.#fetchRemoteTicketJwks();
       const jwks = await this.#remoteTicketJwks;
       return jwtVerify(ticket, createLocalJWKSet(jwks), {
-        audience: "openbot-remote",
+        audience: REMOTE_TICKET_AUDIENCE,
         algorithms: ["ES256"],
       });
     };
@@ -630,6 +688,11 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         },
         decodeSessionResponse,
       );
+      // Signing in as somebody else without signing out first. The host credentials belong
+      // to the account that was issued them, and must not be filed under this session.
+      if (this.#sessionAccountId !== null && this.#sessionAccountId !== session.user.id) {
+        this.#teamHostTokens.clear();
+      }
       this.#sessionToken = session.sessionToken;
       await this.#writeStoredSession();
       return this.#setState({
@@ -779,7 +842,17 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     };
   }
 
-  async #writeStoredSession(): Promise<void> {
+  #writeStoredSession(): Promise<void> {
+    // Serialized: two writes racing inside their filesystem awaits would let the earlier
+    // one rename its snapshot over the later one, restoring a session the user has left.
+    this.#sessionWriteChain = this.#sessionWriteChain.then(
+      () => this.#writeStoredSessionNow(),
+      () => this.#writeStoredSessionNow(),
+    );
+    return this.#sessionWriteChain;
+  }
+
+  async #writeStoredSessionNow(): Promise<void> {
     if (!this.#sessionToken) return;
     if (!this.#options.canPersist()) {
       await rm(this.#options.storagePath, { force: true });
@@ -806,8 +879,15 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   async #clearStoredSession(): Promise<void> {
     this.#sessionToken = null;
+    this.#sessionAccountId = null;
     this.#teamHostTokens.clear();
-    await rm(this.#options.storagePath, { force: true });
+    // Through the same chain as the writes, so a write already in flight cannot put the
+    // file back after it is removed.
+    this.#sessionWriteChain = this.#sessionWriteChain.then(
+      () => rm(this.#options.storagePath, { force: true }),
+      () => rm(this.#options.storagePath, { force: true }),
+    );
+    await this.#sessionWriteChain;
   }
 
   #restoreStoredSession(value: string): void {
@@ -832,6 +912,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   }
 
   #setState(state: CentralAuthState): CentralAuthState {
+    // Held apart from the state, which passes through `code_sent` on the way to another
+    // account: this is whose credentials the store is holding, until they are cleared.
+    if (state.status === "signed_in") this.#sessionAccountId = state.user.id;
     this.#state = state;
     const copy = this.getState();
     this.emit("changed", copy);
@@ -1026,27 +1109,6 @@ function decodeRegisteredRemoteHost(value: unknown): RegisteredRemoteHost {
     membershipId: requiredString(record, "membershipId"),
     authEpoch: record.authEpoch,
     machineToken: record.machineToken === null ? null : requiredString(record, "machineToken"),
-  };
-}
-
-function decodeRemoteConnectionBootstrap(value: unknown): RemoteConnectionBootstrap {
-  const record = decodeRecord(value, "remote connection bootstrap");
-  if (!isNumber(record.expiresAt)) throw new Error("Invalid remote ticket expiration.");
-  const signalUrl = requiredString(record, "signalUrl");
-  const signal = new URL(signalUrl);
-  const loopback = signal.hostname === "127.0.0.1" || signal.hostname === "localhost";
-  if (signal.protocol !== "wss:" && !(signal.protocol === "ws:" && loopback))
-    throw new Error("Invalid Remote Signal URL.");
-  return { ticket: requiredString(record, "ticket"), expiresAt: record.expiresAt, signalUrl };
-}
-
-function decodeRemoteSession(value: unknown): { sessionId: string; hostId: string; expiresAt: number } {
-  const record = decodeRecord(value, "remote session");
-  if (!isNumber(record.expiresAt)) throw new Error("Invalid remote session expiration.");
-  return {
-    sessionId: requiredString(record, "sessionId"),
-    hostId: requiredString(record, "hostId"),
-    expiresAt: record.expiresAt,
   };
 }
 

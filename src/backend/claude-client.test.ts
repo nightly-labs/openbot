@@ -3,11 +3,12 @@
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ModelInfo, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { ModelInfo, SDKUserMessage, SessionMessage } from "@anthropic-ai/claude-agent-sdk";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClaudeAgentClient } from "./claude-client";
 import {
+  decodeAccountRateLimitsReadResult,
   decodeAccountReadResult,
   decodeModelListResponse,
   decodeRecordResponse,
@@ -26,7 +27,7 @@ type TestStreamMessage =
       event: {
         type: "content_block_delta";
         index: number;
-        delta: { type: "text_delta"; text: string };
+        delta: { type: "text_delta"; text: string } | { type: "thinking_delta"; thinking: string };
       };
     }
   | {
@@ -34,7 +35,23 @@ type TestStreamMessage =
       parent_tool_use_id: string | null;
       session_id: string;
       uuid: string;
-      message: { content: Array<{ type: "text"; text: string }> };
+      message: {
+        content: Array<{
+          type: string;
+          text?: string;
+          thinking?: string;
+          id?: string;
+          name?: string;
+          tool_use_id?: string;
+        }>;
+      };
+    }
+  | {
+      type: "user";
+      parent_tool_use_id: string | null;
+      session_id: string;
+      uuid: string;
+      message: { content: Array<{ type: "tool_result"; tool_use_id: string }> };
     }
   | {
       type: "result";
@@ -54,6 +71,108 @@ afterEach(async () => {
 });
 
 describe("ClaudeAgentClient", () => {
+  it("prefers the active model family weekly limit and falls back to the all-model limit", async () => {
+    const usage = {
+      rate_limits_available: true,
+      rate_limits: {
+        five_hour: { utilization: 12, resets_at: "2026-09-03T16:00:00Z" },
+        seven_day: { utilization: 34, resets_at: "2026-09-08T00:00:00Z" },
+        seven_day_sonnet: { utilization: 82, resets_at: "2026-09-09T00:00:00Z" },
+        model_scoped: [{ display_name: "haiku", utilization: 91, resets_at: "2026-09-03T16:00:00Z" }],
+      },
+    };
+    const client = new ClaudeAgentClient(
+      { executable: "/bin/true", version: "2.1.246" },
+      () => new TestQuery(new TestQueue<TestStreamMessage>(), [], usage),
+    );
+    client.start();
+
+    await expect(
+      client.request("account/rateLimits/read", { model: "claude-sonnet-4-6" }, decodeAccountRateLimitsReadResult),
+    ).resolves.toMatchObject({
+      rateLimits: {
+        primary: { usedPercent: 12, windowDurationMins: 300 },
+        secondary: { usedPercent: 82, windowDurationMins: 10_080 },
+      },
+    });
+    await expect(
+      client.request("account/rateLimits/read", { model: "claude-haiku-4-5" }, decodeAccountRateLimitsReadResult),
+    ).resolves.toMatchObject({
+      rateLimits: { secondary: { usedPercent: 34, windowDurationMins: 10_080 } },
+    });
+    await client.stop();
+  });
+
+  it("times out usage discovery and closes its query", async () => {
+    const query = new TestQuery(new TestQueue<TestStreamMessage>(), [], new Promise<unknown>(() => undefined));
+    const client = new ClaudeAgentClient({ executable: "/bin/true", version: "2.1.246" }, () => query, undefined, 10);
+    client.start();
+
+    await expect(
+      client.request("account/rateLimits/read", { model: "claude-sonnet-4-6" }, decodeAccountRateLimitsReadResult),
+    ).rejects.toThrow("Claude request timed out: account/rateLimits/read");
+    expect(query.closed).toBe(true);
+    await client.stop();
+  });
+
+  it("restores one stable reasoning item for a multi-phase turn", async () => {
+    const turnId = "8bf58506-96a8-4d96-837c-3ab807b79d1f";
+    const history: SessionMessage[] = [
+      {
+        type: "user",
+        uuid: turnId,
+        session_id: "thread-1",
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: "Plan it" },
+      },
+      {
+        type: "assistant",
+        uuid: "phase-1",
+        session_id: "thread-1",
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: [{ type: "thinking", thinking: "Check the inputs." }] },
+      },
+      {
+        type: "assistant",
+        uuid: "phase-2",
+        session_id: "thread-1",
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: [{ type: "thinking", thinking: "Compare the options." }] },
+      },
+      {
+        type: "assistant",
+        uuid: "answer",
+        session_id: "thread-1",
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: [{ type: "text", text: "Use option A." }] },
+      },
+    ];
+    const client = new ClaudeAgentClient(
+      { executable: "/bin/true", version: "2.1.231" },
+      undefined,
+      async () => history,
+    );
+    client.start();
+
+    const result = await client.request("thread/read", { threadId: "thread-1" }, decodeThreadResponse);
+
+    expect(result.thread.turns?.[0]?.items).toEqual([
+      expect.objectContaining({ type: "userMessage" }),
+      {
+        id: `${turnId}:reasoning`,
+        type: "agentMessage",
+        phase: "commentary",
+        text: "Check the inputs.\nCompare the options.",
+      },
+      { id: "answer", type: "agentMessage", text: "Use option A." },
+    ]);
+    await client.stop();
+  });
+
   it("streams a Claude SDK turn through the App Server event contract", async () => {
     root = await mkdtemp(join(tmpdir(), "openbot-claude-client-"));
     const sharedRoot = join(root, "shared");
@@ -154,6 +273,15 @@ fi
       event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Hi" } },
     });
     output.push({
+      type: "stream_event",
+      parent_tool_use_id: null,
+      session_id: thread.thread.id,
+      uuid: deliveryId,
+      event: { type: "content_block_delta", index: 1, delta: { type: "thinking_delta", thinking: "Weighing it" } },
+    });
+    output.push(toolUseMessage(thread.thread.id, "tool-message", "tool-use-1", "WebSearch"));
+    output.push(toolResultMessage(thread.thread.id, "tool-result", "tool-use-1"));
+    output.push({
       type: "result",
       subtype: "success",
       result: "Hi",
@@ -172,11 +300,77 @@ fi
           params: expect.objectContaining({ turnId: deliveryId, delta: "Hi" }),
         }),
         expect.objectContaining({
+          method: "item/started",
+          params: expect.objectContaining({
+            turnId: deliveryId,
+            item: { id: "tool-use-1", type: "toolCall", name: "WebSearch", status: "in_progress" },
+          }),
+        }),
+        expect.objectContaining({
+          method: "item/completed",
+          params: expect.objectContaining({
+            turnId: deliveryId,
+            item: { id: "tool-use-1", type: "toolCall", name: "WebSearch", status: "completed" },
+          }),
+        }),
+        // Extended thinking rides its own item: the `commentary` phase is what routes it to the
+        // thinking disclosure instead of the answer bubble.
+        expect.objectContaining({
+          method: "item/started",
+          params: expect.objectContaining({
+            turnId: deliveryId,
+            item: { id: `${deliveryId}:reasoning`, type: "agentMessage", phase: "commentary" },
+          }),
+        }),
+        expect.objectContaining({
+          method: "item/agentMessage/delta",
+          params: expect.objectContaining({ itemId: `${deliveryId}:reasoning`, delta: "Weighing it" }),
+        }),
+        expect.objectContaining({
+          method: "item/completed",
+          params: expect.objectContaining({
+            turnId: deliveryId,
+            item: {
+              id: `${deliveryId}:reasoning`,
+              type: "agentMessage",
+              phase: "commentary",
+              text: "Weighing it",
+            },
+          }),
+        }),
+        expect.objectContaining({
           method: "turn/completed",
           params: expect.objectContaining({ turn: { id: deliveryId, status: "completed" } }),
         }),
       ]),
     );
+    await client.stop();
+  });
+
+  it("separates streamed reasoning phases the same way as restored history", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "99999999-9999-4999-8999-999999999999";
+    await startTurn(client, threadId, turnId);
+
+    output.push(thinkingStreamDelta(threadId, "phase-1", "Check the inputs."));
+    output.push(thinkingMessage(threadId, "phase-1", "Check the inputs."));
+    output.push(thinkingStreamDelta(threadId, "phase-2", "Compare the options."));
+    output.push(thinkingMessage(threadId, "phase-2", "Compare the options."));
+    output.push(resultMessage(threadId, turnId, ""));
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+
+    const reasoningItemId = `${turnId}:reasoning`;
+    const streamed = notifications
+      .filter((event) => event.method === "item/agentMessage/delta")
+      .filter((event) => getString(event.params, "itemId") === reasoningItemId)
+      .map((event) => getString(event.params, "delta") ?? "")
+      .join("");
+    const completed = notifications.find(
+      (event) =>
+        event.method === "item/completed" && getString(getRecord(event.params, "item"), "id") === reasoningItemId,
+    );
+    expect(streamed).toBe("Check the inputs.\nCompare the options.");
+    expect(getString(getRecord(completed?.params, "item"), "text")).toBe(streamed);
     await client.stop();
   });
 
@@ -596,6 +790,26 @@ function streamDelta(threadId: string, turnId: string, text: string): TestStream
   };
 }
 
+function thinkingStreamDelta(threadId: string, messageId: string, thinking: string): TestStreamMessage {
+  return {
+    type: "stream_event",
+    parent_tool_use_id: null,
+    session_id: threadId,
+    uuid: messageId,
+    event: { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking } },
+  };
+}
+
+function thinkingMessage(threadId: string, messageId: string, thinking: string): TestStreamMessage {
+  return {
+    type: "assistant",
+    parent_tool_use_id: null,
+    session_id: threadId,
+    uuid: messageId,
+    message: { content: [{ type: "thinking", thinking }] },
+  };
+}
+
 function assistantMessage(
   threadId: string,
   messageId: string,
@@ -608,6 +822,26 @@ function assistantMessage(
     session_id: threadId,
     uuid: messageId,
     message: { content: [{ type: "text", text }] },
+  };
+}
+
+function toolUseMessage(threadId: string, messageId: string, toolUseId: string, name: string): TestStreamMessage {
+  return {
+    type: "assistant",
+    parent_tool_use_id: null,
+    session_id: threadId,
+    uuid: messageId,
+    message: { content: [{ type: "tool_use", id: toolUseId, name }] },
+  };
+}
+
+function toolResultMessage(threadId: string, messageId: string, toolUseId: string): TestStreamMessage {
+  return {
+    type: "user",
+    parent_tool_use_id: null,
+    session_id: threadId,
+    uuid: messageId,
+    message: { content: [{ type: "tool_result", tool_use_id: toolUseId }] },
   };
 }
 
@@ -673,6 +907,7 @@ class TestQuery implements AsyncIterable<TestStreamMessage> {
   constructor(
     private readonly output: TestQueue<TestStreamMessage>,
     private readonly supportedModelList: ModelInfo[] | Promise<ModelInfo[]> = [],
+    private readonly usageResult: unknown = null,
   ) {}
 
   [Symbol.asyncIterator](): AsyncIterator<TestStreamMessage> {
@@ -685,6 +920,10 @@ class TestQuery implements AsyncIterable<TestStreamMessage> {
 
   async supportedModels(): Promise<ModelInfo[]> {
     return this.supportedModelList;
+  }
+
+  async usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET(): Promise<unknown> {
+    return this.usageResult;
   }
 
   async setModel(model?: string): Promise<void> {
@@ -704,10 +943,7 @@ class TestQuery implements AsyncIterable<TestStreamMessage> {
 }
 
 async function waitFor(check: () => boolean): Promise<void> {
-  const deadline = Date.now() + 1_000;
-  while (Date.now() < deadline) {
-    if (check()) return;
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
-  throw new Error("Timed out waiting for Claude adapter events.");
+  await vi.waitFor(() => {
+    if (!check()) throw new Error("Timed out waiting for Claude adapter events.");
+  });
 }

@@ -4,7 +4,7 @@ export interface BrowserTab {
   url: string;
   loading: boolean;
   ownerThreadId: string | null;
-  ownerBotId: string | null;
+  ownerAgentId: string | null;
   /** Browser Automation V2 metadata. Optional to keep Team API protocol v1 wire-compatible. */
   environment?: BrowserEnvironment;
   recording?: boolean;
@@ -88,6 +88,16 @@ export interface BrowserRecordingArtifact {
   stoppedReason: "requested" | "duration-limit" | "size-limit" | "tab-closed" | "error";
 }
 
+/**
+ * A JSON value produced by a browser evaluation. The engine round-trips every result through
+ * `JSON.stringify` before returning it, so this is the widest shape a caller can observe.
+ */
+export type BrowserJsonValue = string | number | boolean | null | BrowserJsonValue[] | BrowserJsonObject;
+
+export interface BrowserJsonObject {
+  [key: string]: BrowserJsonValue;
+}
+
 export interface BrowserPreview {
   dataUrl: string;
   width: number;
@@ -164,7 +174,7 @@ export type BrowserPictureInPictureEvent =
 export interface BrowserOpenInput {
   url: string;
   ownerThreadId?: string | null;
-  ownerBotId?: string | null;
+  ownerAgentId?: string | null;
   focus?: boolean;
 }
 

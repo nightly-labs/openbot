@@ -12,7 +12,6 @@ const ACCOUNT_NAME_UNSAFE_CHARACTER_PATTERN = /[\p{Cc}\p{Cs}\p{Zl}\p{Zp}]/u;
 const ACCOUNT_NAME_FORMAT_CHARACTER_PATTERN = /\p{Cf}/u;
 const ACCOUNT_NAME_ALLOWED_FORMAT_CHARACTERS = new Set(["\u200c", "\u200d"]);
 const ACCOUNT_NAME_JOINER_NEIGHBOR_PATTERN = /[\p{L}\p{M}\p{N}\p{S}]/u;
-const ACCOUNT_NAME_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 export type ProfileNameValidationError = "required" | "unsafe" | "too-short" | "too-long";
 
@@ -48,13 +47,18 @@ export function hasUnsafeAccountNameCharacters(value: string): boolean {
 export function validateProfileName(value: string): ProfileNameValidationResult {
   const name = normalizeAccountName(value);
   if (hasUnsafeAccountNameCharacters(value)) return { name, error: "unsafe" };
-  const length = [...ACCOUNT_NAME_SEGMENTER.segment(name)].length;
+  const length = countVisibleCharacters(name);
   if (length === 0) return { name, error: "required" };
   if (length < INPUT_LIMITS.profileNameMin) return { name, error: "too-short" };
   if (length > INPUT_LIMITS.profileName || name.length > INPUT_LIMITS.accountName) {
     return { name, error: "too-long" };
   }
   return { name, error: null };
+}
+
+function countVisibleCharacters(value: string): number {
+  if (!Intl.Segmenter) return [...value].length;
+  return [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(value)].length;
 }
 
 export function isValidHostname(value: string, requireDot = true): boolean {
@@ -118,4 +122,25 @@ function isValidTeamHostSlug(value: string | undefined): boolean {
       !value.includes("--") &&
       DOMAIN_LABEL_PATTERN.test(value),
   );
+}
+
+/**
+ * The directory name a pre-rename build gave this agent, or the id unchanged when no pre-rename build could
+ * have minted it.
+ *
+ * The UUID suffix is what makes this reversible, and it is the whole safety argument. Only the app mints
+ * `agent-<uuid>`, so only such an id is guaranteed to have been `bot-<uuid>` before migration v13. An id a
+ * user or an imported `bots.json` chose is an ordinary word: `agent-research` translated to `bot-research`
+ * names a directory that may well belong to a *different* agent, and callers here delete directories
+ * recursively.
+ */
+export function legacyAgentId(agentId: string): string {
+  if (!agentId.startsWith("agent-") || !isGeneratedAgentId(agentId)) return agentId;
+  return `bot-${agentId.slice("agent-".length)}`;
+}
+
+/** Whether this id is one the app minted for itself, in either the pre- or post-rename spelling. */
+export function isGeneratedAgentId(agentId: string): boolean {
+  const prefix = agentId.startsWith("agent-") ? "agent-" : agentId.startsWith("bot-") ? "bot-" : null;
+  return prefix !== null && isUuidV4(agentId.slice(prefix.length));
 }

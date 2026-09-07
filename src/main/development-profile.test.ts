@@ -3,6 +3,7 @@ import {
   developmentUserDataName,
   readDevelopmentInstanceId,
   readDevelopmentProfile,
+  readDevelopmentRemoteDebuggingPort,
   shouldAutoStartHost,
   shouldShowDevelopmentWindow,
 } from "./development-profile";
@@ -23,20 +24,35 @@ describe("development profile", () => {
     expect(developmentUserDataName("app", "5174")).toBe("OpenBot Dev 5174");
   });
 
-  it("republishes only when the configured instance was public on the previous launch", () => {
+  it("only accepts a remote-debugging port inside the range automation connects to", () => {
+    expect(readDevelopmentRemoteDebuggingPort("9333")).toBe("9333");
+    expect(readDevelopmentRemoteDebuggingPort(" 9333 ")).toBe("9333");
+    expect(readDevelopmentRemoteDebuggingPort("0000")).toBeNull();
+    expect(readDevelopmentRemoteDebuggingPort("99999")).toBeNull();
+    expect(readDevelopmentRemoteDebuggingPort("80")).toBeNull();
+    expect(readDevelopmentRemoteDebuggingPort(undefined)).toBeNull();
+  });
+
+  it.each([undefined, null, "host"] as const)("restores published hosting after restart for role %s", (remoteRole) => {
     expect(
       shouldAutoStartHost({
         configured: true,
         enabledOnLaunch: true,
+        remoteRole,
       }),
     ).toBe(true);
     expect(
       shouldAutoStartHost({
         configured: true,
         enabledOnLaunch: false,
+        remoteRole,
       }),
     ).toBe(false);
-    expect(shouldAutoStartHost({ configured: false, enabledOnLaunch: true })).toBe(false);
+    expect(shouldAutoStartHost({ configured: false, enabledOnLaunch: true, remoteRole })).toBe(false);
+  });
+
+  it("does not publish the development test client even with a saved hosting preference", () => {
+    expect(shouldAutoStartHost({ configured: true, enabledOnLaunch: true, remoteRole: "client" })).toBe(false);
   });
 
   it("hides the host window only in the two-client development harness", () => {

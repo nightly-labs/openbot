@@ -66,6 +66,33 @@ describe("RemoteScreenGateway", () => {
     await close();
   });
 
+  it("refuses a session the host may not record, instead of opening one that never shows a frame", async () => {
+    const gateway = createGateway({ screenCaptureDenied: () => true });
+
+    await expect(createSession(gateway, "https://remote.example")).rejects.toMatchObject({
+      status: 503,
+      code: "host_permissions_required",
+    });
+    expect(gateway.list()).toEqual([]);
+  });
+
+  // The other half of that refusal, and the reason it is not a dead end: the error tells the member
+  // to grant screen recording and try again, and Sunshine only reads that grant when it starts. The
+  // fake models the same thing -- a runtime is denied for its whole life, and granting shows up as
+  // the next one started.
+  it("opens the session a host allows after the refusal that asked it to", async () => {
+    let deniedAtStartup = true;
+    const gateway = createGateway({ screenCaptureDenied: () => deniedAtStartup });
+    await expect(createSession(gateway, "https://remote.example")).rejects.toMatchObject({
+      code: "host_permissions_required",
+    });
+
+    deniedAtStartup = false;
+
+    await createSession(gateway, "https://remote.example");
+    expect(gateway.list()).toHaveLength(1);
+  });
+
   it("limits the host to four active sessions", async () => {
     const gateway = createGateway();
     for (let index = 0; index < 4; index += 1) await createSession(gateway, "https://remote.example");
@@ -213,9 +240,9 @@ describe("RemoteScreenGateway", () => {
       client.send(JSON.stringify({ Init: { host_id: 12 + index, app_id: 1 } }));
     });
 
+    // Both Init frames are in flight together, so this only settles on a length of
+    // one while the gateway is holding the second back.
     await vi.waitFor(() => expect(upstreamMessages).toHaveLength(1));
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(upstreamMessages).toHaveLength(1);
     const firstSlot = Number(upstreamMessages[0]?.user.match(/(\d+)$/)?.[1]);
     const firstIndex = firstSlot - 1;
     const connected = await fetch(`${origin}/v1/remote-screen/sessions/${sessions[firstIndex]?.id}/viewer-state`, {
@@ -231,6 +258,7 @@ describe("RemoteScreenGateway", () => {
     });
     expect(connected.status).toBe(204);
     await vi.waitFor(() => expect(upstreamMessages).toHaveLength(2));
+    expect(new Set(upstreamMessages.map((message) => message.user)).size).toBe(2);
 
     clients.forEach((client) => {
       client.close();
@@ -284,7 +312,12 @@ describe("RemoteScreenGateway", () => {
 });
 
 function createGateway(
-  options: { now?: () => number; runtimeBaseUrl?: string; selectDisplay?: (displayId: string) => Promise<void> } = {},
+  options: {
+    now?: () => number;
+    runtimeBaseUrl?: string;
+    selectDisplay?: (displayId: string) => Promise<void>;
+    screenCaptureDenied?: () => boolean;
+  } = {},
 ): RemoteScreenGateway {
   return new RemoteScreenGateway({
     platform: "darwin",
@@ -296,7 +329,7 @@ function createGateway(
     getIceServers: async () => [{ urls: "stun:127.0.0.1:3478" }],
     ...(options.now ? { now: options.now } : {}),
     createRuntime: () => {
-      const runtime = new FakeRuntime(options.runtimeBaseUrl, options.selectDisplay);
+      const runtime = new FakeRuntime(options.runtimeBaseUrl, options.selectDisplay, options.screenCaptureDenied?.());
       runtimes.push(runtime);
       return runtime;
     },
@@ -325,7 +358,12 @@ class FakeRuntime implements RemoteScreenRuntime {
   constructor(
     private readonly baseUrl = "http://127.0.0.1:9",
     private readonly selectDisplayHandler?: (displayId: string) => Promise<void>,
+    private readonly denied = false,
   ) {}
+
+  screenCaptureDenied() {
+    return this.denied;
+  }
 
   async start() {
     return {

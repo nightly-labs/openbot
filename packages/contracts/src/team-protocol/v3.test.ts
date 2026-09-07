@@ -1,4 +1,10 @@
 import { describe, expect, it } from "vitest";
+import {
+  TEAM_AGENT_ACTIVITY_CAPABILITY,
+  TEAM_CURRENT_CAPABILITIES,
+  TEAM_EML_ATTACHMENTS_CAPABILITY,
+  TEAM_MODEL_SCOPED_USAGE_CAPABILITY,
+} from "./current";
 import requestFixture from "./fixtures/v3/client-http-request.json";
 import responseFixture from "./fixtures/v3/host-http-response.json";
 import {
@@ -14,22 +20,76 @@ import {
   encodeTeamProtocolV3CurrentHttpRequest,
   encodeTeamProtocolV3CurrentHttpResponse,
 } from "./v3-adapter";
-import { decodeTeamProtocolV3WebRtcHttpResponse, encodeTeamProtocolV3WebRtcHttpRequest } from "./v3-webrtc-adapter";
+import {
+  decodeTeamProtocolV3WebRtcHttpResponse,
+  encodeTeamProtocolV3WebRtcHttpRequest,
+  encodeTeamProtocolV3WebRtcHttpResponse,
+} from "./v3-webrtc-adapter";
 
 const duplicatePath = "/v1/agents/bot-source/duplicate";
+/**
+ * The wire fixture stays byte-identical; only its current-shaped twin moves. The wire says `bot`, in-app
+ * that is `agent`. `marketplaceSource.agentId` runs the other way: on the wire it names a marketplace
+ * listing, which in-app is `listingId`. A current-facing decode must return both new spellings and a
+ * current-shaped encode must put both wire spellings back. This asymmetry is the evidence the vocabulary
+ * shim runs on the v3 duplicate route.
+ */
+const { bot, ...responseRest } = responseFixture;
+const currentResponseFixture = {
+  ...responseRest,
+  agent: {
+    ...bot,
+    marketplaceSource: {
+      listingId: bot.marketplaceSource.agentId,
+      versionId: bot.marketplaceSource.versionId,
+      version: bot.marketplaceSource.version,
+      skillIds: bot.marketplaceSource.skillIds,
+      routineIds: bot.marketplaceSource.routineIds,
+    },
+  },
+};
+const scopedUsagePath = "/v1/agents/bot-source/usage";
 
 describe("Team protocol v3", () => {
+  it("adds explicit mark-unread without changing the frozen read operation", () => {
+    const path = "/v1/agents/bot-source/conversation/unread";
+    const state = { unreadCount: 2, firstUnreadMessageId: "first-reply", throughMessageId: null };
+    expect(TEAM_CURRENT_CAPABILITIES).toContain("conversation-unread");
+    expect(TEAM_PROTOCOL_V3_CAPABILITIES).not.toContain("conversation-unread");
+    expect(encodeTeamProtocolV3WebRtcHttpRequest("POST", path, {})).toEqual({});
+    expect(decodeTeamProtocolV3CurrentHttpRequest("POST", path, {})).toEqual({});
+    expect(JSON.parse(encodeTeamProtocolV3CurrentHttpResponse("POST", path, 200, state))).toEqual(state);
+    expect(decodeTeamProtocolV3WebRtcHttpResponse("POST", path, 200, state)).toEqual(state);
+    expect(() => encodeTeamProtocolV3WebRtcHttpRequest("POST", path, { memberId: "another-member" })).toThrow(
+      "Invalid conversation-unread request.",
+    );
+    expect(() => decodeTeamProtocolV1HttpRequest("POST", path, {})).toThrow();
+    expect(decodeTeamProtocolV1HttpRequest("POST", path.replace("unread", "read"), { throughMessageId: null })).toEqual(
+      { throughMessageId: null },
+    );
+  });
   it("keeps the duplicate request and response fixtures valid in both adapter directions", () => {
     expect(decodeTeamProtocolV3CurrentHttpRequest("POST", duplicatePath, requestFixture)).toEqual(requestFixture);
     expect(JSON.parse(encodeTeamProtocolV3CurrentHttpRequest("POST", duplicatePath, requestFixture))).toEqual(
       requestFixture,
     );
     expect(decodeTeamProtocolV3CurrentHttpResponse("POST", duplicatePath, 201, responseFixture)).toEqual(
-      responseFixture,
+      currentResponseFixture,
     );
-    expect(JSON.parse(encodeTeamProtocolV3CurrentHttpResponse("POST", duplicatePath, 201, responseFixture))).toEqual(
-      responseFixture,
-    );
+    expect(
+      JSON.parse(encodeTeamProtocolV3CurrentHttpResponse("POST", duplicatePath, 201, currentResponseFixture)),
+    ).toEqual(responseFixture);
+    // Every other route delegates to the v1 adapter, and that branch has to come back current-shaped too:
+    // the handler reading this one says `ownerAgentId`, so the wire spelling would lose the tab's owner
+    // without anything throwing.
+    expect(
+      decodeTeamProtocolV3CurrentHttpRequest("POST", "/v1/browser/open", {
+        url: "https://example.com/",
+        ownerThreadId: "thread-1",
+        ownerBotId: "chief",
+        focus: true,
+      }),
+    ).toEqual({ url: "https://example.com/", ownerThreadId: "thread-1", ownerAgentId: "chief", focus: true });
   });
 
   it("requires a valid idempotency key for duplicate requests", () => {
@@ -49,13 +109,51 @@ describe("Team protocol v3", () => {
     expect(TEAM_PROTOCOL_V1_CAPABILITIES).toContain("hosted-site-event-markers");
     expect(TEAM_PROTOCOL_V3_CAPABILITIES).toContain("agent-duplication");
     expect(TEAM_PROTOCOL_V3_CAPABILITIES).toContain("hosted-site-event-markers");
+    expect(TEAM_PROTOCOL_V1_CAPABILITIES).not.toContain(TEAM_AGENT_ACTIVITY_CAPABILITY);
+    expect(TEAM_PROTOCOL_V3_CAPABILITIES).not.toContain(TEAM_AGENT_ACTIVITY_CAPABILITY);
+    expect(TEAM_CURRENT_CAPABILITIES).toContain(TEAM_AGENT_ACTIVITY_CAPABILITY);
+    expect(TEAM_PROTOCOL_V1_CAPABILITIES).not.toContain(TEAM_MODEL_SCOPED_USAGE_CAPABILITY);
+    expect(TEAM_PROTOCOL_V3_CAPABILITIES).not.toContain(TEAM_MODEL_SCOPED_USAGE_CAPABILITY);
+    expect(TEAM_CURRENT_CAPABILITIES).toContain(TEAM_MODEL_SCOPED_USAGE_CAPABILITY);
+    expect(TEAM_PROTOCOL_V1_CAPABILITIES).not.toContain(TEAM_EML_ATTACHMENTS_CAPABILITY);
+    expect(TEAM_PROTOCOL_V3_CAPABILITIES).not.toContain(TEAM_EML_ATTACHMENTS_CAPABILITY);
+    expect(TEAM_CURRENT_CAPABILITIES).toContain(TEAM_EML_ATTACHMENTS_CAPABILITY);
+  });
+
+  it("adds model-scoped usage only to the current adapter", () => {
+    const usage = {
+      limits: [
+        {
+          id: "claude",
+          primary: null,
+          secondary: { usedPercent: 37, windowDurationMins: 10_080, resetsAt: 1_788_825_600 },
+        },
+      ],
+    };
+    expect(decodeTeamProtocolV3CurrentHttpRequest("GET", scopedUsagePath, {})).toEqual({});
+    expect(JSON.parse(encodeTeamProtocolV3CurrentHttpResponse("GET", scopedUsagePath, 200, usage))).toEqual(usage);
+    expect(() => decodeTeamProtocolV1HttpRequest("GET", scopedUsagePath, {})).toThrow(
+      "Invalid Team protocol v1 HTTP request",
+    );
   });
 
   it("registers the v3 route on the WebRTC adapter", () => {
     expect(encodeTeamProtocolV3WebRtcHttpRequest("POST", duplicatePath, requestFixture)).toEqual(requestFixture);
     expect(decodeTeamProtocolV3WebRtcHttpResponse("POST", duplicatePath, 201, responseFixture)).toEqual(
+      currentResponseFixture,
+    );
+    // The direction the decode assertion above cannot see. What this peer sends has to leave in the frozen
+    // vocabulary: a response spelled `agent` is one the receiving peer's frozen codec rejects outright, and
+    // no already-shipped client would understand it either.
+    expect(encodeTeamProtocolV3WebRtcHttpResponse("POST", duplicatePath, 201, currentResponseFixture)).toEqual(
       responseFixture,
     );
+    expect(encodeTeamProtocolV3WebRtcHttpRequest("GET", scopedUsagePath, undefined)).toEqual({});
+    expect(
+      decodeTeamProtocolV3WebRtcHttpResponse("GET", scopedUsagePath, 200, {
+        limits: [{ id: "claude", primary: null, secondary: null }],
+      }),
+    ).toEqual({ limits: [{ id: "claude", primary: null, secondary: null }] });
   });
 
   it("reports both update directions when no common protocol exists", () => {

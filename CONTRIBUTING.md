@@ -1,7 +1,7 @@
 # Contributing to OpenBot
 
-Thanks for helping improve OpenBot. Small, focused pull requests with clear verification are the
-easiest to review.
+Thanks for helping improve OpenBot. Pull requests with clear verification are the easiest to
+review.
 
 ## Before opening an issue
 
@@ -28,16 +28,40 @@ The Biome configuration also loads the repository-owned GritQL rules in
 `tools/biome/anti-slop/rules`. Fix these findings at the domain boundary. Do not suppress a rule or
 replace a concrete contract with a broad dictionary type.
 
+Biome's `suspicious/noImportCycles` rejects circular imports across the whole repository, so runtime
+imports point in one direction. When two modules need each other, move the shared piece into a third
+module both can import — as `features/conversation/conversation-controller-context.tsx` does for the
+conversation controller, and `features/team/team-typing.ts` for the one IPC call two differently
+scoped owners both need.
+Type-only imports (`import type`) are erased by the compiler and stay allowed in both directions.
+
 ## Pull requests
 
 1. Create a branch from `main`.
-2. Keep behavior and visual changes scoped to the issue being solved.
-3. Add or update tests for behavior changes and reproduced bugs.
-4. Run `bun run check`.
-5. Describe user-visible changes, risks, and manual verification in the pull request.
+2. Add or update tests for behavior changes and reproduced bugs.
+3. Run `bun run check`. Coding agents do not: see `AGENTS.md` "CI owns the minutes-long suites".
+4. Describe user-visible changes, risks, and manual verification in the pull request.
 
 Do not commit generated `out`, `dist`, coverage, local browser profiles, Electron `userData`, CLI
 state, `.env` files, credentials, real conversations, or user attachments.
+
+### Answering the NorbiAI review
+
+Every push runs the automated reviewer and it blocks the merge on an unresolved P0 or P1 finding.
+Two ways past one:
+
+1. Fix it and push. The next review classifies the finding `[RESOLVED]`.
+2. Show it is wrong. Comment the concrete reason — the guard it misses, the line that already
+   handles it — and include `/norbiai review` anywhere in the same comment. The reviewer rechecks
+   that finding against your argument and marks it `[WITHDRAWN]`, which stops blocking and stays
+   recorded under `## Withdrawn Findings` so a later push does not raise it again.
+
+A rebuttal needs something checkable in it. "Intended", "out of scope", or a promise to fix it
+later leaves the finding `[REMAINS]`, and the reviewer says which part it could not verify. Only
+comments from someone who can merge the pull request are read — organization membership on its
+own is not enough — and only those written after the review being answered, plus the comment that
+asked for the recheck whatever its timestamp says. That one is passed to the reviewer whole; the
+older responses share a size budget and are dropped from the oldest end.
 
 ## Security-sensitive changes
 

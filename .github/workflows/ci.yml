@@ -29,17 +29,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-        with:
-          bun-version: 1.4.0
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+        uses: ./.github/actions/setup-bun
 
       - name: Check desktop application
         run: bun run check:desktop
 
   tests:
+    # ubuntu-latest gives 4 vCPUs and vitest uses 3 workers, so this job is
+    # CPU-bound at ~2 minutes. Splitting it across runners saved wall clock but
+    # paid for it with a checkout and an install per shard, so it runs as one.
     name: Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -48,15 +46,58 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        uses: ./.github/actions/setup-bun
         with:
-          bun-version: 1.4.0
+          install: ignore-scripts
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Run desktop tests
+        run: bun run test:desktop
 
-      - name: Run tests
-        run: bun run test
+      - name: Run site router tests
+        run: bun run test:sites
+
+      - name: Run remote API tests
+        run: bun run test:remote
+
+  surfaces:
+    # `desktop:typecheck` covers only the desktop projects, so without this job
+    # `apps/mobile`, `apps/site-router`, `packages/team-client` and `remote/api`
+    # first break at release time rather than on the pull request that broke
+    # them. Mobile's typecheck generates `expo-env.d.ts` and the uniwind
+    # declarations first - both are gitignored, so a fresh checkout cannot
+    # resolve `global.css`. `remote/api` is typechecked through the workspace's
+    # own script rather than through `remote:check`, so that the tests it also
+    # runs stay in the Tests job; its `include` reaches `../scripts/*.ts`, so the
+    # stack scripts come with it. `remote:check:compose` is the rest of
+    # `remote:check`: `docker compose config` interpolates client-side and never
+    # opens a socket, so it validates both Compose files on a runner with no
+    # daemon.
+    name: Surfaces
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Typecheck mobile
+        run: bun run mobile:typecheck
+
+      - name: Typecheck site router
+        run: bun run typecheck:sites
+
+      - name: Typecheck team client
+        run: bun run typecheck:team-client
+
+      - name: Typecheck remote API
+        run: bun run typecheck:remote
+
+      - name: Validate the remote Compose files
+        run: bun run remote:check:compose
 
   api:
     name: API
@@ -67,12 +108,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        uses: ./.github/actions/setup-bun
         with:
-          bun-version: 1.4.0
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
+          install: ignore-scripts
 
       - name: Check API
         run: bun run check:api
@@ -86,12 +124,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        uses: ./.github/actions/setup-bun
         with:
-          bun-version: 1.4.0
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
+          install: ignore-scripts
 
       - name: Build Storybook
         run: bun run build-storybook
@@ -110,12 +145,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-        with:
-          bun-version: 1.4.0
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+        uses: ./.github/actions/setup-bun
 
       - name: Build isolated preview
         run: bun run api:build
@@ -170,7 +200,11 @@ jobs:
   deploy-production:
     name: Deploy Cloudflare production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [check, tests, api, storybook]
+    # `surfaces` gates the deploy even though the Worker it ships lives in
+    # `apps/auth-api`, which `api` already covers: mobile, the site router, the
+    # team client and the remote stack all consume the account API, so a red
+    # Surfaces is the signal that this deploy is the thing about to break them.
+    needs: [check, tests, api, storybook, surfaces]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: cloudflare-production
@@ -181,12 +215,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-        with:
-          bun-version: 1.4.0
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+        uses: ./.github/actions/setup-bun
 
       - name: Build production Worker
         run: bun run api:build

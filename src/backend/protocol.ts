@@ -31,7 +31,7 @@ export interface DynamicToolCallParams {
   threadId: string;
   turnId: string;
   callId: string;
-  ownerBotId?: string | null;
+  ownerAgentId?: string | null;
   namespace: string | null;
   tool: string;
   arguments: unknown;
@@ -82,6 +82,8 @@ export interface AccountRateLimitWindowResult {
 
 export interface AccountRateLimitResult {
   limitId?: string | null;
+  limitName?: string | null;
+  normalModelSlug?: string | null;
   primary?: AccountRateLimitWindowResult | null;
   secondary?: AccountRateLimitWindowResult | null;
 }
@@ -127,6 +129,7 @@ export interface TurnResponse {
 export type ResponseDecoder<T> = (value: unknown) => T;
 
 export interface ModelListResponse {
+  nextCursor?: string;
   data: Array<{
     model?: string;
     displayName?: string;
@@ -138,7 +141,9 @@ export interface ModelListResponse {
 
 export function decodeModelListResponse(value: unknown): ModelListResponse {
   const data = getArray(value, "data");
+  const nextCursor = getString(value, "nextCursor");
   return {
+    ...(nextCursor ? { nextCursor } : {}),
     data: data.filter(isRecord).map((item) => ({
       ...(isString(item.model) ? { model: item.model } : {}),
       ...(isString(item.displayName) ? { displayName: item.displayName } : {}),
@@ -278,6 +283,8 @@ function decodeRateLimit(value: unknown): AccountRateLimitResult | null | undefi
   const record = requiredRecord(value, "rate limit");
   return {
     limitId: optionalString(record, "limitId"),
+    limitName: optionalString(record, "limitName"),
+    normalModelSlug: optionalString(record, "normalModelSlug"),
     primary: decodeRateLimitWindow(record.primary),
     secondary: decodeRateLimitWindow(record.secondary),
   };

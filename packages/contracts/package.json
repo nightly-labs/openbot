@@ -13,6 +13,12 @@
     "./ipc": "./src/ipc.ts",
     "./mobile-connect": "./src/mobile-connect.ts",
     "./runtime-values": "./src/runtime-values.ts",
+    "./ipc-decoding": "./src/ipc-decoding.ts",
+    "./remote-control-plane": "./src/remote-control-plane.ts",
+    "./signal-protocol/decode": "./src/signal-protocol/decode.ts",
+    "./signal-protocol/messages": "./src/signal-protocol/messages.ts",
+    "./signal-protocol/ticket": "./src/signal-protocol/ticket.ts",
+    "./team-api-routes": "./src/team-api-routes.ts",
     "./team-protocol": "./src/team-protocol/index.ts",
     "./team-protocol/current": "./src/team-protocol/current.ts",
     "./team-protocol/v1": "./src/team-protocol/v1.ts",
@@ -28,8 +34,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --config vitest.config.ts src"
   },
+  "dependencies": {
+    "emoji-regex": "10.6.0"
+  },
   "devDependencies": {
-    "typescript": "7.0.2",
-    "vitest": "4.1.10"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

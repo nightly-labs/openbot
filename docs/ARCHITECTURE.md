@@ -10,6 +10,7 @@ apps/
   auth-api/          Cloudflare Worker, account login, remote membership, and connection tickets
 packages/
   contracts/         Process and network boundary types, limits, and pure validation
+  logging/           ts-log Logger interface plus the redacting console/file implementation
 src/
   backend/           Agent runtime, provider adapters, event storage, queues, and browser host
   main/              Electron lifecycle, trusted IPC, host server, and operating-system adapters
@@ -48,7 +49,15 @@ renderer ──► @openbot/contracts ◄── preload ◄── main ──►
   conversation storage.
 - D1 is the source of truth for central accounts, remote membership, invitations, and logical sessions.
 - A local team host owns conversations, files, agents, and the local member projection used by Team API.
-- Renderer signals are projections for the current screen only. They are not durable state.
+- `browser-tabs.json` is the embedded browser's own durable state, outside `openbot.db` and outside the
+  migration runner. It is versioned in the file (`v1` predates the per-tab `BrowserEnvironment`, `v2`
+  carries it) and always rewritten as the current version, so a downgrade reads a file it does not know.
+  Nothing copies it first, so `src/backend/browser-state.ts` re-validates every bound it reads rather
+  than trusting it: a tab whose environment fails validation is still returned, without that
+  environment, because losing the user's open tab is worse than losing an emulated viewport.
+- Renderer signals and stores are projections for the current screen only. They are not durable
+  state, and one concern is one record - a row of parallel signals over its fields lets a screen
+  hold states the product does not have.
 
 ## Change rules
 
@@ -59,7 +68,42 @@ renderer ──► @openbot/contracts ◄── preload ◄── main ──►
 5. Keep Electron entry points small. New features use a service or a focused IPC input module.
 6. Do not add a second linter or formatter. Biome and its repository-owned anti-slop plugins are the
    only repository lint and format tools.
-7. Do not add temporary compatibility paths without a removal condition and a test for that condition. Released Team API protocol adapters are permanent by default and follow the policy below.
+7. Put renderer state in a domain context module inside that domain's feature directory,
+   `src/renderer/src/features/<domain>/<domain>-context.tsx`, beside the logic, views and tests that
+   read it, and place it by lifetime: state that belongs to one team server goes inside the keyed scope in
+   `app-providers.tsx`, everything else above it. A server switch discards and rebuilds that scope,
+   so it is the only per-server teardown there is - a signal on the wrong side of that boundary
+   either survives a switch it should not or dies in one it should not, and no list of setters can
+   fix it. A context reaches another one with `use*()` only downwards, in the nesting order of
+   `app-providers.tsx`, or through a provider prop; a command that writes to several domains lives
+   in a leaf context or a bridge component mounted under all of them. `window.openbot.*` is not a
+   dependency. Cycles are rejected by `noImportCycles`, so an upward edge must be `import type`.
+   Prefer one store per concern inside a context over a signal per field: a row of parallel signals
+   is what lets a screen be loading, loaded, and errored at once.
+8. Read those contexts from the smallest component that needs them. A pane calls the `use*()` of the
+   domains it renders and nothing else; `WorkspaceShell` reads only what decides *which* pane
+   renders, and passes a value down as a prop when two of them would otherwise derive it twice. A
+   component that assembles another one's props is how the god controller grew back last time.
+9. Do not add temporary compatibility paths without a removal condition and a test for that condition. Released Team API protocol adapters are permanent by default and follow the policy below.
+10. Log through `@openbot/logging` (`ts-log` Logger), never bare `console.*` - Biome's `noConsole`
+    enforces this in `src`, `scripts` and `packages`. The remote-desktop build recipe files listed in
+    the `Require a recipe version bump` step of `.github/workflows/remote-desktop-runtime.yml` are
+    exempt: any edit to them, cosmetic or not, forces `remoteDesktop.recipeVersion` up and a full
+    native runtime rebuild, so their logging is frozen until the recipe changes for a real reason. Every line is timestamped, prefixed and
+    secret-redacted, and redaction covers a serialized payload passed as one string, not only a
+    structured param. `info` and above is written by default; `OPENBOT_LOG_LEVEL` lowers the
+    threshold. Machine-readable stdout (piped JSON, tags, harness URLs) uses
+    `process.stdout.write` with a `// Machine-readable:` comment instead. Dev automation
+    (`scripts/dev-automation`, `bun run dev:automation`) drives the already-running dev app over its
+    remote-debugging CDP port and never launches a second instance, seeds, or resets the dev profile.
+    Because several worktrees run dev side by side, each instance publishes its worktree, profile,
+    renderer port and debugging port to a registry in the per-user temporary directory
+    (`scripts/dev-automation/instance-registry.ts`); automation resolves the record of the worktree
+    it runs in, verifies the renderer port and the `window.openbot` preload bridge before driving a
+    page, and refuses `click` or `type` on an instance it only inferred. Every dev window stays
+    reachable: `pages` lists the targets and `--page=<target-id|url-substring>` drives any of them, so
+    the app window is the default rather than a limit. Page URLs reach the diagnostics and the
+    snapshot document only through `describeTarget`.
 
 SQLite migration history starts at the frozen version 8 compatibility baseline. Keep the baseline
 schema unchanged, append every later migration in numeric order, and update the separate latest
@@ -67,9 +111,49 @@ schema used for new databases. Never remove or rewrite a migration that may have
 
 ## Team API compatibility boundary
 
-Current remote connections use Team API protocol v2 over three ordered WebRTC DataChannels: `rpc`,
+Current remote connections use Team API protocol v3 over three ordered WebRTC DataChannels: `rpc`,
 `events`, and `files`. A sandboxed hidden Chromium page owns each `RTCPeerConnection`. Electron main
 uses a `MessagePort` and transfers binary data as `ArrayBuffer`. Signal carries SDP and ICE only.
+OpenBot Mobile uses the same ticket, authentication transcript, framing, RPC codec, and event stream.
+In Expo Go, an Expo DOM component owns the browser `RTCPeerConnection` inside a hidden WebView and
+passes only serializable, validated commands and events to the native React UI; no native WebRTC
+module or development build is required.
+The native/DOM mailbox carries concurrent commands by ID. Switching or disconnecting cancels
+pending callers immediately; peer generations reject late callbacks from a superseded host.
+The persisted hosting preference is restored on startup in both the normal desktop and the
+development host. Starting the development HTTP API alone does not publish WebRTC; Mobile Connect
+needs the published host. The separate development test-client role never auto-publishes.
+Mobile Connect tickets and QR codes bind the started host ID and SHA-256 public-key fingerprint.
+Mobile verifies that binding at redemption and against the directory, pins the key, and selects
+that host rather than the first account-owned desktop. Legacy unbound QR codes require regeneration.
+Conversation read cursors belong to a team member and are shared across that member's devices.
+Advancing a cursor emits a conversation invalidation without the reader's identity or cursor;
+clients reload their own read state even when the conversation content revision is unchanged.
+Mobile acknowledges rendered replies only in the foreground, focused chat at the latest messages.
+The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
+operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
+host's SQLite and emit the same invalidation. Older hosts disable only this optional action.
+Mobile hidden/pinned chat preferences are device-local, persisted in SecureStore per account API,
+account ID and host ID; they are not part of the shared sidebar layout or conversation read state.
+Account/device and logical remote sessions deliberately have no time-based expiration; a finite
+maximum Date deadline preserves existing numeric wire contracts. Pairing codes, connection tickets,
+and Signal resume credentials remain short-lived. Each logical remote session is bound to its
+originating account credential. An atomic D1 trigger ends that credential's remote sessions and
+queues disconnects on logout/device revoke; other phones stay connected. Legacy unbound sessions
+are ended account-wide on revocation because their originating credential is unknown.
+Mobile sign-out keeps the encrypted credential and local session until the account API confirms
+revocation. If the DELETE response fails, mobile validates that same token: a 401 confirms it is no
+longer active and completes sign-out immediately. A successful session check or an inconclusive
+network/service error keeps the credential for retry; a late result cannot clear a newer login.
+Hosts opt in with the additive Signal hello `multiplex` flag; legacy desktops keep their one-peer
+limit so a second phone cannot replace an existing client's connection. Signal multiplexes
+connections by logical session, and the hidden desktop renderer owns a separate
+RTC peer for each device. Main keeps authentication, RPC caches, file staging and event streams
+separate per peer. Transport cleanup closes local access without revoking a replacement connection.
+Settings → Profile → Account sessions lists and revokes both desktop and mobile credentials.
+The account API's existing mobile-device routes expose these via `includeDesktop=true`; their
+default mobile-only behavior is unchanged. Responses contain session IDs and activity metadata,
+never tokens or token hashes, and all operations are scoped to the authenticated account.
 Cloudflare issues short ES256 connection tickets and stores the logical session. Signal issues a
 10-minute resume token, so a short Signal update does not end an active WebRTC connection. Signal
 validates a trusted, non-expired resume token locally. After a Signal restart, the first use of a token
@@ -96,6 +180,9 @@ Protocol support has no fixed time or release limit. Removal is an exceptional a
 
 ## Required verification
 
-Run `bun run check` for normal changes. Changes to packaging, native modules, or Electron security
-also require the applicable macOS and Windows package verification commands. Live provider and team
-smoke tests use isolated temporary data and are manual because they can require local credentials.
+Run the narrowest relevant test, then `bun run lint` and `bun run typecheck`; both are cheap enough
+to run whole, and CI owns the minutes-long suites. See `AGENTS.md` "CI owns the minutes-long suites"
+for the division of labour and what each CI job covers.
+Changes to packaging, native modules, or Electron security also require the applicable macOS and
+Windows package verification commands. Live provider and team smoke tests use isolated temporary
+data and are manual because they can require local credentials.

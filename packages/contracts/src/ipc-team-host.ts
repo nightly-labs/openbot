@@ -1,4 +1,10 @@
-import type { AvatarImageInput } from "./ipc-conversation";
+import type { AvatarImageInput } from "./ipc-agents";
+import type { IceServer } from "./signal-protocol/messages";
+
+// The id every IPC payload carries for "this computer" rather than a remote team server. It is a
+// wire value the main process, the preload bridge and the renderer all compare against, so it lives
+// beside the types they share instead of being retyped at each comparison.
+export const LOCAL_SERVER_ID = "local";
 
 export type ServerConnectionState = "online" | "connecting" | "offline" | "error" | "incompatible";
 export type TeamRole = "owner" | "admin" | "member";
@@ -102,7 +108,7 @@ export interface TeamMemberSummary {
 
 export interface TeamPresenceMember extends TeamMemberSummary {
   online: boolean;
-  typingBotId: string | null;
+  typingAgentId: string | null;
 }
 
 export interface TeamPresenceSnapshot {
@@ -112,7 +118,7 @@ export interface TeamPresenceSnapshot {
 }
 
 export interface SetTeamTypingInput {
-  botId: string | null;
+  agentId: string | null;
   typing: boolean;
 }
 
@@ -268,7 +274,7 @@ function isTeamPresenceMember(value: unknown): value is TeamPresenceMember {
     isTimestamp(value.createdAt) &&
     isBoolean(value.disabled) &&
     isBoolean(value.online) &&
-    (value.typingBotId === null || isIdentifier(value.typingBotId))
+    (value.typingAgentId === null || isIdentifier(value.typingAgentId))
   );
 }
 
@@ -364,11 +370,10 @@ export interface RemoteDesktopDisplay {
   primary: boolean;
 }
 
-export interface RemoteDesktopIceServer {
-  urls: string | string[];
-  username?: string;
-  credential?: string;
-}
+// The ICE servers the Signal service hands a peer, forwarded to the renderer unchanged. It is the
+// same shape by construction rather than by coincidence: this is the IPC-side name for it, kept
+// because it is what every `remoteDesktop:*` payload already spells.
+export type RemoteDesktopIceServer = IceServer;
 
 export interface RemoteDesktopCapabilities {
   ready: boolean;

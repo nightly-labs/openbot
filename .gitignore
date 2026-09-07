@@ -31,10 +31,15 @@ playwright-report/
 test-results/
 storybook-static/
 Shared/
+!apps/mobile/src/shared/
+!apps/mobile/src/shared/**
 index-*.css
 .openbot-browser-test/
 .openbot-build/
 .worktrees/
+# Claude Code creates git worktrees here; they carry a nested biome.json.
+.claude/worktrees/
+.claude/settings.local.json
 /build/cloudflared/
 /build/codex/
 /build/claude/
@@ -42,3 +47,5 @@ index-*.css
 /build/remote-desktop-runtime/
 /build/remote-desktop-release/
 Bots
+!apps/mobile/src/features/bots/
+!apps/mobile/src/features/bots/**

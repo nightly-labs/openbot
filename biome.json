@@ -1,15 +1,11 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
   "plugins": [
-    "./tools/biome/anti-slop/rules/no-chained-type-assertions.grit",
-    "./tools/biome/anti-slop/rules/no-conditional-empty-object-spread.grit",
+    "./tools/biome/anti-slop/rules/no-collections-in-stores.grit",
     "./tools/biome/anti-slop/rules/no-known-value-widening.grit",
     "./tools/biome/anti-slop/rules/no-module-mocking.grit",
     "./tools/biome/anti-slop/rules/no-object-parameters.grit",
-    "./tools/biome/anti-slop/rules/no-reflect-apply.grit",
-    "./tools/biome/anti-slop/rules/no-reflect-get.grit",
-    "./tools/biome/anti-slop/rules/no-runtime-typeof.grit",
-    "./tools/biome/anti-slop/rules/no-shape-in-symbol-names.grit",
+    "./tools/biome/anti-slop/rules/no-reflect-escapes.grit",
     "./tools/biome/anti-slop/rules/no-unknown-returns.grit",
     "./tools/biome/anti-slop/rules/no-unknown-type-aliases.grit",
     "./tools/biome/anti-slop/rules/no-unsafe-dictionary-type.grit"
@@ -18,6 +14,7 @@
     "includes": [
       "**",
       "!.codex",
+      "!.claude",
       "!node_modules",
       "!out",
       "!out-dev-app",
@@ -34,6 +31,7 @@
       "!apps/mobile/src/uniwind-types.d.ts",
       "!**/routeTree.gen.ts",
       "!tools/biome/anti-slop",
+      "!tools/ui-foundation/fixtures",
       "!coverage",
       "!.openbot-build",
       "!.worktrees",
@@ -74,7 +72,10 @@
         "useAsConstAssertion": "error"
       },
       "suspicious": {
-        "noExplicitAny": "error"
+        "noExplicitAny": "error",
+        "noFocusedTests": "error",
+        "noImportCycles": "error",
+        "noSkippedTests": "warn"
       }
     }
   },
@@ -87,7 +88,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/renderer/src/styles/app-shell.css", "src/renderer/src/styles/conversation.css"],
+      "includes": ["src/renderer/src/styles/app-shell.css", "src/renderer/src/features/conversation/conversation.css"],
       "linter": {
         "rules": {
           "style": {
@@ -95,6 +96,108 @@
           }
         }
       }
+    },
+    {
+      "includes": [
+        "packages/contracts/src/**/*.ts",
+        "packages/team-client/src/**/*.ts",
+        "!packages/contracts/src/**/*.test.ts",
+        "!packages/team-client/src/**/*.test.ts"
+      ],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noNodejsModules": "error"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "scripts/**/*.ts",
+        "packages/**/*.ts",
+        "!scripts/build-remote-desktop-runtime.ts",
+        "!scripts/create-remote-desktop-release-manifest.ts",
+        "!scripts/native-runtime-lock.ts",
+        "!scripts/package-remote-desktop-runtime.ts",
+        "!scripts/remote-desktop-runtime-release.ts"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "error"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/**/*.ts", "src/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUndeclaredDependencies": "error"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/renderer/src/**/*.ts", "src/renderer/src/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/main/**", "**/backend/**", "**/preload/**"],
+                    "message": "The renderer reaches main only through the IPC contract. Declare a channel in packages/contracts and go through window.openbot."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/main/**/*.ts", "src/backend/**/*.ts", "src/preload/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/renderer/**"],
+                    "message": "Nothing behind the trust boundary imports renderer code. Share the type through packages/contracts instead."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.test.ts", "**/*.test.tsx"],
+      "plugins": [
+        "./tools/biome/anti-slop/rules/no-class-assertions.grit",
+        "./tools/biome/anti-slop/rules/no-style-assertions.grit",
+        "./tools/biome/anti-slop/rules/no-dom-containment-assertions.grit",
+        "./tools/biome/anti-slop/rules/no-title-copy-assertions.grit",
+        "./tools/biome/anti-slop/rules/no-active-element-assertions.grit",
+        "./tools/biome/anti-slop/rules/no-inner-html-assertions.grit",
+        "./tools/biome/anti-slop/rules/no-dom-traversal-assertions.grit",
+        "./tools/biome/anti-slop/rules/no-icon-query-assertions.grit",
+        "./tools/biome/anti-slop/rules/no-snapshot-tests.grit",
+        "./tools/biome/anti-slop/rules/no-testid-queries.grit",
+        "./tools/biome/anti-slop/rules/no-class-selector-queries.grit",
+        "./tools/biome/anti-slop/rules/no-sleep-in-tests.grit"
+      ]
     }
   ],
   "javascript": {
