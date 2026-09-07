@@ -207,16 +207,20 @@ const Conversation = createSimpleContext({
     }
 
     function applyRuntimeMessages(messages: AgentRuntimeSnapshot["latestMessages"]): void {
-      const currentMessages = Object.fromEntries(
-        Object.entries(conversations).map(([id, conversation]) => [id, conversation.messages]),
-      );
-      const next = appendLatestRuntimeMessages(currentMessages, messages);
-      for (const agentId of new Set(messages.map((message) => message.agentId))) {
-        deleteAgentMessageBodies(rawAgentMessageBodies, agentId);
-        updateConversation(agentId, (conversation) => {
-          conversation.messages = next[agentId] ?? [];
-        });
-      }
+      const agentIds = new Set(messages.map((message) => message.agentId));
+      // The draft includes pending page writes from this event batch. Outside
+      // the setter, store keys can precede their committed conversation values.
+      setConversations((current) => {
+        const currentMessages = Object.fromEntries(
+          Object.entries(current).map(([id, conversation]) => [id, conversation.messages]),
+        );
+        const next = appendLatestRuntimeMessages(currentMessages, messages);
+        for (const agentId of agentIds) {
+          current[agentId] ??= { messages: [] };
+          current[agentId].messages = next[agentId] ?? [];
+        }
+      });
+      for (const agentId of agentIds) deleteAgentMessageBodies(rawAgentMessageBodies, agentId);
       for (const message of messages) {
         rawAgentMessageBodies.set(agentMessageKey(message.agentId, message.id), message.text);
       }
