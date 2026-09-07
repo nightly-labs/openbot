@@ -5,8 +5,9 @@
 // is the opposite: the stack holding the port this worktree wanted is a
 // sibling's, and a report that hid it would answer nothing.
 import { describe, expect, it } from "vitest";
+import type { DevInstanceRecord } from "./dev-automation/instance-registry";
 import type { DevStackRecord } from "./dev-automation/stack-registry";
-import { devStackScope, parseDevStackInvocation, selectDevStacks } from "./dev-stack";
+import { claimOnDevInstance, devStackScope, parseDevStackInvocation, selectDevStacks } from "./dev-stack";
 
 function stack(projectRoot: string, supervisorPid: number): DevStackRecord {
   return {
@@ -48,5 +49,50 @@ describe("what a dev-stack command acts on", () => {
 
   it("refuses a command it does not have", () => {
     expect(() => parseDevStackInvocation(["kill"])).toThrow("status|stop|forget");
+  });
+});
+
+// A dead stack record waits on disk for `dev:forget`, so the pids it names
+// have had every chance to be recycled by the time anything acts on them.
+// Deleting an instance record by pid alone deletes whatever app holds that pid
+// now: it vanishes from `dev:automation instances` until it restarts.
+describe("which instance records a forgotten stack takes with it", () => {
+  const record: DevStackRecord = {
+    ...stack("/worktrees/one", 4_242),
+    processes: [{ name: "app", pid: 7_000, startedAt: 1_000 }],
+  };
+
+  function instance(overrides: Partial<DevInstanceRecord> = {}): DevInstanceRecord {
+    return {
+      service: "app",
+      instanceId: "5173",
+      profile: "OpenBot Dev",
+      projectRoot: "/worktrees/one",
+      rendererPort: 5_173,
+      remoteDebuggingPort: 9_333,
+      pid: 7_000,
+      startedAt: 1_000,
+      ...overrides,
+    };
+  }
+
+  it("takes the record of its own instance, whose process is gone", () => {
+    expect(claimOnDevInstance(instance(), record, () => "gone")).toBe("ours");
+  });
+
+  it("leaves the record of a live instance that recycled the pid", () => {
+    expect(claimOnDevInstance(instance({ startedAt: 9_000 }), record, () => "live")).toBe("another");
+  });
+
+  it("leaves another worktree's record even where nothing can date the pid", () => {
+    expect(claimOnDevInstance(instance({ projectRoot: "/worktrees/two" }), record, () => "unverified")).toBe("another");
+  });
+
+  it("keeps a record of this worktree it cannot date, rather than guess", () => {
+    expect(claimOnDevInstance(instance(), record, () => "unverified")).toBe("unverified");
+  });
+
+  it("leaves a pid this stack never started", () => {
+    expect(claimOnDevInstance(instance({ pid: 8_000 }), record, () => "gone")).toBe("another");
   });
 });

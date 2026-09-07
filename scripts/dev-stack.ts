@@ -9,6 +9,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import {
+  type DevInstanceRecord,
   describeDevInstance,
   readAllDevInstanceRecords,
   readDevInstanceRecords,
@@ -155,15 +156,51 @@ async function stopDevStack(record: DevStackRecord): Promise<boolean> {
   return true;
 }
 
+// What an instance record on disk is, seen from a stack record about to be
+// forgotten. A pid is not an identity - it is a name the kernel reuses - and
+// an instance record is stored at `<service>-<pid>.json`, so the app that
+// recycles a pid writes over the record of the app that had it. `another` is
+// that case: the file names a pid this stack recorded, and belongs to somebody
+// else now.
+export type DevInstanceClaim = "ours" | "another" | "unverified";
+
+// The record dates itself, which is what makes this exact: its `startedAt` is
+// when *that* instance published, and `verifyRecordedProcess` holds it against
+// the start time the kernel reports for the pid. So a live instance is never
+// this dead stack's, whatever pid it holds, and no timestamp has to be carried
+// from the supervisor through electron-vite into the Electron main process to
+// find that out - those are two different events and would date differently.
+// The worktree is checked as well, because it is the cheaper half of the same
+// question and it answers on a machine that cannot date a pid at all.
+export function claimOnDevInstance(
+  instance: DevInstanceRecord,
+  record: DevStackRecord,
+  verify: (entry: { pid: number; startedAt: number }) => RecordedProcessState = verifyRecordedProcess,
+): DevInstanceClaim {
+  if (!record.processes.some((entry) => entry.pid === instance.pid)) return "another";
+  if (!isSameWorktree(instance, record.projectRoot)) return "another";
+  const state = verify(instance);
+  if (state === "live") return "another";
+  return state === "unverified" ? "unverified" : "ours";
+}
+
 // A stack record is a note about pids, so removing it removes nothing else.
 function forgetDevStack(record: DevStackRecord): void {
   removeDevStackRecord(record);
   // A stack the supervisor never got to clean up leaves its instance records
   // behind too, and nothing else deletes them: reading only filters. So this
-  // reads every record rather than the live ones, and drops each one this
-  // stack published.
+  // reads every record rather than the live ones, and drops the ones this
+  // stack still has a claim on.
   for (const instance of readAllDevInstanceRecords()) {
-    if (record.processes.some((entry) => entry.pid === instance.pid)) removeDevInstanceRecord(instance);
+    const claim = claimOnDevInstance(instance, record);
+    if (claim === "ours") removeDevInstanceRecord(instance);
+    if (claim === "unverified") {
+      logger.error(
+        `Cannot confirm pid ${instance.pid} is still the ${instance.service} instance of this stack, ` +
+          "so its record was kept. `bun run dev:status` reports it, and the instance that owns it " +
+          "publishes over it on its next start.",
+      );
+    }
   }
 }
 
