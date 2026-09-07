@@ -55,7 +55,7 @@ export function createProviderFailureNotifications(options: {
     sync(statuses: AgentProviderStatus[]): void {
       for (const status of statuses) {
         if (providerFailed(status)) report(status.id, status.message ?? "");
-        else if (status.state === "available") clear(status.id);
+        else if (status.state === "available" || status.state === "sign-in-required") clear(status.id);
       }
     },
     handleError(event: Extract<AgentEvent, { type: "error" }>, statuses: AgentProviderStatus[]): void {

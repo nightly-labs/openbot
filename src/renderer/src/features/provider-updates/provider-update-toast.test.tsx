@@ -210,6 +210,8 @@ it.each<AgentProviderStatus["state"]>(["error", "not-installed", "outdated"])(
       flush();
       expect(screen.getByText("token=[redacted] ~ failed")).toBeInTheDocument();
       expect(screen.getAllByRole("button", { name: "Close notification" })).toHaveLength(1);
+      failures.sync([{ ...status, state: "checking", message: null }]);
+      flush();
       const close = screen.getByRole("button", { name: "Close notification" });
       close.focus();
       expect(close).toHaveFocus();
@@ -221,6 +223,10 @@ it.each<AgentProviderStatus["state"]>(["error", "not-installed", "outdated"])(
       expect(screen.queryByText("Grok could not start")).not.toBeInTheDocument();
       failures.sync([{ ...status, message: "A different failure" }]);
       expect(await screen.findByText("A different failure")).toBeInTheDocument();
+      failures.sync([{ ...status, state: "sign-in-required", message: "Connect Grok to continue." }]);
+      await waitFor(() => expect(screen.queryByText("Grok could not start")).not.toBeInTheDocument());
+      failures.handleError(event, []);
+      expect(await screen.findByText(event.message)).toBeInTheDocument();
       failures.sync([{ ...status, state: "available", message: null }]);
       await waitFor(() => expect(screen.queryByText("Grok could not start")).not.toBeInTheDocument());
       failures.handleError(event, []);
