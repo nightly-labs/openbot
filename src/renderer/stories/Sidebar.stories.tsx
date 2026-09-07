@@ -3,11 +3,7 @@ import { createSignal, untrack } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { Sidebar } from "../src/features/sidebar/Sidebar";
-import {
-  MAX_SIDEBAR_PINNED_ITEMS,
-  normalizeSidebarPinnedItems,
-  type SidebarPinnedItem,
-} from "../src/features/sidebar/sidebar-pins";
+import { normalizeSidebarPinnedItems, type SidebarPinnedItem } from "../src/features/sidebar/sidebar-pins";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
 import type { SidebarAgentState } from "../src/features/sidebar/sidebar-types";
 import { STORY_AGENTS, STORY_DIRECT_THREADS, STORY_PRESENCE } from "./fixtures";
@@ -240,7 +236,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-async function expectPinnedLayout(canvasElement: HTMLElement, expectedCount: 1 | 2 | 3 | 4 | 5 | 6): Promise<void> {
+async function expectPinnedLayout(canvasElement: HTMLElement, expectedCount: number): Promise<void> {
   const list = canvasElement.querySelector<HTMLElement>(".sidebar-pinned-list");
   if (!list) throw new Error("Pinned list is missing.");
   const tiles = Array.from(list.querySelectorAll<HTMLElement>(".sidebar-pinned-row"));
@@ -248,14 +244,13 @@ async function expectPinnedLayout(canvasElement: HTMLElement, expectedCount: 1 |
   if (avatars.some((avatar) => !avatar)) throw new Error("A pinned avatar is missing.");
 
   await expect(tiles).toHaveLength(expectedCount);
-  await expect(expectedCount).toBeLessThanOrEqual(MAX_SIDEBAR_PINNED_ITEMS);
   for (const tile of tiles) await expect(tile.getBoundingClientRect().height).toBe(94);
   for (const avatar of avatars) await expect(avatar?.getBoundingClientRect().width).toBe(48);
 
   const rects = tiles.map((tile) => tile.getBoundingClientRect());
   const listRect = list.getBoundingClientRect();
   const rowTops = [...new Set(rects.map((rect) => Math.round(rect.top)))].sort((left, right) => left - right);
-  await expect(rowTops).toHaveLength(expectedCount <= 3 ? 1 : 2);
+  await expect(rowTops).toHaveLength(Math.ceil(expectedCount / 3));
   await expect(list.scrollWidth).toBe(list.clientWidth);
   await expect(list.scrollHeight).toBe(list.clientHeight);
   for (const rect of rects) {
@@ -343,6 +338,15 @@ export const PinnedSix: Story = {
   args: { agents: stressAgents, pinnedItems: pinnedSix },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
   play: async ({ canvasElement }) => expectPinnedLayout(canvasElement, 6),
+};
+
+export const PinnedMany: Story = {
+  args: {
+    agents: stressAgents,
+    pinnedItems: stressAgents.slice(0, 12).map((agent) => ({ kind: "agent", id: agent.id })),
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+  play: async ({ canvasElement }) => expectPinnedLayout(canvasElement, 12),
 };
 
 export const PinnedLongLabels: Story = {
@@ -512,6 +516,36 @@ export const DragStress: Story = {
     await expect(canvasElement.querySelectorAll("[data-pinned-key]")).toHaveLength(6);
     await expect(canvasElement.querySelectorAll("[data-section-id]").length).toBeGreaterThanOrEqual(7);
     await expect(canvasElement.querySelectorAll("[data-agent-id]").length).toBeGreaterThanOrEqual(24);
+    const source = canvasElement.querySelector<HTMLElement>("[data-agent-id]");
+    const list = within(canvasElement).getByRole("navigation", { name: "Chat list" });
+    const DataTransferConstructor = canvasElement.ownerDocument.defaultView?.DataTransfer;
+    if (!source || !list || !DataTransferConstructor) throw new Error("Agent drag stress fixture is unavailable.");
+    const section = source.closest<HTMLElement>("[data-section-id]");
+    const target = section?.querySelector<HTMLElement>(
+      `[data-agent-id]:not([data-agent-id="${source.dataset.agentId}"])`,
+    );
+    if (!target) throw new Error("Agent drag stress target is unavailable.");
+    const bounds = source.getBoundingClientRect();
+    const targetBounds = target.getBoundingClientRect();
+    const dataTransfer = new DataTransferConstructor();
+
+    fireEvent.dragStart(source, {
+      clientX: bounds.left + 24,
+      clientY: bounds.top + 24,
+      dataTransfer,
+    });
+    fireEvent.dragOver(target, {
+      clientX: targetBounds.left + 24,
+      clientY: targetBounds.top + 24,
+      dataTransfer,
+    });
+
+    await expect(list).toHaveAttribute("data-sidebar-dragging", "agent");
+    for (const row of canvasElement.querySelectorAll<HTMLElement>("[data-agent-id]")) {
+      await expect(getComputedStyle(row).transitionDuration).toBe("0s");
+    }
+
+    fireEvent.dragEnd(source, { dataTransfer });
   },
 };
 
@@ -593,7 +627,11 @@ export const EmptyPinDropTarget: Story = {
       clientY: bounds.top + 26,
       dataTransfer,
     });
-    await expect(canvas.getByText("Drag here to pin")).toBeInTheDocument();
+    const emptyTarget = canvas.getByText("Drag here to pin");
+    const pinnedGroup = emptyTarget.closest<HTMLElement>(".sidebar-pinned-group");
+    if (!pinnedGroup) throw new Error("Empty pinned group is unavailable.");
+    await expect(emptyTarget.getBoundingClientRect().height).toBe(104);
+    await expect(getComputedStyle(pinnedGroup).transitionProperty).not.toContain("grid-template-rows");
   },
 };
 

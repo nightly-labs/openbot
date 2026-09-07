@@ -95,6 +95,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
   #threadCounter = 0;
   running = false;
   responseError: Error | null = null;
+  modelList: ((params: unknown) => unknown) | undefined;
   accountRateLimits: unknown = { rateLimits: null, rateLimitsByLimitId: null };
 
   constructor(
@@ -145,9 +146,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
       result = {
         data:
           this.provider === "codex"
-            ? // The uncurated ids are advertised on purpose, the way the real CLI
-              // does: CURATED_CODEX_MODEL_IDS has to drop them again.
-              [
+            ? [
                 "gpt-5.6-luna",
                 "gpt-5.6-terra",
                 "gpt-5.6-sol",
@@ -161,6 +160,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
               : ["claude-fable-5", "claude-opus-5", "claude-sonnet-5"].map((model) => ({ model })),
       };
     }
+    if (method === "model/list" && this.modelList) result = this.modelList(params);
     if (method === "plugin/list") result = { marketplaces: [] };
     if (method === "thread/start") {
       this.#threadCounter += 1;

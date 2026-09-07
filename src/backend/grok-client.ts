@@ -189,6 +189,8 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
           ),
         );
       case "model/list":
+        await this.#ensureInitialized();
+        if (this.#signedIn) this.#models = await this.#discoverModels(timeoutMs);
         return decoder({
           data: this.#models.map((model) => ({
             model: model.id,
@@ -271,13 +273,11 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
       advertised.find((method) => method.id === "cached_token");
     try {
       if (selected) await connection.authenticate({ methodId: selected.id });
-      const probe = await connection.newSession({ cwd: process.cwd(), mcpServers: [] });
-      this.#models = modelsFromSessionSetup(probe);
+      this.#models = await this.#discoverModels();
       if (this.#models.length === 0) {
         throw new Error("Grok CLI did not advertise any ACP models. OpenBot will not guess a fallback model.");
       }
       this.#signedIn = true;
-      await connection.closeSession({ sessionId: probe.sessionId }).catch(() => undefined);
     } catch (error) {
       if (isAuthenticationError(error)) {
         this.#signedIn = false;
@@ -285,6 +285,22 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
       }
       throw error;
     }
+  }
+
+  async #discoverModels(timeoutMs = this.#requestTimeoutMs): Promise<GrokModel[]> {
+    const connection = this.#requireConnection();
+    return withTimeout(
+      (async () => {
+        const probe = await connection.newSession({ cwd: process.cwd(), mcpServers: [] });
+        try {
+          return modelsFromSessionSetup(probe);
+        } finally {
+          await connection.closeSession({ sessionId: probe.sessionId }).catch(() => undefined);
+        }
+      })(),
+      timeoutMs,
+      "Grok request timed out: model/list",
+    );
   }
 
   async #startThread(params: unknown, resume: boolean): Promise<{ thread: { id: string } }> {

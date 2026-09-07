@@ -11,12 +11,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
 import { Easing, ReduceMotion, useSharedValue, withTiming } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
 import { AgentPinTransitionOverlay } from "@/features/agents/components/agent-pin-transition-overlay";
-import { MAX_PINNED_AGENTS, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { isIOS } from "@/shared/lib/platform";
 
 export type AgentAvatarLocation = "chat" | "pinned" | "row" | "search";
@@ -211,15 +211,6 @@ export function AgentPinTransitionProvider({ children }: PropsWithChildren) {
       if (!agent || transitionRef.current) return;
 
       const isPinned = pinnedAgentIds.includes(agentId);
-      const pinnedOnServer = pinnedAgentIds.filter((id) =>
-        agents.some((item) => item.id === id && item.serverId === agent.serverId),
-      );
-      if (!isPinned && pinnedOnServer.length >= MAX_PINNED_AGENTS) {
-        if (isIOS) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        Alert.alert("Pin limit reached", `You can pin up to ${MAX_PINNED_AGENTS} agents on a server.`);
-        return;
-      }
-
       const source: AgentAvatarLocation = isPinned ? "pinned" : "row";
       const target: AgentAvatarLocation = isPinned ? "row" : "pinned";
       const sourceNode = avatarRefs.get(agentId)?.[source];
@@ -250,12 +241,7 @@ export function AgentPinTransitionProvider({ children }: PropsWithChildren) {
           progress.set(0);
 
           requestAnimationFrame(() => {
-            const result = toggleAgentPin(agentId);
-            if (result === "limit") {
-              finishTransition();
-              Alert.alert("Pin limit reached", `You can pin up to ${MAX_PINNED_AGENTS} agents on a server.`);
-              return;
-            }
+            toggleAgentPin(agentId);
             if (isIOS) void Haptics.selectionAsync();
             fallbackTimerRef.current = setTimeout(finishTransition, 700);
           });
@@ -316,10 +302,7 @@ export function useAgentPinTransition(): AgentPinTransitionContextValue {
         registerAvatar: () => undefined,
         startAgentNavigationAnimated: () => undefined,
         toggleAgentPinAnimated: (agentId: string) => {
-          const result = toggleAgentPin(agentId);
-          if (result === "limit") {
-            Alert.alert("Pin limit reached", `You can pin up to ${MAX_PINNED_AGENTS} agents on a server.`);
-          }
+          toggleAgentPin(agentId);
         },
         transition: null,
       },

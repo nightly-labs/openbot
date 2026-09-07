@@ -19,23 +19,13 @@ import {
 } from "../../components/ui";
 import type { AgentProfile } from "../../data";
 import { DeleteIcon, EditIcon } from "./SidebarIcons";
-import { MAX_SIDEBAR_PINNED_ITEMS, type SidebarPinnedItem } from "./sidebar-pins";
+import type { SidebarPinnedItem } from "./sidebar-pins";
 import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned: boolean }) {
-  const {
-    agentPinnedItems,
-    assignAgentSection,
-    customSectionById,
-    layoutMutable,
-    openDelete,
-    props,
-    startCreateSection,
-  } = useSidebarScope();
+  const { assignAgentSection, customSectionById, layoutMutable, openDelete, props, startCreateSection } =
+    useSidebarScope();
   const ref = (): SidebarPinnedItem => ({ kind: "agent", id: menuProps.agent.id });
-  // A derivation, not a value: as a component this body runs once, where the closure it replaced ran
-  // inside the parent's render. Reading the pin count eagerly would freeze the limit at mount.
-  const pinLimitReached = () => !menuProps.pinned && agentPinnedItems().length >= MAX_SIDEBAR_PINNED_ITEMS;
   const currentSectionId = () =>
     customSectionById().has(props.layout.agentAssignments[menuProps.agent.id] ?? "")
       ? props.layout.agentAssignments[menuProps.agent.id]
@@ -43,11 +33,7 @@ export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned
   return (
     <ContextMenu.Portal>
       <ContextMenu.Content class="agent-context-menu" aria-label="Agent actions">
-        <ContextMenu.Item
-          disabled={pinLimitReached()}
-          title={pinLimitReached() ? `Maximum ${MAX_SIDEBAR_PINNED_ITEMS} pinned chats` : undefined}
-          onSelect={() => (menuProps.pinned ? props.onUnpin(ref()) : props.onPin(ref()))}
-        >
+        <ContextMenu.Item onSelect={() => (menuProps.pinned ? props.onUnpin(ref()) : props.onPin(ref()))}>
           <Show when={menuProps.pinned} fallback={<Pin class="agent-context-icon size-4" aria-hidden="true" />}>
             <PinOff class="agent-context-icon size-4" aria-hidden="true" />
           </Show>

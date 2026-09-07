@@ -10,7 +10,6 @@ import {
   writeSidebarPeopleOrder,
 } from "./sidebar-people-order";
 import {
-  MAX_SIDEBAR_PINNED_ITEMS,
   normalizeSidebarPinnedItems,
   readSidebarPins,
   reownSidebarPinnedItems,
@@ -125,7 +124,6 @@ const Sidebar = createSimpleContext({
 
     function pinSidebarItem(item: SidebarPinnedItem): void {
       updateActiveServerPins((items) =>
-        items.length >= MAX_SIDEBAR_PINNED_ITEMS ||
         items.some((candidate) => sidebarPinnedItemKey(candidate) === sidebarPinnedItemKey(item))
           ? items
           : [...items, item],

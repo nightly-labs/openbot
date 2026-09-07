@@ -164,7 +164,7 @@ describe("Sidebar pinned chats", () => {
     expect(screen.queryByRole("menuitem", { name: "Duplicate agent" })).not.toBeInTheDocument();
   });
 
-  it("disables agent pin actions after six chats are pinned", async () => {
+  it("allows pinning another agent after six chats are pinned", async () => {
     const props = sidebarPropsWithExtraAgents(
       [
         { kind: "agent", id: "chief" },
@@ -183,7 +183,7 @@ describe("Sidebar pinned chats", () => {
     const pinItem = within(agentMenu).getByRole("menuitem", { name: "Pin" });
 
     await fireEvent.pointerUp(pinItem, { button: 0 });
-    expect(props.onPin).not.toHaveBeenCalled();
+    expect(props.onPin).toHaveBeenCalledWith({ kind: "agent", id: "extra-4" });
   });
 
   it("reorders pinned chats by keyboard and constrained horizontal drag", async () => {
