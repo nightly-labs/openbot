@@ -1,14 +1,25 @@
 // One machine, several worktrees, one range of default dev ports. Reading the
 // stack registry is not enough on its own: a stack publishes its ports only
 // after it has chosen them, so two allocators running at the same moment still
-// both read an empty registry. This lock makes the read-choose-publish sequence
-// one at a time across every worktree on the machine.
+// both read an empty registry. This lock makes the read-choose-publish
+// sequence one at a time across every worktree on the machine.
+//
+// Ownership is a generation, not a path. Taking the lock means creating the
+// *next* numbered file with an exclusive create, so the only step that decides
+// who owns it is one the kernel makes atomic, and nothing is ever taken by
+// deleting. That is the whole reason for the numbering. With a single lock
+// path, recovering one whose holder has died has to `unlink`, and `unlink`
+// cannot be made conditional on what the path holds: two waiters that read the
+// same dead holder both delete, the first publishes a lock of its own and
+// starts allocating, and the second deletes that replacement and starts
+// beside it. Here the second one's create simply fails, and the judgement
+// about a dead holder decides only when to move on - never who won.
 //
 // The critical section is a handful of `bind` probes and one file write, so it
 // is milliseconds long. Everything slow - `bun install`, electron-vite, the
 // Worker runtime - happens after the lock is released.
 
-import { closeSync, linkSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, linkSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import { verifyRecordedProcess } from "./registry-files";
@@ -19,19 +30,13 @@ import {
   readDevStackRecords,
 } from "./stack-registry";
 
-const LOCK_FILE_NAME = "port-allocation.lock";
-// Recovery of a lock nobody holds happens one process at a time, behind this
-// second file. See `breakStaleLock`.
-const BREAK_LOCK_FILE_NAME = "port-allocation.break.lock";
+const LOCK_PREFIX = "port-allocation.";
+const LOCK_SUFFIX = ".lock";
 const LOCK_WAIT_MS = 10_000;
-// How long a file whose contents say nothing may sit at the lock path before
-// an allocator treats it as litter rather than as a lock.
+// How long a file whose contents say nothing may sit in the registry before an
+// allocator treats it as litter rather than as a lock.
 const LOCK_STALE_MS = 30_000;
 const LOCK_POLL_INTERVAL_MS = 25;
-// Breaking a lock and finding it taken again means another waiter broke it
-// first. That is fine once; three times in a row is a spin, and a clear error
-// beats a hang.
-const MAX_BREAK_ATTEMPTS = 3;
 
 export interface DevPortAllocationOptions {
   directory?: string;
@@ -44,8 +49,45 @@ export interface DevPortAllocationOptions {
   onWait?: (holderPid: number) => void;
 }
 
-// How long the lock file has sat there, for the one case where its contents
-// say nothing. Null when it is already gone.
+interface LockHolder {
+  pid: number;
+  acquiredAt: number;
+}
+
+interface HeldLock {
+  generation: number;
+  path: string;
+  holder: LockHolder | null;
+}
+
+function lockPath(directory: string, generation: number): string {
+  return join(directory, `${LOCK_PREFIX}${generation}${LOCK_SUFFIX}`);
+}
+
+// The staging files `tryCreateLock` writes end in `.tmp`, and the stack
+// records in `.json`, so neither is ever read as a lock.
+function lockGeneration(fileName: string): number | null {
+  if (!fileName.startsWith(LOCK_PREFIX) || !fileName.endsWith(LOCK_SUFFIX)) return null;
+  const raw = fileName.slice(LOCK_PREFIX.length, fileName.length - LOCK_SUFFIX.length);
+  const generation = Number(raw);
+  return Number.isInteger(generation) && generation > 0 ? generation : null;
+}
+
+// The highest generation present, which is the one that owns the lock. Lower
+// ones are litter that nothing reads.
+function readCurrentLock(directory: string): HeldLock | null {
+  let current: HeldLock | null = null;
+  for (const entry of readdirSync(directory)) {
+    const generation = lockGeneration(entry);
+    if (generation === null || (current !== null && generation <= current.generation)) continue;
+    const path = join(directory, entry);
+    current = { generation, path, holder: readLockHolder(path) };
+  }
+  return current;
+}
+
+// How long a lock file has sat there, for the one case where its contents say
+// nothing. Null when it is already gone.
 function lockFileAgeMs(path: string, now: number): number | null {
   try {
     return now - statSync(path).mtimeMs;
@@ -54,43 +96,31 @@ function lockFileAgeMs(path: string, now: number): number | null {
   }
 }
 
-// A lock nobody holds. Two states, and a *live* holder is neither of them:
+// A lock to move past. Two states, and a *live* holder is neither of them:
 //
 //   - unreadable contents. `link` publishes the lock and its holder in one
-//     step, so a file at this path always parses the moment it exists. Garbage
-//     is a leftover from an older runner or from a developer's `touch` - still
-//     breakable, but only once it is older than the stale window, because
-//     nothing may assume a file it cannot read is abandoned.
+//     step, so a lock file always parses the moment it exists. Garbage is a
+//     leftover from an older runner or from a developer's `touch` - moved past
+//     only once it is older than the stale window, because nothing may assume
+//     a file it cannot read is abandoned.
 //   - a holder that is no longer running. `verifyRecordedProcess` reads that
 //     off the process start time, so a pid recycled since the lock was taken
-//     counts as gone rather than as a live holder - which is what stops a
+//     counts as gone rather than as a live holder - which is what stops one
 //     recycled pid from wedging every dev start on the machine.
 //
 // How long a live holder has held it does not enter into it. An allocation is
 // milliseconds of work, so a lock held for a minute means something is wrong,
 // but "wrong" is not "finished": the holder may be stopped in a debugger and
-// about to step into the critical section. Waiting it out and then taking it
-// anyway would hand both allocators the same ports, which is the collision
-// this whole file exists to stop, so the developer gets an error naming the
-// pid instead. `unverified` - a holder this machine cannot date - is treated
-// as live for the same reason.
-function isBreakableLock(
-  path: string,
-  holder: LockHolder | null,
-  now: number,
-  staleMs: number,
-  fileAgeMs = lockFileAgeMs,
-): boolean {
-  if (holder === null) {
-    const age = fileAgeMs(path, now);
+// about to step into the critical section. Moving past it would hand both
+// allocators the same ports, which is the collision this whole file exists to
+// stop, so the developer gets an error naming the pid instead. `unverified` -
+// a holder this machine cannot date - is treated as live for the same reason.
+function isAbandonedLock(lock: HeldLock, now: number, staleMs: number, fileAgeMs = lockFileAgeMs): boolean {
+  if (lock.holder === null) {
+    const age = fileAgeMs(lock.path, now);
     return age === null || age > staleMs;
   }
-  return verifyRecordedProcess({ pid: holder.pid, startedAt: holder.acquiredAt }) === "gone";
-}
-
-interface LockHolder {
-  pid: number;
-  acquiredAt: number;
+  return verifyRecordedProcess({ pid: lock.holder.pid, startedAt: lock.holder.acquiredAt }) === "gone";
 }
 
 function parseLockHolder(raw: unknown): LockHolder | null {
@@ -105,8 +135,8 @@ function readLockHolder(path: string): LockHolder | null {
   try {
     return parseLockHolder(JSON.parse(readFileSync(path, "utf8")));
   } catch {
-    // Missing, half-written or garbage. All three mean nobody provable holds
-    // it, which the caller treats as breakable.
+    // Missing or garbage. Both mean nobody readable holds it, which the caller
+    // weighs against how long the file has been there.
     return null;
   }
 }
@@ -130,49 +160,43 @@ export async function withDevPortAllocation<T>(
     onWait,
   } = options;
   ensureDevStackRegistryDirectory(directory);
-  const path = join(directory, LOCK_FILE_NAME);
-  const breakPath = join(directory, BREAK_LOCK_FILE_NAME);
   const holder: LockHolder = { pid: process.pid, acquiredAt: now() };
   const deadline = now() + waitMs;
-  let breakAttempts = 0;
-  let recoveryWasBusy = false;
+  let held = "";
+  let generation = 0;
 
   for (;;) {
-    if (tryCreateLock(path, holder)) break;
-    const current = readLockHolder(path);
-    if (isBreakableLock(path, current, now(), staleMs)) {
-      if (breakAttempts >= MAX_BREAK_ATTEMPTS) {
+    const current = readCurrentLock(directory);
+    if (current === null || isAbandonedLock(current, now(), staleMs)) {
+      generation = (current?.generation ?? 0) + 1;
+      held = lockPath(directory, generation);
+      if (tryCreateLock(held, holder)) break;
+      // Another allocator created that generation between the scan and the
+      // create. Exactly one of us has the lock and it is not this one, so the
+      // next pass finds a live holder and waits for it.
+      if (now() >= deadline) {
         throw new Error(
-          `Could not take the dev port allocation lock at ${path}. ` +
-            "Check `bun run dev:status`, then remove that file if no dev stack is starting.",
+          `Could not take the dev port allocation lock in ${directory}: another allocator won each attempt. ` +
+            "Check `bun run dev:status` and wait for those dev stacks to finish starting.",
         );
       }
-      const broken = breakStaleLock(path, breakPath, () => isBreakableLock(path, readLockHolder(path), now(), staleMs));
-      recoveryWasBusy = !broken;
-      if (broken) {
-        breakAttempts += 1;
-        continue;
-      }
-      // Another allocator is recovering this lock. Look again rather than
-      // reach past it - it is about to publish a lock of its own.
+      continue;
     }
     if (now() >= deadline) {
       throw new Error(
-        recoveryWasBusy
-          ? `The dev port allocation lock at ${path} was left behind by pid ${current?.pid ?? "unknown"}, ` +
-              `and the allocator recovering it did not finish. Remove ${breakPath} if no dev stack is starting.`
-          : `The dev port allocation lock at ${path} is still held by pid ${current?.pid ?? "unknown"}. ` +
-              "Check `bun run dev:status` and stop that dev stack, or wait for it to finish starting.",
+        `The dev port allocation lock at ${current.path} is still held by pid ${current.holder?.pid ?? "unknown"}. ` +
+          "Check `bun run dev:status` and stop that dev stack, or wait for it to finish starting.",
       );
     }
-    onWait?.(current?.pid ?? 0);
+    onWait?.(current.holder?.pid ?? 0);
     await wait(Math.min(pollIntervalMs, Math.max(deadline - now(), 1)));
   }
 
+  discardSupersededLocks(directory, generation);
   try {
     return await run(readRecords());
   } finally {
-    releaseLock(path, holder);
+    releaseLock(held, holder);
   }
 }
 
@@ -183,11 +207,10 @@ function isExistingPathError(error: unknown): error is NodeJS.ErrnoException {
 }
 
 // Fill the file first, then publish it under the lock name with `link`, which
-// is atomic and fails with EEXIST when the lock is taken. Creating the lock
-// with `wx` and writing to it afterwards leaves a window - short, but a window
-// - where the path exists and holds nothing, and a waiter that reads it there
-// sees an anonymous file and takes it for an abandoned one. Both allocators
-// then proceed, which is the same collision as having no lock at all.
+// is atomic and fails with EEXIST when that generation is taken. Creating the
+// lock with `wx` and writing to it afterwards leaves a window - short, but a
+// window - where the file exists and holds nothing, and a waiter that reads it
+// there sees an anonymous file and takes it for litter.
 //
 // Neither `open` with `wx` nor `link` follows a symlink somebody left at the
 // path, so a planted link cannot redirect either half of this.
@@ -211,34 +234,21 @@ function tryCreateLock(path: string, holder: LockHolder): boolean {
   }
 }
 
-// Removing the lock is the one step that touches a file another allocator may
-// own by the time it runs, and `unlink` cannot be made conditional on what the
-// path holds: two waiters that read the same dead holder both delete, the
-// first publishes a lock of its own and enters allocation, and the second
-// deletes *that* one and enters beside it. Both then get the same ports, which
-// is the failure the lock exists to prevent. So recovery is serialized behind
-// a second file: whoever takes it reads the lock again through `judge` and
-// finds the replacement rather than the dead holder it saw a moment ago.
-//
-// Nothing ever breaks this second file. It is held across a handful of
-// syscalls with no `await` between them, so only a hard kill inside that
-// window can leak it, and a leak costs recovery rather than correctness -
-// allocators wait and then fail with a message naming the file. Recovering it
-// automatically would need the same serialization one level down.
-export function breakStaleLock(path: string, breakPath: string, judge: () => boolean): boolean {
-  if (!tryCreateLock(breakPath, { pid: process.pid, acquiredAt: Date.now() })) return false;
-  try {
-    if (!judge()) return false;
-    rmSync(path, { force: true });
-    return true;
-  } finally {
-    rmSync(breakPath, { force: true });
+// Litter left by allocators that crashed before they could release. Removing
+// it cannot change who owns the lock - this process does, at a higher
+// generation, and nothing reads a lower one - and it keeps the numbering from
+// climbing for the life of the temporary directory.
+function discardSupersededLocks(directory: string, generation: number): void {
+  for (const entry of readdirSync(directory)) {
+    const other = lockGeneration(entry);
+    if (other === null || other >= generation) continue;
+    rmSync(join(directory, entry), { force: true });
   }
 }
 
-// Only remove a lock this process still holds. A waiter that decided ours was
-// stale has already replaced it, and deleting theirs would let a third
-// allocator in beside them.
+// Only remove a lock this process still holds. A file that no longer carries
+// our identity was replaced by something that decided ours was abandoned, and
+// deleting theirs would let a third allocator in beside them.
 function releaseLock(path: string, holder: LockHolder): void {
   const current = readLockHolder(path);
   if (current !== null && (current.pid !== holder.pid || current.acquiredAt !== holder.acquiredAt)) return;

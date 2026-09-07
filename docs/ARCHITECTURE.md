@@ -139,10 +139,11 @@ These are manual model evaluations, separate from the fake-provider lifecycle re
     Storybook included, and `scripts/dev-automation/port-allocation.ts` serializes read, choose and
     publish behind one machine-wide lock: probing a port and binding it seconds later is a check
     followed by a use, so two runners starting together both used to win 5173 and the unsuffixed
-    `OpenBot Dev` profile with it. That lock is never taken from a holder that is still running,
-    however long it has held it, and the recovery of one whose holder is gone happens one process
-    at a time - `unlink` cannot be made conditional on what the path holds, so two waiters
-    recovering together would both enter. `bun run dev:status` and `bun run dev:stop`
+    `OpenBot Dev` profile with it. Ownership of that lock is a generation rather than a path: taking
+    it means creating the next numbered file with an exclusive create, so who owns it is decided by
+    a step the kernel makes atomic and never by a delete. A lock whose holder has died is superseded
+    rather than removed, which is what keeps two allocators that read the same dead holder from both
+    entering, and a holder that is still running is never moved past however long it has held it. `bun run dev:status` and `bun run dev:stop`
     (`scripts/dev-stack.ts`) read those pids instead of matching a process name, which is what makes
     stopping one worktree's stack leave the others alone. Every dev window stays
     reachable: `pages` lists the targets and `--page=<target-id|url-substring>` drives any of them, so

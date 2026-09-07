@@ -1,18 +1,22 @@
 // The lock is the whole fix for the race that let two worktrees run on one
-// port. Probing a port and then binding it seconds later is a check followed by
-// a use, and the registry closes that gap only if reading it, choosing ports
-// and publishing them happen one allocator at a time. So what this covers is
-// that a second allocator cannot enter the critical section while a first is
-// inside it - and that it reads the first one's ports when it does get in.
+// port. Probing a port and then binding it seconds later is a check followed
+// by a use, and the registry closes that gap only if reading it, choosing
+// ports and publishing them happen one allocator at a time. So what this
+// covers is that a second allocator cannot enter the critical section while a
+// first is inside it - including when the first one arrived by superseding a
+// lock they both judged abandoned - and that it reads the first one's ports
+// when it does get in.
 //
 // No test here waits on the clock. The second allocator's `onWait` fires when
-// it has seen the lock held, and that is the observable condition the first one
-// waits for before it publishes.
-import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+// it has seen the lock held, and that is the observable condition the first
+// one waits for before it publishes.
+import { spawn } from "node:child_process";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { breakStaleLock, withDevPortAllocation } from "./port-allocation";
+import { withDevPortAllocation } from "./port-allocation";
 import type { DevStackRecord } from "./stack-registry";
 
 function stack(port: number): DevStackRecord {
@@ -26,20 +30,28 @@ function stack(port: number): DevStackRecord {
   };
 }
 
+// A pid above the maximum on every platform this runs on, so nothing holds it.
+const NOBODY = 0x3fffffff;
+
+const here = dirname(fileURLToPath(import.meta.url));
+
 describe("withDevPortAllocation", () => {
   let directory = "";
-  let lockPath = "";
-  let breakPath = "";
 
   beforeEach(() => {
     directory = mkdtempSync(join(tmpdir(), "openbot-port-allocation-"));
-    lockPath = join(directory, "port-allocation.lock");
-    breakPath = join(directory, "port-allocation.break.lock");
   });
 
   afterEach(() => {
     rmSync(directory, { recursive: true, force: true });
   });
+
+  const lockFiles = (): string[] => readdirSync(directory).filter((entry) => entry.endsWith(".lock"));
+  const plantLock = (generation: number, contents: string): string => {
+    const path = join(directory, `port-allocation.${generation}.lock`);
+    writeFileSync(path, contents);
+    return path;
+  };
 
   it("holds a second allocator out until the first has published its ports", async () => {
     const order: string[] = [];
@@ -76,8 +88,63 @@ describe("withDevPortAllocation", () => {
     // The ports the first one won, which is what makes the second walk past
     // them instead of probing them and finding them unbound.
     expect(seenBySecond.flatMap((record) => record.ports)).toEqual([{ name: "app-renderer", port: 5_173 }]);
-    expect(existsSync(lockPath)).toBe(false);
+    expect(lockFiles()).toEqual([]);
   });
+
+  it("lets only one of several processes allocate at a time, even with an abandoned lock to recover", async () => {
+    // The one case in-process tests cannot reach. Everything from reading the
+    // registry to publishing the lock is synchronous, so two allocators in this
+    // process never interleave there - and that gap is exactly where the
+    // dangerous interleaving lives: several allocators reading the same
+    // abandoned lock at once, each deciding to recover it. Real processes are
+    // the only way to put them inside that window together, so this spawns
+    // them.
+    //
+    // Every child starts against a lock left by a dead holder, so each one has
+    // to recover before it can allocate. Whoever recovers must end up with
+    // exclusive use; the others must wait for them. The hold inside the
+    // critical section widens the window a broken lock would overlap in - it
+    // is not what makes a correct one pass, and no assertion here waits on the
+    // clock: the barrier is the children exiting.
+    plantLock(1, JSON.stringify({ pid: NOBODY, acquiredAt: 1 }));
+    const log = join(directory, "sections.log");
+    const child = join(directory, "allocate.ts");
+    writeFileSync(
+      child,
+      `import { appendFileSync } from "node:fs";
+       const { withDevPortAllocation } = await import(${JSON.stringify(join(here, "port-allocation.ts"))});
+       await withDevPortAllocation(async () => {
+         appendFileSync(${JSON.stringify(log)}, \`enter \${process.pid}\\n\`);
+         await new Promise((done) => setTimeout(done, 25));
+         appendFileSync(${JSON.stringify(log)}, \`leave \${process.pid}\\n\`);
+       }, { directory: ${JSON.stringify(directory)}, readRecords: () => [] });`,
+    );
+
+    const exits = await Promise.all(
+      Array.from({ length: 4 }, () => {
+        const process_ = spawn("bun", [child], { stdio: ["ignore", "ignore", "pipe"] });
+        let stderr = "";
+        process_.stderr.on("data", (chunk) => {
+          stderr += String(chunk);
+        });
+        return new Promise<string>((resolveExit) => {
+          process_.once("exit", (code) => resolveExit(code === 0 ? "" : stderr || `exit ${code}`));
+        });
+      }),
+    );
+
+    expect(exits).toEqual(["", "", "", ""]);
+    // Strictly alternating enter/leave. Two allocators inside together read the
+    // same registry and hand their stacks the same ports, which reads here as
+    // an "enter" before the previous "leave".
+    const sections = readFileSync(log, "utf8").trimEnd().split("\n");
+    // Joined, so a failure prints the order it actually got.
+    expect(sections.map((line) => line.split(" ")[0]).join(" ")).toBe(
+      "enter leave enter leave enter leave enter leave",
+    );
+    expect(new Set(sections.map((line) => line.split(" ")[1])).size).toBe(4);
+    expect(lockFiles()).toEqual([]);
+  }, 30_000);
 
   it("names the holder of the lock it is waiting for", async () => {
     const waited: number[] = [];
@@ -106,19 +173,19 @@ describe("withDevPortAllocation", () => {
     // publishes the lock and its contents in one step, so the only way to see
     // this is a leftover from an older runner - or a lock in the moment before
     // its holder's write lands, if a future change ever reintroduces one. Both
-    // are worth waiting for; taking it would put two allocators on one port.
-    writeFileSync(lockPath, '{"pid": 4');
+    // are worth waiting for.
+    const path = plantLock(1, '{"pid": 4');
 
     await expect(
       withDevPortAllocation(async () => {}, { directory, readRecords: () => [], waitMs: 0 }),
     ).rejects.toThrow("still held by pid unknown");
-    expect(readFileSync(lockPath, "utf8")).toBe('{"pid": 4');
+    expect(readFileSync(path, "utf8")).toBe('{"pid": 4');
   });
 
-  it("breaks a lock it cannot read once it has sat there past the stale window", async () => {
-    writeFileSync(lockPath, '{"pid": 4');
+  it("moves past a lock it cannot read once it has sat there past the stale window", async () => {
+    const path = plantLock(1, '{"pid": 4');
     const longAgo = new Date(Date.now() - 60_000);
-    utimesSync(lockPath, longAgo, longAgo);
+    utimesSync(path, longAgo, longAgo);
     let entered = false;
 
     await withDevPortAllocation(
@@ -129,7 +196,7 @@ describe("withDevPortAllocation", () => {
     );
 
     expect(entered).toBe(true);
-    expect(existsSync(lockPath)).toBe(false);
+    expect(lockFiles()).toEqual([]);
   });
 
   it("never takes the lock from a live holder, however long it has held it", async () => {
@@ -142,37 +209,39 @@ describe("withDevPortAllocation", () => {
     const anHourFromNow = Date.now() + 3_600_000;
 
     for (const clock of [Date.now, () => anHourFromNow]) {
-      writeFileSync(lockPath, holder);
+      const path = plantLock(1, holder);
       await expect(
         withDevPortAllocation(async () => {}, { directory, readRecords: () => [], waitMs: 0, now: clock }),
       ).rejects.toThrow(`still held by pid ${process.pid}`);
-      expect(readFileSync(lockPath, "utf8")).toBe(holder);
+      expect(readFileSync(path, "utf8")).toBe(holder);
     }
   });
 
-  it("breaks a lock left behind by a holder that is no longer running", async () => {
-    // The state a crash between `link` and `unlink` leaves. The pid is above
-    // the maximum on every platform this runs on, so nothing holds it.
-    writeFileSync(lockPath, JSON.stringify({ pid: 0x3fffffff, acquiredAt: Date.now() }));
+  it("supersedes a lock left behind by a holder that is no longer running", async () => {
+    // The state a crash between `link` and `unlink` leaves.
+    plantLock(1, JSON.stringify({ pid: NOBODY, acquiredAt: Date.now() }));
     let entered = false;
 
     await withDevPortAllocation(
       async () => {
         entered = true;
+        // Superseded, and the litter goes with it: the file this allocator
+        // holds is the only one left.
+        expect(lockFiles()).toEqual(["port-allocation.2.lock"]);
       },
       { directory, readRecords: () => [] },
     );
 
     expect(entered).toBe(true);
-    expect(existsSync(lockPath)).toBe(false);
+    expect(lockFiles()).toEqual([]);
   });
 
-  it("breaks a lock whose holder pid has since been recycled", async () => {
+  it("supersedes a lock whose holder pid has since been recycled", async () => {
     // This process, but claiming to have taken the lock in 1970: no process
     // alive now started before that, so this pid belongs to something else and
     // the lock is litter. Without this, one recycled pid wedges every dev
     // start on the machine until a developer removes the file by hand.
-    writeFileSync(lockPath, JSON.stringify({ pid: process.pid, acquiredAt: 0 }));
+    plantLock(1, JSON.stringify({ pid: process.pid, acquiredAt: 0 }));
     let entered = false;
 
     await withDevPortAllocation(
@@ -193,52 +262,19 @@ describe("withDevPortAllocation", () => {
       }),
     ).rejects.toThrow("no available development port");
 
-    expect(existsSync(lockPath)).toBe(false);
+    expect(lockFiles()).toEqual([]);
   });
 
-  // `unlink` cannot be made conditional on what the path holds, so two waiters
-  // that read one dead holder would both delete: the first publishes a lock of
-  // its own and starts allocating, and the second deletes that replacement and
-  // starts allocating beside it. Recovery is serialized to make that
-  // impossible, and these cover the two ways it declines to delete.
-  describe("breakStaleLock", () => {
-    it("leaves the replacement a lock it judged has already been given", () => {
-      // `judge` runs under the break lock, and returns false exactly when the
-      // re-read finds a live replacement instead of the dead holder.
-      const replacement = JSON.stringify({ pid: process.pid, acquiredAt: Date.now() });
-      writeFileSync(lockPath, replacement);
-
-      expect(breakStaleLock(lockPath, breakPath, () => false)).toBe(false);
-
-      expect(readFileSync(lockPath, "utf8")).toBe(replacement);
-      expect(existsSync(breakPath)).toBe(false);
-    });
-
-    it("waits its turn while another allocator is recovering the same lock", () => {
-      writeFileSync(breakPath, JSON.stringify({ pid: process.pid, acquiredAt: Date.now() }));
-      const stale = JSON.stringify({ pid: 0x3fffffff, acquiredAt: 0 });
-      writeFileSync(lockPath, stale);
-
-      expect(breakStaleLock(lockPath, breakPath, () => true)).toBe(false);
-
-      // Untouched: the other allocator is between deleting this file and
-      // publishing its own, and deleting it here is what puts two allocators
-      // on one set of ports.
-      expect(readFileSync(lockPath, "utf8")).toBe(stale);
-    });
-  });
-
-  it("leaves a lock a waiter took over after deciding this one was stale", async () => {
+  it("leaves a lock a waiter took over after deciding this one was abandoned", async () => {
     const usurper = JSON.stringify({ pid: process.pid, acquiredAt: 1_234 });
 
     await withDevPortAllocation(
       async () => {
-        writeFileSync(lockPath, usurper);
+        writeFileSync(join(directory, "port-allocation.1.lock"), usurper);
       },
       { directory, readRecords: () => [] },
     );
 
-    expect(existsSync(lockPath)).toBe(true);
-    expect(readFileSync(lockPath, "utf8")).toBe(usurper);
+    expect(readFileSync(join(directory, "port-allocation.1.lock"), "utf8")).toBe(usurper);
   });
 });
