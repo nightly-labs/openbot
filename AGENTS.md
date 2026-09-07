@@ -42,9 +42,12 @@ local development.
 Before you call a task done, run the narrowest test for what you touched, then `bun run lint` and
 `bun run typecheck` — plus `bun run check:ui` if you touched `src/renderer`, which scans the whole
 renderer, and `src` and `apps` for the markup that can name a class, in under 200 ms. All three
-read more than you changed on purpose and none is expensive: `lint` is
-`biome check --max-diagnostics=none .` across every file in about six seconds, `typecheck` is eleven
-`tsc` projects in about four. The wide typecheck is the more useful one — a change in
+read more than you changed on purpose: `lint` runs `biome check --max-diagnostics=none .` across
+every file with two worker threads by default. `typecheck` runs eleven `tsc` projects in sequence
+with two compiler threads and a separate incremental cache for each project. The first run creates
+the caches. Later runs reuse them. Elapsed time depends on other work on the machine; these commands
+still belong in local verification. Set `RAYON_NUM_THREADS` or `GOMAXPROCS` to change the respective
+thread limit. The wide typecheck is the more useful one — a change in
 `packages/contracts` surfaces as an error in `src/renderer` or `src/main`, which a single `tsc -p`
 on the project you edited never sees. The `lint` flag is load-bearing: Biome caps a report at 20
 diagnostics by default, and it prints the honest total but not the findings past the cap, so a
