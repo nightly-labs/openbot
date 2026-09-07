@@ -412,26 +412,22 @@
 }
 
 :where(.z-badge-variant-primary-light) {
-  border-color: var(--openbot-accent-strong);
   background: var(--openbot-accent-soft);
   color: var(--openbot-accent-text);
 }
 
 :where(.z-badge-variant-success-light) {
-  border-color: var(--openbot-success-soft);
   background: var(--openbot-success-soft);
   color: var(--openbot-success);
 }
 
 :where(.z-badge-variant-warning-light) {
-  border-color: var(--openbot-warning-soft);
   background: var(--openbot-warning-soft);
   color: var(--openbot-warning);
 }
 
 :where(.z-badge-variant-destructive),
 :where(.z-badge-variant-destructive-light) {
-  border-color: var(--openbot-danger-soft);
   background: var(--openbot-danger-soft);
   color: var(--openbot-danger);
 }
@@ -441,7 +437,6 @@
  * succeeded nor an action the user can take. The heavier weight and the open tracking
  * are part of the look, which is why this variant sets them and the others do not. */
 :where(.z-badge-variant-new) {
-  border-color: var(--openbot-badge-new-border);
   background: var(--openbot-badge-new-soft);
   color: var(--openbot-badge-new);
   font-weight: var(--openbot-weight-semibold);
@@ -449,7 +444,6 @@
 }
 
 :where(.z-badge-variant-info-light) {
-  border-color: var(--openbot-accent-soft);
   background: var(--openbot-accent-soft);
   color: var(--openbot-accent-text);
 }

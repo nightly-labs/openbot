@@ -118,17 +118,13 @@
   --openbot-island-identity-name: var(--openbot-text-primary);
   --openbot-question-badge-text: #8bdee8;
   --openbot-question-badge-soft: rgba(107, 199, 217, 0.16);
-  --openbot-question-badge-border: rgba(107, 199, 217, 0.24);
   --openbot-message-badge-text: #91c8ff;
   --openbot-message-badge-soft: rgba(116, 185, 255, 0.16);
-  --openbot-message-badge-border: rgba(116, 185, 255, 0.24);
   /* The "new thing is available" pill. One call site - .sidebar-update-pill - and it
      is deliberately not --openbot-accent: an announcement is not an action. */
   --openbot-badge-new: #ff1e5e;
   --openbot-badge-new-soft: rgba(255, 30, 94, 0.16);
-  --openbot-badge-new-border: rgba(255, 30, 94, 0.28);
   --openbot-approval-badge-soft: rgba(255, 148, 18, 0.18);
-  --openbot-approval-badge-border: rgba(255, 148, 18, 0.3);
   /* One red. The palette carried four families - danger (#e47d75), danger-strong
      (#ff4058), settings-danger (#eb4145) and button-destructive (oklch, #ff6467) -
      all between hue 352 and 359, i.e. the same red at four saturations, and the

@@ -22,7 +22,7 @@ const accentBlue = [
   ["Accent hover", "--openbot-accent-hover", "Hover on a filled control"],
   ["Accent text", "--openbot-accent-text", "Links, and the blue word in a badge"],
   ["Accent soft", "--openbot-accent-soft", "Badge and selected-row fills"],
-  ["Accent strong", "--openbot-accent-strong", "The border around a soft fill"],
+  ["Accent strong", "--openbot-accent-strong", "Selection rings, glows and gradient stops"],
   ["Border focus", "--openbot-border-focus", "Focus ring on an interactive edge"],
   ["Focus tint", "--openbot-focus-tint", "The ring's outer glow"],
 ] as const;
@@ -30,7 +30,6 @@ const accentBlue = [
 const accentPink = [
   ["Badge new", "--openbot-badge-new", "The word in a New pill"],
   ["Badge new soft", "--openbot-badge-new-soft", "Its fill"],
-  ["Badge new border", "--openbot-badge-new-border", "Its border"],
 ] as const;
 
 const meta = {
