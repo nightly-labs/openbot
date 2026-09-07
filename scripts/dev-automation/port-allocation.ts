@@ -15,6 +15,22 @@
 // beside it. Here the second one's create simply fails, and the judgement
 // about a dead holder decides only when to move on - never who won.
 //
+// One rule carries that, and it is the one to keep when changing this file:
+// **a lock file is removed by nothing but its own live holder, releasing it.**
+// The generation an allocator asks for is the highest it saw plus one, and the
+// scan and the create are separate steps that the scheduler is free to pull
+// apart - so anything that removes somebody else's lock lets the numbering run
+// backwards over a plan already made against it. Sweeping the litter is how
+// that got in: recover the lock a dead holder left at 1, take 2, release 2,
+// and an allocator arriving now finds an empty directory and takes 1, while an
+// allocator that read the directory before any of it still holds a plan for 2
+// and no longer collides with anybody. Both then allocate.
+//
+// The price is that a lock a crashed holder left behind stays there. Nothing
+// reads it - the highest generation is the lock - and it is what keeps the
+// numbering from ever coming back down to it. A dev start that crashes leaves
+// one small file in the per-user temporary directory.
+//
 // The critical section is a handful of `bind` probes and one file write, so it
 // is milliseconds long. Everything slow - `bun install`, electron-vite, the
 // Worker runtime - happens after the lock is released.
@@ -192,7 +208,6 @@ export async function withDevPortAllocation<T>(
     await wait(Math.min(pollIntervalMs, Math.max(deadline - now(), 1)));
   }
 
-  discardSupersededLocks(directory, generation);
   try {
     return await run(readRecords());
   } finally {
@@ -234,20 +249,11 @@ function tryCreateLock(path: string, holder: LockHolder): boolean {
   }
 }
 
-// Litter left by allocators that crashed before they could release. Removing
-// it cannot change who owns the lock - this process does, at a higher
-// generation, and nothing reads a lower one - and it keeps the numbering from
-// climbing for the life of the temporary directory.
-function discardSupersededLocks(directory: string, generation: number): void {
-  for (const entry of readdirSync(directory)) {
-    const other = lockGeneration(entry);
-    if (other === null || other >= generation) continue;
-    rmSync(join(directory, entry), { force: true });
-  }
-}
-
-// Only remove a lock this process still holds. A file that no longer carries
-// our identity was replaced by something that decided ours was abandoned, and
+// Only remove a lock this process still holds - the one case where removing a
+// lock file is safe. An allocator that read ours as the highest generation read
+// it as live, because we are running, so it waited rather than planning a
+// generation above it: nothing is holding a plan that our removal could let
+// back down. A file that no longer carries our identity is somebody else's, and
 // deleting theirs would let a third allocator in beside them.
 function releaseLock(path: string, holder: LockHolder): void {
   const current = readLockHolder(path);

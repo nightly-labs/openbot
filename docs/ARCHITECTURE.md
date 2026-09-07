@@ -141,9 +141,10 @@ These are manual model evaluations, separate from the fake-provider lifecycle re
     followed by a use, so two runners starting together both used to win 5173 and the unsuffixed
     `OpenBot Dev` profile with it. Ownership of that lock is a generation rather than a path: taking
     it means creating the next numbered file with an exclusive create, so who owns it is decided by
-    a step the kernel makes atomic and never by a delete. A lock whose holder has died is superseded
-    rather than removed, which is what keeps two allocators that read the same dead holder from both
-    entering, and a holder that is still running is never moved past however long it has held it. `bun run dev:status` and `bun run dev:stop`
+    a step the kernel makes atomic and never by a delete. A lock whose holder has died is superseded and
+    left in place - a lock file is removed by nothing but its own live holder, because the numbering
+    comes from the files present and sweeping one away lets it run backwards over a plan already made
+    against it - and a holder that is still running is never moved past however long it has held it. `bun run dev:status` and `bun run dev:stop`
     (`scripts/dev-stack.ts`) read those pids instead of matching a process name, which is what makes
     stopping one worktree's stack leave the others alone. Every dev window stays
     reachable: `pages` lists the targets and `--page=<target-id|url-substring>` drives any of them, so

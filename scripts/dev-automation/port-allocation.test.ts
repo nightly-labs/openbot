@@ -143,7 +143,9 @@ describe("withDevPortAllocation", () => {
       "enter leave enter leave enter leave enter leave",
     );
     expect(new Set(sections.map((line) => line.split(" ")[1])).size).toBe(4);
-    expect(lockFiles()).toEqual([]);
+    // Every lock these four took is released, and the abandoned one they all
+    // recovered from is still there. See the supersede test below.
+    expect(lockFiles()).toEqual(["port-allocation.1.lock"]);
   }, 30_000);
 
   it("names the holder of the lock it is waiting for", async () => {
@@ -196,7 +198,7 @@ describe("withDevPortAllocation", () => {
     );
 
     expect(entered).toBe(true);
-    expect(lockFiles()).toEqual([]);
+    expect(lockFiles()).toEqual(["port-allocation.1.lock"]);
   });
 
   it("never takes the lock from a live holder, however long it has held it", async () => {
@@ -217,23 +219,29 @@ describe("withDevPortAllocation", () => {
     }
   });
 
-  it("supersedes a lock left behind by a holder that is no longer running", async () => {
-    // The state a crash between `link` and `unlink` leaves.
+  it("supersedes a lock left behind by a holder that is no longer running, and leaves it in place", async () => {
+    // The state a crash between `link` and `unlink` leaves - and the rule the
+    // whole scheme rests on: an allocator adds its own lock and removes
+    // nothing else, so a lock file only ever goes away under its own live
+    // holder. Tidying the recovered one away instead is what let the numbering
+    // run backwards: recover 1, take 2, release 2, and the next allocator
+    // finds an empty directory and takes 1 - beside an allocator that read the
+    // directory earlier, planned 2, and now collides with nobody.
     plantLock(1, JSON.stringify({ pid: NOBODY, acquiredAt: Date.now() }));
     let entered = false;
 
     await withDevPortAllocation(
       async () => {
         entered = true;
-        // Superseded, and the litter goes with it: the file this allocator
-        // holds is the only one left.
-        expect(lockFiles()).toEqual(["port-allocation.2.lock"]);
+        expect(lockFiles()).toEqual(["port-allocation.1.lock", "port-allocation.2.lock"]);
       },
       { directory, readRecords: () => [] },
     );
 
     expect(entered).toBe(true);
-    expect(lockFiles()).toEqual([]);
+    // Ours released, the recovered one still standing, so 1 is never handed
+    // out again.
+    expect(lockFiles()).toEqual(["port-allocation.1.lock"]);
   });
 
   it("supersedes a lock whose holder pid has since been recycled", async () => {
