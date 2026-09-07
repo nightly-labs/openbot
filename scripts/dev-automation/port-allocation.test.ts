@@ -12,7 +12,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { withDevPortAllocation } from "./port-allocation";
+import { breakStaleLock, withDevPortAllocation } from "./port-allocation";
 import type { DevStackRecord } from "./stack-registry";
 
 function stack(port: number): DevStackRecord {
@@ -29,10 +29,12 @@ function stack(port: number): DevStackRecord {
 describe("withDevPortAllocation", () => {
   let directory = "";
   let lockPath = "";
+  let breakPath = "";
 
   beforeEach(() => {
     directory = mkdtempSync(join(tmpdir(), "openbot-port-allocation-"));
     lockPath = join(directory, "port-allocation.lock");
+    breakPath = join(directory, "port-allocation.break.lock");
   });
 
   afterEach(() => {
@@ -130,24 +132,46 @@ describe("withDevPortAllocation", () => {
     expect(existsSync(lockPath)).toBe(false);
   });
 
-  it("gives up rather than take the lock from a holder that is alive and still allocating", async () => {
-    // This process, taken a moment ago: the one state where waiting is the
-    // only correct answer. An allocator that ran its wait out and then helped
-    // itself would hand both stacks the same ports - the collision the lock
-    // exists to stop - so the developer gets the error and the holder's pid.
+  it("never takes the lock from a live holder, however long it has held it", async () => {
+    // This process, so the holder is provably alive. An allocator that waited
+    // out a live holder and then helped itself would hand both stacks the same
+    // ports - a holder that is slow, or stopped in a debugger, has not
+    // finished - so the developer gets the error and the pid instead. The
+    // injected hour proves age is not what decides this.
     const holder = JSON.stringify({ pid: process.pid, acquiredAt: Date.now() });
-    writeFileSync(lockPath, holder);
+    const anHourFromNow = Date.now() + 3_600_000;
 
-    await expect(
-      withDevPortAllocation(async () => {}, { directory, readRecords: () => [], waitMs: 0 }),
-    ).rejects.toThrow(`still held by pid ${process.pid}`);
-    expect(readFileSync(lockPath, "utf8")).toBe(holder);
+    for (const clock of [Date.now, () => anHourFromNow]) {
+      writeFileSync(lockPath, holder);
+      await expect(
+        withDevPortAllocation(async () => {}, { directory, readRecords: () => [], waitMs: 0, now: clock }),
+      ).rejects.toThrow(`still held by pid ${process.pid}`);
+      expect(readFileSync(lockPath, "utf8")).toBe(holder);
+    }
   });
 
-  it("breaks a lock whose holder never released it", async () => {
-    // This process, so liveness cannot be what lets the allocator in: the
-    // holder is alive and the lock is old, which is the state left by a crash
-    // between `open` and `unlink`.
+  it("breaks a lock left behind by a holder that is no longer running", async () => {
+    // The state a crash between `link` and `unlink` leaves. The pid is above
+    // the maximum on every platform this runs on, so nothing holds it.
+    writeFileSync(lockPath, JSON.stringify({ pid: 0x3fffffff, acquiredAt: Date.now() }));
+    let entered = false;
+
+    await withDevPortAllocation(
+      async () => {
+        entered = true;
+      },
+      { directory, readRecords: () => [] },
+    );
+
+    expect(entered).toBe(true);
+    expect(existsSync(lockPath)).toBe(false);
+  });
+
+  it("breaks a lock whose holder pid has since been recycled", async () => {
+    // This process, but claiming to have taken the lock in 1970: no process
+    // alive now started before that, so this pid belongs to something else and
+    // the lock is litter. Without this, one recycled pid wedges every dev
+    // start on the machine until a developer removes the file by hand.
     writeFileSync(lockPath, JSON.stringify({ pid: process.pid, acquiredAt: 0 }));
     let entered = false;
 
@@ -155,7 +179,7 @@ describe("withDevPortAllocation", () => {
       async () => {
         entered = true;
       },
-      { directory, readRecords: () => [], now: () => 60_000 },
+      { directory, readRecords: () => [] },
     );
 
     expect(entered).toBe(true);
@@ -170,6 +194,38 @@ describe("withDevPortAllocation", () => {
     ).rejects.toThrow("no available development port");
 
     expect(existsSync(lockPath)).toBe(false);
+  });
+
+  // `unlink` cannot be made conditional on what the path holds, so two waiters
+  // that read one dead holder would both delete: the first publishes a lock of
+  // its own and starts allocating, and the second deletes that replacement and
+  // starts allocating beside it. Recovery is serialized to make that
+  // impossible, and these cover the two ways it declines to delete.
+  describe("breakStaleLock", () => {
+    it("leaves the replacement a lock it judged has already been given", () => {
+      // `judge` runs under the break lock, and returns false exactly when the
+      // re-read finds a live replacement instead of the dead holder.
+      const replacement = JSON.stringify({ pid: process.pid, acquiredAt: Date.now() });
+      writeFileSync(lockPath, replacement);
+
+      expect(breakStaleLock(lockPath, breakPath, () => false)).toBe(false);
+
+      expect(readFileSync(lockPath, "utf8")).toBe(replacement);
+      expect(existsSync(breakPath)).toBe(false);
+    });
+
+    it("waits its turn while another allocator is recovering the same lock", () => {
+      writeFileSync(breakPath, JSON.stringify({ pid: process.pid, acquiredAt: Date.now() }));
+      const stale = JSON.stringify({ pid: 0x3fffffff, acquiredAt: 0 });
+      writeFileSync(lockPath, stale);
+
+      expect(breakStaleLock(lockPath, breakPath, () => true)).toBe(false);
+
+      // Untouched: the other allocator is between deleting this file and
+      // publishing its own, and deleting it here is what puts two allocators
+      // on one set of ports.
+      expect(readFileSync(lockPath, "utf8")).toBe(stale);
+    });
   });
 
   it("leaves a lock a waiter took over after deciding this one was stale", async () => {

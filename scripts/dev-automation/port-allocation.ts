@@ -11,7 +11,7 @@
 import { closeSync, linkSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
-import { isProcessAlive } from "./registry-files";
+import { verifyRecordedProcess } from "./registry-files";
 import {
   type DevStackRecord,
   devStackRegistryDirectory,
@@ -20,9 +20,12 @@ import {
 } from "./stack-registry";
 
 const LOCK_FILE_NAME = "port-allocation.lock";
+// Recovery of a lock nobody holds happens one process at a time, behind this
+// second file. See `breakStaleLock`.
+const BREAK_LOCK_FILE_NAME = "port-allocation.break.lock";
 const LOCK_WAIT_MS = 10_000;
-// A holder that has kept the lock this long is not allocating any more: it
-// crashed between `open` and `unlink`, or a debugger is parked in it.
+// How long a file whose contents say nothing may sit at the lock path before
+// an allocator treats it as litter rather than as a lock.
 const LOCK_STALE_MS = 30_000;
 const LOCK_POLL_INTERVAL_MS = 25;
 // Breaking a lock and finding it taken again means another waiter broke it
@@ -51,20 +54,26 @@ function lockFileAgeMs(path: string, now: number): number | null {
   }
 }
 
-// A lock nobody provable holds. Each arm is a state a *correct* holder can
-// never be in:
+// A lock nobody holds. Two states, and a *live* holder is neither of them:
 //
 //   - unreadable contents. `link` publishes the lock and its holder in one
 //     step, so a file at this path always parses the moment it exists. Garbage
 //     is a leftover from an older runner or from a developer's `touch` - still
 //     breakable, but only once it is older than the stale window, because
-//     nothing else may assume a file it cannot read is abandoned.
-//   - a holder that is no longer running.
-//   - a holder that has kept it far longer than an allocation takes.
+//     nothing may assume a file it cannot read is abandoned.
+//   - a holder that is no longer running. `verifyRecordedProcess` reads that
+//     off the process start time, so a pid recycled since the lock was taken
+//     counts as gone rather than as a live holder - which is what stops a
+//     recycled pid from wedging every dev start on the machine.
 //
-// A live holder inside the window is *not* breakable, however long this
-// process has waited. Taking its lock would put two allocators in the critical
-// section, which is the collision this whole file exists to stop.
+// How long a live holder has held it does not enter into it. An allocation is
+// milliseconds of work, so a lock held for a minute means something is wrong,
+// but "wrong" is not "finished": the holder may be stopped in a debugger and
+// about to step into the critical section. Waiting it out and then taking it
+// anyway would hand both allocators the same ports, which is the collision
+// this whole file exists to stop, so the developer gets an error naming the
+// pid instead. `unverified` - a holder this machine cannot date - is treated
+// as live for the same reason.
 function isBreakableLock(
   path: string,
   holder: LockHolder | null,
@@ -76,8 +85,7 @@ function isBreakableLock(
     const age = fileAgeMs(path, now);
     return age === null || age > staleMs;
   }
-  if (!isProcessAlive(holder.pid)) return true;
-  return now - holder.acquiredAt > staleMs;
+  return verifyRecordedProcess({ pid: holder.pid, startedAt: holder.acquiredAt }) === "gone";
 }
 
 interface LockHolder {
@@ -123,31 +131,38 @@ export async function withDevPortAllocation<T>(
   } = options;
   ensureDevStackRegistryDirectory(directory);
   const path = join(directory, LOCK_FILE_NAME);
+  const breakPath = join(directory, BREAK_LOCK_FILE_NAME);
   const holder: LockHolder = { pid: process.pid, acquiredAt: now() };
   const deadline = now() + waitMs;
   let breakAttempts = 0;
+  let recoveryWasBusy = false;
 
   for (;;) {
     if (tryCreateLock(path, holder)) break;
     const current = readLockHolder(path);
     if (isBreakableLock(path, current, now(), staleMs)) {
-      breakAttempts += 1;
-      if (breakAttempts > MAX_BREAK_ATTEMPTS) {
+      if (breakAttempts >= MAX_BREAK_ATTEMPTS) {
         throw new Error(
           `Could not take the dev port allocation lock at ${path}. ` +
             "Check `bun run dev:status`, then remove that file if no dev stack is starting.",
         );
       }
-      rmSync(path, { force: true });
-      continue;
+      const broken = breakStaleLock(path, breakPath, () => isBreakableLock(path, readLockHolder(path), now(), staleMs));
+      recoveryWasBusy = !broken;
+      if (broken) {
+        breakAttempts += 1;
+        continue;
+      }
+      // Another allocator is recovering this lock. Look again rather than
+      // reach past it - it is about to publish a lock of its own.
     }
-    // Waited out a holder that is alive and inside its window. Something is
-    // wrong with it, but it is not this process's to guess about: allocating
-    // beside it would hand both of us the same ports.
     if (now() >= deadline) {
       throw new Error(
-        `The dev port allocation lock at ${path} is still held by pid ${current?.pid ?? "unknown"}. ` +
-          "Check `bun run dev:status` and stop that dev stack, or wait for it to finish starting.",
+        recoveryWasBusy
+          ? `The dev port allocation lock at ${path} was left behind by pid ${current?.pid ?? "unknown"}, ` +
+              `and the allocator recovering it did not finish. Remove ${breakPath} if no dev stack is starting.`
+          : `The dev port allocation lock at ${path} is still held by pid ${current?.pid ?? "unknown"}. ` +
+              "Check `bun run dev:status` and stop that dev stack, or wait for it to finish starting.",
       );
     }
     onWait?.(current?.pid ?? 0);
@@ -193,6 +208,31 @@ function tryCreateLock(path: string, holder: LockHolder): boolean {
     throw error;
   } finally {
     rmSync(staging, { force: true });
+  }
+}
+
+// Removing the lock is the one step that touches a file another allocator may
+// own by the time it runs, and `unlink` cannot be made conditional on what the
+// path holds: two waiters that read the same dead holder both delete, the
+// first publishes a lock of its own and enters allocation, and the second
+// deletes *that* one and enters beside it. Both then get the same ports, which
+// is the failure the lock exists to prevent. So recovery is serialized behind
+// a second file: whoever takes it reads the lock again through `judge` and
+// finds the replacement rather than the dead holder it saw a moment ago.
+//
+// Nothing ever breaks this second file. It is held across a handful of
+// syscalls with no `await` between them, so only a hard kill inside that
+// window can leak it, and a leak costs recovery rather than correctness -
+// allocators wait and then fail with a message naming the file. Recovering it
+// automatically would need the same serialization one level down.
+export function breakStaleLock(path: string, breakPath: string, judge: () => boolean): boolean {
+  if (!tryCreateLock(breakPath, { pid: process.pid, acquiredAt: Date.now() })) return false;
+  try {
+    if (!judge()) return false;
+    rmSync(path, { force: true });
+    return true;
+  } finally {
+    rmSync(breakPath, { force: true });
   }
 }
 
