@@ -213,7 +213,7 @@ a {
 
 .landing-brand:focus-visible {
   outline: 0;
-  box-shadow: 0 0 0 3px var(--openbot-focus-tint);
+  box-shadow: 0 0 0 3px var(--openbot-accent-strong);
 }
 
 .landing-brand-logo {
@@ -282,7 +282,7 @@ a {
   overflow: hidden;
   padding: 96px 24px 48px;
   background:
-    radial-gradient(circle at 50% 42%, var(--openbot-focus-tint), var(--openbot-transparent) 38%),
+    radial-gradient(circle at 50% 42%, var(--openbot-accent-strong), var(--openbot-transparent) 38%),
     var(--openbot-bg-canvas);
 }
 
@@ -323,7 +323,7 @@ a {
   height: 7px;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-logo-production);
-  box-shadow: 0 0 0 6px var(--openbot-focus-tint);
+  box-shadow: 0 0 0 6px var(--openbot-accent-strong);
 }
 
 .join-card-logo {
@@ -440,7 +440,7 @@ a {
 
 .landing-button:focus-visible {
   outline: 0;
-  box-shadow: 0 0 0 3px var(--openbot-focus-tint);
+  box-shadow: 0 0 0 3px var(--openbot-accent-strong);
 }
 
 .landing-button:active {
@@ -760,7 +760,7 @@ a {
   position: absolute;
   z-index: -1;
   inset: -42px -24px -30px;
-  background: radial-gradient(ellipse at 50% 48%, var(--openbot-focus-tint), var(--openbot-transparent) 68%);
+  background: radial-gradient(ellipse at 50% 48%, var(--openbot-accent-strong), var(--openbot-transparent) 68%);
   content: "";
   filter: blur(22px);
   opacity: 0.82;
@@ -868,7 +868,7 @@ a {
   padding: clamp(26px, 2.6vw, 34px);
   border: 1px solid var(--openbot-download-card-border);
   border-radius: 20px;
-  color: var(--openbot-download-card-ink);
+  color: var(--openbot-text-on-light);
 }
 
 .landing-download-card[data-download-platform="macos"] {
@@ -1016,7 +1016,7 @@ a {
 .landing-footer-column a:focus-visible,
 .landing-footer-meta a:focus-visible {
   outline: 0;
-  box-shadow: 0 0 0 3px var(--openbot-focus-tint);
+  box-shadow: 0 0 0 3px var(--openbot-accent-strong);
 }
 
 .landing-footer-logo {
@@ -1336,7 +1336,7 @@ a {
 
   .landing-download-card[data-state="available"]:hover {
     transform: translateY(-4px);
-    box-shadow: 0 18px 44px -28px var(--openbot-download-card-ink);
+    box-shadow: 0 18px 44px -28px var(--openbot-text-on-light);
   }
 
   .landing-download-card[data-state="available"]:hover .landing-download-arrow {

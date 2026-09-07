@@ -436,7 +436,7 @@ function ProviderMark(props: { provider: AgentProviderId; large?: boolean }) {
 
 function ChevronDownIcon() {
   return (
-    <svg class="provider-model-chevron" viewBox="0 0 16 16" aria-hidden="true">
+    <svg class="provider-model-chevron ui-glyph-16" viewBox="0 0 16 16" aria-hidden="true">
       <path d="m4.5 6.25 3.5 3.5 3.5-3.5" />
     </svg>
   );

@@ -7,10 +7,11 @@ import { Alert, Pressable, ScrollView, View, type ViewStyle } from "react-native
 
 import type { MobileSession } from "@/features/auth/api/mobile-auth";
 import type { MobileServer } from "@/features/workspace/context/mobile-workspace-context";
+import { serverStatusLabel } from "@/features/workspace/model/server-status";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
-
 import { ServerDrawerIconButton } from "./server-drawer-icon-button";
+import { ServerStatusLabel } from "./server-status-label";
 
 interface ServerDrawerContentProps {
   activeServerId: string;
@@ -61,7 +62,10 @@ export function ServerDrawerContent({
     ]);
   }
   const emailSeparatorIndex = session.user.email.indexOf("@");
-  const displayName = emailSeparatorIndex > 0 ? session.user.email.slice(0, emailSeparatorIndex) : session.user.email;
+  const displayName =
+    session.user.name ||
+    (emailSeparatorIndex > 0 ? session.user.email.slice(0, emailSeparatorIndex) : session.user.email);
+  const avatarUrl = session.user.avatarUrl ? new URL(session.user.avatarUrl, session.apiUrl).toString() : null;
   const mutedColor = String(muted);
 
   return (
@@ -83,7 +87,7 @@ export function ServerDrawerContent({
               key={serverItem.id}
               accessibilityRole="button"
               accessibilityState={{ selected }}
-              accessibilityLabel={`${serverItem.name}, ${serverLabel}`}
+              accessibilityLabel={`${serverItem.name}, ${serverLabel}, ${serverStatusLabel(serverItem)}`}
               accessibilityActions={
                 serverItem.kind === "remote" ? [{ name: "leave", label: "Leave server" }] : undefined
               }
@@ -117,9 +121,7 @@ export function ServerDrawerContent({
                 <Typography.Paragraph weight={selected ? "bold" : "semibold"} numberOfLines={1}>
                   {serverItem.name}
                 </Typography.Paragraph>
-                <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                  {serverLabel}
-                </Typography.Paragraph>
+                <ServerStatusLabel server={serverItem} prefix={`${serverLabel} · `} />
               </View>
             </Pressable>
           );
@@ -172,7 +174,7 @@ export function ServerDrawerContent({
 
       <View className="mr-3 flex-row items-center gap-2 pt-2">
         <View className="min-h-14 min-w-0 flex-1 flex-row items-center gap-2.5 rounded-2xl px-2 py-2">
-          <ProfileAvatar name={displayName} imageUrl={session.user.avatarUrl} size={36} />
+          <ProfileAvatar neutral name={displayName} imageUrl={avatarUrl} size={36} />
           <View className="min-w-0 flex-1">
             <Typography.Paragraph type="body-sm" weight="semibold" numberOfLines={1}>
               {displayName}

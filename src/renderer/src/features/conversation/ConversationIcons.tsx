@@ -1,17 +1,20 @@
 export function CloseIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="size-[14px] fill-none stroke-current">
-      <path d="m5 5 10 10M15 5 5 15" stroke-width="1.4" stroke-linecap="round" />
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-[14px] fill-none stroke-current">
+      <path d="m5 5 10 10M15 5 5 15" stroke-linecap="round" />
     </svg>
   );
 }
 
 export function DownloadIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="image-generation-download-icon fill-none stroke-current">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      class="ui-glyph-20 image-generation-download-icon fill-none stroke-current"
+    >
       <path
         d="M10 3.5v8m0 0 3.25-3.25M10 11.5 6.75 8.25M4 14.5v1.75h12V14.5"
-        stroke-width="1.35"
         stroke-linecap="round"
         stroke-linejoin="round"
       />
@@ -21,7 +24,7 @@ export function DownloadIcon() {
 
 export function StopIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="size-[14px] fill-current">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-[14px] fill-current">
       <rect x="6" y="6" width="8" height="8" rx="1.5" />
     </svg>
   );
@@ -29,37 +32,36 @@ export function StopIcon() {
 
 export function BackIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="settings-back-icon fill-none stroke-current">
-      <path d="m12.5 4-6 6 6 6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 settings-back-icon fill-none stroke-current">
+      <path d="m12.5 4-6 6 6 6" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   );
 }
 
 export function SettingsForwardIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="settings-forward-icon fill-none stroke-current">
-      <path d="m5.5 4 6 6-6 6m5-12 6 6-6 6" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" />
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 settings-forward-icon fill-none stroke-current">
+      <path d="m5.5 4 6 6-6 6m5-12 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   );
 }
 
 export function PlusIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="size-[14px] fill-none stroke-current">
-      <path d="M10 4v12M4 10h12" stroke-width="1.3" stroke-linecap="round" />
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-[14px] fill-none stroke-current">
+      <path d="M10 4v12M4 10h12" stroke-linecap="round" />
     </svg>
   );
 }
 
 export function LinkIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 16 16" class="message-link-fallback">
+    <svg aria-hidden="true" viewBox="0 0 16 16" class="ui-glyph-16 message-link-fallback">
       <path
         d="M6.6 9.4 9.4 6.6M5.2 10.8l-1 .9a2.2 2.2 0 0 1-3.1-3.1l2.1-2.1a2.2 2.2 0 0 1 3.1 0M10.8 5.2l1-.9a2.2 2.2 0 1 1 3.1 3.1l-2.1 2.1a2.2 2.2 0 0 1-3.1 0"
         fill="none"
         stroke="currentColor"
         stroke-linecap="round"
-        stroke-width="1.3"
       />
     </svg>
   );
@@ -67,7 +69,7 @@ export function LinkIcon() {
 
 export function ReactionIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20">
       <circle cx="10" cy="10" r="7.25" />
       <path d="M7.25 8h.01M12.75 8h.01M6.9 11.5c.85 1.25 1.88 1.85 3.1 1.85s2.25-.6 3.1-1.85" />
     </svg>
@@ -76,7 +78,7 @@ export function ReactionIcon() {
 
 export function ReplyIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20">
       <path d="m8.25 5-4.5 4.1 4.5 4.1V10c4.1 0 6.45 1.35 8 4.35-.25-5.2-2.9-7.65-8-7.65z" />
     </svg>
   );
@@ -84,7 +86,7 @@ export function ReplyIcon() {
 
 export function MoreIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="conversation-more-icon">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 conversation-more-icon">
       <circle cx="5" cy="10" r="1" />
       <circle cx="10" cy="10" r="1" />
       <circle cx="15" cy="10" r="1" />
@@ -94,7 +96,7 @@ export function MoreIcon() {
 
 export function QueueIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20">
       <path d="M4.5 4.5v8.25a2 2 0 0 0 2 2h8.75" />
       <path d="m12.25 11.75 3 3-3 3" />
     </svg>
@@ -103,7 +105,7 @@ export function QueueIcon() {
 
 export function TrashIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20">
       <path d="M4.5 6.5h11M8 6.5V4.75h4V6.5M6.25 6.5l.75 9h6l.75-9M8.5 9v4M11.5 9v4" />
     </svg>
   );
@@ -111,7 +113,7 @@ export function TrashIcon() {
 
 export function EditIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20">
       <path d="m5 13.9-.7 2.8 2.8-.7L15.4 7.7a1.8 1.8 0 0 0-2.5-2.5z" />
       <path d="m11.7 6.8 1.5 1.5" />
     </svg>
@@ -120,7 +122,7 @@ export function EditIcon() {
 
 export function SteerIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20">
       <path d="M4.25 5.5h3.5v5.75a3.5 3.5 0 0 0 3.5 3.5h4" />
       <path d="m12.25 11.75 3 3-3 3" />
     </svg>
@@ -129,7 +131,7 @@ export function SteerIcon() {
 
 export function CopyIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20">
       <rect x="6.5" y="6.5" width="9" height="9" rx="1.5" />
       <path d="M13 6.5V5a1.5 1.5 0 0 0-1.5-1.5H5A1.5 1.5 0 0 0 3.5 5v6.5A1.5 1.5 0 0 0 5 13h1.5" />
     </svg>
@@ -138,7 +140,7 @@ export function CopyIcon() {
 
 export function CheckIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20">
       <path d="m4.5 10.5 3.25 3.25L15.5 6" />
     </svg>
   );
@@ -146,26 +148,26 @@ export function CheckIcon() {
 
 export function ComputerIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="size-[14px] fill-none stroke-current">
-      <rect x="2.5" y="3" width="15" height="10" rx="1.5" stroke-width="1.3" />
-      <path d="M7 17h6M10 13v4" stroke-width="1.3" stroke-linecap="round" />
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-[14px] fill-none stroke-current">
+      <rect x="2.5" y="3" width="15" height="10" rx="1.5" />
+      <path d="M7 17h6M10 13v4" stroke-linecap="round" />
     </svg>
   );
 }
 
 export function RemoteDesktopIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="size-[14px] fill-none stroke-current">
-      <rect x="2.5" y="3" width="15" height="10" rx="1.5" stroke-width="1.3" />
-      <path d="M7 17h6M10 13v4" stroke-width="1.3" stroke-linecap="round" />
-      <path d="M13.8 6.2c.9.45 1.45 1.15 1.65 2.05M13.65 8.3h.01" stroke-width="1.15" stroke-linecap="round" />
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-[14px] fill-none stroke-current">
+      <rect x="2.5" y="3" width="15" height="10" rx="1.5" />
+      <path d="M7 17h6M10 13v4" stroke-linecap="round" />
+      <path d="M13.8 6.2c.9.45 1.45 1.15 1.65 2.05M13.65 8.3h.01" stroke-linecap="round" />
     </svg>
   );
 }
 
 export function BrowserControlIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 16 16" class="browser-tab-control-icon">
+    <svg aria-hidden="true" viewBox="0 0 16 16" class="ui-glyph-16 browser-tab-control-icon">
       <path d="M3.25 2.5 11 8.2 7.55 9.3l-1.5 3.45z" />
       <circle cx="11.75" cy="3.75" r="1.45" />
     </svg>
@@ -174,25 +176,25 @@ export function BrowserControlIcon() {
 
 export function BrowserBackIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="browser-toolbar-icon fill-none stroke-current">
-      <path d="m12 4-6 6 6 6" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current">
+      <path d="m12 4-6 6 6 6" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   );
 }
 
 export function BrowserForwardIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="browser-toolbar-icon fill-none stroke-current">
-      <path d="m8 4 6 6-6 6" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current">
+      <path d="m8 4 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   );
 }
 
 export function BrowserReloadIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="browser-toolbar-icon fill-none stroke-current">
-      <path d="M15.5 7.5A6 6 0 1 0 16 11" stroke-width="1.3" stroke-linecap="round" />
-      <path d="M15.5 4.5v3h-3" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current">
+      <path d="M15.5 7.5A6 6 0 1 0 16 11" stroke-linecap="round" />
+      <path d="M15.5 4.5v3h-3" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   );
 }

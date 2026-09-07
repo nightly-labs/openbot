@@ -55,6 +55,7 @@ interface GrokTurn {
   text: string;
   thought: string;
   thoughtStarted: boolean;
+  messages: ThreadItem[];
   task: Promise<void>;
 }
 
@@ -440,6 +441,7 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
       text: "",
       thought: "",
       thoughtStarted: false,
+      messages: [],
       task: Promise.resolve(),
     };
     thread.activeTurn = turn;
@@ -473,14 +475,12 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
     const update = notification.update;
     if (!turn) return;
     if (update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {
+      if (update.content.text) this.#completeThought(thread, turn);
       turn.text += update.content.text;
-      this.emit("notification", {
-        method: "item/agentMessage/delta",
-        params: { threadId: thread.id, turnId: turn.id, itemId: turn.itemId, delta: update.content.text },
-      });
       return;
     }
     if (update.sessionUpdate === "agent_thought_chunk" && update.content.type === "text") {
+      this.#completeMessage(thread, turn, "commentary");
       /* A delta carries no phase, so the item has to be opened as `commentary` first — otherwise the
          thought lands in an ordinary agentMessage and renders as a chat bubble. */
       if (!turn.thoughtStarted) {
@@ -502,6 +502,7 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
+      if (update.sessionUpdate === "tool_call") this.#completeMessage(thread, turn, "commentary");
       this.emit("notification", {
         method: update.status === "completed" || update.status === "failed" ? "item/completed" : "item/started",
         params: {
@@ -534,24 +535,36 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
     }
   }
 
+  // ACP cannot identify final text while streaming. Buffer unclassified text privately,
+  // publishing commentary at a later step boundary or an answer when the prompt finishes.
+  #completeMessage(thread: GrokThread, turn: GrokTurn, phase: "commentary" | "final_answer"): void {
+    if (!turn.text) return;
+    const item = { id: turn.itemId, type: "agentMessage", phase, text: turn.text } satisfies ThreadItem;
+    turn.messages.push(item);
+    this.emit("notification", { method: "item/completed", params: { threadId: thread.id, turnId: turn.id, item } });
+    turn.text = "";
+    turn.itemId = `${turn.id}:assistant:${turn.messages.length}`;
+  }
+
+  #completeThought(thread: GrokThread, turn: GrokTurn): void {
+    if (!turn.thoughtStarted) return;
+    const item = {
+      id: turn.thoughtItemId,
+      type: "agentMessage",
+      phase: "commentary",
+      text: turn.thought,
+    } satisfies ThreadItem;
+    turn.messages.push(item);
+    this.emit("notification", { method: "item/completed", params: { threadId: thread.id, turnId: turn.id, item } });
+    turn.thought = "";
+    turn.thoughtStarted = false;
+    turn.thoughtItemId = `${turn.id}:thought:${turn.messages.length}`;
+  }
+
   #completeTurn(thread: GrokThread, turn: GrokTurn, status: string, error: unknown): void {
     if (thread.activeTurn !== turn) return;
-    const item = { id: turn.itemId, type: "agentMessage", text: turn.text } satisfies ThreadItem;
-    const thoughtItem = turn.thoughtStarted
-      ? ({
-          id: turn.thoughtItemId,
-          type: "agentMessage",
-          phase: "commentary",
-          text: turn.thought,
-        } satisfies ThreadItem)
-      : null;
-    if (thoughtItem) {
-      this.emit("notification", {
-        method: "item/completed",
-        params: { threadId: thread.id, turnId: turn.id, item: thoughtItem },
-      });
-    }
-    this.emit("notification", { method: "item/completed", params: { threadId: thread.id, turnId: turn.id, item } });
+    this.#completeThought(thread, turn);
+    this.#completeMessage(thread, turn, "final_answer");
     if (status === "failed" && error) {
       this.emit("notification", {
         method: "error",
@@ -562,7 +575,7 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
       method: "turn/completed",
       params: { threadId: thread.id, turn: { id: turn.id, status } },
     });
-    thread.turns.push({ id: turn.id, status, items: thoughtItem ? [thoughtItem, item] : [item] });
+    thread.turns.push({ id: turn.id, status, items: turn.messages });
     thread.activeTurn = null;
   }
 

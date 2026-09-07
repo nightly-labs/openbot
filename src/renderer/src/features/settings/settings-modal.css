@@ -19,18 +19,7 @@
 
 .settings-modal {
   --openbot-bg-surface: var(--openbot-bg-control);
-  --openbot-accent: var(--openbot-settings-accent);
-  --openbot-accent-hover: var(--openbot-settings-accent-hover);
-  --openbot-accent-text: var(--openbot-settings-accent-text);
-  --openbot-accent-soft: var(--openbot-settings-accent-soft);
-  --openbot-accent-strong: var(--openbot-settings-accent-strong);
   --openbot-text-muted: var(--openbot-settings-text-muted);
-  --openbot-border-focus: var(--openbot-settings-accent);
-  --openbot-button-destructive: var(--openbot-settings-danger);
-  --openbot-button-destructive-soft: var(--openbot-settings-danger-soft);
-  --openbot-button-destructive-hover: var(--openbot-settings-danger-hover);
-  --openbot-button-destructive-focus: var(--openbot-settings-danger-focus);
-  --openbot-button-destructive-border: var(--openbot-settings-danger-border);
   width: min(880px, calc(100vw - 48px));
   height: min(600px, calc(100dvh - 48px));
   min-width: 0;
@@ -90,7 +79,7 @@
 .settings-modal-nav-item svg {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
-  stroke-width: 1.75;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .settings-modal-nav-item[aria-current="page"] {
@@ -138,9 +127,9 @@
 
 .settings-modal-title {
   margin: 0;
-  font-size: var(--openbot-text-settings-title);
+  font-size: var(--openbot-text-2xl);
   font-weight: var(--openbot-weight-semibold);
-  line-height: var(--openbot-leading-settings-title);
+  line-height: var(--openbot-leading-2xl);
   letter-spacing: var(--openbot-tracking-tight);
 }
 
@@ -301,7 +290,7 @@
 }
 
 .settings-modal :where(.ui-button-variant-default) {
-  background: var(--openbot-settings-accent);
+  background: var(--openbot-accent);
   color: var(--openbot-text-primary);
 }
 
@@ -310,12 +299,12 @@
 }
 
 .settings-modal :where(.ui-button-variant-destructive) {
-  background: var(--openbot-settings-danger);
+  background: var(--openbot-danger);
   color: var(--openbot-text-primary);
 }
 
 .settings-modal .ui-switch[data-checked] {
-  background: var(--openbot-settings-accent);
+  background: var(--openbot-accent);
 }
 
 .settings-modal .ui-switch-thumb[data-checked] {
@@ -324,11 +313,11 @@
 
 @media (hover: hover) and (pointer: fine) {
   .settings-modal :where(.ui-button-variant-default):hover:not(:disabled):not([data-disabled]) {
-    background: var(--openbot-settings-accent-hover);
+    background: var(--openbot-accent-hover);
   }
 
   .settings-modal :where(.ui-button-variant-destructive):hover:not(:disabled):not([data-disabled]) {
-    background: var(--openbot-settings-danger-hover);
+    background: var(--openbot-danger-hover);
     color: var(--openbot-text-primary);
   }
 }
@@ -337,7 +326,7 @@
   width: min(920px, calc(100vw - 48px));
   height: min(640px, calc(100dvh - 48px));
   grid-template-columns: 196px minmax(0, 1fr);
-  border-radius: var(--openbot-radius-dialog);
+  border-radius: var(--openbot-radius-card);
   box-shadow:
     var(--openbot-shadow-raised),
     0 0 0 1px var(--openbot-dialog-ring);
@@ -367,11 +356,6 @@
 :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-header {
   align-items: center;
   padding: var(--openbot-space-4) var(--openbot-space-4) var(--openbot-space-6) var(--openbot-space-8);
-}
-
-:is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-title {
-  font-size: var(--openbot-text-2xl);
-  line-height: var(--openbot-leading-2xl);
 }
 
 :is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-description {
@@ -765,7 +749,7 @@
     height: auto;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: var(--openbot-control-md) var(--openbot-leading-xs);
+    grid-template-rows: var(--openbot-control-md) var(--openbot-leading-sm);
     align-items: stretch;
     row-gap: var(--openbot-space-0-5);
   }

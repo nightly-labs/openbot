@@ -421,7 +421,7 @@ export function AccountDock(props: AccountDockProps) {
             </Show>
           </span>
           <Show when={updatePresentation().available}>
-            <Badge class="sidebar-update-pill" tone="accent" shape="pill">
+            <Badge class="sidebar-update-pill" variant="new">
               Update
             </Badge>
             <span class="sr-only">OpenBot update available</span>

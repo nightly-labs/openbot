@@ -41,6 +41,74 @@ afterEach(async () => {
 });
 
 describe.sequential("GrokAgentClient", () => {
+  it.each(["end_turn", "cancelled", "max_tokens"])(
+    "shows only the final segment in chat when Grok ends with %s",
+    async (stopReason) => {
+      process.env.OPENBOT_FAKE_GROK_MODE = stopReason;
+      client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
+      const notifications: AppServerNotification[] = [];
+      client.on("notification", (notification) => notifications.push(notification));
+      client.start();
+      const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
+      await client.request(
+        "turn/start",
+        { threadId: thread.id, input: [{ type: "text", text: "Inspect and answer" }] },
+        decodeTurnResponse,
+      );
+      await waitFor(() => notifications.some((notification) => notification.method === "turn/completed"));
+      const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
+      const messages = history.thread.turns?.[0]?.items;
+      expect(messages).toEqual([
+        expect.objectContaining({ phase: "commentary", text: "Planning inspection." }),
+        expect.objectContaining({ phase: "commentary", text: "Inspecting files." }),
+        expect.objectContaining({ phase: "commentary", text: "Reviewing findings." }),
+        expect.objectContaining({ phase: "commentary", text: "Checking results." }),
+        expect.objectContaining({
+          phase: "final_answer",
+          text: "The final answer.",
+        }),
+      ]);
+      // Only explicit thoughts stream into activity. Unclassified text stays private until
+      // a later boundary establishes commentary or the final answer.
+      const phases = new Map<string, string>();
+      const texts = new Map<string, string>();
+      const completedAnswers: string[] = [];
+      const streamedThoughts: string[] = [];
+      for (const notification of notifications) {
+        if (notification.method === "turn/completed") break;
+        const params = notification.params;
+        if (!isDynamicRecord(params)) continue;
+        if (
+          (notification.method === "item/started" || notification.method === "item/completed") &&
+          isDynamicRecord(params.item)
+        ) {
+          const { id, phase } = params.item;
+          if (typeof id === "string" && typeof phase === "string") phases.set(id, phase);
+          if (phase === "final_answer") {
+            expect(notification.method).toBe("item/completed");
+            completedAnswers.push(String(params.item.text));
+          }
+        }
+        if (notification.method === "item/agentMessage/delta") {
+          const id = String(params.itemId);
+          const text = (texts.get(id) ?? "") + String(params.delta);
+          texts.set(id, text);
+          expect(phases.get(id)).toBe("commentary");
+          expect([...phases.values()]).not.toContain("final_answer");
+          if (text === "Reviewing findings.") {
+            const latestCommentaryId = [...phases].filter(([, phase]) => phase === "commentary").at(-1)?.[0];
+            expect(texts.get(latestCommentaryId ?? "")).toBe("Reviewing findings.");
+            streamedThoughts.push(text);
+          }
+        }
+      }
+      expect([...texts.values()]).toEqual(["Planning inspection.", "Reviewing findings."]);
+      expect(streamedThoughts).toEqual(["Reviewing findings."]);
+      expect(completedAnswers).toEqual(["The final answer."]);
+      expect([...phases.values()].filter((phase) => phase === "final_answer")).toHaveLength(1);
+    },
+  );
+
   it("reads the current weekly billing period and rejects a monthly period", async () => {
     client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
     client.start();
@@ -602,6 +670,23 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     return;
   }
   if (message.method === "session/prompt") {
+    if (["end_turn", "cancelled", "max_tokens"].includes(mode)) {
+      const updates = [
+        { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "Planning inspection." } },
+        { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Inspecting files." } },
+        { sessionUpdate: "tool_call", toolCallId: "read-1", title: "Read files", status: "in_progress" },
+        { sessionUpdate: "tool_call_update", toolCallId: "read-1", status: "completed" },
+        { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "Reviewing findings." } },
+        { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Checking results." } },
+        { sessionUpdate: "tool_call", toolCallId: "read-2", title: "Check results", status: "in_progress" },
+        { sessionUpdate: "tool_call_update", toolCallId: "read-2", status: "completed" },
+        { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "The final " } },
+        { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "answer." } },
+      ];
+      for (const update of updates) write({ method: "session/update", params: { sessionId: message.params.sessionId, update } });
+      write({ id: message.id, result: { stopReason: mode } });
+      return;
+    }
     promptCounter += 1;
     log({ method: message.method, promptCounter, text: message.params.prompt.filter((block) => block.type === "text").map((block) => block.text).join("\n") });
     if (promptCounter === 1) {

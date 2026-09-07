@@ -1,4 +1,4 @@
-import { createSignal, onCleanup } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { createScrollFades } from "../../../components/createScrollFades";
 import type { ConversationProps } from "../conversation-types";
 import { calculateChatScrollMargin, createChatVirtualizer } from "../createChatVirtualizer";
@@ -30,25 +30,41 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   const scrollFades = createScrollFades();
   const [virtualScrollMargin, setVirtualScrollMargin] = createSignal(0);
   const [showScrollToLatest, setShowScrollToLatest] = createSignal(false);
+  const [atHistoryBoundary, setAtHistoryBoundary] = createSignal(false);
   const [unreadDividerVisible, setUnreadDividerVisible] = createSignal(false);
   let unreadVisibilityFrame: number | undefined;
 
+  const timelineMessages = createMemo(() => deps.props.messages.filter((message) => message.kind !== "thinking"));
+
+  createEffect(
+    () =>
+      deps.props.loaded &&
+      (timelineMessages().length === 0 || atHistoryBoundary()) &&
+      deps.props.hasOlder &&
+      !deps.props.loadingOlder &&
+      !deps.props.olderError,
+    (needsOlderPage) => {
+      if (needsOlderPage) deps.props.onLoadOlder?.();
+    },
+  );
+
   const messageVirtualizer = createChatVirtualizer<HTMLDivElement, HTMLDivElement>({
-    count: () => deps.props.messages.length,
+    count: () => timelineMessages().length,
     getScrollElement: () => deps.elements.scrollElement() ?? null,
     estimateSize: () => 128,
-    getItemKey: (index) => deps.props.messages[index]?.id ?? index,
-    keyVersion: () => `${deps.props.messages[0]?.id ?? ""}:${deps.props.messages.at(-1)?.id ?? ""}`,
+    getItemKey: (index) => timelineMessages()[index]?.id ?? index,
+    keyVersion: () => `${timelineMessages()[0]?.id ?? ""}:${timelineMessages().at(-1)?.id ?? ""}`,
     scrollMargin: virtualScrollMargin,
     onChange: (instance) => {
       const first = instance.getVirtualItems()[0];
-      if (first && first.index <= 5 && deps.props.hasOlder && !deps.props.loadingOlder) deps.props.onLoadOlder?.();
+      if (first) setAtHistoryBoundary(first.index <= 5);
     },
   });
 
   function updateScrollFade(element = deps.elements.scrollElement()) {
     if (!element) return;
     scrollFades.measure();
+    setAtHistoryBoundary(element.scrollTop <= 80);
     setShowScrollToLatest(element.scrollHeight - element.scrollTop - element.clientHeight > 80);
   }
 
@@ -137,6 +153,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     unreadDividerVisible,
     setUnreadDividerVisible,
     messageVirtualizer,
+    timelineMessages,
     updateScrollFade,
     updateVirtualScrollMargin,
     updateUnreadDividerVisibility,

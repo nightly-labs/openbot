@@ -1,6 +1,7 @@
 import { Stack } from "expo-router/stack";
 import { useThemeColor } from "heroui-native/hooks";
 import { useState } from "react";
+import { useCSSVariable } from "uniwind";
 import { AgentPinTransitionProvider } from "@/features/agents/components/agent-pin-transition";
 import { ChatNavigationGateContext } from "@/features/agents/components/chat-link-pressable";
 import { createChatNavigationGate } from "@/features/agents/model/chat-navigation-gate";
@@ -15,6 +16,7 @@ export const unstable_settings = {
 
 function AuthenticatedStack() {
   const background = useThemeColor("background");
+  const sheetBackground = String(useCSSVariable("--openbot-bg-sheet") ?? background);
   const [navigationGate] = useState(createChatNavigationGate);
 
   return (
@@ -36,6 +38,7 @@ function AuthenticatedStack() {
           headerBackButtonDisplayMode: "minimal",
           headerShadowVisible: false,
           headerTransparent: isIOS,
+          sheetExpandsWhenScrolledToEdge: false,
         }}
       >
         <Stack.Screen name="connected" options={{ animation: "fade", gestureEnabled: false, title: "" }} />
@@ -52,21 +55,25 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="add-agent"
           options={{
-            contentStyle: { backgroundColor: background },
-            headerStyle: { backgroundColor: background },
-            headerTransparent: false,
+            contentStyle: { backgroundColor: sheetBackground },
+            headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
+            headerTransparent: isIOS,
+            headerBlurEffect: "none",
+            scrollEdgeEffects: { top: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: "fitToContents",
             sheetGrabberVisible: true,
-            title: "Add agent",
+            title: "Create an agent",
           }}
         />
         <Stack.Screen
           name="edit-agent/[agentId]"
           options={{
-            contentStyle: { backgroundColor: background },
-            headerStyle: { backgroundColor: background },
-            headerTransparent: false,
+            contentStyle: { backgroundColor: sheetBackground },
+            headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
+            headerTransparent: isIOS,
+            headerBlurEffect: "none",
+            scrollEdgeEffects: { top: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: "fitToContents",
             sheetGrabberVisible: true,
@@ -76,7 +83,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="add-server"
           options={{
-            contentStyle: { backgroundColor: background },
+            contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
             presentation: "formSheet",
             sheetAllowedDetents: "fitToContents",
@@ -86,7 +93,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="search-agents"
           options={{
-            contentStyle: { backgroundColor: background },
+            contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
             presentation: "formSheet",
             sheetAllowedDetents: [1],
@@ -97,7 +104,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="hidden-chats"
           options={{
-            contentStyle: { backgroundColor: background },
+            contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
             presentation: "formSheet",
             sheetAllowedDetents: "fitToContents",
@@ -107,10 +114,10 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="settings"
           options={{
-            contentStyle: { backgroundColor: background },
+            contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
             presentation: "formSheet",
-            sheetAllowedDetents: "fitToContents",
+            sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
           }}
         />

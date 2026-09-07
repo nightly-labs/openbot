@@ -14,7 +14,7 @@ body,
 
 body {
   background: var(--openbot-bg-canvas);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
   -webkit-font-smoothing: antialiased;
 }
 

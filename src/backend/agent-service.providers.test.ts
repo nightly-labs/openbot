@@ -112,6 +112,71 @@ describe.sequential("AgentService: providers", () => {
     expect(progress()).toEqual([]);
     const stored = await service.readConversation("chief");
     expect(stored.messages.find((message) => message.id === `activity:${turnId}`)).toBeUndefined();
+    client.emit(
+      "notification",
+      notification("item/started", {
+        threadId,
+        turnId,
+        item: { id: "reasoning-1", type: "reasoning", summary: [], content: [] },
+      }),
+    );
+    client.emit(
+      "notification",
+      notification("item/reasoning/summaryTextDelta", {
+        threadId,
+        turnId,
+        itemId: "reasoning-1",
+        summaryIndex: 0,
+        delta: "Inspecting the sources.",
+      }),
+    );
+    client.emit(
+      "notification",
+      notification("item/reasoning/summaryPartAdded", {
+        threadId,
+        turnId,
+        itemId: "reasoning-1",
+        summaryIndex: 1,
+      }),
+    );
+    client.emit(
+      "notification",
+      notification("item/reasoning/summaryTextDelta", {
+        threadId,
+        turnId,
+        itemId: "reasoning-1",
+        summaryIndex: 1,
+        delta: "Comparing the results.",
+      }),
+    );
+    const reasoning = (await service.readConversation("chief")).messages.find(
+      (message) => message.id === "reasoning-1",
+    );
+    expect(reasoning).toMatchObject({
+      itemType: "commentary",
+      status: "streaming",
+      text: "Inspecting the sources.\n\nComparing the results.",
+    });
+    client.emit(
+      "notification",
+      notification("item/completed", {
+        threadId,
+        turnId,
+        item: {
+          id: "reasoning-1",
+          type: "reasoning",
+          summary: ["Inspecting the sources.", "Comparing the results."],
+          content: [],
+        },
+      }),
+    );
+    expect(
+      (await service.readConversation("chief")).messages.find((message) => message.id === "reasoning-1"),
+    ).toMatchObject({
+      itemType: "commentary",
+      status: "completed",
+      text: reasoning?.text,
+    });
     const conversationEventCount = () => events.filter((event) => event.type === "conversation").length;
     const persistedBeforeTools = conversationEventCount();
 

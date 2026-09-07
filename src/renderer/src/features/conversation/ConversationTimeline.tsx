@@ -9,7 +9,7 @@ import {
   MessageContent,
 } from "../../components/ui";
 import type { AgentMessage, ChatActionMarkerModel } from "../../data";
-import { AgentActivityIndicator, ThinkingDisclosure } from "./AgentActivity";
+import { AgentActivityIndicator } from "./AgentActivity";
 import { AttachmentCards } from "./AttachmentCards";
 import { ChatActionMarker } from "./ChatActionMarker";
 import { ChatSearch } from "./ChatSearch";
@@ -74,7 +74,6 @@ export function ConversationTimeline() {
     copiedMessageId,
     copyMessage,
     expandedEmojiMessageId,
-    expandedThinkingMessages,
     installedSkills,
     scrollFades,
     jumpToLatestMessage,
@@ -83,6 +82,7 @@ export function ConversationTimeline() {
     markUnreadMessages,
     markingRead,
     messageVirtualizer,
+    timelineMessages,
     moveChatSearch,
     openExternalMessageUrl,
     openMoreMessageId,
@@ -100,7 +100,6 @@ export function ConversationTimeline() {
     setChatSearchQuery,
     setComposerError,
     setExpandedEmojiMessageId,
-    setExpandedThinkingMessages,
     setOpenMoreMessageId,
     setOpenReactionMessageId,
     showScrollToLatest,
@@ -193,9 +192,9 @@ export function ConversationTimeline() {
               </Show>
             </section>
           </Show>
-          <Show when={props.messages.length > 0}>
+          <Show when={timelineMessages().length > 0}>
             <div class="time-marker">
-              <span>{props.messages[0]?.time ?? "now"}</span>
+              <span>{timelineMessages()[0]?.time ?? "now"}</span>
             </div>
           </Show>
           <Show when={props.loadingOlder || props.olderError}>
@@ -215,7 +214,7 @@ export function ConversationTimeline() {
           >
             <For each={virtualMessageRows()}>
               {(virtualRow) => {
-                const message = createMemo(() => props.messages[virtualRow.index]);
+                const message = createMemo(() => timelineMessages()[virtualRow.index]);
                 const initialMessage = untrack(message);
                 if (!initialMessage) return null;
                 const animateEntrance = initialMessage.animate === true && markMessageSeen(initialMessage.id);
@@ -226,7 +225,7 @@ export function ConversationTimeline() {
                   const current = message();
                   if (!current?.actionMarker) return false;
                   if (current.id === props.firstUnreadMessageId) return false;
-                  const previous = props.messages[virtualRow.index - 1];
+                  const previous = timelineMessages()[virtualRow.index - 1];
                   return previous !== undefined && markerRowEndsWithMarker(previous);
                 });
                 if (markerOnly) {
@@ -319,180 +318,155 @@ export function ConversationTimeline() {
                     <Show
                       when={message()?.questionPrompt}
                       fallback={
-                        <Show
-                          when={message()?.kind === "thinking"}
-                          fallback={
-                            <>
-                              <Show when={message()?.routine && message()?.actionMarker}>
-                                {(marker) => (
-                                  <ChatActionMarker
-                                    marker={marker()}
-                                    agents={props.agents}
-                                    announce={animateEntrance}
-                                    routineAvailable={routineMarkerAvailable(marker(), props.availableRoutineIds)}
-                                    onSelectAgent={props.onSelectAgent}
-                                    onOpenRoutine={openRoutineSettings}
-                                    onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
-                                  />
-                                )}
-                              </Show>
-                              <Message
-                                role="article"
-                                align={message()?.author === "you" ? "end" : "start"}
-                                data-chat-search-message={message()?.id}
-                                data-author={message()?.author === "you" ? "user" : "assistant"}
-                                class={[
-                                  "message-entry",
-                                  {
-                                    "message-entry-animated": animateEntrance,
-                                    "message-entry-user": message()?.author === "you",
-                                    "message-entry-agent": message()?.author === "agent",
-                                  },
-                                ]}
-                              >
-                                <MessageContent>
-                                  <div class="message-shell">
-                                    <Bubble
-                                      align={message()?.author === "you" ? "end" : "start"}
-                                      variant={conversationBubbleVariant(message() ?? initialMessage)}
-                                      data-author={message()?.author === "you" ? "user" : "assistant"}
-                                      data-streaming={message()?.streaming === true ? "" : undefined}
-                                    >
-                                      <BubbleContent>
-                                        <MessageBody
-                                          message={message() ?? initialMessage}
-                                          referencedMessage={
-                                            props.messages.find(
-                                              (candidate) => candidate.id === message()?.replyToMessageId,
-                                            ) ??
-                                            (message()?.replyToMessageId
-                                              ? props.messageReferences?.[message()?.replyToMessageId ?? ""]
-                                              : undefined)
-                                          }
-                                          agents={props.agents}
-                                          skills={installedSkills()}
-                                          onSelectAgent={props.onSelectAgent}
-                                          onOpenLink={(url) => void openExternalMessageUrl(url)}
-                                          onPreview={(attachment) => void previewAttachment(attachment)}
-                                          onAttachmentAction={attachmentAction}
-                                          onOpenSharedFile={openSharedFile}
-                                          onOpenWorkspaceFile={openWorkspaceFile}
-                                          onDownload={(attachment) => attachmentAction(attachment, "download")}
-                                        />
-                                      </BubbleContent>
-                                      <Show when={displayedReactions().length > 0}>
-                                        <BubbleReactions
-                                          class="message-reaction-anchor"
-                                          align={message()?.author === "you" ? "start" : "end"}
-                                          overflowCount={message()?.reactionSummary?.overflowCount}
-                                          role="group"
-                                          aria-label={`Reactions: ${displayedReactions()
-                                            .map((reaction) => reaction.emoji)
-                                            .join(", ")}`}
-                                        >
-                                          <For each={displayedReactions()}>
-                                            {(reaction) => (
-                                              <Show
-                                                when={reaction.actor.kind === "user"}
-                                                fallback={
-                                                  <span
-                                                    class="message-reaction-pill message-reaction-pill-readonly"
-                                                    role="img"
-                                                    aria-label={`${
-                                                      props.agents.find(
-                                                        (agent) =>
-                                                          reaction.actor.kind === "agent" &&
-                                                          agent.id === reaction.actor.agentId,
-                                                      )?.name ?? "Agent"
-                                                    } reacted with ${reaction.emoji}`}
-                                                  >
-                                                    <span aria-hidden="true">{reaction.emoji}</span>
-                                                  </span>
-                                                }
-                                              >
-                                                <Button
-                                                  variant="ghost"
-                                                  type="button"
-                                                  class="message-reaction-pill"
-                                                  aria-label={`Remove your reaction ${reaction.emoji}`}
-                                                  onClick={() => {
-                                                    const currentMessage = message();
-                                                    if (currentMessage) void reactToMessage(currentMessage, null);
-                                                  }}
-                                                >
-                                                  <span aria-hidden="true">{reaction.emoji}</span>
-                                                </Button>
-                                              </Show>
-                                            )}
-                                          </For>
-                                        </BubbleReactions>
-                                      </Show>
-                                    </Bubble>
-                                    <MessageActions
-                                      message={message() ?? initialMessage}
-                                      pickerOpen={openReactionMessageId() === message()?.id}
-                                      moreOpen={openMoreMessageId() === message()?.id}
-                                      expandedEmoji={expandedEmojiMessageId() === message()?.id}
-                                      copied={copiedMessageId() === message()?.id}
-                                      onTogglePicker={() => {
-                                        const messageId = message()?.id;
-                                        if (!messageId) return;
-                                        setOpenReactionMessageId((current) =>
-                                          current === messageId ? null : messageId,
-                                        );
-                                        setOpenMoreMessageId(null);
-                                        setExpandedEmojiMessageId(null);
-                                      }}
-                                      onToggleMore={() => {
-                                        const messageId = message()?.id;
-                                        if (!messageId) return;
-                                        setOpenMoreMessageId((current) => (current === messageId ? null : messageId));
-                                        setOpenReactionMessageId(null);
-                                        setExpandedEmojiMessageId(null);
-                                      }}
-                                      onExpandEmoji={() => {
-                                        const messageId = message()?.id;
-                                        if (!messageId) return;
-                                        setExpandedEmojiMessageId((current) =>
-                                          current === messageId ? null : messageId,
-                                        );
-                                      }}
-                                      onReact={(emoji) => {
-                                        const currentMessage = message();
-                                        if (currentMessage) void reactToMessage(currentMessage, emoji);
-                                      }}
-                                      onReply={() => {
-                                        const currentMessage = message();
-                                        if (currentMessage) replyToMessage(currentMessage);
-                                      }}
-                                      onCopy={() => {
-                                        const currentMessage = message();
-                                        if (currentMessage) void copyMessage(currentMessage);
-                                      }}
-                                    />
-                                  </div>
-                                </MessageContent>
-                              </Message>
-                            </>
-                          }
-                        >
-                          <div
+                        <>
+                          <Show when={message()?.routine && message()?.actionMarker}>
+                            {(marker) => (
+                              <ChatActionMarker
+                                marker={marker()}
+                                agents={props.agents}
+                                announce={animateEntrance}
+                                routineAvailable={routineMarkerAvailable(marker(), props.availableRoutineIds)}
+                                onSelectAgent={props.onSelectAgent}
+                                onOpenRoutine={openRoutineSettings}
+                                onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
+                              />
+                            )}
+                          </Show>
+                          <Message
+                            role="article"
+                            align={message()?.author === "you" ? "end" : "start"}
                             data-chat-search-message={message()?.id}
-                            class={{ "thinking-entry-animated": animateEntrance }}
+                            data-author={message()?.author === "you" ? "user" : "assistant"}
+                            class={[
+                              "message-entry",
+                              {
+                                "message-entry-animated": animateEntrance,
+                                "message-entry-user": message()?.author === "you",
+                                "message-entry-agent": message()?.author === "agent",
+                              },
+                            ]}
                           >
-                            <ThinkingDisclosure
-                              message={message() ?? initialMessage}
-                              working={Boolean(props.activeTurnId && message()?.turnId === props.activeTurnId)}
-                              open={expandedThinkingMessages()[`${props.agent?.id ?? ""}:${message()?.id ?? ""}`]}
-                              onOpenChange={(open) => {
-                                const key = `${props.agent?.id ?? ""}:${message()?.id ?? ""}`;
-                                setExpandedThinkingMessages((current) =>
-                                  current[key] === open ? current : { ...current, [key]: open },
-                                );
-                              }}
-                            />
-                          </div>
-                        </Show>
+                            <MessageContent>
+                              <div class="message-shell">
+                                <Bubble
+                                  align={message()?.author === "you" ? "end" : "start"}
+                                  variant={conversationBubbleVariant(message() ?? initialMessage)}
+                                  data-author={message()?.author === "you" ? "user" : "assistant"}
+                                  data-streaming={message()?.streaming === true ? "" : undefined}
+                                >
+                                  <BubbleContent>
+                                    <MessageBody
+                                      animate={animateEntrance}
+                                      message={message() ?? initialMessage}
+                                      referencedMessage={
+                                        timelineMessages().find(
+                                          (candidate) => candidate.id === message()?.replyToMessageId,
+                                        ) ??
+                                        (message()?.replyToMessageId
+                                          ? props.messageReferences?.[message()?.replyToMessageId ?? ""]
+                                          : undefined)
+                                      }
+                                      agents={props.agents}
+                                      skills={installedSkills()}
+                                      onSelectAgent={props.onSelectAgent}
+                                      onOpenLink={(url) => void openExternalMessageUrl(url)}
+                                      onPreview={(attachment) => void previewAttachment(attachment)}
+                                      onAttachmentAction={attachmentAction}
+                                      onOpenSharedFile={openSharedFile}
+                                      onOpenWorkspaceFile={openWorkspaceFile}
+                                      onDownload={(attachment) => attachmentAction(attachment, "download")}
+                                    />
+                                  </BubbleContent>
+                                  <Show when={displayedReactions().length > 0}>
+                                    <BubbleReactions
+                                      class="message-reaction-anchor"
+                                      align={message()?.author === "you" ? "start" : "end"}
+                                      overflowCount={message()?.reactionSummary?.overflowCount}
+                                      role="group"
+                                      aria-label={`Reactions: ${displayedReactions()
+                                        .map((reaction) => reaction.emoji)
+                                        .join(", ")}`}
+                                    >
+                                      <For each={displayedReactions()}>
+                                        {(reaction) => (
+                                          <Show
+                                            when={reaction.actor.kind === "user"}
+                                            fallback={
+                                              <span
+                                                class="message-reaction-pill message-reaction-pill-readonly"
+                                                role="img"
+                                                aria-label={`${
+                                                  props.agents.find(
+                                                    (agent) =>
+                                                      reaction.actor.kind === "agent" &&
+                                                      agent.id === reaction.actor.agentId,
+                                                  )?.name ?? "Agent"
+                                                } reacted with ${reaction.emoji}`}
+                                              >
+                                                <span aria-hidden="true">{reaction.emoji}</span>
+                                              </span>
+                                            }
+                                          >
+                                            <Button
+                                              variant="ghost"
+                                              type="button"
+                                              class="message-reaction-pill"
+                                              aria-label={`Remove your reaction ${reaction.emoji}`}
+                                              onClick={() => {
+                                                const currentMessage = message();
+                                                if (currentMessage) void reactToMessage(currentMessage, null);
+                                              }}
+                                            >
+                                              <span aria-hidden="true">{reaction.emoji}</span>
+                                            </Button>
+                                          </Show>
+                                        )}
+                                      </For>
+                                    </BubbleReactions>
+                                  </Show>
+                                </Bubble>
+                                <MessageActions
+                                  message={message() ?? initialMessage}
+                                  pickerOpen={openReactionMessageId() === message()?.id}
+                                  moreOpen={openMoreMessageId() === message()?.id}
+                                  expandedEmoji={expandedEmojiMessageId() === message()?.id}
+                                  copied={copiedMessageId() === message()?.id}
+                                  onTogglePicker={() => {
+                                    const messageId = message()?.id;
+                                    if (!messageId) return;
+                                    setOpenReactionMessageId((current) => (current === messageId ? null : messageId));
+                                    setOpenMoreMessageId(null);
+                                    setExpandedEmojiMessageId(null);
+                                  }}
+                                  onToggleMore={() => {
+                                    const messageId = message()?.id;
+                                    if (!messageId) return;
+                                    setOpenMoreMessageId((current) => (current === messageId ? null : messageId));
+                                    setOpenReactionMessageId(null);
+                                    setExpandedEmojiMessageId(null);
+                                  }}
+                                  onExpandEmoji={() => {
+                                    const messageId = message()?.id;
+                                    if (!messageId) return;
+                                    setExpandedEmojiMessageId((current) => (current === messageId ? null : messageId));
+                                  }}
+                                  onReact={(emoji) => {
+                                    const currentMessage = message();
+                                    if (currentMessage) void reactToMessage(currentMessage, emoji);
+                                  }}
+                                  onReply={() => {
+                                    const currentMessage = message();
+                                    if (currentMessage) replyToMessage(currentMessage);
+                                  }}
+                                  onCopy={() => {
+                                    const currentMessage = message();
+                                    if (currentMessage) void copyMessage(currentMessage);
+                                  }}
+                                />
+                              </div>
+                            </MessageContent>
+                          </Message>
+                        </>
                       }
                     >
                       {(questionPrompt) => (

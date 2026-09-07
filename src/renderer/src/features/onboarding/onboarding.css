@@ -188,7 +188,7 @@
 .onboarding-computer-desktop {
   stroke: var(--openbot-border-on-light);
   stroke-width: 1;
-  filter: drop-shadow(0 16px 22px var(--openbot-shadow-popover-key));
+  filter: drop-shadow(0 16px 22px var(--openbot-shadow-popover-ambient));
 }
 
 .onboarding-computer-desktop-highlight {
@@ -272,7 +272,7 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.8;
-  filter: drop-shadow(0 2px 3px var(--openbot-shadow-popover-key));
+  filter: drop-shadow(0 2px 3px var(--openbot-shadow-popover-ambient));
   paint-order: stroke fill;
 }
 
@@ -297,7 +297,7 @@
 .onboarding-computer-avatar .agent-avatar > svg {
   width: 128%;
   height: 128%;
-  filter: drop-shadow(0 2px 4px var(--openbot-shadow-popover-key));
+  filter: drop-shadow(0 2px 4px var(--openbot-shadow-popover-ambient));
 }
 
 @keyframes onboarding-computer-window-drag {

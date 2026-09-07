@@ -199,6 +199,14 @@ export class SignalService {
     this.#metrics.activeSockets = this.#sockets.size;
   }
 
+  profileChanged(userId: string): void {
+    for (const peer of this.#peers.values()) {
+      if (peer.claims.userId === userId) {
+        this.#send(peer.socket, { type: "account-profile-changed", version: 1 });
+      }
+    }
+  }
+
   revoke(hostId: string, authEpoch: number): void {
     const current = this.#revokedEpochs.get(hostId) ?? 0;
     if (authEpoch <= current) return;

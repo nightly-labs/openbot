@@ -777,6 +777,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             call("openbot", "list_agents", args),
           ),
           tool(
+            "update_profile",
+            "Update the name, title, and/or description of a local OpenBot agent.",
+            {
+              agentId: z.string().min(1),
+              name: z.string().max(INPUT_LIMITS.agentName).optional(),
+              title: z.string().max(INPUT_LIMITS.agentTitle).optional(),
+              description: z.string().max(INPUT_LIMITS.agentDescription).optional(),
+            },
+            (args) => call("openbot", "update_profile", args),
+          ),
+          tool(
             "list_routines",
             "List routines for this agent, or for another local agent when agentId is provided.",
             { agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional() },

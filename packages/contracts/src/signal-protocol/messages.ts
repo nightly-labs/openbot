@@ -105,6 +105,7 @@ export type SignalClientMessage =
   | SignalRelayMessage;
 
 export type SignalServerMessage =
+  | { type: "account-profile-changed"; version: SignalProtocolVersion }
   | {
       type: "ready";
       version: SignalProtocolVersion;
