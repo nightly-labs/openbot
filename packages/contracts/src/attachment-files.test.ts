@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ATTACHMENT_FILE_ACCEPT, attachmentMimeTypeForName, isSupportedAttachmentName } from "./attachment-files";
+import {
+  ATTACHMENT_FILE_ACCEPT,
+  attachmentMimeTypeForName,
+  isSupportedAttachmentName,
+  supportedAttachmentExtensions,
+} from "./attachment-files";
 
 describe("attachment file whitelist", () => {
   it("accepts images, documents, text, Markdown, data, and source files", () => {
@@ -27,6 +32,26 @@ describe("attachment file whitelist", () => {
   it.each(["recording.MP3", "Screen Recording.mov"])("accepts %s in the picker", (name) => {
     expect(isSupportedAttachmentName(name)).toBe(true);
     expect(ATTACHMENT_FILE_ACCEPT).toContain(`.${name.split(".").at(-1)?.toLowerCase()}`);
+  });
+
+  it("offers media only when the selected host supports it, without hiding other files", () => {
+    const legacy = supportedAttachmentExtensions({ eml: false, media: false });
+    expect(legacy).not.toContain("mp3");
+    expect(legacy).not.toContain("mov");
+    expect(legacy).not.toContain("eml");
+    expect(legacy).toEqual(expect.arrayContaining(["png", "pdf", "txt"]));
+    const media = supportedAttachmentExtensions({ eml: false, media: true });
+    expect(media).toEqual(expect.arrayContaining(["mp3", "mov", "pdf"]));
+    expect(media).not.toContain("eml");
+    const eml = supportedAttachmentExtensions({ eml: true, media: false });
+    expect(eml).toContain("eml");
+    expect(eml).not.toContain("mp3");
+    expect(eml).not.toContain("mov");
+    expect(
+      supportedAttachmentExtensions({ eml: true, media: true })
+        .map((extension) => `.${extension}`)
+        .join(","),
+    ).toBe(ATTACHMENT_FILE_ACCEPT);
   });
 
   it("assigns stable MIME types to supported formats", () => {

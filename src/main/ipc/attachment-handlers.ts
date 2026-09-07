@@ -5,12 +5,12 @@ import { createHash } from "node:crypto";
 import { chmod, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import {
-  ATTACHMENT_FILE_EXTENSIONS,
   attachmentFileExtension,
   IMAGE_ATTACHMENT_EXTENSIONS,
   isSupportedAttachmentName,
   MEDIA_ATTACHMENT_EXTENSIONS,
   SUPPORTED_ATTACHMENT_DESCRIPTION,
+  supportedAttachmentExtensions,
 } from "@openbot/contracts/attachment-files";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type FilePreview, type ImportAttachmentsInput, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
@@ -68,11 +68,7 @@ export function attachmentIpcHandlers({
               : [
                   {
                     name: "Supported files",
-                    extensions: ATTACHMENT_FILE_EXTENSIONS.filter(
-                      (extension) =>
-                        (supportsEml || extension !== "eml") &&
-                        (supportsMedia || !MEDIA_ATTACHMENT_EXTENSIONS.some((media) => media === extension)),
-                    ),
+                    extensions: supportedAttachmentExtensions({ eml: supportsEml, media: supportsMedia }),
                   },
                 ],
         };

@@ -76,6 +76,14 @@ export const ATTACHMENT_FILE_EXTENSIONS = [
   ...CONTEXT_ATTACHMENT_EXTENSIONS,
 ] as const;
 
+export function supportedAttachmentExtensions(support: { eml: boolean; media: boolean }): string[] {
+  return ATTACHMENT_FILE_EXTENSIONS.filter(
+    (extension) =>
+      (support.eml || extension !== "eml") &&
+      (support.media || !MEDIA_ATTACHMENT_EXTENSIONS.some((media) => media === extension)),
+  );
+}
+
 export const IMAGE_ATTACHMENT_ACCEPT = IMAGE_ATTACHMENT_EXTENSIONS.map((extension) => `.${extension}`).join(",");
 export const ATTACHMENT_FILE_ACCEPT = ATTACHMENT_FILE_EXTENSIONS.map((extension) => `.${extension}`).join(",");
 export const SUPPORTED_ATTACHMENT_DESCRIPTION =
