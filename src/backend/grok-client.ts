@@ -460,21 +460,7 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
     if (!turn) return;
     if (update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {
       if (update.content.text) this.#completeThought(thread, turn);
-      if (!turn.text && update.content.text) {
-        this.emit("notification", {
-          method: "item/started",
-          params: {
-            threadId: thread.id,
-            turnId: turn.id,
-            item: { id: turn.itemId, type: "agentMessage", phase: "commentary" },
-          },
-        });
-      }
       turn.text += update.content.text;
-      this.emit("notification", {
-        method: "item/agentMessage/delta",
-        params: { threadId: thread.id, turnId: turn.id, itemId: turn.itemId, delta: update.content.text },
-      });
       return;
     }
     if (update.sessionUpdate === "agent_thought_chunk" && update.content.type === "text") {
@@ -533,8 +519,8 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
     }
   }
 
-  // ACP cannot identify final text while streaming. Keep live segments in activity and
-  // promote only the remaining segment to an answer when the prompt finishes.
+  // ACP cannot identify final text while streaming. Buffer unclassified text privately,
+  // publishing commentary at a later step boundary or an answer when the prompt finishes.
   #completeMessage(thread: GrokThread, turn: GrokTurn, phase: "commentary" | "final_answer"): void {
     if (!turn.text) return;
     const item = { id: turn.itemId, type: "agentMessage", phase, text: turn.text } satisfies ThreadItem;

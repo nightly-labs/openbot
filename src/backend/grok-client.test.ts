@@ -68,7 +68,8 @@ describe.sequential("GrokAgentClient", () => {
           text: "The final answer.",
         }),
       ]);
-      // Every live delta stays in activity; only the completed final segment enters chat.
+      // Only explicit thoughts stream into activity. Unclassified text stays private until
+      // a later boundary establishes commentary or the final answer.
       const phases = new Map<string, string>();
       const texts = new Map<string, string>();
       const completedAnswers: string[] = [];
@@ -101,6 +102,7 @@ describe.sequential("GrokAgentClient", () => {
           }
         }
       }
+      expect([...texts.values()]).toEqual(["Planning inspection.", "Reviewing findings."]);
       expect(streamedThoughts).toEqual(["Reviewing findings."]);
       expect(completedAnswers).toEqual(["The final answer."]);
       expect([...phases.values()].filter((phase) => phase === "final_answer")).toHaveLength(1);
