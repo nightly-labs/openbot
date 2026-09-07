@@ -458,33 +458,46 @@ export class BrowserHost {
       const target = "ref" in action ? ({ kind: "ref", ref: action.ref, revision } as const) : undefined;
       const deadline = Date.now() + 10_000;
       try {
-        switch (action.type) {
-          case "click":
-            if (!target) throw new Error("Legacy click requires a target.");
-            await tab.engine.click(target, {}, deadline);
-            break;
-          case "type":
-            if (!target) throw new Error("Legacy type requires a target.");
-            await tab.engine.type(target, action.text, { mode: "replace", submit: action.submit === true }, deadline);
-            break;
-          case "key":
-            await tab.engine.press(action.key, undefined, deadline);
-            break;
-          case "scroll":
-            await tab.engine.scroll(undefined, 0, action.deltaY, deadline);
-            break;
-          case "back":
-          case "forward":
-            await navigateAndWait(tab.view.webContents, () =>
-              navigateHistory(tab.view.webContents, action.type, this.#session.getUserAgent()),
-            );
-            break;
-          case "reload":
-            await navigateAndWait(tab.view.webContents, () => {
-              tab.view.webContents.reload();
-              return true;
-            });
-        }
+        const dispatch = async (): Promise<void> => {
+          switch (action.type) {
+            case "click":
+              if (!target) throw new Error("Legacy click requires a target.");
+              await tab.engine.click(target, {}, deadline);
+              return;
+            case "type":
+              if (!target) throw new Error("Legacy type requires a target.");
+              await tab.engine.type(target, action.text, { mode: "replace", submit: action.submit === true }, deadline);
+              return;
+            case "key":
+              await tab.engine.press(action.key, undefined, deadline);
+              return;
+            case "scroll":
+              await tab.engine.scroll(undefined, 0, action.deltaY, deadline);
+              return;
+            case "back":
+            case "forward":
+              await navigateAndWait(tab.view.webContents, () =>
+                navigateHistory(tab.view.webContents, action.type, this.#session.getUserAgent()),
+              );
+              return;
+            case "reload":
+              await navigateAndWait(tab.view.webContents, () => {
+                tab.view.webContents.reload();
+                return true;
+              });
+          }
+        };
+        // The deadline the engine carries is checked between its commands, which a renderer that
+        // answers none of them never reaches -- and re-resolving a ref fingerprints the element in
+        // the frame that owns it, so a page wedged after the snapshot hangs the dispatch itself.
+        const dispatchTimeout = Math.max(1, deadline - Date.now());
+        await this.#boundEngineOperation(
+          tab,
+          dispatch(),
+          dispatchTimeout,
+          "Browser action timed out.",
+          keepQueueBlocked,
+        );
         const settleTimeout = Math.max(1, deadline - Date.now());
         const settleCompletion = tab.engine.settle(settleTimeout);
         try {

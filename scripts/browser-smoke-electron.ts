@@ -125,14 +125,22 @@ const server = createServer((request, response) => {
   // A frame that answers nothing, in its own process, so the parent stays responsive while the
   // snapshot's walk of this frame never returns. The host has to be a site of its own rather than the
   // `localhost` the other cross-origin fixtures use: same site means the same renderer, and wedging
-  // it would take the `/v2` page's own frame down with it for the rest of the run. It announces
-  // itself first and spins from a task afterwards, so the test waits on the announcement rather than
-  // a clock -- a loop entered inline never lets the message out.
+  // it would take the `/v2` page's own frame down with it for the rest of the run. It waits to be told
+  // to spin, because the one target the legacy `act` path accepts is a ref, and a ref only exists for
+  // an element some snapshot saw -- so the frame has to answer a snapshot first. Both messages go out
+  // before the loop is entered from a task, so the test waits on an announcement rather than a clock.
   if (url.pathname === "/spinning-frame") {
     response.setHeader("content-type", "text/html; charset=utf-8");
-    response.end(
-      `<!doctype html><body>spinning<script>parent.postMessage('spinning', '*');setTimeout(() => { while (true) {} }, 0);</script>`,
-    );
+    response.end(`<!doctype html><body>
+      <button type="button">Blocked frame button</button>
+      <script>
+        addEventListener('message', (event) => {
+          if (event.data !== 'spin') return;
+          parent.postMessage('spinning', '*');
+          setTimeout(() => { while (true) {} }, 0);
+        });
+        parent.postMessage('frame-ready', '*');
+      </script>`);
     return;
   }
   if (url.pathname === "/blocking-frame") {
@@ -141,6 +149,7 @@ const server = createServer((request, response) => {
       <output>blocking frame ready</output>
       <script>
         addEventListener('message', (event) => {
+          if (event.data === 'frame-ready') document.querySelector('output').textContent = 'frame ready';
           if (event.data === 'spinning') document.querySelector('output').textContent = 'frame spinning';
         });
       </script>`);
@@ -928,9 +937,6 @@ async function main(): Promise<void> {
       .getAllWebContents()
       .find((contents) => !contents.isDestroyed() && contents.getURL().startsWith(`${origin}/blocking-frame`));
     if (!blockedContents) throw new Error("Blocking frame fixture web contents were not available.");
-    // Taken before the frame spins, because a snapshot is the only way to learn a tab's revision and
-    // every operation below is meant to fail -- and a failed snapshot leaves the revision alone.
-    const blockedBaseline = await browser.snapshot(blockedTab.id);
     await blockedContents.executeJavaScript(
       `(() => {
         const frame = document.createElement('iframe');
@@ -944,8 +950,40 @@ async function main(): Promise<void> {
     await waitFor(
       async () =>
         (await blockedContents.executeJavaScript("document.querySelector('output').textContent", true)) ===
+        "frame ready",
+    );
+    // Taken while the frame still answers, because a snapshot is the only way to learn a tab's
+    // revision and to name an element inside that frame -- and every operation below it is meant to
+    // fail, which leaves the revision alone.
+    const blockedBaseline = await browser.snapshot(blockedTab.id);
+    const blockedFrameRef = blockedBaseline.elements.find((element) => element.name === "Blocked frame button")?.ref;
+    if (!blockedFrameRef) throw new Error("V2 snapshot did not expose the blocked frame's button.");
+    await blockedContents.executeJavaScript(
+      `(() => {
+        document.querySelector('iframe').contentWindow.postMessage('spin', '*');
+        return true;
+      })()`,
+      true,
+    );
+    await waitFor(
+      async () =>
+        (await blockedContents.executeJavaScript("document.querySelector('output').textContent", true)) ===
         "frame spinning",
     );
+    // The legacy dispatch, before any settling: re-resolving a ref fingerprints the element in the
+    // frame that owns it, and the engine's own deadline is only checked between commands, so the
+    // frame that answers none of them holds the click itself. This runs first because the unwind
+    // every assertion below it triggers detaches the session the ref resolves through.
+    const blockedLegacyClick = await Promise.race([
+      browser.act(blockedTab.id, blockedBaseline.revision, { type: "click", ref: blockedFrameRef }).then(
+        () => "clicked",
+        (error: unknown) => String(error),
+      ),
+      new Promise((resolve) => setTimeout(() => resolve(null), 20_000)),
+    ]);
+    if (typeof blockedLegacyClick !== "string" || !blockedLegacyClick.includes("timed out")) {
+      throw new Error(`V2 legacy click never returned from a frame that answers nothing: ${blockedLegacyClick}`);
+    }
     const blockedSnapshotWait = await callBrowserTool(browser, "wait_for", {
       tabId: blockedTab.id,
       url: "/blocking-frame",
