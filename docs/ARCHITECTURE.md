@@ -41,6 +41,12 @@ renderer ──► @openbot/contracts ◄── preload ◄── main ──►
   projections before the main process sends changes to the renderer.
 - The auth API cannot import desktop implementation files.
 
+MP3 and MOV attachments use the existing file attachment contract with no inline preview. Import
+copies and hashes the original bytes under the shared attachment limits; it does not run media
+codecs or extract frames or transcripts. MIME types come from the file extension for these formats,
+so a supplied image or text MIME type cannot enable a preview. Remote support is additive through
+the `media-attachments` capability; released protocol adapters keep their existing meanings.
+
 ## State ownership
 
 - `openbot.db` is the source of truth for OpenBot agents, conversations, queues, reactions,
