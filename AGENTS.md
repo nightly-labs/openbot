@@ -2,325 +2,174 @@
 
 ## Communication
 
-Always use ASD-STE100 Simplified Technical English when you work in this repository or communicate
-with the user. Apply this rule to questions, progress updates, explanations, and final answers.
-Keep exact text unchanged in quotations, code, commands, file paths, identifiers, and required
-technical terms.
+Use ASD-STE100 Simplified Technical English for questions, updates, explanations, and final answers.
+Keep quotations, code, commands, paths, identifiers, and required technical terms unchanged.
 
-Two tiers. **Non-negotiable** items protect user data, released contracts, or the security boundary;
-trade one away only on the developer's explicit decision. Everything else is a **default** their
-preference overrides — if they ask for something this file discourages, do it and say what you set
-aside. Never argue back by citing this file.
+**Non-negotiable** rules protect user data, released contracts, and security. Change them only on
+an explicit developer decision. All other rules are defaults: follow the developer's preference
+and state which default you set aside. Do not argue by citing this file.
 
 ## Non-negotiable
 
-- **Migrations are irreversible.** Nothing copies `openbot.db` before an upgrade. Preserve all user
-  data, support every shipped source schema, never assume a backup exists.
-- **Released Team API adapters are permanent.** A shipped wire protocol never changes meaning.
-- **The renderer-to-main trust boundary holds** — Electron sandboxing, context isolation, navigation
-  policy, IPC sender validation, and their tests. Agents already run with `danger-full-access`; the
-  process boundary is what is left.
-- **Secrets stay redacted** on every path that logs, exports, or sends, diagnostics and analytics
-  included.
-- **The licence is PolyForm Noncommercial 1.0.0.** No dependency that conflicts with it, no
-  relicensed file.
+- **Migrations are irreversible.** No backup of `openbot.db` is made before an upgrade. Preserve all
+  user data and support every shipped source schema. Never assume a backup exists.
+- **Released Team API adapters are permanent.** Do not change a shipped wire protocol's meaning.
+- **Keep the renderer-to-main trust boundary:** Electron sandboxing, context isolation, navigation
+  policy, IPC sender validation, and their tests. Coding agents already have `danger-full-access`.
+- **Redact secrets** on every log, export, and send path, including diagnostics and analytics.
+- **Keep PolyForm Noncommercial 1.0.0.** Do not add incompatible dependencies or relicense files.
 
-The first three are spelled out where they are enforced — `src/backend/AGENTS.md`,
-`packages/contracts/AGENTS.md` and `src/main/AGENTS.md`. `CONTRIBUTING.md` "Security-sensitive
-changes" lists the boundaries in full; `docs/ARCHITECTURE.md` "Change rules" says where a change
-belongs.
+See [CONTRIBUTING.md](CONTRIBUTING.md#security-sensitive-changes) for the security boundaries and
+[architecture change rules](docs/ARCHITECTURE.md#change-rules) for code ownership.
 
-## CI owns the minutes-long suites. Run the fast checks yourself.
+## Product constraints
 
-A fresh worktree has no `node_modules`, and every command below dies with `biome: command not found`
-or `Cannot find module '@openbot/logging'` until it does. Run `bun install --frozen-lockfile` first,
-or `bun scripts/prepare-dev-environment.ts`, which adds the local D1 migration, asserts the Bun
-version, and generates `apps/auth-api/.env.dev` if the checkout has none. That file is per-machine
-and untracked; only `.env.production` is still encrypted, so a missing `.env.keys` no longer stops
-local development.
+- Workspaces, conversations, attachments, browser data, and team data stay on the computer that
+  runs OpenBot. Providers, visited pages, and plugins can use the network.
+- **No cloud dependency for core function.** The app works without an account.
+  Cloudflare holds accounts, avatars, host configuration,
+  memberships, invitations, and logical sessions; it does not hold chats, files, or commands.
+- The user's SQLite database is the source of truth, not a remote cache.
+- Agents keep their workspace, thread, and identity across provider switches and restarts.
+  Do not reset an agent to simplify state.
 
-Before you call a task done, run the narrowest test for what you touched, then `bun run lint` and
-`bun run typecheck` — plus `bun run check:ui` if you touched `src/renderer`, which scans the whole
-renderer, and `src` and `apps` for the markup that can name a class, in under 200 ms. All three
-read more than you changed on purpose: `lint` runs `biome check --max-diagnostics=none .` across
-every file. `typecheck` runs eleven `tsc` projects in parallel with a separate incremental cache for
-each project. Each worktree creates its own caches on the first run and reuses them for later checks.
-Elapsed time depends on cache state and other work on the machine; these commands still belong in
-local verification. The wide typecheck is the more useful one — a change in
-`packages/contracts` surfaces as an error in `src/renderer` or `src/main`, which a single `tsc -p`
-on the project you edited never sees. The `lint` flag is load-bearing: Biome caps a report at 20
-diagnostics by default, and it prints the honest total but not the findings past the cap, so a
-cleanup pass without it costs one full-repo run per 20.
+## Checks
 
-`bun run typecheck` is `typecheck:*`, and `typecheck:mobile` is in that glob, so `apps/mobile` is
-checked with everything else — it depends on `@openbot/brand`, `@openbot/contracts` and
-`@openbot/team-client`, and an export change in any of them breaks the app. It used to be named
-`mobile:typecheck`, which the glob missed, and this file used to carry a paragraph asking you to
-remember that. `mobile:typecheck` survives as an alias because CI's Surfaces job calls it by that
-name. It runs `expo customize` and a `uniwind` codegen before `tsc`, but everything it writes is
-gitignored, so the aggregate still leaves your diff alone.
+1. In a fresh worktree, run `bun install --frozen-lockfile` first. Alternatively, run
+   `bun scripts/prepare-dev-environment.ts` to also check Bun, migrate local D1, and create the
+   untracked `apps/auth-api/.env.dev`. Only `.env.production` needs the encrypted setup.
+2. Before completion, run the narrowest relevant test, then `bun run lint` and `bun run typecheck`.
+   Also run `bun run check:ui` for changes in `src/renderer`. Keep the full lint and typecheck scope;
+   `typecheck:*` includes mobile, Signal, and `remote/scripts`. Each TypeScript project has a
+   separate incremental cache in this worktree. The first run creates it; later runs reuse it.
+   Run these checks locally even when cache state or machine load makes them slower.
+3. Run one desktop test file with `bun run test:desktop -- <path>`. Ask for a specific command
+   before a wider test, build, or packaged-app check. Approval covers only that command.
+4. Leave `bun run check`, `bun run check:desktop`, `bun run test`, and `bun run build-storybook`
+   to CI unless authorized. These suites take minutes and desktop tests can fail under load.
+5. Do not run `bun run format`: it rewrites the whole repository. Use
+   `biome check --write <paths>` for changed files, or the pre-commit `bun run check:staged` hook.
+   Keep `--max-diagnostics=none` for full Biome reports.
 
-`remote/api` is in the glob for the same reason, as `typecheck:remote`. Its tests cover ticket
-verification, session revocation and TURN credentials — the Signal service's whole auth boundary —
-and when the workspace arrived nothing ran them, because its only entry point was `remote:check`,
-which also validates both Compose files. The workspace's own `check` needs nothing but Bun and
-finishes in three seconds, so the halves are split — `typecheck:remote` and `test:remote` run in
-Surfaces and Tests beside the other non-desktop surfaces, and `remote:check:compose` is the rest.
-`docker compose config` interpolates client-side and never opens a socket, so the Compose half needs
-the docker CLI but no daemon and runs in Surfaces too; `remote:check` remains the local superset.
-Nothing in CI builds the image, though, and its Dockerfile installs from a pruned checkout —
-one `COPY` per workspace — so a `workspace:*` dependency added to the root manifest breaks
-`remote:up` while every job stays green. `scripts/dependency-catalog.test.ts` is what notices now:
-it walks the workspace dependency graph and asserts a manifest is copied for each one it reaches.
+[Check design notes](docs/development-checks.md#check-coverage) explain CI coverage, command aliases,
+and the separate Node and Bun type environments. Read them when changing checks or dependencies.
 
-`remote/scripts` rides along in that same project. `check.ts` and `update.ts` are Bun scripts
-using `Bun.spawn` and `import.meta.dir`, and no `tsconfig` reached them: `tsconfig.node.json` stops
-at the root `scripts/**` and pins `"types": ["node"]`, which is why no root script uses the `Bun`
-global at all. Adding `@types/bun` at the root would have made Bun globals resolvable repo-wide,
-including in `src/main`, which runs under Node. Instead `remote/api` already had the Bun-typed
-project the scripts needed, so its `include` carries `../scripts/*.ts` and
-`typecheck:remote` covers both. `update.ts` drains and force-recreates the live coturn container, so
-it is worth a checker.
+## Surfaces to check
 
-Do not run `bun run check`, `check:desktop`, `test`, or `build-storybook`: each takes minutes, and
-the desktop suite flakes under load, so a red result tells you nothing about your change. That is
-where the line falls — how long a command takes and whether you can trust its result, not how many
-files it reads. CI owns all of it on every push:
+State which surfaces a change touches. Check all affected consumers and reverse actions.
 
-| CI job | Runner | Command |
-| --- | --- | --- |
-| Check | `macos-14` | `bun run check:desktop` |
-| Tests | `ubuntu-latest` | `bun run test:desktop`, `bun run test:sites`, `bun run test:remote` |
-| Surfaces | `ubuntu-latest` | `bun run mobile:typecheck`, `bun run typecheck:sites`, `bun run typecheck:team-client`, `bun run typecheck:remote`, `bun run remote:check:compose` |
-| API | `ubuntu-latest` | `bun run check:api` |
-| Storybook build | `ubuntu-latest` | `bun run build-storybook` |
+- Desktop renderer (`src/renderer`), mobile (`apps/mobile`), public web (`apps/auth-api`; no separate
+  landing app), hosted-site routing (`apps/site-router`), and Signal (`remote/api`).
+- IPC contracts (`packages/contracts`) and their preview implementation
+  (`src/renderer/src/preview/mock-openbot.ts`).
+- Reverse actions: snooze/unsnooze, pause/resume, revoke/reconnect, mute/unmute.
+- Migrations and the separate latest schema for new databases.
+- Documentation: `README.md` commands, `docs/ARCHITECTURE.md`, and `PRIVACY.md` when outbound data
+  changes.
 
-All five gate the Cloudflare production deploy on a push to `main`. Surfaces did not until recently,
-so a red mobile, site-router, team-client or remote typecheck let the deploy through.
+## Development data and processes
 
-`bun run test:desktop -- <path>` runs one desktop file. Need something wider? Ask for it. Permission
-covers the one command named — not another one, not a build, not a packaged app.
+- Never run `bun run dev:seed` or `bun run dev:reset` unless asked. Seed replaces the whole
+  `OpenBot Dev` profile and deletes its staging copy on success. Reset deletes app, test-client,
+  and legacy host profiles. `bun run dev:seed --dry-run` is read-only.
+- Reuse a running dev instance, or use `bun run dev --isolated` for a profile tied to this worktree.
+  Dev and Storybook allocate ports through a shared registry; use the ports they report. A second
+  dev stack in the same worktree requires `--force`.
+- Use `bun run dev:automation` for smoke checks instead of starting Electron directly.
+  `instances` lists worktrees, profiles, and ports. `snapshot` and `screenshot` are read-only.
+  `click` and `type` require `--allow-mutations` and a named instance: this worktree's record,
+  `--instance=<id>`, or `--port=`. Never click another worktree's app.
+- `pages` lists all window targets. Use `--page=<target-id|url-substring>` for any target, including
+  Dynamic Island or embedded browser views; the default is the app window. Use
+  `--wait-for=<role>,<name>` to wait for an accessible target before capture and after mutation.
+- Never kill by process pattern, such as `pkill -f electron` or `pkill -f bun`.
+  `bun run dev:status` lists all stacks. `bun run dev:stop` stops only this worktree's stack.
+  Use `--pid=<supervisor pid>` to name another stack or `--all` to name all stacks explicitly.
+- Stop checks each PID's start time. If identity cannot be confirmed, it keeps the record and
+  exits non-zero. Resolve the process first, then use `bun run dev:forget` to remove its record.
+  Dead records do not reserve ports; readers must not delete them. For a process outside the
+  registry, target a PID you started or ask.
 
-`bun run format` is the one fast command to leave alone: it is
-`biome check --write --max-diagnostics=none .`, so it rewrites files your task never touched and
-puts them in your diff. Fix what you changed with `biome check --write <paths>`, or let the
-pre-commit hook's `bun run check:staged` do it over the staged set.
+## Terms
 
-## Hit every surface
+- **agent**: the product object (`AgentStore`, `AgentSummary`, `agent-${uuid}`,
+  `~/OpenBot/Agents/<id>`, `projection_agents`), a coding agent, or a marketplace agent
+  (`ipc-marketplace-agents.ts`). **teammate** is prompt and marketing text, never a type.
+  Human members use `TeamMemberSummary`.
+- **bot**: do not use for new product code. Keep released names: Team API v1-v3
+  `bot`/`botId`/`bots-changed` (`current-agent-keys.ts` translates), `bots.json`, `mailbox.json`,
+  `legacy-import:bots:v1`, and readable `~/OpenBot/Bots` path prefixes. Accept `bot-<uuid>` IDs from
+  databases that did not run migration v13. `"first-bot"` is an avatar seed; `BloubBot` and the
+  lucide `Bot` icon are library names.
+- **server**: a joined team server (`ServerSummary`, `servers:*`), the local Team API host
+  (`HostStatus`, `host:*`, `src/main/team-api-server.ts`), the account API (`apps/auth-api`,
+  `auth:*`), or an MCP server (`createSdkMcpServer`).
+- **thread**: durable `projection_threads` record. **conversation**: its read projection, with no
+  separate table. **provider session**: private CLI resume state (`projection_provider_sessions`).
+  **team session**: authenticated remote connection. **turn**: one exchange in a thread.
+- **routine**: a scheduled instruction for one agent (`projection_agent_routines`), not Claude
+  Code `/schedule`.
 
-A change that works on the path you happened to open is the most common half-change here. **Say
-which of these your change touched.**
+## Task-specific instructions
 
-- **Desktop renderer** (`src/renderer`), **mobile** (`apps/mobile`), **public web**
-  (`apps/auth-api` — there is no separate landing app), **self-hosted Signal service**
-  (`remote/api`, which the desktop app and the phone both connect through).
-- **IPC contracts** in `packages/contracts`, and their second implementation
-  `src/renderer/src/preview/mock-openbot.ts`, which Storybook and the preview run against.
-- **Reverse states.** Snooze needs unsnooze, pause resume, revoke reconnect, mute unmute. A state a
-  user can enter and not leave is a bug.
-- **Migrations**, plus the separate latest schema used for new databases.
-- **Documentation**: the `README.md` command table, `docs/ARCHITECTURE.md`, and `PRIVACY.md` when
-  what leaves the machine changes.
+Read the instruction file for each directory you change. Use the
+[workspace map](docs/ARCHITECTURE.md#workspace-map) to find its owner.
 
-## The three ways to hurt yourself
-
-1. **The user's development database.** `bun run dev:seed` destroys and replaces the whole
-   `OpenBot Dev` profile — real conversations, agents, transfers — and its staging copy is deleted
-   on success, so it is not a safety net. `bun run dev:reset` deletes the app, test-client and legacy
-   host profiles. Never run either unless asked; `dev:seed --dry-run` inspects without touching
-   anything.
-2. **The shared dev stack.** Several agents work in worktrees on this machine at once, sharing one
-   profile and one set of default ports. `bun run dev` now allocates every port under one
-   machine-wide lock and publishes it, so a sibling worktree walks past it instead of claiming it
-   as well, and a second stack in *this* worktree is refused unless you pass `--force`. Reuse the
-   running instance anyway, or get a profile of your own with `bun run dev --isolated`, which keys
-   the instance id to the worktree path (`developmentInstanceIdForWorktree` in
-   `src/main/development-profile.ts`). `bun run storybook` allocates through the same registry, so
-   its port is the one it announces. Drive the
-   running instance for e2e smoke checks with `bun run dev:automation` instead of launching Electron
-   yourself. Each dev instance publishes its worktree, profile and ports, so
-   `bun run dev:automation instances` lists what is live and a command run inside a worktree drives
-   that worktree's app. `snapshot`/`screenshot` are read-only; `click`/`type` need
-   `--allow-mutations` and an instance that was named rather than inferred — the record of this
-   worktree counts, `--instance=<id>` and `--port=` name one outright, and another worktree's app is
-   readable but never clickable. Nothing about a dev window is off limits: `pages` lists every
-   target and `--page=<target-id|url-substring>` drives any of them, including a Dynamic Island surface
-   or an embedded browser view. The app window is only what you get when you aim at nothing. `--wait-for=<role>,<name>` settles on an
-  accessible target before a capture and after a mutation, so a flow needs no snapshot loop.
-3. **Killing processes by pattern.** `pkill -f electron` or `pkill -f bun` kills other sessions' work
-   mid-write. `bun run dev:status` lists every stack live on this machine with its ports, pids and
-   worktree, and `bun run dev:stop` stops this worktree's stack and the children it left behind from
-   the registry - a lookup, not a pattern. `dev:status` reports every stack, because the one holding
-   the port this worktree wanted is a sibling's; `dev:stop` acts on this worktree only. Another
-   worktree's stack takes `--pid=<supervisor pid>`, and every stack takes `--all`, so stopping
-   someone else's work is a thing you say rather than a side effect. A pid is signalled only while
-   its start time still matches the record, so a recycled pid is left alone: `dev:stop` reports what
-   it could not confirm, keeps the record and exits non-zero, and `bun run dev:forget` drops such a
-   record once you have dealt with the process yourself. Nothing else deletes a record - a dead one
-   is filtered out of every read, so its ports are free again, but the file waits for `dev:forget`. Anything not in the registry: target a PID
-   you started, or ask.
-
-## Words we use
-
-- **agent** — three unrelated senses: the OpenBot product concept (`AgentStore`, `AgentSummary`,
-  `agent-${uuid}`, `~/OpenBot/Agents/<id>`, table `projection_agents`); a *coding* agent working on
-  this repository; a *marketplace* agent (`ipc-marketplace-agents.ts`). **teammate** is prompt and
-  marketing copy, never a type. Human team members are `TeamMemberSummary`.
-- **bot** — never the product concept in new code. Where it survives it is frozen, and each place can
-  say why: the Team API v1-v3 wire spells the agent `bot`/`botId`/`bots-changed` and always will
-  (`current-agent-keys.ts` is the only translator); `bots.json`, `mailbox.json` and
-  `legacy-import:bots:v1` are names a shipped release already wrote to disk; the `~/OpenBot/Bots`
-  path prefixes stay readable forever; `"first-bot"` is an avatar seed, not a word; and `BloubBot`
-  and lucide's `Bot` icon belong to their libraries. A `bot-<uuid>` id value is still valid — a
-  database restored from the user's own file copy never ran migration v13.
-- **server** — four senses: a remote team server you join (`ServerSummary`, `servers:*` IPC); your
-  own Team API host (`HostStatus`, `host:*` IPC, `src/main/team-api-server.ts`); the cloud account
-  API (`apps/auth-api`, `auth:*` IPC); an MCP server (`createSdkMcpServer`).
-- **thread** is the durable record (`projection_threads`); **conversation** its read projection (no
-  table — an IPC and renderer word); **provider session** the deliberately private CLI-side resume
-  state (`projection_provider_sessions`); **team session** an authenticated remote connection;
-  **turn** the unit of exchange inside a thread.
-- **routine** — a scheduled standing instruction attached to one agent (`projection_agent_routines`).
-  Not the Claude Code `/schedule` sense.
-
-## What OpenBot is
-
-Four invariants you cannot derive from the code. Check a change against them before optimizing
-something else.
-
-- **Local-first, not offline-only.** Workspaces, conversations, attachments, browser data and team
-  data stay on the computer that runs OpenBot. Codex still connects to OpenAI, Claude to Anthropic,
-  Grok to xAI, and visited pages and plugins use the network. Both halves are true.
-- **No cloud dependency for core function.** Cloudflare holds accounts, avatars, host configuration,
-  memberships, invitations and logical sessions — never chats, files or commands. The app works
-  without an account.
-- **The user's SQLite is the source of truth**, not a cache of something remote. This is why
-  migrations are irreversible and a backup cannot be assumed.
-- **Teammates persist.** An agent keeps its workspace, thread and identity across provider switches
-  and restarts. Resetting an agent to get a cleaner state changes the product.
-
-## Where the rest of this lives
-
-Seven directories carry rules this file used to hold. Each is loaded when you open a file under it,
-and each says what its own boundary costs and how to wait in its tests.
-
-| File | What it owns |
+| File | Scope |
 | --- | --- |
-| `src/renderer/AGENTS.md` | the prerelease SolidJS stack, one store per concern, component reuse, the palette |
-| `src/main/AGENTS.md` | the renderer-to-main trust boundary, and where an IPC endpoint is registered |
-| `src/main/ipc/AGENTS.md` | the four ways to bind a handler, and the steps to add an endpoint |
-| `src/backend/AGENTS.md` | the user's SQLite: irreversible migrations, and the two database build paths |
-| `packages/contracts/AGENTS.md` | the Team API wire protocol, and the one channel list with its manifest and two mirrors |
-| `apps/auth-api/AGENTS.md` | the account Worker, and why its D1 migrations must survive a deploy race |
-| `apps/mobile/AGENTS.md` | the Expo app, and the build and simulator commands that need explicit permission |
+| [src/renderer/AGENTS.md](src/renderer/AGENTS.md) | SolidJS, stores, components, palette |
+| [src/main/AGENTS.md](src/main/AGENTS.md) | Renderer-to-main boundary and main-process ownership |
+| [src/main/ipc/AGENTS.md](src/main/ipc/AGENTS.md) | Handler binding and endpoint registration |
+| [src/backend/AGENTS.md](src/backend/AGENTS.md) | SQLite migrations and database creation |
+| [packages/contracts/AGENTS.md](packages/contracts/AGENTS.md) | Frozen Team API protocols and IPC mirrors |
+| [apps/auth-api/AGENTS.md](apps/auth-api/AGENTS.md) | Account Worker and D1 deployment races |
+| [apps/mobile/AGENTS.md](apps/mobile/AGENTS.md) | Expo and build/simulator permissions |
 
-Read the one for the directory you are changing before you change it. `docs/ARCHITECTURE.md`
-"Change rules" says where a change belongs when it is not obvious.
-
-One file is scoped to a task rather than a directory: `.agents/skills/release-upgrade-safety/` audits
-the diff since the last released tag for the upgrade and data-loss hazards an installed user cannot
-undo, and nothing opens it for you — reach for it when a version is about to be bumped or tagged.
+Before a version bump or tag, use
+[release-upgrade-safety](.agents/skills/release-upgrade-safety/SKILL.md) to audit upgrade and data-loss
+risks since the last release.
 
 ## Tests
 
-1. **The default answer is no test.** Prefer changing an existing test to adding one. A new test
-   names the consequence it protects; a new test *file* needs a boundary that does not exist yet.
-2. **Watch it fail.** Break what it covers — change the value, delete the guard, return early — and
-   confirm it goes red *for the reason you meant*. Still green means it tests nothing; "expected 3
-   children, got 2" means it tests the tree, so fix the assertion before restoring the code. No
-   linter can run this check, and it is what separates a test from a costume. Say in the PR that you
-   did it.
-3. **Check whether something already enforces it.** `tsc`, Biome with its GritQL rules, and
-   `bun run check:ui` cover a large class mechanically. If one of them does, skip the test.
-4. **A test that needs a timeout to pass is wrong.** Wait on an observable condition — a state
-   change, an emitted event, a resolved promise — never the clock. A sleep long enough to pass on
-   your machine is short enough to flake on a loaded runner. A spy call is such a condition:
-   `await waitFor(() => expect(send).toHaveBeenCalled())` is the sanctioned way to satisfy this
-   rule, and is not the mock-shaped assertion the module-mock warning is about. The barrier
-   synchronizes; the assertions after it carry the consequence. Counting `toHaveBeenCalled*` across
-   the suite cannot tell the two apart, so do not "fix" a barrier by grep.
-5. **Test behaviour, data, and accessible roles and names** — not markup, classes, layout or
-   animation timing. Where focus lands *is* behaviour: assert it with `toHaveFocus()`. Assert exact
-   text only for a product contract, an error or security message, serialized output, or a
-   localization key. Visual detail belongs in a Storybook story.
-6. **The file name picks the vitest project.** `*.test.ts` runs in `node` with no DOM, `*.test.tsx`
-   renders JSX in jsdom, `*.dom.test.ts` is the narrow case of a DOM without a component. Needing
-   either of the last two for logic means the logic is not separable yet.
-7. **A test is mandatory** at the renderer-to-main trust boundary, the IPC contract, database schema
-   and migrations, persisted state, secrets, the provider process boundary, the Team API wire
-   protocol, and the updater — at the lowest stable boundary, once, not at both the component and the
-   application level.
+- Prefer an existing test. Add a test only for a user or caller consequence; add a file only for a
+  new boundary. Skip assertions already enforced by TypeScript, Biome, or `check:ui`.
+- Tests are mandatory for changes to the renderer-to-main boundary, IPC contracts, database schema
+  and migrations, persisted state, secrets, provider processes, Team API wire protocols, and the
+  updater. Test once at the lowest stable boundary.
+- For each added assertion, break the behavior and confirm the test fails for the intended reason.
+  Restore the code and report this check in the PR.
+- Wait for state, an event, or a promise, not elapsed time. A spy can provide the wait condition,
+  such as `await waitFor(() => expect(send).toHaveBeenCalled())`; assert the user consequence after
+  that wait. Do not remove synchronization because it uses a spy.
+- Assert behavior and data. Query accessible roles and names; use `toHaveFocus()` for focus.
+  Do not assert markup, classes, layout, animation timing, or snapshots. Use exact text only for
+  product contracts, error/security messages, serialized output, or localization keys.
+- Use Storybook for visual details. Do not add test IDs to avoid missing accessibility.
+  Story play functions can use them; renderer `data-testid` use must stay within the existing
+  `check:ui` budget of five. A new hook must replace an existing one.
+- `*.test.ts` uses Node; `*.test.tsx` uses JSX and jsdom; `*.dom.test.ts` uses DOM without a
+  component. Keep pure logic in Node tests.
 
-Before adding an assertion, ask what a user or a caller would see differently if it failed. "A class
-name changed", "the colour changed", "the element moved", "the tree grew a node" — drop it; colour
-and layout belong in a story, the tree nowhere. How you reach the element counts too: a `data-testid`
-is a hook the product does not otherwise need and a CSS class is a styling detail, so both pin the
-test to markup that is free to change. Query by accessible role and name; nothing accessible to query
-is an accessibility gap in the component, not a reason for a test id. A snapshot is the same failure
-in bulk — it names no consequence, so it gets updated, not read.
+### Check rules
 
-Biome enforces the mechanical half and only that. In test files it rejects `toHaveClass`,
-`toHaveStyle`, `getComputedStyle`, `toContainElement`, `toHaveAttribute("title", …)`,
-`expect(x.innerHTML)`, DOM-tree walks, `querySelector("svg" | "img")`, `document.activeElement`,
-snapshots, the `*ByTestId` queries, an assertion reached through a CSS class, an awaited bare
-`setTimeout`, and `it.only`. It does not see a `data-testid` attribute itself — a GritQL rule cannot
-read the product tree from a test file — so `check:ui` carries that half instead, as a budget frozen
-at the five the renderer has today. It is a budget rather than a ban because three of the five are
-read by play functions in `src/renderer/stories`, which is sanctioned: a sixth hook has to replace
-one of those, and an accessible role and name is the only other way in. All of it stays available in
-`src/renderer/stories`, where it belongs.
+- Fix errors. Assess warnings; do not make correct code worse to silence one. Do not add
+  `biome-ignore`. Explain retained warnings in the PR.
+- GritQL rules must match syntax, not infer domain decisions, and must not duplicate a built-in
+  Biome rule. Consider traversal cost before adding a rule.
+- Each rule in `tools/biome/anti-slop/rules` needs positive and negative fixtures in `../fixtures`.
+  Mark rejected lines with `// flag`; verify with `scripts/anti-slop-rules.test.ts`.
+- Each UI check needs both `renderer` and `renderer-clean` fixtures in `tools/ui-foundation/fixtures`.
+  Verify with `scripts/ui-foundation-check.test.ts`.
 
-`check:ui` also owns the one renderer surface no compiler reads at all. A CSS rule whose class no
-component, story or HTML entry point names is dead and silent about it, which is how 1,400 lines of
-styling for markup that no longer exists accumulated; the scan reports each such class by name. A
-class a `prefix-${value}` template builds still counts as named, but only where that template sits
-inside a `class={…}` — an `id` built the same way has the same shape, and honouring it there would
-spare every rule sharing that prefix. Around
-focus only `document.activeElement` is rejected: it asserts against the document instead of the
-element the test already holds, and fails with "expected null" rather than naming the control.
-`toHaveFocus()` is encouraged.
-
-Two severities. **Error** is for patterns with no honest counter-example: a snapshot, a test id, a
-sleep. **Warning** is for a judgement a pattern cannot make — an `object` parameter, a module mock.
-A warning is a prompt to think, never a demand to rewrite; `biome-ignore` is not available to you, so
-making correct code worse to silence one is the one wrong answer. Leave it and say why in the PR.
-
-Every rule in `tools/biome/anti-slop/rules` owns a fixture in `../fixtures` marking each rejected
-line with `// flag` beside correct code it must leave alone; `scripts/anti-slop-rules.test.ts` checks
-both halves. A pattern that matches nothing is green and enforces nothing — that is how one rule
-stayed blind to `querySelector<HTMLElement>` for months. A new rule without a fixture is not a rule.
-
-A rule here bans a spelling, not a decision, and it does not repeat one Biome already ships.
-`no-runtime-typeof` was deleted for failing the first test: GritQL sees no types, so it could not
-separate `typeof` narrowing an `unknown` at a trust boundary from `typeof` on a value the compiler
-already knows, and all sixteen of its standing warnings turned out to be the correct use — which
-taught readers to skim the warning class that `no-module-mocking` lives in.
-`no-chained-type-assertions` was deleted for failing the second: `noUnsafeTypeAssertion` is already
-an error and reported every chain it caught, while the rule was blind to the unparenthesised
-`value as unknown as T` spelling. `noExplicitAny` owns `any` for the same reason. Cost is the
-tiebreaker when a rule is merely thin: each plugin is a separate traversal of every file, priced by
-how common its head pattern is, so a rule keyed on `const $name = $value` costs more than the rest of
-the linter put together — that is what `no-shape-in-symbol-names` cost to enforce a naming
-preference that review already covers.
-
-`bun run check:ui` is held to the same contract by `tools/ui-foundation/fixtures` and
-`scripts/ui-foundation-check.test.ts`. Two of its checks had gone blind before this existed. The
-`renderer` tree breaks every check once, beside the correct neighbour each must leave alone;
-`renderer-clean` breaks none of them, and carries the negative half for the checks that report
-once per file rather than once per occurrence — in the first tree the violation accounts for the
-failure whether or not the check has also started rejecting the correct code beside it. Adding a
-check means adding to both.
+Read [check design notes](docs/development-checks.md#lint-and-ui-rules) when changing these checks.
+They describe the enforced syntax, fixture behavior, and reasons for removed rules.
 
 ## Pull requests
 
-- **Never open a PR unless you were asked to.**
-- Show before and after for a UI change, and state the model and harness in the body.
-- Wider checks belong before the PR, not during it — ask for the specific command you need.
-
-### Approvability
-
-A PR is not auto-approvable, and needs a named reason in the body, when it adds a `biome-ignore`,
-`@ts-expect-error` or `@ts-ignore`; adds a rule-disabling `overrides` entry to `biome.json` or
-unregisters a GritQL plugin; or widens a type to `any` or `unknown` at a boundary or asserts past a
-checker. These are the exact escape hatches the anti-slop rules exist to close: fix the finding at
-the domain boundary, or say the rule is wrong for this case and let the developer decide.
+- Open a PR only when asked.
+- For UI changes, show before and after. State the model and harness in the PR body.
+- Get approval for a specific wider check and run it before opening the PR.
+- A PR needs a named reason and is not auto-approvable if it adds `biome-ignore`, `@ts-expect-error`,
+  or `@ts-ignore`; disables rules through `biome.json` overrides or removes a GritQL plugin; widens
+  a boundary to `any` or `unknown`; or uses an assertion to bypass a checker. Fix the domain issue,
+  or explain why the rule is wrong and let the developer decide.
