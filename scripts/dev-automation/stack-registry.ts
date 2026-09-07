@@ -202,13 +202,30 @@ export function readDevStackRecords(
     } catch {
       record = null;
     }
-    if (record && isAlive(record)) {
-      records.push(record);
-      continue;
-    }
-    rmSync(path, { force: true });
+    if (record && isAlive(record)) records.push(record);
   }
   return records.sort((left, right) => left.startedAt - right.startedAt);
+}
+
+// Reading does not delete, however dead a record looks. Judging a record and
+// then removing its path is a check followed by a use, and the file can be
+// rewritten in between: a supervisor publishes a detached child and is killed
+// a moment later, and a reader that had already read the record without that
+// child deletes the version *with* it. The child keeps the ports and nothing
+// records them, which is the collision the port lock exists to stop.
+//
+// A record this checkout cannot parse is the second reason, and it needs no
+// race at all: a sibling worktree on a newer branch writes the schema this one
+// has not learned yet, and its stack is live.
+//
+// So a record outlives the stack it describes, and nothing acts on it: a dead
+// one is filtered out of every read, so its ports are free again from the
+// first read that finds it dead. `bun run dev:forget` is what clears the file,
+// because a developer asking for it is a decision rather than a guess. It
+// reads past the filter to do that, so it reaches records no other command
+// reports - and not past the parser, so a newer sibling's record stays.
+export function readAllDevStackRecords(directory = devStackRegistryDirectory()): DevStackRecord[] {
+  return readDevStackRecords(directory, () => true);
 }
 
 export function heldDevStackPorts(records: DevStackRecord[]): Set<number> {

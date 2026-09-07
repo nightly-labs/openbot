@@ -154,7 +154,8 @@ which of these your change touched.**
    someone else's work is a thing you say rather than a side effect. A pid is signalled only while
    its start time still matches the record, so a recycled pid is left alone: `dev:stop` reports what
    it could not confirm, keeps the record and exits non-zero, and `bun run dev:forget` drops such a
-   record once you have dealt with the process yourself. Anything not in the registry: target a PID
+   record once you have dealt with the process yourself. Nothing else deletes a record - a dead one
+   is filtered out of every read, so its ports are free again, but the file waits for `dev:forget`. Anything not in the registry: target a PID
    you started, or ask.
 
 ## Words we use

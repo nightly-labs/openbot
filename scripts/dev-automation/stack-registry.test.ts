@@ -143,14 +143,27 @@ describe("the stack registry directory", () => {
     writeDevStackRecord(stack(), directory);
 
     expect(readDevStackRecords(directory, (record) => isDevStackLive(record, alive([])))).toEqual([]);
-    expect(readdirSync(directory)).toEqual([]);
   });
 
-  it("deletes a record it cannot parse instead of acting on part of it", () => {
+  it("leaves the file of a record it read, so a stack republished a moment later is not lost", () => {
+    writeDevStackRecord(stack({ processes: [] }), directory);
+
+    // A reader judges a copy of the record taken before the supervisor
+    // published its detached child. Deleting the path on that judgement would
+    // delete the version *with* the child, whose ports nothing then records.
+    expect(readDevStackRecords(directory, () => false)).toEqual([]);
+    expect(readdirSync(directory)).toEqual(["stack-4242.json"]);
+  });
+
+  it("ignores a record it cannot parse instead of acting on part of it", () => {
     writeFileSync(join(directory, "stack-4242.json"), '{"supervisorPid": 4242, "ports": "all of them"}');
 
     expect(readDevStackRecords(directory, () => true)).toEqual([]);
-    expect(readdirSync(directory)).toEqual([]);
+    // Nothing this process can parse means nothing it can act on: no port is
+    // reserved and no stack is hidden, so the file is inert rather than
+    // dangerous. Deleting it is what would be dangerous - a sibling worktree
+    // on a newer branch writes records this checkout cannot read.
+    expect(readdirSync(directory)).toEqual(["stack-4242.json"]);
   });
 });
 

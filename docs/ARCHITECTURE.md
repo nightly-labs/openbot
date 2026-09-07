@@ -146,7 +146,13 @@ These are manual model evaluations, separate from the fake-provider lifecycle re
     path, and a lock whose holder has died is superseded where it lies. An allocator asks for the
     highest generation it saw plus one, so anything that frees a path - deleting it, or renaming it
     aside - lets that number be handed out again beside a plan already made against it. A holder
-    that is still running is never moved past, however long it has held it. `bun run dev:status` and `bun run dev:stop`
+    that is still running is never moved past, however long it has held it. Reading a registry is
+    the same shape and holds to the same rule: a record whose processes are gone is filtered out of
+    every read, so its ports are free from that moment, but the file is never deleted by the reader
+    that judged it - the supervisor may have republished it with a detached child in between, and a
+    sibling worktree on a newer branch writes records this checkout cannot parse at all.
+    `bun run dev:forget` is what removes a record, because a developer asking for it is a decision
+    rather than a guess. `bun run dev:status` and `bun run dev:stop`
     (`scripts/dev-stack.ts`) read those pids instead of matching a process name, which is what makes
     stopping one worktree's stack leave the others alone. Every dev window stays
     reachable: `pages` lists the targets and `--page=<target-id|url-substring>` drives any of them, so

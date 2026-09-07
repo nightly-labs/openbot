@@ -96,8 +96,9 @@ export function dropReusedDebuggingPorts(records: DevInstanceRecord[]): DevInsta
 }
 
 // A dev instance killed with SIGKILL never removes its own record, so reading
-// prunes: a record whose process is gone is deleted rather than reported, which
-// keeps a stale port from being offered after another instance reuses it.
+// filters: a record whose process is gone is left out rather than reported,
+// which keeps a stale port from being offered after another instance reuses
+// it. The file itself stays - see the note under this function.
 export function readDevInstanceRecords(
   directory = devInstanceRegistryDirectory(),
   isAlive: (record: DevInstanceRecord) => boolean = isLiveRecordedProcess,
@@ -120,13 +121,18 @@ export function readDevInstanceRecords(
     } catch {
       record = null;
     }
-    if (record && isAlive(record)) {
-      records.push(record);
-      continue;
-    }
-    rmSync(path, { force: true });
+    if (record && isAlive(record)) records.push(record);
   }
   return dropReusedDebuggingPorts(records).sort((left, right) => left.remoteDebuggingPort - right.remoteDebuggingPort);
+}
+
+// Reading does not delete here either, and for the reason spelled out over
+// `readAllDevStackRecords`: the record a reader judged is not always the record
+// on disk when it acts. A dead instance is left out of every read, so nothing
+// offers its port or drives its endpoint; `dev:stop` and `dev:forget` remove
+// the file, naming the stack whose pids it belongs to.
+export function readAllDevInstanceRecords(directory = devInstanceRegistryDirectory()): DevInstanceRecord[] {
+  return readDevInstanceRecords(directory, () => true);
 }
 
 export interface DevInstanceQuery {

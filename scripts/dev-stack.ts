@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import {
   describeDevInstance,
+  readAllDevInstanceRecords,
   readDevInstanceRecords,
   removeDevInstanceRecord,
 } from "./dev-automation/instance-registry";
@@ -21,6 +22,7 @@ import {
   describeDevStack,
   isOrphanedDevStack,
   isSameWorktree,
+  readAllDevStackRecords,
   readDevStackRecords,
   removeDevStackRecord,
 } from "./dev-automation/stack-registry";
@@ -157,9 +159,10 @@ async function stopDevStack(record: DevStackRecord): Promise<boolean> {
 function forgetDevStack(record: DevStackRecord): void {
   removeDevStackRecord(record);
   // A stack the supervisor never got to clean up leaves its instance records
-  // behind too. They would be pruned on the next read, but only once `ps`
-  // agrees the pid is gone, and a recycled pid keeps that from happening.
-  for (const instance of readDevInstanceRecords()) {
+  // behind too, and nothing else deletes them: reading only filters. So this
+  // reads every record rather than the live ones, and drops each one this
+  // stack published.
+  for (const instance of readAllDevInstanceRecords()) {
     if (record.processes.some((entry) => entry.pid === instance.pid)) removeDevInstanceRecord(instance);
   }
 }
@@ -209,7 +212,10 @@ function reportableStack(record: DevStackRecord, projectRoot: string): Reportabl
 async function main(): Promise<void> {
   const invocation = parseDevStackInvocation(process.argv.slice(2));
   const projectRoot = resolve(process.cwd());
-  const records = readDevStackRecords();
+  // `forget` is the one command that acts on a record because it is dead, so
+  // it is the one that reads past the liveness filter. Everything else asks
+  // what is running.
+  const records = invocation.command === "forget" ? readAllDevStackRecords() : readDevStackRecords();
 
   if (invocation.command === "status") {
     const document = {
@@ -230,8 +236,9 @@ async function main(): Promise<void> {
   const selected = selectDevStacks(records, scope);
   if (selected.length === 0) {
     if (scope.kind === "worktree" && records.length > 0) {
+      const elsewhere = invocation.command === "forget" ? "Recorded elsewhere" : "Live elsewhere";
       logger.info(
-        `No dev stack belongs to this worktree. Live elsewhere:\n${records.map((record) => `- ${describeDevStack(record)}`).join("\n")}`,
+        `No dev stack belongs to this worktree. ${elsewhere}:\n${records.map((record) => `- ${describeDevStack(record)}`).join("\n")}`,
       );
       logger.info(`Name one of those with --pid=<supervisor pid>, or every stack with --all.`);
       return;

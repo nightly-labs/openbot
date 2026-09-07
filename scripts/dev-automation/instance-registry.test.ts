@@ -136,7 +136,10 @@ describe("readDevInstanceRecords", () => {
     writeDevInstanceRecord(alive, directory);
     writeDevInstanceRecord(dead, directory);
     expect(readDevInstanceRecords(directory, (candidate) => candidate.pid === 1_111)).toEqual([alive]);
-    expect(readdirSync(directory)).toEqual(["app-1111.json"]);
+    // Left out of the read, and left on disk: an instance republishes its own
+    // record on the next start, and a reader that deletes what it judged can
+    // delete a newer record than the one it judged.
+    expect(readdirSync(directory)).toEqual(["app-1111.json", "app-2222.json"]);
   });
 
   it("survives a half-written or hand-edited file", () => {
