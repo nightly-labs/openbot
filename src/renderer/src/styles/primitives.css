@@ -1343,11 +1343,32 @@
   background: var(--openbot-border-strong);
 }
 
+/* Kobalte reports the value as a custom property and leaves the width to us, so a fill without this
+   line is a full bar at every value. */
 .ui-progress-fill {
+  width: var(--kb-progress-fill-width, 0%);
   height: 100%;
   border-radius: inherit;
   background: var(--openbot-text-secondary);
   transition: width var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+/* An operation with no measurable end reports that it is still running, rather than sitting at a
+   number. Kobalte publishes no width for one, so the fill is a short bar that travels the track. */
+.ui-progress-fill[data-indeterminate] {
+  width: 35%;
+  animation: ui-progress-travel 1.4s var(--openbot-ease-in-out) infinite;
+  transition: none;
+}
+
+@keyframes ui-progress-travel {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(286%);
+  }
 }
 
 .ui-radial-progress {
@@ -1417,11 +1438,20 @@
   --border-radius: var(--openbot-radius-lg);
 }
 
+/* Three columns and two rows: the mark, the words, and an action row under them. Sonner lays the
+   toast out as one flex line, which works until an action is present — the button then sits between
+   the description and the close control, and the description wraps early around it. Placing the
+   action on its own row gives the words the full width and puts the button where a reader looks for
+   it last. The columns are laid out by hand rather than by auto-placement because a toast without an
+   icon renders no `[data-icon]` element at all. */
 .ui-toaster [data-sonner-toast][data-styled="true"] {
   --ui-toast-tone: transparent;
   --ui-toast-motion-duration: var(--openbot-duration-toast-enter);
-  align-items: flex-start;
-  gap: var(--openbot-space-3);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 0;
+  row-gap: var(--openbot-space-2);
   min-height: var(--openbot-control-xl);
   padding: var(--openbot-space-3) var(--openbot-space-4);
   border-color: transparent;
@@ -1445,9 +1475,29 @@
   --ui-toast-motion-duration: var(--openbot-duration-toast-exit);
 }
 
-.ui-toaster.ui-toaster-closeable [data-sonner-toast][data-styled="true"],
-.ui-toaster [data-sonner-toast][data-styled="true"]:has([data-close-button]) {
-  padding-right: calc(var(--openbot-space-4) + var(--openbot-control-xl));
+.ui-toaster [data-sonner-toast][data-styled="true"] [data-content] {
+  grid-area: 1 / 2 / 2 / -1;
+}
+
+.ui-toaster [data-sonner-toast][data-styled="true"] [data-button] {
+  grid-row: 2;
+}
+
+.ui-toaster [data-sonner-toast][data-styled="true"] [data-cancel] {
+  grid-column: 2;
+  justify-self: end;
+}
+
+.ui-toaster [data-sonner-toast][data-styled="true"] [data-action] {
+  grid-column: 3;
+}
+
+/* The close control floats over the top right corner, so only the words have to keep clear of it.
+   Reserving the room on the toast instead left a hole beside every action button, which is visible
+   even while the control itself is hidden. */
+.ui-toaster.ui-toaster-closeable [data-sonner-toast][data-styled="true"] [data-content],
+.ui-toaster [data-sonner-toast][data-styled="true"]:has([data-close-button]) [data-content] {
+  padding-right: var(--openbot-space-6);
 }
 
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-title] {
@@ -1492,9 +1542,12 @@
 }
 
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-icon] {
+  grid-area: 1 / 1;
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
-  margin: 1px 0 0;
+  /* The column gap is zero so that a toast with no icon starts its text at the padding edge. The
+     space between the mark and the words is this margin instead. */
+  margin: 1px var(--openbot-space-3) 0 0;
 }
 
 .ui-toast-icon {
@@ -1508,7 +1561,7 @@
 }
 
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-button] {
-  height: var(--openbot-control-xl);
+  height: var(--openbot-control-md);
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-bg-control-hover);
   box-shadow: inset 0 0 0 1px var(--openbot-border);

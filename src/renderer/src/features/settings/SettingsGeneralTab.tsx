@@ -30,6 +30,7 @@ interface SettingsGeneralTabProps {
   selectMount: HTMLElement | undefined;
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
+  onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
 }
 
@@ -46,6 +47,7 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
           onChange={props.store.setSelectedProvider}
           onDownloadProvider={props.onDownloadProvider}
           onCancelProviderDownload={props.onCancelProviderDownload}
+          onUpdateProvider={props.onUpdateProvider}
           onConnectProvider={props.onConnectProvider}
         />
       </SettingsSection>

@@ -60,11 +60,30 @@ const providerRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   grok: { phase: "downloading", progress: 72, message: null, version: null },
 };
 
+/** Three connected runtimes, one of which has a newer version waiting. */
+const providerUpdateAgentStatus: AgentStatus = {
+  ...providerAgentStatus,
+  phase: "ready",
+  providers: (["codex", "claude", "grok"] as const).map((id) => ({
+    id,
+    state: "available",
+    version: id === "claude" ? "2.1.246" : "1.0.0",
+    message: null,
+  })),
+};
+const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
+  codex: { phase: "ready", progress: 100, message: null, version: "0.149.1" },
+  claude: { phase: "ready", progress: 100, message: null, version: "2.1.246" },
+  grok: { phase: "ready", progress: 100, message: null, version: "1.0.5" },
+};
+const providerAvailableVersions = { codex: "0.149.1", claude: "2.1.250", grok: null } as const;
+
 function SettingsModalStory(props: {
   initialOpen: boolean;
   initialUpdateStatus?: UpdateStatus;
   mockDownloadUpdate?: boolean;
   providerDownloads?: boolean;
+  providerUpdate?: boolean;
   simulateMobileConnection?: boolean;
 }) {
   const previousApi = window.openbot;
@@ -169,11 +188,21 @@ function SettingsModalStory(props: {
             setMobileDevices((current) => current.filter((device) => device.sessionId !== sessionId));
           }}
           onUpdateAction={runUpdateAction}
-          agentStatus={props.providerDownloads ? providerAgentStatus : undefined}
-          providerRuntimeStatuses={props.providerDownloads ? providerRuntimeStatuses : undefined}
-          onDownloadProvider={props.providerDownloads ? fn() : undefined}
-          onCancelProviderDownload={props.providerDownloads ? fn() : undefined}
-          onConnectProvider={props.providerDownloads ? fn() : undefined}
+          agentStatus={
+            props.providerUpdate ? providerUpdateAgentStatus : props.providerDownloads ? providerAgentStatus : undefined
+          }
+          providerRuntimeStatuses={
+            props.providerUpdate
+              ? providerUpdateRuntimeStatuses
+              : props.providerDownloads
+                ? providerRuntimeStatuses
+                : undefined
+          }
+          providerAvailableVersions={props.providerUpdate ? providerAvailableVersions : undefined}
+          onUpdateProvider={props.providerUpdate ? fn() : undefined}
+          onDownloadProvider={props.providerDownloads || props.providerUpdate ? fn() : undefined}
+          onCancelProviderDownload={props.providerDownloads || props.providerUpdate ? fn() : undefined}
+          onConnectProvider={props.providerDownloads || props.providerUpdate ? fn() : undefined}
         />
       </main>
       <Toaster />
@@ -238,6 +267,15 @@ export const Narrow: Story = {
 export const ProviderDownloads: Story = {
   render: () => <SettingsModalStory initialOpen providerDownloads />,
   parameters: { viewport: { defaultViewport: "settingsPhone" } },
+};
+
+/** The durable surface: the update the toast offers is still here after the toast is gone. */
+export const ProviderUpdateAvailable: Story = {
+  render: () => <SettingsModalStory initialOpen providerUpdate />,
+  play: async () => {
+    const body = within(document.body);
+    await expect(body.findByRole("button", { name: "Update Claude to 2.1.250" })).resolves.toBeEnabled();
+  },
 };
 
 export const Profile: Story = {

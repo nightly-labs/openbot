@@ -5,6 +5,8 @@ import type { ProviderPickerOption } from "../../../components/ProviderPicker";
 interface GeneralStoreProps {
   agentStatus?: AgentStatus;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
+  /** The newer runtime main says exists, per provider. Decided there, never worked out here. */
+  providerAvailableVersions?: Partial<Record<AgentProviderId, string | null>>;
 }
 
 /**
@@ -27,6 +29,7 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
         email: agent?.email,
         connectionState: agent?.connectionState,
         checkError: agent?.checkError,
+        availableVersion: props.providerAvailableVersions?.[provider] ?? null,
         runtimeStatus:
           runtime?.phase === "not-downloaded" && (agent?.state === "available" || agent?.state === "sign-in-required")
             ? { ...runtime, phase: "ready", version: agent.version ?? null }
