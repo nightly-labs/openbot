@@ -335,3 +335,63 @@ export const PersistedExpired: Story = {
   args: { questions: multipleQuestions, resolution: { status: "expired" } },
   render: renderInChat,
 };
+
+export const PersistedSingleAnswer: Story = {
+  args: {
+    questions: singleQuestion,
+    resolution: {
+      status: "answered",
+      responses: { reply: { status: "answered", answers: ["Send that reply"] } },
+    },
+  },
+  render: renderInChat,
+};
+
+export const PersistedPrivateAnswer: Story = {
+  args: {
+    questions: secretQuestion,
+    resolution: {
+      status: "answered",
+      responses: { token: { status: "answered" } },
+    },
+  },
+  render: renderInChat,
+};
+
+export const PersistedLongAnswer: Story = {
+  args: {
+    questions: [
+      {
+        id: "outcome",
+        header: "Outcome",
+        question:
+          "What should the implementation plan include so that the team can review the authentication setup and release it safely?",
+        isSecret: false,
+        options: null,
+      },
+    ],
+    resolution: {
+      status: "answered",
+      responses: {
+        outcome: {
+          status: "answered",
+          answers: [
+            "Prepare a technical brief with the proposed approach, risks, owners, and steps to reverse the release. Include this reference: authentication-session-cookie-configuration-and-release-verification-checklist.",
+          ],
+        },
+      },
+    },
+  },
+  render: renderInChat,
+};
+
+export const PersistedLongAnswerNarrow: Story = {
+  ...PersistedLongAnswer,
+  decorators: [
+    (Story) => (
+      <div class="question-prompt-story-narrow">
+        <Story />
+      </div>
+    ),
+  ],
+};

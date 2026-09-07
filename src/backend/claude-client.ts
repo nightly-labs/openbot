@@ -16,6 +16,13 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { z } from "zod";
+import { createAgentToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
+import {
+  assignAgentSectionToolSchema,
+  createSectionToolSchema,
+  deleteSectionToolSchema,
+  renameSectionToolSchema,
+} from "./agent/sidebar-tools";
 import type { AgentProvider } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import type { ClaudeCliInfo } from "./cli";
@@ -54,6 +61,7 @@ interface ThreadConfig {
   developerInstructions: string;
   additionalDirectories: string[];
   persistSession: boolean;
+  profileGeneration: boolean;
 }
 
 interface ActiveTurn {
@@ -364,12 +372,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const input = new AsyncMessageQueue();
     const appliedEffort = this.#resolveEffort(config.model, config.effort);
     const canUseTool: CanUseTool = async (toolName, toolInput, options) => {
+      if (config.profileGeneration) return { behavior: "deny", message: "Profile generation has no tools." };
       if (toolName !== "AskUserQuestion") {
         return { behavior: "allow", updatedInput: toolInput } satisfies PermissionResult;
       }
       return this.#requestUserInput(threadId, toolInput, options.toolUseID ?? randomUUID());
     };
-    const mcpServers = this.#createOpenBotServers(threadId);
+    const mcpServers = config.profileGeneration ? {} : this.#createOpenBotServers(threadId);
     const claudeQuery = this.#createQuery({
       prompt: input,
       options: {
@@ -383,7 +392,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           preset: "claude_code",
           append: config.developerInstructions,
         },
-        settingSources: ["user", "project", "local"],
+        ...(config.profileGeneration ? { tools: [] } : {}),
+        settingSources: config.profileGeneration ? [] : ["user", "project", "local"],
         permissionMode: "default",
         includePartialMessages: true,
         persistSession: config.persistSession,
@@ -773,18 +783,46 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             { paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).min(1).max(INPUT_LIMITS.attachments) },
             (args) => call("openbot", "attach_files_to_response", args),
           ),
+          tool(
+            "list_sections",
+            "List sidebar sections (folders), their stable ids, and agent assignments before grouping agents.",
+            {},
+            (args) => call("openbot", "list_sections", args),
+          ),
+          tool(
+            "create_section",
+            "Create a sidebar section (folder) to group existing agents. List sections first and reuse an existing matching section.",
+            createSectionToolSchema.shape,
+            (args) => call("openbot", "create_section", args),
+          ),
+          tool("rename_section", "Rename an existing custom sidebar section.", renameSectionToolSchema.shape, (args) =>
+            call("openbot", "rename_section", args),
+          ),
+          tool(
+            "delete_section",
+            "Delete a custom sidebar section without deleting its agents; its agents become ungrouped.",
+            deleteSectionToolSchema.shape,
+            (args) => call("openbot", "delete_section", args),
+          ),
+          tool(
+            "assign_agent_section",
+            "Move an existing agent into a sidebar section. Pass null for sectionId to ungroup it.",
+            assignAgentSectionToolSchema.shape,
+            (args) => call("openbot", "assign_agent_section", args),
+          ),
           tool("list_agents", "List OpenBot agents that can receive local messages.", {}, (args) =>
             call("openbot", "list_agents", args),
           ),
           tool(
+            "create_agent",
+            "Create a persistent local teammate from the user's request, with a profile and first task.",
+            createAgentToolSchema.shape,
+            (args) => call("openbot", "create_agent", args),
+          ),
+          tool(
             "update_profile",
-            "Update the name, title, and/or description of a local OpenBot agent.",
-            {
-              agentId: z.string().min(1),
-              name: z.string().max(INPUT_LIMITS.agentName).optional(),
-              title: z.string().max(INPUT_LIMITS.agentTitle).optional(),
-              description: z.string().max(INPUT_LIMITS.agentDescription).optional(),
-            },
+            "Change an existing local agent's profile or generated avatar from the user's request.",
+            updateProfileToolSchema.shape,
             (args) => call("openbot", "update_profile", args),
           ),
           tool(
@@ -1045,6 +1083,7 @@ function readThreadConfig(params: unknown): ThreadConfig {
     developerInstructions: getString(params, "developerInstructions") ?? "",
     additionalDirectories: [...new Set([cwd, ...roots])],
     persistSession: !isRecord(params) || params.persistSession !== false,
+    profileGeneration: isRecord(params) && params.profileGeneration === true,
   };
 }
 

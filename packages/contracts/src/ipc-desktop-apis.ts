@@ -6,6 +6,12 @@ import type {
   DeleteAgentMemoryInput,
   UpdateAgentMemoryInput,
 } from "./ipc-agent-memories";
+import type {
+  AgentProfileDraft,
+  GenerateAgentProfileInput,
+  SaveAgentProfileInput,
+  SaveAgentProfileResult,
+} from "./ipc-agent-profile";
 import type { AccountUsage, AgentProviderId, AgentStatus } from "./ipc-agent-status";
 import type {
   AgentSummary,
@@ -159,6 +165,8 @@ export interface AgentDesktopApi {
   listInstalledSkills: (agentId: string) => Promise<InstalledSkill[]>;
   getSidebarLayout: () => Promise<SidebarLayoutSnapshot>;
   mutateSidebarLayout: (action: SidebarLayoutAction) => Promise<SidebarLayoutSnapshot>;
+  generateProfile: (input: GenerateAgentProfileInput) => Promise<AgentProfileDraft>;
+  saveProfile: (input: SaveAgentProfileInput) => Promise<SaveAgentProfileResult>;
   createAgent: (input: CreateAgentInput) => Promise<AgentSummary>;
   duplicateAgent: (agentId: string) => Promise<DuplicateAgentResult>;
   updateAgent: (input: UpdateAgentInput) => Promise<AgentSummary>;

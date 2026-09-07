@@ -85,6 +85,8 @@ export function createAgents(overrides: Partial<TeamApiAgents> = {}, events = ne
     testRoutine: unimplemented,
     listRoutineRuns: unimplemented,
     listConversationReads: unimplemented,
+    generateProfile: unimplemented,
+    saveProfile: unimplemented,
     createAgent: unimplemented,
     committedAgentDuplication: () => null,
     duplicateAgent: unimplemented,

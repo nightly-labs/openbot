@@ -3,6 +3,7 @@ import { useNativeState } from "@expo/ui/swift-ui";
 import { accessibilityLabel } from "@expo/ui/swift-ui/modifiers";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
+import { useEffect } from "react";
 import { View } from "react-native";
 
 import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.types";
@@ -11,6 +12,7 @@ export function SheetFormField({
   autoCapitalize,
   autoCorrect,
   autoFocus,
+  editable,
   hint,
   inputMode,
   isRequired = false,
@@ -28,6 +30,9 @@ export function SheetFormField({
 }: SheetFormFieldProps) {
   const [foreground, muted, surface, border] = useThemeColor(["foreground", "muted", "surface", "border"]);
   const nativeValue = useNativeState(value);
+  useEffect(() => {
+    nativeValue.set(value);
+  }, [nativeValue, value]);
   const height = multiline ? 108 : 54;
 
   return (
@@ -58,6 +63,7 @@ export function SheetFormField({
             autoCapitalize={autoCapitalize}
             autoCorrect={autoCorrect}
             autoFocus={autoFocus}
+            editable={editable}
             inputMode={inputMode}
             maxLength={maxLength}
             placeholder={placeholder}

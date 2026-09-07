@@ -30,10 +30,14 @@ actions can be associated with the account that started them. The email is store
 profile and is not copied into individual event properties. Agent lifecycle events are emitted once
 by the local host and associated with the host owner's account; clients that observe a remote host do
 not emit the lifecycle again. Sign-in attempts and website activity remain anonymous until an account
-has been verified. Landing-page attribution is reduced to an allowlisted source category and never
-includes a raw referrer or campaign URL. OpenPanel can also derive session, device, browser,
-operating-system, network, and approximate geographic metadata from a request. The analytics service
-runs on OpenBot's self-hosted infrastructure and receives events through `analytics.openbot.run`.
+has been verified. Landing-page attribution includes an allowlisted source category, an allowlisted
+platform name (or unknown), and the referring domain when available. A recognized utm_source tag
+takes precedence over the referring domain for platform classification; unrecognized tags are not
+sent. Attribution excludes referrer paths, query parameters, fragments, credentials, ports, and raw
+campaign URLs. Referrals from openbot.run and its subdomains are omitted. OpenPanel can also derive
+session, device, browser, operating-system, network, and approximate geographic metadata from a
+request. The analytics service runs on OpenBot's self-hosted infrastructure and receives events
+through `analytics.openbot.run`.
 Analytics is enabled in production by default. Desktop users can disable it under **Settings →
 General → Privacy → Share product analytics**. The preference is stored locally and disables both UI
 analytics and lifecycle analytics emitted by the local host. Website analytics does not use the
@@ -209,3 +213,11 @@ Review folders before deleting them and keep a backup of anything you need.
 Use [GitHub Discussions](https://github.com/NorbertBodziony/openbot/discussions) for privacy questions.
 Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), without attaching
 credentials, conversations, or unrelated private files.
+
+When you ask OpenBot to generate or revise an agent profile, it sends your setup
+prompt, the current profile draft (when present), and available sidebar section
+names and identifiers to the selected AI provider through its local CLI. This
+request does not include conversation history, saved memories, or workspace files.
+The draft is reviewed before OpenBot saves it; generating a draft does not create
+an OpenBot conversation or change an existing agent. The provider's own data and
+CLI retention policies still apply.

@@ -1,6 +1,13 @@
+import {
+  decodeAgentProfileDraft,
+  decodeSaveAgentProfileResult,
+  parseGenerateAgentProfile,
+  parseSaveAgentProfile,
+} from "../ipc-agent-profile";
 import { isDynamicRecord } from "../runtime-values";
-import { isConversationUnreadRoute } from "./current";
+import { isAgentProfileRoute, isConversationUnreadRoute } from "./current";
 import { toCurrentAgentKeys, toCurrentAgentKeysObjectForPath, toWireAgentKeys } from "./current-agent-keys";
+import { decodeProfileV1Request, decodeProfileV1Response } from "./profile-v1";
 import type { TeamProtocolV1JsonObject, TeamProtocolV1JsonValue } from "./v1";
 import {
   decodeTeamProtocolV1CurrentHttpRequest,
@@ -16,6 +23,7 @@ export function encodeTeamProtocolV3CurrentHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ): string {
+  if (isAgentProfileRoute(method, path)) return JSON.stringify(encodeProfileRequest(path, value));
   if (isConversationUnreadRoute(method, path)) return JSON.stringify(decodeUnreadRequest(value));
   if (scopedUsageRoute(method, path)) {
     return JSON.stringify(decodeScopedUsageRequest(value));
@@ -32,6 +40,8 @@ export function decodeTeamProtocolV3CurrentHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ): TeamProtocolV1JsonObject {
+  if (isAgentProfileRoute(method, path))
+    return profileRequest(path, decodeProfileV1Request(profileGeneration(path), value));
   if (isConversationUnreadRoute(method, path)) return decodeUnreadRequest(value);
   if (scopedUsageRoute(method, path)) {
     return decodeScopedUsageRequest(value);
@@ -56,6 +66,7 @@ export function encodeTeamProtocolV3CurrentHttpResponse(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ): string {
+  if (isAgentProfileRoute(method, path) && status < 400) return JSON.stringify(encodeProfileResponse(path, value));
   if (isConversationUnreadRoute(method, path))
     return encodeTeamProtocolV1CurrentHttpResponse(method, readPath(path), status, value, options);
   if (scopedUsageRoute(method, path)) {
@@ -75,6 +86,7 @@ export function decodeTeamProtocolV3CurrentHttpResponse(
   status: number,
   value: unknown,
 ): TeamProtocolV1JsonValue {
+  if (isAgentProfileRoute(method, path) && status < 400) return decodeProfileResponse(path, value);
   if (isConversationUnreadRoute(method, path))
     return decodeTeamProtocolV1CurrentHttpResponse(method, readPath(path), status, value);
   if (scopedUsageRoute(method, path)) {
@@ -110,4 +122,49 @@ function decodeScopedUsageRequest(value: unknown): TeamProtocolV1JsonObject {
 function duplicateRoute(method: string, path: string): boolean {
   const pathname = new URL(path, "http://openbot.invalid").pathname;
   return method === "POST" && /^\/v1\/agents\/[^/]+\/duplicate$/u.test(pathname);
+}
+
+function profileRequest(path: string, value: unknown): TeamProtocolV1JsonObject {
+  const parsed = new URL(path, "http://openbot.invalid").pathname.endsWith("/generate")
+    ? parseGenerateAgentProfile(value)
+    : parseSaveAgentProfile(value);
+  return JSON.parse(JSON.stringify(parsed));
+}
+function profileResponse(path: string, value: unknown): TeamProtocolV1JsonObject {
+  const parsed = new URL(path, "http://openbot.invalid").pathname.endsWith("/generate")
+    ? decodeAgentProfileDraft(value)
+    : decodeSaveAgentProfileResult(value);
+  return JSON.parse(JSON.stringify(parsed));
+}
+
+function profileGeneration(path: string): boolean {
+  return new URL(path, "http://openbot.invalid").pathname.endsWith("/generate");
+}
+function encodeProfileRequest(path: string, value: unknown): TeamProtocolV1JsonObject {
+  return decodeProfileV1Request(profileGeneration(path), profileRequest(path, value));
+}
+
+function encodeProfileResponse(path: string, value: unknown): TeamProtocolV1JsonObject {
+  const parsed = profileResponse(path, value);
+  return decodeProfileV1Response(
+    profileGeneration(path),
+    profileGeneration(path)
+      ? parsed
+      : {
+          agent: toWireAgentKeys(parsed.agent),
+          layout: parsed.layout,
+        },
+  );
+}
+function decodeProfileResponse(path: string, value: unknown): TeamProtocolV1JsonObject {
+  const parsed = decodeProfileV1Response(profileGeneration(path), value);
+  return profileResponse(
+    path,
+    profileGeneration(path)
+      ? parsed
+      : {
+          agent: toCurrentAgentKeys(parsed.agent),
+          layout: parsed.layout,
+        },
+  );
 }

@@ -1,11 +1,12 @@
 // @vitest-environment node
-import { mkdir, realpath, symlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, readdir, realpath, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
 import { AgentService } from "./agent-service";
 import {
@@ -39,6 +40,143 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentService: providers", () => {
+  it("refreshes outdated Codex tools while preserving the agent and conversation, then resumes unchanged tools", async () => {
+    const { store, mailbox } = stores(root);
+    let rejectTurn = false;
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
+      if (method === "turn/start" && rejectTurn) throw new Error("Provider rejected the handoff turn.");
+    });
+    const startService = async () => {
+      const next = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+      await next.initialize();
+      return next;
+    };
+    service = await startService();
+    await service.sendMessage({ agentId: "chief", text: "Remember that my researchers cover tennis and football." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const original = service.listAgents().find((agent) => agent.id === "chief");
+    const originalSession = store.activeProviderSession("chief")?.externalSessionId;
+    if (!original || !originalSession) throw new Error("The original session did not start.");
+    await service.stop();
+    const directory = join(store.database.userDataPath, "provider-toolsets");
+    const [manifest] = await readdir(directory);
+    if (!manifest) throw new Error("The session tool manifest was not saved.");
+    await writeFile(join(directory, manifest), "old-toolset");
+
+    rejectTurn = true;
+    service = await startService();
+    await service.sendMessage({ agentId: "chief", text: "Group my researchers." });
+    await waitFor(() => service?.listQueue("chief").deliveries.some((delivery) => delivery.status === "failed"));
+    await service.stop();
+    rejectTurn = false;
+    service = await startService();
+    await service.sendMessage({ agentId: "chief", text: "Try grouping them again." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    const replacement = store.activeProviderSession("chief")?.externalSessionId;
+    expect(replacement).not.toBe(originalSession);
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
+      id: original.id,
+      threadId: original.threadId,
+      workspacePath: original.workspacePath,
+    });
+    expect(
+      (await service.readConversation("chief")).messages.some((message) =>
+        message.text.includes("tennis and football"),
+      ),
+    ).toBe(true);
+    const starts = client.requests.filter((request) => request.method === "thread/start");
+    expect(starts).toHaveLength(2);
+    expect(paramsRecord(starts[1]?.params)?.dynamicTools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "openbot",
+          tools: expect.arrayContaining([expect.objectContaining({ name: "create_section" })]),
+        }),
+      ]),
+    );
+    const turns = client.requests.filter((request) => request.method === "turn/start");
+    expect(JSON.stringify(turns.at(-1)?.params)).toContain("tennis and football");
+    await service.stop();
+
+    service = await startService();
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).toBe(replacement);
+    expect(client.requests.filter((request) => request.method === "thread/start")).toHaveLength(2);
+  });
+
+  it("deletes unloaded pending handoffs for active and retired sessions with their agent", async () => {
+    const { store, mailbox } = stores(root);
+    let rejectTurn = false;
+    const client = new FakeAgentClient("codex", "DONE", true, true, {}, async (method) => {
+      if (rejectTurn && method === "turn/start") throw new Error("Turn rejected.");
+    });
+    const start = async () => {
+      const next = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+      await next.initialize();
+      return next;
+    };
+    service = await start();
+    await service.sendMessage({ agentId: "chief", text: "Private conversation to remove with this agent." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const manifests = join(store.database.userDataPath, "provider-toolsets");
+    const handoffs = join(store.database.userDataPath, "provider-handoffs");
+    rejectTurn = true;
+    for (const attempt of [1, 2]) {
+      await service.stop();
+      for (const file of await readdir(manifests)) await writeFile(join(manifests, file), "outdated");
+      service = await start();
+      await service.sendMessage({ agentId: "chief", text: `Continue ${attempt}` });
+      await waitFor(
+        () =>
+          service?.listQueue("chief").deliveries.filter((delivery) => delivery.status === "failed").length === attempt,
+      );
+    }
+    const recordedHandoffs = await readdir(handoffs);
+    const recordedManifests = await readdir(manifests);
+    expect(recordedHandoffs).toHaveLength(2);
+    await service.stop();
+    const orphan = createHash("sha256").update("unrecorded-session").digest("hex");
+    await writeFile(join(handoffs, orphan), "Private history written before a crash.");
+    await writeFile(join(manifests, orphan), "unrecorded-toolset");
+    service = await start();
+    expect(await readdir(handoffs)).toEqual(recordedHandoffs);
+    expect(await readdir(manifests)).toEqual(recordedManifests);
+    await service.deleteAgent("chief");
+    expect(await readdir(handoffs)).toEqual([]);
+    expect(await readdir(manifests)).toEqual([]);
+    expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(false);
+  });
+
+  it("removes private handoff files immediately when replacement session binding fails", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Private history for the replacement session." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const original = store.activeProviderSession("chief")?.externalSessionId;
+    const manifests = join(store.database.userDataPath, "provider-toolsets");
+    const recorded = await readdir(manifests);
+    for (const file of recorded) await writeFile(join(manifests, file), "outdated");
+    const binding = vi.spyOn(store, "bindProviderSession").mockImplementationOnce(() => {
+      throw new Error("Session binding failed.");
+    });
+    try {
+      await service.sendMessage({ agentId: "chief", text: "Continue with new tools." });
+      await waitFor(() => service?.listQueue("chief").deliveries.some((delivery) => delivery.status === "failed"));
+      expect(store.activeProviderSession("chief")?.externalSessionId).toBe(original);
+      expect(await readdir(join(store.database.userDataPath, "provider-handoffs"))).toEqual([]);
+      expect(await readdir(manifests)).toEqual(recorded);
+    } finally {
+      binding.mockRestore();
+    }
+  });
+
   it.each<AgentProvider>(["codex", "claude", "grok"])(
     "delivers the quiet collaboration policy to %s on startup and after restart",
     async (provider) => {
@@ -469,6 +607,13 @@ describe.sequential("AgentService: providers", () => {
               expect.objectContaining({ name: "ask_user" }),
               expect.objectContaining({ name: "list_agents" }),
               expect.objectContaining({ name: "update_profile" }),
+              expect.objectContaining({ name: "create_agent" }),
+              expect.objectContaining({ name: "list_sections" }),
+              expect.objectContaining({ name: "create_section" }),
+              expect.objectContaining({ name: "rename_section" }),
+              expect.objectContaining({ name: "delete_section" }),
+              expect.objectContaining({ name: "assign_agent_section" }),
+
               expect.objectContaining({ name: "list_routines" }),
               expect.objectContaining({ name: "create_routine" }),
               expect.objectContaining({ name: "update_routine" }),

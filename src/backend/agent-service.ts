@@ -8,6 +8,7 @@ import type {
   AgentEvent,
   AgentMemory,
   AgentModelOption,
+  AgentProfileDraft,
   AgentRuntimeSnapshot,
   AgentStatus,
   AgentSummary,
@@ -26,6 +27,7 @@ import type {
   DeleteRoutineInput,
   DraftAttachment,
   DuplicateAgentResult,
+  GenerateAgentProfileInput,
   ListRoutineRunsInput,
   QueuedMessageReceipt,
   QueueSnapshot,
@@ -35,9 +37,12 @@ import type {
   RespondToPromptInput,
   Routine,
   RoutineRun,
+  SaveAgentProfileInput,
+  SaveAgentProfileResult,
   SendMessageInput,
   SetMessageReactionInput,
   SidebarLayoutSnapshot,
+  SidebarSection,
   SteerQueuedMessageInput,
   TestRoutineInput,
   UpdateAgentInput,
@@ -68,10 +73,14 @@ import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-sit
 import { isHostedSiteMutationTool } from "./agent/hosted-site-events";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { MailboxSync } from "./agent/mailbox-sync";
+import { generateProfile } from "./agent/profile-generation";
+import { ProfileSave } from "./agent/profile-save";
+import { createAgentToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
 import { type AgentClientFactory, ProviderRuntime } from "./agent/provider-runtime";
 import { type RoutineMutationOptions, RoutineScheduler } from "./agent/routine-scheduler";
 import { type OpenBotToolResponse, openBotToolResult } from "./agent/routine-tools";
 import { fitRuntimeSnapshot } from "./agent/runtime-snapshot";
+import { type AgentSidebar, handleSidebarTool } from "./agent/sidebar-tools";
 import { isDynamicToolCall, providerForAgent, providerLabel } from "./agent/thread-items";
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
@@ -82,6 +91,7 @@ import { type ConversationMarkerExclusions, ConversationReadStore } from "./conv
 import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
+import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePathFromInput } from "./workspace-paths";
 
 const logger = createOpenBotLogger("agent-service");
@@ -103,6 +113,8 @@ export interface ResolvedSharedFile {
 }
 
 export class AgentService extends EventEmitter<AgentServiceEvents> {
+  readonly #profileSave: ProfileSave;
+  readonly #profileClients = new Set<AgentClient>();
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
   readonly #browser: AgentBrowserHost;
@@ -125,6 +137,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #turn: TurnLifecycle;
   readonly #compaction: ContextCompaction;
   readonly #duplication: DuplicationGate;
+  readonly #sidebarLayout: AgentSidebar | null;
   #initialized = false;
   #stopping = false;
 
@@ -140,9 +153,25 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     bundledGrokExecutable: string | null | undefined = null,
     prepareAgentWorkspace: (agent: AgentSummary) => Promise<void> = async () => undefined,
     hostedSites: AgentHostedSites | null = null,
+    sidebarLayout: AgentSidebar | null = null,
   ) {
     super();
     this.#store = store;
+    this.#sidebarLayout = sidebarLayout;
+    this.#profileSave = new ProfileSave(store, {
+      create: (input, configure) =>
+        this.createAgent({ ...input.draft, initialMessage: input.initialMessage ?? "" }, configure, input.operationId),
+      changed: (agent) => {
+        const session = this.#store.activeProviderSession(agent.id);
+        if (session) this.#conversation.unloadThread(session.externalSessionId);
+        this.#emit({ type: "agents-changed", agents: this.listAgents() });
+        this.#drain.scheduleDrain(agent.id);
+      },
+      delete: async (agent) => {
+        await this.#deleteAgentData(agent);
+        this.#emit({ type: "agents-changed", agents: this.listAgents() });
+      },
+    });
     this.#mailbox = mailbox;
     this.#browser = browser;
     this.#conversationReads = new ConversationReadStore(store.database);
@@ -312,6 +341,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       providers: this.#providers,
       duplication: this.#duplication,
+      profileSave: this.#profileSave,
       compaction: this.#compaction,
       routines: this.#routines,
       threads: this.#threads,
@@ -464,11 +494,47 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.listModels();
   }
 
-  async createAgent(input: CreateAgentInput): Promise<AgentSummary> {
+  async generateProfile(input: GenerateAgentProfileInput, sections: SidebarSection[]): Promise<AgentProfileDraft> {
+    const agent = input.agentId ? this.listAgents().find((candidate) => candidate.id === input.agentId) : null;
+    if (input.agentId && !agent) throw new Error("This agent no longer exists.");
+    if (this.#stopping) throw new Error("OpenBot is shutting down.");
+    if (this.#profileClients.size >= 3) throw new Error("Profile generation is busy. Try again shortly.");
+    const provider = agent?.provider ?? this.#providers.preferredProvider();
+    await this.ensureProvider(provider);
+    const models = this.#providers.listModels();
+    const defaultModel = provider === "codex" ? "gpt-5.6-luna" : provider === "claude" ? "claude-opus-5" : null;
+    const model = agent
+      ? models.find((candidate) => candidate.id === agent.model && candidate.provider === provider)
+      : (models.find((candidate) => candidate.provider === provider && candidate.id === defaultModel) ??
+        models.find((candidate) => candidate.provider === provider));
+    if (!model) throw new Error("The selected provider has no available model.");
+    if (this.#stopping) throw new Error("OpenBot is shutting down.");
+    if (this.#profileClients.size >= 3) throw new Error("Profile generation is busy. Try again shortly.");
+    const client = this.#providers.createProfileClient(provider);
+    this.#profileClients.add(client);
+    try {
+      return await generateProfile(client, model, input, sections);
+    } finally {
+      this.#profileClients.delete(client);
+    }
+  }
+
+  saveProfile(
+    input: SaveAgentProfileInput,
+    sidebar: Pick<SidebarLayoutStore, "getSnapshot" | "withProfileAssignment">,
+  ): Promise<SaveAgentProfileResult> {
+    return this.#profileSave.save(input, sidebar);
+  }
+
+  async createAgent(
+    input: CreateAgentInput,
+    configure?: (agent: AgentSummary) => Promise<AgentSummary>,
+    profileOperationId?: string,
+  ): Promise<AgentSummary> {
     const initialMessage = input.initialMessage.trim();
     if (!initialMessage) throw new Error("Initial message is required.");
     if (input.initialMessage.length > INPUT_LIMITS.messageText) throw new Error("Initial message is too long.");
-    let agent = await this.#store.createAgent(input);
+    let agent = await this.#store.createAgent(input, profileOperationId);
     try {
       await this.#prepareAgentWorkspace(agent);
       const preferredProvider = this.#providers.preferredProvider();
@@ -487,6 +553,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           reasoningEffort: preferredModel.defaultReasoningEffort,
         });
       }
+      if (configure) agent = await configure(agent);
       await this.sendMessage({ agentId: agent.id, text: initialMessage, attachmentDraftIds: [] });
       return this.#store.list().find((candidate) => candidate.id === agent.id) ?? agent;
     } catch (error) {
@@ -671,6 +738,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async #deleteAgentData(agent: AgentSummary): Promise<void> {
     const providerSessions = agent.threadId ? this.#store.database.listProviderSessions(agent.threadId) : [];
+    // Keep session records available for a retry if removing private transcript files fails.
+    for (const session of providerSessions) await this.#threads.deleteProviderSessionFiles(session.externalSessionId);
     const errors: unknown[] = [];
     try {
       await this.#mailbox.deleteAgentData(agent.id);
@@ -701,6 +770,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#stopping = false;
     await this.#store.initialize();
     await this.#mailbox.initialize();
+    await this.#threads.reconcileProviderSessionFiles();
     this.#boot.recoverPersistedTurns();
     this.#hostedSites.restore();
     this.#routines.skipMissed(new Date());
@@ -743,7 +813,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#attention.clearPrompts();
     this.#attention.clearBrowserTakeovers();
     this.#attention.clearApprovals();
-    const clients = this.#providers.dispose();
+    const clients = [...this.#providers.dispose(), ...this.#profileClients];
+    this.#profileClients.clear();
     for (const [agentId, snapshot] of this.#conversation.activeSnapshots()) {
       if (!snapshot.activeTurnId) continue;
       const session = this.#store.activeProviderSession(agentId);
@@ -1141,22 +1212,35 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       };
     }
 
+    if (params.tool === "create_agent") {
+      const args = createAgentToolSchema.parse(params.arguments);
+      const hue = args.avatarHue ?? null;
+      const created = await this.createAgent(
+        {
+          name: args.name,
+          description: args.description,
+          initialMessage: args.initialMessage,
+          avatarSeed: args.avatarSeed ?? randomUUID(),
+          avatarHue: hue,
+        },
+        args.title === undefined
+          ? undefined
+          : (agent) => this.#store.updateAgent({ agentId: agent.id, title: args.title }),
+      );
+      return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(created) }] };
+    }
+
     if (params.tool === "update_profile") {
-      const args = params.arguments;
-      if (!isRecord(args)) throw new Error("update_profile arguments are required.");
-      const agentId = args.agentId;
-      if (!isString(agentId) || !agentId.trim()) throw new Error("agentId is required.");
-      const profileFields = ["name", "title", "description"] as const;
-      if (!profileFields.some((field) => args[field] !== undefined)) {
+      const args = updateProfileToolSchema.parse(params.arguments);
+      const { agentId, avatarHue, ...fields } = args;
+      if (Object.values(fields).every((value) => value === undefined) && avatarHue === undefined) {
         throw new Error("At least one profile field is required.");
       }
-      const input: UpdateAgentInput = { agentId };
-      for (const field of profileFields) {
-        const value = args[field];
-        if (value !== undefined && !isString(value)) throw new Error(`${field} must be a string.`);
-        if (value !== undefined) input[field] = value;
+      const input: UpdateAgentInput = { agentId, ...fields, ...(avatarHue === undefined ? {} : { avatarHue }) };
+      let updated = await this.updateAgent(input);
+      if (args.avatarSeed !== undefined || args.avatarHue !== undefined) {
+        updated = await this.setAvatar(agentId, null);
       }
-      const updated = await this.updateAgent(input);
       return {
         success: true,
         contentItems: [
@@ -1167,11 +1251,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               name: updated.name,
               title: updated.title,
               description: updated.description,
+              avatarSeed: updated.avatarSeed,
+              avatarHue: updated.avatarHue,
             }),
           },
         ],
       };
     }
+
+    const sidebarResult = await handleSidebarTool(
+      params.tool,
+      params.arguments,
+      this.#sidebarLayout,
+      new Set(this.listAgents().map((agent) => agent.id)),
+    );
+    if (sidebarResult) return sidebarResult;
 
     const routineResult = await this.#routines.handleTool(params, senderAgentId);
     if (routineResult) return routineResult;

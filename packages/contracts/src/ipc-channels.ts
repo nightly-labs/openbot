@@ -80,6 +80,8 @@ export const IPC_CHANNELS = {
   agentListInstalledSkills: "agent:list-installed-skills",
   agentGetSidebarLayout: "agent:get-sidebar-layout",
   agentMutateSidebarLayout: "agent:mutate-sidebar-layout",
+  agentGenerateProfile: "agent:generate-profile",
+  agentSaveProfile: "agent:save-profile",
   agentCreate: "agent:create",
   agentDuplicate: "agent:duplicate",
   agentUpdate: "agent:update",

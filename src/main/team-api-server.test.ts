@@ -178,6 +178,8 @@ const ROUTE_METHODS: Record<string, string> = {
   "respond.approval": "POST",
   "respond.browserTakeover": "POST",
   "agents.all": "GET",
+  "agents.generateProfile": "POST",
+  "agents.saveProfile": "POST",
   "agents.status": "GET",
   "agents.usage": "GET",
   "agents.models": "GET",
@@ -244,6 +246,9 @@ const ROUTES_WITHOUT_A_CLASSIFIED_JSON_BODY = new Set([
   // that calls either anyway is answered 500 rather than a protocol error - see the PR body.
   "agent.duplicate",
   "agent.usage",
+  // Additive v3 routes: peers without the capability receive 400 before any JSON success body.
+  "agents.generateProfile",
+  "agents.saveProfile",
   // Same reason, one adapter deeper: v3 rewrites this to the `read` path before the v1 codec sees a
   // body, so v1 classifies `conversation/read` and never this spelling.
   "agent.conversationUnread",

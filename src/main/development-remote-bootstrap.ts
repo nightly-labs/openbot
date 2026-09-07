@@ -99,15 +99,31 @@ export async function startDevelopmentRemoteRole({
   await connectDevelopmentRemoteServer(remoteServers);
 }
 
-async function ensureDevelopmentAccount(manager: CentralAuthManager, email: string) {
+export async function ensureDevelopmentAccount(
+  manager: Pick<CentralAuthManager, "initialize" | "logout" | "requestEmailCode" | "verifyEmailCode">,
+  email: string,
+) {
   const initialized = await manager.initialize();
   if (initialized.status === "signed_in" && initialized.user.email === email) return initialized.user;
   if (initialized.status === "signed_in") await manager.logout();
-  const challenge = await manager.requestEmailCode(email);
+  let challenge = await manager.requestEmailCode(email);
+  if (
+    challenge.status === "error" &&
+    challenge.issue.code === "code_recently_sent" &&
+    challenge.issue.retryAfterSeconds !== undefined &&
+    challenge.issue.retryAfterSeconds > 0 &&
+    challenge.issue.retryAfterSeconds <= 60
+  ) {
+    const delay = challenge.issue.retryAfterSeconds * 1_000;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    challenge = await manager.requestEmailCode(email);
+  }
+  if (challenge.status === "error") throw new Error(challenge.issue.message);
   if (challenge.status !== "code_sent" || !challenge.developmentCode) {
     throw new Error("The local account API did not return a development sign-in code.");
   }
   const verified = await manager.verifyEmailCode(challenge.challengeId, challenge.developmentCode);
+  if (verified.status === "error") throw new Error(verified.issue.message);
   if (verified.status !== "signed_in") throw new Error("The local development account could not sign in.");
   return verified.user;
 }

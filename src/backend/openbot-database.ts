@@ -240,6 +240,10 @@ export class OpenBotDatabase {
     return this.#sessions.listProviderSessions(threadId);
   }
 
+  listExternalSessionIds(): string[] {
+    return this.#sessions.listExternalSessionIds();
+  }
+
   bindProviderSession(input: {
     threadId: string;
     provider: AgentProviderId;

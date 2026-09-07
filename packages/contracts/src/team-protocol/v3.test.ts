@@ -7,6 +7,7 @@ import {
 } from "./current";
 import requestFixture from "./fixtures/v3/client-http-request.json";
 import responseFixture from "./fixtures/v3/host-http-response.json";
+import profileResponseFixture from "./fixtures/v3/profile-host-response.json";
 import {
   decodeTeamProtocolV1HttpRequest,
   highestCommonTeamProtocol,
@@ -165,4 +166,98 @@ describe("Team protocol v3", () => {
       "host_update_required",
     );
   });
+});
+
+it("round trips reviewed profiles through the additive v3 HTTP and WebRTC routes", async () => {
+  const {
+    encodeTeamProtocolV3CurrentHttpRequest,
+    decodeTeamProtocolV3CurrentHttpRequest,
+    encodeTeamProtocolV3CurrentHttpResponse,
+    decodeTeamProtocolV3CurrentHttpResponse,
+  } = await import("./v3-adapter");
+  const { encodeTeamProtocolV3WebRtcHttpRequest, decodeTeamProtocolV3WebRtcHttpRequest } = await import(
+    "./v3-webrtc-adapter"
+  );
+  const draft = {
+    name: "Researcher",
+    title: "Science",
+    description: "Cite sources",
+    avatarSeed: "research",
+    avatarHue: 215,
+    sectionId: null,
+  };
+  const path = "/v1/agents/profile/generate";
+  const input = { prompt: "Research science", agentId: "chief", draft };
+  const encoded = encodeTeamProtocolV3CurrentHttpRequest("POST", path, input);
+  expect(decodeTeamProtocolV3CurrentHttpRequest("POST", path, JSON.parse(encoded))).toEqual(input);
+  expect(
+    decodeTeamProtocolV3WebRtcHttpRequest("POST", path, encodeTeamProtocolV3WebRtcHttpRequest("POST", path, input)),
+  ).toEqual(input);
+  const incomplete = { ...input, draft: { ...draft, name: "", description: "" } };
+  expect(
+    decodeTeamProtocolV3CurrentHttpRequest(
+      "POST",
+      path,
+      JSON.parse(encodeTeamProtocolV3CurrentHttpRequest("POST", path, incomplete)),
+    ),
+  ).toEqual(incomplete);
+  expect(
+    decodeTeamProtocolV3WebRtcHttpRequest(
+      "POST",
+      path,
+      encodeTeamProtocolV3WebRtcHttpRequest("POST", path, incomplete),
+    ),
+  ).toEqual(incomplete);
+  expect(() =>
+    encodeTeamProtocolV3CurrentHttpRequest("POST", path, {
+      ...incomplete,
+      draft: { ...incomplete.draft, description: "x".repeat(2001) },
+    }),
+  ).toThrow();
+  expect(() => decodeTeamProtocolV3CurrentHttpResponse("POST", path, 200, incomplete.draft)).toThrow();
+  const response = encodeTeamProtocolV3CurrentHttpResponse("POST", path, 200, draft);
+  expect(decodeTeamProtocolV3CurrentHttpResponse("POST", path, 200, JSON.parse(response))).toEqual(draft);
+  expect(() => decodeTeamProtocolV3CurrentHttpResponse("POST", path, 200, { ...draft, avatarHue: 20 })).toThrow();
+  expect(() => encodeTeamProtocolV3CurrentHttpRequest("POST", path, { prompt: "" })).toThrow();
+});
+
+it("rejects invalid reviewed saves at the protocol boundary", async () => {
+  const { parseSaveAgentProfile } = await import("../ipc-agent-profile");
+  const input = {
+    operationId: "ef3cfb5c-d0e9-49bf-b5b1-66ac21415339",
+    initialMessage: "Hello",
+    draft: {
+      name: "Researcher",
+      title: "Science",
+      description: "Cite sources",
+      avatarSeed: "research",
+      avatarHue: 215,
+      sectionId: null,
+    },
+  };
+  expect(parseSaveAgentProfile(input)).toEqual(input);
+  for (const invalid of [
+    { ...input, operationId: "invalid" },
+    { ...input, initialMessage: "" },
+    { ...input, draft: { ...input.draft, name: "" } },
+    { ...input, draft: { ...input.draft, description: "" } },
+    { ...input, draft: { ...input.draft, avatarSeed: "../avatar.png" } },
+  ]) {
+    expect(() => parseSaveAgentProfile(invalid)).toThrow("valid reviewed profile");
+  }
+});
+
+it("keeps profile save responses frozen across HTTP and WebRTC adapters", () => {
+  const path = "/v1/agents/profile/save";
+  const current = { ...currentResponseFixture, agent: { ...currentResponseFixture.agent, futureIpcField: "private" } };
+  expect(JSON.parse(encodeTeamProtocolV3CurrentHttpResponse("POST", path, 200, current))).toEqual(
+    profileResponseFixture,
+  );
+  expect(encodeTeamProtocolV3WebRtcHttpResponse("POST", path, 200, current)).toEqual(profileResponseFixture);
+  expect(decodeTeamProtocolV3CurrentHttpResponse("POST", path, 200, profileResponseFixture)).toEqual(
+    currentResponseFixture,
+  );
+  expect(decodeTeamProtocolV3WebRtcHttpResponse("POST", path, 200, profileResponseFixture)).toEqual(
+    currentResponseFixture,
+  );
 });

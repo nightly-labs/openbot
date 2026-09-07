@@ -1,5 +1,6 @@
 export type TeamClientFetch = typeof globalThis.fetch;
 
+export { saveReviewedAgentProfile } from "./profile-save";
 // Deliberately not `export * from "@openbot/contracts/team-protocol"`. That barrel pulls every
 // frozen per-version codec and adapter - v1 through v3 plus the WebRTC adapter - into any consumer
 // that touches the root export, which on React Native and in a browser is bundle weight for

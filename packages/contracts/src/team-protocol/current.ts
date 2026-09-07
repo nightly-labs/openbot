@@ -8,6 +8,7 @@ export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
 
 export const TEAM_CURRENT_CAPABILITIES = [
   ...TEAM_PROTOCOL_V3_CAPABILITIES,
+  "agent-profile-generation",
   TEAM_SEMANTIC_TAGS_CAPABILITY,
   TEAM_AGENT_ACTIVITY_CAPABILITY,
   TEAM_CONVERSATION_UNREAD_CAPABILITY,
@@ -31,5 +32,12 @@ export function isConversationUnreadRoute(method: string, path: string): boolean
   return (
     method === "POST" &&
     /^\/v1\/agents\/[^/]+\/conversation\/unread$/u.test(new URL(path, "http://openbot.invalid").pathname)
+  );
+}
+
+export function isAgentProfileRoute(method: string, path: string): boolean {
+  return (
+    method === "POST" &&
+    /^\/v1\/agents\/profile\/(generate|save)$/u.test(new URL(path, "http://openbot.invalid").pathname)
   );
 }

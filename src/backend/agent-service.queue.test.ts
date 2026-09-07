@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { randomUUID } from "node:crypto";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
@@ -7,6 +8,7 @@ import type { AgentProvider } from "./agent-client";
 import { AgentService } from "./agent-service";
 import {
   CREATE_AGENT_INPUT,
+  callOpenBotTool,
   createFakeClaude,
   createFakeGrok,
   FakeAgentClient,
@@ -14,6 +16,7 @@ import {
   firstInputText,
   inputRecords,
   notification,
+  openBotToolPayload,
   protocolMessages,
   startAgentTestFixture,
   stopAgentTestFixture,
@@ -21,6 +24,7 @@ import {
   waitFor,
 } from "./agent-service-test-harness";
 import { getString } from "./protocol";
+import { SidebarLayoutStore } from "./sidebar-layout-store";
 
 let root: string;
 let logPath: string;
@@ -207,6 +211,104 @@ describe.sequential("AgentService: queue", () => {
     expect(store.database.listAgents()).toEqual([]);
     await expect(readdir(join(root, "home", "OpenBot", "Agents"))).resolves.toEqual([]);
   });
+
+  it("removes queued profile creation on receipt failure and runs only the successful retry", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    const sidebar = new SidebarLayoutStore(join(root, "sidebar.json"));
+    await sidebar.initialize();
+    const input = {
+      operationId: randomUUID(),
+      initialMessage: "Introduce yourself",
+      draft: {
+        name: "Researcher",
+        title: "Research",
+        description: "Cite sources",
+        avatarSeed: "research",
+        avatarHue: null,
+        sectionId: null,
+      },
+    };
+    let failedAgentId = "";
+    const failure = vi.spyOn(store, "commitReviewedProfile").mockImplementationOnce((agentId) => {
+      failedAgentId = agentId;
+      expect(mailbox.listQueue(agentId).deliveries.map((delivery) => delivery.status)).toEqual(["queued"]);
+      throw new Error("Receipt write failed.");
+    });
+    await expect(service.saveProfile(input, sidebar)).rejects.toThrow("Receipt write failed.");
+    expect(service.listAgents()).toEqual([]);
+    expect(store.database.listAgents()).toEqual([]);
+    expect(mailbox.listQueue(failedAgentId).deliveries).toEqual([]);
+    expect(sidebar.getSnapshot().agentAssignments).toEqual({});
+    expect(client.requests.filter((request) => request.method === "turn/start")).toEqual([]);
+    await expect(readdir(join(root, "home", "OpenBot", "Agents"))).resolves.toEqual([]);
+    failure.mockRestore();
+    const result = await service.saveProfile(input, sidebar);
+    expect((await service.saveProfile(input, sidebar)).agent.id).toBe(result.agent.id);
+    expect(service.listAgents()).toHaveLength(1);
+    await waitFor(() => client.requests.some((request) => request.method === "turn/start"));
+    expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
+  });
+
+  it.each([false, true])(
+    "recovers profile creation before startup drains queues (committed: %s)",
+    async (committed) => {
+      const { store, mailbox } = stores(root);
+      await store.initialize();
+      await mailbox.initialize();
+      const existing = await store.createAgent({ ...CREATE_AGENT_INPUT, name: "Keep this agent" });
+      const sidebar = new SidebarLayoutStore(join(root, "sidebar.json"));
+      await sidebar.initialize();
+      const input = {
+        operationId: randomUUID(),
+        initialMessage: "Introduce yourself",
+        draft: {
+          name: "Researcher",
+          title: "Research",
+          description: "Cite sources",
+          avatarSeed: "research",
+          avatarHue: null,
+          sectionId: null,
+        },
+      };
+      const pending = await store.createAgent(input.draft, input.operationId);
+      await mailbox.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: [pending.id],
+        text: input.initialMessage,
+        draftIds: [],
+        replyToMessageId: null,
+      });
+      if (committed)
+        store.commitReviewedProfile(
+          pending.id,
+          input.draft,
+          `agent-profile:${input.operationId}`,
+          sidebar.getSnapshot(),
+        );
+      // Reopen the persisted state without invoking ProfileSave's in-memory catch or finally.
+      store.database.close();
+      const restarted = stores(root);
+      const client = new FakeAgentClient("codex");
+      service = new AgentService(restarted.store, restarted.mailbox, fakeBrowser(), 30_000, "codex", () => client);
+      await service.initialize();
+      expect(service.listAgents().some((agent) => agent.id === existing.id)).toBe(true);
+      expect(service.listAgents().some((agent) => agent.id === pending.id)).toBe(committed);
+      if (!committed) {
+        expect(restarted.mailbox.listQueue(pending.id).deliveries).toEqual([]);
+        expect(client.requests.filter((request) => request.method === "turn/start")).toEqual([]);
+        await expect(readdir(join(root, "home", "OpenBot", "Agents"))).resolves.toEqual([existing.id]);
+      }
+      const result = await service.saveProfile(input, sidebar);
+      if (committed) expect(result.agent.id).toBe(pending.id);
+      else expect(result.agent.id).not.toBe(pending.id);
+      expect(service.listAgents()).toHaveLength(2);
+      await waitFor(() => client.requests.some((request) => request.method === "turn/start"));
+      expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
+    },
+  );
 
   it("keeps the agent model and thread when a lazy provider cannot start", async () => {
     const { store, mailbox } = stores(root);
@@ -995,6 +1097,128 @@ describe.sequential("AgentService: queue", () => {
     );
   });
 
+  it("creates and groups a persistent teammate from conversation and rejects invalid changes", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    const sidebarPath = join(root, "sidebar-layout.json");
+    const sidebar = new SidebarLayoutStore(sidebarPath);
+    await sidebar.initialize();
+    const changes: unknown[] = [];
+    sidebar.on("changed", (layout) => changes.push(layout));
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+      undefined,
+      null,
+      null,
+      undefined,
+      null,
+      sidebar,
+    );
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Create a research teammate." });
+    await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!client || !threadId) throw new Error("The agent session did not start.");
+    const result = await callOpenBotTool(client, threadId, "create_agent", {
+      name: "Research Partner",
+      title: "Research",
+      description: "Find primary sources.",
+      initialMessage: "Research train routes to Berlin.",
+      avatarSeed: "research-partner",
+      avatarHue: 150,
+    });
+    expect(result.error).toBeUndefined();
+    const created = openBotToolPayload(result.result);
+    expect(created).toMatchObject({
+      name: "Research Partner",
+      title: "Research",
+      description: "Find primary sources.",
+      avatarSeed: "research-partner",
+      avatarHue: 150,
+    });
+    const agentId = getString(created, "id");
+    if (!agentId) throw new Error("The tool did not return the created agent id.");
+    expect(service.listQueue(agentId).deliveries).toHaveLength(1);
+    await service.setAvatar(agentId, {
+      mimeType: "image/png",
+      bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    });
+    expect(store.resolveAvatar(agentId)).not.toBeNull();
+    const invalid = await callOpenBotTool(client, threadId, "update_profile", {
+      agentId,
+      name: "Invalid",
+      avatarHue: 999,
+    });
+    expect(invalid.error).toBeDefined();
+    expect(service.listAgents().find((agent) => agent.id === agentId)?.name).toBe("Research Partner");
+    const invalidCreation = await callOpenBotTool(client, threadId, "create_agent", {
+      name: "Invalid",
+      description: "",
+      initialMessage: " ",
+    });
+    expect(invalidCreation.error).toBeDefined();
+    expect(service.listAgents().filter((agent) => agent.name === "Invalid")).toEqual([]);
+    await callOpenBotTool(client, threadId, "update_profile", { agentId, avatarHue: null });
+    expect(service.listAgents().find((agent) => agent.id === agentId)?.avatarUrl).toBeNull();
+    expect(store.resolveAvatar(agentId)).toBeNull();
+    const initialLayout = await callOpenBotTool(client, threadId, "list_sections", {});
+    expect(openBotToolPayload(initialLayout.result)).toMatchObject({ sections: [], agentAssignments: {} });
+    const grouped = await callOpenBotTool(client, threadId, "create_section", { name: "Research" });
+    expect(grouped.error).toBeUndefined();
+    const sectionId = sidebar.getSnapshot().sections[0]?.id;
+    if (!sectionId) throw new Error("The section was not created.");
+    const assigned = await callOpenBotTool(client, threadId, "assign_agent_section", { agentId, sectionId });
+    expect(openBotToolPayload(assigned.result)).toMatchObject({ agentAssignments: { [agentId]: sectionId } });
+    expect(changes.at(-1)).toMatchObject({ agentAssignments: { [agentId]: sectionId } });
+    const renamed = await callOpenBotTool(client, threadId, "rename_section", { sectionId, name: "Travel" });
+    expect(openBotToolPayload(renamed.result)).toMatchObject({ sections: [{ id: sectionId, name: "Travel" }] });
+    const persistedSidebar = new SidebarLayoutStore(sidebarPath);
+    await persistedSidebar.initialize();
+    expect(persistedSidebar.getSnapshot()).toMatchObject({
+      sections: [{ id: sectionId, name: "Travel" }],
+      agentAssignments: { [agentId]: sectionId },
+    });
+    const beforeInvalid = sidebar.getSnapshot();
+    for (const [tool, args] of [
+      ["create_section", { name: " " }],
+      ["create_section", { name: "Travel" }],
+      ["assign_agent_section", { agentId: "missing-agent", sectionId }],
+      ["assign_agent_section", { agentId, sectionId: "missing-section" }],
+    ] as const) {
+      const rejected = await callOpenBotTool(client, threadId, tool, args);
+      expect(rejected.error).toBeDefined();
+      expect(sidebar.getSnapshot()).toEqual(beforeInvalid);
+    }
+    const ungrouped = await callOpenBotTool(client, threadId, "assign_agent_section", { agentId, sectionId: null });
+    expect(openBotToolPayload(ungrouped.result).agentAssignments).toEqual({});
+    await callOpenBotTool(client, threadId, "assign_agent_section", { agentId, sectionId });
+    const deleted = await callOpenBotTool(client, threadId, "delete_section", { sectionId });
+    expect(openBotToolPayload(deleted.result).sections).toEqual([]);
+    expect(openBotToolPayload(deleted.result).agentAssignments).toEqual({});
+    expect(service.listAgents().some((agent) => agent.id === agentId)).toBe(true);
+    await service.stop();
+    service = null;
+    const restored = stores(root);
+    await restored.store.initialize();
+    expect(restored.store.list().find((agent) => agent.id === agentId)).toMatchObject({
+      name: "Research Partner",
+      title: "Research",
+      description: "Find primary sources.",
+      avatarSeed: "research-partner",
+      avatarHue: null,
+    });
+  });
+
   it("lists complete local profiles and updates a selected agent profile", async () => {
     process.env.OPENBOT_FAKE_AGENT_TOOL_CALLS = JSON.stringify([
       { tool: "list_agents", arguments: {} },
@@ -1005,6 +1229,8 @@ describe.sequential("AgentService: queue", () => {
           name: "Design Studio",
           title: "Product design",
           description: "Owns product interface and visual design.",
+          avatarSeed: "design-studio",
+          avatarHue: 215,
         },
       },
     ]);
@@ -1023,6 +1249,8 @@ describe.sequential("AgentService: queue", () => {
       name: "Design Studio",
       title: "Product design",
       description: "Owns product interface and visual design.",
+      avatarSeed: "design-studio",
+      avatarHue: 215,
     });
     const listResponse = (await protocolMessages(logPath)).find((message) => message.id === "agent-tool-configured-0");
     expect(JSON.stringify(listResponse?.result)).toContain('\\"title\\":\\"Design\\"');

@@ -1088,6 +1088,9 @@ function unavailableSidebarLayout(): TeamApiSidebarLayout {
     mutate: async () => {
       throw new HttpError(503, "Sidebar layout is unavailable.");
     },
+    withProfileAssignment: async () => {
+      throw new Error("Sidebar layout is unavailable.");
+    },
     placeDuplicateAfter: async () => {
       throw new HttpError(503, "Sidebar layout is unavailable.");
     },
