@@ -1163,8 +1163,24 @@ export class BrowserHost {
       diagnostics: history.diagnostics,
       actions: history.actions,
     });
-    keepQueueBlocked(completion);
-    const result = await withTimeout(completion, timeoutMs, timeoutMessage);
+    let cancellationConfirmed = false;
+    const bounded = withTimeout(completion, timeoutMs, timeoutMessage).catch((error) => {
+      if (isTimeoutError(error)) cancellationConfirmed = tab.engine.cancelPendingCommands();
+      throw error;
+    });
+    // A snapshot walks every frame with CDP commands, and Electron's `sendCommand` has no timeout of
+    // its own: a frame whose renderer never answers leaves `completion` pending forever. The bound
+    // above returns an error to the caller, but the queue waits on every promise given to
+    // `keepQueueBlocked`, so without cancelling the command nothing on this tab ever runs again --
+    // navigation, takeover, close and host shutdown all queue behind that drain. Detaching the
+    // debugger is the only cancellation primitive there is, and a confirmed detach is what releases
+    // the drain; when the recorder holds the debugger there is nothing to detach and the wait stands.
+    keepQueueBlocked(
+      Promise.allSettled([bounded]).then(() =>
+        cancellationConfirmed ? undefined : Promise.allSettled([completion]).then(() => undefined),
+      ),
+    );
+    const result = await bounded;
     tab.revision = revision;
     return result;
   }

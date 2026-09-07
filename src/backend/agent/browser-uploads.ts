@@ -172,8 +172,13 @@ export class BrowserUploads {
         }
         const copiedBytes = (await stat(stagedPath)).size;
         // The size was measured before the copy and the quotas were reserved against it, so a file that
-        // grew underneath us has already been charged the wrong amount.
-        if (copiedBytes !== expectedBytes) throw new Error("A browser upload file changed while it was staged.");
+        // changed underneath us has already been charged the wrong amount. The staged size alone only
+        // catches a file that shrank: the read stops at `expectedBytes - 1`, so one that grew produces a
+        // copy of exactly the expected length. Re-stat the descriptor the copy read from -- the same open
+        // handle, so it is the same file even if the path was replaced -- and reject either direction.
+        const sourceBytes = (await source.handle.stat()).size;
+        if (copiedBytes !== expectedBytes || sourceBytes !== expectedBytes)
+          throw new Error("A browser upload file changed while it was staged.");
         stagedPaths.push(stagedPath);
       }
       if (reservation.invalidated) throw new Error("The browser document changed during upload staging.");

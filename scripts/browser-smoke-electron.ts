@@ -111,12 +111,37 @@ const server = createServer((request, response) => {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(`<!doctype html>
       <form onsubmit="event.preventDefault();document.querySelector('output').textContent='form-submit:' + event.isTrusted"><input aria-label="Query" /><button type="submit" aria-label="Search">Search</button></form>
+      <textarea aria-label="Body"></textarea>
       <div id="shadow-host"></div>
       <iframe title="Trigger frame" src="/frame-files?file_label=Trigger+files"></iframe>
       <output>ready</output>
       <script>
         document.querySelector('#shadow-host').attachShadow({ mode: 'open' }).innerHTML =
           '<iframe title="Shadow frame" src="/frame-files?file_label=Shadow+frame+files"></iframe>';
+      </script>`);
+    return;
+  }
+  // A frame that answers nothing, in its own process, so the parent stays responsive while the
+  // snapshot's walk of this frame never returns. The host has to be a site of its own rather than the
+  // `localhost` the other cross-origin fixtures use: same site means the same renderer, and wedging
+  // it would take the `/v2` page's own frame down with it for the rest of the run. It announces
+  // itself first and spins from a task afterwards, so the test waits on the announcement rather than
+  // a clock -- a loop entered inline never lets the message out.
+  if (url.pathname === "/spinning-frame") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(
+      `<!doctype html><body>spinning<script>parent.postMessage('spinning', '*');setTimeout(() => { while (true) {} }, 0);</script>`,
+    );
+    return;
+  }
+  if (url.pathname === "/blocking-frame") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<!doctype html>
+      <output>blocking frame ready</output>
+      <script>
+        addEventListener('message', (event) => {
+          if (event.data === 'spinning') document.querySelector('output').textContent = 'frame spinning';
+        });
       </script>`);
     return;
   }
@@ -786,6 +811,30 @@ async function main(): Promise<void> {
         `V2 submit did not reach native form submission: ${toolError(nativeSubmit)} (${nativeSubmitOutput})`,
       );
     }
+    // Shift is not a command modifier. `Shift+Enter` is how every composer on the web spells "line
+    // break, do not submit", so a shortcut whose character event is suppressed reaches the page as a
+    // keydown that inserts nothing while the tool reports success.
+    const typedIntoBody = await callBrowserTool(browser, "type", {
+      tabId: keysTab.id,
+      target: { kind: "css", selector: 'textarea[aria-label="Body"]' },
+      text: "line",
+      mode: "replace",
+    });
+    if (!typedIntoBody.success) throw new Error(`V2 textarea typing failed: ${toolError(typedIntoBody)}`);
+    const shiftEnterPressed = await callBrowserTool(browser, "press", {
+      tabId: keysTab.id,
+      target: { kind: "css", selector: 'textarea[aria-label="Body"]' },
+      key: "Shift+Enter",
+    });
+    const bodyAfterShiftEnter = await keysContents.executeJavaScript(
+      `document.querySelector('textarea[aria-label="Body"]').value`,
+      true,
+    );
+    if (!shiftEnterPressed.success || bodyAfterShiftEnter !== "line\n") {
+      throw new Error(
+        `V2 Shift+Enter inserted no newline: ${toolError(shiftEnterPressed)} (${JSON.stringify(bodyAfterShiftEnter)})`,
+      );
+    }
     // An input inside an iframe nested in a shadow root is reachable by target discovery, so its
     // document has to be reachable by document enumeration too. If it is not, the next frame
     // navigation reports the document as gone and frees the files the input is still holding.
@@ -853,6 +902,47 @@ async function main(): Promise<void> {
       throw new Error("V2 document enumeration reported a truncated scan as complete and lost an upload document.");
     }
     await browser.close(keysTab.id);
+    // A snapshot walks every frame, and Electron's `sendCommand` has no timeout of its own, so a frame
+    // whose process is spinning never answers the walk. The timeout returns an error to the caller
+    // either way; what it also has to do is cancel the command, or the promise the tab's queue was told
+    // to wait on stays pending and nothing on this tab ever runs again -- which is what the close below
+    // proves. `url` is the one wait condition that needs no CDP command, so the wait itself settles and
+    // the snapshot that follows it is what hits the blocked frame with the caller's remaining time.
+    const blockedTab = await browser.open(`${origin}/blocking-frame`, "smoke-thread", "smoke-bot");
+    const blockedContents = webContents
+      .getAllWebContents()
+      .find((contents) => !contents.isDestroyed() && contents.getURL().startsWith(`${origin}/blocking-frame`));
+    if (!blockedContents) throw new Error("Blocking frame fixture web contents were not available.");
+    await blockedContents.executeJavaScript(
+      `(() => {
+        const frame = document.createElement('iframe');
+        frame.title = 'Blocked frame';
+        frame.src = 'http://spin.localhost:${address.port}/spinning-frame';
+        document.body.appendChild(frame);
+        return true;
+      })()`,
+      true,
+    );
+    await waitFor(
+      async () =>
+        (await blockedContents.executeJavaScript("document.querySelector('output').textContent", true)) ===
+        "frame spinning",
+    );
+    const blockedSnapshotWait = await callBrowserTool(browser, "wait_for", {
+      tabId: blockedTab.id,
+      url: "/blocking-frame",
+      timeoutMs: 700,
+    });
+    if (blockedSnapshotWait.success || !toolError(blockedSnapshotWait).includes("timed out")) {
+      throw new Error(`V2 snapshot did not bound a frame that never answers: ${toolError(blockedSnapshotWait)}`);
+    }
+    const blockedTabClosed = await Promise.race([
+      browser.close(blockedTab.id).then(() => "closed"),
+      new Promise((resolve) => setTimeout(() => resolve("blocked"), 5_000)),
+    ]);
+    if (blockedTabClosed !== "closed") {
+      throw new Error("V2 snapshot timeout left the tab queue waiting on a CDP command it never cancelled.");
+    }
     // `submit: true` reached through a snapshot ref is the case that used to fail: typing changes a
     // contenteditable's visible text, so re-resolving the same ref to press Enter fingerprinted the
     // element against its pre-typing text and threw instead of submitting.

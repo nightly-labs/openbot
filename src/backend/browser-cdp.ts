@@ -2014,8 +2014,20 @@ async function dispatchShortcut(send: SendCommand, shortcut: string, sessionId?:
     if (!modifier) throw new Error(`Invalid browser shortcut: ${shortcut}`);
     modifierNames.push(modifier);
   }
-  const { text: keyText, ...keyInfo } = normalizeKey(key);
+  const { text: keyText, ...normalized } = normalizeKey(key);
   const modifiers = modifierMask(modifierNames);
+  const shiftOnly = modifiers === SHIFT_MODIFIER;
+  // A named key gets its character from the alias table; a single-character shortcut is its own.
+  // A command modifier gets none, because `Ctrl+S` is a command rather than an `s` in the document.
+  // Shift is not one of those: `Shift+Enter` is how a composer spells "line break, do not submit",
+  // and suppressing its character made the shortcut fire a key event, insert nothing, and report
+  // success. Which glyph Shift produces is only knowable for the alias keys, whose text does not
+  // depend on it, and for a letter -- `Shift+1` is `!` on a US layout and something else on half a
+  // dozen others, so it stays a key event rather than a guessed character.
+  const character = keyText ?? (key.length === 1 ? (shiftOnly ? shiftedLetter(key) : key) : undefined);
+  // A real `Shift+a` reports `A` in `event.key`, not an `a` with a shift flag beside it, and the
+  // character event has to agree with the key events around it.
+  const keyInfo = shiftOnly && keyText === undefined && character ? { ...normalized, key: character } : normalized;
   const pressedModifiers: string[] = [];
   let keyPressed = false;
   try {
@@ -2034,10 +2046,7 @@ async function dispatchShortcut(send: SendCommand, shortcut: string, sessionId?:
     }
     await send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...keyInfo, modifiers }, sessionId);
     keyPressed = true;
-    // A named key gets its character from the alias table; a single-character shortcut is its own.
-    // Modified shortcuts get none, because `Ctrl+S` is a command rather than an `s` in the document.
-    const character = keyText ?? (key.length === 1 ? key : undefined);
-    if (character !== undefined && modifiers === 0)
+    if (character !== undefined && (modifiers === 0 || shiftOnly))
       await send("Input.dispatchKeyEvent", { type: "char", ...keyInfo, text: character }, sessionId);
     await send("Input.dispatchKeyEvent", { type: "keyUp", ...keyInfo, modifiers }, sessionId);
     keyPressed = false;
@@ -2126,6 +2135,13 @@ function normalizeKey(key: string): {
   return { key, code: key.length === 1 && /[a-z]/i.test(key) ? `Key${upper}` : upper };
 }
 
+/** Chromium's `Input.dispatchKeyEvent` bit for Shift, the one modifier that still yields a character. */
+const SHIFT_MODIFIER = 8;
+
+function shiftedLetter(key: string): string | undefined {
+  return /^[a-z]$/i.test(key) ? key.toUpperCase() : undefined;
+}
+
 function modifierMask(values: string[]) {
   let result = 0;
   for (const value of values) {
@@ -2133,7 +2149,7 @@ function modifierMask(values: string[]) {
     if (normalized === "Alt") result |= 1;
     if (normalized === "Control") result |= 2;
     if (normalized === "Meta") result |= 4;
-    if (normalized === "Shift") result |= 8;
+    if (normalized === "Shift") result |= SHIFT_MODIFIER;
   }
   return result;
 }
