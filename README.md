@@ -158,7 +158,7 @@ Use `bun run dev:seed --dry-run` to inspect the target and fixture counts withou
 | `bun run check` | Run Biome, both typechecks, offline tests, the browser smoke test, and the production build. |
 | `bun run check:ui` | Check the renderer against the design system: shared primitives, Kobalte and Lucide confined to `components/ui`, palette tokens instead of colour, size, radius and transition literals. Reads the whole renderer in 60 ms. |
 | `bun run test:backend` | Run backend tests only. |
-| `bun run test:browser` | Run the local embedded-browser smoke test. |
+| `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, or `--scenario=evaluation` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
 | `bun run package` | Build an unpacked local ARM64 application. |
 | `bun run package:verify` | Build and verify the real ARM64 app bundle, icon, metadata, ASAR, and fuses. |

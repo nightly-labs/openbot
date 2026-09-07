@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
-import { isString } from "@openbot/contracts/runtime-values";
 import { redactText } from "@openbot/logging";
 import { parseBrowserToolArguments } from "../browser-tools";
 import type { GeneratedAttachmentSource } from "../mailbox-store";
@@ -118,10 +117,6 @@ export class BrowserUploads {
     const args = parseBrowserToolArguments("upload_files", params.arguments);
     const tabId = args.tabId;
     const paths = args.paths;
-    // The schema above already bounded both; this only narrows the parsed record's `unknown` values.
-    if (!isString(tabId) || !Array.isArray(paths) || !paths.every(isString)) {
-      throw new Error("upload_files requires a tabId and a list of local file paths.");
-    }
     const uploadTarget = await this.#browser.resolveUploadTarget(params);
     const sources = await this.#attachments.openSources(agentId, paths, UPLOAD_SCOPE);
     let stagingRoot: string | null = null;

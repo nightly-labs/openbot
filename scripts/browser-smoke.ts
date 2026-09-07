@@ -27,7 +27,7 @@ try {
   const exitCode = await run(electron, [outputPath, `--smoke-root=${smokeRoot}`, ...process.argv.slice(2)], true);
   if (exitCode !== 0) {
     process.exitCode = exitCode;
-  } else {
+  } else if (!process.argv.some((argument) => argument.startsWith("--scenario="))) {
     const persistenceServer = createServer((request, response) => {
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
       if (url.pathname !== "/persistence") {
