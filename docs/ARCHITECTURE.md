@@ -59,6 +59,40 @@ renderer ──► @openbot/contracts ◄── preload ◄── main ──►
   state, and one concern is one record - a row of parallel signals over its fields lets a screen
   hold states the product does not have.
 
+## Agent communication policy
+
+The shared developer instructions keep routine teammate exchanges internal by default. Agents
+should start or resume work without narrating setup, context loading, discovery, or readiness.
+Progress updates focus on meaningful outcomes, completed work, material changes, blockers, failures,
+and required user input or approval. Delegated work still needs an explicit reply to the requesting
+teammate; acknowledgements must not become loops. Relevant findings belong in the task result, and
+the user can ask for a detailed coordination report.
+
+This policy lives in `src/backend/agent/developer-instructions.ts` and is supplied on both thread
+start and resume. Codex receives `developerInstructions`; Claude appends them to its system prompt;
+Grok receives them as a tagged instruction block in normal turn input. There is no model-specific
+verbosity setting or response filter. Delivery is tested, but compliance depends on the provider,
+model, and existing conversation context; Grok's input block is not a dedicated system message.
+Restarting the app reapplies the current policy without deleting conversation history. The policy
+does not hide mailbox records, tool activity, approvals, or failures in desktop or mobile clients.
+
+### Model evaluation scenarios
+
+Run these scenarios in an isolated test profile with two agents, separately for Codex, Claude, and
+Grok. Record provider/model versions, prompts, and observed responses. Repeat collaboration after
+an app restart using the same conversation, including one with earlier verbose coordination.
+These are manual model evaluations, separate from the fake-provider lifecycle regression tests.
+
+| Scenario | Expected behavior |
+| --- | --- |
+| On a new conversation, ask an agent to research a topic with one teammate. | Work begins without a setup, discovery, or readiness monologue. |
+| Exchange routine scope clarifications and acknowledgements during that task. | No user-facing message-by-message recap or acknowledgement loop. |
+| Have the teammate finish its research and send findings back. | The requesting agent receives the result; the user receives a concise useful synthesis. |
+| Have the teammate report a failed step, a blocker, or a finding that changes the recommendation. | The user sees the consequence and any required decision. |
+| Include a step that requires approval or clarification. | The existing approval/question flow remains visible and the agent waits for the answer. |
+| Restart the app, then ask the agent to continue the same task. | Work continues with the same policy and no context-loading recap. |
+| Ask explicitly for a detailed account of teammate coordination. | The agent provides the requested detail. |
+
 ## Change rules
 
 1. Put a type in `packages/contracts` only when it crosses a process or application boundary.

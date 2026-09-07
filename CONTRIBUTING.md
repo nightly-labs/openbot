@@ -50,8 +50,10 @@ state, `.env` files, credentials, real conversations, or user attachments.
 Every push to a branch in this repository runs the automated reviewer, and it blocks the merge on
 an unresolved P0 or P1 finding. A pull request from a fork is the exception: GitHub gives a fork's
 push run a read-only token, so it could not publish a review even if it produced one. Ask a
-maintainer to comment `/norbiai review` — that path runs in this repository and can publish, and
-the same comment re-runs the review after each push. Two ways past a finding:
+maintainer to add the `norbiai` label, or to comment `/norbiai review`. Both run this
+repository's own copy of the workflow, where the token can publish, and either can be repeated
+after a push — the label is removed once the review runs, so re-applying it asks again. Two ways
+past a finding:
 
 1. Fix it and push. The next review classifies the finding `[RESOLVED]`.
 2. Show it is wrong. Comment the concrete reason — the guard it misses, the line that already
@@ -65,7 +67,8 @@ comments from someone who can merge the pull request are read — organization m
 is not enough, and on a fork that means the recheck has to be asked for by a maintainer rather than
 by you — and only those written after the review being answered, plus the comment that asked for
 the recheck whatever its timestamp says. That one is passed to the reviewer whole; the older
-responses share a size budget and are dropped from the oldest end.
+responses share a size budget and are dropped from the oldest end. A label carries no argument of
+its own, so write the rebuttal as a comment first and label afterwards.
 
 ## Security-sensitive changes
 
