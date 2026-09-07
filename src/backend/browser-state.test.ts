@@ -46,6 +46,55 @@ describe("storedBrowserTab", () => {
     ).toBeNull();
   });
 
+  it("upgrades a v1 tab and refuses a viewport the file cannot be trusted for", () => {
+    // Nothing copies this file before an upgrade, so a v1 row -- written by every release before the
+    // per-tab environment existed -- has to survive being read by the v2 build. It comes back with no
+    // `environment` at all rather than a fabricated one, and `BrowserHost` applies
+    // `defaultBrowserEnvironment()` to what it gets.
+    const v1 = storedBrowserTab({
+      id: "tab-1",
+      url: "https://example.com/app",
+      ownerThreadId: null,
+      ownerAgentId: null,
+    });
+    expect(v1).not.toBeNull();
+    expect(v1?.environment).toBeUndefined();
+
+    const restored = storedBrowserTab({
+      id: "tab-2",
+      url: "https://example.com/app",
+      ownerThreadId: null,
+      ownerAgentId: null,
+      environment: {
+        viewport: { mode: "custom", width: 390, height: 844, deviceScaleFactor: 3, preset: "mobile" },
+        colorScheme: "dark",
+        reducedMotion: true,
+      },
+    });
+    expect(restored?.environment).toEqual({
+      viewport: { mode: "custom", width: 390, height: 844, deviceScaleFactor: 3, preset: "mobile" },
+      colorScheme: "dark",
+      reducedMotion: true,
+    });
+
+    // A hand-edited or truncated file must not reach `Emulation.setDeviceMetricsOverride`. The bound is
+    // on physical pixels, so this modest CSS size trips it only once the scale factor is applied -- and
+    // the tab is still returned, because losing the user's open tab is the worse outcome of the two.
+    const oversized = storedBrowserTab({
+      id: "tab-3",
+      url: "https://example.com/app",
+      ownerThreadId: null,
+      ownerAgentId: null,
+      environment: {
+        viewport: { mode: "custom", width: 2000, height: 2000, deviceScaleFactor: 4, preset: null },
+        colorScheme: "system",
+        reducedMotion: false,
+      },
+    });
+    expect(oversized).not.toBeNull();
+    expect(oversized?.environment).toBeUndefined();
+  });
+
   it("gives a tab back to the agent that owns it now, and to nobody else", () => {
     const tab = {
       id: "tab-1",

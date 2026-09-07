@@ -12,15 +12,14 @@ import { newAssistantMessage, normalizeCompletionStatus } from "../conversation-
 import type { DeliveryContext, MailboxStore } from "../mailbox-store";
 import {
   type AppServerNotification,
-  type DynamicToolCallParams,
-  type DynamicToolResult,
   decodeAccountLoginCompletedResult,
   getRecord,
   getString,
   type ThreadItem,
 } from "../protocol";
 import type { AgentMemories } from "./agent-memories";
-import type { AttentionRegistry } from "./attention-registry";
+import type { AttentionBrowserHost, AttentionRegistry } from "./attention-registry";
+import type { BrowserUploadTarget } from "./browser-uploads";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { DeltaBuffer } from "./delta-buffer";
@@ -30,13 +29,16 @@ import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
 import { isNonActionableCodexWarning, toolProgressText, toThreadItem } from "./thread-items";
 
-export interface AgentBrowserHost {
+export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTarget {
   onChanged(listener: (tabs: BrowserTab[], activeTabId: string | null) => void): () => void;
   onControlChanged(listener: (state: BrowserControlState) => void): () => void;
+  /**
+   * Fires with the document ids a tab still has. A navigation drops the file input that justified a
+   * staged upload, so `BrowserUploads` listens here to delete the copy it made.
+   */
+  onDocumentChanged(listener: (tabId: string, documentIds: ReadonlySet<string>) => void): () => void;
   clearControls(): void;
   endControl(threadId: string, turnId: string): void;
-  listTabs(): BrowserTab[];
-  handleDynamicTool(params: DynamicToolCallParams): Promise<DynamicToolResult>;
 }
 
 export interface TurnHooks {

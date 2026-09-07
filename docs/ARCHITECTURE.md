@@ -49,6 +49,12 @@ renderer ──► @openbot/contracts ◄── preload ◄── main ──►
   conversation storage.
 - D1 is the source of truth for central accounts, remote membership, invitations, and logical sessions.
 - A local team host owns conversations, files, agents, and the local member projection used by Team API.
+- `browser-tabs.json` is the embedded browser's own durable state, outside `openbot.db` and outside the
+  migration runner. It is versioned in the file (`v1` predates the per-tab `BrowserEnvironment`, `v2`
+  carries it) and always rewritten as the current version, so a downgrade reads a file it does not know.
+  Nothing copies it first, so `src/backend/browser-state.ts` re-validates every bound it reads rather
+  than trusting it: a tab whose environment fails validation is still returned, without that
+  environment, because losing the user's open tab is worse than losing an emulated viewport.
 - Renderer signals and stores are projections for the current screen only. They are not durable
   state, and one concern is one record - a row of parallel signals over its fields lets a screen
   hold states the product does not have.

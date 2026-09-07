@@ -8,6 +8,7 @@ import { join } from "node:path";
 import type { AgentEvent, BrowserControlState, BrowserTab } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { expect, vi } from "vitest";
+import type { BrowserUploadHooks } from "./agent/browser-uploads";
 import type { AgentClient, AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import { AgentStore } from "./agent-store";
@@ -319,14 +320,29 @@ export function stores(root: string): { store: AgentStore; mailbox: MailboxStore
   return { store, mailbox: new MailboxStore(join(root, "user-data"), store.sharedRoot, store.database) };
 }
 
-export function fakeBrowser(tabs: BrowserTab[] = []) {
+/**
+ * The single stub for `AgentBrowserHost`. Every field is a plain property so a test can replace one and
+ * keep the rest; the upload hooks are driven by default, because a stub that accepted files without ever
+ * reporting them assigned would let `BrowserUploads` retain a staging directory no test ever frees.
+ */
+export function fakeBrowser(tabs: BrowserTab[] = [], uploadTarget = { inputId: "input-1", documentId: "document-1" }) {
   return {
     onChanged: (_listener: (tabs: BrowserTab[], activeTabId: string | null) => void) => () => undefined,
     onControlChanged: (_listener: (state: BrowserControlState) => void) => () => undefined,
+    onDocumentChanged: (_listener: (tabId: string, documentIds: ReadonlySet<string>) => void) => () => undefined,
     clearControls: () => undefined,
     endControl: () => undefined,
     listTabs: () => tabs,
-    handleDynamicTool: async (_params: DynamicToolCallParams) => ({ success: true, contentItems: [] }),
+    // Annotated rather than inferred: `=> undefined` would give these properties a return type no
+    // block-bodied replacement can satisfy, and replacing one is the whole point of the plain property.
+    beginTakeover: async (_tabId: string): Promise<void> => undefined,
+    endTakeover: (_tabId: string): void => undefined,
+    resolveUploadTarget: async (_params: DynamicToolCallParams) => uploadTarget,
+    handleDynamicTool: async (_params: DynamicToolCallParams, hooks?: BrowserUploadHooks) => {
+      hooks?.onUploadTargetResolved?.(uploadTarget.inputId, uploadTarget.documentId);
+      hooks?.onUploadAssigned?.(uploadTarget.inputId, uploadTarget.documentId);
+      return { success: true, contentItems: [] };
+    },
   };
 }
 

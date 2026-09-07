@@ -419,6 +419,16 @@ export const STORY_BROWSER_TABS: BrowserTab[] = [
     loading: false,
     ownerThreadId: "thread-chief",
     ownerAgentId: "chief",
+    // The three toolbar chips each read one of these. Left unset, the preview and every story render a
+    // toolbar with no chips at all, which is the one arrangement the product never shows for a tab an
+    // agent is actually driving.
+    environment: {
+      viewport: { mode: "custom", width: 390, height: 844, deviceScaleFactor: 3, preset: "mobile" },
+      colorScheme: "dark",
+      reducedMotion: false,
+    },
+    recording: true,
+    diagnosticErrorCount: 2,
   },
 ];
 
@@ -431,6 +441,9 @@ export const STORY_BROWSER_CONTROL: BrowserControlState = {
       callId: "call-1",
       tabId: "browser-tab-docs",
       action: "snapshot",
+      // `snapshot` is the coarse action the Team API v1 wire carries; the detail is what the tooltip
+      // shows, and it is the field the v1 projection strips.
+      detailAction: "select-option",
       phase: "waiting",
       startedAt: STORY_NOW,
     },

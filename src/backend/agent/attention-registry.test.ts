@@ -536,6 +536,15 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const tabs: BrowserTab[] = [];
     const browser = fakeBrowser(tabs);
+    // Suspending agent control is half of the contract; resuming it is the half the user cannot work
+    // around. A tab the browser never leaves takeover on is a state they enter and cannot exit.
+    const control: string[] = [];
+    browser.beginTakeover = async (tabId) => {
+      control.push(`begin:${tabId}`);
+    };
+    browser.endTakeover = (tabId) => {
+      control.push(`end:${tabId}`);
+    };
     browser.handleDynamicTool = async (params) => {
       if (params.tool === "open") {
         tabs.push({
@@ -601,9 +610,51 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       request: { requestId: "takeover-call", agentId: "chief", tabId: "protected-tab" },
     });
 
-    await service.respondToBrowserTakeover({ requestId: "takeover-call", decision: "complete" });
+    // While the user holds the tab, every reference the agent has is stale and the page is mid-login, so
+    // its other browser tools are refused rather than queued.
+    client.emit("request", {
+      method: "item/tool/call",
+      id: "snapshot-during-takeover",
+      params: {
+        threadId: externalThreadId,
+        turnId: started.turnId,
+        callId: "snapshot-during-takeover",
+        namespace: "openbot_browser",
+        tool: "snapshot",
+        arguments: { tabId: "protected-tab" },
+      },
+    });
     await waitFor(() => client.responses.length === 2);
-    expect(openBotToolPayload(client.responses[1]?.result)).toEqual({
+    expect(client.responses[1]?.result).toEqual({
+      success: false,
+      contentItems: [{ type: "inputText", text: "Browser tools are unavailable during user takeover." }],
+    });
+
+    // A second card for the same tab could be answered by either one, and resolving one would hand
+    // control back while the other still waits.
+    client.emit("request", {
+      method: "item/tool/call",
+      id: "takeover-duplicate",
+      params: {
+        threadId: externalThreadId,
+        turnId: started.turnId,
+        callId: "takeover-duplicate",
+        namespace: "openbot_browser",
+        tool: "request_takeover",
+        arguments: { tabId: "protected-tab" },
+      },
+    });
+    await waitFor(() => client.responses.length === 3);
+    expect(client.responses[2]?.result).toEqual({
+      success: false,
+      contentItems: [{ type: "inputText", text: "OpenBot could not create a browser takeover request." }],
+    });
+    expect(events.filter((event) => event.type === "browser-takeover-requested")).toHaveLength(1);
+    expect(control).toEqual(["begin:protected-tab"]);
+
+    await service.respondToBrowserTakeover({ requestId: "takeover-call", decision: "complete" });
+    await waitFor(() => client.responses.length === 4);
+    expect(openBotToolPayload(client.responses[3]?.result)).toEqual({
       status: "completed",
       next: "Take a fresh snapshot and continue the task.",
     });
@@ -615,6 +666,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     expect(events.findLast((event) => event.type === "runtime-snapshot")).toMatchObject({
       snapshot: { pendingBrowserTakeovers: [] },
     });
+    expect(control).toEqual(["begin:protected-tab", "end:protected-tab"]);
 
     client.emit("request", {
       method: "item/tool/call",
@@ -634,8 +686,10 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       ),
     );
     await service.respondToBrowserTakeover({ requestId: "takeover-cancel", decision: "cancel" });
-    await waitFor(() => client.responses.length === 3);
-    expect(openBotToolPayload(client.responses[2]?.result)).toEqual({ status: "cancelled" });
+    await waitFor(() => client.responses.length === 5);
+    expect(openBotToolPayload(client.responses[4]?.result)).toEqual({ status: "cancelled" });
+    // Cancelling returns the tab as surely as completing does.
+    expect(control).toEqual(["begin:protected-tab", "end:protected-tab", "begin:protected-tab", "end:protected-tab"]);
   });
   it("keeps legacy approvals interactive and clears pending approvals on shutdown", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();

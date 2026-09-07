@@ -98,9 +98,19 @@ export interface RoutineAttention {
   markRunningForTurn(turnId: string | null): void;
 }
 
+/**
+ * The browser surface a takeover needs: the tab roster, to check that the agent asking owns the tab it
+ * names, and the pair of calls that suspend and resume agent control of it. `BrowserHost` satisfies it.
+ */
+export interface AttentionBrowserHost {
+  listTabs(): BrowserTab[];
+  beginTakeover(tabId: string): Promise<void>;
+  endTakeover(tabId: string): void;
+}
+
 export interface AttentionRegistryOptions {
   conversation: ConversationRuntime;
-  browser: { listTabs(): BrowserTab[] };
+  browser: AttentionBrowserHost;
   hostedSites: HostedSiteApprovals;
   routines: RoutineAttention;
   emit(event: AgentEvent): void;
@@ -125,7 +135,7 @@ export type RuntimeAttention = Pick<
  */
 export class AttentionRegistry {
   readonly #conversation: ConversationRuntime;
-  readonly #browser: { listTabs(): BrowserTab[] };
+  readonly #browser: AttentionBrowserHost;
   readonly #hostedSites: HostedSiteApprovals;
   readonly #routines: RoutineAttention;
   readonly #emit: (event: AgentEvent) => void;
@@ -242,6 +252,15 @@ export class AttentionRegistry {
     this.#emitRuntimeSnapshot();
   }
 
+  /**
+   * Whether this agent is waiting on a takeover. Its browser tools are refused while one is outstanding:
+   * the user has the tab, every reference the agent holds is already stale, and a tool call landing
+   * mid-login would act on a page the user is in the middle of.
+   */
+  hasBrowserTakeoverForAgent(agentId: string): boolean {
+    return [...this.#takeovers.values()].some((pending) => pending.request.agentId === agentId);
+  }
+
   async respondToBrowserTakeover(input: RespondToBrowserTakeoverInput): Promise<void> {
     const pending = this.#takeovers.get(input.requestId);
     if (!pending) throw new Error("This browser takeover is no longer active.");
@@ -349,7 +368,10 @@ export class AttentionRegistry {
       !publicThreadId ||
       !tab ||
       tab.ownerThreadId !== publicThreadId ||
-      tab.ownerAgentId !== agentId
+      tab.ownerAgentId !== agentId ||
+      // A second request for a tab the user already holds would be answered by whichever card they
+      // happened to press, and resolving either one would hand control back while the other still waits.
+      [...this.#takeovers.values()].some((pending) => pending.request.tabId === tabId)
     ) {
       return Promise.resolve(browserTakeoverError());
     }
@@ -362,13 +384,24 @@ export class AttentionRegistry {
       tabId,
     };
     return new Promise((resolve) => {
-      this.#takeovers.set(request.id, {
-        params,
-        request: takeover,
-        resolve,
-      });
-      this.#routines.markNeedsAttention(turnId);
-      this.#emit({ type: "browser-takeover-requested", request: takeover });
+      const pending: PendingBrowserTakeover = { params, request: takeover, resolve };
+      this.#takeovers.set(request.id, pending);
+      // The card is only shown once the tab has actually been handed over -- references invalidated,
+      // diagnostics cleared, any recording stopped. Asking the user for control OpenBot then failed to
+      // give them would leave the agent acting on the page underneath them.
+      void this.#browser.beginTakeover(takeover.tabId).then(
+        () => {
+          if (this.#takeovers.get(request.id) !== pending) return;
+          this.#routines.markNeedsAttention(turnId);
+          this.#emit({ type: "browser-takeover-requested", request: takeover });
+        },
+        () => {
+          if (this.#takeovers.get(request.id) !== pending) return;
+          this.#takeovers.delete(request.id);
+          resolve(browserTakeoverError());
+          this.#emitRuntimeSnapshot();
+        },
+      );
     });
   }
 
@@ -564,6 +597,11 @@ export class AttentionRegistry {
     decision: RespondToBrowserTakeoverInput["decision"],
   ): void {
     this.#takeovers.delete(requestId);
+    // `surfaceBrowserTakeover` refuses a second request for the same tab, so this is belt and braces --
+    // but returning control while another request still waits on the tab would be the worse mistake.
+    if (![...this.#takeovers.values()].some((candidate) => candidate.request.tabId === pending.request.tabId)) {
+      this.#browser.endTakeover(pending.request.tabId);
+    }
     this.#emit({
       type: "browser-takeover-resolved",
       requestId: pending.request.requestId,

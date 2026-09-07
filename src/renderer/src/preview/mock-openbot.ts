@@ -1305,6 +1305,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           loading: false,
           ownerThreadId: input.ownerThreadId ?? null,
           ownerAgentId: input.ownerAgentId ?? null,
+          // `toPublicTab` in `browser-host.ts` fills all three on every tab it reports, so a mock that
+          // left them undefined would be the only surface where a freshly opened tab has no environment.
+          // These are `defaultBrowserEnvironment()` -- a fill viewport, which the real host then reports
+          // at the view's measured size.
+          environment: {
+            viewport: { mode: "fill", width: 1200, height: 800, deviceScaleFactor: 1, preset: null },
+            colorScheme: "system",
+            reducedMotion: false,
+          },
+          recording: false,
+          diagnosticErrorCount: 0,
         };
         browserTabs = [...browserTabs, tab];
         activeBrowserTabId = tab.id;

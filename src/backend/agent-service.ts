@@ -57,6 +57,7 @@ import { AgentMemories } from "./agent/agent-memories";
 import { AttachmentGateway } from "./agent/attachment-gateway";
 import { AttentionRegistry } from "./agent/attention-registry";
 import { BootRecovery } from "./agent/boot-recovery";
+import { BrowserUploads } from "./agent/browser-uploads";
 import { ContextCompaction } from "./agent/context-compaction";
 import { ConversationRuntime } from "./agent/conversation-runtime";
 import {
@@ -85,7 +86,7 @@ import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import type { AgentClient, AgentProvider } from "./agent-client";
 import type { AgentStore } from "./agent-store";
-import { OPENBOT_BROWSER_NAMESPACE } from "./browser-host";
+import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "./conversation-read-store";
 import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
@@ -129,6 +130,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #threads: ThreadLifecycle;
   readonly #drain: DrainScheduler;
   readonly #attachments: AttachmentGateway;
+  readonly #browserUploads: BrowserUploads;
   readonly #mailboxSync: MailboxSync;
   readonly #boot: BootRecovery;
   readonly #deltas: DeltaBuffer;
@@ -270,8 +272,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.#browser.onChanged((tabs, activeTabId) => {
       this.#attention.cancelTakeoversForMissingTabs(tabs);
+      this.#browserUploads.retainTabs(tabs);
       this.#emit({ type: "browser-changed", tabs, activeTabId });
     });
+    this.#browser.onDocumentChanged((tabId, documentIds) => this.#browserUploads.retainDocuments(tabId, documentIds));
     this.#images = new ImageGenRuntime({
       conversation: this.#conversation,
       mailbox,
@@ -312,6 +316,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       },
+    });
+    this.#browserUploads = new BrowserUploads({
+      browser,
+      attachments: this.#attachments,
+      isStopping: () => this.#stopping,
+      hasTakeover: (agentId) => this.#attention.hasBrowserTakeoverForAgent(agentId),
     });
     this.#threads = new ThreadLifecycle({
       store,
@@ -819,6 +829,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#images.dispose();
     await Promise.allSettled(this.#attachments.pendingCommands());
     this.#attachments.dispose();
+    await this.#browserUploads.dispose();
     this.#providers.markStopped();
   }
 
@@ -1094,13 +1105,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               client.respond(request.id, await this.#attention.surfaceBrowserTakeover(request));
               return;
             }
+            if (this.#attention.hasBrowserTakeoverForAgent(agentId)) {
+              client.respond(request.id, {
+                success: false,
+                contentItems: [{ type: "inputText", text: "Browser tools are unavailable during user takeover." }],
+              });
+              return;
+            }
+            const params = {
+              ...request.params,
+              threadId: this.#conversation.publicThreadId(agentId, request.params.threadId),
+              ownerAgentId: agentId,
+            };
             client.respond(
               request.id,
-              await this.#browser.handleDynamicTool({
-                ...request.params,
-                threadId: this.#conversation.publicThreadId(agentId, request.params.threadId),
-                ownerAgentId: agentId,
-              }),
+              request.params.tool === "upload_files"
+                ? await this.#browserUploads.uploadFiles(agentId, params)
+                : await this.#browser.handleDynamicTool(params),
             );
             return;
           }

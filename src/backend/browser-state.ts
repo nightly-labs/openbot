@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { isString } from "@openbot/contracts/runtime-values";
+import type { BrowserEnvironment } from "@openbot/contracts/ipc";
+import { isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { legacyAgentId } from "@openbot/contracts/validation";
 import { isRecord } from "./protocol";
 
@@ -8,6 +9,74 @@ export interface StoredBrowserTab {
   url: string;
   ownerThreadId: string | null;
   ownerAgentId: string | null;
+  /** Absent in a v1 file, and in a v2 file whose environment did not survive validation. */
+  environment?: BrowserEnvironment;
+}
+
+/**
+ * A viewport this large would allocate a backing store big enough to take the whole app down, and the
+ * bound is on the *physical* pixels, so a modest CSS size with a 4x scale factor still trips it.
+ */
+export const MAX_PHYSICAL_VIEWPORT_PIXELS = 8_388_608;
+
+export function isSafeViewportSize(width: number, height: number, deviceScaleFactor: number): boolean {
+  return width * height * deviceScaleFactor * deviceScaleFactor <= MAX_PHYSICAL_VIEWPORT_PIXELS;
+}
+
+export function defaultBrowserEnvironment(): BrowserEnvironment {
+  return {
+    viewport: { mode: "fill", width: 1200, height: 800, deviceScaleFactor: 1, preset: null },
+    colorScheme: "system",
+    reducedMotion: false,
+  };
+}
+
+/**
+ * A per-tab environment read back from the user's own file. Every bound is re-checked rather than
+ * trusted, because a hand-edited or truncated file would otherwise hand a viewport straight to
+ * `Emulation.setDeviceMetricsOverride`.
+ */
+export function browserEnvironment(value: unknown): BrowserEnvironment | null {
+  if (!isRecord(value) || !isRecord(value.viewport)) return null;
+  const viewport = value.viewport;
+  if (viewport.mode !== "fill" && viewport.mode !== "custom") return null;
+  const minimumWidth = viewport.mode === "fill" ? 1 : 320;
+  const minimumHeight = viewport.mode === "fill" ? 1 : 240;
+  if (!isNumber(viewport.width) || viewport.width < minimumWidth || viewport.width > INPUT_LIMITS.browserDimension) {
+    return null;
+  }
+  if (
+    !isNumber(viewport.height) ||
+    viewport.height < minimumHeight ||
+    viewport.height > INPUT_LIMITS.browserDimension
+  ) {
+    return null;
+  }
+  if (!isNumber(viewport.deviceScaleFactor) || viewport.deviceScaleFactor < 0.5 || viewport.deviceScaleFactor > 4) {
+    return null;
+  }
+  if (!isSafeViewportSize(viewport.width, viewport.height, viewport.deviceScaleFactor)) return null;
+  if (
+    viewport.preset !== null &&
+    viewport.preset !== "desktop" &&
+    viewport.preset !== "tablet" &&
+    viewport.preset !== "mobile"
+  ) {
+    return null;
+  }
+  if (value.colorScheme !== "light" && value.colorScheme !== "dark" && value.colorScheme !== "system") return null;
+  if (!isBoolean(value.reducedMotion)) return null;
+  return {
+    viewport: {
+      mode: viewport.mode,
+      width: viewport.width,
+      height: viewport.height,
+      deviceScaleFactor: viewport.deviceScaleFactor,
+      preset: viewport.preset,
+    },
+    colorScheme: value.colorScheme,
+    reducedMotion: value.reducedMotion,
+  };
 }
 
 const X_HOSTS = new Set(["x.com", "www.x.com"]);
@@ -58,7 +127,14 @@ export function storedBrowserTab(value: unknown): StoredBrowserTab | null {
     return null;
   }
   if (!isPersistableBrowserUrl(value.url)) return null;
-  return { id: value.id, url: value.url, ownerThreadId, ownerAgentId };
+  const environment = browserEnvironment(value.environment);
+  return {
+    id: value.id,
+    url: value.url,
+    ownerThreadId,
+    ownerAgentId,
+    ...(environment === null ? {} : { environment }),
+  };
 }
 
 /** Enough of an agent to say which of two spellings of an id is the one it answers to now. */

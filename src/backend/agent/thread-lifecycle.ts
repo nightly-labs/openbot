@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
-import { BROWSER_DYNAMIC_TOOLS } from "../browser-host";
+import { BROWSER_DYNAMIC_TOOLS } from "../browser-tools";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
 import { OPENBOT_DYNAMIC_TOOLS } from "../openbot-tools";

@@ -13,6 +13,28 @@ export interface AttachmentGatewayHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
 }
 
+/**
+ * Where a path a tool named is allowed to point.
+ *
+ * The default is the attachment policy: the file must resolve inside this agent's own workspace or the
+ * OpenBot shared directory, and a symlink anywhere on the way is refused outright.
+ *
+ * `allowAnyReadablePath` is the browser-upload policy. `openbot_browser.upload_files` hands a local
+ * file to a page, and the file the user names is almost never one the agent already copied into its
+ * workspace, so containment would make the tool unusable. It grants no capability an agent does not
+ * already have -- agents run with `danger-full-access` and could copy the file into the workspace first
+ * and reach the same bytes -- and it drops exactly two checks: the containment guard, and the symlink
+ * pre-check that would refuse a path reached through a link the agent does not own. Everything that
+ * makes the open itself safe still runs: the file must be a regular file, it is opened `O_NOFOLLOW` on
+ * its fully resolved path, and its dev/ino are re-validated after the open, so a path swapped
+ * mid-flight is still rejected.
+ */
+export interface AttachmentSourceScope {
+  allowAnyReadablePath: boolean;
+}
+
+const WORKSPACE_OR_SHARED: AttachmentSourceScope = { allowAnyReadablePath: false };
+
 export interface AttachmentGatewayOptions {
   conversation: ConversationRuntime;
   mailbox: MailboxStore;
@@ -62,6 +84,15 @@ export class AttachmentGateway {
     });
   }
 
+  /**
+   * Opens local files for a caller that stages them itself instead of attaching them to a conversation
+   * -- `browser-uploads.ts` copies them into a private staging directory before a page ever sees them.
+   * The handles belong to the caller, which must close every one it is given.
+   */
+  openSources(agentId: string, paths: string[], scope: AttachmentSourceScope): Promise<GeneratedAttachmentSource[]> {
+    return this.#openSources(agentId, paths, scope);
+  }
+
   pendingCommands(): Promise<OpenBotToolResponse>[] {
     return [...this.#inFlight.values()];
   }
@@ -90,7 +121,7 @@ export class AttachmentGateway {
       });
     }
 
-    const sources = await this.#openSources(senderAgentId, paths);
+    const sources = await this.#openSources(senderAgentId, paths, WORKSPACE_OR_SHARED);
     let attachments: Awaited<ReturnType<MailboxStore["stageGeneratedAttachments"]>>;
     try {
       attachments = await this.#mailbox.stageGeneratedAttachments({
@@ -149,8 +180,12 @@ export class AttachmentGateway {
     });
   }
 
-  async #openSources(agentId: string, paths: string[]): Promise<GeneratedAttachmentSource[]> {
-    const results = await Promise.allSettled(paths.map((path) => this.#openSource(agentId, path)));
+  async #openSources(
+    agentId: string,
+    paths: string[],
+    scope: AttachmentSourceScope,
+  ): Promise<GeneratedAttachmentSource[]> {
+    const results = await Promise.allSettled(paths.map((path) => this.#openSource(agentId, path, scope)));
     const sources = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
     const failure = results.find((result) => result.status === "rejected");
     if (failure?.status === "rejected") {
@@ -164,7 +199,11 @@ export class AttachmentGateway {
     return sources;
   }
 
-  async #openSource(agentId: string, inputPath: string): Promise<GeneratedAttachmentSource> {
+  async #openSource(
+    agentId: string,
+    inputPath: string,
+    scope: AttachmentSourceScope,
+  ): Promise<GeneratedAttachmentSource> {
     const agent = this.#conversation.requireKnownAgent(agentId);
     const value = inputPath.trim();
     const [workspaceRoot, sharedRoot] = await Promise.all([realpath(agent.workspacePath), realpath(this.#sharedRoot)]);
@@ -183,9 +222,11 @@ export class AttachmentGateway {
 
     for (const candidate of candidates) {
       try {
-        if ((await lstat(candidate)).isSymbolicLink()) continue;
+        if (!scope.allowAnyReadablePath && (await lstat(candidate)).isSymbolicLink()) continue;
         const resolved = await realpath(candidate);
-        if (!isWithin(workspaceRoot, resolved) && !isWithin(sharedRoot, resolved)) continue;
+        if (!scope.allowAnyReadablePath && !isWithin(workspaceRoot, resolved) && !isWithin(sharedRoot, resolved)) {
+          continue;
+        }
         const authorizedMetadata = await lstat(resolved);
         if (authorizedMetadata.isSymbolicLink() || !authorizedMetadata.isFile()) continue;
         const handle = await open(resolved, constants.O_RDONLY | constants.O_NOFOLLOW);
@@ -207,6 +248,10 @@ export class AttachmentGateway {
         // Try the other permitted root for relative paths.
       }
     }
-    throw new Error("Attachment files must exist inside this agent's workspace or the OpenBot shared directory.");
+    throw new Error(
+      scope.allowAnyReadablePath
+        ? "Upload files must exist, be regular files, and be readable by OpenBot."
+        : "Attachment files must exist inside this agent's workspace or the OpenBot shared directory.",
+    );
   }
 }
