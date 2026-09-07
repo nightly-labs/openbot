@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1750,7 +1750,13 @@ async function main(): Promise<void> {
     if (concurrentRecording.success || !toolError(concurrentRecording).includes("At most 1")) {
       throw new Error("V2 recorder did not enforce its concurrent recording limit.");
     }
-    await new Promise((resolve) => setTimeout(resolve, 1_100));
+    // `recordingDurationMs: 500` stops this recording on its own. Wait for the stop the recorder
+    // reports rather than for a duration that outlives it: the recorder publishes the state change
+    // before it registers the artifact, and `recording_start` awaits that finalization either way.
+    await waitFor(
+      async () => browser.listTabs().find((candidate) => candidate.id === v2Tab.id)?.recording === false,
+      "the recording duration limit to stop the recording",
+    );
     const prematureRecordingRestart = await callBrowserTool(browser, "recording_start", { tabId: v2Tab.id });
     if (prematureRecordingRestart.success || !toolError(prematureRecordingRestart).includes("recording_stop")) {
       throw new Error("V2 recording restart replaced an unclaimed completed artifact.");
@@ -1773,11 +1779,21 @@ async function main(): Promise<void> {
     if (browser.listTabs().find((candidate) => candidate.id === v2Tab.id)?.recording !== false) {
       throw new Error("V2 recording state was not cleaned up.");
     }
+    const filesBeforeRestartedRecording = new Set(await readdir(downloadsRoot));
     const recordingRestarted = await callBrowserTool(browser, "recording_start", { tabId: v2Tab.id });
     if (!recordingRestarted.success) {
       throw new Error(`V2 recording did not restart after an automatic stop: ${toolError(recordingRestarted)}`);
     }
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Stopping a recording that captured nothing is an error, not an empty artifact, and
+    // `MediaRecorder` emits its first chunk only once the capture pipeline produces a frame. The
+    // recorder opens its file before that, so the bytes on disk are the condition to wait on -- a
+    // fixed delay shorter than the 1000 ms timeslice passes only while the runner is idle.
+    await waitFor(async () => {
+      const name = (await readdir(downloadsRoot)).find(
+        (candidate) => !filesBeforeRestartedRecording.has(candidate) && candidate.endsWith(".webm"),
+      );
+      return name !== undefined && (await stat(join(downloadsRoot, name))).size > 0;
+    }, "the restarted recording to capture video");
     const restartedRecordingStopped = await callBrowserTool(browser, "recording_stop", { tabId: v2Tab.id });
     if (!restartedRecordingStopped.success) {
       throw new Error(`V2 restarted recording did not stop: ${toolError(restartedRecordingStopped)}`);
@@ -1790,10 +1806,18 @@ async function main(): Promise<void> {
     if (!abandonedRecordingStarted.success) {
       throw new Error(`V2 abandoned recording did not start: ${toolError(abandonedRecordingStarted)}`);
     }
-    await new Promise((resolve) => setTimeout(resolve, 1_100));
-    const abandonedRecordingName = (await readdir(downloadsRoot)).find(
-      (name) => !filesBeforeAbandonedRecording.has(name) && name.endsWith(".webm"),
-    );
+    // The assertion below reads this file after the tab closes, so wait for the duration limit to
+    // finish the recording rather than for a duration that merely tends to outlast it.
+    const newAbandonedRecordingName = async (): Promise<string | undefined> =>
+      (await readdir(downloadsRoot)).find((name) => !filesBeforeAbandonedRecording.has(name) && name.endsWith(".webm"));
+    await waitFor(async () => {
+      if (browser.listTabs().find((candidate) => candidate.id === abandonedRecordingTab.id)?.recording !== false) {
+        return false;
+      }
+      const name = await newAbandonedRecordingName();
+      return name !== undefined && (await stat(join(downloadsRoot, name))).size > 0;
+    }, "the abandoned recording to reach its duration limit");
+    const abandonedRecordingName = await newAbandonedRecordingName();
     if (!abandonedRecordingName) throw new Error("V2 automatic recording did not create an artifact.");
     const abandonedRecordingPath = join(downloadsRoot, abandonedRecordingName);
     await browser.close(abandonedRecordingTab.id);
@@ -2510,7 +2534,7 @@ async function expectFailure(operation: () => Promise<unknown>): Promise<void> {
   throw new Error("Expected operation to fail.");
 }
 
-async function waitFor(check: () => Promise<boolean>): Promise<void> {
+async function waitFor(check: () => Promise<boolean>, waitedFor = "a browser download"): Promise<void> {
   const deadline = Date.now() + 5_000;
   while (Date.now() < deadline) {
     try {
@@ -2520,7 +2544,7 @@ async function waitFor(check: () => Promise<boolean>): Promise<void> {
     }
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
-  throw new Error("Timed out waiting for a browser download.");
+  throw new Error(`Timed out waiting for ${waitedFor}.`);
 }
 
 async function waitForValue<T>(check: () => T | undefined): Promise<T> {
