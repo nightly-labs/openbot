@@ -30,6 +30,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   const scrollFades = createScrollFades();
   const [virtualScrollMargin, setVirtualScrollMargin] = createSignal(0);
   const [showScrollToLatest, setShowScrollToLatest] = createSignal(false);
+  const [atHistoryBoundary, setAtHistoryBoundary] = createSignal(false);
   const [unreadDividerVisible, setUnreadDividerVisible] = createSignal(false);
   let unreadVisibilityFrame: number | undefined;
 
@@ -38,7 +39,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   createEffect(
     () =>
       deps.props.loaded &&
-      timelineMessages().length === 0 &&
+      (timelineMessages().length === 0 || atHistoryBoundary()) &&
       deps.props.hasOlder &&
       !deps.props.loadingOlder &&
       !deps.props.olderError,
@@ -56,13 +57,14 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     scrollMargin: virtualScrollMargin,
     onChange: (instance) => {
       const first = instance.getVirtualItems()[0];
-      if (first && first.index <= 5 && deps.props.hasOlder && !deps.props.loadingOlder) deps.props.onLoadOlder?.();
+      if (first) setAtHistoryBoundary(first.index <= 5);
     },
   });
 
   function updateScrollFade(element = deps.elements.scrollElement()) {
     if (!element) return;
     scrollFades.measure();
+    setAtHistoryBoundary(element.scrollTop <= 80);
     setShowScrollToLatest(element.scrollHeight - element.scrollTop - element.clientHeight > 80);
   }
 

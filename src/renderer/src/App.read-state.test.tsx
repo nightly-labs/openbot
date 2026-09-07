@@ -84,7 +84,7 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByText("Loaded earlier")).toBeInTheDocument();
   });
 
-  it("loads past commentary-only pages to reach earlier answers", async () => {
+  it.each(["commentary", "answer"])("loads past commentary-only pages after a latest %s", async (latestKind) => {
     const thought = (id: string) => ({
       id,
       author: "assistant" as const,
@@ -95,9 +95,13 @@ describe("OpenBot connected desktop shell", () => {
     });
     vi.mocked(window.openbot.agent.readConversationPage).mockImplementation(async (input) => {
       if (input.anchor?.type !== "before") {
-        return testConversationPage("chief", [thought("thought-latest")], {
-          pageInfo: { hasOlder: true, olderCursor: "middle" },
-        });
+        return testConversationPage(
+          "chief",
+          [{ ...thought("thought-latest"), itemType: latestKind === "commentary" ? "commentary" : undefined }],
+          {
+            pageInfo: { hasOlder: true, olderCursor: "middle" },
+          },
+        );
       }
       if (input.anchor.cursor === "middle") {
         return testConversationPage("chief", [thought("thought-middle")], {
