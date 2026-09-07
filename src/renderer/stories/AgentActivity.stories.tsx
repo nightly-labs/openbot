@@ -1,7 +1,6 @@
 import { createSignal, onSettled } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Button } from "../src/components/ui/button";
-import { AgentActivityIndicator, ThinkingDisclosure } from "../src/features/conversation/AgentActivity";
+import { AgentActivityIndicator } from "../src/features/conversation/AgentActivity";
 import { STORY_AGENTS } from "./fixtures";
 
 const indicatorMeta = {
@@ -42,93 +41,5 @@ export const TransitionLoop: IndicatorStory = {
       return () => window.clearInterval(timer);
     });
     return <AgentActivityIndicator {...args} phase={phase()} />;
-  },
-};
-
-const THINKING_STEPS = [
-  "Summer demand spikes for stone-fruit flavors — peach and apricot lead.",
-  "I should check cone inventory before promoting a waffle-bowl special.",
-  "Joy Cone ships in two days, so the special can start on Friday.",
-];
-
-/* Streaming: the header shimmers while the answer is still coming. */
-export const ThinkingLive: IndicatorStory = {
-  args: {
-    agent: STORY_AGENTS[0],
-    presentation: { animation: "thinking", label: "Thinking it through…" },
-  },
-  render: () => {
-    const [open, setOpen] = createSignal<boolean | undefined>(undefined);
-    return (
-      <ThinkingDisclosure
-        message={{
-          id: "thinking-live",
-          author: "agent",
-          body: "",
-          time: "10:00",
-          kind: "thinking",
-          streaming: true,
-          items: THINKING_STEPS,
-        }}
-        working={true}
-        open={open()}
-        onOpenChange={setOpen}
-      />
-    );
-  },
-};
-
-/* Settled: the trace collapses and reopens on demand. */
-export const ThinkingDetails: IndicatorStory = {
-  args: {
-    agent: STORY_AGENTS[0],
-    presentation: { animation: "thinking", label: "Thinking it through…" },
-  },
-  render: () => {
-    const [open, setOpen] = createSignal<boolean | undefined>(undefined);
-    return (
-      <ThinkingDisclosure
-        message={{
-          id: "thinking-story",
-          author: "agent",
-          body: "",
-          time: "10:00",
-          kind: "thinking",
-          items: THINKING_STEPS,
-        }}
-        working={false}
-        open={open()}
-        onOpenChange={setOpen}
-      />
-    );
-  },
-};
-
-/** The same live-to-settled disclosure used by Codex, Claude, and Grok. */
-export const ReasoningSettles: IndicatorStory = {
-  args: Working.args,
-  render: () => {
-    const [working, setWorking] = createSignal(true);
-    const [open, setOpen] = createSignal<boolean | undefined>(undefined);
-    return (
-      <div>
-        <ThinkingDisclosure
-          message={{
-            id: "reasoning-reference",
-            author: "agent",
-            body: "",
-            time: "10:00",
-            kind: "thinking",
-            items: THINKING_STEPS.slice(0, 2),
-          }}
-          working={working()}
-          open={open()}
-          onOpenChange={setOpen}
-        />
-        <Button onClick={() => setWorking((value) => !value)}>
-          {working() ? "Finish reasoning" : "Start reasoning"}
-        </Button>
-      </div>
-    );
   },
 };

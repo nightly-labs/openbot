@@ -1,4 +1,4 @@
-import { createSignal, onCleanup } from "solid-js";
+import { createMemo, createSignal, onCleanup } from "solid-js";
 import { createScrollFades } from "../../../components/createScrollFades";
 import type { ConversationProps } from "../conversation-types";
 import { calculateChatScrollMargin, createChatVirtualizer } from "../createChatVirtualizer";
@@ -33,12 +33,14 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   const [unreadDividerVisible, setUnreadDividerVisible] = createSignal(false);
   let unreadVisibilityFrame: number | undefined;
 
+  const timelineMessages = createMemo(() => deps.props.messages.filter((message) => message.kind !== "thinking"));
+
   const messageVirtualizer = createChatVirtualizer<HTMLDivElement, HTMLDivElement>({
-    count: () => deps.props.messages.length,
+    count: () => timelineMessages().length,
     getScrollElement: () => deps.elements.scrollElement() ?? null,
     estimateSize: () => 128,
-    getItemKey: (index) => deps.props.messages[index]?.id ?? index,
-    keyVersion: () => `${deps.props.messages[0]?.id ?? ""}:${deps.props.messages.at(-1)?.id ?? ""}`,
+    getItemKey: (index) => timelineMessages()[index]?.id ?? index,
+    keyVersion: () => `${timelineMessages()[0]?.id ?? ""}:${timelineMessages().at(-1)?.id ?? ""}`,
     scrollMargin: virtualScrollMargin,
     onChange: (instance) => {
       const first = instance.getVirtualItems()[0];
@@ -137,6 +139,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     unreadDividerVisible,
     setUnreadDividerVisible,
     messageVirtualizer,
+    timelineMessages,
     updateScrollFade,
     updateVirtualScrollMargin,
     updateUnreadDividerVisibility,
