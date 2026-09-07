@@ -35,7 +35,7 @@
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  background: var(--openbot-main);
+  background: var(--openbot-bg-canvas);
   box-shadow: none;
   transition: grid-template-columns var(--panel-resize-duration, var(--openbot-duration-overlay))
     cubic-bezier(0.32, 0.72, 0, 1);
@@ -649,7 +649,7 @@ textarea {
   min-width: 0;
   overflow: hidden;
   flex-direction: column;
-  background: var(--openbot-sidebar);
+  background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);
 }
 
@@ -714,7 +714,7 @@ textarea {
   border: 0;
   border-radius: var(--openbot-radius-sm);
   background: transparent;
-  color: var(--openbot-muted);
+  color: var(--openbot-text-muted);
   pointer-events: auto;
   cursor: pointer;
   -webkit-app-region: no-drag;
@@ -727,7 +727,7 @@ textarea {
 
 .sidebar-icon-button:hover {
   background: var(--openbot-border);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .sidebar-icon-button:active {
@@ -763,9 +763,9 @@ textarea {
 }
 
 .header-panel-toggle:hover {
-  border-color: var(--openbot-line-strong);
+  border-color: var(--openbot-border-strong);
   background: var(--openbot-hover);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .header-panel-toggle:active {
@@ -808,7 +808,7 @@ textarea {
   border: 0;
   border-radius: var(--openbot-radius-sm);
   background: transparent;
-  color: var(--openbot-muted);
+  color: var(--openbot-text-muted);
   opacity: 0;
   pointer-events: none;
   transform: translateX(6px) scale(0.96);
@@ -822,7 +822,7 @@ textarea {
 
 .sidebar-compact-search:hover {
   background: var(--openbot-hover);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .sidebar-compact-search:active {
@@ -1524,7 +1524,7 @@ textarea {
 }
 
 .agent-row-active {
-  background: var(--openbot-active);
+  background: var(--openbot-bg-surface);
 }
 
 .agent-row-avatar {
@@ -1590,7 +1590,7 @@ textarea {
   width: 16px;
   height: 16px;
   border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-teal);
+  background: var(--openbot-success);
   color: var(--openbot-success);
   animation: sidebar-reply-in var(--openbot-duration-overlay) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -1883,7 +1883,7 @@ textarea {
 
 .avatar-editor-actions button:hover {
   background: var(--openbot-hover);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .avatar-editor-actions button:disabled,
@@ -3078,7 +3078,7 @@ textarea {
 
 .agent-list[data-sidebar-dragging] .agent-row.agent-row-active,
 .agent-list[data-sidebar-dragging] .agent-row.agent-row-active:hover {
-  background: var(--openbot-active);
+  background: var(--openbot-bg-surface);
 }
 
 .agent-settings-content {

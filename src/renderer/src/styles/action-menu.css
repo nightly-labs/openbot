@@ -7,7 +7,7 @@
   box-shadow:
     0 0 0 1px var(--openbot-border),
     0 4px 6px -1px var(--openbot-shadow-popover-ambient),
-    0 2px 4px -2px var(--openbot-shadow-popover-key);
+    0 2px 4px -2px var(--openbot-shadow-popover-ambient);
   color: var(--openbot-text-primary);
 }
 

@@ -494,7 +494,7 @@
   height: 6px;
   flex: 0 0 auto;
   border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-teal);
+  background: var(--openbot-success);
   box-shadow: 0 0 0 3px var(--openbot-success-soft);
 }
 
@@ -584,7 +584,7 @@
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-canvas);
   padding: 15px 17px;
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
   text-align: left;
   transition:
     border-color var(--openbot-duration-hover) ease,
@@ -632,11 +632,11 @@
   height: 9px;
   border: 2px solid var(--openbot-bg-canvas);
   border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-blue);
+  background: var(--openbot-accent);
 }
 
 .setup-route-icon-local i {
-  background: var(--openbot-teal);
+  background: var(--openbot-success);
 }
 
 .setup-route-copy {
@@ -695,7 +695,7 @@
   outline: 0;
   background: var(--openbot-bg-canvas);
   padding: 11px 12px;
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
   line-height: 18px;
   resize: none;
@@ -786,7 +786,7 @@
 
 .provider-picker-list {
   overflow: hidden;
-  border: 1px solid var(--openbot-line-strong);
+  border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-bg-sidebar);
 }
@@ -812,7 +812,7 @@
 }
 
 .provider-picker-option + .provider-picker-option {
-  border-top: 1px solid var(--openbot-line);
+  border-top: 1px solid var(--openbot-border);
 }
 
 .provider-picker-option:hover:not(.provider-picker-option-unavailable),
@@ -968,12 +968,12 @@
 }
 
 .provider-picker-status-available i {
-  background: var(--openbot-teal);
+  background: var(--openbot-success);
 }
 
 .provider-picker-status-sign-in-required i,
 .provider-picker-status-outdated i {
-  background: var(--openbot-orange);
+  background: var(--openbot-warning);
 }
 
 .provider-picker-status-not-installed i,

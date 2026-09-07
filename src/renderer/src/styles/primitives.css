@@ -695,7 +695,7 @@
   background: var(--openbot-bg-surface-raised);
   box-shadow:
     0 4px 6px -1px var(--openbot-shadow-popover-ambient),
-    0 2px 4px -2px var(--openbot-shadow-popover-key),
+    0 2px 4px -2px var(--openbot-shadow-popover-ambient),
     0 0 0 1px var(--openbot-border-strong);
   color: var(--openbot-text-primary);
   transform-origin: var(--kb-select-content-transform-origin);

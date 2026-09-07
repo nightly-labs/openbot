@@ -78,7 +78,7 @@
   padding: var(--openbot-space-2);
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface-raised);
-  filter: drop-shadow(0 6px 16px var(--openbot-shadow-popover-key));
+  filter: drop-shadow(0 6px 16px var(--openbot-shadow-popover-ambient));
   stroke-width: var(--openbot-icon-stroke);
   animation: settings-mobile-connect-success-pop 420ms var(--openbot-ease-out) both;
 }

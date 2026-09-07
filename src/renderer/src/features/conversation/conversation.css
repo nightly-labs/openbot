@@ -5,7 +5,7 @@
   grid-row: 1;
   min-width: 0;
   flex-direction: column;
-  background: var(--openbot-main);
+  background: var(--openbot-bg-canvas);
   transition: padding-right var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -17,8 +17,8 @@
   grid-column: 3;
   grid-row: 1;
   flex-direction: column;
-  background: var(--openbot-main);
-  color: var(--openbot-white);
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
 }
 
 .app-frame-with-server-rail .direct-conversation {
@@ -353,7 +353,7 @@
 }
 
 .conversation-title[aria-label="View agent settings"]:hover {
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .agent-settings-panel {
@@ -365,9 +365,9 @@
   display: flex;
   width: var(--settings-panel-width, 296px);
   flex-direction: column;
-  border-left: 1px solid var(--openbot-line);
+  border-left: 1px solid var(--openbot-border);
   background: var(--openbot-bg-canvas);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
   animation: settings-panel-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
@@ -380,9 +380,9 @@
   display: flex;
   width: var(--browser-panel-width, 380px);
   flex-direction: column;
-  border-left: 1px solid var(--openbot-line);
+  border-left: 1px solid var(--openbot-border);
   background: var(--openbot-bg-canvas);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
   transition:
     border-color var(--openbot-duration-slow) ease,
     box-shadow var(--openbot-duration-slow) ease;
@@ -401,7 +401,7 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid var(--openbot-line);
+  border-bottom: 1px solid var(--openbot-border);
   padding: 0 7px 0 11px;
 }
 
@@ -513,7 +513,7 @@
   position: sticky;
   bottom: 0;
   margin: 0;
-  border-top: 1px solid var(--openbot-line);
+  border-top: 1px solid var(--openbot-border);
   background: var(--openbot-bg-control);
   padding: 7px 12px;
   color: var(--openbot-text-muted);
@@ -526,7 +526,7 @@
   height: 100%;
   overflow: hidden;
   background: var(--openbot-bg-canvas);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .browser-pip-surface {
@@ -546,7 +546,7 @@
   min-width: 0;
   flex-direction: column;
   background: var(--openbot-bg-canvas);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
   opacity: 0;
   pointer-events: none;
   visibility: hidden;
@@ -762,7 +762,7 @@
   height: 34px;
   flex: 0 0 auto;
   align-items: flex-end;
-  border-bottom: 1px solid var(--openbot-line);
+  border-bottom: 1px solid var(--openbot-border);
   padding: 0 8px;
 }
 
@@ -882,7 +882,7 @@
 .browser-tab:hover,
 .browser-tab[data-selected] {
   background: var(--openbot-border);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .browser-tab-controlled {
@@ -970,7 +970,7 @@
 .browser-new-tab:hover,
 .browser-toolbar-button:hover:not(:disabled) {
   background: var(--openbot-border);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .browser-tab-panel {
@@ -1068,13 +1068,13 @@
   flex: 0 0 auto;
   grid-template-columns: 32px 1fr 32px;
   align-items: center;
-  border-bottom: 1px solid var(--openbot-line);
+  border-bottom: 1px solid var(--openbot-border);
   padding: 0 10px;
 }
 
 .agent-settings-header h2 {
   margin: 0;
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
   font-weight: 600;
   line-height: 18px;
@@ -1116,7 +1116,7 @@
 
 .agent-settings-nav-button:hover {
   background: var(--openbot-hover);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .settings-back-icon {
@@ -1187,8 +1187,8 @@
   outline: 0;
   background: var(--openbot-shadow-popover-ambient);
   padding: 10px 11px;
-  color: var(--openbot-white);
-  caret-color: var(--openbot-white);
+  color: var(--openbot-text-primary);
+  caret-color: var(--openbot-text-primary);
   font-size: var(--openbot-text-lg);
   line-height: 19px;
   transition:
@@ -1219,7 +1219,7 @@
 
 .agent-settings-field select option {
   background: var(--openbot-bg-control);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .agent-settings-field textarea {
@@ -1413,7 +1413,7 @@
   display: grid;
   gap: 11px;
   margin-bottom: 20px;
-  border-bottom: 1px solid var(--openbot-line);
+  border-bottom: 1px solid var(--openbot-border);
   padding-bottom: 16px;
 }
 
@@ -1490,7 +1490,7 @@
 }
 
 .agent-routine-history {
-  border-top: 1px solid var(--openbot-line);
+  border-top: 1px solid var(--openbot-border);
   padding-top: 20px;
 }
 
@@ -1502,7 +1502,7 @@
   display: grid;
   grid-template-columns: 8px minmax(0, 1fr) auto;
   gap: 9px;
-  border-bottom: 1px solid var(--openbot-line);
+  border-bottom: 1px solid var(--openbot-border);
   padding: 9px 2px;
 }
 
@@ -2020,7 +2020,7 @@
 }
 
 .agent-memory-limit {
-  background: var(--openbot-active);
+  background: var(--openbot-bg-surface);
   color: var(--openbot-text-secondary);
 }
 
@@ -2301,7 +2301,7 @@
 }
 
 .agent-settings-notifications strong {
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
   font-weight: 500;
   line-height: 18px;
@@ -2336,7 +2336,7 @@
 
 .conversation-title h1 {
   margin: 0;
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
   font-weight: 400;
   line-height: 18px;
@@ -2559,7 +2559,7 @@
 }
 
 .provider-model-rail-button-selected .provider-model-mark {
-  fill: var(--openbot-white);
+  fill: var(--openbot-text-primary);
   opacity: 1;
 }
 
@@ -2734,9 +2734,9 @@
 }
 
 .computer-button[aria-expanded="true"] {
-  border-color: var(--openbot-line-strong);
+  border-color: var(--openbot-border-strong);
   background: var(--openbot-border);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .computer-control-dot {
@@ -2953,7 +2953,7 @@
   align-items: center;
   gap: 8px;
   margin: var(--openbot-space-1) 0 var(--openbot-space-2);
-  color: var(--openbot-unread-divider);
+  color: var(--openbot-unread-surface);
   font-size: var(--openbot-text-sm);
   font-weight: 720;
   letter-spacing: 0.08em;
@@ -2965,7 +2965,7 @@
   height: 1px;
   flex: 1;
   border: 0;
-  background: var(--openbot-unread-divider);
+  background: var(--openbot-unread-surface);
 }
 
 .unread-messages-divider span {
@@ -4209,7 +4209,7 @@ button.chat-action-target:active,
 .message-markdown-table {
   width: 100%;
   border-collapse: collapse;
-  background: var(--openbot-data-table-body-bg);
+  background: var(--openbot-bg-canvas);
   color: var(--openbot-data-table-text);
 }
 
@@ -4222,7 +4222,7 @@ button.chat-action-target:active,
 }
 
 .message-markdown-table th {
-  background: var(--openbot-data-table-header-bg);
+  background: var(--openbot-bg-surface-raised);
   color: var(--openbot-data-table-header-text);
   font-weight: var(--openbot-weight-medium);
 }
@@ -4296,7 +4296,7 @@ button.chat-action-target:active,
   background: var(--openbot-bg-surface-raised);
   padding: 4px;
   box-shadow:
-    0 14px 34px var(--openbot-shadow-popover-key),
+    0 14px 34px var(--openbot-shadow-popover-ambient),
     0 3px 10px var(--openbot-shadow-popover-ambient),
     inset 0 0 0 1px var(--openbot-shadow-ring);
   color: var(--openbot-text-primary);
@@ -4907,7 +4907,7 @@ button.chat-action-target:active,
   border: 1px solid var(--openbot-data-table-outer-border);
   border-radius: var(--openbot-radius-lg);
   border-spacing: 0;
-  background: var(--openbot-data-table-header-bg);
+  background: var(--openbot-bg-surface-raised);
   box-shadow: 0 0 0 0.5px var(--openbot-data-table-ring);
   font-size: var(--openbot-text-md);
 }
@@ -4918,7 +4918,7 @@ button.chat-action-target:active,
 }
 
 .message-data-table tbody {
-  background: var(--openbot-data-table-body-bg);
+  background: var(--openbot-bg-canvas);
 }
 
 .message-data-table tbody tr:not(:last-child) td {
@@ -5593,7 +5593,7 @@ button.chat-action-target:active,
 
 .media-close:hover {
   background: var(--openbot-border);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .choice-options {
@@ -5624,7 +5624,7 @@ button.chat-action-target:active,
 .choice-option:hover,
 .choice-option-selected {
   background: var(--openbot-border);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .choice-key {
@@ -5650,7 +5650,7 @@ button.chat-action-target:active,
   outline: 0;
   background: var(--openbot-bg-canvas);
   padding: 0 9px;
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
 }
 
@@ -5845,7 +5845,7 @@ button.chat-action-target:active,
 
 .composer-button:hover {
   background: var(--openbot-border);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .composer-primary-actions {
@@ -5915,7 +5915,7 @@ button.chat-action-target:active,
 
 .dictation-button:hover:not(:disabled) {
   background: var(--openbot-border);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
 }
 
 .dictation-button svg {
@@ -6034,7 +6034,7 @@ button.chat-action-target:active,
   background: transparent;
   padding: 2px 4px 8px;
   caret-color: var(--openbot-text-primary);
-  color: var(--openbot-white);
+  color: var(--openbot-text-primary);
   cursor: text;
   font-size: var(--openbot-text-lg);
   line-height: 20px;
@@ -7075,7 +7075,7 @@ button.chat-action-target:active,
   box-shadow:
     0 0 0 0.5px var(--openbot-border),
     0 1px 2px var(--openbot-bg-overlay),
-    0 2px 4px var(--openbot-shadow-popover-key);
+    0 2px 4px var(--openbot-shadow-popover-ambient);
   color: var(--openbot-text-primary);
   padding: var(--openbot-space-3);
   animation: browser-takeover-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
@@ -7699,7 +7699,7 @@ button.chat-action-target:active,
   box-shadow:
     0 0 0 0.5px var(--openbot-border),
     0 1px 2px var(--openbot-bg-overlay),
-    0 2px 4px var(--openbot-shadow-popover-key);
+    0 2px 4px var(--openbot-shadow-popover-ambient);
   color: var(--openbot-text-primary);
   flex-direction: column;
   gap: 12px;

@@ -65,7 +65,7 @@
   color: var(--openbot-text-primary);
 }
 .skills-marketplace-kind-tab[data-active] {
-  box-shadow: 0 1px 2px var(--openbot-shadow-popover-key);
+  box-shadow: 0 1px 2px var(--openbot-shadow-popover-ambient);
 }
 .skills-marketplace-kind-tab:disabled {
   color: var(--openbot-text-muted);

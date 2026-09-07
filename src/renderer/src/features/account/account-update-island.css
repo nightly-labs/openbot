@@ -139,7 +139,7 @@
   min-height: var(--openbot-control-sm);
   border-radius: var(--openbot-radius-sm);
   background: var(--openbot-surface-light);
-  box-shadow: 0 1px 2px var(--openbot-shadow-popover-key);
+  box-shadow: 0 1px 2px var(--openbot-shadow-popover-ambient);
   padding: 0 var(--openbot-space-3) 0 var(--openbot-space-2);
   color: var(--openbot-text-on-light);
   transition:
@@ -301,7 +301,7 @@
     background: var(--openbot-surface-light);
     box-shadow:
       0 0 0 1px var(--openbot-text-dim-on-light),
-      0 1px 2px var(--openbot-shadow-popover-key);
+      0 1px 2px var(--openbot-shadow-popover-ambient);
     color: var(--openbot-text-on-light);
   }
 }
