@@ -1111,7 +1111,7 @@
 .agent-settings-nav-button > svg {
   width: 16px;
   height: 16px;
-  stroke-width: var(--openbot-icon-stroke);
+  /* The weight is left to .ui-glyph-20 on the icons themselves, as in .message-action-button. */
 }
 
 .agent-settings-nav-button:hover {
@@ -3082,7 +3082,9 @@
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: var(--openbot-icon-stroke);
+  /* No stroke-width: every icon in this row is hand-drawn on a 20-unit grid and carries
+   * its own scaled weight from .ui-glyph-20. Setting it here outranks that class and
+   * paints them a fifth heavier than the grid they were drawn for. */
 }
 
 .message-action-button svg circle:not(:first-child),
