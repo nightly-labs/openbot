@@ -7,16 +7,15 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createDevInstanceRecord, type DevelopmentServiceSpec } from "../dev-services";
 import {
-  assertOwnerOnlyDirectory,
   type DevInstanceRecord,
   dropReusedDebuggingPorts,
-  isRecordedProcess,
   parseDevInstanceRecord,
   readDevInstanceRecords,
   removeDevInstanceRecord,
   selectDevInstance,
   writeDevInstanceRecord,
 } from "./instance-registry";
+import { assertOwnerOnlyDirectory, isRecordedProcess } from "./registry-files";
 
 function record(overrides: Partial<DevInstanceRecord> = {}): DevInstanceRecord {
   return {

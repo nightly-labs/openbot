@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  developmentInstanceIdForWorktree,
   developmentUserDataName,
   readDevelopmentInstanceId,
   readDevelopmentProfile,
@@ -22,6 +23,19 @@ describe("development profile", () => {
   it("isolates a fallback dev instance without accepting arbitrary path content", () => {
     expect(readDevelopmentInstanceId("5174")).toBe("5174");
     expect(developmentUserDataName("app", "5174")).toBe("OpenBot Dev 5174");
+  });
+
+  it("keeps an isolated worktree on one profile whichever port it wins", () => {
+    const instanceId = developmentInstanceIdForWorktree("/worktrees/one");
+
+    // Derived from the path, so the same worktree gets the same profile after
+    // a restart that landed it on a different renderer port - and its
+    // conversations do not move with the suffix.
+    expect(developmentInstanceIdForWorktree("/worktrees/one")).toBe(instanceId);
+    expect(developmentInstanceIdForWorktree("/worktrees/two")).not.toBe(instanceId);
+    // And it has to survive the check the main process puts it through.
+    expect(readDevelopmentInstanceId(instanceId)).toBe(instanceId);
+    expect(developmentUserDataName("app", instanceId)).toBe(`OpenBot Dev ${instanceId}`);
   });
 
   it("only accepts a remote-debugging port inside the range automation connects to", () => {

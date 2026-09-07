@@ -3,7 +3,9 @@ import {
   configureMobileConnectDevelopmentNetwork,
   configureSiteHostingDevelopmentEnvironment,
   createDevelopmentServiceSpec,
+  createDevStackRecord,
   developmentEnvironmentForTarget,
+  findAvailablePort,
   parseDevelopmentTarget,
   projectRoot,
   selectMobileConnectLanAddress,
@@ -132,6 +134,51 @@ describe("development service runner", () => {
     expect(() => parseDevelopmentTarget(["all", "--watch"])).toThrow("Unknown option");
   });
 
+  it("takes a port a running stack has published as gone without probing it", async () => {
+    const probed: number[] = [];
+    const port = await findAvailablePort(5_173, new Set([5_174]), new Set([5_173]), async (candidate) => {
+      probed.push(candidate);
+      return true;
+    });
+
+    // 5173 belongs to a sibling worktree that has not bound it yet, so probing
+    // it would report it free and hand it to this worktree as well.
+    expect(port).toBe(5_175);
+    expect(probed).toEqual([5_175]);
+  });
+
+  it("publishes every port the stack listens on, so the next worktree walks past all of them", () => {
+    const specs = [
+      createDevelopmentServiceSpec("api", { OPENBOT_API_PORT: "3110" }),
+      createDevelopmentServiceSpec("remote", { REMOTE_SIGNAL_PORT: "3111", REMOTE_HEALTH_PORT: "3112" }),
+      createDevelopmentServiceSpec("app", {
+        OPENBOT_DEV_RENDERER_PORT: "5180",
+        OPENBOT_DEV_REMOTE_DEBUGGING_PORT: "9340",
+      }),
+      createDevelopmentServiceSpec("test-client", {
+        OPENBOT_DEV_RENDERER_PORT: "5181",
+        OPENBOT_DEV_REMOTE_DEBUGGING_PORT: "9341",
+      }),
+    ];
+
+    const record = createDevStackRecord(specs, 4_242, 1_000);
+
+    expect(record.ports).toEqual([
+      { name: "api", port: 3_110 },
+      { name: "signal", port: 3_111 },
+      { name: "signal-health", port: 3_112 },
+      { name: "app-renderer", port: 5_180 },
+      { name: "app-debug", port: 9_340 },
+      { name: "test-client-renderer", port: 5_181 },
+      { name: "test-client-debug", port: 9_341 },
+    ]);
+    expect(record.services).toEqual(["api", "remote", "app", "test-client"]);
+    expect(record.projectRoot).toBe(projectRoot);
+    expect(record.supervisorPid).toBe(4_242);
+    // The children are published as they start, not before any of them exists.
+    expect(record.processes).toEqual([]);
+  });
+
   it("signals a detached POSIX process group after its launcher exits", () => {
     const kill = vi.fn<typeof process.kill>(() => true);
     const child = { pid: 321, exitCode: 0, kill: vi.fn(() => true) };
@@ -140,6 +187,18 @@ describe("development service runner", () => {
 
     expect(kill).toHaveBeenCalledWith(-321, "SIGTERM");
     expect(child.kill).not.toHaveBeenCalled();
+  });
+
+  it("signals a recorded supervisor itself, not the group its shell leads", () => {
+    const kill = vi.fn<typeof process.kill>(() => true);
+
+    // `dev:stop` reads this pid from the registry rather than spawning it, and
+    // the supervisor shares its group with the `bun run` that started it. A
+    // group signal would reach that job instead, and `kill(-pid)` failing with
+    // ESRCH reads as "already stopped", so the runner would survive the stop.
+    signalOwnedProcess({ pid: 321, exitCode: null }, "SIGTERM", "darwin", kill, "process");
+
+    expect(kill).toHaveBeenCalledWith(321, "SIGTERM");
   });
 
   it("gives a surviving POSIX process group time to exit cleanly", async () => {

@@ -134,7 +134,14 @@ These are manual model evaluations, separate from the fake-provider lifecycle re
     renderer port and debugging port to a registry in the per-user temporary directory
     (`scripts/dev-automation/instance-registry.ts`); automation resolves the record of the worktree
     it runs in, verifies the renderer port and the `window.openbot` preload bridge before driving a
-    page, and refuses `click` or `type` on an instance it only inferred. Every dev window stays
+    page, and refuses `click` or `type` on an instance it only inferred. A second registry beside it
+    (`scripts/dev-automation/stack-registry.ts`) records every port and pid a whole dev stack holds,
+    Storybook included, and `scripts/dev-automation/port-allocation.ts` serializes read, choose and
+    publish behind one machine-wide lock: probing a port and binding it seconds later is a check
+    followed by a use, so two runners starting together both used to win 5173 and the unsuffixed
+    `OpenBot Dev` profile with it. `bun run dev:status` and `bun run dev:stop`
+    (`scripts/dev-stack.ts`) read those pids instead of matching a process name, which is what makes
+    stopping one worktree's stack leave the others alone. Every dev window stays
     reachable: `pages` lists the targets and `--page=<target-id|url-substring>` drives any of them, so
     the app window is the default rather than a limit. Page URLs reach the diagnostics and the
     snapshot document only through `describeTarget`.
