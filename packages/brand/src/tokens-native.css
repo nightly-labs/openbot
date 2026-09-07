@@ -76,12 +76,12 @@
     --openbot-text-on-status: #07130c;
     --openbot-action: #f0f0f0;
     --openbot-action-foreground: #141414;
-    --openbot-accent: #0092ff;
-    --openbot-accent-text: #6cc4ff;
+    --openbot-accent: #007cf7;
+    --openbot-accent-text: #42a0ff;
     --openbot-logo-production: #d6adf2;
     --openbot-logo-eye: #040007;
     --openbot-success: #61c985;
-    --openbot-warning: #e3b866;
+    --openbot-warning: #ff9412;
     --openbot-danger: #e47d75;
     --openbot-drawer-scrim: #202020;
     --openbot-scroll-edge-overlay: rgba(0, 0, 0, 0.72);

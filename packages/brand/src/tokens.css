@@ -55,8 +55,8 @@
   --openbot-border: rgba(255, 255, 255, 0.035);
   --openbot-border-strong: rgba(255, 255, 255, 0.045);
   --openbot-image-outline: rgba(255, 255, 255, 0.1);
-  --openbot-border-focus: rgba(0, 146, 255, 0.72);
-  --openbot-focus-tint: rgba(0, 146, 255, 0.34);
+  --openbot-border-focus: rgba(0, 124, 247, 0.72);
+  --openbot-focus-tint: rgba(0, 124, 247, 0.34);
   --openbot-text-primary: #ffffff;
   --openbot-text-on-light: #141414;
   --openbot-surface-light: #f0f0f0;
@@ -79,11 +79,15 @@
   --openbot-text-placeholder: #bfbfbf;
   --openbot-text-on-accent: #ffffff;
   --openbot-text-on-status: #07130c;
-  --openbot-accent: #0092ff;
-  --openbot-accent-hover: #1fa2ff;
-  --openbot-accent-text: #6cc4ff;
-  --openbot-accent-soft: rgba(0, 146, 255, 0.16);
-  --openbot-accent-strong: rgba(0, 146, 255, 0.34);
+  /* Hue 210, sampled from the reference UIs rather than picked: their status dot is
+     #007cf7 and their link and section headings are #42a0ff, both hue 210. The palette
+     sat at hue 206, which reads cyan next to them, and accent-text was 71% light,
+     which reads washed out. */
+  --openbot-accent: #007cf7;
+  --openbot-accent-hover: #1f8fff;
+  --openbot-accent-text: #42a0ff;
+  --openbot-accent-soft: rgba(0, 124, 247, 0.16);
+  --openbot-accent-strong: rgba(0, 124, 247, 0.34);
   --openbot-action: #f0f0f0;
   --openbot-action-foreground: #141414;
   --openbot-settings-text-muted: rgba(255, 255, 255, 0.59);
@@ -105,8 +109,11 @@
   --openbot-success: #61c985;
   --openbot-success-soft: rgba(97, 201, 133, 0.12);
   --openbot-success-wash: rgba(111, 205, 188, 0.045);
-  --openbot-warning: #e3b866;
-  --openbot-warning-soft: rgba(227, 184, 102, 0.12);
+  /* Both warning marks in the reference measure hue 33 at full saturation (#ff9917 on
+     the triangle, #ff9412 on the heading). The palette's #e3b866 was a desaturated gold
+     at hue 39, which reads as a disabled state rather than as something needing attention. */
+  --openbot-warning: #ff9412;
+  --openbot-warning-soft: rgba(255, 148, 18, 0.12);
   --openbot-question-option: #6bc7d9;
   --openbot-question-option-soft: rgba(107, 199, 217, 0.14);
   --openbot-question-option-hover: rgba(107, 199, 217, 0.2);
@@ -124,8 +131,8 @@
   --openbot-badge-new: #ff1e5e;
   --openbot-badge-new-soft: rgba(255, 30, 94, 0.16);
   --openbot-badge-new-border: rgba(255, 30, 94, 0.28);
-  --openbot-approval-badge-soft: rgba(227, 184, 102, 0.18);
-  --openbot-approval-badge-border: rgba(227, 184, 102, 0.3);
+  --openbot-approval-badge-soft: rgba(255, 148, 18, 0.18);
+  --openbot-approval-badge-border: rgba(255, 148, 18, 0.3);
   --openbot-danger: #e47d75;
   --openbot-danger-soft: rgba(228, 125, 117, 0.13);
   --openbot-danger-strong: #ff4058;
@@ -149,7 +156,7 @@
   --openbot-file-pink: #d98ac9;
   --openbot-file-pink-soft: rgba(217, 138, 201, 0.14);
   --openbot-file-purple: var(--openbot-accent-text);
-  --openbot-file-purple-soft: rgba(0, 146, 255, 0.14);
+  --openbot-file-purple-soft: rgba(0, 124, 247, 0.14);
   --openbot-data-table-header-bg: #242424;
   --openbot-data-table-body-bg: #1a1a1a;
   --openbot-data-table-border: #303030;
