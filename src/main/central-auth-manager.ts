@@ -154,6 +154,8 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   #remoteTicketJwks: Promise<z.infer<typeof remoteTicketJwksSchema>> | null = null;
   #initializationPromise: Promise<CentralAuthState> | null = null;
   #emailCodeRequest: EmailCodeRequest | null = null;
+  #profileRefreshPromise: Promise<CentralAuthState> | null = null;
+  #profileRefreshGeneration = 0;
 
   constructor(options: CentralAuthManagerOptions) {
     super();
@@ -171,6 +173,41 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   getState(): CentralAuthState {
     return structuredClone(this.#state);
+  }
+
+  stopProfileRefresh(): void {
+    this.#profileRefreshGeneration += 1;
+  }
+
+  refreshProfile(): Promise<CentralAuthState> {
+    if (this.#profileRefreshPromise) return this.#profileRefreshPromise;
+    const state = this.#state;
+    const token = this.#sessionToken;
+    const generation = this.#profileRefreshGeneration;
+    if (state.status !== "signed_in" || !token) return Promise.resolve(this.getState());
+    const pending = this.#authorizedRequest("/v1/me", { method: "GET" }, decodeCentralAuthUser)
+      .then((user) => {
+        if (this.#state !== state || this.#sessionToken !== token || generation !== this.#profileRefreshGeneration) {
+          return this.getState();
+        }
+        if (user.id !== state.user.id) throw new Error("The account service returned an invalid user.");
+        const resolved = this.#resolveUserAvatar(user);
+        if (
+          resolved.name === state.user.name &&
+          resolved.email === state.user.email &&
+          resolved.avatarUrl === state.user.avatarUrl
+        ) {
+          return this.getState();
+        }
+        return this.#setState({ status: "signed_in", user: resolved });
+      })
+      // Background refresh must not replace a usable profile with a loading/error screen.
+      .catch(() => this.getState())
+      .finally(() => {
+        this.#profileRefreshPromise = null;
+      });
+    this.#profileRefreshPromise = pending;
+    return pending;
   }
 
   getSignedInUser(): CentralAuthUser {

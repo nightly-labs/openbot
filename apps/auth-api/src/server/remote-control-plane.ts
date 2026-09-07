@@ -179,7 +179,7 @@ export class RemoteControlPlane {
     });
     this.#webhookUrl = bindings.REMOTE_AUTH_WEBHOOK_URL?.trim() || null;
     this.#webhookSecret = bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim() || null;
-    this.#fetch = options.fetch ?? fetch;
+    this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
     this.#now = options.now ?? Date.now;
   }
 
@@ -903,10 +903,26 @@ export class RemoteControlPlane {
   }
 }
 
+export async function notifyAccountProfileChanged(
+  bindings: Pick<WorkerBindings, "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_SECRET">,
+  userId: string,
+  waitUntil: (delivery: Promise<void>) => void,
+  fetcher: RemoteFetch = (input, init) => fetch(input, init),
+): Promise<void> {
+  if (!bindings.REMOTE_AUTH_WEBHOOK_URL?.trim() || !bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim()) return;
+  const now = Date.now();
+  await bindings.DB.prepare(
+    "INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at) VALUES (?, ?, ?, 0, ?)",
+  )
+    .bind(crypto.randomUUID(), JSON.stringify({ type: "account-profile-changed", userId }), now, now)
+    .run();
+  waitUntil(deliverPendingRemoteAuthEvents(bindings, now, fetcher));
+}
+
 export async function deliverPendingRemoteAuthEvents(
   bindings: Pick<WorkerBindings, "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_SECRET">,
   now: number,
-  fetcher: RemoteFetch = fetch,
+  fetcher: RemoteFetch = (input, init) => fetch(input, init),
 ): Promise<void> {
   await deliverRemoteAuthEvents({
     database: bindings.DB,
@@ -943,6 +959,7 @@ async function deliverRemoteAuthEvents(input: {
           "OpenBot-Signature": signature,
         },
         body: event.payload,
+        signal: AbortSignal.timeout(5_000),
       });
       if (!response.ok) throw new Error("Remote Signal rejected the authorization event.");
       await input.database.prepare("DELETE FROM remote_auth_events WHERE event_id = ?").bind(event.event_id).run();

@@ -35,6 +35,7 @@ interface AuthServiceOptions {
   exposeDevelopmentCode?: boolean;
   now?: () => number;
   flushSessionRevocations?: () => Promise<void>;
+  profileChanged?: (userId: string) => Promise<void>;
 }
 
 export interface EmailSignInStart {
@@ -50,8 +51,10 @@ export class AuthService {
   readonly #exposeDevelopmentCode: boolean;
   readonly #now: () => number;
   readonly #flushSessionRevocations: () => Promise<void>;
+  readonly #profileChanged: (userId: string) => Promise<void>;
 
   constructor(options: AuthServiceOptions) {
+    this.#profileChanged = options.profileChanged ?? (async () => undefined);
     this.#repository = options.repository;
     this.#delivery = options.delivery;
     this.#exposeDevelopmentCode = options.exposeDevelopmentCode ?? false;
@@ -223,7 +226,9 @@ export class AuthService {
     }
     const now = this.#now();
     await this.#enforceRateLimit(`profile:user:${user.id}`, 20, now);
-    return this.#repository.updateUserName(user.id, validation.name, now);
+    const updated = await this.#repository.updateUserName(user.id, validation.name, now);
+    if (user.name !== updated.name) await this.#profileChanged(user.id).catch(() => undefined);
+    return updated;
   }
 
   async updateAvatar(
@@ -239,6 +244,7 @@ export class AuthService {
     if (!updated) {
       throw new AuthServiceError(409, "avatar_conflict", "The account avatar changed during this request. Try again.");
     }
+    if (user.avatarUrl !== updated.avatarUrl) await this.#profileChanged(user.id).catch(() => undefined);
     return updated;
   }
 

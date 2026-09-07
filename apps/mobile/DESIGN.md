@@ -35,10 +35,148 @@ Native ownership takes priority over HeroUI for navigation chrome. HeroUI owners
 
 - Obtain Liquid Glass through native navigation components. Do not imitate it with blur views, gradients, translucent HeroUI cards, shadows, or screenshots of glass.
 - Do not replace native headers, tab bars, toolbars, or search bars with `GlassView`. `expo-glass-effect` is for deliberate custom content surfaces, not for rebuilding system chrome.
-- Preserve automatic safe-area and scroll-edge behavior. Screens under native chrome should normally use scroll containers with automatic content inset adjustment instead of manual top or bottom spacers.
+- Preserve platform safe-area and scroll-edge behavior. Ordinary screens normally use automatic content inset adjustment. Native sheets use the shared `SheetScrollView` header handling described below; do not add a second automatic inset or screen-local spacer.
 - Avoid forcing opaque colors or bespoke backgrounds onto native chrome unless the product requirement explicitly calls for it. Let the operating system adapt materials to the platform version, appearance, accessibility settings, and scroll state.
 - Treat older iOS versions and Android as first-class fallbacks. The interface must remain complete and readable when Liquid Glass is unavailable or reduced transparency is enabled.
 - Use platform-native icons in native navigation (`sf` on iOS and the corresponding Material icon on Android). Use the existing application icon convention for HeroUI content.
+
+## Sheets
+
+The sheet style is a neutral iOS-style grouped surface: a white/light-gray sheet in light mode,
+charcoal in dark mode, gently contrasting groups, muted descriptions, inset separators and soft
+16 pt group corners. Keep this visual language consistent across settings, add/edit forms and
+other sheets. The system owns the outer sheet shape and presentation.
+
+### Native presentation and headers
+
+Register standalone sheet routes in the existing Expo Router stack. The current configuration for
+a standalone sheet with a native title is:
+
+```tsx
+{
+  presentation: "formSheet",
+  sheetAllowedDetents: "fitToContents",
+  sheetGrabberVisible: true,
+  sheetExpandsWhenScrolledToEdge: false,
+  contentStyle: { backgroundColor: sheetBackground },
+  headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
+  headerTransparent: isIOS,
+  headerBlurEffect: "none",
+  scrollEdgeEffects: { top: "soft" },
+  title: "Profile",
+}
+```
+
+Resolve `sheetBackground` from `--openbot-bg-sheet`, as in `src/app/(app)/_layout.tsx`.
+Keep `headerShadowVisible: false` from the parent stack. A headerless sheet uses
+`headerShown: false`; do not add a fake navigation bar. Full-height detents are appropriate for
+search or similarly large content, not the default for a short form.
+
+Multi-page flows such as Settings stay inside ONE sheet. Register the outer `settings` route with
+`presentation: "formSheet"`, `headerShown: false`, a grabber and stable detents `[0.85]`.
+Its `settings/_layout.tsx` owns a native `Stack`; detail routes use `presentation: "card"`,
+`headerBackButtonDisplayMode: "minimal"` and the same transparent header styling. `router.push`
+opens an inner page and `router.back` returns to the previous page without dismissing the sheet.
+Include secondary flows such as joining a server in this stack. Do not register each settings page
+as another modal. Use `initialRouteName: "index"` so direct entry into a detail page has a back route.
+
+A nested navigator requires a stable viewport; do not combine it with `fitToContents`. The
+intrinsic-height rule applies to standalone forms, not multi-page settings. Preserve the active
+page and unsaved input when navigating forward and back; do not replace routing with conditional
+screen rendering or a custom back-button imitation.
+
+Settings has one detent, `[0.85]`, so a drag cannot expand it to an otherwise unnecessary second
+height. The parent stack sets `sheetExpandsWhenScrolledToEdge: false` for sheets. Overflow belongs
+to the content scroll view, not a larger sheet detent. Native dismissal remains available.
+
+`headerTransparent` alone does not remove a configured blur material. Do not restore
+`systemMaterial` or another `headerBlurEffect` on these sheets, or put an opaque header color back
+on iOS. The native soft scroll edge handles the transition under the title.
+
+### Scroll ownership
+
+Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. In particular:
+
+- Disable bounce and overscroll (`bounces={false}`, `alwaysBounceVertical={false}` and
+  `overScrollMode="never"`). Content that fits stays still; longer content keeps native scrolling.
+  Do not disable scrolling globally or add a height-measurement loop to decide whether it is needed.
+- With an iOS native header, it reads `HeaderHeightContext` and `HeaderShownContext` from
+  `expo-router/react-navigation`, disables automatic content inset adjustment, and adds the
+  measured header height inside scrollable content. This keeps the first item below the title at
+  rest while allowing it to scroll underneath. No hardcoded header height or additional safe-area
+  wrapper belongs in the screen.
+- It suppresses `SheetScrollEdgeEffect` when a native header owns the edge. Do not combine custom
+  masking, blur material and native scroll-edge effects; they can obscure content in overlapping
+  bands. Headerless sheets retain their existing shared edge behavior.
+- Keep the scroll view reachable directly from the sheet. Avoid surrounding `flex: 1` containers
+  for standalone fit-to-content presentations. A nested settings stack has a bounded viewport. Keep the last action in the same scroll flow, with the existing
+  bottom safe-area utilities, so it remains reachable on small screens and with the keyboard open.
+- Use `keyboardDismissMode="interactive"` and `keyboardShouldPersistTaps="handled"` for forms,
+  following existing screens. Reuse `SheetFormField` instead of rebuilding its platform inputs.
+
+### Palette, groups and text
+
+The values belong to `packages/brand/src/tokens.css` and `tokens-native.css`; `global.css` only
+maps them to utilities. Do not copy these hex values into components.
+
+| Role | Utility | Light | Dark |
+| --- | --- | --- | --- |
+| Sheet background | `bg-sheet` | `#fcfcfc` | `#121212` |
+| Group background | `bg-grouped` | `#f2f2f2` | `#212121` |
+| Supporting text | `text-grouped-secondary` | `#858589` | `#96969b` |
+| Inset separator | `bg-grouped-border` | `#dddddf` | `#333335` |
+| Group corners | `rounded-grouped` | 16 pt | 16 pt |
+
+Use the same sheet token for the native route container and scroll background. `bg-background`
+is the app canvas, and `bg-control` is a different surface; neither is a substitute here.
+`rounded-2xl` follows the shared desktop radius scale and does not mean a 16 pt group corner in
+this app. Use `rounded-grouped` explicitly.
+
+Reuse the settings compositions in `src/features/settings/components/settings-content.tsx`.
+Groups use HeroUI `ListGroup` without shadows, regular-weight primary text, smaller muted
+supporting text, and inset hairline separators. Section captions use normal casing. Avoid heavy
+labels, uppercase section titles, decorative cards and tinted gray backgrounds. Account portraits
+can use `ProfileAvatar neutral`; agent colors still convey their own identities.
+
+Action rows use the same flat grouped surface as navigation rows. Sign-out and photo-removal
+rows do not have chevrons; destructive actions use `text-danger` instead of a filled red block.
+Keep pending/disabled behavior and confirmation for sign-out. Do not add account deletion or other
+unsupported actions just because a visual reference shows them.
+
+Use `Typography` for application text. Native pickers and other platform controls remain inside
+an Expo UI `Host` with the selected app appearance. A whole SwiftUI `FieldGroup`/`Form` introduces
+its own scrolling, background and typography, so do not use it as a replacement for this sheet
+composition merely because its individual controls are native.
+
+### Profile and About
+
+Keep the profile identity centered: neutral avatar, editable name directly below, then the email
+in smaller secondary text. Place the pencil immediately beside the visible name, not against the
+sheet edge. Keep the name centered and constrain long names to the available width.
+
+Edit the name inline with the same mounted native input and typography in both states. Do not
+replace the label with a separate form that moves the surrounding content. Show Save only after
+the name changes, disable it for invalid input or a pending request, and let Cancel restore the
+saved name. Reserve a compact action area so showing these controls does not shift the page.
+Group the identity, action area and Profile photo section together instead of applying the
+standard section gap on both sides of the reserved area. Keep the email close to the name.
+
+About ends with a centered, interactive `AppLogo`, the OpenBot name and the app version, including
+the build number when available. Reuse the logo's existing tap animation; do not create another
+mascot animation or add a marketing subtitle. Read version metadata from the app rather than
+hardcoding it.
+
+### Visual verification
+
+Inspect light and dark mode, initial presentation, a scrolled position under the title, the bottom
+of the sheet, and keyboard-open state. Include large text and small screens when layout changes.
+Check headerless sheets as well when changing `SheetScrollView`. Native behavior should be checked
+on iOS and Android when available, including iOS 26 for its scroll-edge behavior.
+
+A compiler or token test cannot confirm transparency, clipping, colors or corner radii. State
+which visual checks ran and which remain unverified. Do not start a simulator, native client or
+build without the authorization required by `AGENTS.md`; inspecting an already running instance
+does not prove a changed screen was exercised.
 
 ## Theme and visual consistency
 

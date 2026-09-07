@@ -41,11 +41,10 @@ export function AddAgentScreen() {
 
   return (
     <SheetScrollView
-      className="flex-1 bg-background"
-      contentContainerClassName="gap-5 px-5 pb-safe-offset-8 pt-5"
+      className="bg-sheet"
+      contentContainerClassName="gap-5 px-5 pb-safe-offset-5 pt-5"
       contentInsetAdjustmentBehavior="automatic"
       keyboardDismissMode="interactive"
-      keyboardMode="layout"
       keyboardShouldPersistTaps="handled"
     >
       <AgentAppearancePicker

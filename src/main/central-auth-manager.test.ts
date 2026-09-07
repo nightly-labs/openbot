@@ -14,6 +14,99 @@ afterEach(async () => {
 });
 
 describe("CentralAuthManager", () => {
+  it("refreshes profiles on demand without polling or emitting unchanged identities", async () => {
+    vi.useFakeTimers();
+    const root = await createRoot();
+    const storagePath = join(root, "session.bin");
+    await writeFile(storagePath, Buffer.from("session-token").toString("base64"));
+    let user = { id: "user-1", email: "person@example.com", name: "Original", avatarUrl: "/v1/avatars/user-1?v=old" };
+    const request = vi.fn(async () => Response.json(user));
+    const manager = new CentralAuthManager({
+      apiUrl: "http://127.0.0.1:3100",
+      storagePath,
+      encrypt: (value) => Buffer.from(value),
+      decrypt: (value) => value.toString(),
+      fetch: request,
+    });
+    await manager.initialize();
+    const changed = vi.fn();
+    manager.on("changed", changed);
+    try {
+      user = { ...user, name: "From phone", avatarUrl: "/v1/avatars/user-1?v=new" };
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(manager.getSignedInUser().name).toBe("Original");
+      await manager.refreshProfile();
+      expect(manager.getSignedInUser()).toMatchObject({
+        name: "From phone",
+        avatarUrl: "http://127.0.0.1:3100/v1/avatars/user-1?v=new",
+      });
+      expect(changed).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: "signed_in", user: expect.objectContaining({ name: "From phone" }) }),
+      );
+      changed.mockClear();
+      await manager.refreshProfile();
+      expect(changed).not.toHaveBeenCalled();
+      request.mockRejectedValueOnce(new Error("Offline"));
+      await manager.refreshProfile();
+      expect(manager.getSignedInUser().name).toBe("From phone");
+      user = { ...user, avatarUrl: "" };
+      await manager.refreshProfile();
+      expect(manager.getSignedInUser().avatarUrl).toBeNull();
+      manager.stopProfileRefresh();
+      user = { ...user, name: "After stop" };
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(manager.getSignedInUser().name).toBe("From phone");
+    } finally {
+      manager.stopProfileRefresh();
+    }
+  });
+
+  it("does not let an older profile read undo a local edit or restore a logged-out account", async () => {
+    const root = await createRoot();
+    const storagePath = join(root, "session.bin");
+    await writeFile(storagePath, Buffer.from("session-token").toString("base64"));
+    const user = { id: "user-1", email: "person@example.com", name: "Original", avatarUrl: null };
+    const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json(user));
+    const manager = new CentralAuthManager({
+      apiUrl: "http://127.0.0.1:3100",
+      storagePath,
+      encrypt: (value) => Buffer.from(value),
+      decrypt: (value) => value.toString(),
+      fetch: request,
+    });
+    await manager.initialize();
+    let finishStale: ((response: Response) => void) | undefined;
+    request.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          finishStale = resolve;
+        }),
+    );
+    const refresh = manager.refreshProfile();
+    expect(manager.refreshProfile()).toBe(refresh);
+    request.mockResolvedValueOnce(Response.json({ ...user, name: "Local edit" }));
+    await manager.updateName("Local edit");
+    finishStale?.(Response.json(user));
+    await refresh;
+    expect(manager.getSignedInUser().name).toBe("Local edit");
+    let finishLate: ((response: Response) => void) | undefined;
+    request.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          finishLate = resolve;
+        }),
+    );
+    const pending = manager.refreshProfile();
+    request.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await manager.logout();
+    finishLate?.(Response.json(user));
+    await pending;
+    expect(manager.getState().status).toBe("signed_out");
+    request.mockClear();
+    await manager.refreshProfile();
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it("accepts a private-LAN Signal URL for local Mobile Connect development", async () => {
     const root = await createRoot();
     const storagePath = join(root, "session.bin");

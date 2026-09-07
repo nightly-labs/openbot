@@ -181,7 +181,9 @@ export function parseDevelopmentTarget(args: string[]): {
 
 async function main(): Promise<void> {
   const { target, dryRun } = parseDevelopmentTarget(process.argv.slice(2));
-  if (!dryRun) prepareDevelopmentEnvironment();
+  if (!dryRun && prepareDevelopmentEnvironment() === "created") {
+    logger.info("Generated apps/auth-api/.env.dev for local development.");
+  }
   const services = servicesForTarget(target);
   const sharedEnvironment = developmentEnvironmentForTarget(target);
   const reservedPorts = new Set<number>();
