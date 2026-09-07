@@ -225,6 +225,11 @@ available sidebar section names/IDs are supplied. Provider output is validated
 before it reaches the editable review form. Cancelling review leaves the agent
 unchanged; late responses are discarded when the client leaves that scope.
 
+A profile-creation marker is written before its workspace or agent row. Startup removes
+uncommitted creations before mailbox initialization and queue draining, while a committed
+retry receipt preserves the agent and its introduction. The existing sidebar reconciliation
+removes assignments for recovered incomplete agents.
+
 Reviewed instructions use the existing profile description. Profile saves coordinate
 SQLite with the separately stored sidebar layout, rolling back section assignment
 on failure. Updating an existing profile and its retry receipt shares a SQLite

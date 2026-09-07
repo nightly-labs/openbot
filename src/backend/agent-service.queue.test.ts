@@ -250,6 +250,64 @@ describe.sequential("AgentService: queue", () => {
     expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
   });
 
+  it.each([false, true])(
+    "recovers profile creation before startup drains queues (committed: %s)",
+    async (committed) => {
+      const { store, mailbox } = stores(root);
+      await store.initialize();
+      await mailbox.initialize();
+      const existing = await store.createAgent({ ...CREATE_AGENT_INPUT, name: "Keep this agent" });
+      const sidebar = new SidebarLayoutStore(join(root, "sidebar.json"));
+      await sidebar.initialize();
+      const input = {
+        operationId: randomUUID(),
+        initialMessage: "Introduce yourself",
+        draft: {
+          name: "Researcher",
+          title: "Research",
+          description: "Cite sources",
+          avatarSeed: "research",
+          avatarHue: null,
+          sectionId: null,
+        },
+      };
+      const pending = await store.createAgent(input.draft, input.operationId);
+      await mailbox.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: [pending.id],
+        text: input.initialMessage,
+        draftIds: [],
+        replyToMessageId: null,
+      });
+      if (committed)
+        store.commitReviewedProfile(
+          pending.id,
+          input.draft,
+          `agent-profile:${input.operationId}`,
+          sidebar.getSnapshot(),
+        );
+      // Reopen the persisted state without invoking ProfileSave's in-memory catch or finally.
+      store.database.close();
+      const restarted = stores(root);
+      const client = new FakeAgentClient("codex");
+      service = new AgentService(restarted.store, restarted.mailbox, fakeBrowser(), 30_000, "codex", () => client);
+      await service.initialize();
+      expect(service.listAgents().some((agent) => agent.id === existing.id)).toBe(true);
+      expect(service.listAgents().some((agent) => agent.id === pending.id)).toBe(committed);
+      if (!committed) {
+        expect(restarted.mailbox.listQueue(pending.id).deliveries).toEqual([]);
+        expect(client.requests.filter((request) => request.method === "turn/start")).toEqual([]);
+        await expect(readdir(join(root, "home", "OpenBot", "Agents"))).resolves.toEqual([existing.id]);
+      }
+      const result = await service.saveProfile(input, sidebar);
+      if (committed) expect(result.agent.id).toBe(pending.id);
+      else expect(result.agent.id).not.toBe(pending.id);
+      expect(service.listAgents()).toHaveLength(2);
+      await waitFor(() => client.requests.some((request) => request.method === "turn/start"));
+      expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
+    },
+  );
+
   it("keeps the agent model and thread when a lazy provider cannot start", async () => {
     const { store, mailbox } = stores(root);
     service = new AgentService(store, mailbox, fakeBrowser());

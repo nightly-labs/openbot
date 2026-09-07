@@ -153,7 +153,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#store = store;
     this.#profileSave = new ProfileSave(store, {
       create: (input, configure) =>
-        this.createAgent({ ...input.draft, initialMessage: input.initialMessage ?? "" }, configure),
+        this.createAgent({ ...input.draft, initialMessage: input.initialMessage ?? "" }, configure, input.operationId),
       changed: (agent) => {
         const session = this.#store.activeProviderSession(agent.id);
         if (session) this.#conversation.unloadThread(session.externalSessionId);
@@ -514,11 +514,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   async createAgent(
     input: CreateAgentInput,
     configure?: (agent: AgentSummary) => Promise<AgentSummary>,
+    profileOperationId?: string,
   ): Promise<AgentSummary> {
     const initialMessage = input.initialMessage.trim();
     if (!initialMessage) throw new Error("Initial message is required.");
     if (input.initialMessage.length > INPUT_LIMITS.messageText) throw new Error("Initial message is too long.");
-    let agent = await this.#store.createAgent(input);
+    let agent = await this.#store.createAgent(input, profileOperationId);
     try {
       await this.#prepareAgentWorkspace(agent);
       const preferredProvider = this.#providers.preferredProvider();

@@ -43,6 +43,7 @@ import {
 import { type DynamicRecord, isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { isGeneratedAgentId, isUuidV4, legacyAgentId } from "@openbot/contracts/validation";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { ProfileCreationRecovery } from "./agent/profile-creation-recovery";
 import { OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
 import { isRecord } from "./protocol";
 
@@ -109,6 +110,7 @@ export class AgentStore {
   readonly #downloadsRoot: string;
   readonly #avatarsRoot: string;
   readonly #duplicationsRoot: string;
+  readonly #profileCreationRecovery: ProfileCreationRecovery;
   readonly #database: OpenBotDatabase;
   #state: StoredState = { version: 2, examplesInitialized: false, agents: [] };
   #avatarUpdateQueue: Promise<void> = Promise.resolve();
@@ -124,6 +126,10 @@ export class AgentStore {
     this.#avatarsRoot = join(userDataPath, "avatars", "agents");
     this.#duplicationsRoot = join(userDataPath, "agent-duplications");
     this.#database = database;
+    this.#profileCreationRecovery = new ProfileCreationRecovery(
+      join(userDataPath, "agent-profile-creations"),
+      this.#agentsRoot,
+    );
   }
 
   get database(): OpenBotDatabase {
@@ -190,17 +196,23 @@ export class AgentStore {
     }
     await this.#reconcileLegacyDirectories();
     await this.#recoverPendingDuplications();
+    await this.#profileCreationRecovery.recover(this.#database, async (agentId) => {
+      await this.deleteAgent(agentId);
+    });
   }
 
   list(): AgentSummary[] {
     return this.#state.agents.map((agent) => ({ ...agent }));
   }
 
-  createAgent(input: Omit<CreateAgentInput, "initialMessage">): Promise<AgentSummary> {
-    return this.#enqueueCreation(() => this.#createAgent(input));
+  createAgent(input: Omit<CreateAgentInput, "initialMessage">, profileOperationId?: string): Promise<AgentSummary> {
+    return this.#enqueueCreation(() => this.#createAgent(input, profileOperationId));
   }
 
-  async #createAgent(input: Omit<CreateAgentInput, "initialMessage">): Promise<AgentSummary> {
+  async #createAgent(
+    input: Omit<CreateAgentInput, "initialMessage">,
+    profileOperationId?: string,
+  ): Promise<AgentSummary> {
     if (this.#state.agents.length >= INPUT_LIMITS.agents) {
       throw new Error(`A host can have up to ${INPUT_LIMITS.agents} agents.`);
     }
@@ -211,6 +223,7 @@ export class AgentStore {
     const record = this.#createRecord(`agent-${randomUUID()}`, name, "", description);
     record.avatarSeed = input.avatarSeed;
     record.avatarHue = input.avatarHue;
+    if (profileOperationId) await this.#profileCreationRecovery.begin(record.id, profileOperationId);
     await mkdir(record.workspacePath, { recursive: true, mode: 0o700 });
     this.#state.agents.unshift(record);
     try {

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentProfileDraft, SaveAgentProfileInput } from "@openbot/contracts/ipc";
@@ -7,6 +7,7 @@ import { saveReviewedAgentProfile } from "@openbot/team-client";
 import { afterEach, expect, it, vi } from "vitest";
 import { AgentStore } from "../agent-store";
 import { SidebarLayoutStore } from "../sidebar-layout-store";
+import { ProfileCreationRecovery } from "./profile-creation-recovery";
 import { ProfileSave } from "./profile-save";
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -29,7 +30,7 @@ async function fixture() {
   const sidebar = new SidebarLayoutStore(join(root, "sidebar.json"));
   await sidebar.initialize();
   const save = new ProfileSave(store, {
-    create: async (input, configure) => configure(await store.createAgent(input.draft)),
+    create: async (input, configure) => configure(await store.createAgent(input.draft, input.operationId)),
     changed: () => undefined,
     delete: async (agent) => {
       await store.deleteAgent(agent.id);
@@ -132,6 +133,9 @@ it("removes an incomplete new agent and its assignment when profile persistence 
   const result = await save.save(input, sidebar);
   expect(store.list()).toHaveLength(1);
   expect(sidebar.getSnapshot().agentAssignments[result.agent.id]).toBe(input.draft.sectionId);
+  store.database.close();
+  await store.initialize();
+  expect(store.list().map((agent) => agent.id)).toEqual([result.agent.id]);
 });
 
 it("reconciles a lost creation response before applying edited retry fields", async () => {
@@ -158,4 +162,18 @@ it("allows correcting a rejected creation while retaining its original retry ide
   const result = await saveReviewedAgentProfile(send, edited, original);
   expect(result.agent.name).toBe(draft.name);
   expect(store.list()).toHaveLength(1);
+});
+
+it("removes a profile workspace left before its agent row was written", async () => {
+  const { store, root } = await fixture();
+  const agentId = `agent-${randomUUID()}`;
+  const workspaces = join(root, "home", "OpenBot", "Agents");
+  const markers = join(root, "data", "agent-profile-creations");
+  await new ProfileCreationRecovery(markers, workspaces).begin(agentId, randomUUID());
+  await mkdir(join(workspaces, agentId));
+  store.database.close();
+  await store.initialize();
+  expect(store.list()).toEqual([]);
+  await expect(readdir(workspaces)).resolves.toEqual([]);
+  await expect(readdir(markers)).resolves.toEqual([]);
 });
