@@ -40,7 +40,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md#security-sensitive-changes) for the securi
    untracked `apps/auth-api/.env.dev`. Only `.env.production` needs the encrypted setup.
 2. Before completion, run the narrowest relevant test, then `bun run lint` and `bun run typecheck`.
    Also run `bun run check:ui` for changes in `src/renderer`. Keep the full lint and typecheck scope;
-   `typecheck:*` includes mobile, Signal, and `remote/scripts`.
+   `typecheck:*` includes mobile, Signal, and `remote/scripts`. Each TypeScript project has a
+   separate incremental cache in this worktree. The first run creates it; later runs reuse it.
+   Run these checks locally even when cache state or machine load makes them slower.
 3. Run one desktop test file with `bun run test:desktop -- <path>`. Ask for a specific command
    before a wider test, build, or packaged-app check. Approval covers only that command.
 4. Leave `bun run check`, `bun run check:desktop`, `bun run test`, and `bun run build-storybook`
