@@ -84,7 +84,11 @@ describe("Agent usage", () => {
     expect(screen.getByRole("table", { name: "Daily usage and cost" })).toBe(day);
   });
   it("loads usage, switches the period, and shows empty data", async () => {
-    vi.mocked(window.openbot.agent.getHostAnalytics).mockImplementation(async (input) => ({ ...result(), ...input }));
+    // Electron must clone this payload before it can reach the main process.
+    vi.mocked(window.openbot.agent.getHostAnalytics).mockImplementation(async (input) => ({
+      ...result(),
+      ...structuredClone(input),
+    }));
     show();
     await vi.waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("No usage recorded"));
     await pick("Usage period", "7 days");

@@ -67,7 +67,8 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
       });
     try {
       const [result, agents] = await Promise.all([
-        window.openbot.agent.getHostAnalytics(range, serverId),
+        // Electron cannot clone the Solid store proxy across the context bridge.
+        window.openbot.agent.getHostAnalytics({ ...range }, serverId),
         window.openbot.agent.listAgents(serverId),
       ]);
       if (request === generation && props.serverId === serverId && state.range.agentId === agentId)
