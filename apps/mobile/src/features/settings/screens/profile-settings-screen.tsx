@@ -1,4 +1,4 @@
-import { Host, TextInput, type TextInputRef, useNativeState } from "@expo/ui";
+import { Host, Text as NativeText, TextInput, type TextInputRef, useNativeState } from "@expo/ui";
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import { AVATAR_IMAGE_LIMITS } from "@openbot/contracts/input-limits";
 import { validateProfileName } from "@openbot/contracts/validation";
@@ -104,26 +104,27 @@ export function ProfileSettingsScreen() {
               className="w-full flex-row items-center justify-center"
               onLayout={(event) => setNameRowWidth(event.nativeEvent.layout.width)}
             >
-              {/* Measure the visible label so the edit affordance follows its text, not the sheet edge. */}
-              <Typography.Paragraph
-                numberOfLines={1}
+              {/* Measure with the input's native text engine so its font metrics match. */}
+              <Host
+                matchContents
+                ignoreSafeArea="all"
                 accessibilityElementsHidden
                 importantForAccessibility="no-hide-descendants"
                 pointerEvents="none"
-                style={{
-                  position: "absolute",
-                  opacity: 0,
-                  fontSize: nameTextStyle.fontSize,
-                  lineHeight: nameTextStyle.lineHeight,
-                  fontWeight: "600",
-                }}
-                onTextLayout={(event) => {
-                  const line = event.nativeEvent.lines[0];
-                  if (line) setNameWidth(line.width);
-                }}
+                style={{ position: "absolute", opacity: 0, maxWidth: Math.max(44, nameRowWidth - 56) }}
+                onLayoutContent={(event) => setNameWidth(Math.ceil(event.nativeEvent.width))}
               >
-                {name || "Add your name"}
-              </Typography.Paragraph>
+                <NativeText
+                  numberOfLines={1}
+                  textStyle={{
+                    fontSize: nameTextStyle.fontSize,
+                    lineHeight: nameTextStyle.lineHeight,
+                    fontWeight: "600",
+                  }}
+                >
+                  {name || "Add your name"}
+                </NativeText>
+              </Host>
               <View className="w-7" />
               <Host
                 colorScheme={theme === "dark" ? "dark" : "light"}
