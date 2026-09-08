@@ -73,6 +73,36 @@ describe("mobile session revocation", () => {
     },
   );
 
+  it("processes a sign-out queued during a retry without repeating failed credentials", async () => {
+    const started = Promise.withResolvers<void>();
+    const response = Promise.withResolvers<Response>();
+    const replacement = { ...session, apiUrl: "https://other.example.com", sessionToken: "replacement-token" };
+    native.fetch.mockImplementation(async (url, init) => {
+      if (url === `${replacement.apiUrl}/v1/mobile-auth/session`) return new Response(null, { status: 204 });
+      if (init?.method === "DELETE") {
+        started.resolve();
+        return response.promise;
+      }
+      return Response.json(session.user);
+    });
+    await logoutMobileSession(session);
+    await started.promise;
+    const retry = retryMobileSessionRevocations();
+    native.storage.set(key, JSON.stringify(replacement));
+    await logoutMobileSession(replacement);
+    response.resolve(new Response(null, { status: 500 }));
+    await retry;
+    expect(native.fetch.mock.calls.map(([url, init]) => [url, init?.method ?? "GET"])).toEqual([
+      [`${session.apiUrl}/v1/mobile-auth/session`, "DELETE"],
+      [`${session.apiUrl}/v1/mobile-auth/session`, "GET"],
+      [`${replacement.apiUrl}/v1/mobile-auth/session`, "DELETE"],
+    ]);
+    expect(JSON.parse(native.storage.get("openbot.mobile.pending-revocations.v1") ?? "null")).toEqual([
+      { apiUrl: session.apiUrl, sessionToken: session.sessionToken },
+    ]);
+    expect(native.storage.has(key)).toBe(false);
+  });
+
   it("does not restore a login if the app stopped after queuing sign-out", async () => {
     native.storage.set(
       "openbot.mobile.pending-revocations.v1",

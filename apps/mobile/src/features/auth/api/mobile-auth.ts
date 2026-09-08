@@ -273,6 +273,7 @@ export async function logoutMobileSession(session: MobileSession): Promise<void>
       await SecureStore.setItemAsync(MOBILE_REVOCATIONS_KEY, JSON.stringify(pending), {
         keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
       });
+      revocationRetryRequested = true;
     }
     const stored = await SecureStore.getItemAsync(MOBILE_SESSION_KEY);
     if (stored && sameCredential(decodeStoredMobileCredential(JSON.parse(stored)), session)) {
@@ -293,39 +294,47 @@ async function readPendingRevocations(): Promise<MobileCredential[]> {
 }
 
 let revocationRetry: Promise<void> | null = null;
+let revocationRetryRequested = false;
 
 // Pending tokens are never restored as logins. Keep them in Keychain until the
 // account service confirms revocation, without blocking local sign-out or login.
 export function retryMobileSessionRevocations(): Promise<void> {
   if (revocationRetry) return revocationRetry;
   revocationRetry = (async () => {
-    const pending = await serializeMobileSessionStorage(readPendingRevocations);
-    await Promise.all(
-      pending.map(async (credential) => {
-        try {
-          await revokeMobileCredential(credential);
-          await serializeMobileSessionStorage(async () => {
-            const remaining = (await readPendingRevocations()).filter((item) => !sameCredential(item, credential));
-            if (remaining.length === 0) {
-              await SecureStore.deleteItemAsync(MOBILE_REVOCATIONS_KEY);
-            } else {
-              await SecureStore.setItemAsync(MOBILE_REVOCATIONS_KEY, JSON.stringify(remaining), {
-                keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    const attempted: MobileCredential[] = [];
+    try {
+      do {
+        revocationRetryRequested = false;
+        const pending = (await serializeMobileSessionStorage(readPendingRevocations)).filter(
+          (credential) => !attempted.some((item) => sameCredential(item, credential)),
+        );
+        attempted.push(...pending);
+        await Promise.all(
+          pending.map(async (credential) => {
+            try {
+              await revokeMobileCredential(credential);
+              await serializeMobileSessionStorage(async () => {
+                const remaining = (await readPendingRevocations()).filter((item) => !sameCredential(item, credential));
+                if (remaining.length === 0) {
+                  await SecureStore.deleteItemAsync(MOBILE_REVOCATIONS_KEY);
+                } else {
+                  await SecureStore.setItemAsync(MOBILE_REVOCATIONS_KEY, JSON.stringify(remaining), {
+                    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+                  });
+                }
               });
+            } catch {
+              // Retry failed credentials only on the next external trigger.
             }
-          });
-        } catch {
-          // Retry on startup, foreground validation, or the next QR scan.
-        }
-      }),
-    );
-  })()
-    .catch(() => {
+          }),
+        );
+      } while (revocationRetryRequested);
+    } catch {
       // A storage failure must not produce an unhandled background rejection.
-    })
-    .finally(() => {
+    } finally {
       revocationRetry = null;
-    });
+    }
+  })();
   return revocationRetry;
 }
 
