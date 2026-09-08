@@ -462,7 +462,15 @@ copy refuses this command, because the runtime manager replaces that installatio
 Every runtime the store reaches is on this computer: `window.openbot.providerRuntimes` addresses no
 other one, while the agent status beside it describes whichever server is open. The store therefore
 takes `isLocalServer`, and a workspace on another computer announces no offer and starts no update -
-the same rule the provider row and the picker already follow.
+the same rule the provider row and the picker already follow. A server switch rebuilds that store,
+so the version a user closed the notification on is kept by the notification module, which outlives
+the switch: the offer is raised again on the way back only if the user never closed it.
+
+Replacing the CLI is not a start. `#activateProviderClient` skips `onProvidersReady` for it, because
+that hook is restart recovery: it settles every unresolved delivery, and the other providers keep
+running through the replacement, so a live turn would be recorded as `interrupted` - which
+`MailboxStore.markTerminal` then refuses to correct. `onProviderResumed` schedules the deliveries
+the replacement held back.
 
 The update replaces the binary under a running client. A provider that has an agent in a turn -
 a delivery on its way to one, which holds no turn id yet, or a context compaction, whose

@@ -5,6 +5,8 @@ import { FALLBACK_PROVIDER_RUNTIMES } from "../../app-defaults";
 import { type ProviderUpdate, providerUpdatesToAnnounce } from "./provider-update";
 import {
   dismissProviderUpdateToast,
+  hideProviderUpdateToast,
+  providerUpdateOfferClosed,
   reportProviderUpdateToast,
   showProviderUpdateToast,
 } from "./provider-update-toast";
@@ -230,6 +232,9 @@ export function createProviderRuntimeStore(
       // it says what the user was told about this computer, which the open server does not change.
       if (!next) return;
       for (const update of providerUpdatesToAnnounce(announced, next)) {
+        // A closed notification stays closed, including across the server switch that rebuilds this
+        // store: the record of it is kept by the notification module, which outlives the switch.
+        if (providerUpdateOfferClosed(update.provider, update.availableVersion)) continue;
         showProviderUpdateToast(update, () => void startProviderUpdate(update.provider));
       }
       announced = next;
@@ -246,7 +251,8 @@ export function createProviderRuntimeStore(
       disposed = true;
       unsubscribe?.();
       updating.clear();
-      for (const provider of ["codex", "claude", "grok"] as const) dismissProviderUpdateToast(provider);
+      // Hidden, not dismissed: the offer outlives the workspace this store was built for.
+      for (const provider of ["codex", "claude", "grok"] as const) hideProviderUpdateToast(provider);
     };
   });
   return {

@@ -680,8 +680,9 @@ export class ProviderRuntime implements ProviderPort {
     client: AgentClient,
     cli: AgentCliInfo,
     account: NonNullable<AccountReadResult["account"]>,
-    isCurrent?: () => boolean,
+    options: { isCurrent?: () => boolean; notifyReady?: boolean } = {},
   ): Promise<void> {
+    const { isCurrent, notifyReady = true } = options;
     const activation = this.#providerActivation
       .catch(() => undefined)
       .then(async () => {
@@ -742,7 +743,7 @@ export class ProviderRuntime implements ProviderPort {
 
         if (previousClient && previousClient !== client) await previousClient.stop().catch(() => undefined);
         if (provider === "codex") void this.#refreshUsage(client).catch(() => undefined);
-        await this.#hooks.onProvidersReady();
+        if (notifyReady) await this.#hooks.onProvidersReady();
       });
     this.#providerActivation = activation.catch(() => undefined);
     await activation;
@@ -815,7 +816,13 @@ export class ProviderRuntime implements ProviderPort {
       bundledExecutable: this.#bundledExecutables.get(provider),
     });
     const candidate = await this.#createAuthenticatedProviderClient(provider, cli);
-    await this.#activateProviderClient(provider, candidate.client, cli, candidate.account);
+    // Not a start: `onProvidersReady` is restart recovery, and it settles every unresolved delivery,
+    // including the live ones of the other providers - a turn still running would be recorded as
+    // interrupted, which `markTerminal` then refuses to correct. `onProviderResumed` schedules the
+    // deliveries this replacement held back instead.
+    await this.#activateProviderClient(provider, candidate.client, cli, candidate.account, {
+      notifyReady: false,
+    });
   }
 
   async #startCliLogin(provider: AgentProvider, command: ProviderCliCommand): Promise<AgentStatus> {
@@ -853,13 +860,9 @@ export class ProviderRuntime implements ProviderPort {
         await candidate.client.stop().catch(() => undefined);
         return;
       }
-      await this.#activateProviderClient(
-        provider,
-        candidate.client,
-        pending.cli,
-        candidate.account,
-        () => this.#cliLogins.get(provider) === pending,
-      );
+      await this.#activateProviderClient(provider, candidate.client, pending.cli, candidate.account, {
+        isCurrent: () => this.#cliLogins.get(provider) === pending,
+      });
       if (this.#cliLogins.get(provider) === pending) this.#cliLogins.delete(provider);
     } catch (error) {
       await this.#failCliLogin(provider, pending, error);
@@ -973,13 +976,9 @@ export class ProviderRuntime implements ProviderPort {
         throw new Error("ChatGPT did not return an authenticated account.");
       }
       if (this.#codexLogin !== pending) return;
-      await this.#activateProviderClient(
-        "codex",
-        pending.client,
-        pending.cli,
-        account.account,
-        () => this.#codexLogin === pending,
-      );
+      await this.#activateProviderClient("codex", pending.client, pending.cli, account.account, {
+        isCurrent: () => this.#codexLogin === pending,
+      });
       if (this.#codexLogin === pending) this.#codexLogin = null;
     } catch {
       await this.#failCodexLogin(pending, "OpenBot could not verify the ChatGPT connection. Try again.");

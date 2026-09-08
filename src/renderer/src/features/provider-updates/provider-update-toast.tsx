@@ -135,15 +135,24 @@ function ProviderUpdateActionLabel(props: { presentation: ProviderUpdatePresenta
   );
 }
 
-/** The notification open for one provider, and the two things about it that still move. */
+/** The notification open for one provider, and the three things about it that still move. */
 interface LiveProviderUpdateToast {
   present: (presentation: ProviderUpdatePresentation) => void;
   setAct: (act: () => void) => void;
+  setOffer: (version: string | null) => void;
 }
 
 const liveToasts = new Map<AgentProviderId, LiveProviderUpdateToast>();
 const dismissTimers = new Map<AgentProviderId, number>();
 const disposers = new Map<AgentProviderId, () => void>();
+/**
+ * The version each provider's notification was closed on by the user.
+ *
+ * It lives here because this module outlives the runtime store, which is rebuilt for every server
+ * the user opens: without it, opening a team workspace and coming back raises an offer the user has
+ * already closed. It is keyed by version, so the next version is a new offer and is announced.
+ */
+const closedOffers = new Map<AgentProviderId, string>();
 
 /**
  * Forget the notification, whether it was dismissed from here or closed by the user.
@@ -183,11 +192,15 @@ function liveToast(provider: AgentProviderId, presentation: ProviderUpdatePresen
     const [current, setCurrent] = createSignal(presentation);
     // Read at click time, so the button that offered the update is the button that retries it.
     let act = (): void => {};
+    let offered: string | null = null;
 
     const live: LiveProviderUpdateToast = {
       present: (next) => setCurrent(next),
       setAct: (next) => {
         act = next;
+      },
+      setOffer: (version) => {
+        offered = version;
       },
     };
     liveToasts.set(provider, live);
@@ -195,6 +208,7 @@ function liveToast(provider: AgentProviderId, presentation: ProviderUpdatePresen
 
     return {
       live,
+      offeredVersion: () => offered,
       // The title is the one thing given as a function. Sonner re-measures the toast whenever the
       // title or the description changes, and the other two are elements that keep their identity
       // for the whole flow, so this read of the signal is what keeps the recorded height honest.
@@ -219,7 +233,12 @@ function liveToast(provider: AgentProviderId, presentation: ProviderUpdatePresen
     action: { label: parts.label, onClick: parts.onClick },
     duration: PERSISTENT,
     onDismiss: () => {
-      if (liveToasts.get(provider) === parts.live) releaseProviderUpdateToast(provider);
+      // Only the user reaches this notification while it is still the live one: every close made
+      // from this module releases it first, so a late callback for one of those finds nothing.
+      if (liveToasts.get(provider) !== parts.live) return;
+      const closed = parts.offeredVersion();
+      if (closed) closedOffers.set(provider, closed);
+      releaseProviderUpdateToast(provider);
     },
   });
 
@@ -235,6 +254,23 @@ export function showProviderUpdateToast(update: ProviderUpdate, onUpdate: () => 
   const live = liveToast(update.provider, presentation);
   live.present(presentation);
   live.setAct(onUpdate);
+  live.setOffer(presentation.updatable ? update.availableVersion : null);
+}
+
+/** The offer this provider's notification was closed on, and so must not be raised again. */
+export function providerUpdateOfferClosed(provider: AgentProviderId, availableVersion: string | null): boolean {
+  return availableVersion !== null && closedOffers.get(provider) === availableVersion;
+}
+
+/**
+ * Take the notification off the screen without ending the offer behind it.
+ *
+ * A server switch rebuilds the runtime store, and what the user was told about this computer is not
+ * the switch's to forget: the offer is raised again on the way back, unless the user closed it.
+ */
+export function hideProviderUpdateToast(provider: AgentProviderId): void {
+  toast.dismiss(toastId(provider));
+  releaseProviderUpdateToast(provider);
 }
 
 /**
@@ -249,6 +285,7 @@ export function reportProviderUpdateToast(update: ProviderUpdate, onRetry: () =>
   const presentation = presentProviderUpdate(update);
   live.present(presentation);
   live.setAct(onRetry);
+  live.setOffer(presentation.updatable ? update.availableVersion : null);
 
   const timer = dismissTimers.get(update.provider);
   if (timer !== undefined) window.clearTimeout(timer);
@@ -261,7 +298,8 @@ export function reportProviderUpdateToast(update: ProviderUpdate, onRetry: () =>
   );
 }
 
+/** End the offer as well as the notification: it has been acted on, cancelled or settled. */
 export function dismissProviderUpdateToast(provider: AgentProviderId): void {
-  toast.dismiss(toastId(provider));
-  releaseProviderUpdateToast(provider);
+  closedOffers.delete(provider);
+  hideProviderUpdateToast(provider);
 }

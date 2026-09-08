@@ -4,7 +4,7 @@ import type {
   ProviderRuntimeStatus,
   ProviderRuntimesDesktopApi,
 } from "@openbot/contracts/ipc";
-import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { afterEach, expect, it, vi } from "vitest";
 import { FALLBACK_UPDATE_STATUS } from "../../app-defaults";
@@ -302,4 +302,17 @@ it("offers no CLI update while a workspace on another computer is open", async (
   setLocal(true);
   flush();
   expect(await screen.findByText("ChatGPT update available")).toBeInTheDocument();
+});
+
+it("keeps an offer the user closed closed when the workspace is opened again", async () => {
+  const updateSystemCli = vi.fn(async () => {});
+  systemCliHarness(updateSystemCli);
+  fireEvent.click(await screen.findByRole("button", { name: "Close notification" }));
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Update" })).not.toBeInTheDocument());
+  // A server switch disposes the store that raised the notification and builds a new one.
+  cleanup();
+
+  const { store } = systemCliHarness(updateSystemCli);
+  await waitFor(() => expect(store.providerAvailableVersions().codex).toBe("0.153.4"));
+  expect(screen.queryByRole("button", { name: "Update" })).not.toBeInTheDocument();
 });
