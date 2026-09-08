@@ -5,7 +5,7 @@ import type {
   TeamPresenceMember,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
-import { createMemo, createSignal } from "solid-js";
+import { createEffect, createMemo, createSignal, flush } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
 import { useServers } from "./servers-context";
@@ -43,6 +43,25 @@ const ServerSettings = createSimpleContext({
     let serverSettingsRestoreTarget: HTMLElement | null = null;
 
     const serverSettingsTarget = createMemo(() => servers().find((server) => server.id === serverSettingsTargetId()));
+
+    createEffect(
+      () => ({ open: serverSettingsOpen(), id: serverSettingsTargetId() }),
+      ({ open, id }) => {
+        if (!open || !id) return;
+        let previous = "";
+        return window.openbot.servers.onPresence((presence) => {
+          // Typing updates must not read the account API again. Membership and
+          // online changes are enough to refresh an accepted invitation.
+          const signature = JSON.stringify(
+            presence.members.map((member) => [member.id, member.role, member.disabled, member.online]),
+          );
+          if (signature === previous) return;
+          previous = signature;
+          flush(() => setServerSettingsMembers(presence.members));
+          void refreshServerSettings(id);
+        }, id);
+      },
+    );
 
     async function refreshServerSettings(serverId = serverSettingsTargetId()): Promise<void> {
       if (!serverId) return;

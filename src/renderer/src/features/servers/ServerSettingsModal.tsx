@@ -40,8 +40,6 @@ import {
   ItemMedia,
   ItemTitle,
   Monitor,
-  Pause,
-  Play,
   QrCode,
   RefreshCw,
   ScanLine,
@@ -202,10 +200,16 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const activeInvites = createMemo(() =>
     props.invites.filter((item) => item.usedAt === null && Date.parse(item.expiresAt) > now()),
   );
+  const inviteUsed = () =>
+    Boolean(
+      panels.invite.result && props.invites.some((invite) => invite.id === panels.invite.result?.id && invite.usedAt),
+    );
+  const inviteExpired = () => Boolean(panels.invite.result && Date.parse(panels.invite.result.expiresAt) <= now());
+  const activeMembers = createMemo(() => props.members.filter((member) => !member.disabled));
   const filteredMembers = createMemo(() => {
     const query = panels.members.search.trim().toLowerCase();
-    if (!query) return props.members;
-    return props.members.filter((member) =>
+    if (!query) return activeMembers();
+    return activeMembers().filter((member) =>
       [teamMemberName(member), member.email, member.username].some((value) => value?.toLowerCase().includes(query)),
     );
   });
@@ -839,7 +843,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <SettingsSection
           class="server-settings-members-section"
           title="Server members"
-          description={<>{props.members.length} members</>}
+          description={<>{activeMembers().length} members</>}
           actions={
             <label class="server-settings-search">
               <Search aria-hidden="true" />
@@ -978,33 +982,55 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               >
                 {(result) => (
                   <div class="server-settings-invite-share">
-                    <CopyButton
-                      class="server-settings-invite-copy"
-                      value={result().inviteUrl}
-                      label="Copy link"
-                      copiedLabel="Copied"
-                      size="sm"
-                      variant="default"
-                      onCopyError={showCopyError}
-                    />
                     <Button
-                      size="icon-sm"
-                      variant="default"
-                      aria-label="Show invitation QR code"
-                      aria-expanded={panels.invite.showQr ? "true" : "false"}
-                      onClick={() =>
-                        setPanels((state) => {
-                          state.invite.showQr = !state.invite.showQr;
-                        })
-                      }
+                      size="sm"
+                      variant="ghost"
+                      aria-label="Create new invitation link"
+                      title="Create new link"
+                      loading={busy() === "invite"}
+                      disabled={!canInvite()}
+                      onClick={() => void createInvite()}
                     >
-                      <ScanLine />
+                      <RefreshCw />
+                      New link
                     </Button>
+                    <Show when={!inviteUsed() && !inviteExpired()}>
+                      <CopyButton
+                        class="server-settings-invite-copy"
+                        value={result().inviteUrl}
+                        label="Copy link"
+                        copiedLabel="Copied"
+                        size="sm"
+                        variant="default"
+                        onCopyError={showCopyError}
+                      />
+                      <Button
+                        size="icon-sm"
+                        variant="default"
+                        aria-label="Show invitation QR code"
+                        aria-expanded={panels.invite.showQr ? "true" : "false"}
+                        onClick={() =>
+                          setPanels((state) => {
+                            state.invite.showQr = !state.invite.showQr;
+                          })
+                        }
+                      >
+                        <ScanLine />
+                      </Button>
+                    </Show>
                   </div>
                 )}
               </Show>
             </div>
-            <Show when={panels.invite.showQr && panels.invite.mode === "link" && panels.invite.result}>
+            <Show
+              when={
+                panels.invite.showQr &&
+                !inviteUsed() &&
+                !inviteExpired() &&
+                panels.invite.mode === "link" &&
+                panels.invite.result
+              }
+            >
               {(result) => (
                 <div class="server-settings-invite-qr">
                   <QrCode value={result().inviteUrl} label="Invitation QR code" />
@@ -1014,15 +1040,29 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 </div>
               )}
             </Show>
-            <Show when={panels.invite.result?.email ? panels.invite.result : null}>
+            <Show when={panels.invite.result}>
               {(result) => (
                 <Alert class="server-settings-invite-result" tone="success" role="status">
                   <AlertIcon>
                     <Check />
                   </AlertIcon>
                   <AlertContent>
-                    <AlertTitle>{result().email ? "Invitation sent" : "Invitation link ready"}</AlertTitle>
-                    <AlertDescription>{result().email}</AlertDescription>
+                    <AlertTitle>
+                      {inviteUsed()
+                        ? "Invitation accepted"
+                        : inviteExpired()
+                          ? "Invitation expired"
+                          : result().email
+                            ? "Invitation sent"
+                            : "Invitation link ready"}
+                    </AlertTitle>
+                    <AlertDescription>
+                      {inviteUsed()
+                        ? "The member joined this server. Create a new link to invite someone else."
+                        : inviteExpired()
+                          ? "Create a new link to invite someone."
+                          : result().email || "Share the link or scan the QR code in OpenBot Mobile."}
+                    </AlertDescription>
                   </AlertContent>
                 </Alert>
               )}
@@ -1051,9 +1091,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 mount={modalElement}
                 onRoleChange={(role) =>
                   void run(`member:${member.id}`, () => props.onUpdateMember({ memberId: member.id, role }))
-                }
-                onPausedChange={(disabled) =>
-                  void run(`member:${member.id}`, () => props.onUpdateMember({ memberId: member.id, disabled }))
                 }
                 onRemove={(trigger) => {
                   removeMemberTrigger = trigger;
@@ -1237,7 +1274,6 @@ function MemberActionsMenu(props: {
   member: TeamPresenceMember;
   mount: HTMLElement | undefined;
   onRoleChange: (role: InviteRole) => void;
-  onPausedChange: (paused: boolean) => void;
   onRemove: (trigger: HTMLElement) => void;
 }) {
   const name = () => teamMemberName(props.member);
@@ -1259,10 +1295,6 @@ function MemberActionsMenu(props: {
           >
             {props.member.role === "admin" ? <UserRound aria-hidden="true" /> : <ShieldCheck aria-hidden="true" />}
             {props.member.role === "admin" ? "Make member" : "Make admin"}
-          </DropdownMenu.Item>
-          <DropdownMenu.Item onSelect={() => props.onPausedChange(!props.member.disabled)}>
-            {props.member.disabled ? <Play aria-hidden="true" /> : <Pause aria-hidden="true" />}
-            {props.member.disabled ? "Restore access" : "Pause access"}
           </DropdownMenu.Item>
           <DropdownMenu.Separator />
           <DropdownMenu.Item

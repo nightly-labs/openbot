@@ -133,10 +133,10 @@ export class RemoteTeamDirectoryClient {
     const directory = hosts.flat();
     if (this.#pairedHost) {
       const paired = directory.find((host) => host.hostId === this.#pairedHost?.hostId);
-      if (!paired || remoteHostFingerprint(paired.devicePublicKey) !== this.#pairedHost.fingerprint) {
+      if (paired && remoteHostFingerprint(paired.devicePublicKey) !== this.#pairedHost.fingerprint) {
         throw new Error("The paired desktop identity is missing or changed. Scan a new code from that desktop.");
       }
-      await this.#pinHostKey(paired.hostId, paired.devicePublicKey);
+      if (paired) await this.#pinHostKey(paired.hostId, paired.devicePublicKey);
     }
     return directory;
   }

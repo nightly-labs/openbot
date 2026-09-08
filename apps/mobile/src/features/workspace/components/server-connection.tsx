@@ -27,6 +27,7 @@ interface Props {
   register(hostId: string, handle: ServerConnectionHandle | null): void;
   load(hostId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext): Promise<void>;
   onStatus(hostId: string, status: RemoteRecoveryStatus, failure: string | null): void;
+  onMembershipChanged?(): Promise<void>;
   onTeamEvent(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
 }
 
@@ -40,12 +41,14 @@ export function ServerConnection({
   load,
   onStatus,
   onTeamEvent,
+  onMembershipChanged,
 }: Props) {
   const [client, setClient] = useState<RemoteTeamTransportRef | null>(null);
   const controller = useRef<ReturnType<typeof createRemoteConnectionRecovery> | null>(null);
   const activeRef = useRef(active);
   activeRef.current = active;
   const generation = useRef(0);
+  const wasOnline = useRef(false);
   const attach = useCallback((value: RemoteTeamTransportRef | null) => setClient(value), []);
 
   useEffect(() => {
@@ -96,7 +99,11 @@ export function ServerConnection({
       onTeamEvent={onTeamEvent}
       onConnectionUpdate={(update) => {
         if (!activeRef.current || update.hostId !== hostId) return;
+        if (update.state === "online") wasOnline.current = true;
         if (update.state === "offline") {
+          if (update.code === "session_revoked" || wasOnline.current)
+            void onMembershipChanged?.().catch(() => undefined);
+          wasOnline.current = false;
           const error = new Error(update.message ?? "The desktop went offline.");
           if (update.code === "protocol_error") controller.current?.suspend(error);
           else controller.current?.offline(error);

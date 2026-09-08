@@ -2,8 +2,7 @@ import { MenuView } from "@expo/ui/community/menu";
 import type { Href } from "expo-router";
 import { Typography } from "heroui-native";
 import { Monitor, Plus, Server, Settings } from "lucide-react-native";
-import { useRef } from "react";
-import { Alert, Pressable, ScrollView, View, type ViewStyle } from "react-native";
+import { Pressable, ScrollView, View, type ViewStyle } from "react-native";
 
 import type { MobileSession } from "@/features/auth/api/mobile-auth";
 import type { MobileServer } from "@/features/workspace/context/mobile-workspace-context";
@@ -24,7 +23,6 @@ interface ServerDrawerContentProps {
   topInset: number;
   onNavigate: (href: Href) => void;
   onSelectServer: (serverId: string) => void;
-  onLeaveServer: (serverId: string) => Promise<void>;
 }
 
 export function ServerDrawerContent({
@@ -38,29 +36,7 @@ export function ServerDrawerContent({
   topInset,
   onNavigate,
   onSelectServer,
-  onLeaveServer,
 }: ServerDrawerContentProps) {
-  const leaving = useRef(false);
-  function confirmLeave(server: MobileServer): void {
-    Alert.alert(`Leave ${server.name}?`, "You will need another invitation to join again.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Leave server",
-        style: "destructive",
-        onPress: () => {
-          if (leaving.current) return;
-          leaving.current = true;
-          void onLeaveServer(server.id)
-            .catch((error) => {
-              Alert.alert("Could not leave server", error instanceof Error ? error.message : "Please try again.");
-            })
-            .finally(() => {
-              leaving.current = false;
-            });
-        },
-      },
-    ]);
-  }
   const emailSeparatorIndex = session.user.email.indexOf("@");
   const displayName =
     session.user.name ||
@@ -88,11 +64,10 @@ export function ServerDrawerContent({
               accessibilityRole="button"
               accessibilityState={{ selected }}
               accessibilityLabel={`${serverItem.name}, ${serverLabel}, ${serverStatusLabel(serverItem)}`}
-              accessibilityActions={
-                serverItem.role !== "owner" ? [{ name: "leave", label: "Leave server" }] : undefined
-              }
+              accessibilityActions={[{ name: "options", label: "Server options" }]}
               onAccessibilityAction={(event) => {
-                if (event.nativeEvent.actionName === "leave" && serverItem.role !== "owner") confirmLeave(serverItem);
+                if (event.nativeEvent.actionName === "options")
+                  onNavigate({ pathname: "/server-settings", params: { serverId: serverItem.id } });
               }}
               className="min-h-16 flex-row items-center gap-3 rounded-2xl px-3 py-2"
               onPress={() => onSelectServer(serverItem.id)}
@@ -125,26 +100,18 @@ export function ServerDrawerContent({
               </View>
             </Pressable>
           );
-          return serverItem.role !== "owner" ? (
+          return (
             <MenuView
               key={serverItem.id}
               shouldOpenOnLongPress
-              actions={[
-                {
-                  id: "leave",
-                  title: "Leave server",
-                  attributes: { destructive: true },
-                  image: "rectangle.portrait.and.arrow.right",
-                },
-              ]}
+              actions={[{ id: "options", title: "Options", image: "gearshape" }]}
               onPressAction={(event) => {
-                if (event.nativeEvent.event === "leave") confirmLeave(serverItem);
+                if (event.nativeEvent.event === "options")
+                  onNavigate({ pathname: "/server-settings", params: { serverId: serverItem.id } });
               }}
             >
               {row}
             </MenuView>
-          ) : (
-            row
           );
         })}
       </ScrollView>

@@ -113,6 +113,16 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="server-settings"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
           name="settings"
           options={{
             contentStyle: { backgroundColor: sheetBackground },

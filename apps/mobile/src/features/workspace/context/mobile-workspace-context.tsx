@@ -24,6 +24,7 @@ import {
   type RemoteWorkspacePreferences,
   resyncRemoteConversations,
 } from "@openbot/team-client";
+import { useQueryClient } from "@tanstack/react-query";
 import { fetch } from "expo/fetch";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
@@ -92,7 +93,9 @@ const EMPTY_SERVER: MobileServer = {
 const MobileWorkspaceContext = createContext<MobileWorkspaceContextValue | null>(null);
 
 export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
-  const { session } = useMobileSession();
+  const { session, sessionScope } = useMobileSession();
+  const queryClient = useQueryClient();
+  const presenceSignatures = useRef(new Map<string, string>());
   if (!session) throw new Error("MobileWorkspaceProvider requires a signed-in mobile session.");
 
   const directory = useMemo(
@@ -145,6 +148,30 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
 
   const installHosts = useCallback(
     (hosts: RemoteTeamHost[]) => {
+      const available = new Set(hosts.map((host) => host.hostId));
+      const removed = serversRef.current.filter((server) => !available.has(server.id));
+      const removedAgentIds = new Set<string>();
+      for (const server of removed) {
+        removedServers.current.add(server.id);
+        readRefresh.invalidate(server.id);
+        for (const id of serverAgentIds.current.get(server.id) ?? []) removedAgentIds.add(id);
+        serverAgentIds.current.delete(server.id);
+        presenceSignatures.current.delete(server.id);
+        for (const kind of ["server-members", "server-invites"]) {
+          queryClient.removeQueries({ queryKey: [kind, session.apiUrl, session.user.id, sessionScope, server.id] });
+        }
+      }
+      for (const host of hosts) removedServers.current.delete(host.hostId);
+      if (removed.length) {
+        setAgents((current) => current.filter((agent) => available.has(agent.serverId)));
+        setConversations((current) =>
+          Object.fromEntries(Object.entries(current).filter(([id]) => !removedAgentIds.has(id))),
+        );
+        setUnreadAgentIds((current) => current.filter((id) => !removedAgentIds.has(id)));
+        setActivityByServer((current) =>
+          Object.fromEntries(Object.entries(current).filter(([id]) => available.has(id))),
+        );
+      }
       setServers((current) => {
         const previousServers = new Map(current.map((server) => [server.id, server]));
         return hosts.map((host, index) => {
@@ -167,7 +194,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       });
       setActiveServerId((current) => (hosts.some((host) => host.hostId === current) ? current : null));
     },
-    [session.host?.hostId],
+    [session.host?.hostId, session.apiUrl, session.user.id, sessionScope, queryClient, readRefresh],
   );
 
   const directoryRefresh = useMemo(
@@ -191,6 +218,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [directory, installHosts],
   );
   const refreshHosts = useCallback(() => directoryRefresh.refresh(true), [directoryRefresh]);
+  const refreshMemberships = useCallback(() => {
+    directoryGeneration.current += 1;
+    directoryRefresh.invalidate();
+    return directoryRefresh.refresh(true);
+  }, [directoryRefresh]);
 
   useEffect(() => {
     void refreshHosts().catch(() => undefined);
@@ -321,6 +353,20 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const handleTeamEvent = useCallback(
     (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
       if (removedServers.current.has(serverId)) return;
+      if (event.type === "team-presence") {
+        const signature = JSON.stringify(
+          event.snapshot.members.map((member) => [member.id, member.role, member.disabled, member.online]),
+        );
+        if (presenceSignatures.current.get(serverId) !== signature) {
+          presenceSignatures.current.set(serverId, signature);
+          for (const kind of ["server-members", "server-invites"]) {
+            void queryClient.invalidateQueries({
+              queryKey: [kind, session.apiUrl, session.user.id, sessionScope, serverId],
+            });
+          }
+        }
+        return;
+      }
       if (
         event.type !== "conversation" ||
         event.snapshot.revision >= (conversationsRef.current[event.snapshot.agentId]?.revision ?? 0)
@@ -393,7 +439,16 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         );
       }
     },
-    [loadConversation, replaceServerAgents, refreshConversationReads, readRefresh],
+    [
+      loadConversation,
+      replaceServerAgents,
+      refreshConversationReads,
+      readRefresh,
+      queryClient,
+      session.apiUrl,
+      session.user.id,
+      sessionScope,
+    ],
   );
 
   const markAgentRead = useCallback(
@@ -512,6 +567,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         updatePreferences(serverId, () => ({ hidden: [], pinned: [] }));
         setUnreadAgentIds((current) => current.filter((id) => !removedIds.has(id)));
       },
+      refreshServer: async (serverId) => {
+        connections.current.get(serverId)?.refresh();
+        await refreshHosts();
+      },
       refreshServers: async () => {
         for (const connection of connections.current.values()) connection.refresh();
         await refreshHosts();
@@ -540,6 +599,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         setActiveServerId(host.hostId);
         // Membership is already committed. Directory failure must not reuse the consumed invite.
         void refreshHosts().catch(() => undefined);
+        return host.hostId;
       },
       createAgent: async (input: CreateAgentInput) => {
         const created = await request("POST", TEAM_API_ROUTES.agents.all, decodeAgent, {
@@ -677,6 +737,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             register={registerConnection}
             load={loadServer}
             onStatus={handleConnectionStatus}
+            onMembershipChanged={refreshMemberships}
             onTeamEvent={handleTeamEvent}
           />
         ))}

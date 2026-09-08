@@ -28,7 +28,9 @@ export function AddServerScreen({
   onJoined?: () => void;
 } = {}) {
   const foreground = useThemeColor("foreground");
-  const { addRemoteServer } = useMobileWorkspace();
+  const { addRemoteServer, servers } = useMobileWorkspace();
+  const [joinedId, setJoinedId] = useState<string | null>(null);
+  const joinedServer = servers.find((server) => server.id === joinedId);
   const [inviteLink, setInviteLink] = useState(initialInvite);
   const [reviewedInvite, setReviewedInvite] = useState<string | null>(initialInvite || null);
   const [error, setError] = useState<string | null>(null);
@@ -53,9 +55,9 @@ export function AddServerScreen({
     setJoining(true);
     setError(null);
     try {
-      await addRemoteServer({ inviteUrl: reviewedInvite });
-      if (onJoined) onJoined();
-      else router.back();
+      const serverId = await addRemoteServer({ inviteUrl: reviewedInvite });
+      setJoinedId(serverId);
+      setJoining(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "OpenBot could not join this server.");
       joinInFlight.current = false;
@@ -77,14 +79,28 @@ export function AddServerScreen({
       <View className="items-center gap-3 px-4">
         <AppLogo animation="blink" followDeviceOrientation interactive size={72} />
         <Typography.Heading type="h3" align="center" className="pt-1">
-          Join a server
+          {joinedId ? (joinedServer?.state === "online" ? "Connected" : "Invitation accepted") : "Join a server"}
         </Typography.Heading>
         <Typography.Paragraph align="center" className="max-w-80 text-text-secondary">
-          Paste or scan the invitation you received from a server owner.
+          {joinedId
+            ? joinedServer?.state === "online"
+              ? `You are connected to ${joinedServer.name}.`
+              : `You joined ${joinedServer?.name ?? "the server"}. ${joinedServer?.connectionMessage ?? "Connecting…"}`
+            : "Paste or scan the invitation you received from a server owner."}
         </Typography.Paragraph>
       </View>
 
-      {reviewedInvite ? (
+      {joinedId ? (
+        <Button
+          size="lg"
+          onPress={() => {
+            if (onJoined) onJoined();
+            else router.back();
+          }}
+        >
+          <Button.Label>Done</Button.Label>
+        </Button>
+      ) : reviewedInvite ? (
         <View className="gap-5">
           <View className="flex-row items-center gap-3 rounded-3xl bg-control px-4 py-4">
             <View className="size-12 items-center justify-center rounded-2xl bg-accent">

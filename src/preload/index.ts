@@ -955,9 +955,9 @@ const openbotApi: OpenBotDesktopApi = {
     createInvite: (serverId, input) =>
       ipcRenderer.invoke(IPC_CHANNELS.serversCreateInvite, { serverId, payload: input }),
     setTyping: (input) => ipcRenderer.invoke(IPC_CHANNELS.serversSetTyping, input),
-    onPresence: (listener) => {
+    onPresence: (listener, serverId) => {
       const handler = (_event: Electron.IpcRendererEvent, payload: ScopedTeamPresenceSnapshot) => {
-        if (payload.serverId === selectedServerId) listener(payload.snapshot);
+        if (payload.serverId === (serverId ?? selectedServerId)) listener(payload.snapshot);
       };
       ipcRenderer.on(IPC_CHANNELS.serversPresence, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.serversPresence, handler);

@@ -24,6 +24,24 @@ const PREVIEW = {
 const ACCEPTED = { hostId: HOST_ID, membershipId: "membership-1", role: "member" };
 
 describe("RemoteTeamDirectoryClient", () => {
+  it("removes a revoked paired desktop while keeping the other memberships available", async () => {
+    const remote = {
+      hostId: "other",
+      name: "Other",
+      logoKey: null,
+      devicePublicKey: "other-key",
+      membershipId: "other-member",
+      role: "member",
+    };
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "session",
+      pairedHost: { hostId: HOST_ID, fingerprint: HOST_FINGERPRINT },
+      fetch: async () => Response.json({ hosts: [remote] }),
+    });
+    await expect(client.listHosts()).resolves.toEqual([remote]);
+  });
+
   it("pins the QR's exact host even when another owned desktop is first", async () => {
     const pinned = new Map<string, string>();
     const client = new RemoteTeamDirectoryClient({

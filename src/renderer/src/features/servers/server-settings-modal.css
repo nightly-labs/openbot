@@ -221,6 +221,11 @@
   font-family: var(--openbot-font-sans);
 }
 
+.server-settings-invite-copy > span {
+  min-width: 9ch;
+  text-align: center;
+}
+
 .server-settings-invite-copy > svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
@@ -506,6 +511,8 @@
 }
 
 .server-settings-invite-qr {
+  animation: server-settings-invite-panel-in var(--openbot-duration-normal) var(--openbot-ease-out);
+  transform-origin: top;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -515,6 +522,22 @@
 
 @media (prefers-reduced-motion: reduce) {
   .server-settings-invite-share > .ui-button:last-child {
+    animation: none;
+  }
+}
+
+@keyframes server-settings-invite-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--openbot-space-3))) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .server-settings-invite-qr {
     animation: none;
   }
 }

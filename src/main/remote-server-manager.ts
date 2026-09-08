@@ -79,6 +79,7 @@ import {
 } from "./team-webrtc-client-transport";
 
 interface RemoteServerEvents {
+  directoryInvalidated: [];
   changed: [servers: ServerSummary[]];
   agent: [serverId: string, event: AgentEvent, bufferedLive?: boolean];
   presence: [serverId: string, snapshot: TeamPresenceSnapshot];
@@ -219,6 +220,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       }
     });
     this.#webrtcTransport?.on("disconnected", (serverId) => {
+      const wasOnline = this.#connections.statusFor(serverId).state === "online";
       // A host the app has stopped reconnecting to is not merely offline. The recorded failure is
       // the reason it will not come back, and this disconnect is that failure's own tail -- the one
       // `#suspendServer` asked for. Writing "offline" over an "incompatible" would leave the issue
@@ -227,10 +229,12 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#presence.markOffline(serverId);
       this.#emitChanged();
       this.#events.scheduleReconnect(serverId);
+      if (wasOnline) this.emit("directoryInvalidated");
     });
     this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
     this.#webrtcTransport?.on("error", (serverId, code, message) => {
       if (!this.#connections.reportTransportError(serverId, code, message)) this.#events.scheduleReconnect(serverId);
+      if (code === "session_revoked") this.emit("directoryInvalidated");
     });
   }
 

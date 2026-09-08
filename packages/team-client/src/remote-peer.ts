@@ -90,7 +90,7 @@ export interface RemoteTeamConnectionUpdate {
    * than about whether there is one. A consumer that retries every offline update has to be told
    * the difference, or it retries into the same frame forever.
    */
-  code?: "protocol_error";
+  code?: "protocol_error" | "session_revoked";
   resync?: boolean;
 }
 
@@ -357,7 +357,11 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       void actions.current.onAccountProfileChanged?.().catch(() => undefined);
       return;
     }
-    if (message.type === "error") throw new Error(message.message);
+    if (message.type === "error") {
+      if (message.code === "session_revoked")
+        return failPeer(state, new Error(message.message), actions, "session_revoked");
+      throw new Error(message.message);
+    }
     if (message.type === "ready") {
       state.resumeToken = message.resumeToken;
       // Null on the `ready` that answers a TURN refresh: the credentials are new, the connection is
@@ -760,7 +764,12 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     }, SIGNAL_TURN_REFRESH_INTERVAL_MS);
   }
 
-  function failPeer(state: PeerState, error: unknown, actions: ActionsRef, code?: "protocol_error"): void {
+  function failPeer(
+    state: PeerState,
+    error: unknown,
+    actions: ActionsRef,
+    code?: RemoteTeamConnectionUpdate["code"],
+  ): void {
     if (state.closed || peer !== state) return;
     const message = error instanceof Error ? error.message : "The WebRTC connection failed.";
     rejectConnection(state, new Error(message));

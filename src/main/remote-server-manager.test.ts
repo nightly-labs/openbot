@@ -377,11 +377,19 @@ describe("remote server links", () => {
       expect(manager.list().some((server) => server.id === gammaId)).toBe(false);
       expect(removeMember).not.toHaveBeenCalledWith(gammaId, `${gammaId}-member`);
       expect(JSON.parse(await readFile(statePath, "utf8"))).toMatchObject({ hiddenHostIds: [gammaId] });
+      const directoryChanged = vi.fn(() => {
+        void manager.syncRemoteHosts();
+      });
+      manager.on("directoryInvalidated", directoryChanged);
+      hosts = hosts.filter((host) => host.hostId !== betaId);
       transport.emit("error", betaId, "session_revoked", "The remote session was revoked.");
       expect(manager.list().find((server) => server.id === betaId)).toMatchObject({
         state: "error",
         issue: { code: "authentication_required", retryable: false },
       });
+      await vi.waitFor(() => expect(manager.list().some((server) => server.id === betaId)).toBe(false));
+      expect(directoryChanged).toHaveBeenCalledOnce();
+      expect(manager.activeServerId).toBe("local");
     } finally {
       await manager.stop();
       await rm(directory, { recursive: true, force: true });

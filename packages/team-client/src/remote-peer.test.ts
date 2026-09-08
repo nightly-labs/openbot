@@ -20,6 +20,16 @@ afterEach(() => {
 });
 
 describe("browser remote peer recovery", () => {
+  it("reports session revocation so the client can refresh memberships immediately", async () => {
+    const network = await setupNetwork();
+    await network.connect();
+    network
+      .socket()
+      .receive({ type: "error", version: 1, code: "session_revoked", message: "The remote session ended." });
+    await vi.waitFor(() => expect(network.updates.at(-1)).toMatchObject({ state: "offline", code: "session_revoked" }));
+    await network.runtime.dispose();
+  });
+
   it("refreshes the account on Signal invalidation without breaking the team connection if refresh fails", async () => {
     const refreshProfile = vi.fn(async () => {
       throw new Error("Account API offline");

@@ -61,7 +61,8 @@ export interface MobileWorkspaceContextValue {
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
   refreshServers: () => Promise<void>;
-  addRemoteServer: (input: AddRemoteServerInput) => Promise<void>;
+  refreshServer: (serverId: string) => Promise<void>;
+  addRemoteServer: (input: AddRemoteServerInput) => Promise<string>;
   createAgent: (input: CreateAgentInput) => Promise<void>;
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
   deleteAgent: (agentId: string) => Promise<void>;

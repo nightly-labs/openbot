@@ -1,7 +1,7 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { RemoteHostSummary } from "./central-auth-manager";
-import { reconcileWebRtcHosts } from "./remote-server-host-directory";
+import { reconcileWebRtcHosts, watchRemoteHostDirectory } from "./remote-server-host-directory";
 import type { PreservedHostIdentity } from "./remote-server-store";
 import type { StoredRemoteServer } from "./remote-server-stored-shape";
 import { fingerprint } from "./team-store";
@@ -176,4 +176,26 @@ describe("reconcileWebRtcHosts", () => {
 
     expect(result.servers[0]).toMatchObject({ name: "Renamed", role: "admin", logoVersion: "logo-2" });
   });
+});
+
+it("refreshes cross-device memberships only while active and stops on shutdown", async () => {
+  vi.useFakeTimers();
+  let active = false;
+  const refresh = vi.fn(async () => undefined);
+  const stop = watchRemoteHostDirectory({ isActive: () => active, refresh });
+  try {
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(refresh).not.toHaveBeenCalled();
+    active = true;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    stop();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  } finally {
+    stop();
+    vi.useRealTimers();
+  }
 });

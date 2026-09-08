@@ -116,3 +116,31 @@ it("keeps both memberships connected across selection, retries one failure, and 
   await act(async () => render("remote", ["remote"]));
   expect([...handles.keys()]).toEqual(["remote"]);
 });
+
+it("refreshes membership after revocation without waiting for a foreground transition", async () => {
+  const directory = new RemoteTeamDirectoryClient({ apiUrl: "https://example.com", token: "test", fetch });
+  const refreshMemberships = vi.fn(async () => {});
+  await act(async () =>
+    root.render(
+      <ServerConnection
+        hostId="revoked"
+        publicKey="key"
+        active
+        directory={directory}
+        register={() => {}}
+        load={async (id, key, client) => {
+          await client.connect(id, key);
+        }}
+        onStatus={() => {}}
+        onTeamEvent={() => {}}
+        onMembershipChanged={refreshMemberships}
+      />,
+    ),
+  );
+  await act(async () =>
+    endpoints
+      .get("revoked")
+      ?.update({ hostId: "revoked", state: "offline", code: "session_revoked", message: "The remote session ended." }),
+  );
+  expect(refreshMemberships).toHaveBeenCalledTimes(1);
+});

@@ -26,6 +26,15 @@ import type { PreservedHostIdentity, StoredRemoteServerView } from "./remote-ser
 import type { StoredRemoteServer } from "./remote-server-stored-shape";
 import { fingerprint } from "./team-store";
 
+/** Cross-device joins have no local transport event. Only poll while the user can see the app. */
+export function watchRemoteHostDirectory(options: { isActive(): boolean; refresh(): Promise<void> }): () => void {
+  const timer = setInterval(() => {
+    if (options.isActive()) void options.refresh().catch(() => undefined);
+  }, 30_000);
+  timer.unref();
+  return () => clearInterval(timer);
+}
+
 export interface HostKeyPin {
   readonly hostId: string;
   readonly publicKey: string;

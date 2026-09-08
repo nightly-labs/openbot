@@ -39,6 +39,7 @@ import {
   showMainWindow,
 } from "./main-window";
 import { ensureMacApplicationPresence } from "./main-window-state";
+import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
@@ -567,7 +568,18 @@ if (!hasSingleInstanceLock) {
         return remoteAccountSync;
       });
       app.on("browser-window-focus", (_event, window) => {
-        if (window === windowHolder.current) void directoryRefresh.refresh();
+        if (window === windowHolder.current) void directoryRefresh.refresh(true);
+      });
+      const refreshMemberships = () => void directoryRefresh.refresh(true);
+      remoteServers.on("directoryInvalidated", refreshMemberships);
+      const stopDirectoryWatch = watchRemoteHostDirectory({
+        isActive: () =>
+          Boolean(windowHolder.current?.isFocused()) && built.centralAuth.getState().status === "signed_in",
+        refresh: () => directoryRefresh.refresh(true),
+      });
+      teardown.push(0, "joined-server directory refresh", () => {
+        stopDirectoryWatch();
+        remoteServers.off("directoryInvalidated", refreshMemberships);
       });
 
       app.on("activate", () => {
