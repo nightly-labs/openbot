@@ -1,10 +1,10 @@
 // @vitest-environment node
 
-import { access, mkdir, mkdtemp, open, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, open, readdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_RUNTIME_TEXT_LIMIT,
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
@@ -35,12 +35,40 @@ describe("MailboxStore", () => {
     await source.close();
 
     await expect(store.listExportAttachments()).resolves.toEqual([]);
+    expect(() =>
+      store.persistGeneratedAttachmentsWithConversation(
+        { agentId: "missing-agent", threadId: "missing-thread", activeTurnId: null, revision: 0, messages: [] },
+        "response.attachments-added",
+        {},
+        staged.map((attachment) => attachment.id),
+      ),
+    ).toThrow("Unknown agent for conversation");
     await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Unrelated work" });
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
     await restored.initialize();
     await expect(restored.listExportAttachments()).resolves.toEqual([]);
 
     await store.discardStagedGeneratedAttachments(staged.map((attachment) => attachment.id));
+    await expect(readdir(join(root, "Shared", "Transfers", "generated"))).resolves.toEqual([]);
+  });
+
+  it("copies the opened generated file if its source path is replaced", async () => {
+    const sourcePath = join(root, "opened.png");
+    await writeFile(sourcePath, "authorized image");
+    const source = await open(sourcePath, "r");
+    try {
+      await rename(sourcePath, join(root, "original.png"));
+      await writeFile(sourcePath, "replacement data");
+
+      const [attachment] = await store.stageGeneratedAttachments({ sources: [{ path: sourcePath, handle: source }] });
+
+      await expect(
+        readFile(join(root, "Shared", "Transfers", "generated", attachment.id, attachment.name), "utf8"),
+      ).resolves.toBe("authorized image");
+      await store.discardStagedGeneratedAttachments([attachment.id]);
+    } finally {
+      await source.close();
+    }
   });
 
   it("preserves the extension when it shortens a long attachment name", async () => {
@@ -232,7 +260,7 @@ describe("MailboxStore", () => {
     });
   });
 
-  it("rejects managed attachments after their contents change", async () => {
+  it("rejects managed attachments after their contents change without changing size", async () => {
     const source = join(root, "mutable.txt");
     await writeFile(source, "original");
     const [draft] = await store.prepareAttachments([source]);
@@ -243,7 +271,7 @@ describe("MailboxStore", () => {
       draftIds: [draft.id],
     });
     const attachment = store.getDelivery(receipt.deliveries[0].id)?.managedAttachments[0];
-    await writeFile(attachment?.path ?? "missing", "changed");
+    await writeFile(attachment?.path ?? "missing", "modified");
 
     await expect(store.verifyDeliveryAttachments(receipt.deliveries[0].id)).rejects.toThrow("has changed");
     await expect(store.resolveAttachment(attachment?.id ?? "")).resolves.toBeNull();
@@ -474,6 +502,79 @@ describe("MailboxStore", () => {
     ).rejects.toThrow("installer.exe is not supported");
   });
 
+  it.each([
+    ["recording.mp3", "audio/mpeg"],
+    ["Screen Recording.MOV", "video/quicktime"],
+  ])("preserves %s from paths and bytes for the agent without decoding media", async (name, mimeType) => {
+    // Deliberately damaged media is still useful to an agent asked to inspect or repair it.
+    const bytes = Buffer.from("truncated recording\0");
+    const sourcePath = join(root, name);
+    await writeFile(sourcePath, bytes);
+    const drafts = await store.prepareImportedAttachments([sourcePath], [{ name, mimeType: "image/png", bytes }]);
+    expect(drafts).toMatchObject([
+      { name, mimeType, kind: "file", previewKind: "none", size: bytes.length },
+      { name, mimeType, kind: "file", previewKind: "none", size: bytes.length },
+    ]);
+    const receipt = await store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Inspect this recording",
+      draftIds: drafts.map((draft) => draft.id),
+    });
+    await rm(sourcePath);
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    const delivery = restored.getDelivery(receipt.deliveries[0].id);
+    expect(delivery?.managedAttachments).toHaveLength(2);
+    for (const attachment of delivery?.managedAttachments ?? []) {
+      await expect(readFile(attachment.path)).resolves.toEqual(bytes);
+    }
+  });
+
+  it.each(["mp3", "mov"])("rejects oversized %s recordings before copying them", async (extension) => {
+    const path = join(root, `large.${extension}`);
+    const file = await open(path, "w");
+    await file.truncate(ATTACHMENT_LIMITS.fileBytes + 1);
+    await file.close();
+    await expect(store.prepareAttachments([path])).rejects.toThrow("exceeds the 100 MB limit");
+  });
+
+  it("enforces byte-import and combined recording size limits", async () => {
+    await expect(
+      store.prepareImportedAttachments(
+        [],
+        [
+          {
+            name: "large.mp3",
+            mimeType: "audio/mpeg",
+            bytes: new Uint8Array(ATTACHMENT_LIMITS.fileBytes + 1),
+          },
+        ],
+      ),
+    ).rejects.toThrow("exceeds the 100 MB limit");
+    const bytes = new Uint8Array(ATTACHMENT_LIMITS.fileBytes);
+    await expect(
+      store.prepareImportedAttachments(
+        [],
+        [
+          { name: "first.mp3", mimeType: "audio/mpeg", bytes },
+          { name: "second.mov", mimeType: "video/quicktime", bytes },
+          { name: "third.mov", mimeType: "video/quicktime", bytes },
+        ],
+      ),
+    ).rejects.toThrow("Attachments exceed the 250 MB total limit.");
+    await expect(store.listExportAttachments()).resolves.toEqual([]);
+  });
+
+  it("gives an export alternative for unsupported media", async () => {
+    await expect(
+      store.prepareImportedAttachments(
+        [],
+        [{ name: "recording.avi", mimeType: "video/x-msvideo", bytes: new Uint8Array([1]) }],
+      ),
+    ).rejects.toThrow("For other audio or video formats, export as MP3 or MOV, or attach a text transcript.");
+  });
+
   it("imports pathless image bytes and accepts an attachment-only user message", async () => {
     const [draft] = await store.prepareImportedAttachments(
       [],
@@ -534,11 +635,13 @@ describe("MailboxStore", () => {
       ownerThreadId: "thread-chief",
     });
 
-    await expect(store.resolveAttachment(attachment.id)).resolves.toBeTruthy();
+    const resolved = await store.resolveAttachment(attachment.id);
+    expect(resolved).not.toBeNull();
     await store.deleteAgentData("chief");
 
     await expect(store.resolveAttachment(attachment.id)).resolves.toBeNull();
     await expect(store.listExportAttachments()).resolves.toEqual([]);
+    await expect(access(resolved?.path ?? "missing")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("cleans unrecoverable attachment drafts when a new app session starts", async () => {
@@ -551,6 +654,47 @@ describe("MailboxStore", () => {
     await restored.initialize();
 
     await expect(restored.resolveAttachment(draft.id)).resolves.toBeNull();
+  });
+
+  it("rejects deliveries during deletion and permits new work after release", async () => {
+    const release = store.blockAgentDeliveries("chief");
+    await expect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "sales" },
+        recipientAgentIds: ["chief", "sales"],
+        text: "Work",
+      }),
+    ).rejects.toThrow("The recipient is being deleted.");
+    expect(store.listQueue("chief").deliveries).toEqual([]);
+    expect(store.listQueue("sales").deliveries).toEqual([]);
+    release();
+    await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Retry" });
+    expect(store.listQueue("chief").deliveries).toMatchObject([{ text: "Retry", status: "queued" }]);
+  });
+
+  it("rejects prepared attachments after deletion finishes without restoring deleted deliveries", async () => {
+    const source = join(root, "overlapping.txt");
+    await writeFile(source, "Keep this draft available for retry.");
+    const [draft] = await store.prepareAttachments([source]);
+    const sending = store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Overlapping delivery",
+      draftIds: [draft.id],
+    });
+    // Enqueue has reached asynchronous attachment preparation, but cannot insert yet.
+    const release = store.blockAgentDeliveries("chief");
+    const rejected = expect(sending).rejects.toThrow("The recipient is being deleted.");
+    release();
+    await rejected;
+    await store.deleteAgentData("chief");
+    await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["sales"], text: "Unrelated write" });
+    expect(store.listQueue("chief").deliveries).toEqual([]);
+    expect(await readdir(join(root, "Shared", "Transfers"))).toEqual([]);
+    await expect(store.resolveAttachment(draft.id)).resolves.toBeTruthy();
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    expect(restored.listQueue("chief").deliveries).toEqual([]);
   });
 
   it("removes deleted agent deliveries while preserving messages visible to other agents", async () => {
@@ -578,7 +722,7 @@ describe("MailboxStore", () => {
     const source = join(root, "inside.txt");
     const outside = join(root, "outside.txt");
     await writeFile(source, "original");
-    await writeFile(outside, "secret");
+    await writeFile(outside, "original");
     const [draft] = await store.prepareAttachments([source]);
     const receipt = await store.enqueue({
       sender: { kind: "user" },

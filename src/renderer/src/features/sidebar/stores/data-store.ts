@@ -73,11 +73,21 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
   );
   const customSectionById = createMemo(() => new Map(props.layout.sections.map((section) => [section.id, section])));
   const collapsedSectionIds = createMemo(() => new Set(props.collapsedSectionIds));
+  const orderedSectionIds = createMemo(() => new Set(props.layout.order));
+  // A section has to be in `order` as well as in `sections` for its group to be drawn, because
+  // `visibleSectionIds` walks `order`. An agent grouped under a section that `order` leaves out is on
+  // no screen while its chat and every message in it are intact, which reads as history that
+  // disappeared -- so it goes to the unassigned section, where the user can still open it and move it.
+  // `isCompleteSectionOrder` rejects such a layout at the IPC boundary; this keeps the agent visible if
+  // one ever reaches the sidebar another way.
   const filteredAgentsBySection = createMemo(() => {
     const groups = new Map<string, AgentProfile[]>();
     for (const agent of filteredAgents()) {
       const assigned = props.layout.agentAssignments[agent.id];
-      const sectionId = assigned && customSectionById().has(assigned) ? assigned : SIDEBAR_UNASSIGNED_SECTION_ID;
+      const sectionId =
+        assigned && customSectionById().has(assigned) && orderedSectionIds().has(assigned)
+          ? assigned
+          : SIDEBAR_UNASSIGNED_SECTION_ID;
       groups.set(sectionId, [...(groups.get(sectionId) ?? []), agent]);
     }
     return groups;

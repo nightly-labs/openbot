@@ -72,7 +72,13 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
           >
             <Link.AppleZoom>
               <AgentPinAvatar agentId={agent.id} location="pinned" size={76}>
-                <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={76} />
+                <BloubAvatar
+                  agentId={agent.id}
+                  hue={agent.avatarHue}
+                  seed={agent.avatarSeed}
+                  size={76}
+                  animateIdle={false}
+                />
                 {isUnread ? (
                   <View
                     className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"

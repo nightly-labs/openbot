@@ -7,7 +7,7 @@ import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useTurns } from "../../turns";
 import { useConversation } from "../conversation/conversation-context";
-import { agentConversationKey, deleteAgentMessageBodies } from "../conversation/conversation-keys";
+import { agentConversationKey } from "../conversation/conversation-keys";
 import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
@@ -28,10 +28,8 @@ import type { FirstAgentDraft } from "./FirstAgentSetup";
  * first-agent form is mid-submit there is no agent to act on yet, and letting a
  * second write through would race the one in flight.
  *
- * `deleteAgent` removes the agent from twelve maps by hand rather than letting a
- * projection drop it. Every one of them is keyed by agent id and outlives the
- * agent otherwise, so a missed key is a leak that shows up as a stale badge on
- * an agent that no longer exists.
+ * Conversation cleanup belongs to its domain. This command removes the agent
+ * and asks each domain to remove the state that it owns.
  */
 const AgentActions = createSimpleContext({
   name: "Agent actions",
@@ -55,15 +53,7 @@ const AgentActions = createSimpleContext({
       appendUiError,
       analyticsAgentProperties,
     } = useAgents();
-    const {
-      setLiveMessages,
-      setConversationLoaded,
-      setConversationRevisions,
-      setUnreadReplies,
-      setConversationReads,
-      setRecentReplies,
-      rawAgentMessageBodies,
-    } = useConversation();
+    const { initializeConversation, removeConversation } = useConversation();
     const { setActiveTurns, setFailedTurns, setQueues, setPendingPrompts } = useTurns();
     const { setSidebarLayout, removePinnedSidebarItemEverywhere } = useSidebar();
     const { clearDirectSelection } = useDirectMessages();
@@ -85,8 +75,7 @@ const AgentActions = createSimpleContext({
         });
         const newAgent = createStoredProfile(toAgentProfile(stored));
         setAgentList((current) => [newAgent, ...current.filter((item) => item.id !== newAgent.id)]);
-        setLiveMessages((current) => (current[newAgent.id] ? current : { ...current, [newAgent.id]: [] }));
-        setConversationLoaded((current) => ({ ...current, [newAgent.id]: true }));
+        initializeConversation(newAgent.id);
         setAgentSetupOpen(false);
         clearDirectSelection();
         setActiveAgentId(newAgent.id);
@@ -152,16 +141,10 @@ const AgentActions = createSimpleContext({
         setAgentList(remaining);
         setActiveAgentId((current) => (current === agentId ? (remaining[0]?.id ?? "") : current));
         setSettingsRequest((current) => (current?.agentId === agentId ? null : current));
-        setLiveMessages((current) => withoutAgent(current, agentId));
-        deleteAgentMessageBodies(rawAgentMessageBodies, agentId);
+        removeConversation(agentId);
         setUiErrors((current) => withoutAgent(current, agentConversationKey(activeServerId(), agentId)));
-        setConversationLoaded((current) => withoutAgent(current, agentId));
-        setConversationRevisions((current) => withoutAgent(current, agentId));
         setActiveTurns((current) => withoutAgent(current, agentId));
         setFailedTurns((current) => withoutAgent(current, agentId));
-        setUnreadReplies((current) => withoutAgent(current, agentId));
-        setConversationReads((current) => withoutAgent(current, agentId));
-        setRecentReplies((current) => withoutAgent(current, agentId));
         setQueues((current) => withoutAgent(current, agentId));
         setPendingPrompts((current) => withoutAgent(current, agentId));
         removePinnedSidebarItemEverywhere({ kind: "agent", id: agentId });

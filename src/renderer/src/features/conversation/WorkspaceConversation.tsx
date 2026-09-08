@@ -58,13 +58,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   } = useTurns();
   const {
     activeMessages,
-    conversationReferences,
-    conversationReads,
-    conversationLoaded,
-    conversationPages,
-    conversationWindowModes,
-    conversationOlderLoading,
-    conversationOlderErrors,
+    conversations,
     sendMessage,
     markAgentMessagesRead,
     loadOlderAgentMessages,
@@ -114,20 +108,20 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       availableRoutineIds={activeRoutineIds()}
       modelOptions={modelOptions()}
       messages={activeMessages()}
-      messageReferences={activeAgent() ? (conversationReferences()[activeAgent()?.id ?? ""] ?? {}) : {}}
-      unreadCount={activeAgent() ? (conversationReads()[activeAgent()?.id ?? ""]?.unreadCount ?? 0) : 0}
+      messageReferences={activeAgent() ? (conversations[activeAgent()?.id ?? ""]?.references ?? {}) : {}}
+      unreadCount={activeAgent() ? (conversations[activeAgent()?.id ?? ""]?.read?.unreadCount ?? 0) : 0}
       firstUnreadMessageId={
-        activeAgent() ? (conversationReads()[activeAgent()?.id ?? ""]?.firstUnreadMessageId ?? null) : null
+        activeAgent() ? (conversations[activeAgent()?.id ?? ""]?.read?.firstUnreadMessageId ?? null) : null
       }
-      loaded={activeAgent() ? conversationLoaded()[activeAgent()?.id ?? ""] === true : false}
+      loaded={activeAgent() ? conversations[activeAgent()?.id ?? ""]?.loaded === true : false}
       hasOlder={
         activeServerSupportsCapability("conversation-pagination") && activeAgent()
-          ? (conversationPages()[activeAgent()?.id ?? ""]?.hasOlder ?? false)
+          ? (conversations[activeAgent()?.id ?? ""]?.page?.hasOlder ?? false)
           : false
       }
-      discontinuous={activeAgent() ? conversationWindowModes()[activeAgent()?.id ?? ""] === "around" : false}
-      loadingOlder={activeAgent() ? conversationOlderLoading()[activeAgent()?.id ?? ""] === true : false}
-      olderError={activeAgent() ? (conversationOlderErrors()[activeAgent()?.id ?? ""] ?? null) : null}
+      discontinuous={activeAgent() ? conversations[activeAgent()?.id ?? ""]?.windowMode === "around" : false}
+      loadingOlder={activeAgent() ? conversations[activeAgent()?.id ?? ""]?.olderLoading === true : false}
+      olderError={activeAgent() ? (conversations[activeAgent()?.id ?? ""]?.olderError ?? null) : null}
       queue={activeQueue()}
       browserTabs={browserTabs()}
       activeBrowserTabId={activeBrowserTabId()}

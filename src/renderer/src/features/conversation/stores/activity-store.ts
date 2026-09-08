@@ -176,12 +176,6 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     activeActivityDetail,
     agentActivity,
     activityPresentation,
-    clearAgentActivityShowTimer,
-    clearAgentActivityExitTimer,
-    clearAgentActivityExitDelayTimer,
-    getAgentActivityShowTimer: () => agentActivityShowTimer,
-    getAgentActivityExitTimer: () => agentActivityExitTimer,
-    getAgentActivityExitDelayTimer: () => agentActivityExitDelayTimer,
   };
 }
 

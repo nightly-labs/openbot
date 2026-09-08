@@ -1741,8 +1741,11 @@ textarea {
   color: var(--openbot-text-primary);
 }
 
-.agent-delete-actions .agent-delete-confirm:hover {
-  background: var(--openbot-danger);
+@media (hover: hover) and (pointer: fine) {
+  .agent-delete-actions .agent-delete-confirm:hover:not(:disabled):not([data-disabled]) {
+    background: var(--openbot-danger-hover);
+    color: var(--openbot-text-primary);
+  }
 }
 
 @keyframes agent-context-in {

@@ -4,7 +4,6 @@ import { toAgentMessage } from "./app-message-projection";
 import type { AgentMessage } from "./data";
 import { useAgents } from "./features/agents/agents-context";
 import { useConversation } from "./features/conversation/conversation-context";
-import { agentConversationKey } from "./features/conversation/conversation-keys";
 import { useDirectMessages } from "./features/conversation/direct-messages-context";
 import { useServers } from "./features/servers/servers-context";
 import { usePresence } from "./features/team/team-context";
@@ -47,19 +46,15 @@ const Navigation = createSimpleContext({
       creatingAgent,
       setSettingsRequest,
       setExplicitlyOpenedAgentChatId,
-      setAgentChatOpenRevision,
       appendUiError,
     } = useAgents();
     const { setDirectTyping, clearDirectSelection, openDirectConversation } = useDirectMessages();
     const scopeIsCurrent = createScopeGuard();
     const {
       pruneInactiveAgentHistory,
-      clearReplyIndicators,
-      autoReadAgentMessages,
-      agentChatsToMarkRead,
-      agentChatsRetriedOnOpen,
-      conversationPageRequests,
-      applyConversationPage,
+      clearRecentReply,
+      requestConversationRead,
+      loadAgentMessagePage,
       markAgentMessagesRead,
     } = useConversation();
 
@@ -78,14 +73,10 @@ const Navigation = createSimpleContext({
       setAgentSetupError(null);
       setDirectTyping(false);
       clearDirectSelection();
-      clearReplyIndicators(agentId);
-      const trackingKey = agentConversationKey(activeServerId(), agentId);
-      autoReadAgentMessages.delete(trackingKey);
-      agentChatsToMarkRead.add(trackingKey);
-      agentChatsRetriedOnOpen.delete(agentId);
+      clearRecentReply(agentId);
       setExplicitlyOpenedAgentChatId(agentId);
       setActiveAgentId(agentId);
-      setAgentChatOpenRevision((current) => current + 1);
+      requestConversationRead(agentId, true);
     }
 
     async function selectDirectMember(memberId: string): Promise<void> {
@@ -128,19 +119,9 @@ const Navigation = createSimpleContext({
       const serverId = activeServerId();
       await Promise.resolve();
       if (!scopeIsCurrent()) return;
-      const request = (conversationPageRequests.get(agentId) ?? 0) + 1;
-      conversationPageRequests.set(agentId, request);
       try {
-        const page = await window.openbot.agent.readConversationPage({
-          agentId,
-          anchor: { type: "around", messageId },
-          limit: 50,
-        });
-        if (conversationPageRequests.get(agentId) !== request || !scopeIsCurrent()) return;
-        if (!page.messages.some((message) => message.id === messageId)) {
-          throw new Error("This message is no longer available.");
-        }
-        applyConversationPage(page, "replace", "around");
+        const page = await loadAgentMessagePage(agentId, messageId);
+        if (!page) return;
         setMessageFocusRequest({ agentId, messageId, nonce: Date.now() });
         try {
           let readBoundary = page.messages.at(-1)?.id ?? messageId;

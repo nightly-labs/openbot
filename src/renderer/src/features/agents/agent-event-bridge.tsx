@@ -9,22 +9,13 @@ import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { useConversation } from "../conversation/conversation-context";
-import {
-  agentConversationKey,
-  agentMessageKey,
-  deleteAgentMessageBodies,
-  promptRequestKey,
-} from "../conversation/conversation-keys";
+import { agentConversationKey, promptRequestKey } from "../conversation/conversation-keys";
 import { latestIncomingConversationMessage } from "../conversation/conversation-read-state";
 import { reconcileQueuesWithRuntimeWork } from "../dynamic-island/dynamic-island-coordinator";
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { cleanAgentMessageText } from "./agent-message-text";
-import {
-  appendLatestRuntimeMessages,
-  reconcileAttentionApprovals,
-  reconcileAttentionPrompts,
-} from "./agent-runtime-snapshot";
+import { reconcileAttentionApprovals, reconcileAttentionPrompts } from "./agent-runtime-snapshot";
 import { useAgents } from "./agents-context";
 
 /**
@@ -51,10 +42,9 @@ export function AgentEventBridge() {
   const { applyAgentStatus } = useProviders();
   const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents, appendUiError } = useAgents();
   const {
-    setLiveMessages,
-    conversationReads,
+    applyRuntimeMessages,
+    conversations,
     applyConversationReads,
-    rawAgentMessageBodies,
     agentChatsToRetryRead,
     scheduleConversation,
     isAgentChatReadable,
@@ -107,7 +97,7 @@ export function AgentEventBridge() {
         return;
       case "conversation-page":
         {
-          const existingUnreadCount = conversationReads()[event.page.agentId]?.unreadCount ?? 0;
+          const existingUnreadCount = conversations[event.page.agentId]?.read?.unreadCount ?? 0;
           const trackingKey = agentConversationKey(activeServerId(), event.page.agentId);
           const markNewMessagesRead =
             isAgentChatReadable(event.page.agentId) &&
@@ -269,13 +259,7 @@ export function AgentEventBridge() {
     setQueues((current) => reconcileQueuesWithRuntimeWork(current, snapshot.work, runtimeTurns));
     setPendingPrompts((current) => reconcileAttentionPrompts(current, snapshot, submittedPromptRequests()));
     setPendingApprovals((current) => reconcileAttentionApprovals(current, snapshot));
-    for (const agentId of new Set(snapshot.latestMessages.map((message) => message.agentId))) {
-      deleteAgentMessageBodies(rawAgentMessageBodies, agentId);
-    }
-    for (const message of snapshot.latestMessages) {
-      rawAgentMessageBodies.set(agentMessageKey(message.agentId, message.id), message.text);
-    }
-    setLiveMessages((current) => appendLatestRuntimeMessages(current, snapshot.latestMessages));
+    applyRuntimeMessages(snapshot.latestMessages);
   }
 
   onSettled(() => {

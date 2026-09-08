@@ -772,6 +772,16 @@ function readAgentIdRenames(db: DatabaseSync): readonly AgentIdRename[] {
     )
     .all();
   const taken = new Set<string>();
+  // Only `projection_agents`, which is where migration v13 shipped. `projection_threads.agent_id`
+  // carries no foreign key and `ensureThreadProjection` never deletes, so a thread can outlive the
+  // agent row that named it, and such a thread already keyed at `agent-<uuid>` is invisible here: the
+  // rename collides with it, the row-level `OR REPLACE` below deletes the orphan, both threads'
+  // messages are rewritten onto the one surviving thread id in the same pass, and nothing dangles --
+  // so no check objects and the two conversations silently merge. Widening this set would prevent that,
+  // but v13 has shipped, and a migration that transforms one database differently from another under
+  // the same version number is the larger hazard. `AgentStore` closes the hole from the other side
+  // instead: it restores an agent the roster projection lost and gives an unclaimed thread back to the
+  // agent that names it at every startup, so the orphan this cannot see stops existing.
   for (const row of db.prepare("SELECT agent_id FROM projection_agents").all()) {
     if (isDynamicRecord(row) && isString(row.agent_id)) taken.add(row.agent_id);
   }

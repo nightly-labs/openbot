@@ -97,6 +97,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
   running = false;
   responseError: Error | null = null;
   modelList: ((params: unknown) => unknown) | undefined;
+  threadRead: ((params: unknown) => unknown) | undefined;
   accountRateLimits: unknown = { rateLimits: null, rateLimitsByLimitId: null };
 
   constructor(
@@ -171,7 +172,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
       result = { thread: { id: stringParam(params, "threadId") } };
     }
     if (method === "thread/read") {
-      result = { thread: { id: stringParam(params, "threadId"), turns: [] } };
+      result = this.threadRead?.(params) ?? { thread: { id: stringParam(params, "threadId"), turns: [] } };
     }
     if (method === "thread/compact/start" || method === "turn/interrupt") result = {};
     if (method === "turn/steer") {

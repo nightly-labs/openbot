@@ -1,5 +1,6 @@
 import type { AgentSummary, BrowserTab, ServerSummary } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
+import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
@@ -10,10 +11,41 @@ import {
   installOpenbotStub,
   testServer,
 } from "./app-test-harness";
+import { TestResizeObserver } from "./setupTests";
 
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
     installOpenbotStub();
+  });
+
+  it("keeps the dragged browser width when conversation padding changes and restores it after a window resize", async () => {
+    window.localStorage.setItem("openbot:browser-panel-width", "400");
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await fireEvent.click(screen.getByRole("button", { name: "Open computer" }));
+    const resizer = await screen.findByRole("separator", { name: "Resize right panel" });
+    const conversation = screen.getByRole("main", { name: "Conversation" });
+    const width = vi.spyOn(conversation, "clientWidth", "get").mockReturnValue(1200);
+
+    await fireEvent.pointerDown(resizer, { button: 0, pointerId: 1, clientX: 800 });
+    await fireEvent.pointerMove(window, { pointerId: 1, clientX: 700 });
+    expect(resizer).toHaveAttribute("aria-valuenow", "500");
+    TestResizeObserver.resize(conversation, "content-box");
+    flush();
+    expect(resizer).toHaveAttribute("aria-valuenow", "500");
+    await fireEvent.pointerUp(window, { pointerId: 1, clientX: 700 });
+    expect(window.localStorage.getItem("openbot:browser-panel-width")).toBe("500");
+
+    width.mockReturnValue(300);
+    TestResizeObserver.resize(conversation, "border-box");
+    await waitFor(() => expect(resizer).toHaveAttribute("aria-valuenow", "220"));
+    expect(window.localStorage.getItem("openbot:browser-panel-width")).toBe("500");
+    width.mockReturnValue(1200);
+    TestResizeObserver.resize(conversation, "border-box");
+    await waitFor(() => expect(resizer).toHaveAttribute("aria-valuenow", "500"));
+    await fireEvent.keyDown(resizer, { key: "ArrowLeft" });
+    expect(window.localStorage.getItem("openbot:browser-panel-width")).toBe("512");
+    width.mockRestore();
   });
 
   it("moves the live embedded browser between the sidebar and desktop Picture in Picture", async () => {

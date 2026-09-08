@@ -1,13 +1,13 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { AVATAR_HUES, isAvatarSeed } from "@openbot/contracts/ipc";
+import { AVATAR_HUES, AVATAR_SEED_PATTERN } from "@openbot/contracts/ipc";
 import { z } from "zod";
 
 const profileFields = {
   name: z.string().trim().min(1).max(INPUT_LIMITS.agentName),
   title: z.string().max(INPUT_LIMITS.agentTitle),
   description: z.string().max(INPUT_LIMITS.agentDescription),
-  avatarSeed: z.string().refine(isAvatarSeed, "Invalid avatar seed."),
-  avatarHue: z.union(AVATAR_HUES.map((hue) => z.literal(hue))).nullable(),
+  avatarSeed: z.string().regex(AVATAR_SEED_PATTERN, "Invalid avatar seed."),
+  avatarHue: z.literal(AVATAR_HUES).nullable(),
 };
 
 export const createAgentToolSchema = z

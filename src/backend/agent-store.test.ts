@@ -162,12 +162,117 @@ describe("AgentStore", () => {
 
     await store.getOrCreate("chief");
     const threadId = await store.ensureThreadId("chief");
+    // Derived from the agent id, not minted at random. Both conversation read paths call `getOrCreate`,
+    // so reading a chat whose roster row is gone rebuilds the agent with no thread and arrives here --
+    // and a random id would file it against an empty thread while the user's own thread, with every
+    // message in it, stays on disk addressable by nothing.
+    expect(threadId).toBe("openbot-thread-chief");
     const restored = new AgentStore(userData, join(root, "home"));
     await restored.initialize();
     expect(restored.list().find((agent) => agent.id === "chief")?.threadId).toBe(threadId);
     await expect(readFile(join(userData, "bots.json"), "utf8")).rejects.toMatchObject({
       code: "ENOENT",
     });
+  });
+
+  // The state any `#persist` made with an incomplete roster leaves behind: `replaceAgents` truncates the
+  // roster and re-inserts the list it was given, while `ensureThreadProjection` never deletes. Nothing
+  // then reaches the thread -- `projection_threads.agent_id` carries no foreign key, the chat list is the
+  // roster with no join, and nothing enumerates threads -- so the user sees an empty chat while every
+  // message is still on disk. Startup gives the thread back rather than leaving it addressable by nothing.
+  it("gives back a thread its roster row stopped naming", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
+    temporaryRoots.push(root);
+    const userData = join(root, "user-data");
+    const home = join(root, "home");
+    const store = new AgentStore(userData, home);
+    await store.initialize();
+    await store.getOrCreate("chief");
+    const threadId = await store.ensureThreadId("chief");
+    store.database.appendConversationMessage({
+      agentId: "chief",
+      threadId,
+      activeTurnId: null,
+      message: {
+        id: "message-1",
+        author: "user",
+        text: "Where did my chat go?",
+        createdAt: "2026-09-01T12:00:00.000Z",
+        status: "completed",
+      },
+      eventType: "turn.started",
+    });
+    store.restoreThreadIdentity("chief", null, null);
+    await store.updatePreview("chief", "stranded");
+    expect(store.list().find((agent) => agent.id === "chief")?.threadId).toBeNull();
+
+    const restored = new AgentStore(userData, home);
+    await restored.initialize();
+
+    expect(restored.list().find((agent) => agent.id === "chief")?.threadId).toBe(threadId);
+    expect(restored.database.readConversationPage("chief", threadId).messages).toEqual([
+      expect.objectContaining({ id: "message-1", text: "Where did my chat go?" }),
+    ]);
+  });
+
+  it("rebuilds a roster its projection lost from the event log", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
+    temporaryRoots.push(root);
+    const userData = join(root, "user-data");
+    const home = join(root, "home");
+    const store = new AgentStore(userData, home);
+    await store.initialize();
+    await store.getOrCreate("chief");
+    await store.getOrCreate("sales-outbound");
+    const threadId = await store.ensureThreadId("chief");
+    store.database.appendConversationMessage({
+      agentId: "chief",
+      threadId,
+      activeTurnId: null,
+      message: {
+        id: "message-1",
+        author: "user",
+        text: "Where did my chat go?",
+        createdAt: "2026-09-01T12:00:00.000Z",
+        status: "completed",
+      },
+      eventType: "turn.started",
+    });
+    // The state the replay answers, in its more likely half: one roster row is gone while the rest of
+    // the roster is intact, which is what a persist made with an agent missing leaves behind. The agent
+    // has no chat in the sidebar, a later `getOrCreate` rebuilds it with no thread, and both read paths
+    // then report an empty history -- while the thread and every message stay on disk.
+    store.database.connection.prepare("DELETE FROM projection_agents WHERE agent_id = ?").run("chief");
+
+    const restored = new AgentStore(userData, home);
+    await restored.initialize();
+
+    expect(restored.list().map((agent) => agent.id)).toEqual(["sales-outbound", "chief"]);
+    expect(restored.list().find((agent) => agent.id === "chief")?.threadId).toBe(threadId);
+    expect(restored.database.readConversationPage("chief", threadId).messages).toEqual([
+      expect.objectContaining({ id: "message-1", text: "Where did my chat go?" }),
+    ]);
+
+    // The whole roster gone is the same repair. Both agents come back, and the repair is persisted, so a
+    // third launch reads them out of the projection with no replay at all.
+    restored.database.connection.exec("DELETE FROM projection_agents");
+    const rebuilt = new AgentStore(userData, home);
+    await rebuilt.initialize();
+
+    expect(
+      rebuilt
+        .list()
+        .map((agent) => agent.id)
+        .sort(),
+    ).toEqual(["chief", "sales-outbound"]);
+    const reopened = new AgentStore(userData, home);
+    await reopened.initialize();
+    expect(
+      reopened
+        .list()
+        .map((agent) => agent.id)
+        .sort(),
+    ).toEqual(["chief", "sales-outbound"]);
   });
 
   it("persists marketplace installation versions", async () => {
@@ -803,6 +908,48 @@ describe("AgentStore", () => {
       { provider: "claude", externalSessionId: "claude-native-1", state: "inactive" },
       { provider: "codex", externalSessionId: "codex-native-2", state: "active" },
     ]);
+  });
+
+  it("retains the agent across reload after partial file deletion and permits retry", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
+    temporaryRoots.push(root);
+    const userData = join(root, "user-data");
+    const home = join(root, "home");
+    const store = new AgentStore(userData, home);
+    await store.initialize();
+    const agent = await store.createAgent(AGENT_PROFILE_INPUT);
+    const marker = join(userData, "agent-duplications", `${agent.id}.pending`);
+    // A directory at the marker path makes unlink fail after workspace removal.
+    await mkdir(marker, { recursive: true });
+    await expect(store.deleteAgent(agent.id)).rejects.toThrow();
+    expect(store.list().map((entry) => entry.id)).toEqual([agent.id]);
+
+    const restored = new AgentStore(userData, home);
+    await restored.initialize();
+    expect(restored.list().map((entry) => entry.id)).toEqual([agent.id]);
+    await rm(marker, { recursive: true });
+    await restored.deleteAgent(agent.id);
+    // Older releases could leave managed files after removing the record.
+    await mkdir(agent.workspacePath, { recursive: true });
+    await writeFile(join(agent.workspacePath, "leftover.txt"), "owned data");
+    await restored.deleteAgent(agent.id);
+    expect(restored.list()).toEqual([]);
+    await expect(readdir(agent.workspacePath)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("keeps the in-memory roster when the deletion transaction fails", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
+    temporaryRoots.push(root);
+    const store = new AgentStore(join(root, "user-data"), join(root, "home"));
+    await store.initialize();
+    const agent = await store.createAgent(AGENT_PROFILE_INPUT);
+    vi.spyOn(store.database, "hardDeleteAgent").mockImplementationOnce(() => {
+      throw new Error("Database write failed");
+    });
+    await expect(store.deleteAgent(agent.id)).rejects.toThrow("Database write failed");
+    expect(store.list().map((entry) => entry.id)).toEqual([agent.id]);
+    await store.deleteAgent(agent.id);
+    expect(store.list()).toEqual([]);
   });
 
   it("deletes agents persistently without reseeding examples", async () => {

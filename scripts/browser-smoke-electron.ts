@@ -224,6 +224,12 @@ void main().catch((error) => {
 });
 
 async function main(): Promise<void> {
+  const scenario = process.argv.find((argument) => argument.startsWith("--scenario="))?.slice("--scenario=".length);
+  if (scenario !== undefined && !["controls", "tool-boundary", "evaluation", "wait-deadlines"].includes(scenario)) {
+    throw new Error(
+      `Unknown browser smoke scenario: ${scenario}. Use controls, tool-boundary, evaluation, or wait-deadlines.`,
+    );
+  }
   const googleLive = process.argv.includes("--google-live");
   const xLive = process.argv.includes("--x-live");
   const configuredRoot = argumentValue("--smoke-root=");
@@ -273,6 +279,34 @@ async function main(): Promise<void> {
       recordingMaxAggregateBytes: 100 * 1024 * 1024,
     });
     await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
+    if (scenario) {
+      try {
+        if (scenario === "tool-boundary") {
+          await runToolBoundaryScenario(browser, origin);
+        } else {
+          const { tab, contents } = await openTabWithContents(browser, `${origin}/v2`, "smoke-thread", "smoke-bot");
+          try {
+            if (scenario === "controls") {
+              await runControlActions(browser, tab.id, contents);
+              await runDragAction(browser, tab.id, contents);
+              await runDoubleClickScenario(browser, origin);
+              await runKeyboardScenario(browser, origin, temporaryRoot);
+            } else if (scenario === "wait-deadlines") {
+              await runWaitDeadlines(browser, tab.id, contents);
+            } else {
+              await runEvaluationScenario(browser, tab.id, contents);
+            }
+          } finally {
+            await browser.close(tab.id);
+          }
+        }
+        process.stdout.write(`BrowserHost: ${scenario} scenario passed.\n`);
+      } finally {
+        await browser.destroy();
+        window.destroy();
+      }
+      return;
+    }
     const documentChangedTabs: string[] = [];
     const retainedDocumentChanges: Array<{ tabId: string; documentIds: ReadonlySet<string> }> = [];
     browser.onDocumentChanged((tabId, documentIds) => {
@@ -326,39 +360,7 @@ async function main(): Promise<void> {
     }
     process.stdout.write("BrowserHost: snapshot and actions passed.\n");
 
-    const doubleUrl = `${origin}/blocking-frame?double-click`;
-    const doubleTab = await browser.open(doubleUrl, "smoke-thread", "smoke-bot");
-    const doubleContents = webContents
-      .getAllWebContents()
-      .find((contents) => !contents.isDestroyed() && contents.getURL() === doubleUrl);
-    if (!doubleContents) throw new Error("Double-click fixture web contents were not available.");
-    await doubleContents.executeJavaScript(
-      `(() => {
-      const button = document.createElement('button');
-      button.textContent = 'Double-click item';
-      button.addEventListener('click', event => {
-        if (event.detail === 1 && event.isTrusted) button.dataset.selected = 'true';
-      });
-      button.addEventListener('dblclick', event => {
-        if (button.dataset.selected === 'true' && event.isTrusted) button.dataset.activated = 'true';
-      });
-      button.id = 'double-click-item';
-      document.body.prepend(button);
-    })()`,
-      true,
-    );
-    const doubleClicked = await callBrowserTool(browser, "click", {
-      tabId: doubleTab.id,
-      target: { kind: "role", role: "button", name: "Double-click item", exact: true },
-      clickCount: 2,
-    });
-    const activated = await doubleContents.executeJavaScript(
-      "document.getElementById('double-click-item').dataset.activated === 'true'",
-      true,
-    );
-    if (!doubleClicked.success || !activated) throw new Error("V2 double-click did not select before activation.");
-    await doubleContents.executeJavaScript("document.getElementById('double-click-item').remove()", true);
-    await browser.close(doubleTab.id);
+    await runDoubleClickScenario(browser, origin);
     const v2Tab = await browser.open(`${origin}/v2`, "smoke-thread", "smoke-bot");
     const v2Contents = webContents
       .getAllWebContents()
@@ -714,251 +716,8 @@ async function main(): Promise<void> {
     await browser.snapshot(v2Tab.id);
     const noDomRefs = await v2Contents.executeJavaScript("document.querySelector('[data-openbot-ref]') === null", true);
     if (noDomRefs !== true) throw new Error("V2 snapshot mutated the page DOM.");
-    const selected = await callBrowserTool(browser, "select_option", {
-      tabId: v2Tab.id,
-      target: { kind: "role", role: "combobox", name: "Mode", exact: true },
-      values: ["b"],
-    });
-    if (!selected.success) throw new Error(`V2 select failed: ${toolError(selected)}`);
-    const selectionValue = await v2Contents.executeJavaScript(
-      `(() => { const select = document.querySelector('[aria-label="Mode"]'); return { value: select.value, inputTrusted: select.dataset.inputTrusted, changeTrusted: select.dataset.changeTrusted }; })()`,
-      true,
-    );
-    if (
-      !isDynamicRecord(selectionValue) ||
-      selectionValue.value !== "b" ||
-      selectionValue.inputTrusted !== "true" ||
-      selectionValue.changeTrusted !== "true"
-    ) {
-      throw new Error("V2 select did not use trusted native input.");
-    }
-    // An option whose value is the empty string is how a page spells "no selection", and the value is
-    // the only way to address it -- its label is shared with Alpha's initial, so typeahead alone lands
-    // elsewhere. Rejecting the empty string as invalid put a real option out of reach.
-    const clearedSelection = await callBrowserTool(browser, "select_option", {
-      tabId: v2Tab.id,
-      target: { kind: "role", role: "combobox", name: "Mode", exact: true },
-      values: [""],
-    });
-    const clearedValue = await v2Contents.executeJavaScript(
-      `document.querySelector('[aria-label="Mode"]').value`,
-      true,
-    );
-    if (!clearedSelection.success || clearedValue !== "") {
-      throw new Error(`V2 select could not clear through an empty option: ${toolError(clearedSelection)}`);
-    }
-    const reselected = await callBrowserTool(browser, "select_option", {
-      tabId: v2Tab.id,
-      target: { kind: "role", role: "combobox", name: "Mode", exact: true },
-      values: ["b"],
-    });
-    if (!reselected.success) throw new Error(`V2 select could not restore a value: ${toolError(reselected)}`);
-    const partialSelection = await callBrowserTool(browser, "select_option", {
-      tabId: v2Tab.id,
-      target: { kind: "role", role: "combobox", name: "Mode", exact: true },
-      values: ["b", "missing"],
-    });
-    if (partialSelection.success || !toolError(partialSelection).includes("single-select")) {
-      throw new Error("V2 single-select accepted multiple requested values.");
-    }
-    const missingSelection = await callBrowserTool(browser, "select_option", {
-      tabId: v2Tab.id,
-      target: { kind: "role", role: "combobox", name: "Mode", exact: true },
-      values: ["missing"],
-    });
-    if (missingSelection.success || !toolError(missingSelection).includes("do not exist")) {
-      throw new Error("V2 select silently accepted a missing requested value.");
-    }
-    const checked = await callBrowserTool(browser, "set_checked", {
-      tabId: v2Tab.id,
-      target: { kind: "role", role: "checkbox", name: "Agree", exact: true },
-      checked: true,
-    });
-    if (!checked.success) throw new Error(`V2 checkbox failed: ${toolError(checked)}`);
-    const clearedRadio = await callBrowserTool(browser, "set_checked", {
-      tabId: v2Tab.id,
-      target: { kind: "role", role: "radio", name: "Primary choice", exact: true },
-      checked: false,
-    });
-    if (clearedRadio.success || !toolError(clearedRadio).includes("cannot be cleared directly")) {
-      throw new Error("V2 selected radio clearing did not return a truthful error.");
-    }
-    const nonCheckable = await callBrowserTool(browser, "set_checked", {
-      tabId: v2Tab.id,
-      target: { kind: "role", role: "spinbutton", name: "Quantity", exact: true },
-      checked: false,
-    });
-    if (nonCheckable.success || !toolError(nonCheckable).includes("not checkable")) {
-      throw new Error("V2 set_checked accepted a non-checkable input.");
-    }
-    const contentEditable = await callBrowserTool(browser, "type", {
-      tabId: v2Tab.id,
-      target: { kind: "role", role: "textbox", name: "Notes", exact: true },
-      text: "editable text",
-      mode: "replace",
-    });
-    if (!contentEditable.success) throw new Error(`V2 contenteditable typing failed: ${toolError(contentEditable)}`);
-    const appendedContentEditable = await callBrowserTool(browser, "type", {
-      tabId: v2Tab.id,
-      target: { kind: "role", role: "textbox", name: "Notes", exact: true },
-      text: " appended",
-      mode: "append",
-    });
-    if (!appendedContentEditable.success) {
-      throw new Error(`V2 contenteditable append failed: ${toolError(appendedContentEditable)}`);
-    }
-    const editableValue = await v2Contents.executeJavaScript(
-      "document.querySelector('[contenteditable]').textContent",
-      true,
-    );
-    if (editableValue !== "editable text appended") {
-      throw new Error("V2 contenteditable target did not receive text.");
-    }
-    // Chromium decides implicit form submission and text insertion from the *character* event, not
-    // the key event, so a named key dispatched without one reaches the page as a keydown nobody acts
-    // on: `submit: true` left a plain form unsubmitted and `press("Space")` typed nothing. Nothing is
-    // bound to this field, so only native submission can produce the form's output.
-    const keysTab = await browser.open(`${origin}/keys`, "smoke-thread", "smoke-bot");
-    const keysContents = webContents
-      .getAllWebContents()
-      .find((contents) => !contents.isDestroyed() && contents.getURL().startsWith(`${origin}/keys`));
-    if (!keysContents) throw new Error("Keys fixture web contents were not available.");
-    const typedIntoForm = await callBrowserTool(browser, "type", {
-      tabId: keysTab.id,
-      target: { kind: "css", selector: 'input[aria-label="Query"]' },
-      text: "open",
-      mode: "replace",
-    });
-    if (!typedIntoForm.success) throw new Error(`V2 form field typing failed: ${toolError(typedIntoForm)}`);
-    const spacePressed = await callBrowserTool(browser, "press", {
-      tabId: keysTab.id,
-      target: { kind: "css", selector: 'input[aria-label="Query"]' },
-      key: "Space",
-    });
-    const queryAfterSpace = await keysContents.executeJavaScript(
-      `document.querySelector('input[aria-label="Query"]').value`,
-      true,
-    );
-    if (!spacePressed.success || queryAfterSpace !== "open ") {
-      throw new Error(`V2 press did not insert a space: ${toolError(spacePressed)} (${queryAfterSpace})`);
-    }
-    const nativeSubmit = await callBrowserTool(browser, "type", {
-      tabId: keysTab.id,
-      target: { kind: "css", selector: 'input[aria-label="Query"]' },
-      text: "sesame",
-      mode: "append",
-      submit: true,
-    });
-    const nativeSubmitOutput = await keysContents.executeJavaScript(
-      "document.querySelector('output').textContent",
-      true,
-    );
-    if (!nativeSubmit.success || nativeSubmitOutput !== "form-submit:true") {
-      throw new Error(
-        `V2 submit did not reach native form submission: ${toolError(nativeSubmit)} (${nativeSubmitOutput})`,
-      );
-    }
-    // Shift is not a command modifier. `Shift+Enter` is how every composer on the web spells "line
-    // break, do not submit", so a shortcut whose character event is suppressed reaches the page as a
-    // keydown that inserts nothing while the tool reports success.
-    const typedIntoBody = await callBrowserTool(browser, "type", {
-      tabId: keysTab.id,
-      target: { kind: "css", selector: 'textarea[aria-label="Body"]' },
-      text: "line",
-      mode: "replace",
-    });
-    if (!typedIntoBody.success) throw new Error(`V2 textarea typing failed: ${toolError(typedIntoBody)}`);
-    const shiftEnterPressed = await callBrowserTool(browser, "press", {
-      tabId: keysTab.id,
-      target: { kind: "css", selector: 'textarea[aria-label="Body"]' },
-      key: "Shift+Enter",
-    });
-    const bodyAfterShiftEnter = await keysContents.executeJavaScript(
-      `document.querySelector('textarea[aria-label="Body"]').value`,
-      true,
-    );
-    if (!shiftEnterPressed.success || bodyAfterShiftEnter !== "line\n") {
-      throw new Error(
-        `V2 Shift+Enter inserted no newline: ${toolError(shiftEnterPressed)} (${JSON.stringify(bodyAfterShiftEnter)})`,
-      );
-    }
-    // The character event carries the same modifier mask as the key events around it, or the page sees
-    // an unshifted Enter -- which is how a composer decides to send the message instead of breaking
-    // the line, whatever the textarea ends up containing.
-    const shiftEnterKeypress = await keysContents.executeJavaScript(
-      "document.querySelector('#keypress-log').textContent",
-      true,
-    );
-    if (shiftEnterKeypress !== "keypress:Enter:true") {
-      throw new Error(`V2 Shift+Enter reached the page unshifted: ${shiftEnterKeypress}`);
-    }
-    // An input inside an iframe nested in a shadow root is reachable by target discovery, so its
-    // document has to be reachable by document enumeration too. If it is not, the next frame
-    // navigation reports the document as gone and frees the files the input is still holding.
-    const nestedUploadPath = join(temporaryRoot, "nested-frame-upload.txt");
-    await writeFile(nestedUploadPath, "nested frame upload fixture");
-    let shadowFrameDocumentId = "";
-    const shadowFrameUpload = await callBrowserTool(
-      browser,
-      "upload_files",
-      {
-        tabId: keysTab.id,
-        target: { kind: "role", role: "button", name: "Shadow frame files", exact: true },
-        paths: [nestedUploadPath],
-      },
-      { onUploadAssigned: (_inputId, documentId) => (shadowFrameDocumentId = documentId) },
-    );
-    if (!shadowFrameUpload.success || !shadowFrameDocumentId) {
-      throw new Error(`V2 shadow-root iframe upload failed: ${toolError(shadowFrameUpload)}`);
-    }
-    const changesBeforeTriggerNavigation = retainedDocumentChanges.length;
-    await keysContents.executeJavaScript(
-      `(() => {
-        document.querySelector('iframe[title="Trigger frame"]').src = '/frame-files?file_label=Reloaded+files';
-        return true;
-      })()`,
-      true,
-    );
-    await waitFor(async () =>
-      retainedDocumentChanges.slice(changesBeforeTriggerNavigation).some((change) => change.tabId === keysTab.id),
-    );
-    const retainedShadowFrame = retainedDocumentChanges
-      .slice(changesBeforeTriggerNavigation)
-      .some((change) => change.tabId === keysTab.id && change.documentIds.has(shadowFrameDocumentId));
-    if (!retainedShadowFrame) {
-      throw new Error("V2 document enumeration lost an upload document inside a shadow-root iframe.");
-    }
-    // The same document, now behind a parent grown past the enumeration node budget. A walk that stops
-    // early never reaches the upload frame, and a partial list reported as complete is indistinguishable
-    // from a closed document -- which frees the files the input downstairs is still holding.
-    const grown = await callBrowserTool(browser, "evaluate", {
-      tabId: keysTab.id,
-      expression: `(() => {
-        const bulk = document.createElement('div');
-        for (let index = 0; index < 10500; index++) bulk.appendChild(document.createElement('span'));
-        document.body.appendChild(bulk);
-        return document.querySelectorAll('*').length;
-      })()`,
-    });
-    if (!grown.success) throw new Error(`V2 could not grow the keys document: ${toolError(grown)}`);
-    const changesBeforeGrownNavigation = retainedDocumentChanges.length;
-    await keysContents.executeJavaScript(
-      `(() => {
-        document.querySelector('iframe[title="Trigger frame"]').src = '/frame-files?file_label=Grown+files';
-        return true;
-      })()`,
-      true,
-    );
-    await waitFor(async () =>
-      retainedDocumentChanges.slice(changesBeforeGrownNavigation).some((change) => change.tabId === keysTab.id),
-    );
-    const retainedPastBudget = retainedDocumentChanges
-      .slice(changesBeforeGrownNavigation)
-      .some((change) => change.tabId === keysTab.id && change.documentIds.has(shadowFrameDocumentId));
-    if (!retainedPastBudget) {
-      throw new Error("V2 document enumeration reported a truncated scan as complete and lost an upload document.");
-    }
-    await browser.close(keysTab.id);
+    await runControlActions(browser, v2Tab.id, v2Contents);
+    await runKeyboardScenario(browser, origin, temporaryRoot);
     // A snapshot walks every frame, and Electron's `sendCommand` has no timeout of its own, so a frame
     // whose process is spinning never answers the walk. The timeout returns an error to the caller
     // either way; what it also has to do is cancel the command, or the promise the tab's queue was told
@@ -1038,6 +797,8 @@ async function main(): Promise<void> {
     // Upload staging resolves the input before the bounded upload action runs, on the same queue and
     // by the same frame walk: a CSS target has to be proven unique everywhere, so the frame that
     // answers nothing holds the preflight open ahead of the action the timeout was meant to cover.
+    const blockedUploadPath = join(temporaryRoot, "blocked-upload.txt");
+    await writeFile(blockedUploadPath, "blocked upload fixture");
     const blockedUploadPreflight = await Promise.race([
       browser
         .resolveUploadTarget({
@@ -1050,7 +811,7 @@ async function main(): Promise<void> {
           arguments: {
             tabId: blockedTab.id,
             target: { kind: "css", selector: "input[type=file]" },
-            paths: [nestedUploadPath],
+            paths: [blockedUploadPath],
             timeoutMs: 700,
           },
         })
@@ -1328,26 +1089,7 @@ async function main(): Promise<void> {
     if (offViewportClick.success || !toolError(offViewportClick).includes("outside the current viewport")) {
       throw new Error("V2 click accepted an off-viewport point target.");
     }
-    const dragged = await callBrowserTool(browser, "drag", {
-      tabId: v2Tab.id,
-      source: { kind: "role", role: "button", name: "Drag source", exact: true },
-      target: { kind: "role", role: "button", name: "Drop target", exact: true },
-    });
-    if (!dragged.success) throw new Error(`V2 drag failed: ${toolError(dragged)}`);
-    const dragValue = await v2Contents.executeJavaScript("document.querySelector('output').textContent", true);
-    if (dragValue !== "drag:true") {
-      const dragDiagnostics = await v2Contents.executeJavaScript(
-        `(() => ({
-          output: document.querySelector('output').textContent,
-          source: document.querySelector('[aria-label="Drag source"]').getBoundingClientRect().toJSON(),
-          target: document.querySelector('[aria-label="Drop target"]').getBoundingClientRect().toJSON(),
-          scrollY,
-          viewport: { width: innerWidth, height: innerHeight },
-        }))()`,
-        true,
-      );
-      throw new Error(`V2 drag did not produce a trusted drop event: ${JSON.stringify(dragDiagnostics)}`);
-    }
+    await runDragAction(browser, v2Tab.id, v2Contents);
     const spaClick = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
       target: { kind: "role", role: "button", name: "SPA", exact: true },
@@ -1396,98 +1138,7 @@ async function main(): Promise<void> {
     if (removedRefWait.success || !toolError(removedRefWait).includes("timed out")) {
       throw new Error("V2 ref wait matched an element after it was removed.");
     }
-    await v2Contents.executeJavaScript(
-      "(() => { const container = Object.assign(document.createElement('div'), { innerHTML: Array.from({ length: 200 }, (_, index) => '<button aria-label=\"Bulk ' + index + '\">Bulk ' + index + '</button>').join('') }); container.dataset.bulkTargets = ''; document.body.appendChild(container); return true; })()",
-      true,
-    );
-    const semanticWaitStarted = Date.now();
-    const boundedSemanticWait = await callBrowserTool(browser, "wait_for", {
-      tabId: v2Tab.id,
-      target: { kind: "role", role: "button", name: "Missing bulk target", exact: true },
-      timeoutMs: 5,
-    });
-    if (
-      boundedSemanticWait.success ||
-      !toolError(boundedSemanticWait).includes("timed out") ||
-      Date.now() - semanticWaitStarted > 1_000
-    ) {
-      throw new Error("V2 semantic wait did not enforce its collection deadline.");
-    }
-    const boundedWaitSnapshot = await callBrowserTool(browser, "wait_for", {
-      tabId: v2Tab.id,
-      url: "/v2",
-      timeoutMs: 5,
-    });
-    if (boundedWaitSnapshot.success || !toolError(boundedWaitSnapshot).includes("timed out")) {
-      throw new Error("V2 wait snapshot did not share the condition deadline.");
-    }
-    await v2Contents.executeJavaScript("document.querySelector('[data-bulk-targets]').remove(); true", true);
-    await v2Contents.executeJavaScript(
-      `(() => {
-        const container = document.createElement('div');
-        container.dataset.bulkText = '';
-        container.innerHTML = Array.from({ length: 6000 }, (_, index) => '<span>Bounded text ' + index + '</span>').join('');
-        document.body.appendChild(container);
-      })()`,
-      true,
-    );
-    const textWaitStarted = Date.now();
-    const boundedTextWait = await callBrowserTool(browser, "wait_for", {
-      tabId: v2Tab.id,
-      text: "Missing bounded text target",
-      timeoutMs: 5,
-    });
-    if (
-      boundedTextWait.success ||
-      !toolError(boundedTextWait).includes("timed out") ||
-      Date.now() - textWaitStarted > 1_000
-    ) {
-      throw new Error("V2 text wait did not enforce its scan deadline.");
-    }
-    await v2Contents.executeJavaScript(`document.querySelector('[data-bulk-text]').remove()`, true);
-    const boundedActionPoint = await v2Contents.executeJavaScript(
-      `(() => {
-        const bounds = document.querySelector('[aria-label="SPA"]').getBoundingClientRect();
-        return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
-      })()`,
-      true,
-    );
-    if (!isDynamicRecord(boundedActionPoint) || !isNumber(boundedActionPoint.x) || !isNumber(boundedActionPoint.y)) {
-      throw new Error("V2 bounded action point fixture was not available.");
-    }
-    await v2Contents.executeJavaScript(
-      "globalThis.__openbotNoise = setInterval(() => document.querySelector('output').toggleAttribute('data-noise'), 10); true",
-      true,
-    );
-    const actionTimeoutStarted = Date.now();
-    const boundedAction = await callBrowserTool(browser, "click", {
-      tabId: v2Tab.id,
-      target: { kind: "point", x: boundedActionPoint.x, y: boundedActionPoint.y },
-      timeoutMs: 250,
-    });
-    const boundedActionPayload = toolTextPayload(boundedAction);
-    if (
-      !boundedAction.success ||
-      !Array.isArray(boundedActionPayload?.actions) ||
-      !boundedActionPayload.actions.some(
-        (entry) => isDynamicRecord(entry) && String(entry.detail).includes("Action completed"),
-      ) ||
-      Date.now() - actionTimeoutStarted > 1_000
-    ) {
-      throw new Error("V2 dispatched action did not report success when settling exceeded its deadline.");
-    }
-    const quietWait = await callBrowserTool(browser, "wait_for", {
-      tabId: v2Tab.id,
-      state: "dom-quiet",
-      timeoutMs: 200,
-    });
-    if (quietWait.success || !toolError(quietWait).includes("timed out")) {
-      throw new Error("V2 DOM-quiet wait suppressed its timeout.");
-    }
-    await v2Contents.executeJavaScript(
-      "clearInterval(globalThis.__openbotNoise); delete globalThis.__openbotNoise; true",
-      true,
-    );
+    await runWaitDeadlines(browser, v2Tab.id, v2Contents);
     await v2Contents.executeJavaScript(
       "globalThis.__openbotSlowNoise = setInterval(() => document.body.toggleAttribute('data-slow-noise'), 10); setTimeout(() => { clearInterval(globalThis.__openbotSlowNoise); delete globalThis.__openbotSlowNoise; }, 1200); true",
       true,
@@ -1515,71 +1166,7 @@ async function main(): Promise<void> {
         `V2 DOM-quiet wait did not recheck its matched text condition: ${toolError(invalidatedQuietWait)}`,
       );
     }
-    const evaluated = await callBrowserTool(browser, "evaluate", {
-      tabId: v2Tab.id,
-      expression:
-        "new Promise(resolve => setTimeout(() => { document.body.dataset.evaluated = 'true'; resolve({ title: document.title, async: true, sandboxed: typeof process === 'undefined' && typeof require === 'undefined' }); }, 25))",
-    });
-    const evaluatedValue = toolTextPayload(evaluated);
-    if (!evaluated.success || evaluatedValue?.async !== true || evaluatedValue.sandboxed !== true) {
-      throw new Error(`V2 page evaluation did not return its sandboxed async value: ${toolError(evaluated)}`);
-    }
-    const evaluatedMutation = await v2Contents.executeJavaScript("document.body.dataset.evaluated", true);
-    if (evaluatedMutation !== "true") throw new Error("V2 page evaluation did not run in the main-frame page context.");
-    const evaluationSnapshot = await browser.snapshot(v2Tab.id);
-    if (!evaluationSnapshot.actions.some((action) => action.action === "evaluate" && action.outcome === "success")) {
-      throw new Error("V2 page evaluation was not recorded in browser action history.");
-    }
-    const thrownEvaluation = await callBrowserTool(browser, "evaluate", {
-      tabId: v2Tab.id,
-      expression: "(() => { throw new Error('evaluation-smoke-error'); })()",
-    });
-    if (thrownEvaluation.success || !toolError(thrownEvaluation).includes("evaluation-smoke-error")) {
-      throw new Error("V2 page evaluation did not return a page exception.");
-    }
-    const leakyEvaluation = await callBrowserTool(browser, "evaluate", {
-      tabId: v2Tab.id,
-      expression: "(() => { throw new Error('page said password=hunter2'); })()",
-    });
-    if (leakyEvaluation.success || toolError(leakyEvaluation).includes("hunter2")) {
-      throw new Error(`V2 page exception carried a page secret to the provider: ${toolError(leakyEvaluation)}`);
-    }
-    if (!toolError(leakyEvaluation).includes("[redacted]")) {
-      throw new Error(`V2 page exception was not redacted: ${toolError(leakyEvaluation)}`);
-    }
-    const unserializableEvaluation = await callBrowserTool(browser, "evaluate", {
-      tabId: v2Tab.id,
-      expression: "undefined",
-    });
-    if (unserializableEvaluation.success || !toolError(unserializableEvaluation).includes("not JSON-serializable")) {
-      throw new Error("V2 page evaluation accepted an unserializable result.");
-    }
-    const oversizedEvaluation = await callBrowserTool(browser, "evaluate", {
-      tabId: v2Tab.id,
-      expression: "'x'.repeat(70_000)",
-    });
-    if (oversizedEvaluation.success || !toolError(oversizedEvaluation).includes("exceeds 64 KB")) {
-      throw new Error("V2 page evaluation accepted an oversized result.");
-    }
-    // A promise the page never settles is the one evaluation CDP's own execution timeout does not
-    // bound, so the host has to cancel the pending command itself. If it does not, the tab's queue
-    // waits on that promise forever and every later operation -- including close and shutdown --
-    // blocks behind it, which is what the next call proves it does not.
-    const neverSettlingEvaluation = await callBrowserTool(browser, "evaluate", {
-      tabId: v2Tab.id,
-      expression: "new Promise(() => {})",
-      timeoutMs: 300,
-    });
-    if (neverSettlingEvaluation.success || !toolError(neverSettlingEvaluation).includes("timed out")) {
-      throw new Error("V2 page evaluation did not bound a promise the page never settles.");
-    }
-    const evaluationAfterFailure = await callBrowserTool(browser, "evaluate", {
-      tabId: v2Tab.id,
-      expression: "({ queueRecovered: true })",
-    });
-    if (!evaluationAfterFailure.success || toolTextPayload(evaluationAfterFailure)?.queueRecovered !== true) {
-      throw new Error(`V2 page evaluation left the action queue unusable: ${toolError(evaluationAfterFailure)}`);
-    }
+    await runEvaluationScenario(browser, v2Tab.id, v2Contents);
     const timedOut = await callBrowserTool(browser, "wait_for", {
       tabId: v2Tab.id,
       text: "never appears",
@@ -2090,86 +1677,7 @@ async function main(): Promise<void> {
       arguments: { url: `${origin}/cookie` },
     });
     if (!toolResult.success) throw new Error("Dynamic browser tool failed.");
-    const invalidToolArguments = [
-      ["click", { tabId: tab.id, target: { kind: "point", x: 10, y: 10 }, clickCount: 1.5 }],
-      ["click", { tabId: tab.id, target: { kind: "point", x: 10, y: 10 }, modifiers: ["Bogus"] }],
-      ["scroll", { tabId: tab.id, deltaY: 100_001 }],
-      ["evaluate", { tabId: tab.id, expression: "1", returnByValue: false }],
-      ["set_environment", { tabId: tab.id, width: 390.5 }],
-    ] as const;
-    for (const [tool, argumentsValue] of invalidToolArguments) {
-      const invalidResult = await callBrowserTool(browser, tool, argumentsValue);
-      if (invalidResult.success || !toolError(invalidResult).includes("Invalid browser tool arguments")) {
-        throw new Error(`Dynamic browser tool accepted invalid ${tool} arguments: ${toolError(invalidResult)}`);
-      }
-    }
-    process.stdout.write("BrowserHost: runtime tool argument schemas passed.\n");
-    const otherAgentTab = await browser.open(`${origin}/cookie`, "smoke-thread", "other-bot");
-    const scopedTabsResult = await browser.handleDynamicTool({
-      threadId: "smoke-thread",
-      turnId: "browser-smoke-scope-turn",
-      callId: "browser-smoke-scope-call",
-      ownerAgentId: "smoke-bot",
-      namespace: "openbot_browser",
-      tool: "list_tabs",
-      arguments: {},
-    });
-    const scopedTabsContent = scopedTabsResult.contentItems[0];
-    const scopedTabsPayload = scopedTabsContent?.type === "inputText" ? JSON.parse(scopedTabsContent.text) : undefined;
-    if (
-      !scopedTabsResult.success ||
-      !isDynamicRecord(scopedTabsPayload) ||
-      !Array.isArray(scopedTabsPayload.tabs) ||
-      scopedTabsPayload.tabs.some((candidate) => isDynamicRecord(candidate) && candidate.id === otherAgentTab.id)
-    ) {
-      throw new Error("Dynamic browser tools exposed another agent's tab.");
-    }
-    const crossAgentSnapshot = await browser.handleDynamicTool({
-      threadId: "smoke-thread",
-      turnId: "browser-smoke-scope-turn",
-      callId: "browser-smoke-cross-agent-call",
-      ownerAgentId: "smoke-bot",
-      namespace: "openbot_browser",
-      tool: "snapshot",
-      arguments: { tabId: otherAgentTab.id },
-    });
-    if (crossAgentSnapshot.success) throw new Error("Dynamic browser tools accessed another agent's tab.");
-    const crossAgentClose = await browser.handleDynamicTool({
-      threadId: "smoke-thread",
-      turnId: "browser-smoke-cross-agent-close-turn",
-      callId: "browser-smoke-cross-agent-close-call",
-      ownerAgentId: "smoke-bot",
-      namespace: "openbot_browser",
-      tool: "close_tab",
-      arguments: { tabId: otherAgentTab.id },
-    });
-    if (crossAgentClose.success || !browser.listTabs().some((candidate) => candidate.id === otherAgentTab.id)) {
-      throw new Error("Dynamic browser tools closed another agent's tab.");
-    }
-    const closableToolTab = await browser.open(`${origin}/cookie`, "smoke-thread", "smoke-bot");
-    const firstClose = browser.handleDynamicTool({
-      threadId: "smoke-thread",
-      turnId: "browser-smoke-close-turn-1",
-      callId: "browser-smoke-close-call-1",
-      ownerAgentId: "smoke-bot",
-      namespace: "openbot_browser",
-      tool: "close_tab",
-      arguments: { tabId: closableToolTab.id },
-    });
-    const repeatedClose = browser.handleDynamicTool({
-      threadId: "smoke-thread",
-      turnId: "browser-smoke-close-turn-2",
-      callId: "browser-smoke-close-call-2",
-      ownerAgentId: "smoke-bot",
-      namespace: "openbot_browser",
-      tool: "close_tab",
-      arguments: { tabId: closableToolTab.id },
-    });
-    const closeResults = await Promise.all([firstClose, repeatedClose]);
-    if (closeResults.some((result) => !result.success)) {
-      throw new Error("Repeated agent tab close was not idempotent.");
-    }
-    process.stdout.write("BrowserHost: agent tab isolation passed.\n");
+    await runToolBoundaryScenario(browser, origin);
     if (!controlPhases.includes("open:acting") || !controlPhases.includes("open:waiting")) {
       throw new Error(`Browser control lifecycle was not reported: ${controlPhases.join(", ")}`);
     }
@@ -2272,6 +1780,582 @@ async function main(): Promise<void> {
     if (server.listening) server.close();
     if (!configuredRoot) await rm(temporaryRoot, { recursive: true, force: true });
     app.quit();
+  }
+}
+
+async function runWaitDeadlines(browser: BrowserHost, tabId: string, v2Contents: WebContents): Promise<void> {
+  // A timeout returns before its CDP commands finish unwinding. A queued snapshot waits for
+  // that cleanup, so the next measurement covers its own deadline rather than the prior queue.
+  await browser.snapshot(tabId);
+  await v2Contents.executeJavaScript(
+    "(() => { const container = Object.assign(document.createElement('div'), { innerHTML: Array.from({ length: 200 }, (_, index) => '<button aria-label=\"Bulk ' + index + '\">Bulk ' + index + '</button>').join('') }); container.dataset.bulkTargets = ''; document.body.appendChild(container); return true; })()",
+    true,
+  );
+  const semanticWaitStarted = Date.now();
+  const boundedSemanticWait = await callBrowserTool(browser, "wait_for", {
+    tabId: tabId,
+    target: { kind: "role", role: "button", name: "Missing bulk target", exact: true },
+    timeoutMs: 5,
+  });
+  if (
+    boundedSemanticWait.success ||
+    !toolError(boundedSemanticWait).includes("timed out") ||
+    Date.now() - semanticWaitStarted > 1_000
+  ) {
+    throw new Error("V2 semantic wait did not enforce its collection deadline.");
+  }
+  const boundedWaitSnapshot = await callBrowserTool(browser, "wait_for", {
+    tabId: tabId,
+    url: "/v2",
+    timeoutMs: 5,
+  });
+  if (boundedWaitSnapshot.success || !toolError(boundedWaitSnapshot).includes("timed out")) {
+    throw new Error("V2 wait snapshot did not share the condition deadline.");
+  }
+  await v2Contents.executeJavaScript("document.querySelector('[data-bulk-targets]').remove(); true", true);
+  await browser.snapshot(tabId);
+  await v2Contents.executeJavaScript(
+    `(() => {
+      const container = document.createElement('div');
+      container.dataset.bulkText = '';
+      container.innerHTML = Array.from({ length: 6000 }, (_, index) => '<span>Bounded text ' + index + '</span>').join('');
+      document.body.appendChild(container);
+    })()`,
+    true,
+  );
+  const textWaitStarted = Date.now();
+  const boundedTextWait = await callBrowserTool(browser, "wait_for", {
+    tabId: tabId,
+    text: "Missing bounded text target",
+    timeoutMs: 5,
+  });
+  if (
+    boundedTextWait.success ||
+    !toolError(boundedTextWait).includes("timed out") ||
+    Date.now() - textWaitStarted > 1_000
+  ) {
+    throw new Error("V2 text wait did not enforce its scan deadline.");
+  }
+  await v2Contents.executeJavaScript(`document.querySelector('[data-bulk-text]').remove()`, true);
+  await browser.snapshot(tabId);
+  const boundedActionPoint = await v2Contents.executeJavaScript(
+    `(() => {
+      const bounds = document.querySelector('[aria-label="SPA"]').getBoundingClientRect();
+      return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+    })()`,
+    true,
+  );
+  if (!isDynamicRecord(boundedActionPoint) || !isNumber(boundedActionPoint.x) || !isNumber(boundedActionPoint.y)) {
+    throw new Error("V2 bounded action point fixture was not available.");
+  }
+  await v2Contents.executeJavaScript(
+    "globalThis.__openbotNoise = setInterval(() => document.querySelector('output').toggleAttribute('data-noise'), 10); true",
+    true,
+  );
+  const actionTimeoutStarted = Date.now();
+  const boundedAction = await callBrowserTool(browser, "click", {
+    tabId: tabId,
+    target: { kind: "point", x: boundedActionPoint.x, y: boundedActionPoint.y },
+    timeoutMs: 250,
+  });
+  const boundedActionPayload = toolTextPayload(boundedAction);
+  if (
+    !boundedAction.success ||
+    !Array.isArray(boundedActionPayload?.actions) ||
+    !boundedActionPayload.actions.some(
+      (entry) => isDynamicRecord(entry) && String(entry.detail).includes("Action completed"),
+    ) ||
+    Date.now() - actionTimeoutStarted > 1_000
+  ) {
+    throw new Error("V2 dispatched action did not report success when settling exceeded its deadline.");
+  }
+  const quietWait = await callBrowserTool(browser, "wait_for", {
+    tabId: tabId,
+    state: "dom-quiet",
+    timeoutMs: 200,
+  });
+  if (quietWait.success || !toolError(quietWait).includes("timed out")) {
+    throw new Error("V2 DOM-quiet wait suppressed its timeout.");
+  }
+  await v2Contents.executeJavaScript(
+    "clearInterval(globalThis.__openbotNoise); delete globalThis.__openbotNoise; true",
+    true,
+  );
+}
+
+async function runDoubleClickScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const doubleUrl = `${origin}/blocking-frame?double-click`;
+  const doubleTab = await browser.open(doubleUrl, "smoke-thread", "smoke-bot");
+  try {
+    const doubleContents = webContents
+      .getAllWebContents()
+      .find((contents) => !contents.isDestroyed() && contents.getURL() === doubleUrl);
+    if (!doubleContents) throw new Error("Double-click fixture web contents were not available.");
+    await doubleContents.executeJavaScript(
+      `(() => {
+    const button = document.createElement('button');
+    button.textContent = 'Double-click item';
+    button.addEventListener('click', event => {
+      if (event.detail === 1 && event.isTrusted) button.dataset.selected = 'true';
+    });
+    button.addEventListener('dblclick', event => {
+      if (button.dataset.selected === 'true' && event.isTrusted) button.dataset.activated = 'true';
+    });
+    button.id = 'double-click-item';
+    document.body.prepend(button);
+  })()`,
+      true,
+    );
+    const doubleClicked = await callBrowserTool(browser, "click", {
+      tabId: doubleTab.id,
+      target: { kind: "role", role: "button", name: "Double-click item", exact: true },
+      clickCount: 2,
+    });
+    const activated = await doubleContents.executeJavaScript(
+      "document.getElementById('double-click-item').dataset.activated === 'true'",
+      true,
+    );
+    if (!doubleClicked.success || !activated) throw new Error("V2 double-click did not select before activation.");
+    await doubleContents.executeJavaScript("document.getElementById('double-click-item').remove()", true);
+  } finally {
+    await browser.close(doubleTab.id);
+  }
+}
+
+async function runDragAction(browser: BrowserHost, tabId: string, v2Contents: WebContents): Promise<void> {
+  const dragged = await callBrowserTool(browser, "drag", {
+    tabId: tabId,
+    source: { kind: "role", role: "button", name: "Drag source", exact: true },
+    target: { kind: "role", role: "button", name: "Drop target", exact: true },
+  });
+  if (!dragged.success) throw new Error(`V2 drag failed: ${toolError(dragged)}`);
+  const dragValue = await v2Contents.executeJavaScript("document.querySelector('output').textContent", true);
+  if (dragValue !== "drag:true") {
+    const dragDiagnostics = await v2Contents.executeJavaScript(
+      `(() => ({
+        output: document.querySelector('output').textContent,
+        source: document.querySelector('[aria-label="Drag source"]').getBoundingClientRect().toJSON(),
+        target: document.querySelector('[aria-label="Drop target"]').getBoundingClientRect().toJSON(),
+        scrollY,
+        viewport: { width: innerWidth, height: innerHeight },
+      }))()`,
+      true,
+    );
+    throw new Error(`V2 drag did not produce a trusted drop event: ${JSON.stringify(dragDiagnostics)}`);
+  }
+}
+
+async function runControlActions(browser: BrowserHost, tabId: string, v2Contents: WebContents): Promise<void> {
+  const selected = await callBrowserTool(browser, "select_option", {
+    tabId: tabId,
+    target: { kind: "role", role: "combobox", name: "Mode", exact: true },
+    values: ["b"],
+  });
+  if (!selected.success) throw new Error(`V2 select failed: ${toolError(selected)}`);
+  const selectionValue = await v2Contents.executeJavaScript(
+    `(() => { const select = document.querySelector('[aria-label="Mode"]'); return { value: select.value, inputTrusted: select.dataset.inputTrusted, changeTrusted: select.dataset.changeTrusted }; })()`,
+    true,
+  );
+  if (
+    !isDynamicRecord(selectionValue) ||
+    selectionValue.value !== "b" ||
+    selectionValue.inputTrusted !== "true" ||
+    selectionValue.changeTrusted !== "true"
+  ) {
+    throw new Error("V2 select did not use trusted native input.");
+  }
+  // An option whose value is the empty string is how a page spells "no selection", and the value is
+  // the only way to address it -- its label is shared with Alpha's initial, so typeahead alone lands
+  // elsewhere. Rejecting the empty string as invalid put a real option out of reach.
+  const clearedSelection = await callBrowserTool(browser, "select_option", {
+    tabId: tabId,
+    target: { kind: "role", role: "combobox", name: "Mode", exact: true },
+    values: [""],
+  });
+  const clearedValue = await v2Contents.executeJavaScript(`document.querySelector('[aria-label="Mode"]').value`, true);
+  if (!clearedSelection.success || clearedValue !== "") {
+    throw new Error(`V2 select could not clear through an empty option: ${toolError(clearedSelection)}`);
+  }
+  const reselected = await callBrowserTool(browser, "select_option", {
+    tabId: tabId,
+    target: { kind: "role", role: "combobox", name: "Mode", exact: true },
+    values: ["b"],
+  });
+  if (!reselected.success) throw new Error(`V2 select could not restore a value: ${toolError(reselected)}`);
+  const partialSelection = await callBrowserTool(browser, "select_option", {
+    tabId: tabId,
+    target: { kind: "role", role: "combobox", name: "Mode", exact: true },
+    values: ["b", "missing"],
+  });
+  if (partialSelection.success || !toolError(partialSelection).includes("single-select")) {
+    throw new Error("V2 single-select accepted multiple requested values.");
+  }
+  const missingSelection = await callBrowserTool(browser, "select_option", {
+    tabId: tabId,
+    target: { kind: "role", role: "combobox", name: "Mode", exact: true },
+    values: ["missing"],
+  });
+  if (missingSelection.success || !toolError(missingSelection).includes("do not exist")) {
+    throw new Error("V2 select silently accepted a missing requested value.");
+  }
+  const checked = await callBrowserTool(browser, "set_checked", {
+    tabId: tabId,
+    target: { kind: "role", role: "checkbox", name: "Agree", exact: true },
+    checked: true,
+  });
+  if (!checked.success) throw new Error(`V2 checkbox failed: ${toolError(checked)}`);
+  const clearedRadio = await callBrowserTool(browser, "set_checked", {
+    tabId: tabId,
+    target: { kind: "role", role: "radio", name: "Primary choice", exact: true },
+    checked: false,
+  });
+  if (clearedRadio.success || !toolError(clearedRadio).includes("cannot be cleared directly")) {
+    throw new Error("V2 selected radio clearing did not return a truthful error.");
+  }
+  const nonCheckable = await callBrowserTool(browser, "set_checked", {
+    tabId: tabId,
+    target: { kind: "role", role: "spinbutton", name: "Quantity", exact: true },
+    checked: false,
+  });
+  if (nonCheckable.success || !toolError(nonCheckable).includes("not checkable")) {
+    throw new Error("V2 set_checked accepted a non-checkable input.");
+  }
+  const contentEditable = await callBrowserTool(browser, "type", {
+    tabId: tabId,
+    target: { kind: "role", role: "textbox", name: "Notes", exact: true },
+    text: "editable text",
+    mode: "replace",
+  });
+  if (!contentEditable.success) throw new Error(`V2 contenteditable typing failed: ${toolError(contentEditable)}`);
+  const appendedContentEditable = await callBrowserTool(browser, "type", {
+    tabId: tabId,
+    target: { kind: "role", role: "textbox", name: "Notes", exact: true },
+    text: " appended",
+    mode: "append",
+  });
+  if (!appendedContentEditable.success) {
+    throw new Error(`V2 contenteditable append failed: ${toolError(appendedContentEditable)}`);
+  }
+  const editableValue = await v2Contents.executeJavaScript(
+    "document.querySelector('[contenteditable]').textContent",
+    true,
+  );
+  if (editableValue !== "editable text appended") {
+    throw new Error("V2 contenteditable target did not receive text.");
+  }
+}
+
+async function runKeyboardScenario(browser: BrowserHost, origin: string, temporaryRoot: string): Promise<void> {
+  // Chromium decides implicit form submission and text insertion from the *character* event, not
+  // the key event, so a named key dispatched without one reaches the page as a keydown nobody acts
+  // on: `submit: true` left a plain form unsubmitted and `press("Space")` typed nothing. Nothing is
+  // bound to this field, so only native submission can produce the form's output.
+  const { tab: keysTab, contents: keysContents } = await openTabWithContents(
+    browser,
+    `${origin}/keys`,
+    "smoke-thread",
+    "smoke-bot",
+  );
+  const retainedDocumentChanges: Array<{ tabId: string; documentIds: ReadonlySet<string> }> = [];
+  const unsubscribe = browser.onDocumentChanged((tabId, documentIds) => {
+    retainedDocumentChanges.push({ tabId, documentIds });
+  });
+  try {
+    const typedIntoForm = await callBrowserTool(browser, "type", {
+      tabId: keysTab.id,
+      target: { kind: "css", selector: 'input[aria-label="Query"]' },
+      text: "open",
+      mode: "replace",
+    });
+    if (!typedIntoForm.success) throw new Error(`V2 form field typing failed: ${toolError(typedIntoForm)}`);
+    const spacePressed = await callBrowserTool(browser, "press", {
+      tabId: keysTab.id,
+      target: { kind: "css", selector: 'input[aria-label="Query"]' },
+      key: "Space",
+    });
+    const queryAfterSpace = await keysContents.executeJavaScript(
+      `document.querySelector('input[aria-label="Query"]').value`,
+      true,
+    );
+    if (!spacePressed.success || queryAfterSpace !== "open ") {
+      throw new Error(`V2 press did not insert a space: ${toolError(spacePressed)} (${queryAfterSpace})`);
+    }
+    const nativeSubmit = await callBrowserTool(browser, "type", {
+      tabId: keysTab.id,
+      target: { kind: "css", selector: 'input[aria-label="Query"]' },
+      text: "sesame",
+      mode: "append",
+      submit: true,
+    });
+    const nativeSubmitOutput = await keysContents.executeJavaScript(
+      "document.querySelector('output').textContent",
+      true,
+    );
+    if (!nativeSubmit.success || nativeSubmitOutput !== "form-submit:true") {
+      throw new Error(
+        `V2 submit did not reach native form submission: ${toolError(nativeSubmit)} (${nativeSubmitOutput})`,
+      );
+    }
+    // Shift is not a command modifier. `Shift+Enter` is how every composer on the web spells "line
+    // break, do not submit", so a shortcut whose character event is suppressed reaches the page as a
+    // keydown that inserts nothing while the tool reports success.
+    const typedIntoBody = await callBrowserTool(browser, "type", {
+      tabId: keysTab.id,
+      target: { kind: "css", selector: 'textarea[aria-label="Body"]' },
+      text: "line",
+      mode: "replace",
+    });
+    if (!typedIntoBody.success) throw new Error(`V2 textarea typing failed: ${toolError(typedIntoBody)}`);
+    const shiftEnterPressed = await callBrowserTool(browser, "press", {
+      tabId: keysTab.id,
+      target: { kind: "css", selector: 'textarea[aria-label="Body"]' },
+      key: "Shift+Enter",
+    });
+    const bodyAfterShiftEnter = await keysContents.executeJavaScript(
+      `document.querySelector('textarea[aria-label="Body"]').value`,
+      true,
+    );
+    if (!shiftEnterPressed.success || bodyAfterShiftEnter !== "line\n") {
+      throw new Error(
+        `V2 Shift+Enter inserted no newline: ${toolError(shiftEnterPressed)} (${JSON.stringify(bodyAfterShiftEnter)})`,
+      );
+    }
+    // The character event carries the same modifier mask as the key events around it, or the page sees
+    // an unshifted Enter -- which is how a composer decides to send the message instead of breaking
+    // the line, whatever the textarea ends up containing.
+    const shiftEnterKeypress = await keysContents.executeJavaScript(
+      "document.querySelector('#keypress-log').textContent",
+      true,
+    );
+    if (shiftEnterKeypress !== "keypress:Enter:true") {
+      throw new Error(`V2 Shift+Enter reached the page unshifted: ${shiftEnterKeypress}`);
+    }
+    // An input inside an iframe nested in a shadow root is reachable by target discovery, so its
+    // document has to be reachable by document enumeration too. If it is not, the next frame
+    // navigation reports the document as gone and frees the files the input is still holding.
+    const nestedUploadPath = join(temporaryRoot, "nested-frame-upload.txt");
+    await writeFile(nestedUploadPath, "nested frame upload fixture");
+    let shadowFrameDocumentId = "";
+    const shadowFrameUpload = await callBrowserTool(
+      browser,
+      "upload_files",
+      {
+        tabId: keysTab.id,
+        target: { kind: "role", role: "button", name: "Shadow frame files", exact: true },
+        paths: [nestedUploadPath],
+      },
+      { onUploadAssigned: (_inputId, documentId) => (shadowFrameDocumentId = documentId) },
+    );
+    if (!shadowFrameUpload.success || !shadowFrameDocumentId) {
+      throw new Error(`V2 shadow-root iframe upload failed: ${toolError(shadowFrameUpload)}`);
+    }
+    const changesBeforeTriggerNavigation = retainedDocumentChanges.length;
+    await keysContents.executeJavaScript(
+      `(() => {
+      document.querySelector('iframe[title="Trigger frame"]').src = '/frame-files?file_label=Reloaded+files';
+      return true;
+    })()`,
+      true,
+    );
+    await waitFor(async () =>
+      retainedDocumentChanges.slice(changesBeforeTriggerNavigation).some((change) => change.tabId === keysTab.id),
+    );
+    const retainedShadowFrame = retainedDocumentChanges
+      .slice(changesBeforeTriggerNavigation)
+      .some((change) => change.tabId === keysTab.id && change.documentIds.has(shadowFrameDocumentId));
+    if (!retainedShadowFrame) {
+      throw new Error("V2 document enumeration lost an upload document inside a shadow-root iframe.");
+    }
+    // The same document, now behind a parent grown past the enumeration node budget. A walk that stops
+    // early never reaches the upload frame, and a partial list reported as complete is indistinguishable
+    // from a closed document -- which frees the files the input downstairs is still holding.
+    const grown = await callBrowserTool(browser, "evaluate", {
+      tabId: keysTab.id,
+      expression: `(() => {
+      const bulk = document.createElement('div');
+      for (let index = 0; index < 10500; index++) bulk.appendChild(document.createElement('span'));
+      document.body.appendChild(bulk);
+      return document.querySelectorAll('*').length;
+    })()`,
+    });
+    if (!grown.success) throw new Error(`V2 could not grow the keys document: ${toolError(grown)}`);
+    const changesBeforeGrownNavigation = retainedDocumentChanges.length;
+    await keysContents.executeJavaScript(
+      `(() => {
+      document.querySelector('iframe[title="Trigger frame"]').src = '/frame-files?file_label=Grown+files';
+      return true;
+    })()`,
+      true,
+    );
+    await waitFor(async () =>
+      retainedDocumentChanges.slice(changesBeforeGrownNavigation).some((change) => change.tabId === keysTab.id),
+    );
+    const retainedPastBudget = retainedDocumentChanges
+      .slice(changesBeforeGrownNavigation)
+      .some((change) => change.tabId === keysTab.id && change.documentIds.has(shadowFrameDocumentId));
+    if (!retainedPastBudget) {
+      throw new Error("V2 document enumeration reported a truncated scan as complete and lost an upload document.");
+    }
+  } finally {
+    unsubscribe();
+    await browser.close(keysTab.id);
+  }
+}
+
+async function runEvaluationScenario(browser: BrowserHost, tabId: string, v2Contents: WebContents): Promise<void> {
+  const evaluated = await callBrowserTool(browser, "evaluate", {
+    tabId: tabId,
+    expression:
+      "new Promise(resolve => setTimeout(() => { document.body.dataset.evaluated = 'true'; resolve({ title: document.title, async: true, sandboxed: typeof process === 'undefined' && typeof require === 'undefined' }); }, 25))",
+  });
+  const evaluatedValue = toolTextPayload(evaluated);
+  if (!evaluated.success || evaluatedValue?.async !== true || evaluatedValue.sandboxed !== true) {
+    throw new Error(`V2 page evaluation did not return its sandboxed async value: ${toolError(evaluated)}`);
+  }
+  const evaluatedMutation = await v2Contents.executeJavaScript("document.body.dataset.evaluated", true);
+  if (evaluatedMutation !== "true") throw new Error("V2 page evaluation did not run in the main-frame page context.");
+  const evaluationSnapshot = await browser.snapshot(tabId);
+  if (!evaluationSnapshot.actions.some((action) => action.action === "evaluate" && action.outcome === "success")) {
+    throw new Error("V2 page evaluation was not recorded in browser action history.");
+  }
+  const thrownEvaluation = await callBrowserTool(browser, "evaluate", {
+    tabId: tabId,
+    expression: "(() => { throw new Error('evaluation-smoke-error'); })()",
+  });
+  if (thrownEvaluation.success || !toolError(thrownEvaluation).includes("evaluation-smoke-error")) {
+    throw new Error("V2 page evaluation did not return a page exception.");
+  }
+  const leakyEvaluation = await callBrowserTool(browser, "evaluate", {
+    tabId: tabId,
+    expression: "(() => { throw new Error('page said password=hunter2'); })()",
+  });
+  if (leakyEvaluation.success || toolError(leakyEvaluation).includes("hunter2")) {
+    throw new Error(`V2 page exception carried a page secret to the provider: ${toolError(leakyEvaluation)}`);
+  }
+  if (!toolError(leakyEvaluation).includes("[redacted]")) {
+    throw new Error(`V2 page exception was not redacted: ${toolError(leakyEvaluation)}`);
+  }
+  const unserializableEvaluation = await callBrowserTool(browser, "evaluate", {
+    tabId: tabId,
+    expression: "undefined",
+  });
+  if (unserializableEvaluation.success || !toolError(unserializableEvaluation).includes("not JSON-serializable")) {
+    throw new Error("V2 page evaluation accepted an unserializable result.");
+  }
+  const oversizedEvaluation = await callBrowserTool(browser, "evaluate", {
+    tabId: tabId,
+    expression: "'x'.repeat(70_000)",
+  });
+  if (oversizedEvaluation.success || !toolError(oversizedEvaluation).includes("exceeds 64 KB")) {
+    throw new Error("V2 page evaluation accepted an oversized result.");
+  }
+  // A promise the page never settles is the one evaluation CDP's own execution timeout does not
+  // bound, so the host has to cancel the pending command itself. If it does not, the tab's queue
+  // waits on that promise forever and every later operation -- including close and shutdown --
+  // blocks behind it, which is what the next call proves it does not.
+  const neverSettlingEvaluation = await callBrowserTool(browser, "evaluate", {
+    tabId: tabId,
+    expression: "new Promise(() => {})",
+    timeoutMs: 300,
+  });
+  if (neverSettlingEvaluation.success || !toolError(neverSettlingEvaluation).includes("timed out")) {
+    throw new Error("V2 page evaluation did not bound a promise the page never settles.");
+  }
+  const evaluationAfterFailure = await callBrowserTool(browser, "evaluate", {
+    tabId: tabId,
+    expression: "({ queueRecovered: true })",
+  });
+  if (!evaluationAfterFailure.success || toolTextPayload(evaluationAfterFailure)?.queueRecovered !== true) {
+    throw new Error(`V2 page evaluation left the action queue unusable: ${toolError(evaluationAfterFailure)}`);
+  }
+}
+
+async function runToolBoundaryScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const tab = await browser.open(`${origin}/cookie`, "smoke-thread", "smoke-bot");
+  const otherAgentTab = await browser.open(`${origin}/cookie`, "smoke-thread", "other-bot");
+  try {
+    const invalidToolArguments = [
+      ["click", { tabId: tab.id, target: { kind: "point", x: 10, y: 10 }, clickCount: 1.5 }],
+      ["click", { tabId: tab.id, target: { kind: "point", x: 10, y: 10 }, modifiers: ["Bogus"] }],
+      ["scroll", { tabId: tab.id, deltaY: 100_001 }],
+      ["evaluate", { tabId: tab.id, expression: "1", returnByValue: false }],
+      ["set_environment", { tabId: tab.id, width: 390.5 }],
+    ] as const;
+    for (const [tool, argumentsValue] of invalidToolArguments) {
+      const invalidResult = await callBrowserTool(browser, tool, argumentsValue);
+      if (invalidResult.success || !toolError(invalidResult).includes("Invalid browser tool arguments")) {
+        throw new Error(`Dynamic browser tool accepted invalid ${tool} arguments: ${toolError(invalidResult)}`);
+      }
+    }
+    process.stdout.write("BrowserHost: runtime tool argument schemas passed.\n");
+    const scopedTabsResult = await browser.handleDynamicTool({
+      threadId: "smoke-thread",
+      turnId: "browser-smoke-scope-turn",
+      callId: "browser-smoke-scope-call",
+      ownerAgentId: "smoke-bot",
+      namespace: "openbot_browser",
+      tool: "list_tabs",
+      arguments: {},
+    });
+    const scopedTabsContent = scopedTabsResult.contentItems[0];
+    const scopedTabsPayload = scopedTabsContent?.type === "inputText" ? JSON.parse(scopedTabsContent.text) : undefined;
+    if (
+      !scopedTabsResult.success ||
+      !isDynamicRecord(scopedTabsPayload) ||
+      !Array.isArray(scopedTabsPayload.tabs) ||
+      scopedTabsPayload.tabs.some((candidate) => isDynamicRecord(candidate) && candidate.id === otherAgentTab.id)
+    ) {
+      throw new Error("Dynamic browser tools exposed another agent's tab.");
+    }
+    const crossAgentSnapshot = await browser.handleDynamicTool({
+      threadId: "smoke-thread",
+      turnId: "browser-smoke-scope-turn",
+      callId: "browser-smoke-cross-agent-call",
+      ownerAgentId: "smoke-bot",
+      namespace: "openbot_browser",
+      tool: "snapshot",
+      arguments: { tabId: otherAgentTab.id },
+    });
+    if (crossAgentSnapshot.success) throw new Error("Dynamic browser tools accessed another agent's tab.");
+    const crossAgentClose = await browser.handleDynamicTool({
+      threadId: "smoke-thread",
+      turnId: "browser-smoke-cross-agent-close-turn",
+      callId: "browser-smoke-cross-agent-close-call",
+      ownerAgentId: "smoke-bot",
+      namespace: "openbot_browser",
+      tool: "close_tab",
+      arguments: { tabId: otherAgentTab.id },
+    });
+    if (crossAgentClose.success || !browser.listTabs().some((candidate) => candidate.id === otherAgentTab.id)) {
+      throw new Error("Dynamic browser tools closed another agent's tab.");
+    }
+    const closableToolTab = await browser.open(`${origin}/cookie`, "smoke-thread", "smoke-bot");
+    const firstClose = browser.handleDynamicTool({
+      threadId: "smoke-thread",
+      turnId: "browser-smoke-close-turn-1",
+      callId: "browser-smoke-close-call-1",
+      ownerAgentId: "smoke-bot",
+      namespace: "openbot_browser",
+      tool: "close_tab",
+      arguments: { tabId: closableToolTab.id },
+    });
+    const repeatedClose = browser.handleDynamicTool({
+      threadId: "smoke-thread",
+      turnId: "browser-smoke-close-turn-2",
+      callId: "browser-smoke-close-call-2",
+      ownerAgentId: "smoke-bot",
+      namespace: "openbot_browser",
+      tool: "close_tab",
+      arguments: { tabId: closableToolTab.id },
+    });
+    const closeResults = await Promise.all([firstClose, repeatedClose]);
+    if (closeResults.some((result) => !result.success)) {
+      throw new Error("Repeated agent tab close was not idempotent.");
+    }
+    process.stdout.write("BrowserHost: agent tab isolation passed.\n");
+  } finally {
+    await browser.close(tab.id);
+    await browser.close(otherAgentTab.id);
   }
 }
 

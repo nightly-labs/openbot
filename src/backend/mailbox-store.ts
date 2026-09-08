@@ -1,29 +1,11 @@
-import { createHash, randomUUID } from "node:crypto";
-import {
-  copyFile,
-  type FileHandle,
-  mkdir,
-  open,
-  readFile,
-  realpath,
-  rename,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
-import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
-import {
-  attachmentMimeTypeForName,
-  isSupportedAttachmentName,
-  SUPPORTED_ATTACHMENT_DESCRIPTION,
-} from "@openbot/contracts/attachment-files";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { rewriteAttachmentReferences } from "@openbot/contracts/attachment-references";
-import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentRuntimeWorkItem,
   AttachmentDataInput,
-  AttachmentKind,
-  AttachmentPreviewKind,
   AttachmentSummary,
   ConversationMessage,
   ConversationReaction,
@@ -43,28 +25,23 @@ import {
   isMessageReaction,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import {
+  AttachmentFiles,
+  type ExportedAttachmentFile,
+  type GeneratedAttachmentSource,
+  type StoredAttachment,
+  type StoredDraft,
+  type StoredGeneratedAttachment,
+  toAttachmentSummary,
+} from "./attachment-files";
+
+export type { ExportedAttachmentFile, GeneratedAttachmentSource } from "./attachment-files";
+
+import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
 import { OpenBotDatabase } from "./openbot-database";
 import { isRecord } from "./protocol";
 
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
-const MAX_FILE_BYTES = ATTACHMENT_LIMITS.fileBytes;
-const MAX_TOTAL_BYTES = ATTACHMENT_LIMITS.totalBytes;
-const TRANSFER_MANIFEST_FILE = ".openbot-transfer.json";
-
-interface StoredAttachment extends AttachmentSummary {
-  path: string;
-  sha256: string;
-}
-
-interface StoredGeneratedAttachment extends StoredAttachment {
-  ownerAgentId?: string;
-  ownerThreadId?: string | null;
-}
-
-interface StoredDraft extends StoredAttachment {
-  createdAt: string;
-}
-
 interface StoredMessage {
   id: string;
   sender:
@@ -117,48 +94,9 @@ interface EnqueueInput {
   idempotencyKey?: string;
 }
 
-interface TransferManifest {
-  /**
-   * 2, because the rename changed the field names inside: `recipientBotIds` became `recipientAgentIds` and
-   * `ownerBotId` became `ownerAgentId`. Nothing in the app reads this sidecar back -- it is written for the
-   * user and the model looking at the transfer directory -- but a released version 1 on disk spells those
-   * fields the old way, and leaving both shapes under one number would make the version say nothing.
-   */
-  version: 2;
-  kind: "message-transfer" | "generated-attachment";
-  transferId?: string;
-  messageId?: string;
-  generatedAttachmentId?: string;
-  sender?: StoredMessage["sender"];
-  recipientAgentIds?: string[];
-  ownerAgentId?: string;
-  ownerThreadId?: string | null;
-  createdAt: string;
-  attachments: Array<{
-    id: string;
-    name: string;
-    relativePath: string;
-    size: number;
-    kind: AttachmentKind;
-    mimeType: string;
-    previewKind: AttachmentPreviewKind;
-    sha256: string;
-  }>;
-}
-
 export interface DeliveryContext {
   delivery: QueueDelivery;
   managedAttachments: Array<AttachmentSummary & { path: string }>;
-}
-
-export interface ExportedAttachmentFile {
-  sourcePath: string;
-  relativePath: string;
-}
-
-export interface GeneratedAttachmentSource {
-  path: string;
-  handle: FileHandle;
 }
 
 const EMPTY_STATE: StoredState = {
@@ -174,25 +112,20 @@ const EMPTY_STATE: StoredState = {
 
 export class MailboxStore {
   readonly #statePath: string;
-  readonly #draftsRoot: string;
-  readonly #transfersRoot: string;
+  readonly #files: AttachmentFiles;
   readonly #database: OpenBotDatabase;
+  readonly #deliveryGate = new MailboxDeliveryGate();
   readonly #stagedGeneratedAttachments = new Map<string, StoredGeneratedAttachment>();
   #state: StoredState = structuredClone(EMPTY_STATE);
 
   constructor(userDataPath: string, sharedRoot: string, database = new OpenBotDatabase(userDataPath)) {
     this.#statePath = join(userDataPath, "mailbox.json");
-    this.#draftsRoot = join(userDataPath, "attachment-drafts");
-    this.#transfersRoot = join(sharedRoot, "Transfers");
+    this.#files = new AttachmentFiles({ userDataPath, sharedRoot });
     this.#database = database;
   }
 
   async initialize(): Promise<void> {
-    await Promise.all([
-      mkdir(dirname(this.#statePath), { recursive: true, mode: 0o700 }),
-      mkdir(this.#draftsRoot, { recursive: true, mode: 0o700 }),
-      mkdir(this.#transfersRoot, { recursive: true, mode: 0o700 }),
-    ]);
+    await Promise.all([mkdir(dirname(this.#statePath), { recursive: true, mode: 0o700 }), this.#files.initialize()]);
     await this.#database.initialize();
     const stored = this.#database.readMailboxState();
     if (stored !== null && stored !== undefined) {
@@ -208,8 +141,7 @@ export class MailboxStore {
       this.#state.drafts = [];
       await this.#persist("mailbox.drafts-cleared");
     }
-    await rm(this.#draftsRoot, { recursive: true, force: true });
-    await mkdir(this.#draftsRoot, { recursive: true, mode: 0o700 });
+    await this.#files.resetDrafts();
     await this.#drainFileDeletionOutbox();
   }
 
@@ -225,84 +157,15 @@ export class MailboxStore {
     if (this.#state.drafts.length + paths.length + data.length > INPUT_LIMITS.draftAttachments) {
       throw new Error(`Keep at most ${INPUT_LIMITS.draftAttachments} draft attachments.`);
     }
-    if (paths.some((path) => !path || path.length > INPUT_LIMITS.path)) {
-      throw new Error("An attachment path is invalid.");
-    }
-    if (
-      data.some(
-        (item) => item.name.length > INPUT_LIMITS.attachmentName || item.mimeType.length > INPUT_LIMITS.mimeType,
-      )
-    ) {
-      throw new Error("Attachment metadata is too long.");
-    }
-
-    const prepared: StoredDraft[] = [];
-    let total = 0;
+    const prepared = await this.#files.prepareDrafts(paths, data);
+    this.#state.drafts.push(...prepared);
     try {
-      for (const sourcePath of paths) {
-        const source = await inspectSource(sourcePath);
-        const id = randomUUID();
-        const targetDirectory = join(this.#draftsRoot, id);
-        const name = sanitizeName(source.path);
-        assertSupportedAttachmentName(name);
-        const targetPath = join(targetDirectory, name);
-        await mkdir(targetDirectory, { recursive: true, mode: 0o700 });
-        await copyFile(source.path, targetPath);
-        const copied = await stat(targetPath);
-        if (copied.size > MAX_FILE_BYTES) {
-          await rm(targetDirectory, { recursive: true, force: true });
-          throw new Error(`${name} exceeds the 100 MB limit.`);
-        }
-        total += copied.size;
-        if (total > MAX_TOTAL_BYTES) {
-          await rm(targetDirectory, { recursive: true, force: true });
-          throw new Error("Attachments exceed the 250 MB total limit.");
-        }
-        const metadata = attachmentMetadata(name);
-        prepared.push({
-          id,
-          name,
-          size: copied.size,
-          ...metadata,
-          previewUrl: attachmentPreviewUrl(id),
-          path: targetPath,
-          sha256: await sha256(targetPath),
-          createdAt: new Date().toISOString(),
-        });
-      }
-      for (const item of data) {
-        const bytes = normalizeBytes(item.bytes);
-        if (bytes.byteLength > MAX_FILE_BYTES) {
-          throw new Error(`${item.name} exceeds the 100 MB limit.`);
-        }
-        total += bytes.byteLength;
-        if (total > MAX_TOTAL_BYTES) throw new Error("Attachments exceed the 250 MB total limit.");
-        const id = randomUUID();
-        const targetDirectory = join(this.#draftsRoot, id);
-        const name = sanitizeName(item.name || "pasted-image.png");
-        assertSupportedAttachmentName(name);
-        const targetPath = join(targetDirectory, name);
-        const metadata = attachmentMetadata(name, item.mimeType);
-        await mkdir(targetDirectory, { recursive: true, mode: 0o700 });
-        await writeFile(targetPath, bytes, { mode: 0o600 });
-        prepared.push({
-          id,
-          name,
-          size: bytes.byteLength,
-          ...metadata,
-          previewUrl: attachmentPreviewUrl(id),
-          path: targetPath,
-          sha256: createHash("sha256").update(bytes).digest("hex"),
-          createdAt: new Date().toISOString(),
-        });
-      }
-      this.#state.drafts.push(...prepared);
       await this.#persist("attachments.prepared");
       return prepared.map(toAttachmentSummary);
     } catch (error) {
       const preparedIds = new Set(prepared.map((draft) => draft.id));
       this.#state.drafts = this.#state.drafts.filter((draft) => !preparedIds.has(draft.id));
-      await Promise.all(prepared.map((draft) => rm(dirname(draft.path), { recursive: true, force: true })));
+      await this.#files.removeAttachmentDirectories(prepared.map((draft) => draft.path));
       throw error;
     }
   }
@@ -317,7 +180,15 @@ export class MailboxStore {
       this.#state.drafts.splice(index, 0, draft);
       throw error;
     }
-    await rm(dirname(draft.path), { recursive: true, force: true });
+    await this.#files.removeAttachmentDirectories([draft.path]);
+  }
+
+  blockAgentDeliveries(agentId: string): () => void {
+    return this.#deliveryGate.block(agentId);
+  }
+
+  prepareDelivery(agentIds: string[]): () => void {
+    return this.#deliveryGate.prepare(agentIds);
   }
 
   async enqueue(input: EnqueueInput): Promise<QueuedMessageReceipt> {
@@ -327,6 +198,7 @@ export class MailboxStore {
     }
 
     const recipients = [...new Set(input.recipientAgentIds)];
+    const validateRecipients = this.prepareDelivery(recipients);
     if (recipients.length === 0) throw new Error("At least one recipient is required.");
     if (recipients.length > INPUT_LIMITS.messageRecipients) {
       throw new Error(`A message can have at most ${INPUT_LIMITS.messageRecipients} recipients.`);
@@ -357,7 +229,7 @@ export class MailboxStore {
 
     const createdAt = new Date().toISOString();
     const messageId = randomUUID();
-    const attachments = await this.#commitAttachments(
+    const attachments = await this.#files.commitMessageTransfer(
       messageId,
       input.sender,
       recipients,
@@ -365,6 +237,12 @@ export class MailboxStore {
       createdAt,
       sourcePaths,
     );
+    try {
+      validateRecipients();
+    } catch (error) {
+      await this.#files.remove(this.#files.transferRoot(messageId));
+      throw error;
+    }
     const committedByDraftId = new Map(drafts.map((draft, index) => [draft.id, attachments[index]] as const));
     const message: StoredMessage = {
       id: messageId,
@@ -406,10 +284,10 @@ export class MailboxStore {
           this.#state.drafts.push(draft);
         }
       }
-      await rm(join(this.#transfersRoot, messageId), { recursive: true, force: true });
+      await this.#files.remove(this.#files.transferRoot(messageId));
       throw error;
     }
-    await Promise.all(drafts.map((draft) => rm(dirname(draft.path), { recursive: true, force: true })));
+    await this.#files.removeAttachmentDirectories(drafts.map((draft) => draft.path));
     return this.#receipt(messageId);
   }
 
@@ -703,13 +581,13 @@ export class MailboxStore {
       if (!keep) removedMessageIds.add(message.id);
       if (!keep) {
         for (const attachment of message.attachments) {
-          const transferRoot = transferRootForPath(this.#transfersRoot, attachment.path);
+          const transferRoot = this.#files.transferRootForPath(attachment.path);
           if (transferRoot) removedTransferRoots.add(transferRoot);
         }
       }
       return keep;
     });
-    for (const messageId of removedMessageIds) removedTransferRoots.add(join(this.#transfersRoot, messageId));
+    for (const messageId of removedMessageIds) removedTransferRoots.add(this.#files.transferRoot(messageId));
     this.#state.pausedAgentIds = this.#state.pausedAgentIds.filter((id) => id !== agentId);
     this.#state.reactions = this.#state.reactions.filter(
       (reaction) => reaction.agentId !== agentId && !removedMessageIds.has(reaction.messageId),
@@ -727,7 +605,7 @@ export class MailboxStore {
         [
           ...removedTransferRoots,
           ...removedGenerated
-            .map((attachment) => generatedRootForPath(this.#transfersRoot, attachment.path))
+            .map((attachment) => this.#files.generatedRootForPath(attachment.path))
             .filter((path): path is string => path !== null),
         ],
         true,
@@ -860,7 +738,7 @@ export class MailboxStore {
     try {
       const keptAttachments = message.attachments.filter((attachment) => keepIds.has(attachment.id));
       const committedDrafts = draftAttachmentPaths.length
-        ? await this.#commitAttachments(
+        ? await this.#files.commitMessageTransfer(
             `${message.id}-edit-${randomUUID()}`,
             message.sender,
             this.#state.deliveries
@@ -898,10 +776,10 @@ export class MailboxStore {
           this.#state.drafts.push(draft);
         }
       }
-      await Promise.all(newAttachmentPaths.map((path) => rm(dirname(path), { recursive: true, force: true })));
+      await this.#files.removeAttachmentDirectories(newAttachmentPaths);
       throw error;
     }
-    await Promise.all(drafts.map((draft) => rm(dirname(draft.path), { recursive: true, force: true })));
+    await this.#files.removeAttachmentDirectories(drafts.map((draft) => draft.path));
     await this.#drainFileDeletionOutbox();
   }
 
@@ -955,13 +833,13 @@ export class MailboxStore {
 
   async resolveAttachment(id: string): Promise<{ path: string; mimeType: string } | null> {
     const draft = this.#state.drafts.find((candidate) => candidate.id === id);
-    if (draft) return resolveManagedAttachment(this.#draftsRoot, draft);
+    if (draft) return this.#files.resolveDraft(draft);
     for (const message of this.#state.messages) {
       const attachment = message.attachments.find((candidate) => candidate.id === id);
-      if (attachment) return resolveManagedAttachment(this.#transfersRoot, attachment);
+      if (attachment) return this.#files.resolveTransfer(attachment);
     }
     const generated = this.#state.generatedAttachments.find((candidate) => candidate.id === id);
-    if (generated) return resolveManagedAttachment(this.#transfersRoot, generated);
+    if (generated) return this.#files.resolveTransfer(generated);
     return null;
   }
 
@@ -970,7 +848,7 @@ export class MailboxStore {
     if (!delivery) throw new Error(`Unknown delivery: ${deliveryId}`);
     const message = this.#requireMessage(delivery.messageId);
     for (const attachment of message.attachments) {
-      const resolved = await resolveManagedAttachment(this.#transfersRoot, attachment);
+      const resolved = await this.#files.resolveTransfer(attachment);
       if (!resolved) throw new Error(`Managed attachment is missing or has changed: ${attachment.name}`);
     }
   }
@@ -980,69 +858,9 @@ export class MailboxStore {
     ownerAgentId?: string;
     ownerThreadId?: string | null;
   }): Promise<AttachmentSummary[]> {
-    if (input.sources.length === 0 || input.sources.length > MAX_ATTACHMENTS) {
-      throw new Error(`Attach between 1 and ${MAX_ATTACHMENTS} files.`);
-    }
-    const sources = await Promise.all(
-      input.sources.map(async (source) => {
-        const metadata = await source.handle.stat();
-        if (!metadata.isFile()) throw new Error(`Attachment is not a file: ${source.path}`);
-        if (metadata.size > MAX_FILE_BYTES) throw new Error(`${basename(source.path)} exceeds the 100 MB limit.`);
-        assertSupportedAttachmentName(source.path);
-        return { ...source, size: metadata.size };
-      }),
-    );
-    const total = sources.reduce((sum, source) => sum + source.size, 0);
-    if (total > MAX_TOTAL_BYTES) throw new Error("Attachments exceed the 250 MB total limit.");
-
-    const usedNames = new Set<string>();
-    const entries = sources.map((source) => {
-      const id = randomUUID();
-      const name = uniqueName(sanitizeName(source.path), usedNames);
-      const generatedRoot = join(this.#transfersRoot, "generated", id);
-      return { id, name, source, generatedRoot, targetPath: join(generatedRoot, name) };
-    });
-    const storedIds = new Set<string>(entries.map((entry) => entry.id));
-
-    try {
-      const attachments: StoredGeneratedAttachment[] = [];
-      let copiedTotal = 0;
-      for (const entry of entries) {
-        await mkdir(entry.generatedRoot, { recursive: true, mode: 0o700 });
-        await copyOpenedFile(entry.source.handle, entry.targetPath, entry.name, MAX_TOTAL_BYTES - copiedTotal);
-        const copied = await stat(entry.targetPath);
-        if (copied.size > MAX_FILE_BYTES) throw new Error(`${entry.name} exceeds the 100 MB limit.`);
-        copiedTotal += copied.size;
-        if (copiedTotal > MAX_TOTAL_BYTES) throw new Error("Attachments exceed the 250 MB total limit.");
-        const attachment: StoredGeneratedAttachment = {
-          id: entry.id,
-          name: entry.name,
-          size: copied.size,
-          ...attachmentMetadata(entry.name),
-          previewUrl: attachmentPreviewUrl(entry.id),
-          path: entry.targetPath,
-          sha256: await sha256(entry.targetPath),
-          ...(input.ownerAgentId ? { ownerAgentId: input.ownerAgentId } : {}),
-          ...(input.ownerThreadId !== undefined ? { ownerThreadId: input.ownerThreadId } : {}),
-        };
-        await writeTransferManifest(entry.generatedRoot, {
-          version: 2,
-          kind: "generated-attachment",
-          generatedAttachmentId: entry.id,
-          ...(input.ownerAgentId ? { ownerAgentId: input.ownerAgentId } : {}),
-          ...(input.ownerThreadId !== undefined ? { ownerThreadId: input.ownerThreadId } : {}),
-          createdAt: new Date().toISOString(),
-          attachments: [manifestAttachment(attachment, entry.name)],
-        });
-        attachments.push(attachment);
-      }
-      for (const attachment of attachments) this.#stagedGeneratedAttachments.set(attachment.id, attachment);
-      return attachments.map(toAttachmentSummary);
-    } catch (error) {
-      for (const id of storedIds) this.#stagedGeneratedAttachments.delete(id);
-      await Promise.allSettled(entries.map((entry) => rm(entry.generatedRoot, { recursive: true, force: true })));
-      throw error;
-    }
+    const attachments = await this.#files.stageGenerated(input);
+    for (const attachment of attachments) this.#stagedGeneratedAttachments.set(attachment.id, attachment);
+    return attachments.map(toAttachmentSummary);
   }
 
   persistGeneratedAttachmentsWithConversation(
@@ -1081,10 +899,7 @@ export class MailboxStore {
     if (removed.length === 0) return;
 
     for (const id of ids) this.#stagedGeneratedAttachments.delete(id);
-    const generatedRoots = removed
-      .map((attachment) => generatedRootForPath(this.#transfersRoot, attachment.path))
-      .filter((path): path is string => path !== null);
-    await Promise.allSettled(generatedRoots.map((path) => rm(path, { recursive: true, force: true })));
+    await this.#files.discardGenerated(removed);
   }
 
   async storeGeneratedAttachment(input: {
@@ -1095,91 +910,31 @@ export class MailboxStore {
     ownerAgentId?: string;
     ownerThreadId?: string | null;
   }): Promise<AttachmentSummary> {
-    if ((input.sourcePath === undefined) === (input.bytes === undefined)) {
-      throw new Error("Provide exactly one generated image source.");
-    }
-
-    const id = randomUUID();
-    const source = input.sourcePath === undefined ? null : await inspectSource(input.sourcePath);
-    const bytes = input.bytes === undefined ? null : normalizeBytes(input.bytes);
-    const size = source?.size ?? bytes?.byteLength ?? 0;
-    if (size > MAX_FILE_BYTES) throw new Error("Generated image exceeds the 100 MB limit.");
-
-    const name = sanitizeName(input.name ?? (source ? basename(source.path) : "generated-image.png"));
-    const metadata = attachmentMetadata(name, input.mimeType);
-    const generatedRoot = join(this.#transfersRoot, "generated", id);
-    const targetPath = join(generatedRoot, name);
-    await mkdir(generatedRoot, { recursive: true, mode: 0o700 });
+    const attachment = await this.#files.storeGenerated(input);
+    this.#state.generatedAttachments.push(attachment);
     try {
-      if (source) await copyFile(source.path, targetPath);
-      else if (bytes) await writeFile(targetPath, bytes, { mode: 0o600 });
-      else throw new Error("Generated image bytes are missing.");
-      const stored = await stat(targetPath);
-      if (stored.size > MAX_FILE_BYTES) throw new Error("Generated image exceeds the 100 MB limit.");
-      const attachment: StoredAttachment = {
-        id,
-        name,
-        size: stored.size,
-        ...metadata,
-        previewUrl: attachmentPreviewUrl(id),
-        path: targetPath,
-        sha256: await sha256(targetPath),
-      };
-      const generatedAttachment: StoredGeneratedAttachment = {
-        ...attachment,
-        ...(input.ownerAgentId ? { ownerAgentId: input.ownerAgentId } : {}),
-        ...(input.ownerThreadId !== undefined ? { ownerThreadId: input.ownerThreadId } : {}),
-      };
-      await writeTransferManifest(generatedRoot, {
-        version: 2,
-        kind: "generated-attachment",
-        generatedAttachmentId: id,
-        ...(input.ownerAgentId ? { ownerAgentId: input.ownerAgentId } : {}),
-        ...(input.ownerThreadId !== undefined ? { ownerThreadId: input.ownerThreadId } : {}),
-        createdAt: new Date().toISOString(),
-        attachments: [manifestAttachment(generatedAttachment, name)],
-      });
-      this.#state.generatedAttachments.push(generatedAttachment);
-      try {
-        await this.#persist("attachment.generated");
-      } catch (error) {
-        this.#state.generatedAttachments = this.#state.generatedAttachments.filter((candidate) => candidate.id !== id);
-        throw error;
-      }
+      await this.#persist("attachment.generated");
       return toAttachmentSummary(attachment);
     } catch (error) {
-      await rm(generatedRoot, { recursive: true, force: true });
+      this.#state.generatedAttachments = this.#state.generatedAttachments.filter(
+        (candidate) => candidate.id !== attachment.id,
+      );
+      await this.#files.removeAttachmentDirectories([attachment.path]);
       throw error;
     }
   }
 
   async listExportAttachments(): Promise<ExportedAttachmentFile[]> {
     const files: ExportedAttachmentFile[] = [];
-    for (const [messageIndex, message] of this.#state.messages.entries()) {
+    for (const [index, message] of this.#state.messages.entries()) {
       for (const attachment of message.attachments) {
-        const resolved = await resolveManagedAttachment(this.#transfersRoot, attachment);
-        if (!resolved) continue;
-        files.push({
-          sourcePath: resolved.path,
-          relativePath: join(
-            "attachments",
-            `${messageIndex + 1}-${safeArchiveSegment(message.id)}`,
-            `${safeArchiveSegment(attachment.id)}-${safeArchiveSegment(attachment.name)}`,
-          ),
-        });
+        const file = await this.#files.exportAttachment(attachment, { id: message.id, index });
+        if (file) files.push(file);
       }
     }
     for (const attachment of this.#state.generatedAttachments) {
-      const resolved = await resolveManagedAttachment(this.#transfersRoot, attachment);
-      if (!resolved) continue;
-      files.push({
-        sourcePath: resolved.path,
-        relativePath: join(
-          "attachments",
-          "generated",
-          `${safeArchiveSegment(attachment.id)}-${safeArchiveSegment(attachment.name)}`,
-        ),
-      });
+      const file = await this.#files.exportAttachment(attachment);
+      if (file) files.push(file);
     }
     return files;
   }
@@ -1250,61 +1005,6 @@ export class MailboxStore {
     };
   }
 
-  async #commitAttachments(
-    transferId: string,
-    sender: StoredMessage["sender"],
-    recipientAgentIds: string[],
-    messageId: string,
-    createdAt: string,
-    sourcePaths: string[],
-  ): Promise<StoredAttachment[]> {
-    if (sourcePaths.length === 0) return [];
-    const inspected = await Promise.all(sourcePaths.map(inspectSource));
-    const temporaryRoot = join(this.#transfersRoot, `.tmp-${transferId}`);
-    const finalRoot = join(this.#transfersRoot, transferId);
-    await mkdir(temporaryRoot, { recursive: true, mode: 0o700 });
-    const usedNames = new Set<string>();
-    try {
-      const attachments: StoredAttachment[] = [];
-      let total = 0;
-      for (const source of inspected) {
-        const name = uniqueName(sanitizeName(source.path), usedNames);
-        const id = randomUUID();
-        const targetPath = join(temporaryRoot, name);
-        await copyFile(source.path, targetPath);
-        const copied = await stat(targetPath);
-        if (copied.size > MAX_FILE_BYTES) throw new Error(`${name} exceeds the 100 MB limit.`);
-        total += copied.size;
-        if (total > MAX_TOTAL_BYTES) throw new Error("Attachments exceed the 250 MB total limit.");
-        const metadata = attachmentMetadata(name);
-        attachments.push({
-          id,
-          name,
-          size: copied.size,
-          ...metadata,
-          previewUrl: attachmentPreviewUrl(id),
-          path: join(finalRoot, name),
-          sha256: await sha256(targetPath),
-        });
-      }
-      await writeTransferManifest(temporaryRoot, {
-        version: 2,
-        kind: "message-transfer",
-        transferId,
-        messageId,
-        sender,
-        recipientAgentIds,
-        createdAt,
-        attachments: attachments.map((attachment) => manifestAttachment(attachment, attachment.name)),
-      });
-      await rename(temporaryRoot, finalRoot);
-      return attachments;
-    } catch (error) {
-      await rm(temporaryRoot, { recursive: true, force: true });
-      throw error;
-    }
-  }
-
   async #updateDelivery(id: string, allowed: QueueDeliveryStatus[], patch: Partial<StoredDelivery>): Promise<void> {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === id);
     if (!delivery) throw new Error(`Unknown delivery: ${id}`);
@@ -1344,146 +1044,13 @@ export class MailboxStore {
   async #drainFileDeletionOutbox(): Promise<void> {
     for (const item of this.#database.pendingFileDeletions()) {
       try {
-        await rm(item.path, { recursive: true, force: true });
+        await this.#files.remove(item.path);
         this.#database.completeFileDeletion(item.id);
       } catch (error) {
         this.#database.failFileDeletion(item.id, error instanceof Error ? error.message : String(error));
       }
     }
   }
-}
-
-async function resolveManagedAttachment(
-  root: string,
-  attachment: StoredAttachment,
-): Promise<{ path: string; mimeType: string } | null> {
-  try {
-    const [canonicalRoot, canonicalPath] = await Promise.all([realpath(root), realpath(attachment.path)]);
-    if (!isWithin(canonicalRoot, canonicalPath)) return null;
-    const metadata = await stat(canonicalPath);
-    if (!metadata.isFile() || metadata.size !== attachment.size) return null;
-    if ((await sha256(canonicalPath)) !== attachment.sha256) return null;
-    return { path: canonicalPath, mimeType: attachment.mimeType };
-  } catch {
-    return null;
-  }
-}
-
-async function writeTransferManifest(directory: string, manifest: TransferManifest): Promise<void> {
-  await writeFile(join(directory, TRANSFER_MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-}
-
-function manifestAttachment(
-  attachment: StoredAttachment,
-  relativePath: string,
-): TransferManifest["attachments"][number] {
-  return {
-    id: attachment.id,
-    name: attachment.name,
-    relativePath,
-    size: attachment.size,
-    kind: attachment.kind,
-    mimeType: attachment.mimeType,
-    previewKind: attachment.previewKind,
-    sha256: attachment.sha256,
-  };
-}
-
-async function inspectSource(sourcePath: string): Promise<{ path: string; size: number }> {
-  const path = await realpath(sourcePath);
-  const metadata = await stat(path);
-  if (!metadata.isFile()) throw new Error(`Only regular files can be attached: ${basename(path)}`);
-  if (metadata.size > MAX_FILE_BYTES) throw new Error(`${basename(path)} exceeds the 100 MB limit.`);
-  return { path, size: metadata.size };
-}
-
-async function sha256(path: string): Promise<string> {
-  return createHash("sha256")
-    .update(await readFile(path))
-    .digest("hex");
-}
-
-function sanitizeName(path: string): string {
-  const value = basename(path)
-    .replace(/[^\p{L}\p{N}._ -]+/gu, "-")
-    .replace(/^\.+/, "")
-    .trim();
-  if (!value) return "attachment";
-  const extension = extname(value);
-  if (!extension || extension.length >= 180) return value.slice(0, 180);
-  const stem = value.slice(0, -extension.length);
-  return `${stem.slice(0, 180 - extension.length)}${extension}`;
-}
-
-function safeArchiveSegment(value: string): string {
-  return (
-    basename(value)
-      .replace(/[^\p{L}\p{N}._ -]+/gu, "-")
-      .replace(/^\.+/, "")
-      .slice(0, 120) || "item"
-  );
-}
-
-function uniqueName(name: string, used: Set<string>): string {
-  if (!used.has(name)) {
-    used.add(name);
-    return name;
-  }
-  const extension = extname(name);
-  const stem = name.slice(0, -extension.length || undefined);
-  let index = 2;
-  while (used.has(`${stem}-${index}${extension}`)) index += 1;
-  const result = `${stem}-${index}${extension}`;
-  used.add(result);
-  return result;
-}
-
-function attachmentMetadata(
-  name: string,
-  explicitMimeType?: string,
-): { kind: AttachmentKind; mimeType: string; previewKind: AttachmentPreviewKind } {
-  const inferred = attachmentMimeTypeForName(name);
-  const mimeType = explicitMimeType?.trim() || inferred;
-  const previewKind: AttachmentPreviewKind = mimeType.startsWith("image/")
-    ? "image"
-    : mimeType === "application/pdf"
-      ? "pdf"
-      : mimeType.startsWith("text/") || mimeType === "application/json"
-        ? "text"
-        : "none";
-  return { kind: previewKind === "image" ? "image" : "file", mimeType, previewKind };
-}
-
-function assertSupportedAttachmentName(name: string): void {
-  if (isSupportedAttachmentName(name)) return;
-  throw new Error(`${name} is not supported. Attach ${SUPPORTED_ATTACHMENT_DESCRIPTION}.`);
-}
-
-function attachmentPreviewUrl(id: string): string {
-  return `openbot-attachment://file/${id}`;
-}
-
-function toAttachmentSummary(attachment: StoredAttachment): AttachmentSummary {
-  const metadata = attachmentMetadata(attachment.name, attachment.mimeType);
-  return {
-    id: attachment.id,
-    name: attachment.name,
-    size: attachment.size,
-    ...metadata,
-    // `isStoredAttachment` accepts a persisted attachment with no `previewUrl` at all, from before
-    // the field existed. `StoredAttachment extends AttachmentSummary` claims `string | null`, so
-    // tsc cannot see the gap — and an `undefined` reaching the summary fails `isAttachmentSummary`
-    // at the IPC boundary, which would take the whole conversation down with it.
-    previewUrl: attachment.previewUrl ?? null,
-  };
-}
-
-function normalizeBytes(value: Uint8Array): Uint8Array {
-  if (value instanceof Uint8Array) return value;
-  throw new Error("Attachment data is invalid.");
 }
 
 function normalizeStoredState(value: StoredState): StoredState {
@@ -1696,54 +1263,4 @@ function compareReactionActors(left: ConversationReaction, right: ConversationRe
   if (left.actor.kind !== right.actor.kind) return left.actor.kind === "user" ? -1 : 1;
   if (left.actor.kind === "user" || right.actor.kind === "user") return 0;
   return left.actor.agentId.localeCompare(right.actor.agentId);
-}
-
-function isWithin(root: string, path: string): boolean {
-  const candidate = relative(root, path);
-  return candidate !== "" && !candidate.startsWith("..") && !isAbsolute(candidate);
-}
-
-function transferRootForPath(root: string, path: string): string | null {
-  const candidate = relative(root, path);
-  if (!candidate || candidate.startsWith("..") || isAbsolute(candidate)) return null;
-  const segment = candidate.split(/[\\/]/u)[0];
-  return segment && !segment.startsWith(".") ? join(root, segment) : null;
-}
-
-function generatedRootForPath(root: string, path: string): string | null {
-  const candidate = relative(root, path);
-  if (!candidate || candidate.startsWith("..") || isAbsolute(candidate)) return null;
-  const segments = candidate.split(/[\\/]/u);
-  if (segments[0] !== "generated" || !segments[1] || segments[1].startsWith(".")) return null;
-  return join(root, "generated", segments[1]);
-}
-
-async function copyOpenedFile(
-  source: FileHandle,
-  targetPath: string,
-  name: string,
-  remainingTotalBytes: number,
-): Promise<void> {
-  const target = await open(targetPath, "wx", 0o600);
-  const buffer = Buffer.allocUnsafe(64 * 1024);
-  let position = 0;
-  try {
-    while (true) {
-      const { bytesRead } = await source.read(buffer, 0, buffer.byteLength, position);
-      if (bytesRead === 0) return;
-      const nextPosition = position + bytesRead;
-      if (nextPosition > MAX_FILE_BYTES) throw new Error(`${name} exceeds the 100 MB limit.`);
-      if (nextPosition > remainingTotalBytes) throw new Error("Attachments exceed the 250 MB total limit.");
-
-      let written = 0;
-      while (written < bytesRead) {
-        const result = await target.write(buffer, written, bytesRead - written, position + written);
-        if (result.bytesWritten === 0) throw new Error(`OpenBot could not copy ${name}.`);
-        written += result.bytesWritten;
-      }
-      position = nextPosition;
-    }
-  } finally {
-    await target.close();
-  }
 }

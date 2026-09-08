@@ -13,19 +13,11 @@ import {
   tool,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
-import { z } from "zod";
-import { createAgentToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
-import {
-  assignAgentSectionToolSchema,
-  createSectionToolSchema,
-  deleteSectionToolSchema,
-  renameSectionToolSchema,
-} from "./agent/sidebar-tools";
 import type { AgentProvider } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import type { ClaudeCliInfo } from "./cli";
+import { OPENBOT_TOOL_DEFINITIONS } from "./openbot-tools";
 import {
   type AccountRateLimitsReadResult,
   type AccountRateLimitWindowResult,
@@ -41,7 +33,6 @@ import {
   type ThreadResponse,
   type TurnResponse,
 } from "./protocol";
-import { routineScheduleZodSchema } from "./routine-tool-schema";
 
 const execFileAsync = promisify(execFile);
 const CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
@@ -768,170 +759,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       openbot: createSdkMcpServer({
         name: "openbot",
         version: "0.1.0",
-        tools: [
-          tool("list_sites", "List static sites hosted by the signed-in OpenBot user.", {}, (args) =>
-            call("openbot", "list_sites", args),
+        // Claude uses the SDK's AskUserQuestion permission flow.
+        tools: OPENBOT_TOOL_DEFINITIONS.filter((definition) => definition.name !== "ask_user").map((definition) =>
+          tool(definition.name, definition.description, definition.shape, (args) =>
+            call("openbot", definition.name, args),
           ),
-          tool(
-            "publish_site",
-            "Publish a static site only after the user explicitly asks to publish it.",
-            {
-              sourcePath: z.string().min(1).max(INPUT_LIMITS.path),
-              title: z.string().min(1).max(120),
-              description: z.string().min(1).max(500),
-              spaFallback: z.boolean().optional(),
-            },
-            (args) => call("openbot", "publish_site", args),
-          ),
-          tool(
-            "replace_site",
-            "Replace an owned static site only after the user explicitly asks. The URL stays the same.",
-            {
-              siteId: z.string().min(1).max(INPUT_LIMITS.identifier),
-              sourcePath: z.string().min(1).max(INPUT_LIMITS.path),
-              title: z.string().min(1).max(120),
-              description: z.string().min(1).max(500),
-              spaFallback: z.boolean().optional(),
-            },
-            (args) => call("openbot", "replace_site", args),
-          ),
-          tool(
-            "delete_site",
-            "Delete an owned static site only after the user explicitly asks to delete it.",
-            { siteId: z.string().min(1).max(INPUT_LIMITS.identifier) },
-            (args) => call("openbot", "delete_site", args),
-          ),
-          tool(
-            "attach_files_to_response",
-            "Attach existing local files to the current response for the user. Use this for screenshots, charts, diagrams, reports, and other files that the user should receive.",
-            { paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).min(1).max(INPUT_LIMITS.attachments) },
-            (args) => call("openbot", "attach_files_to_response", args),
-          ),
-          tool(
-            "list_sections",
-            "List sidebar sections (folders), their stable ids, and agent assignments before grouping agents.",
-            {},
-            (args) => call("openbot", "list_sections", args),
-          ),
-          tool(
-            "create_section",
-            "Create a sidebar section (folder) to group existing agents. List sections first and reuse an existing matching section.",
-            createSectionToolSchema.shape,
-            (args) => call("openbot", "create_section", args),
-          ),
-          tool("rename_section", "Rename an existing custom sidebar section.", renameSectionToolSchema.shape, (args) =>
-            call("openbot", "rename_section", args),
-          ),
-          tool(
-            "delete_section",
-            "Delete a custom sidebar section without deleting its agents; its agents become ungrouped.",
-            deleteSectionToolSchema.shape,
-            (args) => call("openbot", "delete_section", args),
-          ),
-          tool(
-            "assign_agent_section",
-            "Move an existing agent into a sidebar section. Pass null for sectionId to ungroup it.",
-            assignAgentSectionToolSchema.shape,
-            (args) => call("openbot", "assign_agent_section", args),
-          ),
-          tool("list_agents", "List OpenBot agents that can receive local messages.", {}, (args) =>
-            call("openbot", "list_agents", args),
-          ),
-          tool(
-            "create_agent",
-            "Create a persistent local teammate from the user's request, with a profile and first task.",
-            createAgentToolSchema.shape,
-            (args) => call("openbot", "create_agent", args),
-          ),
-          tool(
-            "update_profile",
-            "Change an existing local agent's profile or generated avatar from the user's request.",
-            updateProfileToolSchema.shape,
-            (args) => call("openbot", "update_profile", args),
-          ),
-          tool(
-            "list_routines",
-            "List routines for this agent, or for another local agent when agentId is provided.",
-            { agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional() },
-            (args) => call("openbot", "list_routines", args),
-          ),
-          tool(
-            "create_routine",
-            "Create a scheduled routine for this agent, or for another local agent when agentId is provided.",
-            {
-              agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
-              name: z.string().min(1).max(INPUT_LIMITS.routineName),
-              instruction: z.string().min(1).max(INPUT_LIMITS.routineInstruction),
-              schedule: routineScheduleZodSchema,
-              active: z.boolean().optional(),
-              timezone: z.string().min(1).max(128).optional(),
-            },
-            (args) => call("openbot", "create_routine", args),
-          ),
-          tool(
-            "update_routine",
-            "Update, pause, or resume an existing routine for this agent, or for another local agent when agentId is provided.",
-            {
-              agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
-              routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
-              name: z.string().min(1).max(INPUT_LIMITS.routineName).optional(),
-              instruction: z.string().min(1).max(INPUT_LIMITS.routineInstruction).optional(),
-              schedule: routineScheduleZodSchema.optional(),
-              active: z.boolean().optional(),
-            },
-            (args) => call("openbot", "update_routine", args),
-          ),
-          tool(
-            "delete_routine",
-            "Delete an existing routine for this agent, or for another local agent when agentId is provided.",
-            {
-              agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
-              routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
-            },
-            (args) => call("openbot", "delete_routine", args),
-          ),
-          tool(
-            "test_routine",
-            "Queue one manual test run of an existing routine for this agent, or for another local agent when agentId is provided.",
-            {
-              agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
-              routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
-            },
-            (args) => call("openbot", "test_routine", args),
-          ),
-          tool(
-            "remember",
-            "Stage one durable memory for this agent. Use memoryId to update an existing memory.",
-            {
-              text: z.string().min(1).max(500),
-              memoryId: z.string().optional(),
-            },
-            (args) => call("openbot", "remember", args),
-          ),
-          tool(
-            "forget_memory",
-            "Stage deletion of one saved memory when the user asks you to forget it.",
-            { memoryId: z.string().min(1) },
-            (args) => call("openbot", "forget_memory", args),
-          ),
-          tool(
-            "react_to_user_message",
-            "Add one emoji reaction for an obvious positive or negative emotional moment such as a win, affection, gratitude, humor, sadness, disappointment, frustration, empathy, or strong approval. Inline emoji do not count as reactions. Skip neutral messages and always provide the same complete normal answer.",
-            { emoji: z.string().min(1).max(64) },
-            (args) => call("openbot", "react_to_user_message", args),
-          ),
-          tool(
-            "send_message",
-            "Send an asynchronous message or local files to OpenBot teammates.",
-            {
-              recipientAgentIds: z.array(z.string()).min(1).max(32),
-              text: z.string().min(1).max(100_000),
-              paths: z.array(z.string()).max(10).optional(),
-              replyToMessageId: z.string().nullable().optional(),
-            },
-            (args) => call("openbot", "send_message", args),
-          ),
-        ],
+        ),
       }),
     };
   }

@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import type { DatabaseCore } from "./database-core";
-import { databaseRows, requiredStringColumn } from "./database-rows";
+import { databaseRow, databaseRows, requiredStringColumn } from "./database-rows";
 
 export interface AgentRosterOptions {
   core: DatabaseCore;
@@ -31,6 +31,66 @@ export class AgentRoster {
     return databaseRows(
       this.#core.connection.prepare("SELECT agent_json FROM projection_agents ORDER BY sort_order, agent_id").all(),
     ).map((row) => JSON.parse(requiredStringColumn(row, "agent_json")));
+  }
+
+  /**
+   * Every thread row no agent claims as its own `thread_id`.
+   *
+   * `projection_threads.agent_id` carries no foreign key to `projection_agents`, the chat list is the
+   * roster with no join, and nothing else in the app enumerates threads -- so a thread that falls out
+   * of the roster becomes unreachable rather than broken, and reports itself as an empty chat. This is
+   * the only query that can see one. `replaceAgents` is how they appear: it truncates the roster and
+   * re-inserts the in-memory list, while `ensureThreadProjection` never deletes, so a persist made
+   * with an agent missing leaves that agent's thread and every message in it behind.
+   *
+   * Claimed by `thread_id` rather than matched on `agent_id`, because both halves of the split have to
+   * be caught: an agent rebuilt under its own id points at no thread while its old row still names it,
+   * and a thread whose `agent_id` keeps a pre-rename spelling names an agent that no longer answers to
+   * it. Ordered so that a repair over the result is deterministic.
+   */
+  unclaimedThreads(): { threadId: string; agentId: string }[] {
+    return databaseRows(
+      this.#core.connection
+        .prepare(
+          `SELECT thread_id, agent_id FROM projection_threads
+           WHERE thread_id NOT IN (SELECT thread_id FROM projection_agents WHERE thread_id IS NOT NULL)
+           ORDER BY thread_id`,
+        )
+        .all(),
+    ).map((row) => ({
+      threadId: requiredStringColumn(row, "thread_id"),
+      agentId: requiredStringColumn(row, "agent_id"),
+    }));
+  }
+
+  /**
+   * The agent list the newest roster event carries, for a roster projection that has lost its rows.
+   *
+   * `orchestration_events` is the source of truth and every roster write appends the whole list to one
+   * aggregate, so the newest event on it is the roster. Nothing else reads events back into
+   * `projection_agents`: the projection is written only by `replaceAgents`, and an empty projection
+   * beside a non-empty log reads as "no agents" -- every chat gone, with each thread and message row
+   * still on disk.
+   *
+   * Newest only, never a fold over the whole aggregate. `hardDeleteAgent` appends the *remaining*
+   * agents, so a fold would resurrect an agent the user deleted on purpose, and a newest event with an
+   * empty list correctly means the user has no agents. The rows are returned unvalidated because the
+   * roster class holds no agent decoder; the caller validates each entry and drops the ones that fail.
+   */
+  latestRosterAgents(): unknown[] {
+    const row = databaseRow(
+      this.#core.connection
+        .prepare(
+          `SELECT payload_json FROM orchestration_events
+           WHERE aggregate_type = 'agents' AND aggregate_id = 'agents'
+           ORDER BY sequence DESC LIMIT 1`,
+        )
+        .get(),
+    );
+    if (!row) return [];
+    const payload = databaseRow(JSON.parse(requiredStringColumn(row, "payload_json")));
+    if (!payload || !Array.isArray(payload.agents)) return [];
+    return payload.agents;
   }
 
   replaceAgents(commandId: string, agents: AgentSummary[], eventType: string): void {

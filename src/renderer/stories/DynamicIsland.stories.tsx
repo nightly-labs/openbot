@@ -5,7 +5,7 @@ import type {
   DynamicIslandPromptItem,
 } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
-import { createMemo } from "solid-js";
+import { createMemo, createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import type { DynamicIslandViewState } from "../src/components/ui";
@@ -277,3 +277,35 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Playground: Story = {};
+
+export const OpenChatReturnsToIdle: Story = {
+  render: () => (
+    <DynamicIslandDisplayComparison
+      defaultState="expanded"
+      renderIsland={(preview) => {
+        const [presentation, setPresentation] = createSignal(presentationFor("chat", "standard", "single"));
+        return (
+          <OpenBotDynamicIsland
+            presentation={presentation()}
+            state={preview.state()}
+            displayMode={preview.displayMode}
+            suppressInitialHover
+            onStateChange={preview.onStateChange}
+            onAction={() => {
+              setPresentation({ serverId: "local", mode: "idle" });
+              preview.onStateChange("compact", "pointer");
+            }}
+          />
+        );
+      }}
+    />
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Click Open chat on each display. The island must collapse and show its idle icons inside the black surface.",
+      },
+    },
+  },
+};

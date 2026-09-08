@@ -139,6 +139,87 @@ describe.sequential("AgentService: restart", () => {
     });
   });
 
+  it("recovers history from sessions retired by an upgrade and retries failed reads without losing local messages", async () => {
+    const { store } = stores(root);
+    await store.initialize();
+    await store.getOrCreate("chief");
+    const threadId = await store.ensureThreadId("chief");
+    store.bindProviderSession("chief", "old-session");
+    const local = {
+      id: "local-message",
+      author: "user" as const,
+      text: "Keep this local message",
+      createdAt: "2026-08-01T12:00:00.000Z",
+      status: "completed" as const,
+    };
+    store.database.persistConversation(
+      { agentId: "chief", threadId, activeTurnId: null, revision: 0, messages: [local] },
+      "test.saved-before-upgrade",
+    );
+    // Version 14 changes session state only. Reopen the version 13 database to run the shipped upgrade.
+    store.database.connection.prepare("DELETE FROM schema_migrations WHERE version = 14").run();
+    store.database.close();
+
+    let failRead = true;
+    const events: AgentEvent[] = [];
+    const createService = () => {
+      const restored = stores(root);
+      const next = new AgentService(restored.store, restored.mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+        const client = new FakeAgentClient(provider);
+        client.threadRead = () => {
+          if (failRead) throw new Error("Saved provider history is unavailable. Try again.");
+          return {
+            thread: {
+              id: "old-session",
+              turns: [
+                {
+                  id: "old-turn",
+                  status: "completed",
+                  startedAt: 1785585600,
+                  items: [{ id: "old-reply", type: "agentMessage", text: "Reply saved before the update" }],
+                },
+              ],
+            },
+          };
+        };
+        return client;
+      });
+      next.on("event", (event) => events.push(event));
+      return { next, restored };
+    };
+    const first = createService();
+    service = first.next;
+    await service.initialize();
+    await waitFor(() =>
+      events.some((event) => event.type === "error" && event.code === "provider_history_backfill_pending"),
+    );
+    expect((await service.readConversation("chief")).messages).toEqual([expect.objectContaining(local)]);
+    expect(first.restored.store.activeProviderSession("chief")).toBeNull();
+    await service.stop();
+    first.restored.store.database.close();
+
+    failRead = false;
+    for (let restart = 0; restart < 2; restart += 1) {
+      const { next, restored } = createService();
+      service = next;
+      await service.initialize();
+      await waitFor(async () =>
+        (await next.readConversation("chief")).messages.some((message) => message.id === "old-reply"),
+      );
+      const recovered = await service.readConversation("chief");
+      expect(recovered.threadId).toBe(threadId);
+      expect(recovered.messages).toEqual([
+        expect.objectContaining(local),
+        expect.objectContaining({ id: "old-reply", text: "Reply saved before the update" }),
+      ]);
+      expect(restored.store.database.listProviderSessions(threadId)).toEqual([
+        expect.objectContaining({ externalSessionId: "old-session", state: "inactive" }),
+      ]);
+      await service.stop();
+      restored.store.database.close();
+    }
+  });
+
   it("does not persist unchanged provider history after repeated restarts", async () => {
     const clients: FakeAgentClient[] = [];
     const { store, mailbox } = stores(root);
@@ -239,6 +320,7 @@ describe.sequential("AgentService: restart", () => {
     });
     expect(store.database.pendingHostedSiteTerminalEvents()).toHaveLength(1);
     await service.deleteAgent("sales-outbound");
+    await expect(service.deleteAgent("sales-outbound")).resolves.toBeUndefined();
     expect(service.listAgents().some((agent) => agent.id === "sales-outbound")).toBe(false);
     expect(store.database.pendingHostedSiteTerminalEvents()).toEqual([]);
     expect(
@@ -264,6 +346,86 @@ describe.sequential("AgentService: restart", () => {
       "Stop the agent and cancel its queued messages before deleting it.",
     );
     expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(true);
+  });
+
+  it("keeps an agent available for retry when mailbox deletion fails", async () => {
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser());
+    await service.initialize();
+    const agent = await store.getOrCreate("delete-retry");
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    vi.spyOn(mailbox, "deleteAgentData").mockRejectedValueOnce(new Error("private/path secret"));
+
+    await expect(service.deleteAgent(agent.id)).rejects.toThrow("The agent data could not be removed completely.");
+    expect(service.listAgents().some((entry) => entry.id === agent.id)).toBe(true);
+    expect(events.filter((event) => event.type === "agents-changed")).toEqual([]);
+
+    await service.deleteAgent(agent.id);
+    expect(service.listAgents().some((entry) => entry.id === agent.id)).toBe(false);
+    expect(events).toContainEqual({ type: "agents-changed", agents: service.listAgents() });
+  });
+
+  it("holds due routines and rejects messages during deletion, then resumes after failure", async () => {
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      // Keep the resumed turn running until the test can observe it.
+      (provider) => new FakeAgentClient(provider, "", false),
+    );
+    await service.initialize();
+    const agent = await store.getOrCreate("delete-routine");
+    vi.useFakeTimers({ now: new Date("2026-08-25T11:00:00.000Z") });
+    let releaseCleanup: (() => void) | undefined;
+    const cleanupGate = new Promise<void>((resolve) => {
+      releaseCleanup = resolve;
+    });
+    vi.spyOn(mailbox, "deleteAgentData").mockImplementationOnce(async () => {
+      await cleanupGate;
+      throw new Error("Cleanup failed");
+    });
+    const routine = service.createRoutine({
+      agentId: agent.id,
+      name: "Check during deletion",
+      instruction: "Check the queue.",
+      active: true,
+      timezone: "UTC",
+      schedule: { kind: "interval", amount: 15, unit: "minutes", anchorAt: "2026-08-25T11:00:00.000Z" },
+    });
+    const deletion = service.deleteAgent(agent.id);
+    const failedDeletion = expect(deletion).rejects.toThrow("Retry deleting the agent.");
+    try {
+      await vi.advanceTimersByTimeAsync(15 * 60_000);
+      expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id })).toEqual([]);
+      await expect(service.testRoutine({ agentId: agent.id, routineId: routine.id })).rejects.toThrow(
+        "Wait until the agent operation finishes before running a routine.",
+      );
+      await expect(service.sendMessage({ agentId: agent.id, text: "Wait for cleanup." })).rejects.toThrow(
+        "The recipient is being deleted. Retry after deletion finishes.",
+      );
+      expect(service.listQueue(agent.id).deliveries).toEqual([]);
+      expect(store.activeProviderSession(agent.id)).toBeNull();
+      await expect(service.deleteAgent(agent.id)).rejects.toThrow("Agent deletion is already in progress.");
+
+      releaseCleanup?.();
+      await failedDeletion;
+      const changed = nextRoutinesChanged(service, agent.id);
+      await vi.advanceTimersByTimeAsync(0);
+      await changed;
+      expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id })).toEqual([
+        expect.objectContaining({ kind: "scheduled" }),
+      ]);
+      vi.useRealTimers();
+      await waitFor(() => service?.listQueue(agent.id).deliveries.some((delivery) => delivery.status === "running"));
+    } finally {
+      releaseCleanup?.();
+      await failedDeletion;
+      vi.useRealTimers();
+    }
   });
 
   it("queues independent manual routine runs and renders routine metadata", async () => {
