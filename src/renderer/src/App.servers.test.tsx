@@ -1,5 +1,6 @@
 import type { AgentEvent, ConversationMessage, ServerSummary } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
+import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
@@ -65,6 +66,25 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByRole("button", { name: "Studio Mac server" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("finishes the pending workspace load when the active server is selected again", async () => {
+    const local = testServer("local", false);
+    const remote = testServer("remote-1", true);
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, remote]);
+    vi.mocked(window.openbot.servers.select).mockResolvedValueOnce([local, remote]);
+    let resolveAgents: ((agents: typeof AGENTS) => void) | undefined;
+    vi.mocked(window.openbot.agent.listAgents).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveAgents = resolve;
+      }),
+    );
+    render(() => <App />);
+    await waitFor(() => expect(window.openbot.agent.listAgents).toHaveBeenCalledOnce());
+    await fireEvent.click(screen.getByRole("button", { name: "Studio Mac server" }));
+    await waitFor(() => expect(window.openbot.servers.select).toHaveBeenCalledWith(remote.id));
+    resolveAgents?.(AGENTS);
+    expect(await screen.findByRole("heading", { name: "Chief" })).toBeInTheDocument();
+  });
+
   it("blocks an incompatible remote workspace and offers a manual retry", async () => {
     vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
       { ...testServer("local", false) },
@@ -93,6 +113,83 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.agent.listAgents).not.toHaveBeenCalled();
     await fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(window.openbot.servers.retryConnection).toHaveBeenCalledWith("remote-1"));
+  });
+
+  it("keeps a busy-host error visible during retry and loads agents after recovery", async () => {
+    const local = testServer("local", false);
+    const busy: ServerSummary = {
+      ...testServer("remote-1", true),
+      state: "offline",
+      issue: {
+        code: "network_unavailable",
+        message: "The host already has an active remote session.",
+        retryable: true,
+      },
+    };
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, busy]);
+    render(() => <App />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(busy.issue?.message ?? "");
+    expect(window.openbot.agent.listAgents).not.toHaveBeenCalled();
+    await fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(window.openbot.servers.retryConnection).toHaveBeenCalledWith(busy.id));
+    emitServers?.([local, { ...busy, state: "connecting" }]);
+    expect(screen.getByRole("alert")).toHaveTextContent("The host already has an active remote session.");
+    emitServers?.([local, { ...busy, state: "online", issue: null, connectionSequence: 1 }]);
+    expect(await screen.findByRole("heading", { name: "Chief" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Cannot connect to Studio Mac" })).not.toBeInTheDocument();
+  });
+
+  it.each(["sequence", "online"])("refreshes after %s changes without clearing cached agents", async (change) => {
+    const local = testServer("local", false);
+    const remote: ServerSummary = { ...testServer("remote-1", true), connectionSequence: 1 };
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, remote]);
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    let resolveAgents: ((agents: typeof AGENTS) => void) | undefined;
+    vi.mocked(window.openbot.agent.listAgents).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveAgents = resolve;
+      }),
+    );
+    if (change === "online") emitServers?.([local, { ...remote, state: "offline" }]);
+    emitServers?.([local, { ...remote, connectionSequence: change === "sequence" ? 2 : 1 }]);
+    await waitFor(() => expect(window.openbot.agent.listAgents).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("heading", { name: "Chief" })).toBeInTheDocument();
+    resolveAgents?.([{ ...AGENTS[0], name: "Recovered Chief" }]);
+    expect(await screen.findByRole("heading", { name: "Recovered Chief" })).toBeInTheDocument();
+  });
+
+  it("keeps cached agents after a failed refresh and ignores an older reconnect response", async () => {
+    const local = testServer("local", false);
+    const remote: ServerSummary = { ...testServer("remote-1", true), connectionSequence: 1 };
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, remote]);
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    let rejectAgents: ((error: Error) => void) | undefined;
+    vi.mocked(window.openbot.agent.listAgents).mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        rejectAgents = reject;
+      }),
+    );
+    emitServers?.([local, { ...remote, connectionSequence: 2 }]);
+    await waitFor(() => expect(window.openbot.agent.listAgents).toHaveBeenCalledTimes(2));
+    rejectAgents?.(new Error("The host is not reachable."));
+    // A later successful load is the barrier after the failed refresh.
+    let resolveOld: ((agents: typeof AGENTS) => void) | undefined;
+    const oldAgents = new Promise<typeof AGENTS>((resolve) => {
+      resolveOld = resolve;
+    });
+    vi.mocked(window.openbot.agent.listAgents).mockReturnValueOnce(oldAgents);
+    emitServers?.([local, { ...remote, connectionSequence: 3 }]);
+    await waitFor(() => expect(window.openbot.agent.listAgents).toHaveBeenCalledTimes(3));
+    expect(screen.getByRole("heading", { name: "Chief" })).toBeInTheDocument();
+    vi.mocked(window.openbot.agent.listAgents).mockResolvedValueOnce([{ ...AGENTS[0], name: "Current Chief" }]);
+    emitServers?.([local, { ...remote, connectionSequence: 4 }]);
+    await screen.findByRole("heading", { name: "Current Chief" });
+    resolveOld?.([]);
+    await oldAgents;
+    flush();
+    expect(screen.getByRole("heading", { name: "Current Chief" })).toBeInTheDocument();
   });
 
   it("keeps a newer online event when retry returns an older summary", async () => {
@@ -205,7 +302,7 @@ describe("OpenBot connected desktop shell", () => {
     emitServers?.([local, negotiated]);
     await waitFor(() => expect(window.openbot.agent.getSidebarLayout).toHaveBeenCalled());
     expect(window.openbot.browser.listTabs).toHaveBeenCalled();
-    // The server was already active, so the workspace reloads by remounting on
+    // The server was already active, so the workspace reloads on
     // the completed handshake. Nothing asks main to select it a second time.
     expect(window.openbot.servers.select).not.toHaveBeenCalled();
   });
