@@ -340,8 +340,23 @@ const ANALYTICS_SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS agent_usage_activity_date ON agent_usage_activity(agent_id, occurred_at);
 `;
 
+// A host-wide report constrains the date and nothing else, and an index that leads with
+// `agent_id` cannot serve a range over `occurred_at` alone - so every such report used to
+// scan all retained history, and a report open across turn completions repeated that scan.
+// The date-leading pair is what a host read seeks on; `agent_usage_date` and
+// `agent_usage_activity_date` still serve a report filtered to one agent.
+//
+// A separate constant, and migration 16 rather than an edit to 15: a database that already
+// ran 15 - every development profile on this machine - would otherwise never meet the index.
+const ANALYTICS_DATE_INDEX_SQL = `
+  CREATE INDEX IF NOT EXISTS agent_usage_occurred ON agent_usage_records(occurred_at);
+  CREATE INDEX IF NOT EXISTS agent_usage_activity_occurred ON agent_usage_activity(occurred_at);
+`;
+
 const LATEST_SCHEMA_SQL =
-  substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL) + ANALYTICS_SCHEMA_SQL;
+  substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL) +
+  ANALYTICS_SCHEMA_SQL +
+  ANALYTICS_DATE_INDEX_SQL;
 
 // Silence here would ship new installs a table the migrations never produce, so an edit to the baseline
 // that moves this declaration out from under the substitution has to be loud.
@@ -401,6 +416,7 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     up: refreshProviderSessionsForDynamicTools,
   },
   { version: 15, up: (db) => db.exec(ANALYTICS_SCHEMA_SQL) },
+  { version: 16, up: (db) => db.exec(ANALYTICS_DATE_INDEX_SQL) },
 ];
 
 const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? BASELINE_SCHEMA_VERSION;

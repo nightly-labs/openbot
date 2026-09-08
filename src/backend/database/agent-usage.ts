@@ -169,30 +169,25 @@ export class AgentUsage {
 
   readHost(raw: HostAnalyticsInput): HostAnalytics {
     const input = parseHostAnalyticsInput(raw);
-    const records = databaseRows(
-      this.#core.connection
-        .prepare(
-          "SELECT * FROM agent_usage_records WHERE (? IS NULL OR agent_id = ?) AND occurred_at >= ? AND occurred_at < ?",
-        )
-        .all(
-          input.agentId ?? null,
-          input.agentId ?? null,
-          new Date(Date.parse(input.startDate) - 86400000).toISOString(),
-          new Date(Date.parse(input.endDate) + 2 * 86400000).toISOString(),
-        ),
-    );
-    const activity = databaseRows(
-      this.#core.connection
-        .prepare(
-          "SELECT * FROM agent_usage_activity WHERE (? IS NULL OR agent_id = ?) AND occurred_at >= ? AND occurred_at < ?",
-        )
-        .all(
-          input.agentId ?? null,
-          input.agentId ?? null,
-          new Date(Date.parse(input.startDate) - 86400000).toISOString(),
-          new Date(Date.parse(input.endDate) + 2 * 86400000).toISOString(),
-        ),
-    );
+    // One statement per shape rather than one with `(? IS NULL OR agent_id = ?)`. That
+    // predicate cannot be answered from an index in either case, so both reads scanned all
+    // retained history: a seven-day report cost as much as the whole table, and a report
+    // left open repeated it after every turn. Each shape now seeks - the host-wide read on
+    // the date-leading index, the agent read on the leading `agent_id` of its own.
+    const rangeStart = new Date(Date.parse(input.startDate) - 86400000).toISOString();
+    const rangeEnd = new Date(Date.parse(input.endDate) + 2 * 86400000).toISOString();
+    const readRange = (table: string): DynamicRecord[] =>
+      databaseRows(
+        input.agentId
+          ? this.#core.connection
+              .prepare(`SELECT * FROM ${table} WHERE agent_id = ? AND occurred_at >= ? AND occurred_at < ?`)
+              .all(input.agentId, rangeStart, rangeEnd)
+          : this.#core.connection
+              .prepare(`SELECT * FROM ${table} WHERE occurred_at >= ? AND occurred_at < ?`)
+              .all(rangeStart, rangeEnd),
+      );
+    const records = readRange("agent_usage_records");
+    const activity = readRange("agent_usage_activity");
     const totals = bucket();
     const days = new Map<string, Bucket>();
     for (
