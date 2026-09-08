@@ -1,13 +1,30 @@
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
-import { createPublicationSql, type Publication } from "./publish-production-catalog";
+import { createPublicationSql, type Publication, parsePublicationArguments } from "./publish-production-catalog";
 
 describe("production catalog publication", () => {
+  it("keeps local publication separate from explicit production writes", () => {
+    expect(parsePublicationArguments([])).toEqual({ apply: false, target: "production" });
+    expect(parsePublicationArguments(["--local", "--apply"])).toEqual({ apply: true, target: "local" });
+    expect(parsePublicationArguments(["--apply", "--confirm-production"])).toEqual({
+      apply: true,
+      target: "production",
+    });
+    for (const args of [
+      ["--apply"],
+      ["--confirm-production"],
+      ["--local", "--apply", "--confirm-production"],
+      ["--remote"],
+    ]) {
+      expect(() => parsePublicationArguments(args)).toThrow();
+    }
+  });
   it("creates approved marketplace records owned by OpenBot without resetting marketplace counters", () => {
     const publication: Publication = {
       catalogVersion: "v1",
       skills: [
         {
+          featured: true,
           id: "openbot-curated-skill-example",
           versionId: "openbot-curated-version-example-v1-deadbeefdeadbeef",
           slug: "example",
@@ -22,6 +39,8 @@ describe("production catalog publication", () => {
       ],
       agents: [
         {
+          featured: true,
+          category: "research",
           id: "openbot-curated-agent-example",
           versionId: "openbot-curated-agent-version-example-v1-deadbeefdeadbeef",
           name: "Example Agent",
@@ -37,9 +56,15 @@ describe("production catalog publication", () => {
     };
 
     const sql = createPublicationSql(publication, 1234);
+    const newer: Publication = {
+      ...publication,
+      catalogVersion: "v2",
+      skills: publication.skills.map((skill) => ({ ...skill, version: 2, versionId: `${skill.versionId}-v2` })),
+      agents: publication.agents.map((agent) => ({ ...agent, version: 2, versionId: `${agent.versionId}-v2` })),
+    };
 
     expect(sql).toContain("'openbot-production-catalog'");
-    expect(sql).toContain("'OpenBot'");
+    expect(sql).toContain("'OpenBot Team'");
     expect(sql.match(/'approved'/gu)).toHaveLength(2);
     expect(sql).toContain("ON CONFLICT(id) DO NOTHING");
     expect(sql).not.toMatch(/DO UPDATE SET[^;]*(?:installs|featured)/u);
@@ -49,18 +74,24 @@ describe("production catalog publication", () => {
 
     const verification = spawnSync("/usr/bin/sqlite3", [":memory:"], {
       encoding: "utf8",
-      input: `${schema}\n${sql}\nUPDATE marketplace_skills SET installs = 8, featured = 1;\nUPDATE marketplace_agents SET installs = 5, featured = 1;\n${createPublicationSql(publication, 5678)}\n.mode json\nSELECT (SELECT name FROM users WHERE id = 'openbot-production-catalog') AS owner, (SELECT installs FROM marketplace_skills) AS skill_installs, (SELECT featured FROM marketplace_skills) AS skill_featured, (SELECT installs FROM marketplace_agents) AS agent_installs, (SELECT featured FROM marketplace_agents) AS agent_featured, (SELECT status FROM marketplace_skill_versions) AS skill_status, (SELECT status FROM marketplace_agent_versions) AS agent_status;\n`,
+      input: `${schema}\n${sql}\nCREATE TEMP TABLE initial AS SELECT (SELECT featured FROM marketplace_skills) AS skill_featured, (SELECT featured FROM marketplace_agents) AS agent_featured;\nUPDATE marketplace_skills SET installs = 8, featured = 0;\nUPDATE marketplace_agents SET installs = 5, featured = 0;\n${createPublicationSql(newer, 4567)}\n${createPublicationSql(publication, 5678)}\n.mode json\nSELECT (SELECT name FROM users WHERE id = 'openbot-production-catalog') AS owner, (SELECT installs FROM marketplace_skills) AS skill_installs, (SELECT featured FROM marketplace_skills) AS skill_featured, (SELECT installs FROM marketplace_agents) AS agent_installs, (SELECT featured FROM marketplace_agents) AS agent_featured, (SELECT status FROM marketplace_skill_versions) AS skill_status, (SELECT status FROM marketplace_agent_versions) AS agent_status, (SELECT category FROM marketplace_agent_versions) AS category, (SELECT skill_featured FROM initial) AS initial_skill_featured, (SELECT agent_featured FROM initial) AS initial_agent_featured, (SELECT count(*) FROM marketplace_skill_versions) AS skill_versions, (SELECT version FROM marketplace_skill_versions WHERE id = (SELECT approved_version_id FROM marketplace_skills)) AS approved_skill_version, (SELECT version FROM marketplace_agent_versions WHERE id = (SELECT approved_version_id FROM marketplace_agents)) AS approved_agent_version;\n`,
     });
     expect(verification.status).toBe(0);
     expect(JSON.parse(verification.stdout)).toEqual([
       {
-        owner: "OpenBot",
+        owner: "OpenBot Team",
         skill_installs: 8,
-        skill_featured: 1,
+        skill_featured: 0,
         agent_installs: 5,
-        agent_featured: 1,
+        agent_featured: 0,
         skill_status: "approved",
         agent_status: "approved",
+        category: "research",
+        initial_skill_featured: 1,
+        initial_agent_featured: 1,
+        skill_versions: 2,
+        approved_skill_version: 2,
+        approved_agent_version: 2,
       },
     ]);
   });
@@ -92,7 +123,7 @@ CREATE TABLE marketplace_agent_versions (
   id TEXT PRIMARY KEY, agent_id TEXT NOT NULL REFERENCES marketplace_agents(id), version INTEGER NOT NULL,
   name TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL, avatar_seed TEXT NOT NULL,
   avatar_hue INTEGER, avatar_key TEXT, skills_json TEXT NOT NULL CHECK(json_valid(skills_json)),
-  routines_json TEXT NOT NULL CHECK(json_valid(routines_json)), status TEXT NOT NULL, rejection_note TEXT,
+  routines_json TEXT NOT NULL CHECK(json_valid(routines_json)), category TEXT NOT NULL DEFAULT 'other', status TEXT NOT NULL, rejection_note TEXT,
   created_at INTEGER NOT NULL, reviewed_at INTEGER, UNIQUE(agent_id, version)
 );
 `;

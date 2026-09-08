@@ -88,7 +88,7 @@ interface SkillsMarketplace {
 
 export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   const [market, setMarket] = createStore<SkillsMarketplace>({
-    browse: { kind: "skills", tab: "discover", targetAgentId: "" },
+    browse: { kind: "agents", tab: "discover", targetAgentId: "" },
     detail: { kind: "none" },
     installed: [],
     publication: {
