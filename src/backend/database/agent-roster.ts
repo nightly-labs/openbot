@@ -33,6 +33,36 @@ export class AgentRoster {
     ).map((row) => JSON.parse(requiredStringColumn(row, "agent_json")));
   }
 
+  /**
+   * Every thread row no agent claims as its own `thread_id`.
+   *
+   * `projection_threads.agent_id` carries no foreign key to `projection_agents`, the chat list is the
+   * roster with no join, and nothing else in the app enumerates threads -- so a thread that falls out
+   * of the roster becomes unreachable rather than broken, and reports itself as an empty chat. This is
+   * the only query that can see one. `replaceAgents` is how they appear: it truncates the roster and
+   * re-inserts the in-memory list, while `ensureThreadProjection` never deletes, so a persist made
+   * with an agent missing leaves that agent's thread and every message in it behind.
+   *
+   * Claimed by `thread_id` rather than matched on `agent_id`, because both halves of the split have to
+   * be caught: an agent rebuilt under its own id points at no thread while its old row still names it,
+   * and a thread whose `agent_id` keeps a pre-rename spelling names an agent that no longer answers to
+   * it. Ordered so that a repair over the result is deterministic.
+   */
+  unclaimedThreads(): { threadId: string; agentId: string }[] {
+    return databaseRows(
+      this.#core.connection
+        .prepare(
+          `SELECT thread_id, agent_id FROM projection_threads
+           WHERE thread_id NOT IN (SELECT thread_id FROM projection_agents WHERE thread_id IS NOT NULL)
+           ORDER BY thread_id`,
+        )
+        .all(),
+    ).map((row) => ({
+      threadId: requiredStringColumn(row, "thread_id"),
+      agentId: requiredStringColumn(row, "agent_id"),
+    }));
+  }
+
   replaceAgents(commandId: string, agents: AgentSummary[], eventType: string): void {
     this.#core.dispatch(
       commandId,

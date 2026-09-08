@@ -4,6 +4,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  isCompleteSectionOrder,
   SIDEBAR_PEOPLE_SECTION_ID,
   SIDEBAR_UNASSIGNED_SECTION_ID,
   type SidebarLayoutAction,
@@ -386,14 +387,7 @@ function isStoredSidebarLayoutBody(value: unknown): boolean {
     sections.push({ id: candidate.id, name: candidate.name });
   }
 
-  const expectedOrder = new Set([SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID, ...ids]);
-  if (
-    value.order.length !== expectedOrder.size ||
-    !value.order.every((sectionId) => isString(sectionId) && expectedOrder.has(sectionId)) ||
-    new Set(value.order).size !== value.order.length
-  ) {
-    return false;
-  }
+  if (!isCompleteSectionOrder(value.order, ids)) return false;
   return Object.entries(value.agentAssignments).every(
     ([agentId, sectionId]) =>
       agentId.length > 0 && agentId.length <= INPUT_LIMITS.identifier && isString(sectionId) && ids.has(sectionId),

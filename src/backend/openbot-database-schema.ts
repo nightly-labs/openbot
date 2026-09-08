@@ -734,8 +734,21 @@ function readAgentIdRenames(db: DatabaseSync): readonly AgentIdRename[] {
     )
     .all();
   const taken = new Set<string>();
-  for (const row of db.prepare("SELECT agent_id FROM projection_agents").all()) {
-    if (isDynamicRecord(row) && isString(row.agent_id)) taken.add(row.agent_id);
+  // Both tables, because the roster is not the only place an id is held. `projection_threads.agent_id`
+  // carries no foreign key, and `replaceAgents` truncates the roster while `ensureThreadProjection`
+  // never deletes, so a thread can outlive the agent row that named it. Such a thread already keyed at
+  // `agent-<uuid>` is invisible to a check that reads `projection_agents` alone, and the collision it
+  // causes is silent: `openbot-thread-bot-<uuid>` becomes `openbot-thread-agent-<uuid>`, which the
+  // orphan already holds, and the row-level `OR REPLACE` below resolves that by deleting the orphan.
+  // Its messages are rewritten onto the same thread id in the same pass, so nothing dangles and no
+  // check objects -- the two conversations simply merge, and the user opens one chat to find messages
+  // from another mixed into it, with the thread record that separated them gone. Two messages sharing
+  // an id lose one outright. A rename whose target any surviving thread names is skipped for the reason
+  // a taken agent id is: a stale spelling is legible, silently merged history is not recoverable.
+  for (const table of ["projection_agents", "projection_threads"]) {
+    for (const row of db.prepare(`SELECT agent_id FROM ${table}`).all()) {
+      if (isDynamicRecord(row) && isString(row.agent_id)) taken.add(row.agent_id);
+    }
   }
   const renames: AgentIdRename[] = [];
   for (const row of rows) {

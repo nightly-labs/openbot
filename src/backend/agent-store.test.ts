@@ -162,12 +162,57 @@ describe("AgentStore", () => {
 
     await store.getOrCreate("chief");
     const threadId = await store.ensureThreadId("chief");
+    // Derived from the agent id, not minted at random. Both conversation read paths call `getOrCreate`,
+    // so reading a chat whose roster row is gone rebuilds the agent with no thread and arrives here --
+    // and a random id would file it against an empty thread while the user's own thread, with every
+    // message in it, stays on disk addressable by nothing.
+    expect(threadId).toBe("openbot-thread-chief");
     const restored = new AgentStore(userData, join(root, "home"));
     await restored.initialize();
     expect(restored.list().find((agent) => agent.id === "chief")?.threadId).toBe(threadId);
     await expect(readFile(join(userData, "bots.json"), "utf8")).rejects.toMatchObject({
       code: "ENOENT",
     });
+  });
+
+  // The state any `#persist` made with an incomplete roster leaves behind: `replaceAgents` truncates the
+  // roster and re-inserts the list it was given, while `ensureThreadProjection` never deletes. Nothing
+  // then reaches the thread -- `projection_threads.agent_id` carries no foreign key, the chat list is the
+  // roster with no join, and nothing enumerates threads -- so the user sees an empty chat while every
+  // message is still on disk. Startup gives the thread back rather than leaving it addressable by nothing.
+  it("gives back a thread its roster row stopped naming", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
+    temporaryRoots.push(root);
+    const userData = join(root, "user-data");
+    const home = join(root, "home");
+    const store = new AgentStore(userData, home);
+    await store.initialize();
+    await store.getOrCreate("chief");
+    const threadId = await store.ensureThreadId("chief");
+    store.database.appendConversationMessage({
+      agentId: "chief",
+      threadId,
+      activeTurnId: null,
+      message: {
+        id: "message-1",
+        author: "user",
+        text: "Where did my chat go?",
+        createdAt: "2026-09-01T12:00:00.000Z",
+        status: "completed",
+      },
+      eventType: "turn.started",
+    });
+    store.restoreThreadIdentity("chief", null, null);
+    await store.updatePreview("chief", "stranded");
+    expect(store.list().find((agent) => agent.id === "chief")?.threadId).toBeNull();
+
+    const restored = new AgentStore(userData, home);
+    await restored.initialize();
+
+    expect(restored.list().find((agent) => agent.id === "chief")?.threadId).toBe(threadId);
+    expect(restored.database.readConversationPage("chief", threadId).messages).toEqual([
+      expect.objectContaining({ id: "message-1", text: "Where did my chat go?" }),
+    ]);
   });
 
   it("persists marketplace installation versions", async () => {
