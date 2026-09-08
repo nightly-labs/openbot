@@ -5,6 +5,7 @@ import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.t
 
 export function SheetFormField({
   hint,
+  trailing,
   isRequired = false,
   label,
   multiline = false,
@@ -20,13 +21,22 @@ export function SheetFormField({
           {label}
         </Typography>
       )}
-      <Control
-        accessibilityLabel={label}
-        className={`rounded-2xl px-4 font-sans text-body ${multiline ? "min-h-28" : "min-h-12"} ${appearance === "soft" ? "border-0 bg-surface shadow-none" : ""}`}
-        multiline={multiline}
-        variant="primary"
-        {...inputProps}
-      />
+      <View
+        className={
+          trailing ? "flex-row items-center rounded-2xl border border-border bg-surface" : "flex-row items-center"
+        }
+      >
+        <View className="min-w-0 flex-1">
+          <Control
+            accessibilityLabel={label}
+            className={`rounded-2xl px-4 font-sans text-body ${multiline ? "min-h-28" : "min-h-12"} ${trailing ? "border-0 bg-transparent shadow-none" : appearance === "soft" ? "border-0 bg-surface shadow-none" : ""}`}
+            multiline={multiline}
+            variant="primary"
+            {...inputProps}
+          />
+        </View>
+        {trailing}
+      </View>
       {hint ? (
         <View className="px-1">
           <Typography.Paragraph type="body-xs" className="text-text-secondary">

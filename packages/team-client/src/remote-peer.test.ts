@@ -20,6 +20,16 @@ afterEach(() => {
 });
 
 describe("browser remote peer recovery", () => {
+  it("reports session revocation so the client can refresh memberships immediately", async () => {
+    const network = await setupNetwork();
+    await network.connect();
+    network
+      .socket()
+      .receive({ type: "error", version: 1, code: "session_revoked", message: "The remote session ended." });
+    await vi.waitFor(() => expect(network.updates.at(-1)).toMatchObject({ state: "offline", code: "session_revoked" }));
+    await network.runtime.dispose();
+  });
+
   it("refreshes the account on Signal invalidation without breaking the team connection if refresh fails", async () => {
     const refreshProfile = vi.fn(async () => {
       throw new Error("Account API offline");
@@ -195,9 +205,11 @@ describe("browser remote peer recovery", () => {
   it.each(["disconnected", "failed", "closed"] as const)(
     "releases a %s peer and authenticates a fresh connection",
     async (state) => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       const network = await setupNetwork();
       await expect(network.connect()).resolves.toMatchObject({ ok: true });
       network.connection().drop(state);
+      if (state === "disconnected") await vi.advanceTimersByTimeAsync(5_000);
       expect(network.updates.at(-1)?.state).toBe("offline");
       await expect(network.connect()).resolves.toMatchObject({ ok: true });
       expect(network.connections).toHaveLength(2);
@@ -208,6 +220,83 @@ describe("browser remote peer recovery", () => {
       await network.runtime.dispose();
     },
   );
+
+  it("keeps the authenticated session when a short network interruption recovers", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const network = await setupNetwork();
+    await network.connect();
+    network.connection().drop("disconnected");
+    await vi.advanceTimersByTimeAsync(2_000);
+    network.connection().drop("connected");
+    await vi.advanceTimersByTimeAsync(5_000);
+    const result = await network.runtime.execute({
+      id: "after-network-change",
+      type: "request",
+      method: "GET",
+      path: "/v1/agents",
+      body: {},
+    });
+    expect({ result, bootstraps: network.bootstraps(), state: network.updates.at(-1)?.state }).toEqual({
+      result: { commandId: "after-network-change", ok: true, status: 200, body: [] },
+      bootstraps: 1,
+      state: "online",
+    });
+    await network.runtime.dispose();
+  });
+
+  it("keeps a sent message pending in the background until the desktop confirms it", async () => {
+    const arrived = deferred();
+    const release = deferred();
+    const network = await setupNetwork({
+      responseBody: { messageId: "sent-message", deliveries: [] },
+      beforeResponse: async () => {
+        arrived.resolve();
+        await release.promise;
+      },
+    });
+    await network.connect();
+    const pending = network.runtime.execute({
+      id: "send-message",
+      type: "request",
+      method: "POST",
+      path: "/v1/agents/agent/messages",
+      body: { text: "Hello" },
+    });
+    await arrived.promise;
+    network.runtime.setActive(false);
+    release.resolve();
+    await expect(pending).resolves.toMatchObject({ commandId: "send-message", ok: true, status: 200 });
+    await network.runtime.dispose();
+  });
+
+  it("releases a pending workspace read on background entry and reuses healthy channels on return", async () => {
+    const network = await setupNetwork();
+    await network.connect();
+    const pending = network.runtime.execute({
+      id: "background-read",
+      type: "request",
+      method: "GET",
+      path: "/v1/agents/slow/conversation",
+      body: {},
+    });
+    await network.slowRequest.promise;
+    network.runtime.setActive(false);
+    await expect(pending).resolves.toMatchObject({ ok: false, error: "The app is in the background." });
+    network.runtime.setActive(true);
+    await network.connect();
+    const result = await network.runtime.execute({
+      id: "resumed-read",
+      type: "request",
+      method: "GET",
+      path: "/v1/agents",
+      body: {},
+    });
+    expect({ result, bootstraps: network.bootstraps() }).toEqual({
+      result: { commandId: "resumed-read", ok: true, status: 200, body: [] },
+      bootstraps: 1,
+    });
+    await network.runtime.dispose();
+  });
 
   it("does not reuse an authenticated peer whose browser missed the disconnect event", async () => {
     const network = await setupNetwork();
@@ -350,6 +439,8 @@ async function setupNetwork(
     endSession?: () => Promise<void>;
     beforeBootstrap?: (hostId: string) => Promise<void>;
     beforeAnswer?: () => Promise<void>;
+    beforeResponse?: () => Promise<void>;
+    responseBody?: TeamProtocolV2Json;
   } = {},
 ) {
   const host = await createEd25519Identity(() => new Uint8Array(32).fill(7));
@@ -465,14 +556,17 @@ async function setupNetwork(
           slowRequest.resolve();
           return;
         }
-        this.receive(
-          JSON.stringify({
-            version: 2,
-            type: "response",
-            requestId: frame.requestId,
-            result: { status: 200, body: [] },
-          }),
-        );
+        void (async () => {
+          await options.beforeResponse?.();
+          this.receive(
+            JSON.stringify({
+              version: 2,
+              type: "response",
+              requestId: frame.requestId,
+              result: { status: 200, body: options.responseBody ?? [] },
+            }),
+          );
+        })();
       }
     }
   }

@@ -14,6 +14,7 @@ export function SheetFormField({
   autoFocus,
   editable,
   hint,
+  trailing,
   inputMode,
   isRequired = false,
   label,
@@ -52,9 +53,11 @@ export function SheetFormField({
           borderWidth: appearance === "soft" ? 0 : 1,
           height,
           overflow: "hidden",
+          flexDirection: "row",
+          alignItems: "center",
         }}
       >
-        <Host ignoreSafeArea="all" style={{ height }}>
+        <Host ignoreSafeArea="all" style={{ height, flex: 1 }}>
           <TextInput
             modifiers={[accessibilityLabel(label)]}
             multiline={multiline}
@@ -77,6 +80,7 @@ export function SheetFormField({
             onSubmitEditing={onSubmitEditing}
           />
         </Host>
+        {trailing}
       </View>
       {hint ? (
         <View className="px-1">

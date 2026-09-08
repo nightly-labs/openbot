@@ -1,5 +1,6 @@
-import type { HostStatus, ServerSummary, TeamPresenceMember } from "@openbot/contracts/ipc";
+import type { HostStatus, ServerSummary, TeamInviteSummary, TeamPresenceMember } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 import { Toaster } from "../../components/ui";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "./ServerSettingsModal";
@@ -309,7 +310,7 @@ describe("ServerSettingsModal", () => {
     await waitFor(() => expect(onRemoveMember).toHaveBeenCalledWith("alice-1"));
   });
 
-  it("lets a remote administrator invite, search, revoke, and pause access", async () => {
+  it("lets a remote administrator invite, search, revoke, and change member roles", async () => {
     const onCreateInvite = vi.fn(async (input: { role: "admin" | "member"; email?: string }) => ({
       id: "invite-new",
       role: input.role,
@@ -360,8 +361,84 @@ describe("ServerSettingsModal", () => {
     const memberActions = screen.getByRole("button", { name: "Actions for Alice Chen" });
     await fireEvent.pointerDown(memberActions, { button: 0 });
     await fireEvent.pointerUp(memberActions, { button: 0 });
-    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Pause access" }), { button: 0 });
-    await waitFor(() => expect(onUpdateMember).toHaveBeenCalledWith({ memberId: "alice-1", disabled: true }));
+    expect(screen.queryByRole("menuitem", { name: "Pause access" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Restore access" })).not.toBeInTheDocument();
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Make admin" }), { button: 0 });
+    await waitFor(() => expect(onUpdateMember).toHaveBeenCalledWith({ memberId: "alice-1", role: "admin" }));
+  });
+
+  it("hides removed members and excludes them from the member count", async () => {
+    render(() => (
+      <ServerSettingsModal
+        {...props({
+          server: { ...remoteServer, apiUrl: "webrtc://remote-1" },
+          hostStatus: null,
+          members: members.map((member) => ({ ...member, disabled: member.id === "alice-1" })),
+        })}
+      />
+    ));
+    await fireEvent.click(screen.getByRole("tab", { name: "Members" }));
+    expect(screen.getByText("Server Owner")).toBeInTheDocument();
+    expect(screen.queryByText("Alice Chen")).not.toBeInTheDocument();
+    expect(screen.getByText("1 members")).toBeInTheDocument();
+  });
+
+  it("lets the owner remove an inactive legacy member before inviting them again", async () => {
+    const [currentMembers, setCurrentMembers] = createSignal(
+      members.map((member) => ({ ...member, disabled: member.id === "alice-1" })),
+    );
+    const onRemoveMember = vi.fn(async (memberId: string) => {
+      setCurrentMembers((current) => current.filter((member) => member.id !== memberId));
+    });
+    render(() => (
+      <ServerSettingsModal
+        {...props({
+          server: { ...remoteServer, role: "owner" },
+          hostStatus: null,
+          members: currentMembers(),
+          onRemoveMember,
+        })}
+      />
+    ));
+    await fireEvent.click(screen.getByRole("tab", { name: "Members" }));
+    expect(screen.getByText("1 members")).toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Actions for Alice Chen" });
+    await fireEvent.pointerDown(trigger, { button: 0 });
+    await fireEvent.pointerUp(trigger, { button: 0 });
+    expect(screen.queryByRole("menuitem", { name: "Restore access" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Make admin" })).not.toBeInTheDocument();
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Remove member" }), { button: 0 });
+    await fireEvent.click(await screen.findByRole("button", { name: "Remove member" }));
+    await waitFor(() => expect(onRemoveMember).toHaveBeenCalledWith("alice-1"));
+    await waitFor(() => expect(screen.queryByText("Alice Chen")).not.toBeInTheDocument());
+    expect(screen.getByText("Server Owner")).toBeInTheDocument();
+  });
+
+  it("shows when the invitation is accepted and stops offering its consumed QR", async () => {
+    const invite = {
+      id: "live-invite",
+      role: "member" as const,
+      expiresAt: "2099-01-01T00:00:00.000Z",
+      usedAt: null,
+      email: null,
+      inviteUrl: "https://openbot.run/join?invite=live",
+    };
+    const [invites, setInvites] = createSignal<TeamInviteSummary[]>([invite]);
+    render(() => (
+      <ServerSettingsModal
+        {...props({ server: remoteServer, hostStatus: null, members, onCreateInvite: async () => invite })}
+        invites={invites()}
+      />
+    ));
+    await fireEvent.click(screen.getByRole("tab", { name: "Members" }));
+    await fireEvent.click(screen.getByRole("tab", { name: "Invite link" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Create link" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Show invitation QR code" }));
+    await screen.findByRole("img", { name: "Invitation QR code" });
+    setInvites([{ ...invite, usedAt: "2026-09-08T12:00:00.000Z" }]);
+    expect(await screen.findByText("Invitation accepted")).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Invitation QR code" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create new invitation link" })).toBeEnabled();
   });
 
   it("associates invite validation with the email field and creates invite links", async () => {
@@ -396,5 +473,11 @@ describe("ServerSettingsModal", () => {
     await waitFor(() => expect(onCreateInvite).toHaveBeenCalledWith({ role: "member" }));
     expect(await screen.findByRole("button", { name: "Copy link" })).toBeInTheDocument();
     await waitFor(() => expect(inviteLink).toHaveValue("https://studio.example.com/invite/new"));
+    await fireEvent.click(screen.getByRole("button", { name: "Show invitation QR code" }));
+    expect(await screen.findByRole("img", { name: "Invitation QR code" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Show invitation QR code" }));
+    expect(screen.queryByRole("img", { name: "Invitation QR code" })).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Create new invitation link" }));
+    await waitFor(() => expect(onCreateInvite).toHaveBeenCalledTimes(2));
   });
 });

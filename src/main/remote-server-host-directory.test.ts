@@ -1,7 +1,7 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { RemoteHostSummary } from "./central-auth-manager";
-import { reconcileWebRtcHosts } from "./remote-server-host-directory";
+import { reconcileWebRtcHosts, watchRemoteHostDirectory } from "./remote-server-host-directory";
 import type { PreservedHostIdentity } from "./remote-server-store";
 import type { StoredRemoteServer } from "./remote-server-stored-shape";
 import { fingerprint } from "./team-store";
@@ -43,9 +43,11 @@ function reconcile(input: {
   preservedIdentities?: PreservedHostIdentity[];
   hidden?: string[];
   keepOtherTransports?: boolean;
+  connected?: string[];
 }) {
   return reconcileWebRtcHosts({
     hosts: input.hosts ?? [],
+    isConnected: (hostId) => (input.connected ?? []).includes(hostId),
     servers: input.servers ?? [],
     preservedIdentities: input.preservedIdentities ?? [],
     localHostId: input.localHostId ?? null,
@@ -56,6 +58,18 @@ function reconcile(input: {
 }
 
 describe("reconcileWebRtcHosts", () => {
+  it("preserves observed desktop availability only while the same host stays connected", () => {
+    const servers = [
+      storedHost("online", { remoteDesktopAvailable: true }),
+      storedHost("offline", { remoteDesktopAvailable: true }),
+    ];
+    const result = reconcile({ hosts: [listedHost("online"), listedHost("offline")], servers, connected: ["online"] });
+    expect(result.servers.map((server) => [server.id, server.remoteDesktopAvailable])).toEqual([
+      ["online", true],
+      ["offline", false],
+    ]);
+  });
+
   it("keeps the order the user arranged and appends hosts they have not seen", () => {
     const result = reconcile({
       hosts: [listedHost("first"), listedHost("second"), listedHost("third")],
@@ -162,4 +176,26 @@ describe("reconcileWebRtcHosts", () => {
 
     expect(result.servers[0]).toMatchObject({ name: "Renamed", role: "admin", logoVersion: "logo-2" });
   });
+});
+
+it("refreshes cross-device memberships only while active and stops on shutdown", async () => {
+  vi.useFakeTimers();
+  let active = false;
+  const refresh = vi.fn(async () => undefined);
+  const stop = watchRemoteHostDirectory({ isActive: () => active, refresh });
+  try {
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(refresh).not.toHaveBeenCalled();
+    active = true;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    stop();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  } finally {
+    stop();
+    vi.useRealTimers();
+  }
 });

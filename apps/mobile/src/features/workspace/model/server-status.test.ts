@@ -1,6 +1,12 @@
 import { createRemoteConnectionRecovery, REMOTE_RETRY_INTERVAL_MS } from "@openbot/team-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { applyServerFailure, applyServerRecovery, resetServerStatus, serverStatusLabel } from "./server-status";
+import {
+  applyServerFailure,
+  applyServerRecovery,
+  resetServerStatus,
+  serverKind,
+  serverStatusLabel,
+} from "./server-status";
 import type { MobileServer } from "./workspace-types";
 
 const server: MobileServer = {
@@ -14,6 +20,7 @@ const server: MobileServer = {
   accent: "",
   publicKey: "key",
   membershipId: "member",
+  role: "owner",
 };
 
 afterEach(() => vi.useRealTimers());
@@ -90,10 +97,18 @@ describe("mobile server availability", () => {
       ...server,
       recoveryStatus: { phase: "online", attempt: 0, remainingSeconds: 0 },
     });
-    expect(serverStatusLabel(reset)).toBe("Unknown");
+    expect(serverStatusLabel(reset)).toBe("Not connected");
     expect(reset.recoveryStatus).toBeUndefined();
     expect(reset.initialConnectionPending).toBe(false);
     expect(reset.publicKey).toBe(server.publicKey);
     expect(serverStatusLabel({ ...server, state: "error" })).toBe("Connection error");
   });
+});
+
+it("labels only the paired desktop as local", () => {
+  expect([
+    serverKind("paired", "paired"),
+    serverKind("another-owned-host", "paired"),
+    serverKind("host", undefined),
+  ]).toEqual(["local", "remote", "remote"]);
 });
