@@ -1,5 +1,6 @@
 import type { ChildProcess } from "node:child_process";
 import type { AgentProviderStatus } from "@openbot/contracts/ipc";
+import { redactText } from "@openbot/logging";
 import type { AgentProvider } from "../agent-client";
 import { CodexCliError } from "../cli";
 
@@ -53,6 +54,9 @@ export function providerFailureStatus(
  * Collects a failing process's own explanation from its error stream: the last line it wrote,
  * bounded, for a message the user reads. Returns null when the process said nothing usable, so the
  * caller keeps its own wording rather than showing an empty sentence.
+ *
+ * The line is redacted first. It goes into the provider row, which the Team API broadcasts to the
+ * team's connected clients, and a CLI that fails on authentication prints the header or key it sent.
  */
 export function readProcessReason(child: ChildProcess): () => string | null {
   let text = "";
@@ -68,7 +72,8 @@ export function readProcessReason(child: ChildProcess): () => string | null {
       .filter(Boolean)
       .at(-1);
     if (!line) return null;
-    return line.length > 200 ? `${line.slice(0, 199)}…` : line;
+    const safe = redactText(line);
+    return safe.length > 200 ? `${safe.slice(0, 199)}…` : safe;
   };
 }
 

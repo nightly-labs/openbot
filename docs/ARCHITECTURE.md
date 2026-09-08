@@ -455,7 +455,10 @@ one Update button, and one entry point in the runtime store, `startProviderUpdat
 behind it differs: a `system` install goes to `updateProviderCli`, which runs that CLI's own updater
 (`codex update`) and then restarts the provider on the binary now on disk. That updater reports no
 progress, so the notification holds its indeterminate step until the provider comes back, and a
-failure keeps the reason the CLI gave, in one error that goes to the provider row and to the caller.
+failure keeps the reason the CLI gave, redacted, in one error that goes to the provider row and to
+the caller - and on, through the Team API, to the team's connected clients.
+The owner comes from the last resolution of the binary, not from the client that runs it, so a
+provider that is signed out still reports its own install rather than reading as the managed copy.
 OpenBot downloads nothing on this path, so the pinned artifact checksums are untouched. The managed
 copy refuses this command, because the runtime manager replaces that installation whole.
 

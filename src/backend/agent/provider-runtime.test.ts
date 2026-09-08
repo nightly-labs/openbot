@@ -719,6 +719,52 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     });
   }
 
+  it("keeps the owner of a CLI whose provider is signed out", async () => {
+    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => new FakeAgentClient(provider, undefined, true, provider !== "claude"),
+    );
+    await service.initialize();
+
+    // Signed out, the provider keeps no client, so the row would name no owner - and an unowned CLI
+    // is read as the managed copy, which sends the user's own install to a download.
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "claude", state: "sign-in-required", cliSource: "system" }),
+    );
+  });
+
+  it("redacts a secret in the reason the updater printed", async () => {
+    const claude = await createUpdatableFakeClaude(
+      root,
+      "2.1.250",
+      "registry refused Authorization: Bearer abcdef123456",
+    );
+    process.env.OPENBOT_CLAUDE_PATH = claude.executable;
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "claude",
+      (provider) => new FakeAgentClient(provider),
+    );
+    await service.initialize();
+
+    // The row goes to the caller and to every client the Team API broadcasts to.
+    await expect(service.updateProviderCli("claude")).rejects.toThrow(/\[redacted\]/u);
+
+    const message = service.getStatus().providers?.find((provider) => provider.id === "claude")?.message;
+    expect(message).toContain("[redacted]");
+    expect(message).not.toContain("abcdef123456");
+  });
+
   it("keeps the CLI's own reason when its updater refuses", async () => {
     const claude = await createUpdatableFakeClaude(root, "2.1.250", "Installed by Homebrew. Run brew upgrade.");
     process.env.OPENBOT_CLAUDE_PATH = claude.executable;

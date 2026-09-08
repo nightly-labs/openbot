@@ -208,6 +208,15 @@ export class ProviderRuntime implements ProviderPort {
   readonly #bundledExecutables: ReadonlyMap<AgentProvider, string | null | undefined>;
   readonly #clients = new Map<AgentProvider, AgentClient>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
+  /**
+   * Who owns each provider's binary, as the last resolution found it.
+   *
+   * `#cli` holds only the CLI a client runs on, and a provider that is signed out has no client
+   * although its binary is resolved and its version is on the row. Without this record that row
+   * names no owner, and an unowned CLI is read as the managed copy: the user's own install would be
+   * offered a download instead of its own updater.
+   */
+  readonly #cliSources = new Map<AgentProvider, AgentCliInfo["source"]>();
   readonly #accounts = new Map<AgentProvider, AccountReadResult["account"]>();
   readonly #providerStarts = new Map<AgentProvider, Promise<void>>();
   readonly #providerConnectionCommands = new Map<AgentProvider, Promise<void>>();
@@ -260,10 +269,25 @@ export class ProviderRuntime implements ProviderPort {
     return {
       ...status,
       providers: status.providers.map((row) => {
-        const source = this.#cli.get(row.id)?.source;
+        const source = this.#cli.get(row.id)?.source ?? this.#cliSources.get(row.id);
         return source ? { ...row, cliSource: source } : row;
       }),
     };
+  }
+
+  /** Resolve a provider's binary and keep who owns it, whether or not the provider is signed in. */
+  async #resolveProviderCli(provider: AgentProvider): Promise<AgentCliInfo> {
+    try {
+      const cli = await requireProviderDriver(provider).resolveCli({
+        bundledExecutable: this.#bundledExecutables.get(provider),
+      });
+      this.#cliSources.set(provider, cli.source);
+      return cli;
+    } catch (error) {
+      // Nothing resolved, so there is no owner to name: a kept one would outlive its binary.
+      this.#cliSources.delete(provider);
+      throw error;
+    }
   }
 
   isReady(): boolean {
@@ -401,7 +425,7 @@ export class ProviderRuntime implements ProviderPort {
     const command = driver.cliUpdate;
     if (!command) throw new Error(`OpenBot cannot update the ${providerLabel(provider)} CLI.`);
     return this.#runProviderConnectionCommand(provider, async () => {
-      const cli = await driver.resolveCli({ bundledExecutable: this.#bundledExecutables.get(provider) });
+      const cli = await this.#resolveProviderCli(provider);
       if (cli.source === "managed") {
         throw new Error(`OpenBot manages this ${providerLabel(provider)} CLI and updates it with the app.`);
       }
@@ -814,9 +838,7 @@ export class ProviderRuntime implements ProviderPort {
       await this.#connect("starting", [provider], { preserveCheckErrors: true, notifyReady: false });
       return;
     }
-    const cli = await requireProviderDriver(provider).resolveCli({
-      bundledExecutable: this.#bundledExecutables.get(provider),
-    });
+    const cli = await this.#resolveProviderCli(provider);
     const candidate = await this.#createAuthenticatedProviderClient(provider, cli);
     // Not a start: `onProvidersReady` is restart recovery, and it settles every unresolved delivery,
     // including the live ones of the other providers - a turn still running would be recorded as
@@ -832,9 +854,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#setProviderConnectionState(provider, "connecting");
 
     try {
-      cli = await requireProviderDriver(provider).resolveCli({
-        bundledExecutable: this.#bundledExecutables.get(provider),
-      });
+      cli = await this.#resolveProviderCli(provider);
       const child = spawn(cli.executable, [...command.argv], {
         cwd: process.cwd(),
         env: { ...process.env, ...command.env(cli) },
@@ -1046,7 +1066,7 @@ export class ProviderRuntime implements ProviderPort {
         let client: AgentClient | null = null;
         let cli: AgentCliInfo | null = null;
         try {
-          cli = await driver.resolveCli({ bundledExecutable: this.#bundledExecutables.get(provider) });
+          cli = await this.#resolveProviderCli(provider);
           client = this.#clientFactory
             ? this.#clientFactory(provider, cli)
             : driver.createClient(cli, this.#requestTimeoutMs);
