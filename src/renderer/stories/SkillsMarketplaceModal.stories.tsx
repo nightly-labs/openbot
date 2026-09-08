@@ -130,6 +130,7 @@ export const SkillDetail: Story = {
   render: () => <SkillsMarketplaceModalStory initialOpen />,
   play: async ({ userEvent }) => {
     const body = within(document.body);
+    await userEvent.click(await body.findByRole("button", { name: "Skills" }));
     await userEvent.click(await body.findByRole("button", { name: "View Release notes details" }));
     await expect(await body.findByRole("region", { name: "Release notes details" })).toBeVisible();
   },
@@ -139,6 +140,7 @@ export const MySubmissions: Story = {
   render: () => <SkillsMarketplaceModalStory initialOpen />,
   play: async ({ userEvent }) => {
     const body = within(document.body);
+    await userEvent.click(await body.findByRole("button", { name: "Skills" }));
     await userEvent.click(await body.findByRole("button", { name: "Marketplace menu" }));
     await userEvent.click(await body.findByRole("menuitem", { name: "My submissions" }));
     await expect(await body.findByText("Standup digest")).toBeVisible();
@@ -178,7 +180,13 @@ export const LoadingTransition: Story = {
 };
 export const MissingImages: Story = {
   render: () => <SkillsMarketplaceModalStory initialOpen catalogState="missing-images" />,
+  play: async ({ userEvent }) => {
+    await userEvent.click(await within(document.body).findByRole("button", { name: "Skills" }));
+  },
 };
 export const FourFeatured: Story = {
   render: () => <SkillsMarketplaceModalStory initialOpen catalogState="four-featured" />,
+  play: async ({ userEvent }) => {
+    await userEvent.click(await within(document.body).findByRole("button", { name: "Skills" }));
+  },
 };
