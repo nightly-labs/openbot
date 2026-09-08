@@ -60,6 +60,6 @@ describe("AgentSettingsPanel", () => {
     expect(screen.getByRole("button", { name: /Agent reasoning level/ })).toHaveTextContent("Extra high");
     await fireEvent.click(screen.getByRole("button", { name: "Usage" }));
     expect(onOpenUsage).toHaveBeenCalledWith(screen.getByRole("button", { name: "Usage" }));
-    expect(screen.getByRole("button", { name: "Agent model: Sol" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Sol" })).toBeInTheDocument();
   });
 });
