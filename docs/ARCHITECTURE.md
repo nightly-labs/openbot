@@ -388,7 +388,12 @@ the same report with an agent filter. Host changes clear the filter and stale re
 
 `host:get-analytics` and the optional `host-analytics` capability expose `GET /v1/analytics`.
 The host queries its local usage tables once for the date range and optional agent filter; it does
-not add per-agent API responses. Session and turn identities include agent and provider. HTTP and
+not add per-agent API responses. The one pass groups by agent id beside day and model, so the
+host-wide response carries per-agent rows that the client labels from the agent list it already
+reads. The same pass also groups by day and provider, which is what lets the chart draw one area
+per provider over a shared baseline; a cell carries only the token count and the cost estimate,
+because those are the two measures the chart reads. Both arrays are on the host report only, which
+is why the agent-scoped route, its codec and the mobile screen are unchanged. Session and turn identities include agent and provider. HTTP and
 WebRTC use an explicit host analytics codec. Existing agent analytics and account limits keep their
 contracts. All authenticated team members can read these aggregates; no additional analytics data
 is stored by the account service or Signal service.

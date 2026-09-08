@@ -1,6 +1,26 @@
-import type { AnalyticsModel } from "@openbot/contracts/ipc";
+import type { AnalyticsDay, AnalyticsModel, AnalyticsProviderDay } from "@openbot/contracts/ipc";
 
-export type UsageMetric = "Cost" | "Tokens";
+// The header filters render these lists directly, so the visible label and the
+// stored value are one string.
+export const usageMetrics = ["Cost", "Tokens"] as const;
+export type UsageMetric = (typeof usageMetrics)[number];
+export const usagePeriods = ["7 days", "30 days", "90 days", "1 year"] as const;
+export type UsagePeriod = (typeof usagePeriods)[number];
+// A label is not a number of days once "1 year" is an option, and the host rejects a
+// range wider than 367 days, so a year is the 365 the calendar names rather than 366.
+export const usagePeriodDays: Record<UsagePeriod, number> = {
+  "7 days": 7,
+  "30 days": 30,
+  "90 days": 90,
+  "1 year": 365,
+};
+// A report row names an agent by id, and the provider is empty when the agent is not in
+// the list the panel read, because UsageProviderMark already draws nothing for a string
+// it does not recognize.
+export interface UsageAgentLabel {
+  name: string;
+  provider: string;
+}
 export function usageNumber(value: number | null): string {
   return value === null ? "Unavailable" : value.toLocaleString();
 }
@@ -41,4 +61,64 @@ export function usageProviders(models: AnalyticsModel[]) {
     providers.set(model.provider, row);
   }
   return [...providers.values()];
+}
+
+// A series wears its provider's colour, never the colour of its rank: the provider list
+// re-sorts when the metric changes, and a legend dot that repainted with it would say a
+// different area belongs to the row.
+const seriesColors: Readonly<Record<string, string>> = {
+  codex: "var(--openbot-chart-series-codex)",
+  claude: "var(--openbot-chart-series-claude)",
+  grok: "var(--openbot-chart-series-grok)",
+};
+export function usageSeriesColor(provider: string): string {
+  return seriesColors[provider] ?? "var(--openbot-chart-series-other)";
+}
+
+// The one series a report without a provider split still draws. It cannot collide with a
+// provider column: the fallback returns it as the whole series list.
+export const usageTotalSeries = "total";
+
+export interface UsageSeriesRow {
+  date: string;
+  [provider: string]: string | number | null;
+}
+/**
+ * Pivots the daily-by-provider grid into the wide rows the chart reads: one row per day,
+ * one column per provider. A provider with no cell for a day spent nothing there, so it
+ * reads zero; a cell whose cost is unknown stays null, which is what draws a gap instead
+ * of a false zero.
+ */
+export function usageSeries(
+  cells: AnalyticsProviderDay[],
+  daily: AnalyticsDay[],
+  metric: UsageMetric,
+): { series: string[]; rows: UsageSeriesRow[] } {
+  const measure = (value: { processedTokens: number; estimatedCostUsd: number | null }) =>
+    metric === "Cost" ? value.estimatedCostUsd : value.processedTokens;
+  if (cells.length === 0)
+    return {
+      series: [usageTotalSeries],
+      rows: daily.map((day) => ({ date: day.date, [usageTotalSeries]: measure(day) })),
+    };
+  const totals = new Map<string, number>();
+  const byDate = new Map<string, Map<string, number | null>>();
+  for (const cell of cells) {
+    totals.set(cell.provider, (totals.get(cell.provider) ?? 0) + cell.processedTokens);
+    const row = byDate.get(cell.date) ?? new Map<string, number | null>();
+    row.set(cell.provider, measure(cell));
+    byDate.set(cell.date, row);
+  }
+  const series = [...totals.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([provider]) => provider);
+  return {
+    series,
+    rows: daily.map((day) => {
+      const row: UsageSeriesRow = { date: day.date };
+      const cellsForDay = byDate.get(day.date);
+      for (const provider of series) row[provider] = cellsForDay?.get(provider) ?? 0;
+      return row;
+    }),
+  };
 }

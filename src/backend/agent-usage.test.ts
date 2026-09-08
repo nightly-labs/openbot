@@ -65,9 +65,32 @@ describe("local agent usage", () => {
       ["codex", "unknown-model", 0.35],
       ["claude", "unknown-model", 0.3],
     ]);
+    expect(all.agents.map((agent) => [agent.agentId, agent.processedTokens, agent.share])).toEqual([
+      ["agent-a", 350, 0.35],
+      ["agent-b", 350, 0.35],
+      ["agent-c", 300, 0.3],
+    ]);
     expect(db.usage.readHost(range).totals).toEqual(db.usage.read(range).totals);
     const anotherHost = await database();
     expect(anotherHost.usage.readHost(range).totals.sessions).toBe(0);
+  });
+  // The chart draws one area per provider, so the host report carries a cell per calendar
+  // day and provider. No other fixture reads two dates through readHost, which is where
+  // the bucketing and the range guard live.
+  it("groups the daily provider grid by calendar day and leaves out-of-range rows out", async () => {
+    const db = await database();
+    db.usage.record(sample);
+    db.usage.record({ ...sample, agentId: "agent-c", provider: "claude", counterId: "claude-a" });
+    db.usage.record({ ...sample, counterId: "day-three", occurredAt: "2026-09-03T12:00:00Z" });
+    db.usage.record({ ...sample, counterId: "old", occurredAt: "2026-08-31T23:59:59Z" });
+    const all = db.usage.readHost({ startDate: range.startDate, endDate: range.endDate, timeZone: range.timeZone });
+    expect(all.providerDaily.map((cell) => [cell.date, cell.provider, cell.processedTokens])).toEqual([
+      ["2026-09-02", "claude", 350],
+      ["2026-09-02", "codex", 350],
+      ["2026-09-03", "codex", 350],
+    ]);
+    // The grid is host-only: on an agent-scoped report it would restate one provider.
+    expect(db.usage.read(range)).not.toHaveProperty("providerDaily");
   });
   it("normalizes provider usage and counts completed answers without commentary or old messages", async () => {
     const db = await database();

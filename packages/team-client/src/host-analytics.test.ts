@@ -10,6 +10,8 @@ const report = {
   totals: emptyAnalyticsTotals(),
   daily: [],
   models: [],
+  agents: [],
+  providerDaily: [],
 };
 describe("host analytics client", () => {
   it("does not send an unsupported request and rejects data from another filter", async () => {

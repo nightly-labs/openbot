@@ -1,4 +1,4 @@
-import type { AnalyticsTotals, HostAnalytics, HostAnalyticsInput } from "@openbot/contracts/ipc";
+import type { AnalyticsProviderDay, AnalyticsTotals, HostAnalytics, HostAnalyticsInput } from "@openbot/contracts/ipc";
 import {
   type AgentAnalytics,
   type AgentAnalyticsInput,
@@ -6,9 +6,12 @@ import {
   emptyAnalyticsTotals,
 } from "@openbot/contracts/ipc";
 
+// The weight separates the agents from each other: without it every mock agent draws the
+// same curve, and the per-agent table previews as identical rows with equal shares.
 export function mockAgentAnalytics(
   input: AgentAnalyticsInput,
   agent: Pick<AgentSummary, "id" | "model" | "provider">,
+  weight = 1,
 ): AgentAnalytics {
   const daily = [];
   for (
@@ -24,12 +27,12 @@ export function mockAgentAnalytics(
       userMessages: scale,
       assistantMessages: scale,
       turns: scale,
-      uncachedInput: scale * 5000,
-      cachedInput: scale * 15000,
+      uncachedInput: scale * weight * 5000,
+      cachedInput: scale * weight * 15000,
       cacheCreation: 0,
-      output: scale * 1000,
-      processedTokens: scale * 21000,
-      estimatedCostUsd: scale * 0.025,
+      output: scale * weight * 1000,
+      processedTokens: scale * weight * 21000,
+      estimatedCostUsd: scale * weight * 0.025,
     });
   }
   const totals = emptyAnalyticsTotals();
@@ -61,7 +64,9 @@ export function mockHostAnalytics(
   agents: Pick<AgentSummary, "id" | "model" | "provider">[],
 ): HostAnalytics {
   const selected = agents.filter((agent) => !input.agentId || agent.id === input.agentId);
-  const reports = selected.map((agent) => mockAgentAnalytics({ ...input, agentId: agent.id }, agent));
+  const reports = selected.map((agent, index) =>
+    mockAgentAnalytics({ ...input, agentId: agent.id }, agent, 1 + index * 0.5),
+  );
   function sum(rows: AnalyticsTotals[]): AnalyticsTotals {
     const total = emptyAnalyticsTotals();
     for (const row of rows) {
@@ -82,6 +87,20 @@ export function mockHostAnalytics(
     return total;
   }
   const totals = sum(reports.map((report) => report.totals));
+  // Each mock report covers one provider, and two agents can share one, so the grid is the
+  // reports' daily rows folded together by [date, provider] - the same shape and order the
+  // read path produces.
+  const providerDays = new Map<string, AnalyticsProviderDay>();
+  for (const [index, report] of reports.entries()) {
+    const provider = selected[index]?.provider ?? "";
+    for (const day of report.daily) {
+      const key = JSON.stringify([day.date, provider]);
+      const cell = providerDays.get(key) ?? { date: day.date, provider, processedTokens: 0, estimatedCostUsd: null };
+      cell.processedTokens += day.processedTokens;
+      if (day.estimatedCostUsd !== null) cell.estimatedCostUsd = (cell.estimatedCostUsd ?? 0) + day.estimatedCostUsd;
+      providerDays.set(key, cell);
+    }
+  }
   const models = new Map<string, { provider: string; model: string; rows: AnalyticsTotals[] }>();
   for (const report of reports)
     for (const model of report.models) {
@@ -108,5 +127,15 @@ export function mockHostAnalytics(
         share: totals.processedTokens ? values.processedTokens / totals.processedTokens : 0,
       };
     }),
+    agents: reports
+      .map((report) => ({
+        ...report.totals,
+        agentId: report.agentId,
+        share: totals.processedTokens ? report.totals.processedTokens / totals.processedTokens : 0,
+      }))
+      .sort((a, b) => b.processedTokens - a.processedTokens || a.agentId.localeCompare(b.agentId)),
+    providerDaily: [...providerDays.values()].sort(
+      (a, b) => a.date.localeCompare(b.date) || a.provider.localeCompare(b.provider),
+    ),
   };
 }

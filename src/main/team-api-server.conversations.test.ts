@@ -148,7 +148,8 @@ describe("TeamApiServer conversations", () => {
       models: [],
     };
     const getAnalytics = vi.fn(() => analytics);
-    const { agentId: _agentId, ...hostAnalytics } = analytics;
+    const { agentId: _agentId, ...report } = analytics;
+    const hostAnalytics = { ...report, agents: [], providerDaily: [] };
     const getHostAnalytics = vi.fn(() => hostAnalytics);
     const readConversationPageFor = vi.fn(async (...args: unknown[]) => {
       const options = isDynamicRecord(args[4]) ? args[4] : {};

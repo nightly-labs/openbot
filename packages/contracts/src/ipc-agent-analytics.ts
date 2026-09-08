@@ -34,6 +34,19 @@ export interface AnalyticsModel extends AnalyticsTotals {
   model: string;
   share: number;
 }
+export interface AnalyticsAgent extends AnalyticsTotals {
+  agentId: string;
+  share: number;
+}
+// One cell of the daily-by-provider grid. The chart reads exactly these two measures, so
+// the cell carries them rather than the eleven other fields of AnalyticsTotals: at the
+// 367-day cap a full-totals cell per provider is four times the payload for nothing.
+export interface AnalyticsProviderDay {
+  date: string;
+  provider: string;
+  processedTokens: number;
+  estimatedCostUsd: number | null;
+}
 export interface AgentAnalytics {
   agentId: string;
   startDate: string;
@@ -189,6 +202,35 @@ export function decodeAnalyticsReport(value: unknown): Omit<AgentAnalytics, "age
       return { ...totals(model), provider: model.provider, model: model.model, share: number(model.share) };
     }),
   };
+}
+
+// The host report groups by agent beside provider and model, and the renderer joins each
+// row to the agent list it already reads, so only the id crosses the boundary.
+export function decodeAnalyticsAgents(value: unknown): AnalyticsAgent[] {
+  if (!Array.isArray(value)) throw new Error("Invalid agent analytics rows.");
+  return value.map((agent) => {
+    if (!isDynamicRecord(agent) || !isString(agent.agentId) || !agent.agentId || agent.agentId.length > 256)
+      throw new Error("Invalid agent analytics row.");
+    if (number(agent.share) > 1) throw new Error("Invalid agent analytics row.");
+    return { ...totals(agent), agentId: agent.agentId, share: number(agent.share) };
+  });
+}
+
+// The daily grid is host-only for the same reason as the agent split, and it is a
+// separate array rather than a field on each AnalyticsDay because a day carries no
+// provider dimension anywhere else in the report.
+export function decodeAnalyticsProviderDays(value: unknown): AnalyticsProviderDay[] {
+  if (!Array.isArray(value)) throw new Error("Invalid provider analytics rows.");
+  return value.map((cell) => {
+    if (!isDynamicRecord(cell) || !isString(cell.provider) || cell.provider.length > 100)
+      throw new Error("Invalid provider analytics row.");
+    return {
+      date: dateValue(cell.date),
+      provider: cell.provider,
+      processedTokens: number(cell.processedTokens),
+      estimatedCostUsd: nullableNumber(cell.estimatedCostUsd),
+    };
+  });
 }
 
 export function decodeAgentAnalytics(value: unknown): AgentAnalytics {

@@ -3,7 +3,7 @@ import { createEffect, createStore, onSettled, Show } from "solid-js";
 import {
   ArrowLeft,
   Button,
-  Input,
+  IconButton,
   RefreshCw,
   Select,
   SelectContent,
@@ -12,7 +12,14 @@ import {
   SelectValue,
 } from "../../components/ui";
 import { AgentUsageReport } from "./AgentUsageReport";
-import type { UsageMetric } from "./usage-format";
+import {
+  type UsageAgentLabel,
+  type UsageMetric,
+  type UsagePeriod,
+  usageMetrics,
+  usagePeriodDays,
+  usagePeriods,
+} from "./usage-format";
 
 interface AgentUsagePanelProps {
   agentId?: string;
@@ -26,9 +33,8 @@ interface UsageState {
   result: HostAnalytics | null;
   phase: "loading" | "ready" | "unsupported" | "error";
   agents: AgentSummary[];
-  custom: boolean;
   metric: UsageMetric;
-  period: string;
+  period: UsagePeriod;
   serverId: string;
 }
 
@@ -38,7 +44,6 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     agents: [],
     result: null,
     phase: "loading",
-    custom: false,
     metric: "Cost",
     period: "30 days",
     serverId: props.serverId,
@@ -105,6 +110,15 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
       reconnect();
     };
   });
+  // The filter and the per-agent table both name an agent by id, and props.agentName only
+  // names the panel's own agent, so it must not label another agent's row.
+  const agentLabel = (id: string): UsageAgentLabel => {
+    const agent = state.agents.find((candidate) => candidate.id === id);
+    return {
+      name: agent?.name ?? (id === props.agentId ? props.agentName : undefined) ?? id,
+      provider: agent?.provider ?? "",
+    };
+  };
   let reportBody: HTMLDivElement | undefined;
   let heading: HTMLHeadingElement | undefined;
   onSettled(() => heading?.focus());
@@ -112,9 +126,9 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     <section class="agent-usage" aria-label="Agent usage">
       <header class="agent-usage-header">
         <div class="agent-usage-identity">
-          <Button variant="ghost" size="icon-sm" aria-label="Back" onClick={props.onBack}>
+          <IconButton variant="ghost" label="Back" onClick={props.onBack}>
             <ArrowLeft />
-          </Button>
+          </IconButton>
           <h2 ref={heading} tabindex={-1}>
             Usage <span aria-hidden="true">/</span> <span>{props.hostName}</span>
           </h2>
@@ -139,11 +153,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
             }}
             itemComponent={(itemProps) => (
               <SelectItem item={itemProps.item}>
-                {itemProps.item.rawValue === "all"
-                  ? "All agents"
-                  : (state.agents.find((agent) => agent.id === itemProps.item.rawValue.slice(6))?.name ??
-                    props.agentName ??
-                    itemProps.item.rawValue.slice(6))}
+                {itemProps.item.rawValue === "all" ? "All agents" : agentLabel(itemProps.item.rawValue.slice(6)).name}
               </SelectItem>
             )}
           >
@@ -152,9 +162,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
                 {(selection) =>
                   selection.selectedOption() === "all"
                     ? "All agents"
-                    : (state.agents.find((agent) => `agent:${agent.id}` === selection.selectedOption())?.name ??
-                      props.agentName ??
-                      state.range.agentId)
+                    : agentLabel(selection.selectedOption().slice(6)).name
                 }
               </SelectValue>
             </SelectTrigger>
@@ -162,74 +170,39 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
           </Select>
           <UsageSelect
             label="Usage metric"
-            options={["Cost", "Tokens"]}
+            options={usageMetrics}
             value={state.metric}
             onChange={(value) => {
-              if (value === "Cost" || value === "Tokens")
-                setState((draft) => {
-                  draft.metric = value;
-                });
+              setState((draft) => {
+                draft.metric = value;
+              });
             }}
           />
           <UsageSelect
             label="Usage period"
-            options={["7 days", "30 days", "90 days", "Custom range"]}
+            options={usagePeriods}
             value={state.period}
             onChange={(value) => {
               setState((draft) => {
                 draft.period = value;
-                draft.custom = value === "Custom range";
-                if (!draft.custom)
-                  draft.range = {
-                    ...analyticsRange("range", Number.parseInt(value, 10)),
-                    agentId: draft.range.agentId,
-                  };
+                draft.range = {
+                  ...analyticsRange("range", usagePeriodDays[value]),
+                  agentId: draft.range.agentId,
+                };
               });
             }}
           />
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Refresh usage"
+          <IconButton
+            variant="outline"
+            label="Refresh usage"
             disabled={state.phase === "loading"}
             onClick={() => void load()}
           >
             <RefreshCw />
-          </Button>
+          </IconButton>
         </div>
       </header>
       <div ref={reportBody} class="agent-usage-body">
-        <Show when={state.custom}>
-          <div class="agent-usage-dates">
-            <label>
-              Start date
-              <Input
-                type="date"
-                value={state.range.startDate}
-                onInput={(event) =>
-                  setState((draft) => {
-                    draft.range.startDate = event.currentTarget.value;
-                  })
-                }
-              />
-            </label>
-            <label>
-              End date
-              <Input
-                type="date"
-                value={state.range.endDate}
-                onInput={(event) =>
-                  setState((draft) => {
-                    draft.range.endDate = event.currentTarget.value;
-                  })
-                }
-              />
-            </label>
-          </div>
-        </Show>
-        <p class="agent-usage-range">
-          {state.range.startDate} – {state.range.endDate} · {state.range.timeZone}
-        </p>
         <Show when={state.phase === "loading"}>
           <div class="agent-usage-loading" role="status">
             <span>Loading usage…</span>
@@ -263,6 +236,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
             <AgentUsageReport
               result={result()}
               metric={state.metric}
+              agentLabel={agentLabel}
               onReady={() => {
                 // Start each loaded report at its total, after the tabs settle their initial selection.
                 if (reportBody) reportBody.scrollTop = 0;
@@ -275,18 +249,25 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
   );
 }
 
-function UsageSelect(props: { label: string; options: string[]; value: string; onChange: (value: string) => void }) {
+// The header filters share one chip dropdown so the metric and period read as the
+// same kind of control as the agent picker beside them.
+function UsageSelect<Value extends string>(props: {
+  label: string;
+  options: readonly Value[];
+  value: Value;
+  onChange: (value: Value) => void;
+}) {
   return (
-    <Select<string>
-      options={props.options}
+    <Select<Value>
+      options={[...props.options]}
       value={props.value}
       onChange={(value) => {
         if (value) props.onChange(value);
       }}
-      itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue}</SelectItem>}
+      itemComponent={(itemProps) => <SelectItem item={itemProps.item}>{itemProps.item.rawValue}</SelectItem>}
     >
       <SelectTrigger size="sm" aria-label={props.label}>
-        <SelectValue<string>>{(state) => state.selectedOption()}</SelectValue>
+        <SelectValue<Value>>{(selection) => selection.selectedOption()}</SelectValue>
       </SelectTrigger>
       <SelectContent />
     </Select>

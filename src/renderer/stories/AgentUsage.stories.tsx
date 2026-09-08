@@ -34,7 +34,16 @@ function UsageStory(props: {
       model: props.state === "long" ? `${model.model}-long-context-experimental-model-name` : model.model,
       estimatedCostUsd: model.estimatedCostUsd === null ? null : model.estimatedCostUsd * factor,
     }));
-    if (props.state === "empty") return { ...data, totals: emptyAnalyticsTotals(), models: [], daily: [] };
+    data.agents = data.agents.map((agent) => ({
+      ...agent,
+      estimatedCostUsd: agent.estimatedCostUsd === null ? null : agent.estimatedCostUsd * factor,
+    }));
+    data.providerDaily = data.providerDaily.map((cell) => ({
+      ...cell,
+      estimatedCostUsd: cell.estimatedCostUsd === null ? null : cell.estimatedCostUsd * factor,
+    }));
+    if (props.state === "empty")
+      return { ...data, totals: emptyAnalyticsTotals(), models: [], daily: [], agents: [], providerDaily: [] };
     if (props.state === "partial")
       return { ...data, totals: { ...data.totals, missingUsageTurns: 3, unpricedRecords: 2 } };
     return data;

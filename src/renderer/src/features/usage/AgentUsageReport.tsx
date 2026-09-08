@@ -1,9 +1,10 @@
-import { ProviderLogo } from "@openbot/brand";
-import { type HostAnalytics, isAgentProvider } from "@openbot/contracts/ipc";
+import type { AnalyticsTotals, HostAnalytics } from "@openbot/contracts/ipc";
 import { createMemo, createStore, For, onSettled, Show } from "solid-js";
 import { Button, SlidingTabs } from "../../components/ui";
 import { UsageChart } from "./UsageChart";
+import { UsageProviderMark } from "./UsageProviderMark";
 import {
+  type UsageAgentLabel,
   type UsageMetric,
   usageCompact,
   usageCost,
@@ -11,14 +12,9 @@ import {
   usageNumber,
   usageProviderName,
   usageProviders,
+  usageSeriesColor,
 } from "./usage-format";
 
-export function UsageProviderMark(props: { provider: string }) {
-  const provider = () => (isAgentProvider(props.provider) ? props.provider : null);
-  return (
-    <Show when={provider()}>{(value) => <ProviderLogo provider={value()} class="agent-usage-provider-icon" />}</Show>
-  );
-}
 function Amount(props: { value: number | null; cost?: boolean }) {
   return (
     <>
@@ -27,9 +23,43 @@ function Amount(props: { value: number | null; cost?: boolean }) {
     </>
   );
 }
-export function AgentUsageReport(props: { result: HostAnalytics; metric: UsageMetric; onReady: () => void }) {
+// The model and agent tables carry the same three value columns, so they share them and
+// the metric switch changes the same one column in both by construction. The headers name
+// the measure only: every cost cell carries its currency, and the note under the tables
+// already says a share is of the known amount.
+function BreakdownColumns(props: { label: string }) {
+  return (
+    <tr>
+      <th scope="col">{props.label}</th>
+      <th scope="col">Cost</th>
+      <th scope="col">Share</th>
+      <th scope="col">Tokens</th>
+    </tr>
+  );
+}
+function BreakdownCells(props: { row: AnalyticsTotals; cost: boolean; share: (amount: number | null) => string }) {
+  return (
+    <>
+      <td>
+        <Amount value={props.row.estimatedCostUsd} cost />
+      </td>
+      <td>{props.share(props.cost ? props.row.estimatedCostUsd : props.row.processedTokens)}</td>
+      <td>
+        <Amount value={props.row.processedTokens} />
+      </td>
+    </>
+  );
+}
+export function AgentUsageReport(props: {
+  result: HostAnalytics;
+  metric: UsageMetric;
+  agentLabel: (agentId: string) => UsageAgentLabel;
+  onReady: () => void;
+}) {
   onSettled(() => queueMicrotask(props.onReady));
-  const [state, setState] = createStore({ breakdown: "model" });
+  // The host report answers "which teammate spent this" first, so the split by agent is
+  // the tab that opens.
+  const [state, setState] = createStore({ breakdown: "agent" });
   const totals = () => props.result.totals;
   const cost = () => props.metric === "Cost";
   const providers = createMemo(() =>
@@ -39,6 +69,11 @@ export function AgentUsageReport(props: { result: HostAnalytics; metric: UsageMe
   );
   const models = createMemo(() =>
     [...props.result.models].sort((a, b) =>
+      cost() ? (b.estimatedCostUsd ?? -1) - (a.estimatedCostUsd ?? -1) : b.processedTokens - a.processedTokens,
+    ),
+  );
+  const agents = createMemo(() =>
+    [...props.result.agents].sort((a, b) =>
       cost() ? (b.estimatedCostUsd ?? -1) - (a.estimatedCostUsd ?? -1) : b.processedTokens - a.processedTokens,
     ),
   );
@@ -71,7 +106,6 @@ export function AgentUsageReport(props: { result: HostAnalytics; metric: UsageMe
       <div class="agent-usage-overview">
         <section class="agent-usage-summary" aria-label="Usage summary">
           <div>
-            <p class="agent-usage-eyebrow">{cost() ? "Estimated cost" : "Processed tokens"}</p>
             <p class="agent-usage-hero">
               <Amount value={cost() ? totals().estimatedCostUsd : totals().processedTokens} cost={cost()} />
             </p>
@@ -86,6 +120,14 @@ export function AgentUsageReport(props: { result: HostAnalytics; metric: UsageMe
                 <div class="agent-usage-provider">
                   <div class="agent-usage-provider-heading">
                     <span>
+                      {/* The chart needs a legend, and this list already names every
+                          series, so the dot is it - which is why the colour follows the
+                          provider rather than the row's place in a metric-sorted list. */}
+                      <span
+                        class="agent-usage-series-dot"
+                        style={{ background: usageSeriesColor(provider.provider) }}
+                        aria-hidden="true"
+                      />
                       <UsageProviderMark provider={provider.provider} />
                       {usageProviderName(provider.provider)}
                     </span>
@@ -112,7 +154,7 @@ export function AgentUsageReport(props: { result: HostAnalytics; metric: UsageMe
           <UsageChart result={props.result} metric={props.metric} />
         </section>
       </div>
-      <section aria-label="Token totals">
+      <section aria-label="Totals">
         <h3>Totals</h3>
         <dl class="agent-usage-totals">
           <For
@@ -122,6 +164,8 @@ export function AgentUsageReport(props: { result: HostAnalytics; metric: UsageMe
               { label: "Uncached input", value: totals().uncachedInput },
               { label: "Cache creation", value: totals().cacheCreation },
               { label: "Output", value: totals().output },
+              { label: "User messages", value: totals().userMessages },
+              { label: "Completed assistant messages", value: totals().assistantMessages },
             ]}
           >
             {(item) => (
@@ -134,10 +178,6 @@ export function AgentUsageReport(props: { result: HostAnalytics; metric: UsageMe
             )}
           </For>
         </dl>
-        <p class="agent-usage-activity">
-          {usageNumber(totals().userMessages)} user messages <span aria-hidden="true">·</span>{" "}
-          {usageNumber(totals().assistantMessages)} completed assistant messages
-        </p>
       </section>
       <SlidingTabs.Root
         value={state.breakdown}
@@ -151,73 +191,92 @@ export function AgentUsageReport(props: { result: HostAnalytics; metric: UsageMe
           <h3>Breakdown</h3>
           <SlidingTabs.List aria-label="Usage breakdown">
             <SlidingTabs.Trigger value="model">Model</SlidingTabs.Trigger>
+            <SlidingTabs.Trigger value="agent">Agent</SlidingTabs.Trigger>
             <SlidingTabs.Trigger value="day">Day</SlidingTabs.Trigger>
           </SlidingTabs.List>
         </div>
-        <SlidingTabs.Content value="model">
-          <div class="agent-usage-table">
-            <table>
-              <caption class="sr-only">Usage by model</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Model</th>
-                  <th scope="col">Cost · USD</th>
-                  <th scope="col">Share of known {cost() ? "cost" : "tokens"}</th>
-                  <th scope="col">Tokens</th>
-                </tr>
-              </thead>
-              <tbody>
-                <For each={models()}>
-                  {(model) => (
-                    <tr>
-                      <th scope="row">
-                        <span class="agent-usage-model-name">
-                          <UsageProviderMark provider={model.provider} />
-                          <span>
-                            {model.model || "Unknown model"}
-                            <small>{usageProviderName(model.provider)}</small>
+        {/* Every panel is force-mounted, and the grid slot is what makes the hidden ones
+            share one cell instead of each reserving its own height below the visible table. */}
+        <SlidingTabs.ContentSlot>
+          <SlidingTabs.Content value="model">
+            <div class="agent-usage-table">
+              <table>
+                <caption class="sr-only">Usage by model</caption>
+                <thead>
+                  <BreakdownColumns label="Model" />
+                </thead>
+                <tbody>
+                  <For each={models()}>
+                    {(model) => (
+                      <tr>
+                        <th scope="row">
+                          <span class="agent-usage-model-name">
+                            <UsageProviderMark provider={model.provider} />
+                            <span>
+                              {model.model || "Unknown model"}
+                              <small>{usageProviderName(model.provider)}</small>
+                            </span>
                           </span>
-                        </span>
-                      </th>
-                      <td>
-                        <Amount value={model.estimatedCostUsd} cost />
-                      </td>
-                      <td>{share(cost() ? model.estimatedCostUsd : model.processedTokens)}</td>
-                      <td>
-                        <Amount value={model.processedTokens} />
-                      </td>
-                    </tr>
-                  )}
-                </For>
-              </tbody>
-            </table>
-          </div>
-        </SlidingTabs.Content>
-        <SlidingTabs.Content value="day">
-          <div class="agent-usage-table">
-            <table ref={dailyTable} tabindex={-1}>
-              <caption class="sr-only">Daily usage and cost</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Date</th>
-                  <th scope="col">Cost · USD</th>
-                  <th scope="col">Processed tokens</th>
-                </tr>
-              </thead>
-              <tbody>
-                <For each={[...props.result.daily].reverse()}>
-                  {(day) => (
-                    <tr>
-                      <th scope="row">{day.date}</th>
-                      <td>{usageExactCost(day.estimatedCostUsd)}</td>
-                      <td>{usageNumber(day.processedTokens)}</td>
-                    </tr>
-                  )}
-                </For>
-              </tbody>
-            </table>
-          </div>
-        </SlidingTabs.Content>
+                        </th>
+                        <BreakdownCells row={model} cost={cost()} share={share} />
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+          </SlidingTabs.Content>
+          <SlidingTabs.Content value="agent">
+            <div class="agent-usage-table">
+              <table>
+                <caption class="sr-only">Usage by agent</caption>
+                <thead>
+                  <BreakdownColumns label="Agent" />
+                </thead>
+                <tbody>
+                  <For each={agents()}>
+                    {(agent) => (
+                      <tr>
+                        <th scope="row">
+                          <span class="agent-usage-model-name">
+                            <UsageProviderMark provider={props.agentLabel(agent.agentId).provider} />
+                            <span>{props.agentLabel(agent.agentId).name}</span>
+                          </span>
+                        </th>
+                        <BreakdownCells row={agent} cost={cost()} share={share} />
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+          </SlidingTabs.Content>
+          <SlidingTabs.Content value="day">
+            <div class="agent-usage-table">
+              <table ref={dailyTable} tabindex={-1}>
+                <caption class="sr-only">Daily usage and cost</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Date</th>
+                    <th scope="col">Cost · USD</th>
+                    <th scope="col">Processed tokens</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <For each={[...props.result.daily].reverse()}>
+                    {(day) => (
+                      <tr>
+                        <th scope="row">{day.date}</th>
+                        <td>{usageExactCost(day.estimatedCostUsd)}</td>
+                        <td>{usageNumber(day.processedTokens)}</td>
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+          </SlidingTabs.Content>
+        </SlidingTabs.ContentSlot>
       </SlidingTabs.Root>
       <footer class="agent-usage-footer">
         <p>

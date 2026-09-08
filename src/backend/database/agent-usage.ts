@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import {
   type AgentAnalytics,
   type AgentAnalyticsInput,
+  type AnalyticsProviderDay,
   type AnalyticsTotals,
   analyticsDate,
   type ConversationMessage,
@@ -160,7 +161,10 @@ export class AgentUsage {
   }
 
   read(raw: AgentAnalyticsInput): AgentAnalytics {
-    return { ...this.readHost(parseAgentAnalyticsInput(raw)), agentId: raw.agentId };
+    // A spread does not trigger excess-property checking, so the host-only arrays of a
+    // single-agent report are dropped by name rather than left for a decoder to strip.
+    const { agents: _agents, providerDaily: _providerDaily, ...report } = this.readHost(parseAgentAnalyticsInput(raw));
+    return { ...report, agentId: raw.agentId };
   }
 
   readHost(raw: HostAnalyticsInput): HostAnalytics {
@@ -198,11 +202,16 @@ export class AgentUsage {
     )
       days.set(date.toISOString().slice(0, 10), bucket());
     const models = new Map<string, { provider: string; model: string; bucket: Bucket }>();
+    const agents = new Map<string, Bucket>();
+    // The chart reads two measures per [date, provider], and a Bucket would allocate three
+    // Sets per cell - about 3,300 at the 367-day cap - for fields this row never carries.
+    const providerDays = new Map<string, AnalyticsProviderDay>();
     let updatedAt: string | null = null;
-    const targets = (row: DynamicRecord): Bucket[] => {
+    const targets = (row: DynamicRecord): { targets: Bucket[]; cell: AnalyticsProviderDay | null } => {
       const occurred = requiredStringColumn(row, "occurred_at");
-      const day = days.get(analyticsDate(new Date(occurred), input.timeZone));
-      if (!day) return [];
+      const date = analyticsDate(new Date(occurred), input.timeZone);
+      const day = days.get(date);
+      if (!day) return { targets: [], cell: null };
       const updated = typeof row.recorded_at === "string" ? row.recorded_at : occurred;
       if (!updatedAt || updated > updatedAt) updatedAt = updated;
       const provider = requiredStringColumn(row, "provider");
@@ -213,12 +222,27 @@ export class AgentUsage {
         entry = { provider, model, bucket: bucket() };
         models.set(key, entry);
       }
-      return [totals, day, entry.bucket];
+      // The bucket is created past the day guard, so an agent whose rows all fall outside
+      // the range stays out of the table instead of arriving as a row of zeroes.
+      const agentId = requiredStringColumn(row, "agent_id");
+      let agentEntry = agents.get(agentId);
+      if (!agentEntry) {
+        agentEntry = bucket();
+        agents.set(agentId, agentEntry);
+      }
+      const cellKey = JSON.stringify([date, provider]);
+      let cell = providerDays.get(cellKey);
+      if (!cell) {
+        cell = { date, provider, processedTokens: 0, estimatedCostUsd: null };
+        providerDays.set(cellKey, cell);
+      }
+      return { targets: [totals, day, entry.bucket, agentEntry], cell };
     };
     for (const row of records) {
       const tokens = decodeUsageTokens(JSON.parse(requiredStringColumn(row, "tokens_json")));
       const turn = JSON.stringify([row.agent_id, row.provider, row.session_id, row.turn_id]);
-      for (const target of targets(row)) {
+      const scope = targets(row);
+      for (const target of scope.targets) {
         if (TOKEN_KEYS.some((key) => tokens[key] !== null)) target.usageTurns.add(turn);
         target.sessions.add(JSON.stringify([row.agent_id, row.provider, row.session_id]));
         for (const key of TOKEN_KEYS) {
@@ -232,9 +256,17 @@ export class AgentUsage {
           target.values.estimatedCostUsd = (target.values.estimatedCostUsd ?? 0) + row.estimated_cost_usd;
         else target.values.unpricedRecords++;
       }
+      // Only this loop feeds the cell: tokens and cost live on agent_usage_records, and the
+      // activity rows below carry turn and message counts the cell does not hold.
+      const cell = scope.cell;
+      if (cell) {
+        for (const key of TOKEN_KEYS) if (tokens[key] !== null) cell.processedTokens += tokens[key];
+        if (typeof row.estimated_cost_usd === "number")
+          cell.estimatedCostUsd = (cell.estimatedCostUsd ?? 0) + row.estimated_cost_usd;
+      }
     }
     for (const row of activity) {
-      for (const target of targets(row)) {
+      for (const target of targets(row).targets) {
         if (row.kind === "turn") {
           target.turns.add(JSON.stringify([row.agent_id, row.provider, row.session_id, row.turn_id]));
           target.sessions.add(JSON.stringify([row.agent_id, row.provider, row.session_id]));
@@ -257,6 +289,20 @@ export class AgentUsage {
           share: summary.processedTokens ? item.values.processedTokens / summary.processedTokens : 0,
         }))
         .sort((a, b) => b.processedTokens - a.processedTokens),
+      agents: [...agents]
+        .map(([agentId, item]) => ({
+          agentId,
+          ...finish(item),
+          share: summary.processedTokens ? item.values.processedTokens / summary.processedTokens : 0,
+        }))
+        // Agent ids are unique, so the tiebreak makes the order of two equal rows a
+        // decision rather than a consequence of the unordered SELECT above.
+        .sort((a, b) => b.processedTokens - a.processedTokens || a.agentId.localeCompare(b.agentId)),
+      // daily leans on the insertion order of a map seeded date by date; this map is built
+      // lazily from an ORDER BY-less SELECT, so the order is sorted rather than inherited.
+      providerDaily: [...providerDays.values()].sort(
+        (a, b) => a.date.localeCompare(b.date) || a.provider.localeCompare(b.provider),
+      ),
     };
   }
 }

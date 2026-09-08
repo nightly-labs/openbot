@@ -17,7 +17,11 @@ transcripts or store message contents, credentials, or raw provider responses in
 
 Authenticated members of a host team can read aggregate usage for that host's agents through the
 Team API, including from mobile. Desktop can also show the combined totals for all agents on one
-host, with an optional agent filter. A host-wide request returns aggregate data only. These records are separate from product analytics and are not sent
+host, with an optional agent filter. A host-wide response carries the combined totals, one row per
+day, one row per model, one aggregate row per agent, identified by the agent's internal id, and one
+row per day and provider with that provider's token count and cost estimate for the day. Agent
+names are not part of the analytics payload; the client shows them from the agent list it already
+reads. These records are separate from product analytics and are not sent
 to OpenPanel or stored by the account service or Signal service. Conversation clearing retains usage;
 agent deletion removes it. A duplicate agent starts with no usage history.
 

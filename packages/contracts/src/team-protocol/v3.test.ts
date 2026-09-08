@@ -5,7 +5,7 @@ import {
   emptyAnalyticsTotals,
   parseAgentAnalyticsInput,
 } from "../ipc-agent-analytics";
-import { assertHostAnalyticsScope, parseHostAnalyticsInput } from "../ipc-host-analytics";
+import { assertHostAnalyticsScope, decodeHostAnalytics, parseHostAnalyticsInput } from "../ipc-host-analytics";
 import {
   TEAM_AGENT_ACTIVITY_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
@@ -69,6 +69,8 @@ describe("Team protocol v3", () => {
       totals: emptyAnalyticsTotals(),
       daily: [],
       models: [],
+      agents: [{ ...emptyAnalyticsTotals(), agentId: "agent-a", share: 1 }],
+      providerDaily: [{ date: "2026-09-01", provider: "codex", processedTokens: 10, estimatedCostUsd: 0.5 }],
     };
     expect(TEAM_CURRENT_CAPABILITIES).toContain("host-analytics");
     expect(TEAM_PROTOCOL_V3_CAPABILITIES).not.toContain("host-analytics");
@@ -85,6 +87,24 @@ describe("Team protocol v3", () => {
         totals: { ...value.totals, sessions: -1 },
       }),
     ).toThrow("number");
+    expect(() =>
+      decodeTeamProtocolV3CurrentHttpResponse("GET", path, 200, {
+        ...value,
+        agents: [{ ...emptyAnalyticsTotals(), agentId: "agent-a", share: 2 }],
+      }),
+    ).toThrow("share");
+    // Both host-only arrays are required, so a host that omits one fails closed rather than
+    // reaching the renderer as an empty table or a chart with no series.
+    expect(() => decodeHostAnalytics({ ...value, agents: undefined })).toThrow();
+    expect(() => decodeHostAnalytics({ ...value, providerDaily: undefined })).toThrow();
+    // A cell's date is a calendar date, not any string the wire happens to carry, because
+    // the chart joins it to the daily rows by exact value.
+    expect(() =>
+      decodeHostAnalytics({
+        ...value,
+        providerDaily: [{ ...value.providerDaily[0], date: "2026-9-1" }],
+      }),
+    ).toThrow("date");
     expect(
       decodeTeamProtocolV3CurrentHttpResponse("GET", path, 200, { ...value, prompt: "private" }),
     ).not.toHaveProperty("prompt");

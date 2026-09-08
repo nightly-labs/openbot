@@ -34,7 +34,13 @@ function totals(value: unknown): TeamProtocolV1JsonObject {
 }
 export function decodeHostAnalyticsV1Response(value: unknown): TeamProtocolV1JsonObject {
   const input = record(value);
-  if (!Array.isArray(input.daily) || !Array.isArray(input.models)) throw new Error("Invalid analytics rows.");
+  if (
+    !Array.isArray(input.daily) ||
+    !Array.isArray(input.models) ||
+    !Array.isArray(input.agents) ||
+    !Array.isArray(input.providerDaily)
+  )
+    throw new Error("Invalid analytics rows.");
   return {
     ...(input.agentId === undefined ? {} : { agentId: text(input.agentId) }),
     startDate: text(input.startDate),
@@ -52,6 +58,23 @@ export function decodeHostAnalyticsV1Response(value: unknown): TeamProtocolV1Jso
       const share = number(model.share);
       if (share > 1) throw new Error("Invalid analytics share.");
       return { ...totals(model), provider: text(model.provider), model: text(model.model), share };
+    }),
+    agents: input.agents.map((value) => {
+      const agent = record(value);
+      const share = number(agent.share);
+      if (share > 1) throw new Error("Invalid analytics share.");
+      return { ...totals(agent), agentId: text(agent.agentId), share };
+    }),
+    // A cell of the daily-by-provider grid carries only the two measures the chart draws,
+    // so it does not go through totals().
+    providerDaily: input.providerDaily.map((value) => {
+      const cell = record(value);
+      return {
+        date: text(cell.date),
+        provider: text(cell.provider),
+        processedTokens: number(cell.processedTokens),
+        estimatedCostUsd: cell.estimatedCostUsd === null ? null : number(cell.estimatedCostUsd),
+      };
     }),
   };
 }

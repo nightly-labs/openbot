@@ -1,8 +1,12 @@
 import {
   type AgentAnalytics,
   type AgentAnalyticsInput,
+  type AnalyticsAgent,
   AnalyticsInputError,
+  type AnalyticsProviderDay,
   analyticsQuery,
+  decodeAnalyticsAgents,
+  decodeAnalyticsProviderDays,
   decodeAnalyticsReport,
   parseAnalyticsRange,
 } from "./ipc-agent-analytics";
@@ -11,8 +15,13 @@ import { isDynamicRecord, isString } from "./runtime-values";
 export interface HostAnalyticsInput extends Omit<AgentAnalyticsInput, "agentId"> {
   agentId?: string;
 }
+// Only the host report carries the per-agent split and the daily-by-provider grid: on an
+// agent-scoped report the agent array would be one row restating the totals, and adding
+// either to AgentAnalytics would drag the agent codec and the mobile screen along.
 export interface HostAnalytics extends Omit<AgentAnalytics, "agentId"> {
   agentId?: string;
+  agents: AnalyticsAgent[];
+  providerDaily: AnalyticsProviderDay[];
 }
 export function parseHostAnalyticsInput(value: unknown): HostAnalyticsInput {
   const range = parseAnalyticsRange(value);
@@ -23,7 +32,13 @@ export function parseHostAnalyticsInput(value: unknown): HostAnalyticsInput {
   return { ...range, agentId: value.agentId };
 }
 export function decodeHostAnalytics(value: unknown): HostAnalytics {
-  return { ...decodeAnalyticsReport(value), ...parseHostAnalyticsInput(value) };
+  if (!isDynamicRecord(value)) throw new AnalyticsInputError("Invalid analytics request.");
+  return {
+    ...decodeAnalyticsReport(value),
+    ...parseHostAnalyticsInput(value),
+    agents: decodeAnalyticsAgents(value.agents),
+    providerDaily: decodeAnalyticsProviderDays(value.providerDaily),
+  };
 }
 export function decodeOptionalHostAnalytics(value: unknown): HostAnalytics | null {
   return value === null ? null : decodeHostAnalytics(value);
