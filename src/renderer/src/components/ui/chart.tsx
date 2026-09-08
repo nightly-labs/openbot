@@ -4,6 +4,8 @@ import type { ComponentProps, JSX } from "@solidjs/web";
 import { For, Show } from "solid-js";
 import { ResponsiveContainer, Tooltip, type TooltipContentProps } from "solid-recharts";
 
+export type { TooltipContentProps } from "solid-recharts";
+
 export { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "solid-recharts";
 
 export function ChartContainer(props: {

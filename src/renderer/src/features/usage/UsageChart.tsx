@@ -8,6 +8,7 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  type TooltipContentProps,
   XAxis,
   YAxis,
 } from "../../components/ui/chart";
@@ -68,13 +69,13 @@ export function UsageChart(props: { result: HostAnalytics; metric: UsageMetric }
         />
         <ChartTooltip
           cursor={{ stroke: "var(--openbot-text-muted)", strokeWidth: 1 }}
-          content={(contentProps) => (
+          content={(contentProps: TooltipContentProps) => (
             <ChartTooltipContent
               {...contentProps}
               formatValue={formatValue}
               series={
                 named()
-                  ? (key) => ({ name: usageProviderName(key), mark: <UsageProviderMark provider={key} /> })
+                  ? (key: string) => ({ name: usageProviderName(key), mark: <UsageProviderMark provider={key} /> })
                   : undefined
               }
               total={named()}
