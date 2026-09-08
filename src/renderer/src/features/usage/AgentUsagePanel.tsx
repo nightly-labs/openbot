@@ -49,14 +49,22 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     serverId: props.serverId,
   });
   let generation = 0;
-  async function load(range = state.range): Promise<void> {
+  /**
+   * A refresh nobody asked for keeps the report on screen. Clearing `result` unmounts
+   * `AgentUsageReport`, which returns on the next response with its breakdown back to
+   * Agent and scrolled to the total - and a turn completes while the report is open
+   * often enough that this is the common case, not the rare one. Only a request the
+   * user made may blank the body: the first load, a filter change, Refresh.
+   */
+  async function load(range = state.range, background = false): Promise<void> {
     const request = ++generation;
     const serverId = props.serverId;
     const agentId = range.agentId;
-    setState((draft) => {
-      draft.phase = "loading";
-      draft.result = null;
-    });
+    if (!background)
+      setState((draft) => {
+        draft.phase = "loading";
+        draft.result = null;
+      });
     try {
       const [result, agents] = await Promise.all([
         window.openbot.agent.getHostAnalytics(range, serverId),
@@ -70,7 +78,9 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
           draft.phase = result ? "ready" : "unsupported";
         });
     } catch {
-      if (request === generation && props.serverId === serverId && state.range.agentId === agentId)
+      // A background refresh that fails leaves the last good report where it is rather
+      // than replacing it with an error the user cannot act on; the next turn retries.
+      if (!background && request === generation && props.serverId === serverId && state.range.agentId === agentId)
         setState((draft) => {
           draft.result = null;
           draft.phase = "error";
@@ -99,10 +109,11 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
         event.type === "turn-completed" &&
         (!state.range.agentId || event.agentId === state.range.agentId)
       )
-        void load();
+        void load(state.range, true);
     });
     const reconnect = window.openbot.servers.onEvent((servers) => {
-      if (servers.some((server) => server.id === props.serverId && server.state === "online")) void load();
+      if (servers.some((server) => server.id === props.serverId && server.state === "online"))
+        void load(state.range, true);
     });
     return () => {
       generation++;

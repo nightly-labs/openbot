@@ -2,7 +2,7 @@ import { analyticsRange, emptyAnalyticsTotals, type HostAnalytics } from "@openb
 import { fireEvent, render, screen, within } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { installOpenbotStub } from "../../app-test-harness";
+import { emitScopedAgentEvent, installOpenbotStub } from "../../app-test-harness";
 import { AgentUsagePanel } from "./AgentUsagePanel";
 
 beforeEach(installOpenbotStub);
@@ -62,6 +62,26 @@ describe("Agent usage", () => {
     await vi.waitFor(() =>
       expect(screen.getByRole("region", { name: "Usage summary" })).toHaveTextContent("3 sessions"),
     );
+
+    // A turn completing refreshes the open report. The new numbers have to arrive in the
+    // table the user chose, not in a report rebuilt back to its own default: a completed
+    // turn arrives while the report is open often enough to be the common case.
+    await fireEvent.click(screen.getByRole("tab", { name: "Day" }));
+    const day = await screen.findByRole("table", { name: "Daily usage and cost" });
+    vi.mocked(window.openbot.agent.getHostAnalytics).mockImplementation(async (input) => ({
+      ...result(),
+      ...input,
+      totals: { ...emptyAnalyticsTotals(), sessions: 4 },
+    }));
+    emitScopedAgentEvent?.({
+      serverId: "host-a",
+      event: { type: "turn-completed", agentId: "chief", threadId: "thread-1", turnId: "turn-1", status: "completed" },
+    });
+
+    await vi.waitFor(() =>
+      expect(screen.getByRole("region", { name: "Usage summary" })).toHaveTextContent("4 sessions"),
+    );
+    expect(screen.getByRole("table", { name: "Daily usage and cost" })).toBe(day);
   });
   it("loads usage, switches the period, and shows empty data", async () => {
     vi.mocked(window.openbot.agent.getHostAnalytics).mockImplementation(async (input) => ({ ...result(), ...input }));
