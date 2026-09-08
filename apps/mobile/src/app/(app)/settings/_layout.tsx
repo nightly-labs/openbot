@@ -22,7 +22,6 @@ export default function SettingsLayout() {
       <Stack.Screen name="index" options={{ title: "Settings" }} />
       <Stack.Screen name="profile" options={{ title: "Profile" }} />
       <Stack.Screen name="general" options={{ title: "General" }} />
-      <Stack.Screen name="connections" options={{ title: "Connections" }} />
       <Stack.Screen name="sessions" options={{ title: "Account sessions" }} />
       <Stack.Screen name="about" options={{ title: "About" }} />
       <Stack.Screen name="hidden-chats" options={{ title: "Hidden chats" }} />

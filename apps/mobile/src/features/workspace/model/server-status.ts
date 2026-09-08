@@ -2,7 +2,7 @@ import { type RemoteRecoveryStatus, remoteRecoveryMessage } from "@openbot/team-
 import type { MobileServer, MobileServerState } from "./workspace-types";
 
 const LABELS: Record<MobileServerState, string> = {
-  unknown: "Unknown",
+  unknown: "Not connected",
   connecting: "Connecting…",
   online: "Online",
   offline: "Offline",
@@ -42,12 +42,6 @@ export function applyServerRecovery(
   };
 }
 
-/** A directory entry is membership, not proof of a usable connection. */
-export function resetServerStatus(server: MobileServer): MobileServer {
-  return {
-    ...server,
-    state: "unknown",
-    connectionMessage: null,
-    recoveryStatus: undefined,
-  };
+export function serverKind(hostId: string, pairedHostId: string | undefined): MobileServer["kind"] {
+  return hostId === pairedHostId ? "local" : "remote";
 }

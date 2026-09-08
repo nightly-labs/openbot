@@ -108,8 +108,10 @@ Mobile Settings can update your account name and photo through the same account 
 disconnect account sessions. The appearance preference is stored only on the phone.
 After a profile change, the account API sends Signal a signed notification identifying the account.
 Signal notifies only that account’s connected devices, without including the profile or credentials.
-Devices refresh the profile on notification, reconnection or foreground entry; there is no periodic
-profile polling. These authenticated requests retrieve
+Devices check the profile and joined-server directory on a cold launch and every 15 minutes while active.
+Returning from the background does not trigger an automatic check. On mobile, Notification Center and
+other iOS `inactive` transitions do not count as leaving the app and do not reset the timer. Profile change notifications
+can trigger an earlier refresh. These authenticated requests retrieve
 account identity (name, email and avatar URL), not conversations or workspace content.
 
 Mobile hidden and pinned chat preferences are stored on the phone, separately per account and server.
@@ -221,6 +223,8 @@ request does not include conversation history, saved memories, or workspace file
 The draft is reviewed before OpenBot saves it; generating a draft does not create
 an OpenBot conversation or change an existing agent. The provider's own data and
 CLI retention policies still apply.
+
+Marketplace submissions from the desktop app show the publisher’s current account photo publicly on the listing. Account photo updates appear on the listing; removing the account photo removes it from the listing. Private memories and integration credentials are not included.
 
 ## Shared desktop channels
 

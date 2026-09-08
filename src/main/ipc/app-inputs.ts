@@ -112,7 +112,7 @@ export function parseProfileName(input: unknown): string {
   return validation.name;
 }
 
-// The two marketplaces share a query shape; only the category filter and the error wording differ.
+// The two marketplaces share query fields and validate their category filters at the boundary.
 // `query` is truncated rather than rejected, which is the behaviour these channels have always had.
 function parseMarketplaceQueryFields(input: DynamicRecord, sortError: string): MarketplaceAgentQuery {
   if (input.sort !== undefined && input.sort !== "installs") throw new Error(sortError);
@@ -137,13 +137,16 @@ export function parseMarketplaceSkillQuery(input: unknown): MarketplaceSkillQuer
 
 export function parseMarketplaceAgentQuery(input: unknown): MarketplaceAgentQuery {
   if (!isObject(input)) throw new Error("Invalid agent marketplace query.");
-  return parseMarketplaceQueryFields(input, "Unknown agent sort order.");
+  const category = input.category;
+  if (category !== undefined && !isSkillCategory(category)) throw new Error("Unknown agent category.");
+  return { ...parseMarketplaceQueryFields(input, "Unknown agent sort order."), ...(category ? { category } : {}) };
 }
 
 export function parseSubmitSkill(input: unknown): SubmitSkillInput {
   if (!isObject(input) || !isSkillCategory(input.category)) throw new Error("Invalid skill submission.");
   return {
     draftId: requireString(input.draftId, "draftId"),
+    ...creatorAvatarOption(input),
     category: input.category,
     icon: parseAvatarImage(input.icon),
     ...(input.skillId === undefined ? {} : { skillId: requireString(input.skillId, "skillId") }),
@@ -198,9 +201,13 @@ export function parseDeleteHostedSite(input: unknown): string {
 
 export function parseSubmitMarketplaceAgent(input: unknown): SubmitMarketplaceAgentInput {
   if (!isObject(input)) throw new Error("Invalid agent submission.");
+  const category = input.category;
+  if (category !== undefined && !isSkillCategory(category)) throw new Error("Unknown agent category.");
   return {
     agentId: requireString(input.agentId, "agentId"),
     ...(input.listingId === undefined ? {} : { listingId: requireString(input.listingId, "listingId") }),
+    ...(category ? { category } : {}),
+    ...creatorAvatarOption(input),
   };
 }
 
@@ -214,4 +221,9 @@ export function parseInstallMarketplaceAgent(input: unknown): InstallMarketplace
     timezone: requireString(input.timezone, "timezone", 255),
     receiptId: requireString(input.receiptId, "receiptId", INPUT_LIMITS.identifier),
   };
+}
+
+function creatorAvatarOption(input: DynamicRecord): { showCreatorAvatar?: boolean } {
+  const showCreatorAvatar = optionalBoolean(input.showCreatorAvatar, "showCreatorAvatar");
+  return showCreatorAvatar === undefined ? {} : { showCreatorAvatar };
 }

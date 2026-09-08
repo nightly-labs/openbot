@@ -160,6 +160,40 @@ describe("sidebar layout event validation", () => {
     ).toBe(true);
   });
 
+  // The renderer draws the sidebar by walking `order`, so a section left out of it is not drawn and
+  // every agent assigned to that section is off the screen -- while the agent, its chat and every
+  // message in it are intact. That is history the user cannot reach, from a layout a remote host is
+  // free to send, so the layout is rejected here rather than repaired downstream.
+  it("rejects a layout whose order leaves out a section that holds agents", () => {
+    expect(
+      isAgentEvent({
+        type: "sidebar-layout-changed",
+        layout: {
+          revision: 3,
+          sections: [{ id: "11111111-1111-4111-8111-111111111111", name: "Demo" }],
+          order: ["people", "unassigned"],
+          agentAssignments: { chief: "11111111-1111-4111-8111-111111111111" },
+          agentOrder: ["chief"],
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("rejects a layout whose order repeats a section", () => {
+    expect(
+      isAgentEvent({
+        type: "sidebar-layout-changed",
+        layout: {
+          revision: 3,
+          sections: [],
+          order: ["people", "unassigned", "unassigned"],
+          agentAssignments: {},
+          agentOrder: [],
+        },
+      }),
+    ).toBe(false);
+  });
+
   it("rejects malformed sidebar layout events", () => {
     expect(
       isAgentEvent({

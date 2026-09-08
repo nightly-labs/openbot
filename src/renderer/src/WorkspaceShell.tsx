@@ -50,7 +50,7 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   const blockedRemoteServer = createMemo(() => {
     const server = activeServer();
     if (server?.kind !== "remote") return null;
-    return server.state === "incompatible" || server.issue?.code === "protocol_error" ? server : null;
+    return server.state === "incompatible" || server.issue != null ? server : null;
   });
   const activePeopleEnabled = createMemo(
     () => platform.peopleEnabled && activeServerSupportsCapability("direct-messages"),

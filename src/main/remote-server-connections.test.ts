@@ -15,6 +15,20 @@ function connections() {
 }
 
 describe("RemoteServerConnections", () => {
+  it("retains host-busy through disconnect and retry until connection succeeds", () => {
+    const { tracker } = connections();
+    tracker.reportTransportError("host", "host_busy", "The host already has an active remote session.");
+    for (const state of ["offline", "connecting"] as const) {
+      tracker.setState("host", state);
+      expect(tracker.statusFor("host")).toMatchObject({
+        state,
+        issue: { message: "The host already has an active remote session.", retryable: true },
+      });
+    }
+    tracker.markConnected("host");
+    expect(tracker.statusFor("host")).toMatchObject({ state: "online", issue: null, connectionSequence: 1 });
+  });
+
   it("announces a failure once, however many requests it refuses", () => {
     const { tracker, changes, suspended } = connections();
 

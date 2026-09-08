@@ -14,16 +14,18 @@ import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import {
-  createRemoteConnectionRecovery,
+  createRemoteDirectoryRefresh,
+  createRemoteReadRefresh,
   createWorkspacePreferences,
   mergeRemoteUnreadIds,
-  type RemoteConnectionStage,
+  type RemoteRecoveryStatus,
   RemoteTeamDirectoryClient,
   type RemoteTeamHost,
   type RemoteWorkspacePreferences,
-  remoteConnectionFailure,
   resyncRemoteConversations,
+  watchRemoteDirectory,
 } from "@openbot/team-client";
+import { useQueryClient } from "@tanstack/react-query";
 import { fetch } from "expo/fetch";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
@@ -40,13 +42,15 @@ import {
 import { Alert, AppState, View } from "react-native";
 
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
 import {
-  RemoteTeamTransport,
-  type RemoteTeamTransportRef,
-} from "@/features/workspace/components/remote-team-transport";
+  ServerConnection,
+  type ServerConnectionHandle,
+  type ServerLoadContext,
+} from "@/features/workspace/components/server-connection";
 import { type MobileAgentActivities, reduceAgentActivity } from "@/features/workspace/model/agent-activity";
 import { decodeConversation } from "@/features/workspace/model/conversation";
-import { applyServerFailure, applyServerRecovery, resetServerStatus } from "@/features/workspace/model/server-status";
+import { applyServerRecovery, serverKind } from "@/features/workspace/model/server-status";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
 import type {
   MobileAgent,
@@ -84,12 +88,15 @@ const EMPTY_SERVER: MobileServer = {
   accent: SERVER_ACCENTS[0],
   publicKey: "",
   membershipId: "",
+  role: "member",
 };
 
 const MobileWorkspaceContext = createContext<MobileWorkspaceContextValue | null>(null);
 
 export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
-  const { session } = useMobileSession();
+  const { session, sessionScope } = useMobileSession();
+  const queryClient = useQueryClient();
+  const presenceSignatures = useRef(new Map<string, string>());
   if (!session) throw new Error("MobileWorkspaceProvider requires a signed-in mobile session.");
 
   const directory = useMemo(
@@ -103,14 +110,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }),
     [session.apiUrl, session.sessionToken, session.user.id, session.host],
   );
-  const transport = useRef<RemoteTeamTransportRef | null>(null);
-  const [transportReady, setTransportReady] = useState(false);
+  const connections = useRef(new Map<string, ServerConnectionHandle>());
   const loadGeneration = useRef(0);
-  const connectionStage = useRef<RemoteConnectionStage>("connection");
   const directoryGeneration = useRef(0);
-  const recovery = useRef<ReturnType<typeof createRemoteConnectionRecovery> | null>(null);
-  const [foreground, setForeground] = useState(AppState.currentState === "active");
-  const foregroundRef = useRef(foreground);
+  const [foreground, setForeground] = useState(AppState.currentState !== "background");
   const [servers, setServers] = useState<MobileServer[]>([]);
   const [serverDirectoryState, setServerDirectoryState] = useState<MobileServerDirectoryState>("loading");
   const [serverDirectoryError, setServerDirectoryError] = useState<string | null>(null);
@@ -120,10 +123,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   // Keep former agent IDs too, so leaving also removes cached chats of deleted agents.
   const serverAgentIds = useRef(new Map<string, Set<string>>());
   const removedServers = useRef(new Set<string>());
-  const readRefreshSequence = useRef(0);
+  const readRefresh = useMemo(() => createRemoteReadRefresh(), []);
   const serverCapabilities = useRef(new Map<string, string[]>());
   const [activeServerId, setActiveServerId] = useState<string | null>(session.host?.hostId ?? null);
-  const activeServerPublicKey = servers.find((server) => server.id === activeServerId)?.publicKey;
+  const activeServerIdRef = useRef(activeServerId);
+  activeServerIdRef.current = activeServerId;
   const [conversations, setConversations] = useState<Record<string, ConversationSnapshot>>({});
   const [activityByServer, setActivityByServer] = useState<Record<string, MobileAgentActivities>>({});
   const conversationsRef = useRef(conversations);
@@ -143,56 +147,101 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const readWrites = useRef(new Map<string, Promise<void>>());
   const [unreadAgentIds, setUnreadAgentIds] = useState<string[]>([]);
 
-  const installHosts = useCallback((hosts: RemoteTeamHost[]) => {
-    setServers((current) => {
-      const previousServers = new Map(current.map((server) => [server.id, server]));
-      return hosts.map((host, index) => {
-        const previous = previousServers.get(host.hostId);
-        return {
-          id: host.hostId,
-          name: host.name,
-          kind: host.role === "owner" ? "local" : "remote",
-          state: previous?.state ?? "unknown",
-          initialConnectionPending: previous?.initialConnectionPending ?? true,
-          connectionMessage: previous?.connectionMessage ?? null,
-          recoveryStatus: previous?.recoveryStatus,
-          address: null,
-          accent: SERVER_ACCENTS[index % SERVER_ACCENTS.length] ?? SERVER_ACCENTS[0],
-          publicKey: previous?.publicKey ?? host.devicePublicKey,
-          membershipId: host.membershipId,
-        };
+  const installHosts = useCallback(
+    (hosts: RemoteTeamHost[]) => {
+      const available = new Set(hosts.map((host) => host.hostId));
+      const removed = serversRef.current.filter((server) => !available.has(server.id));
+      const removedAgentIds = new Set<string>();
+      for (const server of removed) {
+        removedServers.current.add(server.id);
+        readRefresh.invalidate(server.id);
+        for (const id of serverAgentIds.current.get(server.id) ?? []) removedAgentIds.add(id);
+        serverAgentIds.current.delete(server.id);
+        presenceSignatures.current.delete(server.id);
+        for (const kind of ["server-members", "server-invites"]) {
+          queryClient.removeQueries({ queryKey: [kind, session.apiUrl, session.user.id, sessionScope, server.id] });
+        }
+      }
+      for (const host of hosts) removedServers.current.delete(host.hostId);
+      if (removed.length) {
+        setAgents((current) => current.filter((agent) => available.has(agent.serverId)));
+        setConversations((current) =>
+          Object.fromEntries(Object.entries(current).filter(([id]) => !removedAgentIds.has(id))),
+        );
+        setUnreadAgentIds((current) => current.filter((id) => !removedAgentIds.has(id)));
+        setActivityByServer((current) =>
+          Object.fromEntries(Object.entries(current).filter(([id]) => available.has(id))),
+        );
+      }
+      setServers((current) => {
+        const previousServers = new Map(current.map((server) => [server.id, server]));
+        return hosts.map((host, index) => {
+          const previous = previousServers.get(host.hostId);
+          return {
+            id: host.hostId,
+            name: host.name,
+            kind: serverKind(host.hostId, session.host?.hostId),
+            state: previous?.state ?? "unknown",
+            initialConnectionPending: previous?.initialConnectionPending ?? true,
+            connectionMessage: previous?.connectionMessage ?? null,
+            recoveryStatus: previous?.recoveryStatus,
+            address: null,
+            accent: SERVER_ACCENTS[index % SERVER_ACCENTS.length] ?? SERVER_ACCENTS[0],
+            publicKey: previous?.publicKey ?? host.devicePublicKey,
+            membershipId: host.membershipId,
+            role: host.role,
+          };
+        });
       });
-    });
-    setActiveServerId((current) => (hosts.some((host) => host.hostId === current) ? current : null));
-  }, []);
+      setActiveServerId((current) => (hosts.some((host) => host.hostId === current) ? current : null));
+    },
+    [session.host?.hostId, session.apiUrl, session.user.id, sessionScope, queryClient, readRefresh],
+  );
 
-  const refreshHosts = useCallback(async () => {
-    const generation = ++directoryGeneration.current;
-    setServerDirectoryState("loading");
-    setServerDirectoryError(null);
-    try {
-      const hosts = await directory.listHosts();
-      if (generation !== directoryGeneration.current) return;
-      installHosts(hosts);
-      setServerDirectoryState("ready");
-    } catch (error) {
-      if (generation !== directoryGeneration.current) return;
-      setServerDirectoryState("error");
-      setServerDirectoryError(error instanceof Error ? error.message : "The server directory is unavailable.");
-      throw error;
-    }
-  }, [directory, installHosts]);
+  const directoryRefresh = useMemo(
+    () =>
+      createRemoteDirectoryRefresh(async () => {
+        const generation = ++directoryGeneration.current;
+        setServerDirectoryState("loading");
+        setServerDirectoryError(null);
+        try {
+          const hosts = await directory.listHosts();
+          if (generation !== directoryGeneration.current) return;
+          installHosts(hosts);
+          setServerDirectoryState("ready");
+        } catch (error) {
+          if (generation !== directoryGeneration.current) return;
+          setServerDirectoryState("error");
+          setServerDirectoryError(error instanceof Error ? error.message : "The server directory is unavailable.");
+          throw error;
+        }
+      }),
+    [directory, installHosts],
+  );
+  const refreshHosts = useCallback(() => directoryRefresh.refresh(true), [directoryRefresh]);
+  const refreshMemberships = useCallback(() => {
+    directoryGeneration.current += 1;
+    directoryRefresh.invalidate();
+    return directoryRefresh.refresh(true);
+  }, [directoryRefresh]);
 
   useEffect(() => {
     void refreshHosts().catch(() => undefined);
     return () => {
       directoryGeneration.current += 1;
+      directoryRefresh.invalidate();
     };
-  }, [refreshHosts]);
+  }, [refreshHosts, directoryRefresh]);
 
   const request = useCallback(
-    async <T,>(method: string, path: string, decode: (value: unknown) => T, body?: TeamProtocolV2Json): Promise<T> => {
-      const client = transport.current;
+    async <T,>(
+      method: string,
+      path: string,
+      decode: (value: unknown) => T,
+      body?: TeamProtocolV2Json,
+      serverId = activeServerIdRef.current,
+    ): Promise<T> => {
+      const client = serverId ? connections.current.get(serverId)?.client : null;
       if (!client) throw new Error("The mobile transport is not ready.");
       return client.request(method, path, decode, body);
     },
@@ -210,129 +259,123 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   }, []);
 
   const loadServer = useCallback(
-    async (server: MobileServer) => {
-      const currentGeneration = ++loadGeneration.current;
-      setActivityByServer((current) => ({ ...current, [server.id]: {} }));
-      connectionStage.current = "preferences";
-      const saved = preferenceStore.read(server.id);
-      setPreferences((current) => ({ ...current, [server.id]: saved }));
-      const client = transport.current;
-      if (!client) throw new Error("The mobile transport is not ready.");
-      connectionStage.current = "connection";
-      await client.connect(server.id, server.publicKey);
-      if (currentGeneration !== loadGeneration.current) return;
-      connectionStage.current = "compatibility";
-      const compatibility = await request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV1);
-      if (currentGeneration !== loadGeneration.current) return;
+    async (serverId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext) => {
+      setActivityByServer((current) => ({ ...current, [serverId]: {} }));
+      context.stage = "preferences";
+      const saved = preferenceStore.read(serverId);
+      setPreferences((current) => ({ ...current, [serverId]: saved }));
+      context.stage = "connection";
+      await client.connect(serverId, publicKey);
+      if (!context.isCurrent()) return;
+      context.stage = "compatibility";
+      const compatibility = await client.request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV1);
+      if (!context.isCurrent()) return;
       if (compatibility.protocol.minimum > TEAM_PROTOCOL_V3 || compatibility.protocol.maximum < TEAM_PROTOCOL_V3) {
         throw new Error("Update OpenBot Mobile or the desktop app before connecting.");
       }
-      serverCapabilities.current.set(server.id, compatibility.capabilities);
-      connectionStage.current = "agents";
-      const summaries = await request("GET", TEAM_API_ROUTES.agents.all, decodeAgentSummaries);
-      if (currentGeneration !== loadGeneration.current) return;
-      replaceServerAgents(server.id, summaries);
-      const readSequence = ++readRefreshSequence.current;
-      connectionStage.current = "reads";
-      const reads = await request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads);
-      if (currentGeneration !== loadGeneration.current) return;
-      if (readSequence === readRefreshSequence.current) {
-        setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads));
-      }
-      connectionStage.current = "conversations";
+      serverCapabilities.current.set(serverId, compatibility.capabilities);
+      context.stage = "agents";
+      const summaries = await client.request("GET", TEAM_API_ROUTES.agents.all, decodeAgentSummaries);
+      if (!context.isCurrent()) return;
+      replaceServerAgents(serverId, summaries);
+      context.stage = "reads";
+      await readRefresh.refresh(
+        serverId,
+        () => client.request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads),
+        (reads) => setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads)),
+        () => context.isCurrent() && !removedServers.current.has(serverId),
+      );
+      if (!context.isCurrent()) return;
+      context.stage = "conversations";
       await resyncRemoteConversations({
         agentIds: summaries.map((agent) => agent.id),
         cached: conversationsRef.current,
-        load: (agentId) => request("GET", TEAM_API_ROUTES.agent.conversation(agentId), decodeConversation),
+        load: (agentId) => client.request("GET", TEAM_API_ROUTES.agent.conversation(agentId), decodeConversation),
         apply: (snapshot) => setConversations((current) => storeNewestSnapshot(current, snapshot)),
-        isCurrent: () => currentGeneration === loadGeneration.current,
+        isCurrent: context.isCurrent,
       });
-      if (currentGeneration !== loadGeneration.current) return;
-      connectionStage.current = "connection";
+      context.stage = "connection";
     },
-    [replaceServerAgents, request, preferenceStore],
+    [replaceServerAgents, preferenceStore, readRefresh],
   );
 
-  useEffect(() => {
-    if (!transportReady || !activeServerId || !activeServerPublicKey) return;
-    const server = serversRef.current.find((candidate) => candidate.id === activeServerId);
-    if (!server?.publicKey) return;
-    let lastFailure: string | null = null;
-    let failureReported = false;
-    const controller = createRemoteConnectionRecovery(
-      () => loadServer(server),
-      (error) => {
-        if (!foregroundRef.current) return;
-        if (!failureReported) lastFailure = remoteConnectionFailure(connectionStage.current, error);
-        failureReported = true;
-        const connectionMessage = lastFailure;
-        setServers((current) =>
-          current.map((candidate) =>
-            candidate.id === server.id ? applyServerFailure(candidate, connectionMessage) : candidate,
-          ),
-        );
-      },
-      (status) => {
-        if (!foregroundRef.current) return;
-        if (status.phase === "connecting") failureReported = false;
-        if (status.phase === "online") {
-          lastFailure = null;
-          failureReported = false;
-        }
-        setServers((current) =>
-          current.map((candidate) =>
-            candidate.id === server.id ? applyServerRecovery(candidate, status, lastFailure) : candidate,
-          ),
-        );
-      },
+  const registerConnection = useCallback((hostId: string, handle: ServerConnectionHandle | null) => {
+    if (handle) connections.current.set(hostId, handle);
+    else connections.current.delete(hostId);
+  }, []);
+  const handleConnectionStatus = useCallback((hostId: string, status: RemoteRecoveryStatus, failure: string | null) => {
+    setServers((current) =>
+      current.map((server) => (server.id === hostId ? applyServerRecovery(server, status, failure) : server)),
     );
-    recovery.current = controller;
-    controller.setActive(foregroundRef.current);
-    return () => {
-      controller.dispose();
-      if (recovery.current === controller) recovery.current = null;
-      setServers((current) =>
-        current.map((candidate) => (candidate.id === server.id ? resetServerStatus(candidate) : candidate)),
-      );
-      loadGeneration.current += 1;
-    };
-  }, [activeServerId, activeServerPublicKey, loadServer, transportReady]);
+  }, []);
 
   useEffect(() => {
+    let connectionActive = AppState.currentState !== "background";
     const subscription = AppState.addEventListener("change", (state) => {
+      // iOS system overlays report inactive without putting the app in the background.
+      if (state === "inactive") return;
       const active = state === "active";
-      foregroundRef.current = active;
+      if (active === connectionActive) return;
+      connectionActive = active;
       setForeground(active);
       if (!active) {
         loadGeneration.current += 1;
-        setServers((current) => current.map(resetServerStatus));
       }
-      recovery.current?.setActive(active);
     });
     return () => subscription.remove();
   }, []);
 
+  useEffect(() => {
+    if (!foreground) return;
+    return watchRemoteDirectory(() => directoryRefresh.refresh());
+  }, [foreground, directoryRefresh]);
+
   const loadConversation = useCallback(
-    async (agentId: string) => {
+    async (agentId: string, serverId = activeServerIdRef.current) => {
       const generation = loadGeneration.current;
-      const snapshot = await request("GET", TEAM_API_ROUTES.agent.conversation(agentId), decodeConversation);
+      const snapshot = await request(
+        "GET",
+        TEAM_API_ROUTES.agent.conversation(agentId),
+        decodeConversation,
+        undefined,
+        serverId,
+      );
       if (generation === loadGeneration.current) setConversations((current) => storeNewestSnapshot(current, snapshot));
       return snapshot;
     },
     [request],
   );
 
-  const refreshConversationReads = useCallback(async () => {
-    const sequence = ++readRefreshSequence.current;
-    const generation = loadGeneration.current;
-    const reads = await request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads);
-    if (sequence !== readRefreshSequence.current || generation !== loadGeneration.current) return;
-    setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads));
-  }, [request]);
+  const refreshConversationReads = useCallback(
+    async (serverId = activeServerIdRef.current) => {
+      if (!serverId) return;
+      await readRefresh.refresh(
+        serverId,
+        () => request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads, undefined, serverId),
+        (reads) => setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads)),
+        () => !removedServers.current.has(serverId),
+      );
+    },
+    [request, readRefresh],
+  );
 
   const handleTeamEvent = useCallback(
     (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
       if (removedServers.current.has(serverId)) return;
+      if (event.type === "team-presence") {
+        const signature = JSON.stringify(
+          event.snapshot.members.map((member) => [member.id, member.role, member.disabled, member.online]),
+        );
+        if (presenceSignatures.current.get(serverId) !== signature) {
+          presenceSignatures.current.set(serverId, signature);
+          for (const kind of ["server-members", "server-invites"]) {
+            void queryClient.invalidateQueries({
+              queryKey: [kind, session.apiUrl, session.user.id, sessionScope, serverId],
+            });
+          }
+        }
+        return;
+      }
       if (
         event.type !== "conversation" ||
         event.snapshot.revision >= (conversationsRef.current[event.snapshot.agentId]?.revision ?? 0)
@@ -348,7 +391,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         event.type === "conversation-invalidated" ||
         event.type === "turn-completed"
       ) {
-        void refreshConversationReads().catch(() => undefined);
+        void refreshConversationReads(serverId).catch(() => undefined);
       }
       if (event.type === "agents-changed") replaceServerAgents(serverId, event.agents);
       else if (event.type === "conversation") {
@@ -391,20 +434,30 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       } else if (event.type === "conversation-page") {
         const readState = event.page.readState;
         if (readState) {
-          readRefreshSequence.current += 1;
+          readRefresh.invalidate(serverId);
           setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, { [event.page.agentId]: readState }));
-        } else void refreshConversationReads().catch(() => undefined);
+        } else void refreshConversationReads(serverId).catch(() => undefined);
         if (conversationsRef.current[event.page.agentId])
-          void loadConversation(event.page.agentId).catch(() => undefined);
+          void loadConversation(event.page.agentId, serverId).catch(() => undefined);
       } else if (event.type === "conversation-invalidated" || event.type === "turn-completed") {
-        if (conversationsRef.current[event.agentId]) void loadConversation(event.agentId).catch(() => undefined);
+        if (conversationsRef.current[event.agentId])
+          void loadConversation(event.agentId, serverId).catch(() => undefined);
       } else if (event.type === "team-identity") {
         setServers((current) =>
           current.map((server) => (server.id === serverId ? { ...server, name: event.serverName } : server)),
         );
       }
     },
-    [loadConversation, replaceServerAgents, refreshConversationReads],
+    [
+      loadConversation,
+      replaceServerAgents,
+      refreshConversationReads,
+      readRefresh,
+      queryClient,
+      session.apiUrl,
+      session.user.id,
+      sessionScope,
+    ],
   );
 
   const markAgentRead = useCallback(
@@ -417,7 +470,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         Alert.alert("Update required", "Update this desktop server to mark conversations unread.");
         return;
       }
-      const sequence = ++readRefreshSequence.current;
+      if (!activeServerId) return;
+      const isCurrentRead = readRefresh.invalidate(activeServerId);
       const generation = loadGeneration.current;
       setUnreadAgentIds((current) =>
         visibleMessageId === null ? [...new Set([...current, agentId])] : current.filter((id) => id !== agentId),
@@ -440,7 +494,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             (value) => decodeConversationReads({ [agentId]: value }),
             visibleMessageId === null ? {} : { throughMessageId },
           );
-          if (generation === loadGeneration.current && sequence === readRefreshSequence.current) {
+          if (generation === loadGeneration.current && isCurrentRead()) {
+            readRefresh.invalidate(activeServerId);
             setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads));
           }
         })
@@ -453,7 +508,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (readWrites.current.get(agentId) === write) readWrites.current.delete(agentId);
       });
     },
-    [request, refreshConversationReads, loadConversation, activeServerId],
+    [request, refreshConversationReads, loadConversation, activeServerId, readRefresh],
   );
 
   const updatePreferences = useCallback(
@@ -475,6 +530,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     const activeServer = servers.find((server) => server.id === activeServerId) ?? EMPTY_SERVER;
     return {
       servers,
+      teamDirectory: directory,
       serverDirectoryState,
       serverDirectoryError,
       agents,
@@ -487,19 +543,24 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       unreadAgentIds,
       conversations,
       activityByServer,
-      selectServer: setActiveServerId,
+      selectServer: (id) => {
+        loadGeneration.current += 1;
+        setActiveServerId(id);
+      },
       leaveServer: async (serverId) => {
         const server = serversRef.current.find((candidate) => candidate.id === serverId);
-        if (server?.kind !== "remote") throw new Error("Only joined remote servers can be left.");
+        if (!server || server.role === "owner") throw new Error("Only joined remote servers can be left.");
         await directory.leaveHost(server.id, server.membershipId);
         removedServers.current.add(serverId);
+        readRefresh.invalidate(serverId);
         directoryGeneration.current += 1;
+        directoryRefresh.invalidate();
+        setServerDirectoryState("ready");
+        setServerDirectoryError(null);
         const removedIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
         serverAgentIds.current.delete(serverId);
         if (activeServerId === serverId) {
-          recovery.current?.dispose();
           loadGeneration.current += 1;
-          await transport.current?.disconnect().catch(() => undefined);
           setActiveServerId(session.host?.hostId ?? null);
         }
         setServers((current) => current.filter((candidate) => candidate.id !== serverId));
@@ -515,12 +576,18 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         updatePreferences(serverId, () => ({ hidden: [], pinned: [] }));
         setUnreadAgentIds((current) => current.filter((id) => !removedIds.has(id)));
       },
+      refreshServer: async (serverId) => {
+        connections.current.get(serverId)?.refresh();
+        await refreshHosts();
+      },
       refreshServers: async () => {
-        recovery.current?.refresh();
+        for (const connection of connections.current.values()) connection.refresh();
         await refreshHosts();
       },
       addRemoteServer: async ({ inviteUrl }) => {
         const host = await directory.acceptInvite(inviteUrl);
+        directoryGeneration.current += 1;
+        directoryRefresh.invalidate();
         removedServers.current.delete(host.hostId);
         setServers((current) => [
           ...current.filter((server) => server.id !== host.hostId),
@@ -535,11 +602,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             accent: SERVER_ACCENTS[0],
             publicKey: host.devicePublicKey,
             membershipId: host.membershipId,
+            role: host.role,
           },
         ]);
         setActiveServerId(host.hostId);
         // Membership is already committed. Directory failure must not reuse the consumed invite.
         void refreshHosts().catch(() => undefined);
+        return host.hostId;
       },
       createAgent: async (input: CreateAgentInput) => {
         const created = await request("POST", TEAM_API_ROUTES.agents.all, decodeAgent, {
@@ -646,11 +715,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     agents,
     conversations,
     directory,
+    directoryRefresh,
     hiddenAgentIds,
     loadConversation,
     markAgentRead,
     pinnedAgentIds,
     refreshHosts,
+    readRefresh,
     request,
     serverDirectoryError,
     serverDirectoryState,
@@ -661,35 +732,24 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     updatePreferences,
   ]);
 
-  const setTransport = useCallback((instance: RemoteTeamTransportRef | null) => {
-    transport.current = instance;
-    setTransportReady(Boolean(instance));
-  }, []);
-
   return (
     <MobileWorkspaceContext.Provider value={value}>
       <View className="flex-1">
         {children}
-        <RemoteTeamTransport
-          active={foreground}
-          ref={setTransport}
-          directory={directory}
-          onConnectionUpdate={(update) => {
-            if (foregroundRef.current && activeServerId === update.hostId && recovery.current) {
-              if (update.state === "offline") {
-                const failure = new Error(update.message ?? "The desktop went offline.");
-                // `protocol_error` is the peer saying a reconnect would be sent the same frame it
-                // could not read. Handing that to `offline` retries it every ten seconds, five
-                // times, then every two minutes, for as long as the app is open.
-                if (update.code === "protocol_error") recovery.current.suspend(failure);
-                else recovery.current.offline(failure);
-              }
-              if (update.resync) recovery.current.refresh();
-              return;
-            }
-          }}
-          onTeamEvent={handleTeamEvent}
-        />
+        {servers.map((server) => (
+          <ServerConnection
+            key={server.id}
+            hostId={server.id}
+            publicKey={server.publicKey}
+            active={foreground}
+            directory={directory}
+            register={registerConnection}
+            load={loadServer}
+            onStatus={handleConnectionStatus}
+            onMembershipChanged={refreshMemberships}
+            onTeamEvent={handleTeamEvent}
+          />
+        ))}
       </View>
     </MobileWorkspaceContext.Provider>
   );

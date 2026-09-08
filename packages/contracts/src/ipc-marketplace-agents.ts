@@ -1,6 +1,7 @@
 import type { AvatarHue } from "./ipc-agent-identity";
 import type { AgentSummary } from "./ipc-agents";
 import type { RoutineSchedule } from "./ipc-routines";
+import type { SkillCategory } from "./ipc-skills";
 
 export type AgentReviewStatus = "pending" | "approved" | "rejected";
 
@@ -20,6 +21,8 @@ export interface MarketplaceAgentRoutine {
 }
 
 export interface MarketplaceAgentSummary {
+  category?: SkillCategory;
+  creatorAvatarUrl?: string | null;
   id: string;
   name: string;
   title: string;
@@ -49,6 +52,7 @@ export interface MarketplaceAgentPage {
 }
 
 export interface MarketplaceAgentQuery {
+  category?: SkillCategory;
   query?: string;
   featured?: boolean;
   sort?: "installs";
@@ -57,6 +61,8 @@ export interface MarketplaceAgentQuery {
 }
 
 export interface AgentSubmission {
+  category?: SkillCategory;
+  showCreatorAvatar?: boolean;
   id: string;
   listingId: string;
   name: string;
@@ -87,6 +93,8 @@ export interface AgentPublicationPreview {
 }
 
 export interface SubmitMarketplaceAgentInput {
+  category?: SkillCategory;
+  showCreatorAvatar?: boolean;
   agentId: string;
   listingId?: string;
 }

@@ -660,11 +660,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       list: async (query) => {
         const matches = marketplaceSkills.filter(
           (skill) =>
-            matchesQuery(`${skill.name} ${skill.description}`, query?.query) &&
+            matchesQuery(`${skill.name} ${skill.description} ${skill.creatorName}`, query?.query) &&
             (!query?.category || skill.category === query.category) &&
             (query?.featured !== true || skill.featured),
         );
-        return clone({ skills: matches, nextCursor: null });
+        const start = Number(query?.cursor ?? 0);
+        const end = start + (query?.limit ?? 50);
+        return clone({
+          skills: matches.slice(start, end),
+          nextCursor: end < matches.length ? String(end) : null,
+        });
       },
       get: async (skillId) => {
         const detail = STORY_MARKETPLACE_SKILL_DETAILS[skillId];
@@ -677,6 +682,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         const preview = STORY_SKILL_PACKAGE_PREVIEW;
         const submission: SkillSubmission = {
           id: `submission-${preview.slug}-${skillSubmissions.length + 1}`,
+          showCreatorAvatar: input.showCreatorAvatar ?? false,
           skillId: input.skillId ?? `skill-${preview.slug}`,
           slug: preview.slug,
           name: preview.name,
@@ -757,10 +763,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       list: async (query) => {
         const matches = STORY_MARKETPLACE_AGENTS.filter(
           (agent) =>
-            matchesQuery(`${agent.name} ${agent.title} ${agent.description}`, query?.query) &&
+            matchesQuery(`${agent.name} ${agent.title} ${agent.description} ${agent.creatorName}`, query?.query) &&
+            (!query?.category || (agent.category ?? "other") === query.category) &&
             (query?.featured !== true || agent.featured),
         );
-        return clone({ agents: matches, nextCursor: null });
+        const start = Number(query?.cursor ?? 0);
+        const end = start + (query?.limit ?? 50);
+        return clone({
+          agents: matches.slice(start, end),
+          nextCursor: end < matches.length ? String(end) : null,
+        });
       },
       get: async (listingId) => {
         const detail = STORY_MARKETPLACE_AGENT_DETAILS[listingId];
@@ -799,6 +811,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (!agent) throw new Error("Agent not found");
         const submission: AgentSubmission = {
           id: `agent-submission-${agent.id}-${marketplaceAgentSubmissions.length + 1}`,
+          showCreatorAvatar: input.showCreatorAvatar ?? false,
+          category: input.category ?? "other",
           listingId: input.listingId ?? `listing-${agent.id}`,
           name: agent.name,
           title: agent.title,
@@ -1556,9 +1570,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         email: input.email ?? null,
       }),
       setTyping: async (_input: SetTeamTypingInput) => undefined,
-      onPresence: (listener) => {
-        presenceListeners.add(listener);
-        return () => presenceListeners.delete(listener);
+      onPresence: (listener, serverId) => {
+        const receive = (snapshot: TeamPresenceSnapshot) => {
+          if (
+            !serverId ||
+            snapshot.serverId === serverId ||
+            (serverId === "local" && snapshot.serverId === hostStatus.serverId)
+          )
+            listener(snapshot);
+        };
+        presenceListeners.add(receive);
+        return () => presenceListeners.delete(receive);
       },
       listDirectThreads: async () => clone(directThreads),
       readDirectConversation: async (memberId) =>

@@ -90,7 +90,7 @@ export interface RemoteTeamConnectionUpdate {
    * than about whether there is one. A consumer that retries every offline update has to be told
    * the difference, or it retries into the same frame forever.
    */
-  code?: "protocol_error";
+  code?: "protocol_error" | "session_revoked";
   resync?: boolean;
 }
 
@@ -141,12 +141,16 @@ interface PeerState {
   turnRefreshTimer: ReturnType<typeof setTimeout> | null;
   iceServers: RTCIceServer[];
   lastEventSequence: number;
+  needsResync: boolean;
   connectedResolve: (() => void) | null;
+  connectedPromise: Promise<void> | null;
   connectedReject: ((error: Error) => void) | null;
   connectedTimer: ReturnType<typeof setTimeout> | null;
+  disconnectedTimer: ReturnType<typeof setTimeout> | null;
 }
 
 const CHANNELS: ChannelKind[] = ["rpc", "events", "files", "desktop"];
+const DISCONNECT_GRACE_MS = 5_000;
 const REQUEST_TIMEOUT_MS = 10 * 60_000 + 30_000;
 
 export function createRemoteTeamPeer(actions: ActionsRef) {
@@ -169,14 +173,27 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       if (!active) {
         if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
         if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
+        if (state.disconnectedTimer !== null) clearTimeout(state.disconnectedTimer);
+        state.disconnectedTimer = null;
         state.reconnectTimer = null;
         state.turnRefreshTimer = null;
+        // The host can commit a sent write while the app is inactive. Keep its
+        // response registered so the caller does not offer to send it again.
+        state.needsResync ||= [...pendingRequests.values()].some(
+          (request) => request.method === "GET" || request.method === "HEAD",
+        );
+        rejectRequests(new Error("The app is in the background."), true);
+        if (!state.authenticated) failPeer(state, new Error("The app is in the background."), actions);
       } else {
-        if (!isPeerOnline(state)) {
+        if (canRecoverPeer(state)) {
+          scheduleDisconnectedCheck(state, actions);
+          if (!state.socket) openSignal(state, actions);
+        } else if (!isPeerOnline(state)) {
           failPeer(state, new Error("The desktop connection needs to be restored."), actions);
         } else {
           scheduleTurnRefresh(state);
           if (!state.socket) openSignal(state, actions);
+          resyncIfNeeded(state, actions);
         }
       }
     },
@@ -188,11 +205,46 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       CHANNELS.every((kind) => state.channels[kind]?.readyState === "open")
     );
   }
+  function canRecoverPeer(state: PeerState): boolean {
+    return (
+      state.authenticated &&
+      state.connection?.connectionState === "disconnected" &&
+      CHANNELS.every((kind) => state.channels[kind]?.readyState === "open")
+    );
+  }
+
+  function scheduleDisconnectedCheck(state: PeerState, actions: ActionsRef): void {
+    if (!active || state.disconnectedTimer !== null) return;
+    state.disconnectedTimer = setTimeout(() => {
+      state.disconnectedTimer = null;
+      if (!isPeerOnline(state)) failPeer(state, new Error("The desktop went offline."), actions);
+    }, DISCONNECT_GRACE_MS);
+  }
+
+  function resyncIfNeeded(state: PeerState, actions: ActionsRef): void {
+    if (!active || !isPeerOnline(state) || !state.needsResync) return;
+    state.needsResync = false;
+    void actions.current.onConnectionUpdate({ hostId: state.hostId, state: "online", message: null, resync: true });
+  }
   async function executeCommand(command: RemoteTeamCommand, actions: ActionsRef): Promise<RemoteTeamCommandResult> {
     let commandGeneration = generation;
     try {
       if (command.type === "connect") {
         if (!active) throw new Error("The app is in the background.");
+        if (peer && peer.hostId === command.hostId && peer.hostPublicKey === command.hostPublicKey) {
+          if (canRecoverPeer(peer)) {
+            const recovering = peer;
+            scheduleDisconnectedCheck(recovering, actions);
+            recovering.connectedPromise ??= new Promise<void>((resolve, reject) => {
+              recovering.connectedResolve = resolve;
+              recovering.connectedReject = reject;
+            });
+          }
+          if (peer.connectedPromise) {
+            await peer.connectedPromise;
+            return { commandId: command.id, ok: true };
+          }
+        }
         if (
           peer &&
           isPeerOnline(peer) &&
@@ -270,9 +322,12 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       turnRefreshTimer: null,
       iceServers: [],
       lastEventSequence: 0,
+      needsResync: false,
       connectedResolve: null,
+      connectedPromise: null,
       connectedReject: null,
       connectedTimer: null,
+      disconnectedTimer: null,
     };
     peer = state;
     const connected = new Promise<void>((resolve, reject) => {
@@ -283,6 +338,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         30_000,
       );
     });
+    state.connectedPromise = connected;
     try {
       openSignal(state, actions);
     } catch (error) {
@@ -294,7 +350,6 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
   function openSignal(state: PeerState, actions: ActionsRef): void {
     if (!active || state.closed || peer !== state || state.socket) return;
     const socket = new WebSocket(state.signalUrl);
-    let accountRefreshed = false;
     state.socket = socket;
     socket.onopen = () => {
       if (state.closed || peer !== state || state.socket !== socket) return;
@@ -324,10 +379,6 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
             return failPeer(state, error, actions, "protocol_error");
           }
           // A frame type this build does not know is a newer Signal service, not a broken connection.
-          if (message?.type === "ready" && !accountRefreshed) {
-            accountRefreshed = true;
-            void actions.current.onAccountProfileChanged?.().catch(() => undefined);
-          }
           if (message) await handleSignal(state, message, actions);
         })
         // Only what handling a frame this peer did read can throw -- an ICE or SDP operation the
@@ -350,7 +401,11 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       void actions.current.onAccountProfileChanged?.().catch(() => undefined);
       return;
     }
-    if (message.type === "error") throw new Error(message.message);
+    if (message.type === "error") {
+      if (message.code === "session_revoked")
+        return failPeer(state, new Error(message.message), actions, "session_revoked");
+      throw new Error(message.message);
+    }
     if (message.type === "ready") {
       state.resumeToken = message.resumeToken;
       // Null on the `ready` that answers a TURN refresh: the credentials are new, the connection is
@@ -429,8 +484,22 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       if (kind) bindChannel(state, kind, event.channel, actions);
     };
     connection.onconnectionstatechange = () => {
-      if (state.connection !== connection) return;
-      if (["disconnected", "failed", "closed"].includes(connection.connectionState)) {
+      if (state.connection !== connection || state.closed || peer !== state) return;
+      if (connection.connectionState === "disconnected") {
+        // ICE can recover a short network interruption without replacing the authenticated session.
+        scheduleDisconnectedCheck(state, actions);
+        return;
+      }
+      if (connection.connectionState === "connected" && state.disconnectedTimer !== null) {
+        clearTimeout(state.disconnectedTimer);
+        state.disconnectedTimer = null;
+      }
+      if (isPeerOnline(state)) {
+        if (active && state.turnRefreshTimer === null) scheduleTurnRefresh(state);
+        settleConnected(state);
+        resyncIfNeeded(state, actions);
+      }
+      if (connection.connectionState === "failed" || connection.connectionState === "closed") {
         failPeer(state, new Error("The desktop went offline."), actions);
       }
     };
@@ -614,7 +683,10 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
 
   async function request(method: string, path: string, body: TeamProtocolV2Json) {
     const state = peer;
-    if (!state || !isPeerOnline(state)) throw new Error("The selected server is offline.");
+    if (!state || !isPeerOnline(state)) {
+      if (state && (method === "GET" || method === "HEAD")) state.needsResync = true;
+      throw new Error("The selected server is offline.");
+    }
     const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
     const result = new Promise<{ status: number; body: TeamProtocolV2Json }>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -740,7 +812,12 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     }, SIGNAL_TURN_REFRESH_INTERVAL_MS);
   }
 
-  function failPeer(state: PeerState, error: unknown, actions: ActionsRef, code?: "protocol_error"): void {
+  function failPeer(
+    state: PeerState,
+    error: unknown,
+    actions: ActionsRef,
+    code?: RemoteTeamConnectionUpdate["code"],
+  ): void {
     if (state.closed || peer !== state) return;
     const message = error instanceof Error ? error.message : "The WebRTC connection failed.";
     rejectConnection(state, new Error(message));
@@ -753,6 +830,15 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     void closePeer(actions.current.endSession);
   }
 
+  function rejectRequests(error: Error, readsOnly = false): void {
+    for (const [id, pending] of pendingRequests) {
+      if (readsOnly && pending.method !== "GET" && pending.method !== "HEAD") continue;
+      pendingRequests.delete(id);
+      clearTimeout(pending.timer);
+      pending.reject(error);
+    }
+  }
+
   async function closePeer(endSession: (sessionId: string) => Promise<void>): Promise<void> {
     const state = peer;
     peer = null;
@@ -762,15 +848,12 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
     if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
     if (state.connectedTimer !== null) clearTimeout(state.connectedTimer);
+    if (state.disconnectedTimer !== null) clearTimeout(state.disconnectedTimer);
     state.socket?.close();
     state.connection?.close();
     for (const decoder of Object.values(state.decoders)) decoder?.reset();
     state.channelChains = {};
-    for (const [requestId, pending] of pendingRequests) {
-      clearTimeout(pending.timer);
-      pendingRequests.delete(requestId);
-      pending.reject(new Error("The server disconnected."));
-    }
+    rejectRequests(new Error("The server disconnected."));
     rejectConnection(state, new Error("The server disconnected."));
     const cleanup = (closingSessions.get(state.hostId) ?? Promise.resolve())
       .then(() => endSession(state.sessionId))
@@ -789,6 +872,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     state.connectedResolve?.();
     state.connectedResolve = null;
     state.connectedReject = null;
+    state.connectedPromise = null;
   }
 
   function rejectConnection(state: PeerState, error: Error): void {
@@ -797,6 +881,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     state.connectedReject?.(error);
     state.connectedResolve = null;
     state.connectedReject = null;
+    state.connectedPromise = null;
   }
 
   function channelLabel(kind: ChannelKind): string {

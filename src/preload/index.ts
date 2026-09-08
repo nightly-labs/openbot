@@ -439,6 +439,7 @@ function decodeSkillSummary(value: unknown) {
     description: requiredString(item, "description"),
     category: item.category,
     creatorName: requiredString(item, "creatorName"),
+    creatorAvatarUrl: item.creatorAvatarUrl === undefined ? null : nullableString(item, "creatorAvatarUrl"),
     version: requiredNumber(item, "version"),
     installs: requiredNumber(item, "installs"),
     featured: requiredBoolean(item, "featured"),
@@ -473,6 +474,7 @@ function decodeSubmission(value: unknown): SkillSubmission {
     throw new Error("Invalid skill submission state.");
   }
   return {
+    showCreatorAvatar: item.showCreatorAvatar === undefined ? false : requiredBoolean(item, "showCreatorAvatar"),
     id: requiredString(item, "id"),
     skillId: requiredString(item, "skillId"),
     slug: requiredString(item, "slug"),
@@ -531,12 +533,15 @@ function decodeMarketplaceAgentSummary(value: unknown): MarketplaceAgentSummary 
   const item = decodeRecord(value, "marketplace agent");
   if (!isAvatarSeed(item.avatarSeed) || (item.avatarHue !== null && !isAvatarHue(item.avatarHue)))
     throw new Error("Invalid marketplace agent avatar.");
+  if (item.category !== undefined && !isSkillCategory(item.category)) throw new Error("Invalid agent category.");
   return {
+    category: item.category ?? "other",
     id: requiredString(item, "id"),
     name: requiredString(item, "name"),
     title: requiredString(item, "title"),
     description: requiredString(item, "description"),
     creatorName: requiredString(item, "creatorName"),
+    creatorAvatarUrl: item.creatorAvatarUrl === undefined ? null : nullableString(item, "creatorAvatarUrl"),
     version: requiredNumber(item, "version"),
     installs: requiredNumber(item, "installs"),
     featured: requiredBoolean(item, "featured"),
@@ -593,7 +598,10 @@ function decodeAgentSubmission(value: unknown): AgentSubmission {
     (item.avatarHue !== null && !isAvatarHue(item.avatarHue))
   )
     throw new Error("Invalid agent submission.");
+  if (item.category !== undefined && !isSkillCategory(item.category)) throw new Error("Invalid agent category.");
   return {
+    showCreatorAvatar: item.showCreatorAvatar === undefined ? false : requiredBoolean(item, "showCreatorAvatar"),
+    category: item.category ?? "other",
     id: requiredString(item, "id"),
     listingId: requiredString(item, "listingId"),
     name: requiredString(item, "name"),
@@ -961,9 +969,9 @@ const openbotApi: OpenBotDesktopApi = {
     createInvite: (serverId, input) =>
       ipcRenderer.invoke(IPC_CHANNELS.serversCreateInvite, { serverId, payload: input }),
     setTyping: (input) => ipcRenderer.invoke(IPC_CHANNELS.serversSetTyping, input),
-    onPresence: (listener) => {
+    onPresence: (listener, serverId) => {
       const handler = (_event: Electron.IpcRendererEvent, payload: ScopedTeamPresenceSnapshot) => {
-        if (payload.serverId === selectedServerId) listener(payload.snapshot);
+        if (payload.serverId === (serverId ?? selectedServerId)) listener(payload.snapshot);
       };
       ipcRenderer.on(IPC_CHANNELS.serversPresence, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.serversPresence, handler);

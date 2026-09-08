@@ -96,6 +96,7 @@ function service(overrides: { failSkill?: boolean } = {}) {
     },
   };
   return {
+    auth,
     agents,
     skills,
     marketplace: new AgentMarketplaceService(auth, agents, skills),
@@ -103,6 +104,21 @@ function service(overrides: { failSkill?: boolean } = {}) {
 }
 
 describe("AgentMarketplaceService", () => {
+  it("passes catalog categories and creator photos through the account API", async () => {
+    const { marketplace, auth } = service();
+    const request = vi.spyOn(auth, "requestAuthorized").mockImplementation(async (_path, _init, decode) =>
+      decode({
+        agents: [{ ...detail, category: "research", creatorAvatarUrl: "/v1/avatars/owner" }],
+        nextCursor: null,
+      }),
+    );
+    expect((await marketplace.list({ category: "research" })).agents[0]).toMatchObject({
+      category: "research",
+      creatorAvatarUrl: "/v1/avatars/owner",
+    });
+    expect(request.mock.calls[0]?.[0]).toContain("category=research");
+  });
+
   it("publishes only the public profile, approved skills, and routine definitions", async () => {
     const { marketplace } = service();
     const preview = await marketplace.preview(agent.id);

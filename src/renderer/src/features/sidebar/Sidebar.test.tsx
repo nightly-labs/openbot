@@ -386,6 +386,23 @@ describe("Sidebar sections", () => {
     await waitFor(() => expect(sales).not.toBeInTheDocument());
   });
 
+  // The sidebar draws only the sections `order` names, so an agent filed under a section that `order`
+  // leaves out has no header to sit under and vanishes -- with its chat and every message in it still
+  // on disk, which the user reads as history that disappeared. `isCompleteSectionOrder` rejects such a
+  // layout at the IPC boundary; if one arrives anyway the agent belongs in Unassigned, where the user
+  // can open it and file it again.
+  it("shows an agent filed under an unordered section in Unassigned", async () => {
+    const props = sidebarProps();
+    const layout = sectionLayout();
+    render(() => <Sidebar {...props} layout={{ ...layout, order: ["people", "unassigned", emptyId] }} />);
+
+    expect(screen.queryByRole("button", { name: "Demo" })).not.toBeInTheDocument();
+    const unassigned = screen.getByRole("button", { name: "Unassigned" });
+    expect(unassigned).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Chief/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Research/ })).toBeInTheDocument();
+  });
+
   it("moves through empty custom sections and disables movement at the visible edge", async () => {
     const props = sidebarProps();
     const layout = sectionLayout();

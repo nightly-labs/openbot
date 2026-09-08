@@ -20,6 +20,16 @@ afterEach(() => {
 });
 
 describe("browser remote peer recovery", () => {
+  it("reports session revocation so the client can refresh memberships immediately", async () => {
+    const network = await setupNetwork();
+    await network.connect();
+    network
+      .socket()
+      .receive({ type: "error", version: 1, code: "session_revoked", message: "The remote session ended." });
+    await vi.waitFor(() => expect(network.updates.at(-1)).toMatchObject({ state: "offline", code: "session_revoked" }));
+    await network.runtime.dispose();
+  });
+
   it("refreshes the account on Signal invalidation without breaking the team connection if refresh fails", async () => {
     const refreshProfile = vi.fn(async () => {
       throw new Error("Account API offline");
@@ -28,7 +38,7 @@ describe("browser remote peer recovery", () => {
     await network.connect();
     try {
       network.socket().receive({ type: "account-profile-changed", version: 1 });
-      await vi.waitFor(() => expect(refreshProfile).toHaveBeenCalledTimes(2));
+      await vi.waitFor(() => expect(refreshProfile).toHaveBeenCalledTimes(1));
       const result = await network.runtime.execute({
         id: "after-profile",
         type: "request",
@@ -131,7 +141,7 @@ describe("browser remote peer recovery", () => {
       } else await initial;
       const closed =
         mode === "disconnect" ? network.runtime.execute({ id: "disconnect", type: "disconnect" }) : Promise.resolve();
-      if (mode === "reconnect") network.connection().drop("disconnected");
+      if (mode === "reconnect") network.connection().drop("failed");
       const reconnecting = network.connect();
       await vi.advanceTimersByTimeAsync(0);
       cleanup.resolve();
@@ -195,9 +205,11 @@ describe("browser remote peer recovery", () => {
   it.each(["disconnected", "failed", "closed"] as const)(
     "releases a %s peer and authenticates a fresh connection",
     async (state) => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       const network = await setupNetwork();
       await expect(network.connect()).resolves.toMatchObject({ ok: true });
       network.connection().drop(state);
+      if (state === "disconnected") await vi.advanceTimersByTimeAsync(5_000);
       expect(network.updates.at(-1)?.state).toBe("offline");
       await expect(network.connect()).resolves.toMatchObject({ ok: true });
       expect(network.connections).toHaveLength(2);
@@ -209,12 +221,140 @@ describe("browser remote peer recovery", () => {
     },
   );
 
-  it("does not reuse an authenticated peer whose browser missed the disconnect event", async () => {
+  it("keeps the authenticated session when a short network interruption recovers", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const network = await setupNetwork();
     await network.connect();
+    network.connection().drop("disconnected");
+    await vi.advanceTimersByTimeAsync(2_000);
+    network.connection().drop("connected");
+    await vi.advanceTimersByTimeAsync(5_000);
+    const result = await network.runtime.execute({
+      id: "after-network-change",
+      type: "request",
+      method: "GET",
+      path: "/v1/agents",
+      body: {},
+    });
+    expect({ result, bootstraps: network.bootstraps(), state: network.updates.at(-1)?.state }).toEqual({
+      result: { commandId: "after-network-change", ok: true, status: 200, body: [] },
+      bootstraps: 1,
+      state: "online",
+    });
+    await network.runtime.dispose();
+  });
+
+  it("keeps a sent message pending in the background until the desktop confirms it", async () => {
+    const arrived = deferred();
+    const release = deferred();
+    const network = await setupNetwork({
+      responseBody: { messageId: "sent-message", deliveries: [] },
+      beforeResponse: async () => {
+        arrived.resolve();
+        await release.promise;
+      },
+    });
+    await network.connect();
+    const pending = network.runtime.execute({
+      id: "send-message",
+      type: "request",
+      method: "POST",
+      path: "/v1/agents/agent/messages",
+      body: { text: "Hello" },
+    });
+    await arrived.promise;
+    network.runtime.setActive(false);
+    release.resolve();
+    await expect(pending).resolves.toMatchObject({ commandId: "send-message", ok: true, status: 200 });
+    await network.runtime.dispose();
+  });
+
+  it("releases a pending workspace read on background entry and reuses healthy channels on return", async () => {
+    const network = await setupNetwork();
+    await network.connect();
+    const pending = network.runtime.execute({
+      id: "background-read",
+      type: "request",
+      method: "GET",
+      path: "/v1/agents/slow/conversation",
+      body: {},
+    });
+    await network.slowRequest.promise;
+    network.runtime.setActive(false);
+    await expect(pending).resolves.toMatchObject({ ok: false, error: "The app is in the background." });
+    network.runtime.setActive(true);
+    await network.connect();
+    const result = await network.runtime.execute({
+      id: "resumed-read",
+      type: "request",
+      method: "GET",
+      path: "/v1/agents",
+      body: {},
+    });
+    expect({ result, bootstraps: network.bootstraps() }).toEqual({
+      result: { commandId: "resumed-read", ok: true, status: 200, body: [] },
+      bootstraps: 1,
+    });
+    await network.runtime.dispose();
+  });
+
+  it("waits for RTC recovery on resume even if the browser missed the disconnect event", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const endSession = vi.fn(async () => {});
+    const network = await setupNetwork({ endSession });
+    await network.connect();
+    network.runtime.setActive(false);
     network.connection().connectionState = "disconnected";
+    network.runtime.setActive(true);
+    const reconnect = network.connect();
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(endSession).not.toHaveBeenCalled();
+    network.connection().drop("connected");
+    await expect(reconnect).resolves.toMatchObject({ ok: true });
+    expect(network.bootstraps()).toBe(1);
+    await network.runtime.dispose();
+  });
+
+  it("ends an unrecoverable RTC session after the resume grace period", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const endSession = vi.fn(async () => {});
+    const network = await setupNetwork({ endSession });
+    await network.connect();
+    network.runtime.setActive(false);
+    network.connection().drop("disconnected");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(endSession).not.toHaveBeenCalled();
+    network.runtime.setActive(true);
+    const reconnect = network.connect();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(reconnect).resolves.toMatchObject({ ok: false });
+    expect(endSession).toHaveBeenCalledTimes(1);
     await expect(network.connect()).resolves.toMatchObject({ ok: true });
-    expect(network.connections).toHaveLength(2);
+    expect(network.bootstraps()).toBe(2);
+    await network.runtime.dispose();
+  });
+
+  it("reports canceled reads for data synchronization without replacing the healthy peer", async () => {
+    const network = await setupNetwork();
+    await network.connect();
+    network.updates.length = 0;
+    network.runtime.setActive(false);
+    network.runtime.setActive(true);
+    expect(network.updates).toEqual([]);
+    const read = network.runtime.execute({
+      id: "canceled",
+      type: "request",
+      method: "GET",
+      path: "/v1/agents/slow/conversation",
+      body: {},
+    });
+    await network.slowRequest.promise;
+    network.updates.length = 0;
+    network.runtime.setActive(false);
+    await read;
+    network.runtime.setActive(true);
+    expect(network.updates).toEqual([{ hostId: "host", state: "online", message: null, resync: true }]);
+    expect(network.bootstraps()).toBe(1);
     await network.runtime.dispose();
   });
 
@@ -350,6 +490,8 @@ async function setupNetwork(
     endSession?: () => Promise<void>;
     beforeBootstrap?: (hostId: string) => Promise<void>;
     beforeAnswer?: () => Promise<void>;
+    beforeResponse?: () => Promise<void>;
+    responseBody?: TeamProtocolV2Json;
   } = {},
 ) {
   const host = await createEd25519Identity(() => new Uint8Array(32).fill(7));
@@ -465,14 +607,17 @@ async function setupNetwork(
           slowRequest.resolve();
           return;
         }
-        this.receive(
-          JSON.stringify({
-            version: 2,
-            type: "response",
-            requestId: frame.requestId,
-            result: { status: 200, body: [] },
-          }),
-        );
+        void (async () => {
+          await options.beforeResponse?.();
+          this.receive(
+            JSON.stringify({
+              version: 2,
+              type: "response",
+              requestId: frame.requestId,
+              result: { status: 200, body: options.responseBody ?? [] },
+            }),
+          );
+        })();
       }
     }
   }

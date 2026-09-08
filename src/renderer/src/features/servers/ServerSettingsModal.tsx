@@ -40,9 +40,9 @@ import {
   ItemMedia,
   ItemTitle,
   Monitor,
-  Pause,
-  Play,
+  QrCode,
   RefreshCw,
+  ScanLine,
   Search,
   Select,
   SelectContent,
@@ -123,6 +123,7 @@ interface InvitePanel {
   link: string;
   mode: InviteMode;
   result: InviteSummary | null;
+  showQr: boolean;
   role: InviteRole;
 }
 
@@ -156,7 +157,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       savedLogoUrl: null,
       savedName: "",
     },
-    invite: { email: "", emailError: null, link: "", mode: "email", result: null, role: "member" },
+    invite: { email: "", emailError: null, link: "", mode: "email", result: null, showQr: false, role: "member" },
     members: { removeId: null, search: "" },
   });
   const [section, setSection] = createSignal<Section>("general");
@@ -199,10 +200,21 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const activeInvites = createMemo(() =>
     props.invites.filter((item) => item.usedAt === null && Date.parse(item.expiresAt) > now()),
   );
+  const inviteUsed = () =>
+    Boolean(
+      panels.invite.result && props.invites.some((invite) => invite.id === panels.invite.result?.id && invite.usedAt),
+    );
+  const inviteExpired = () => Boolean(panels.invite.result && Date.parse(panels.invite.result.expiresAt) <= now());
+  const activeMembers = createMemo(() => props.members.filter((member) => !member.disabled));
+  const inactiveLegacyMembers = createMemo(() =>
+    props.server.kind === "remote" && /^https?:\/\//u.test(props.server.apiUrl ?? "")
+      ? props.members.filter((member) => member.disabled && member.role !== "owner")
+      : [],
+  );
   const filteredMembers = createMemo(() => {
     const query = panels.members.search.trim().toLowerCase();
-    if (!query) return props.members;
-    return props.members.filter((member) =>
+    if (!query) return activeMembers();
+    return activeMembers().filter((member) =>
       [teamMemberName(member), member.email, member.username].some((value) => value?.toLowerCase().includes(query)),
     );
   });
@@ -233,6 +245,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           state.identity.nameTouched = false;
           state.identity.nameShaking = false;
           state.invite.result = null;
+          state.invite.showQr = false;
           state.members.search = "";
         });
         resetInviteLink();
@@ -459,6 +472,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       setPanels((state) => {
         state.invite.mode = value;
         state.invite.result = null;
+        state.invite.showQr = false;
         state.invite.emailError = null;
       });
       resetInviteLink();
@@ -834,7 +848,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <SettingsSection
           class="server-settings-members-section"
           title="Server members"
-          description={<>{props.members.length} members</>}
+          description={<>{activeMembers().length} members</>}
           actions={
             <label class="server-settings-search">
               <Search aria-hidden="true" />
@@ -868,6 +882,13 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             </Show>
           </ItemGroup>
         </SettingsSection>
+        <Show when={canManage() && inactiveLegacyMembers().length > 0}>
+          <SettingsSection title="Inactive members" description="Remove an inactive member before inviting them again.">
+            <ItemGroup class="settings-modal-card server-settings-members-list">
+              <For each={inactiveLegacyMembers()}>{(member) => memberRow(member)}</For>
+            </ItemGroup>
+          </SettingsSection>
+        </Show>
         <Show when={canManage()}>{pendingInvites()}</Show>
       </>
     );
@@ -972,27 +993,88 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 }
               >
                 {(result) => (
-                  <CopyButton
-                    class="server-settings-invite-copy"
-                    value={result().inviteUrl}
-                    label="Copy link"
-                    copiedLabel="Copied"
-                    size="sm"
-                    variant="default"
-                    onCopyError={showCopyError}
-                  />
+                  <div class="server-settings-invite-share">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label="Create new invitation link"
+                      title="Create new link"
+                      loading={busy() === "invite"}
+                      disabled={!canInvite()}
+                      onClick={() => void createInvite()}
+                    >
+                      <RefreshCw />
+                      New link
+                    </Button>
+                    <Show when={!inviteUsed() && !inviteExpired()}>
+                      <CopyButton
+                        class="server-settings-invite-copy"
+                        value={result().inviteUrl}
+                        label="Copy link"
+                        copiedLabel="Copied"
+                        size="sm"
+                        variant="default"
+                        onCopyError={showCopyError}
+                      />
+                      <Button
+                        size="icon-sm"
+                        variant="default"
+                        aria-label="Show invitation QR code"
+                        aria-expanded={panels.invite.showQr ? "true" : "false"}
+                        onClick={() =>
+                          setPanels((state) => {
+                            state.invite.showQr = !state.invite.showQr;
+                          })
+                        }
+                      >
+                        <ScanLine />
+                      </Button>
+                    </Show>
+                  </div>
                 )}
               </Show>
             </div>
-            <Show when={panels.invite.result?.email ? panels.invite.result : null}>
+            <Show
+              when={
+                panels.invite.showQr &&
+                !inviteUsed() &&
+                !inviteExpired() &&
+                panels.invite.mode === "link" &&
+                panels.invite.result
+              }
+            >
+              {(result) => (
+                <div class="server-settings-invite-qr">
+                  <QrCode value={result().inviteUrl} label="Invitation QR code" />
+                  <Text variant="caption" tone="muted">
+                    Scan this code in OpenBot Mobile to join this server.
+                  </Text>
+                </div>
+              )}
+            </Show>
+            <Show when={panels.invite.result}>
               {(result) => (
                 <Alert class="server-settings-invite-result" tone="success" role="status">
                   <AlertIcon>
                     <Check />
                   </AlertIcon>
                   <AlertContent>
-                    <AlertTitle>{result().email ? "Invitation sent" : "Invitation link ready"}</AlertTitle>
-                    <AlertDescription>{result().email}</AlertDescription>
+                    <AlertTitle>
+                      {inviteUsed()
+                        ? "Invitation accepted"
+                        : inviteExpired()
+                          ? "Invitation expired"
+                          : result().email
+                            ? "Invitation sent"
+                            : "Invitation link ready"}
+                    </AlertTitle>
+                    <AlertDescription>
+                      {inviteUsed()
+                        ? "The member joined this server. Create a new link to invite someone else."
+                        : inviteExpired()
+                          ? "Create a new link to invite someone."
+                          : result().email || "Share the link or scan the QR code in OpenBot Mobile."}
+                    </AlertDescription>
                   </AlertContent>
                 </Alert>
               )}
@@ -1021,9 +1103,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 mount={modalElement}
                 onRoleChange={(role) =>
                   void run(`member:${member.id}`, () => props.onUpdateMember({ memberId: member.id, role }))
-                }
-                onPausedChange={(disabled) =>
-                  void run(`member:${member.id}`, () => props.onUpdateMember({ memberId: member.id, disabled }))
                 }
                 onRemove={(trigger) => {
                   removeMemberTrigger = trigger;
@@ -1207,7 +1286,6 @@ function MemberActionsMenu(props: {
   member: TeamPresenceMember;
   mount: HTMLElement | undefined;
   onRoleChange: (role: InviteRole) => void;
-  onPausedChange: (paused: boolean) => void;
   onRemove: (trigger: HTMLElement) => void;
 }) {
   const name = () => teamMemberName(props.member);
@@ -1223,18 +1301,13 @@ function MemberActionsMenu(props: {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal mount={props.mount}>
         <DropdownMenu.Content class="server-settings-member-menu">
-          <DropdownMenu.Item
-            disabled={props.member.disabled}
-            onSelect={() => props.onRoleChange(props.member.role === "admin" ? "member" : "admin")}
-          >
-            {props.member.role === "admin" ? <UserRound aria-hidden="true" /> : <ShieldCheck aria-hidden="true" />}
-            {props.member.role === "admin" ? "Make member" : "Make admin"}
-          </DropdownMenu.Item>
-          <DropdownMenu.Item onSelect={() => props.onPausedChange(!props.member.disabled)}>
-            {props.member.disabled ? <Play aria-hidden="true" /> : <Pause aria-hidden="true" />}
-            {props.member.disabled ? "Restore access" : "Pause access"}
-          </DropdownMenu.Item>
-          <DropdownMenu.Separator />
+          <Show when={!props.member.disabled}>
+            <DropdownMenu.Item onSelect={() => props.onRoleChange(props.member.role === "admin" ? "member" : "admin")}>
+              {props.member.role === "admin" ? <UserRound aria-hidden="true" /> : <ShieldCheck aria-hidden="true" />}
+              {props.member.role === "admin" ? "Make member" : "Make admin"}
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+          </Show>
           <DropdownMenu.Item
             class="ui-action-menu-danger"
             onSelect={() => triggerElement && props.onRemove(triggerElement)}

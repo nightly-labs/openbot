@@ -213,13 +213,19 @@ In Expo Go, an Expo DOM component owns the browser `RTCPeerConnection` inside a 
 passes only serializable, validated commands and events to the native React UI; no native WebRTC
 module or development build is required.
 Mobile server labels in the drawer and connection settings describe the authenticated application
-connection, not membership or Signal presence. Only the selected server has a live connection;
-unselected/unobserved servers show Unknown. Switching servers or backgrounding clears the previous
-status. Connecting becomes Online after compatibility and workspace synchronization succeed;
+connection, not membership or Signal presence. Each membership has its own transport and recovery controller while mobile is active.
+Switching servers changes the visible workspace without closing other connections. iOS `inactive`
+transitions leave connections alone. Backgrounding retains the last connection status and pauses
+recovery; transport failures received in the background are retained for resume. Only the paired desktop is Local;
+other servers are Remote regardless of the account role. Connecting becomes Online after compatibility and workspace synchronization succeed;
 transport failures and reconnect attempts show Offline, and protocol failures show Connection error.
 The existing RTC connection updates and recovery controller are the source of truth; the indicator
-adds no polling or health requests. Foreground resume, invite selection and manual refresh reuse
-that controller. RTC disconnection/failure events clear Online and drive recovery after network loss.
+adds no polling or health requests. Foreground resume reuses a healthy connection without a workspace
+reload. Canceled reads and event resets request data synchronization without showing a reconnect on
+a healthy connection. Invite selection and manual refresh reuse the same controller. A transient RTC
+disconnected state has a five-second recovery window, including on resume; failed or closed states
+drive recovery immediately. Backgrounding pauses the grace timer and cancels pending reads so they cannot block resume.
+Explicit refresh bypasses the retry cooldown without overlapping a pending connection attempt.
 The native/DOM mailbox carries concurrent commands by ID. Switching or disconnecting cancels
 pending callers immediately; peer generations reject late callbacks from a superseded host.
 The persisted hosting preference is restored on startup in both the normal desktop and the
@@ -228,6 +234,26 @@ needs the published host. The separate development test-client role never auto-p
 Mobile Connect tickets and QR codes bind the started host ID and SHA-256 public-key fingerprint.
 Mobile verifies that binding at redemption and against the directory, pins the key, and selects
 that host rather than the first account-owned desktop. Legacy unbound QR codes require regeneration.
+Desktop invitation QR codes contain the same one-use link as Copy link. The signed-in mobile
+scanner validates that link and opens the invitation review before acceptance. These codes join
+one server; Mobile Connect codes sign in to the desktop account and select the paired host.
+Both clients read account-wide membership from D1's indexed `remote_memberships` / `remote_hosts`
+join. An offline paired desktop does not remove other memberships, and mobile connects directly
+to each host independently. A cold launch refreshes the account directory. Both clients check again
+every 15 minutes while active. Concurrent directory reads coalesce; inactive clients do not poll.
+Mobile background entry stops the timer, and foreground entry starts a new 15-minute interval.
+iOS `inactive` transitions, including Notification Center, do not trigger a check or reset the timer.
+Session revocation, explicit refresh,
+and completed invitation acceptance can refresh sooner. A lost healthy connection also requests
+membership reconciliation; a transport failure alone never removes a server. Mobile member controls
+use the same account endpoints: owners and admins can invite, while only owners can change another
+member's role or remove access. D1 retains revoked membership records and invalidates affected
+sessions; both clients exclude inactive members from the active list and count. On legacy HTTP(S)
+hosts, desktop exposes inactive records separately for removal before a new invitation; it does not
+restore the pause/restore controls or change the released invitation rules. Mobile separates shareable
+links from email invitations. Email mode creates an address-bound invitation and sends it through
+the same delivery endpoint as desktop; failed delivery attempts revoke the new invitation. Released restore endpoints
+remain compatible with older clients. Member and invitation lists refresh after changes or on explicit request.
 Conversation read cursors belong to a team member and are shared across that member's devices.
 Advancing a cursor emits a conversation invalidation without the reader's identity or cursor;
 clients reload their own read state even when the conversation content revision is unchanged.
@@ -255,9 +281,14 @@ Account profile writes enqueue an `account-profile-changed` invalidation in the 
 account-to-Signal outbox before returning. Worker `waitUntil` delivers notifications outside the
 profile-save response path, with a five-second timeout per request and outbox retries. Signal forwards the optional frame only to authenticated sockets for that
 user; the frame contains no profile or credential. Desktop and mobile fetch the profile through
-the account API on notification, foreground entry, or Signal reconnection, with no periodic polling.
+the account API on notification, cold launch, and every 15 minutes while active.
+Returning from the background or restoring window focus does not trigger an automatic account
+or directory check. iOS `inactive` alone does not trigger a check or reset the periodic timer.
+Explicit profile invalidations trigger an earlier check and are deferred while mobile is in the
+background. Signal readiness does not trigger a profile check; the account timer remains independent
+of transport recovery. Failed automatic checks use the same interval.
 Older Signal clients ignore this optional event. API and Signal both need the event support for push;
-foreground refresh remains the fallback when Signal is unavailable. Unchanged responses do not
+the periodic check remains the fallback when Signal is unavailable. Unchanged responses do not
 publish a new identity. Desktop ignores reads overtaken by a local edit, sign-out or shutdown;
 its central-auth change event updates the renderer and host identity. The mobile drawer and Settings
 both display the session's name and resolve avatar paths against its account API.
@@ -274,6 +305,11 @@ Mobile sign-out keeps the encrypted credential and local session until the accou
 revocation. If the DELETE response fails, mobile validates that same token: a 401 confirms it is no
 longer active and completes sign-out immediately. A successful session check or an inconclusive
 network/service error keeps the credential for retry; a late result cannot clear a newer login.
+The desktop keeps remote connection errors visible in the workspace during retries. A successful
+connection clears the error. A new connection sequence or a return to online reloads the active
+workspace without remounting its providers, so failed refreshes retain cached data. Server switches
+still dispose the old scope; load generations and scope guards reject late responses.
+
 Hosts opt in with the additive Signal hello `multiplex` flag; legacy desktops keep their one-peer
 limit so a second phone cannot replace an existing client's connection. Signal multiplexes
 connections by logical session, and the hidden desktop renderer owns a separate

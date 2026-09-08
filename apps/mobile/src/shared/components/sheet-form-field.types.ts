@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { TextInputProps } from "react-native";
 
 export interface SheetFormFieldProps {
@@ -6,6 +7,7 @@ export interface SheetFormFieldProps {
   autoFocus?: boolean;
   editable?: boolean;
   hint?: string;
+  trailing?: ReactNode;
   inputMode?: TextInputProps["inputMode"];
   isRequired?: boolean;
   label: string;
