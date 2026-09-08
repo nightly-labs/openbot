@@ -234,6 +234,31 @@ describe("browser remote peer recovery", () => {
     await network.runtime.dispose();
   });
 
+  it("keeps a sent message pending in the background until the desktop confirms it", async () => {
+    const arrived = deferred();
+    const release = deferred();
+    const network = await setupNetwork({
+      responseBody: { messageId: "sent-message", deliveries: [] },
+      beforeResponse: async () => {
+        arrived.resolve();
+        await release.promise;
+      },
+    });
+    await network.connect();
+    const pending = network.runtime.execute({
+      id: "send-message",
+      type: "request",
+      method: "POST",
+      path: "/v1/agents/agent/messages",
+      body: { text: "Hello" },
+    });
+    await arrived.promise;
+    network.runtime.setActive(false);
+    release.resolve();
+    await expect(pending).resolves.toMatchObject({ commandId: "send-message", ok: true, status: 200 });
+    await network.runtime.dispose();
+  });
+
   it("releases a pending workspace read on background entry and reuses healthy channels on return", async () => {
     const network = await setupNetwork();
     await network.connect();
@@ -404,6 +429,8 @@ async function setupNetwork(
     endSession?: () => Promise<void>;
     beforeBootstrap?: (hostId: string) => Promise<void>;
     beforeAnswer?: () => Promise<void>;
+    beforeResponse?: () => Promise<void>;
+    responseBody?: TeamProtocolV2Json;
   } = {},
 ) {
   const host = await createEd25519Identity(() => new Uint8Array(32).fill(7));
@@ -519,14 +546,17 @@ async function setupNetwork(
           slowRequest.resolve();
           return;
         }
-        this.receive(
-          JSON.stringify({
-            version: 2,
-            type: "response",
-            requestId: frame.requestId,
-            result: { status: 200, body: [] },
-          }),
-        );
+        void (async () => {
+          await options.beforeResponse?.();
+          this.receive(
+            JSON.stringify({
+              version: 2,
+              type: "response",
+              requestId: frame.requestId,
+              result: { status: 200, body: options.responseBody ?? [] },
+            }),
+          );
+        })();
       }
     }
   }

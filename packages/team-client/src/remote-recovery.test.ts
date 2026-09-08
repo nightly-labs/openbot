@@ -2,6 +2,7 @@ import type { ConversationSnapshot } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createRemoteConnectionRecovery,
+  createRemoteReadRefresh,
   mergeRemoteUnreadIds,
   remoteConnectionFailure,
   remoteRecoveryMessage,
@@ -57,6 +58,58 @@ describe("remote connection recovery", () => {
         remoteConnectionFailure("connection", new Error("The desktop did not connect.")),
       ),
     ).toContain("Connecting to the desktop: The desktop did not connect.");
+  });
+
+  it("does not let an initial read overwrite a newer event refresh", async () => {
+    const refresh = createRemoteReadRefresh();
+    let unread = ["agent"];
+    const apply = (reads: Record<string, { unreadCount: number }>) => {
+      unread = mergeRemoteUnreadIds(unread, reads);
+    };
+    const initial = deferredReads();
+    const loading = refresh.refresh(
+      "host",
+      () => initial.promise,
+      apply,
+      () => true,
+    );
+    await refresh.refresh(
+      "host",
+      async () => ({ agent: { unreadCount: 0 } }),
+      apply,
+      () => true,
+    );
+    initial.resolve({ agent: { unreadCount: 1 } });
+    await loading;
+    expect(unread).toEqual([]);
+  });
+
+  it("invalidates pending reads when a cursor changes without discarding another server's read", async () => {
+    const refresh = createRemoteReadRefresh();
+    let unread = ["agent"];
+    const apply = (reads: Record<string, { unreadCount: number }>) => {
+      unread = mergeRemoteUnreadIds(unread, reads);
+    };
+    const initial = deferredReads();
+    const other = deferredReads();
+    const loading = refresh.refresh(
+      "host",
+      () => initial.promise,
+      apply,
+      () => true,
+    );
+    const loadingOther = refresh.refresh(
+      "other",
+      () => other.promise,
+      apply,
+      () => true,
+    );
+    refresh.invalidate("host");
+    apply({ agent: { unreadCount: 0 } });
+    initial.resolve({ agent: { unreadCount: 1 } });
+    other.resolve({ remote: { unreadCount: 1 } });
+    await Promise.all([loading, loadingOther]);
+    expect(unread).toEqual(["remote"]);
   });
 
   it("applies live unread changes without erasing another server's unread agents", () => {
@@ -375,3 +428,11 @@ describe("conversation recovery after an event reset", () => {
     expect(displayed.revision).toBe(1);
   });
 });
+
+function deferredReads() {
+  let resolve: (value: Record<string, { unreadCount: number }>) => void = () => {};
+  const promise = new Promise<Record<string, { unreadCount: number }>>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}

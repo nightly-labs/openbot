@@ -173,7 +173,9 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
         state.reconnectTimer = null;
         state.turnRefreshTimer = null;
-        rejectRequests(new Error("The app is in the background."));
+        // The host can commit a sent write while the app is inactive. Keep its
+        // response registered so the caller does not offer to send it again.
+        rejectRequests(new Error("The app is in the background."), true);
         if (!state.authenticated) failPeer(state, new Error("The app is in the background."), actions);
       } else {
         if (!isPeerOnline(state)) {
@@ -771,12 +773,13 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     void closePeer(actions.current.endSession);
   }
 
-  function rejectRequests(error: Error): void {
-    for (const pending of pendingRequests.values()) {
+  function rejectRequests(error: Error, readsOnly = false): void {
+    for (const [id, pending] of pendingRequests) {
+      if (readsOnly && pending.method !== "GET" && pending.method !== "HEAD") continue;
+      pendingRequests.delete(id);
       clearTimeout(pending.timer);
       pending.reject(error);
     }
-    pendingRequests.clear();
   }
 
   async function closePeer(endSession: (sessionId: string) => Promise<void>): Promise<void> {

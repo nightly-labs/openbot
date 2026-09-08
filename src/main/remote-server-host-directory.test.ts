@@ -43,9 +43,11 @@ function reconcile(input: {
   preservedIdentities?: PreservedHostIdentity[];
   hidden?: string[];
   keepOtherTransports?: boolean;
+  connected?: string[];
 }) {
   return reconcileWebRtcHosts({
     hosts: input.hosts ?? [],
+    isConnected: (hostId) => (input.connected ?? []).includes(hostId),
     servers: input.servers ?? [],
     preservedIdentities: input.preservedIdentities ?? [],
     localHostId: input.localHostId ?? null,
@@ -56,6 +58,18 @@ function reconcile(input: {
 }
 
 describe("reconcileWebRtcHosts", () => {
+  it("preserves observed desktop availability only while the same host stays connected", () => {
+    const servers = [
+      storedHost("online", { remoteDesktopAvailable: true }),
+      storedHost("offline", { remoteDesktopAvailable: true }),
+    ];
+    const result = reconcile({ hosts: [listedHost("online"), listedHost("offline")], servers, connected: ["online"] });
+    expect(result.servers.map((server) => [server.id, server.remoteDesktopAvailable])).toEqual([
+      ["online", true],
+      ["offline", false],
+    ]);
+  });
+
   it("keeps the order the user arranged and appends hosts they have not seen", () => {
     const result = reconcile({
       hosts: [listedHost("first"), listedHost("second"), listedHost("third")],

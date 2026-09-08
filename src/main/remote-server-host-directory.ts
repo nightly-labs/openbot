@@ -63,6 +63,7 @@ export interface WebRtcHostReconciliationInput {
   readonly username: string;
   /** Development only: keep HTTPS servers that the account directory does not know about. */
   readonly keepOtherTransports: boolean;
+  readonly isConnected: (hostId: string) => boolean;
 }
 
 export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebRtcHostReconciliation {
@@ -107,6 +108,9 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
     const refreshed = listedById.get(server.id);
     if (!refreshed) return [];
     seen.add(server.id);
+    if (input.isConnected(server.id) && server.publicKey === refreshed.publicKey) {
+      refreshed.remoteDesktopAvailable = server.remoteDesktopAvailable;
+    }
     return [refreshed];
   });
   for (const server of listed) {

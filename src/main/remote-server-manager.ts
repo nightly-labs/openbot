@@ -945,6 +945,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     if (!transport) return;
     const { servers, removedHostIds, staleTransportHostIds, pinnedKeys } = reconcileWebRtcHosts({
       hosts: await transport.listHosts(),
+      isConnected: (hostId) => transport.isConnected(hostId),
       servers: this.#store.servers,
       preservedIdentities: this.#store.preservedIdentities,
       localHostId: this.#getLocalHostId(),

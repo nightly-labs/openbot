@@ -220,6 +220,31 @@ export function createRemoteConnectionRecovery(
   };
 }
 
+/** Order initial and event reads together, without invalidating another server's responses. */
+export function createRemoteReadRefresh() {
+  const requests = new Map<string, number>();
+  const cursors = new Map<string, number>();
+  return {
+    invalidate(serverId: string): () => boolean {
+      const cursor = (cursors.get(serverId) ?? 0) + 1;
+      cursors.set(serverId, cursor);
+      return () => cursors.get(serverId) === cursor;
+    },
+    async refresh<T>(
+      serverId: string,
+      load: () => Promise<T>,
+      apply: (value: T) => void,
+      isCurrent: () => boolean,
+    ): Promise<void> {
+      const request = (requests.get(serverId) ?? 0) + 1;
+      requests.set(serverId, request);
+      const cursor = cursors.get(serverId);
+      const value = await load();
+      if (requests.get(serverId) === request && cursors.get(serverId) === cursor && isCurrent()) apply(value);
+    },
+  };
+}
+
 /** Merge one server/page's read state without clearing unrelated cached unread IDs. */
 export function mergeRemoteUnreadIds(current: string[], reads: Record<string, { unreadCount: number }>): string[] {
   return [

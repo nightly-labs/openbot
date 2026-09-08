@@ -15,6 +15,7 @@ import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import {
   createRemoteDirectoryRefresh,
+  createRemoteReadRefresh,
   createWorkspacePreferences,
   mergeRemoteUnreadIds,
   type RemoteRecoveryStatus,
@@ -118,8 +119,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   // Keep former agent IDs too, so leaving also removes cached chats of deleted agents.
   const serverAgentIds = useRef(new Map<string, Set<string>>());
   const removedServers = useRef(new Set<string>());
-  const readRefreshSequence = useRef(0);
-  const readRequests = useRef(new Map<string, number>());
+  const readRefresh = useMemo(() => createRemoteReadRefresh(), []);
   const serverCapabilities = useRef(new Map<string, string[]>());
   const [activeServerId, setActiveServerId] = useState<string | null>(session.host?.hostId ?? null);
   const activeServerIdRef = useRef(activeServerId);
@@ -246,9 +246,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       if (!context.isCurrent()) return;
       replaceServerAgents(serverId, summaries);
       context.stage = "reads";
-      const reads = await client.request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads);
+      await readRefresh.refresh(
+        serverId,
+        () => client.request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads),
+        (reads) => setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads)),
+        () => context.isCurrent() && !removedServers.current.has(serverId),
+      );
       if (!context.isCurrent()) return;
-      setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads));
       context.stage = "conversations";
       await resyncRemoteConversations({
         agentIds: summaries.map((agent) => agent.id),
@@ -259,7 +263,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       });
       context.stage = "connection";
     },
-    [replaceServerAgents, preferenceStore],
+    [replaceServerAgents, preferenceStore, readRefresh],
   );
 
   const registerConnection = useCallback((hostId: string, handle: ServerConnectionHandle | null) => {
@@ -304,25 +308,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const refreshConversationReads = useCallback(
     async (serverId = activeServerIdRef.current) => {
       if (!serverId) return;
-      const sequence = readRefreshSequence.current;
-      const requestSequence = (readRequests.current.get(serverId) ?? 0) + 1;
-      readRequests.current.set(serverId, requestSequence);
-      const reads = await request(
-        "GET",
-        TEAM_API_ROUTES.agents.conversationReads,
-        decodeConversationReads,
-        undefined,
+      await readRefresh.refresh(
         serverId,
+        () => request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads, undefined, serverId),
+        (reads) => setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads)),
+        () => !removedServers.current.has(serverId),
       );
-      if (
-        sequence !== readRefreshSequence.current ||
-        readRequests.current.get(serverId) !== requestSequence ||
-        removedServers.current.has(serverId)
-      )
-        return;
-      setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads));
     },
-    [request],
+    [request, readRefresh],
   );
 
   const handleTeamEvent = useCallback(
@@ -386,7 +379,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       } else if (event.type === "conversation-page") {
         const readState = event.page.readState;
         if (readState) {
-          readRefreshSequence.current += 1;
+          readRefresh.invalidate(serverId);
           setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, { [event.page.agentId]: readState }));
         } else void refreshConversationReads(serverId).catch(() => undefined);
         if (conversationsRef.current[event.page.agentId])
@@ -400,7 +393,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         );
       }
     },
-    [loadConversation, replaceServerAgents, refreshConversationReads],
+    [loadConversation, replaceServerAgents, refreshConversationReads, readRefresh],
   );
 
   const markAgentRead = useCallback(
@@ -413,7 +406,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         Alert.alert("Update required", "Update this desktop server to mark conversations unread.");
         return;
       }
-      const sequence = ++readRefreshSequence.current;
+      if (!activeServerId) return;
+      const isCurrentRead = readRefresh.invalidate(activeServerId);
       const generation = loadGeneration.current;
       setUnreadAgentIds((current) =>
         visibleMessageId === null ? [...new Set([...current, agentId])] : current.filter((id) => id !== agentId),
@@ -436,7 +430,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             (value) => decodeConversationReads({ [agentId]: value }),
             visibleMessageId === null ? {} : { throughMessageId },
           );
-          if (generation === loadGeneration.current && sequence === readRefreshSequence.current) {
+          if (generation === loadGeneration.current && isCurrentRead()) {
+            readRefresh.invalidate(activeServerId);
             setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads));
           }
         })
@@ -449,7 +444,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (readWrites.current.get(agentId) === write) readWrites.current.delete(agentId);
       });
     },
-    [request, refreshConversationReads, loadConversation, activeServerId],
+    [request, refreshConversationReads, loadConversation, activeServerId, readRefresh],
   );
 
   const updatePreferences = useCallback(
@@ -493,6 +488,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (!server || server.role === "owner") throw new Error("Only joined remote servers can be left.");
         await directory.leaveHost(server.id, server.membershipId);
         removedServers.current.add(serverId);
+        readRefresh.invalidate(serverId);
         directoryGeneration.current += 1;
         directoryRefresh.invalidate();
         setServerDirectoryState("ready");
@@ -656,6 +652,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     markAgentRead,
     pinnedAgentIds,
     refreshHosts,
+    readRefresh,
     request,
     serverDirectoryError,
     serverDirectoryState,
