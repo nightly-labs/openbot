@@ -301,8 +301,11 @@ const V12_REACTIONS_TABLE_SQL = `  CREATE TABLE IF NOT EXISTS projection_reactio
     PRIMARY KEY(agent_id, message_id, actor_kind, actor_agent_id)
   );`;
 
+// IF NOT EXISTS throughout, because this text is both migration 15 and the tail of the latest
+// schema. A database built from the latest schema and then replayed forward - which is how a
+// test fakes an older version - meets its own tables.
 const ANALYTICS_SCHEMA_SQL = `
-  CREATE TABLE agent_usage_records (
+  CREATE TABLE IF NOT EXISTS agent_usage_records (
     agent_id TEXT NOT NULL,
     record_id TEXT NOT NULL,
     session_id TEXT NOT NULL,
@@ -316,14 +319,14 @@ const ANALYTICS_SCHEMA_SQL = `
     recorded_at TEXT NOT NULL,
     PRIMARY KEY(agent_id, record_id)
   );
-  CREATE INDEX agent_usage_date ON agent_usage_records(agent_id, occurred_at);
-  CREATE TABLE agent_usage_checkpoints (
+  CREATE INDEX IF NOT EXISTS agent_usage_date ON agent_usage_records(agent_id, occurred_at);
+  CREATE TABLE IF NOT EXISTS agent_usage_checkpoints (
     agent_id TEXT NOT NULL,
     counter_id TEXT NOT NULL,
     tokens_json TEXT NOT NULL CHECK(json_valid(tokens_json)),
     PRIMARY KEY(agent_id, counter_id)
   );
-  CREATE TABLE agent_usage_activity (
+  CREATE TABLE IF NOT EXISTS agent_usage_activity (
     agent_id TEXT NOT NULL,
     activity_id TEXT NOT NULL,
     session_id TEXT NOT NULL,
@@ -334,7 +337,7 @@ const ANALYTICS_SCHEMA_SQL = `
     occurred_at TEXT NOT NULL,
     PRIMARY KEY(agent_id, activity_id)
   );
-  CREATE INDEX agent_usage_activity_date ON agent_usage_activity(agent_id, occurred_at);
+  CREATE INDEX IF NOT EXISTS agent_usage_activity_date ON agent_usage_activity(agent_id, occurred_at);
 `;
 
 const LATEST_SCHEMA_SQL =
