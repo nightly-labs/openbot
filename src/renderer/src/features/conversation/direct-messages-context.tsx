@@ -121,7 +121,18 @@ const DirectMessages = createSimpleContext({
           .catch(() => undefined);
       }
       setActiveDirectMemberId(memberId);
-      setDirectConversationLoading(true);
+      await loadDirectConversation(memberId, false);
+    }
+
+    async function refreshDirectConversation(): Promise<void> {
+      const memberId = activeDirectMemberId();
+      if (!memberId || !scopeIsCurrent() || !activeServerSupportsCapability("direct-messages")) return;
+      await loadDirectConversation(memberId, true);
+    }
+
+    async function loadDirectConversation(memberId: string, retainCached: boolean): Promise<void> {
+      const hasCached = retainCached && Boolean(directConversations()[memberId]);
+      setDirectConversationLoading(!hasCached);
       setDirectConversationError(null);
       const request = ++directConversationRequest;
       try {
@@ -130,7 +141,7 @@ const DirectMessages = createSimpleContext({
           anchor: { type: "latest" },
           limit: 50,
         });
-        if (request !== directConversationRequest) return;
+        if (!scopeIsCurrent() || request !== directConversationRequest) return;
         setDirectConversations((current) => ({
           ...current,
           [memberId]: snapshot,
@@ -140,10 +151,11 @@ const DirectMessages = createSimpleContext({
           void markDirectMessagesRead(memberId, snapshot.messages.at(-1)?.sequence).catch(() => undefined);
         }
       } catch (error) {
-        if (request !== directConversationRequest) return;
-        setDirectConversationError(error instanceof Error ? error.message : "The messages could not load.");
+        if (!scopeIsCurrent() || request !== directConversationRequest) return;
+        if (!hasCached)
+          setDirectConversationError(error instanceof Error ? error.message : "The messages could not load.");
       } finally {
-        if (request === directConversationRequest) setDirectConversationLoading(false);
+        if (scopeIsCurrent() && request === directConversationRequest) setDirectConversationLoading(false);
       }
     }
 
@@ -455,6 +467,7 @@ const DirectMessages = createSimpleContext({
       directOlderErrors,
       directTypingMemberIds,
       refreshDirectThreads,
+      refreshDirectConversation,
       openDirectConversation,
       loadOlderDirectMessages,
       openDirectMessage,

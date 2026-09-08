@@ -46,8 +46,13 @@ const ServerScope = createSimpleContext({
     const { servers, activeServerId, initialServersReady, serverLoadRequest } = useServers();
     const { pendingAgentSelection, setPendingAgentSelection } = useServerSwitch();
     const { setTeamPresence } = usePresence();
-    const { activeDirectMemberId, directConversations, refreshDirectThreads, markDirectMessagesRead } =
-      useDirectMessages();
+    const {
+      activeDirectMemberId,
+      directConversations,
+      refreshDirectThreads,
+      refreshDirectConversation,
+      markDirectMessagesRead,
+    } = useDirectMessages();
     const { setModelOptions, activeAgent, setAgentStatus, applyStoredAgents } = useAgents();
     const {
       setBrowserControlState,
@@ -134,6 +139,7 @@ const ServerScope = createSimpleContext({
         })
         .catch(() => undefined);
       void refreshDirectThreads();
+      void refreshDirectConversation();
     }
 
     onSettled(() => {

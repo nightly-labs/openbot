@@ -1,6 +1,7 @@
 import type {
   ConversationPage,
   ConversationReadState,
+  DirectConversationPage,
   DirectConversationSnapshot,
   DirectThreadSummary,
 } from "@openbot/contracts/ipc";
@@ -8,12 +9,14 @@ import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-lib
 import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
+import { AppAccessGate } from "./AppView";
 import { AppProviders } from "./app-providers";
 import {
   emitAgentEvent,
   emitDirectMessage,
   emitDynamicIslandAction,
   emitPresence,
+  emitServers,
   installOpenbotStub,
   presenceMember,
   testConversationPage,
@@ -94,6 +97,82 @@ describe("OpenBot connected desktop shell", () => {
       await pending;
       flush();
       expect(screen.getByLabelText("Direct unread")).toHaveTextContent("2");
+    },
+  );
+
+  it.each(["success", "failure", "late response"])(
+    "refreshes the open direct conversation on reconnect (%s)",
+    async (outcome) => {
+      const remote = { ...testServer("remote-1", true), connectionSequence: 1 };
+      vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([remote]);
+      vi.mocked(window.openbot.servers.getPresence).mockResolvedValue({
+        serverId: remote.id,
+        updatedAt: "2026-09-08T00:00:00Z",
+        members: [
+          presenceMember("self", "person@example.com", "Person"),
+          presenceMember("alice", "alice@example.com", "Alice"),
+        ],
+      });
+      const page = (text: string, revision: number): DirectConversationPage => ({
+        threadId: "direct-1",
+        otherMemberId: "alice",
+        revision,
+        messages: [
+          {
+            id: `message-${revision}`,
+            threadId: "direct-1",
+            senderMemberId: "alice",
+            recipientMemberId: "self",
+            text,
+            sequence: revision,
+            createdAt: "2026-09-08T00:00:00Z",
+          },
+        ],
+        readState: { unreadCount: 0, firstUnreadMessageId: null, throughSequence: revision },
+        pageInfo: { hasOlder: false, olderCursor: null },
+      });
+      vi.mocked(window.openbot.servers.readDirectConversationPage).mockResolvedValueOnce(
+        page("Cached direct message", 1),
+      );
+      let loadedMessage: () => string | undefined = () => undefined;
+      function Probe() {
+        const direct = useDirectMessages();
+        loadedMessage = () => direct.directConversations().alice?.messages[0]?.text;
+        return null;
+      }
+      render(() => (
+        <AppProviders peopleEnabled>
+          <AppAccessGate />
+          <Probe />
+        </AppProviders>
+      ));
+      await fireEvent.click(await screen.findByRole("button", { name: /Alice/ }));
+      await screen.findByText("Cached direct message");
+      let resolvePage: ((value: DirectConversationPage) => void) | undefined;
+      let rejectPage: ((error: Error) => void) | undefined;
+      const pendingPage = new Promise<DirectConversationPage>((resolve, reject) => {
+        resolvePage = resolve;
+        rejectPage = reject;
+      });
+      vi.mocked(window.openbot.servers.readDirectConversationPage).mockReturnValueOnce(pendingPage);
+      emitServers?.([{ ...remote, connectionSequence: 2 }]);
+      await waitFor(() => expect(window.openbot.servers.readDirectConversationPage).toHaveBeenCalledTimes(2));
+      expect(screen.getByText("Cached direct message")).toBeInTheDocument();
+      if (outcome === "late response") {
+        vi.mocked(window.openbot.servers.readDirectConversationPage).mockResolvedValueOnce(
+          page("Missed direct message", 3),
+        );
+        emitServers?.([{ ...remote, connectionSequence: 3 }]);
+        await screen.findByText("Missed direct message");
+      }
+      if (outcome === "failure") rejectPage?.(new Error("The host is offline."));
+      else resolvePage?.(page(outcome === "late response" ? "Stale direct message" : "Missed direct message", 2));
+      await pendingPage.catch(() => undefined);
+      flush();
+      expect(loadedMessage()).toBe(outcome === "failure" ? "Cached direct message" : "Missed direct message");
+      expect(
+        await screen.findByText(outcome === "failure" ? "Cached direct message" : "Missed direct message"),
+      ).toBeInTheDocument();
     },
   );
 
