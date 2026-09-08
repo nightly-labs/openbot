@@ -466,11 +466,14 @@ the same rule the provider row and the picker already follow. A server switch re
 so the version a user closed the notification on is kept by the notification module, which outlives
 the switch: the offer is raised again on the way back only if the user never closed it.
 
-Replacing the CLI is not a start. `#activateProviderClient` skips `onProvidersReady` for it, because
+Replacing the CLI is not a start, on either path: `#activateProviderClient` swaps the client of a
+provider that has one, `#connect` connects one whose client is gone, and both skip
+`onProvidersReady` for the replacement, because
 that hook is restart recovery: it settles every unresolved delivery, and the other providers keep
 running through the replacement, so a live turn would be recorded as `interrupted` - which
 `MailboxStore.markTerminal` then refuses to correct. `onProviderResumed` schedules the deliveries
-the replacement held back.
+the replacement held back. The refusal record is written through one queue, because two providers
+can finish an update at once and the older snapshot must not be renamed over the newer one.
 
 The update replaces the binary under a running client. A provider that has an agent in a turn -
 a delivery on its way to one, which holds no turn id yet, or a context compaction, whose

@@ -77,6 +77,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * because an offer that returns on the next start is the same dead end again.
    */
   readonly #refusedUpdates = new Map<AgentProviderId, { version: string; pinnedVersion: string }>();
+  /** The queue that keeps the record's writes in the order the refusals were recorded. */
+  #refusedUpdatesWrite: Promise<void> = Promise.resolve();
   #revision = 0;
   #stopping = false;
 
@@ -185,16 +187,28 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     }
   }
 
+  /**
+   * Writes the record, one write at a time.
+   *
+   * Two providers can finish an update at once. Each write serializes the record as it stands when
+   * its turn comes and renames its own temporary file into place, so without the queue the older
+   * snapshot could be renamed last and drop the newer provider's refusal - which the user would meet
+   * as an offer that provider has already turned down.
+   */
   async #writeRefusedUpdates(): Promise<void> {
-    const path = this.#refusedUpdatesPath();
-    const temporaryPath = `${path}.${randomUUID()}.tmp`;
-    try {
-      await mkdir(this.#root, { recursive: true });
-      await writeFile(temporaryPath, `${JSON.stringify(Object.fromEntries(this.#refusedUpdates))}\n`, "utf8");
-      await rename(temporaryPath, path);
-    } catch {
-      await rm(temporaryPath, { force: true }).catch(() => undefined);
-    }
+    const write = this.#refusedUpdatesWrite.then(async () => {
+      const path = this.#refusedUpdatesPath();
+      const temporaryPath = `${path}.${randomUUID()}.tmp`;
+      try {
+        await mkdir(this.#root, { recursive: true });
+        await writeFile(temporaryPath, `${JSON.stringify(Object.fromEntries(this.#refusedUpdates))}\n`, "utf8");
+        await rename(temporaryPath, path);
+      } catch {
+        await rm(temporaryPath, { force: true }).catch(() => undefined);
+      }
+    });
+    this.#refusedUpdatesWrite = write;
+    await write;
   }
 
   #refusedUpdatesPath(): string {

@@ -684,33 +684,40 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     await waitFor(() => started.filter((agentId) => agentId === agent.id).length > turnsBefore);
   });
 
-  it("leaves another provider's running turn alone while a CLI is replaced", async () => {
-    const claude = await createUpdatableFakeClaude(root, "2.1.250");
-    process.env.OPENBOT_CLAUDE_PATH = claude.executable;
-    const { store, mailbox } = stores(root);
-    service = new AgentService(
-      store,
-      mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => new FakeAgentClient(provider, "", false),
-    );
-    const running = service;
-    const events: AgentEvent[] = [];
-    service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Keep working." });
-    await waitFor(() => events.some((event) => event.type === "turn-started"));
-    const turnId = (await running.readConversation("chief")).activeTurnId;
+  // The replacement puts the provider back on the binary now on disk in one of two ways: it swaps
+  // the client of a provider that has one, and it connects one whose client is gone. Neither is a
+  // start, so neither may run restart recovery over the other providers' live deliveries.
+  for (const claudeSignedIn of [true, false]) {
+    it(`leaves another provider's running turn alone while a CLI ${
+      claudeSignedIn ? "is replaced" : "with no client is connected again"
+    }`, async () => {
+      const claude = await createUpdatableFakeClaude(root, "2.1.250");
+      process.env.OPENBOT_CLAUDE_PATH = claude.executable;
+      const { store, mailbox } = stores(root);
+      service = new AgentService(
+        store,
+        mailbox,
+        fakeBrowser(),
+        30_000,
+        "codex",
+        (provider) => new FakeAgentClient(provider, "", false, claudeSignedIn || provider !== "claude"),
+      );
+      const running = service;
+      const events: AgentEvent[] = [];
+      service.on("event", (event) => events.push(event));
+      await service.initialize();
+      await service.sendMessage({ agentId: "chief", text: "Keep working." });
+      await waitFor(() => events.some((event) => event.type === "turn-started"));
+      const turnId = (await running.readConversation("chief")).activeTurnId;
 
-    // Claude is idle, so its CLI is replaced. Restart recovery would settle every unresolved
-    // delivery, and this one belongs to a turn Codex is still running.
-    await service.updateProviderCli("claude");
+      // Claude is idle, so its CLI is replaced. Restart recovery would settle every unresolved
+      // delivery, and this one belongs to a turn Codex is still running.
+      await service.updateProviderCli("claude");
 
-    expect(running.listQueue("chief").deliveries[0]?.status).toBe("running");
-    expect((await running.readConversation("chief")).activeTurnId).toBe(turnId);
-  });
+      expect(running.listQueue("chief").deliveries[0]?.status).toBe("running");
+      expect((await running.readConversation("chief")).activeTurnId).toBe(turnId);
+    });
+  }
 
   it("keeps the CLI's own reason when its updater refuses", async () => {
     const claude = await createUpdatableFakeClaude(root, "2.1.250", "Installed by Homebrew. Run brew upgrade.");

@@ -809,7 +809,9 @@ export class ProviderRuntime implements ProviderPort {
     if (!this.#clients.has(provider)) {
       this.#clearProviderConnectionState(provider);
       this.#cli.delete(provider);
-      await this.#connect("starting", [provider], { preserveCheckErrors: true });
+      // Connecting the replaced CLI is not a start either: the other providers are running through
+      // it, and `onProvidersReady` would settle their live deliveries. See below.
+      await this.#connect("starting", [provider], { preserveCheckErrors: true, notifyReady: false });
       return;
     }
     const cli = await requireProviderDriver(provider).resolveCli({
@@ -1009,7 +1011,7 @@ export class ProviderRuntime implements ProviderPort {
   async #connect(
     phase: "starting" | "restarting",
     requestedProviders: readonly AgentProvider[],
-    options: { preserveCheckErrors?: boolean; refreshRuntimeInBackground?: boolean } = {},
+    options: { preserveCheckErrors?: boolean; refreshRuntimeInBackground?: boolean; notifyReady?: boolean } = {},
   ): Promise<void> {
     const hadClients = this.#clients.size > 0;
     const providerStatuses: AgentProviderStatus[] = structuredClone(
@@ -1148,7 +1150,7 @@ export class ProviderRuntime implements ProviderPort {
         });
       }
       if (codexClient) void this.#refreshUsage(codexClient).catch(() => undefined);
-      await this.#hooks.onProvidersReady();
+      if (options.notifyReady !== false) await this.#hooks.onProvidersReady();
     };
     if (options.refreshRuntimeInBackground) {
       void refreshRuntime().catch((error) => this.#emitError("provider_metadata_refresh_failed", error));
