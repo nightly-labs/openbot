@@ -506,7 +506,7 @@ describe("TeamWebRtcClientTransport", () => {
     await transport.stop();
   });
 
-  it("carries group payloads and revision events outside the released base adapter", async () => {
+  it("carries channel payloads and revision events outside the released base adapter", async () => {
     const bridge = new TeamWebRtcBridge();
     vi.spyOn(bridge, "connect").mockImplementation(async ({ peerId }) => {
       queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
@@ -517,11 +517,11 @@ describe("TeamWebRtcClientTransport", () => {
     await transport.listHosts();
     transport.pinHostKey("host-1", hostKeys.publicKey);
     await transport.connect("host-1");
-    const pending = transport.request("host-1", "/v1/groups");
+    const pending = transport.request("host-1", "/v1/channels");
     await vi.waitFor(() => expect(sentRequestId(authentication.send)).toBeTruthy());
-    const groups = [
+    const channels = [
       {
-        id: "group-1",
+        id: "channel-1",
         name: "Project",
         purpose: "Research",
         members: [],
@@ -542,10 +542,10 @@ describe("TeamWebRtcClientTransport", () => {
         version: 2,
         type: "response",
         requestId: sentRequestId(authentication.send),
-        result: { status: 200, body: groups },
+        result: { status: 200, body: channels },
       }),
     );
-    expect(await pending).toEqual(groups);
+    expect(await pending).toEqual(channels);
     const event = vi.fn();
     transport.on("event", event);
     bridge.emit(
@@ -556,10 +556,10 @@ describe("TeamWebRtcClientTransport", () => {
         version: 2,
         type: "event",
         sequence: 1,
-        payload: { type: "groups-changed", groupId: "group-1", revision: 2 },
+        payload: { type: "channels-changed", channelId: "channel-1", revision: 2 },
       }),
     );
-    expect(event).toHaveBeenCalledWith("host-1", { type: "groups-changed", groupId: "group-1", revision: 2 });
+    expect(event).toHaveBeenCalledWith("host-1", { type: "channels-changed", channelId: "channel-1", revision: 2 });
     await transport.stop();
   });
 

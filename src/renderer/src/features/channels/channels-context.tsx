@@ -1,14 +1,19 @@
-import { GROUP_CHATS_CAPABILITY, type GroupCommand, type GroupPage, type GroupSummary } from "@openbot/contracts/ipc";
+import {
+  CHANNEL_CHATS_CAPABILITY,
+  type ChannelCommand,
+  type ChannelPage,
+  type ChannelSummary,
+} from "@openbot/contracts/ipc";
 import { createEffect, createStore, flush, onSettled, reconcile } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { useServers } from "../servers/servers-context";
 
-interface GroupsState {
-  groups: GroupSummary[];
+interface ChannelsState {
+  channels: ChannelSummary[];
   selectedId: string | null;
-  page: GroupPage | null;
+  page: ChannelPage | null;
   loading: boolean;
   pending: boolean;
   error: string | null;
@@ -17,8 +22,8 @@ interface GroupsState {
   collapsed: boolean;
 }
 
-const Groups = createSimpleContext({
-  name: "Groups",
+const Channels = createSimpleContext({
+  name: "Channels",
   init: () => {
     const { activeServerSupportsCapability } = useServers();
     const { setAgentSetupOpen } = useAgents();
@@ -27,8 +32,8 @@ const Groups = createSimpleContext({
       const auth = centralAuth();
       return auth.status === "signed_in" ? auth.user.id : auth.status;
     };
-    const [state, setState] = createStore<GroupsState>({
-      groups: [],
+    const [state, setState] = createStore<ChannelsState>({
+      channels: [],
       selectedId: null,
       page: null,
       loading: false,
@@ -41,28 +46,28 @@ const Groups = createSimpleContext({
     let disposed = false;
     let pendingCommands = 0;
     let refreshId = 0;
-    let failedCommand: GroupCommand | null = null;
+    let failedCommand: ChannelCommand | null = null;
     const readThrough = new Map<string, number>();
 
-    const supported = () => activeServerSupportsCapability(GROUP_CHATS_CAPABILITY);
+    const supported = () => activeServerSupportsCapability(CHANNEL_CHATS_CAPABILITY);
     async function refresh() {
       if (!supported()) return;
       const id = ++refreshId;
       const account = accountKey();
       const selected = state.selectedId;
       try {
-        const [groups, page] = await Promise.all([
-          window.openbot.agent.listGroups(),
-          selected ? window.openbot.agent.readGroup({ groupId: selected }) : Promise.resolve(null),
+        const [channels, page] = await Promise.all([
+          window.openbot.agent.listChannels(),
+          selected ? window.openbot.agent.readChannel({ channelId: selected }) : Promise.resolve(null),
         ]);
         if (disposed || account !== accountKey() || id !== refreshId || selected !== state.selectedId) return;
         setState((state) => {
-          state.groups = groups;
-          if (page && state.page?.group.id === page.group.id) {
+          state.channels = channels;
+          if (page && state.page?.channel.id === page.channel.id) {
             const older = state.page.messages.filter((item) => item.sequence < (page.messages[0]?.sequence ?? 0));
             reconcile([...older, ...page.messages], "id")(state.page.messages);
             reconcile(page.tasks, "id")(state.page.tasks);
-            Object.assign(state.page, { group: page.group, throughSequence: page.throughSequence });
+            Object.assign(state.page, { channel: page.channel, throughSequence: page.throughSequence });
             if (!older.length) state.page.olderCursor = page.olderCursor;
           } else state.page = page;
           state.loading = false;
@@ -71,9 +76,9 @@ const Groups = createSimpleContext({
         if (selected && page && document.hasFocus() && page.throughSequence > (readThrough.get(selected) ?? 0)) {
           readThrough.set(selected, page.throughSequence);
           try {
-            await window.openbot.agent.groupCommand({
+            await window.openbot.agent.channelCommand({
               type: "read",
-              groupId: selected,
+              channelId: selected,
               throughSequence: page.throughSequence,
               operationId: crypto.randomUUID(),
             });
@@ -86,17 +91,17 @@ const Groups = createSimpleContext({
         if (!disposed && account === accountKey() && id === refreshId)
           setState((state) => {
             Object.assign(state, {
-              error: error instanceof Error ? error.message : "Could not load groups.",
+              error: error instanceof Error ? error.message : "Could not load channels.",
               loading: false,
             });
           });
       }
     }
-    async function open(groupId: string) {
+    async function open(channelId: string) {
       setAgentSetupOpen(false);
       flush(() =>
         setState((state) => {
-          Object.assign(state, { selectedId: groupId, page: null, editing: null, loading: true });
+          Object.assign(state, { selectedId: channelId, page: null, editing: null, loading: true });
         }),
       );
       await refresh();
@@ -110,12 +115,12 @@ const Groups = createSimpleContext({
       } catch (error) {
         if (!disposed && account === accountKey())
           setState((state) => {
-            state.error = error instanceof Error ? error.message : "The group action failed.";
+            state.error = error instanceof Error ? error.message : "The channel action failed.";
           });
         return false;
       }
     }
-    async function command(input: GroupCommand): Promise<boolean> {
+    async function command(input: ChannelCommand): Promise<boolean> {
       const account = accountKey();
       if (state.pending && input.type !== "stop" && input.type !== "archive") return false;
       pendingCommands += 1;
@@ -130,14 +135,14 @@ const Groups = createSimpleContext({
         }),
       );
       try {
-        await window.openbot.agent.groupCommand(attempt);
+        await window.openbot.agent.channelCommand(attempt);
         if (disposed || account !== accountKey()) return false;
         failedCommand = null;
         if (input.type === "save") setAgentSetupOpen(false);
         if (input.type === "save")
           flush(() =>
             setState((state) => {
-              Object.assign(state, { selectedId: input.groupId, editing: null });
+              Object.assign(state, { selectedId: input.channelId, editing: null });
             }),
           );
         await refresh();
@@ -146,7 +151,9 @@ const Groups = createSimpleContext({
         if (!disposed && account === accountKey()) {
           failedCommand = attempt;
           setState((state) => {
-            Object.assign(state, { error: error instanceof Error ? error.message : "The group could not be updated." });
+            Object.assign(state, {
+              error: error instanceof Error ? error.message : "The channel could not be updated.",
+            });
           });
         }
         return false;
@@ -159,13 +166,13 @@ const Groups = createSimpleContext({
       }
     }
     async function loadOlder() {
-      const groupId = state.selectedId;
+      const channelId = state.selectedId;
       const beforeSequence = state.page?.olderCursor;
       const account = accountKey();
-      if (!groupId || !beforeSequence) return;
+      if (!channelId || !beforeSequence) return;
       try {
-        const older = await window.openbot.agent.readGroup({ groupId, beforeSequence });
-        if (!disposed && account === accountKey() && state.selectedId === groupId)
+        const older = await window.openbot.agent.readChannel({ channelId, beforeSequence });
+        if (!disposed && account === accountKey() && state.selectedId === channelId)
           setState((state) => {
             const page = state.page;
             if (!page || page.olderCursor !== beforeSequence) return;
@@ -174,7 +181,7 @@ const Groups = createSimpleContext({
             page.olderCursor = older.olderCursor;
           });
       } catch (error) {
-        if (!disposed && account === accountKey() && state.selectedId === groupId)
+        if (!disposed && account === accountKey() && state.selectedId === channelId)
           setState((state) => {
             state.error = error instanceof Error ? error.message : "Could not load earlier messages.";
           });
@@ -188,7 +195,7 @@ const Groups = createSimpleContext({
       flush(() =>
         setState((state) => {
           Object.assign(state, {
-            groups: [],
+            channels: [],
             selectedId: null,
             page: null,
             pending: false,
@@ -251,5 +258,5 @@ const Groups = createSimpleContext({
     };
   },
 });
-export const GroupsProvider = Groups.provider;
-export const useGroups = Groups.use;
+export const ChannelsProvider = Channels.provider;
+export const useChannels = Channels.use;

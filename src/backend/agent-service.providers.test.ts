@@ -40,7 +40,7 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentService: providers", () => {
-  it("runs a group turn in a separate session and returns to the unchanged normal conversation", async () => {
+  it("runs a channel turn in a separate session and returns to the unchanged normal conversation", async () => {
     const { store, mailbox } = stores(root);
     const client = new FakeAgentClient("codex", "CODEX_DONE");
     service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
@@ -52,10 +52,10 @@ describe.sequential("AgentService: providers", () => {
     const normalSession = store.activeProviderSession(agent.id)?.externalSessionId;
     const before = await service.readConversation(agent.id);
     const actor = { id: "human", name: "Alex" };
-    await service.groups.command(
+    await service.channels.command(
       {
         type: "save",
-        groupId: "group-1",
+        channelId: "channel-1",
         operationId: "create",
         draft: {
           name: "Project",
@@ -67,29 +67,29 @@ describe.sequential("AgentService: providers", () => {
       },
       actor,
     );
-    await service.groups.command(
+    await service.channels.command(
       {
         type: "send",
-        groupId: "group-1",
+        channelId: "channel-1",
         operationId: "send",
-        text: "Work only in this group.",
+        text: "Work only in this channel.",
         recipientAgentId: agent.id,
         replyToMessageId: null,
         attachmentDraftIds: [],
       },
       actor,
     );
-    await waitFor(() => service?.groups.store.tasks("group-1")[0]?.state === "completed");
+    await waitFor(() => service?.channels.store.tasks("channel-1")[0]?.state === "completed");
     expect(
-      service.groups.store
-        .messages("group-1")
+      service.channels.store
+        .messages("channel-1")
         .filter((item) => item.author.kind === "agent")
         .map((item) => item.message.text),
     ).toEqual(["CODEX_DONE"]);
     expect((await service.readConversation(agent.id)).messages).toEqual(before.messages);
     expect(store.activeProviderSession(agent.id)?.externalSessionId).toBe(normalSession);
     expect(store.list().find((item) => item.id === agent.id)?.threadId).toBe(agent.threadId);
-    const execution = service.groups.store.context("group-1", agent.id);
+    const execution = service.channels.store.context("channel-1", agent.id);
     expect(store.database.activeProviderSession(execution.threadId, agent.provider)?.externalSessionId).not.toBe(
       normalSession,
     );
@@ -98,16 +98,16 @@ describe.sequential("AgentService: providers", () => {
     expect(store.activeProviderSession(agent.id)?.externalSessionId).toBe(normalSession);
   });
 
-  it("keeps an agent with active group work from being deleted", async () => {
+  it("keeps an agent with active channel work from being deleted", async () => {
     const { store, mailbox } = stores(root);
     const client = new FakeAgentClient("codex", "", false);
     service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
     await service.initialize();
     await store.getOrCreate("chief");
-    await service.groups.command(
+    await service.channels.command(
       {
         type: "save",
-        groupId: "group-busy",
+        channelId: "channel-busy",
         operationId: "create-busy",
         draft: {
           name: "Project",
@@ -119,10 +119,10 @@ describe.sequential("AgentService: providers", () => {
       },
       { id: "human", name: "Alex" },
     );
-    await service.groups.command(
+    await service.channels.command(
       {
         type: "send",
-        groupId: "group-busy",
+        channelId: "channel-busy",
         operationId: "send-busy",
         text: "Continue working",
         recipientAgentId: "chief",
@@ -131,7 +131,7 @@ describe.sequential("AgentService: providers", () => {
       },
       { id: "human", name: "Alex" },
     );
-    await waitFor(() => service?.groups.store.tasks("group-busy")[0]?.state === "running");
+    await waitFor(() => service?.channels.store.tasks("channel-busy")[0]?.state === "running");
     expect(service.listQueue("chief").deliveries).toEqual([]);
     await expect(service.deleteAgent("chief")).rejects.toThrow("Stop the agent");
     expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(true);

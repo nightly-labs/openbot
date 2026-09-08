@@ -17,11 +17,11 @@ import type { SidebarPinnedItem } from "./sidebar-pins";
  * view to borrow a name.
  */
 export interface SidebarProps {
-  groups?: JSX.Element;
-  hasGroups?: boolean;
-  showingArchivedGroups?: boolean;
-  onToggleArchivedGroups?: () => void;
-  onCreateGroup?: () => void;
+  channels?: JSX.Element;
+  hasChannels?: boolean;
+  showingArchivedChannels?: boolean;
+  onToggleArchivedChannels?: () => void;
+  onCreateChannel?: () => void;
   serverName: string;
   onOpenServerSettings: (trigger: HTMLElement) => void;
   agents: AgentProfile[];

@@ -2,8 +2,13 @@ import { generateKeyPairSync, randomBytes, sign, verify } from "node:crypto";
 import { EventEmitter } from "node:events";
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import {
+  channelEvent,
+  channelRequest,
+  channelResponse,
+  isChannelRoute,
+} from "@openbot/contracts/team-protocol/channels-v1";
 import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
-import { groupEvent, groupRequest, groupResponse, isGroupRoute } from "@openbot/contracts/team-protocol/groups-v1";
 import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
@@ -247,8 +252,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         path,
         body: binary
           ? null
-          : isGroupRoute(path)
-            ? groupRequest(path, init.body)
+          : isChannelRoute(path)
+            ? channelRequest(path, init.body)
             : encodeTeamProtocolV3WebRtcHttpRequest(method, path, init.body, {
                 preserveSemanticTags: init.preserveSemanticTags,
               }),
@@ -290,8 +295,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     let body: ReturnType<typeof decodeTeamProtocolV3WebRtcHttpResponse> = null;
     if (!file) {
       try {
-        body = isGroupRoute(path)
-          ? groupResponse(path, envelope.status, envelope.body)
+        body = isChannelRoute(path)
+          ? channelResponse(path, envelope.status, envelope.body)
           : decodeTeamProtocolV3WebRtcHttpResponse(method, path, envelope.status, envelope.body);
       } catch {
         throw new TeamWebRtcRequestError(502, "protocol_error", "The host returned an invalid response body.");
@@ -719,8 +724,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         this.#failProtocol(hostId, "The host event sequence has a gap.");
         return;
       }
-      const group = frame.type === "event" ? groupEvent(frame.payload) : null;
-      const decoded = group ? { status: "known" as const, event: group } : decodeTeamProtocolV2CurrentEvent(frame);
+      const channel = frame.type === "event" ? channelEvent(frame.payload) : null;
+      const decoded = channel ? { status: "known" as const, event: channel } : decodeTeamProtocolV2CurrentEvent(frame);
       if (decoded.status === "invalid") {
         this.#failProtocol(hostId, "The host returned a malformed known event.");
         return;

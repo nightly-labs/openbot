@@ -101,6 +101,40 @@ export const CommandSearch: Story = {
   },
 };
 
+type PlayContext = Parameters<NonNullable<Story["play"]>>[0];
+
+async function openNewChannelDialog(context: PlayContext): Promise<HTMLElement> {
+  const body = within(context.canvasElement.ownerDocument.body);
+  await context.canvas.findByRole("heading", { name: "Chief" });
+  await context.userEvent.click(context.canvas.getByRole("button", { name: "New agent or channel" }));
+  await context.userEvent.click(await body.findByRole("menuitem", { name: "New channel" }));
+  return await body.findByRole("dialog", { name: "New channel" });
+}
+
+export const NewChannel: Story = {
+  render: () => <OpenBotPlayground />,
+  play: async (context) => {
+    const dialog = await openNewChannelDialog(context);
+    await expect(within(dialog).getByRole("searchbox", { name: "Search agents" })).toBeVisible();
+    await expect(within(dialog).getByRole("button", { name: "Create" })).toBeDisabled();
+  },
+};
+
+export const NewChannelWithMembers: Story = {
+  render: () => <OpenBotPlayground />,
+  play: async (context) => {
+    const dialog = await openNewChannelDialog(context);
+    const field = within(dialog);
+    const userEvent = context.userEvent;
+    await userEvent.type(field.getByRole("textbox", { name: "Channel name" }), "Project Falcon");
+    await userEvent.click(field.getByRole("checkbox", { name: /Chief/ }));
+    await userEvent.click(field.getByRole("checkbox", { name: /Research/ }));
+    await expect(field.getByRole("button", { name: "Remove Chief" })).toBeVisible();
+    await expect(field.getByRole("button", { name: "Remove Research" })).toBeVisible();
+    await expect(field.getByRole("button", { name: "Create" })).toBeEnabled();
+  },
+};
+
 export const AccountMenu: Story = {
   render: () => <SidebarStatePlayground compact={false} />,
   play: async ({ canvas, canvasElement, userEvent }) => {

@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { GROUP_ROUTES, groupEvent, groupRequest, groupResponse } from "./groups-v1";
+import { CHANNEL_ROUTES, channelEvent, channelRequest, channelResponse } from "./channels-v1";
 
 const command = {
   type: "send",
   operationId: "operation-1",
-  groupId: "group-1",
+  channelId: "channel-1",
   text: "Prepare the report",
   recipientAgentId: "agent-1",
   replyToMessageId: null,
   attachmentDraftIds: [],
 };
-const group = {
-  id: "group-1",
+const channel = {
+  id: "channel-1",
   name: "Project",
   purpose: "Ship the project",
   members: [{ agentId: "agent-1", responsibility: "Research" }],
@@ -22,18 +22,25 @@ const group = {
   createdAt: "2026-09-07T12:00:00.000Z",
 };
 
-describe("group-chats-v1 payloads", () => {
+describe("channel-chats-v1 payloads", () => {
   it("preserves the published command, list, page, and change fixtures", () => {
-    expect(groupRequest(GROUP_ROUTES.command, command)).toEqual(command);
-    expect(groupResponse(GROUP_ROUTES.list, 200, [{ ...group, unreadCount: 1, activeTasks: 0 }])).toEqual([
-      { ...group, unreadCount: 1, activeTasks: 0 },
+    expect(channelRequest(CHANNEL_ROUTES.command, command)).toEqual(command);
+    const preview = { authorName: "Researcher", text: "Choose a format", at: channel.createdAt };
+    expect(
+      channelResponse(CHANNEL_ROUTES.list, 200, [
+        { ...channel, unreadCount: 1, activeTasks: 0, lastMessage: preview },
+        { ...channel, id: "channel-2", unreadCount: 0, activeTasks: 0, lastMessage: null },
+      ]),
+    ).toEqual([
+      { ...channel, unreadCount: 1, activeTasks: 0, lastMessage: preview },
+      { ...channel, id: "channel-2", unreadCount: 0, activeTasks: 0, lastMessage: null },
     ]);
     const page = {
-      group,
+      channel,
       messages: [
         {
           id: "message-1",
-          groupId: group.id,
+          channelId: channel.id,
           sequence: 1,
           author: { kind: "agent", id: "agent-1", name: "Researcher" },
           taskId: "task-1",
@@ -43,7 +50,7 @@ describe("group-chats-v1 payloads", () => {
             turnId: "turn-1",
             author: "assistant",
             text: "Choose a format",
-            createdAt: group.createdAt,
+            createdAt: channel.createdAt,
             status: "completed",
             attachments: [
               {
@@ -69,7 +76,7 @@ describe("group-chats-v1 payloads", () => {
       tasks: [
         {
           id: "task-1",
-          groupId: group.id,
+          channelId: channel.id,
           parentTaskId: null,
           rootTaskId: "task-1",
           ownerAgentId: "agent-1",
@@ -89,39 +96,39 @@ describe("group-chats-v1 payloads", () => {
       olderCursor: null,
       throughSequence: 1,
     };
-    expect(groupResponse(GROUP_ROUTES.read, 200, page)).toEqual(page);
-    expect(groupResponse(GROUP_ROUTES.command, 200, { ...group, providerSessionId: "private" })).toEqual(group);
-    expect(groupEvent({ type: "groups-changed", groupId: "group-1", revision: 2 })).toEqual({
-      type: "groups-changed",
-      groupId: "group-1",
+    expect(channelResponse(CHANNEL_ROUTES.read, 200, page)).toEqual(page);
+    expect(channelResponse(CHANNEL_ROUTES.command, 200, { ...channel, providerSessionId: "private" })).toEqual(channel);
+    expect(channelEvent({ type: "channels-changed", channelId: "channel-1", revision: 2 })).toEqual({
+      type: "channels-changed",
+      channelId: "channel-1",
       revision: 2,
     });
   });
   it("does not accept an asserted human author from a client", () => {
-    expect(groupRequest(GROUP_ROUTES.command, { ...command, author: { id: "owner", name: "Impersonation" } })).toEqual(
-      command,
-    );
+    expect(
+      channelRequest(CHANNEL_ROUTES.command, { ...command, author: { id: "owner", name: "Impersonation" } }),
+    ).toEqual(command);
   });
   it("rejects malformed commands, memberships, pages, and known events", () => {
-    expect(() => groupRequest(GROUP_ROUTES.command, { ...command, recipientAgentId: 8 })).toThrow();
+    expect(() => channelRequest(CHANNEL_ROUTES.command, { ...command, recipientAgentId: 8 })).toThrow();
     expect(() =>
-      groupRequest(GROUP_ROUTES.command, {
+      channelRequest(CHANNEL_ROUTES.command, {
         type: "save",
-        groupId: "g",
+        channelId: "g",
         operationId: "o",
-        draft: { ...group, leadAgentId: "outsider" },
+        draft: { ...channel, leadAgentId: "outsider" },
       }),
     ).toThrow();
     expect(() =>
-      groupResponse(GROUP_ROUTES.read, 200, {
-        group,
+      channelResponse(CHANNEL_ROUTES.read, 200, {
+        channel,
         messages: [{}],
         tasks: [],
         throughSequence: 0,
         olderCursor: null,
       }),
     ).toThrow();
-    expect(() => groupEvent({ type: "groups-changed", groupId: "g", revision: -1 })).toThrow();
-    expect(groupEvent({ type: "future-optional-event" })).toBeNull();
+    expect(() => channelEvent({ type: "channels-changed", channelId: "g", revision: -1 })).toThrow();
+    expect(channelEvent({ type: "future-optional-event" })).toBeNull();
   });
 });

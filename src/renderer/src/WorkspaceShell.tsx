@@ -3,12 +3,12 @@ import { createMemo, Show } from "solid-js";
 import { WorkspaceAccountDock } from "./features/account/WorkspaceAccountDock";
 import { useAgents } from "./features/agents/agents-context";
 import { WorkspaceAgentSetup } from "./features/agents/WorkspaceAgentSetup";
+import { ChannelConversation } from "./features/channels/ChannelConversation";
+import { ChannelCreateDialog } from "./features/channels/ChannelCreateDialog";
+import { useChannels } from "./features/channels/channels-context";
 import { useDirectMessages } from "./features/conversation/direct-messages-context";
 import { WorkspaceConversation } from "./features/conversation/WorkspaceConversation";
 import { WorkspaceDirectConversation } from "./features/conversation/WorkspaceDirectConversation";
-import { GroupConversation } from "./features/groups/GroupConversation";
-import { GroupCreateDialog } from "./features/groups/GroupEditor";
-import { useGroups } from "./features/groups/groups-context";
 import { RemoteCompatibilityScreen } from "./features/remote-desktop/RemoteCompatibilityScreen";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { useServers } from "./features/servers/servers-context";
@@ -39,8 +39,8 @@ import { WorkspaceOverlays } from "./WorkspaceOverlays";
  */
 export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   const platform = usePlatform();
-  const groups = useGroups();
-  const groupOpen = () => groups.state.selectedId !== null;
+  const channels = useChannels();
+  const channelOpen = () => channels.state.selectedId !== null;
   const layout = useLayout();
   const { activeServer, activeServerSupportsCapability, retryServerConnection } = useServers();
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
@@ -82,21 +82,21 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
       </Show>
       <Show
         when={
-          !blockedRemoteServer() && activePeopleEnabled() && !agentSetupOpen() && !groupOpen() && activeDirectMember()
+          !blockedRemoteServer() && activePeopleEnabled() && !agentSetupOpen() && !channelOpen() && activeDirectMember()
         }
         keyed
       >
         {(member) => <WorkspaceDirectConversation member={member} />}
       </Show>
-      <Show when={!blockedRemoteServer() && !agentSetupOpen() && !groupOpen() && !activeDirectMember()}>
+      <Show when={!blockedRemoteServer() && !agentSetupOpen() && !channelOpen() && !activeDirectMember()}>
         <WorkspaceConversation account={props.account} />
       </Show>
-      <Show when={!blockedRemoteServer() && !agentSetupOpen() && groupOpen()}>
-        <GroupConversation />
+      <Show when={!blockedRemoteServer() && !agentSetupOpen() && channelOpen()}>
+        <ChannelConversation />
       </Show>
       <WorkspaceOverlays account={props.account} />
-      <Show when={groups.state.editing === "create"}>
-        <GroupCreateDialog />
+      <Show when={channels.state.editing === "create"}>
+        <ChannelCreateDialog />
       </Show>
     </div>
   );

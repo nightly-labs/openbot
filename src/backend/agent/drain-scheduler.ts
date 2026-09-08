@@ -1,5 +1,5 @@
 import type { AgentStore } from "../agent-store";
-import type { GroupService } from "../group-service";
+import type { ChannelService } from "../channel-service";
 import type { DeliveryContext, MailboxStore } from "../mailbox-store";
 import { decodeTurnResponse } from "../protocol";
 import type { ContextCompaction } from "./context-compaction";
@@ -30,7 +30,7 @@ export interface DrainSchedulerOptions {
   routines: RoutineScheduler;
   threads: ThreadLifecycle;
   hooks: DrainHooks;
-  groups?: GroupService;
+  channels?: ChannelService;
 }
 
 /**
@@ -55,7 +55,7 @@ export class DrainScheduler {
   readonly #routines: RoutineScheduler;
   readonly #threads: ThreadLifecycle;
   readonly #hooks: DrainHooks;
-  readonly #groups: GroupService | undefined;
+  readonly #channels: ChannelService | undefined;
   readonly #drainingAgents = new Set<string>();
   readonly #scheduledDrains = new Set<string>();
   readonly #drainTasks = new Map<string, Promise<void>>();
@@ -72,13 +72,13 @@ export class DrainScheduler {
     this.#routines = options.routines;
     this.#threads = options.threads;
     this.#hooks = options.hooks;
-    this.#groups = options.groups;
+    this.#channels = options.channels;
   }
 
   mayDrain(agentId: string): boolean {
     return (
       !this.#conversation.workingSnapshot(agentId)?.activeTurnId &&
-      (this.#groups?.mayDrain(agentId) ?? true) &&
+      (this.#channels?.mayDrain(agentId) ?? true) &&
       this.#profileSave.mayDrain(agentId) &&
       this.#duplication.mayDrain(agentId) &&
       this.#compaction.mayDrain(agentId) &&
@@ -140,9 +140,9 @@ export class DrainScheduler {
       const context = this.#mailbox.nextQueued(agentId);
       if (!context) return;
       const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-      const assignment = this.#groups?.store.assignmentForDelivery(context.delivery.id);
+      const assignment = this.#channels?.store.assignmentForDelivery(context.delivery.id);
       const publicThreadId = assignment
-        ? this.#groups?.store.context(assignment.groupId, assignment.agentId).threadId
+        ? this.#channels?.store.context(assignment.channelId, assignment.agentId).threadId
         : agent?.threadId;
       const session =
         agent && publicThreadId ? this.#store.database.activeProviderSession(publicThreadId, agent.provider) : null;
@@ -168,7 +168,7 @@ export class DrainScheduler {
       this.#threads.applyPendingRuntimeRefresh(agent);
       await this.#providers.ensureProvider(providerForAgent(agent));
       const client = this.#providers.requireReadyClient(providerForAgent(agent));
-      const execution = await this.#groups?.prepare(context);
+      const execution = await this.#channels?.prepare(context);
       let threadId = await this.#threads.ensureThread(agent, client, execution?.threadId);
       const snapshot = this.#conversation.ensureSnapshot(agent.id, threadId);
       if (snapshot.activeTurnId) {
@@ -312,7 +312,7 @@ export class DrainScheduler {
       }
       await this.#mailbox.markRunning(delivery.id, response.turn.id);
       confirmedTurnId = response.turn.id;
-      this.#groups?.accepted(delivery.id, threadId, response.turn.id);
+      this.#channels?.accepted(delivery.id, threadId, response.turn.id);
       const currentDelivery = this.#mailbox.getDelivery(delivery.id)?.delivery;
       if (currentDelivery?.status === "running" && currentDelivery.turnId === response.turn.id) {
         snapshot.activeTurnId = response.turn.id;
@@ -331,7 +331,7 @@ export class DrainScheduler {
         return;
       }
       if (isRequestTimeout(error, "turn/start")) {
-        this.#groups?.deliveryUncertain(delivery.id);
+        this.#channels?.deliveryUncertain(delivery.id);
         this.#hooks.emitError(
           "delivery_start_unconfirmed",
           "Codex did not confirm the turn start in time. OpenBot will wait for lifecycle events instead of retrying potentially duplicated work.",
@@ -341,7 +341,7 @@ export class DrainScheduler {
       }
       await this.#mailbox.markTerminal(delivery.id, "failed", error instanceof Error ? error.message : String(error));
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-      this.#groups?.deliveryFailed(delivery.id, "The provider could not start this assignment. Resume to try again.");
+      this.#channels?.deliveryFailed(delivery.id, "The provider could not start this assignment. Resume to try again.");
       this.#hooks.emitError("delivery_start_failed", error, delivery.recipientAgentId);
       this.scheduleDrain(delivery.recipientAgentId);
     }

@@ -23,10 +23,10 @@ afterEach(async () => {
 });
 
 describe("OpenBotDatabase", () => {
-  it("rolls back a failed group migration and preserves agent history on retry", async () => {
+  it("rolls back a failed channel migration and preserves agent history on retry", async () => {
     const database = await createDatabase();
     const agent = testAgent();
-    database.replaceAgents("seed-group-upgrade", [agent], "agents.updated");
+    database.replaceAgents("seed-channel-upgrade", [agent], "agents.updated");
     const original = {
       agentId: agent.id,
       threadId: agent.threadId,
@@ -47,15 +47,15 @@ describe("OpenBotDatabase", () => {
     const root = database.userDataPath;
     database.close();
     const legacy = new DatabaseSync(path);
-    removeGroupSchemaForLegacyFixture(legacy);
-    legacy.exec("CREATE TABLE projection_group_tasks (conflict TEXT)");
+    removeChannelSchemaForLegacyFixture(legacy);
+    legacy.exec("CREATE TABLE projection_channel_tasks (conflict TEXT)");
     legacy.close();
     const failed = new OpenBotDatabase(root);
     await expect(failed.initialize()).rejects.toThrow("migration to version 15 failed");
     const check = new DatabaseSync(path);
-    expect(check.prepare("SELECT name FROM sqlite_master WHERE name = 'projection_groups'").get()).toBeUndefined();
+    expect(check.prepare("SELECT name FROM sqlite_master WHERE name = 'projection_channels'").get()).toBeUndefined();
     expect(check.prepare("SELECT version FROM schema_migrations WHERE version = 15").get()).toBeUndefined();
-    check.exec("DROP TABLE projection_group_tasks");
+    check.exec("DROP TABLE projection_channel_tasks");
     check.close();
     const retried = new OpenBotDatabase(root);
     await retried.initialize();
@@ -790,7 +790,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeGroupSchemaForLegacyFixture(legacy);
+    removeChannelSchemaForLegacyFixture(legacy);
     legacy.exec("PRAGMA journal_mode = WAL");
     legacy.prepare("DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14)").run();
     legacy
@@ -863,7 +863,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeGroupSchemaForLegacyFixture(legacy);
+    removeChannelSchemaForLegacyFixture(legacy);
     legacy.exec(`
       DROP TABLE projection_routine_runs;
       DROP TABLE projection_routine_triggers;
@@ -914,7 +914,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeGroupSchemaForLegacyFixture(legacy);
+    removeChannelSchemaForLegacyFixture(legacy);
     downgradeReactionsToV7(legacy);
     legacy.close();
 
@@ -947,7 +947,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeGroupSchemaForLegacyFixture(legacy);
+    removeChannelSchemaForLegacyFixture(legacy);
     downgradeReactionsToV7(legacy);
     legacy.exec("CREATE TABLE projection_reactions_v8 (blocker TEXT)");
     legacy.close();
@@ -997,7 +997,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeGroupSchemaForLegacyFixture(legacy);
+    removeChannelSchemaForLegacyFixture(legacy);
     legacy.prepare("DELETE FROM schema_migrations WHERE version >= 10").run();
     legacy.close();
 
@@ -1028,7 +1028,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeGroupSchemaForLegacyFixture(legacy);
+    removeChannelSchemaForLegacyFixture(legacy);
     legacy.prepare("DELETE FROM schema_migrations WHERE version >= 11").run();
     legacy.close();
 
@@ -1062,7 +1062,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeGroupSchemaForLegacyFixture(legacy);
+    removeChannelSchemaForLegacyFixture(legacy);
     legacy.exec(`
       DELETE FROM schema_migrations WHERE version >= 11;
       CREATE TRIGGER reject_session_refresh
@@ -1102,7 +1102,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeGroupSchemaForLegacyFixture(legacy);
+    removeChannelSchemaForLegacyFixture(legacy);
     downgradeToV11(legacy);
     legacy.exec(`
       INSERT INTO projection_reactions (
@@ -1134,7 +1134,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeGroupSchemaForLegacyFixture(legacy);
+    removeChannelSchemaForLegacyFixture(legacy);
     downgradeToV11(legacy);
     legacy.exec(`
       INSERT INTO projection_reactions (
@@ -1189,7 +1189,7 @@ describe("OpenBotDatabase", () => {
     const legacyWorkspace = `/Users/dev/OpenBot/Agents/${legacyId}`;
     const workspace = `/Users/dev/OpenBot/Agents/${agentId}`;
     const legacy = new DatabaseSync(database.path);
-    removeGroupSchemaForLegacyFixture(legacy);
+    removeChannelSchemaForLegacyFixture(legacy);
     downgradeToV11(legacy);
     seedLegacyAgent(legacy, legacyId, legacyWorkspace);
     legacy.close();
@@ -1289,7 +1289,7 @@ describe("OpenBotDatabase", () => {
 
     const legacyId = "bot-6d3e8b17-9c04-4f21-8a55-1b2c3d4e5f60";
     const legacy = new DatabaseSync(database.path);
-    removeGroupSchemaForLegacyFixture(legacy);
+    removeChannelSchemaForLegacyFixture(legacy);
     downgradeToV11(legacy);
     seedLegacyAgent(legacy, legacyId, `/Users/dev/OpenBot/Bots/${legacyId}`);
     // This migration rewrites every text column in the database with foreign keys switched off, which is
@@ -1333,7 +1333,7 @@ describe("OpenBotDatabase", () => {
     // one onto the other is a primary-key collision the substitution resolves by dropping a row -- so an
     // agent nobody touched disappears on upgrade.
     const legacy = new DatabaseSync(database.path);
-    removeGroupSchemaForLegacyFixture(legacy);
+    removeChannelSchemaForLegacyFixture(legacy);
     downgradeToV11(legacy);
     seedLegacyAgent(legacy, "bot-research", "/Users/dev/OpenBot/Agents/bot-research");
     seedLegacyAgent(legacy, "agent-research", "/Users/dev/OpenBot/Agents/agent-research");
@@ -1419,7 +1419,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeGroupSchemaForLegacyFixture(legacy);
+    removeChannelSchemaForLegacyFixture(legacy);
     legacy.exec(`
       PRAGMA foreign_keys = OFF;
       CREATE TABLE projection_provider_sessions_v6 (
@@ -1736,8 +1736,8 @@ function conversationSnapshot(agent: AgentSummary, text: string): ConversationSn
 }
 
 // These tests construct released schemas by stripping newer additions from a fresh fixture.
-function removeGroupSchemaForLegacyFixture(db: DatabaseSync): void {
+function removeChannelSchemaForLegacyFixture(db: DatabaseSync): void {
   for (const table of ["assignments", "tasks", "messages", "summaries", "reads", "contexts"])
-    db.exec(`DROP TABLE projection_group_${table}`);
-  db.exec("DROP TABLE projection_groups; DELETE FROM schema_migrations WHERE version = 15");
+    db.exec(`DROP TABLE projection_channel_${table}`);
+  db.exec("DROP TABLE projection_channels; DELETE FROM schema_migrations WHERE version = 15");
 }

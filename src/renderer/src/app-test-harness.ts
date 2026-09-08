@@ -19,7 +19,7 @@ import type {
 import { screen } from "@solidjs/testing-library";
 import { vi } from "vitest";
 import { type AnalyticsEventName, type DesktopAnalyticsEvents, desktopAnalytics } from "./analytics";
-import { createMockGroups } from "./preview/mock-groups";
+import { createMockChannels } from "./preview/mock-channels";
 
 /** Shared by every harness helper, so `expect(trackAnalytics)` works without re-importing the spy. */
 export const trackAnalytics =
@@ -491,7 +491,9 @@ export function installOpenbotStub(): void {
         onEvent: vi.fn(authBridge.subscribe),
       },
       agent: {
-        ...createMockGroups((groupId, revision) => emitAgentEvent?.({ type: "groups-changed", groupId, revision })),
+        ...createMockChannels((channelId, revision) =>
+          emitAgentEvent?.({ type: "channels-changed", channelId, revision }),
+        ),
         getStatus: vi.fn().mockResolvedValue({
           phase: "ready",
           cliVersion: "0.144.1",

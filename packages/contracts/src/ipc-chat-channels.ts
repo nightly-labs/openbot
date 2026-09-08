@@ -3,35 +3,35 @@ import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { type ConversationMessage, isConversationMessage } from "./ipc-conversation-messages";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
-export const GROUP_CHATS_CAPABILITY = "group-chats-v1";
-export const GROUP_PARALLEL_LIMIT = 2;
-export const GROUP_ASSIGNMENT_LIMIT = 8;
+export const CHANNEL_CHATS_CAPABILITY = "channel-chats-v1";
+export const CHANNEL_PARALLEL_LIMIT = 2;
+export const CHANNEL_ASSIGNMENT_LIMIT = 8;
 
-export interface GroupMember {
+export interface ChannelMember {
   agentId: string;
   responsibility: string;
 }
 
-export interface GroupDraft {
+export interface ChannelDraft {
   name: string;
   purpose: string;
-  members: GroupMember[];
+  members: ChannelMember[];
   leadAgentId: string | null;
   linkedThreadIds: string[];
 }
 
-export interface Group extends GroupDraft {
+export interface Channel extends ChannelDraft {
   id: string;
   archived: boolean;
   revision: number;
   createdAt: string;
 }
 
-export type GroupTaskState = "queued" | "running" | "waiting" | "paused" | "completed" | "failed" | "cancelled";
+export type ChannelTaskState = "queued" | "running" | "waiting" | "paused" | "completed" | "failed" | "cancelled";
 
-export interface GroupTask {
+export interface ChannelTask {
   id: string;
-  groupId: string;
+  channelId: string;
   parentTaskId: string | null;
   rootTaskId: string;
   ownerAgentId: string | null;
@@ -42,15 +42,15 @@ export interface GroupTask {
   sourceMessageIds: string[];
   dependencies: string[];
   resources: string[];
-  state: GroupTaskState;
+  state: ChannelTaskState;
   revision: number;
   assignmentCount: number;
   error: string | null;
 }
 
-export interface GroupMessage {
+export interface ChannelMessage {
   id: string;
-  groupId: string;
+  channelId: string;
   sequence: number;
   author: { kind: "member" | "agent" | "coordinator"; id: string; name: string };
   taskId: string | null;
@@ -58,27 +58,37 @@ export interface GroupMessage {
   message: ConversationMessage;
 }
 
-export interface GroupSummary extends Group {
-  unreadCount: number;
-  activeTasks: number;
+/** One ellipsised sidebar line: enough to preview a channel, never a whole message body. */
+export interface ChannelPreview {
+  authorName: string;
+  text: string;
+  at: string;
 }
 
-export interface GroupPage {
-  group: Group;
-  messages: GroupMessage[];
-  tasks: GroupTask[];
+export const CHANNEL_PREVIEW_LIMIT = 160;
+
+export interface ChannelSummary extends Channel {
+  unreadCount: number;
+  activeTasks: number;
+  lastMessage: ChannelPreview | null;
+}
+
+export interface ChannelPage {
+  channel: Channel;
+  messages: ChannelMessage[];
+  tasks: ChannelTask[];
   olderCursor: number | null;
   throughSequence: number;
 }
 
-export type GroupCommand =
-  | { type: "save"; operationId: string; groupId: string; draft: GroupDraft }
-  | { type: "restore"; operationId: string; groupId: string }
-  | { type: "archive"; operationId: string; groupId: string }
+export type ChannelCommand =
+  | { type: "save"; operationId: string; channelId: string; draft: ChannelDraft }
+  | { type: "restore"; operationId: string; channelId: string }
+  | { type: "archive"; operationId: string; channelId: string }
   | {
       type: "send";
       operationId: string;
-      groupId: string;
+      channelId: string;
       text: string;
       recipientAgentId: string | null;
       replyToMessageId: string | null;
@@ -87,18 +97,18 @@ export type GroupCommand =
   | {
       type: "stop" | "resume" | "reassign";
       operationId: string;
-      groupId: string;
+      channelId: string;
       taskId: string;
       recipientAgentId: string | null;
     }
-  | { type: "read"; operationId: string; groupId: string; throughSequence: number };
+  | { type: "read"; operationId: string; channelId: string; throughSequence: number };
 
-export interface GroupReadInput {
-  groupId: string;
+export interface ChannelReadInput {
+  channelId: string;
   beforeSequence?: number;
 }
 
-export function isGroupDraft(value: unknown): value is GroupDraft {
+export function isChannelDraft(value: unknown): value is ChannelDraft {
   return (
     isDynamicRecord(value) &&
     isBoundedString(value.name, INPUT_LIMITS.agentName) &&
@@ -106,7 +116,7 @@ export function isGroupDraft(value: unknown): value is GroupDraft {
     isBoundedString(value.purpose, INPUT_LIMITS.agentDescription) &&
     Array.isArray(value.members) &&
     value.members.length <= INPUT_LIMITS.agents &&
-    value.members.every(isGroupMember) &&
+    value.members.every(isChannelMember) &&
     new Set(value.members.map((member) => member.agentId)).size === value.members.length &&
     (value.leadAgentId === null ||
       (isIdentifier(value.leadAgentId) && value.members.some((member) => member.agentId === value.leadAgentId))) &&
@@ -114,7 +124,7 @@ export function isGroupDraft(value: unknown): value is GroupDraft {
   );
 }
 
-function isGroupMember(value: unknown): value is GroupMember {
+function isChannelMember(value: unknown): value is ChannelMember {
   return (
     isDynamicRecord(value) &&
     isIdentifier(value.agentId) &&
@@ -135,10 +145,10 @@ function sequence(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
-export function isGroup(value: unknown): value is Group {
+export function isChannel(value: unknown): value is Channel {
   return (
     isDynamicRecord(value) &&
-    isGroupDraft(value) &&
+    isChannelDraft(value) &&
     isIdentifier(value.id) &&
     typeof value.archived === "boolean" &&
     sequence(value.revision) &&
@@ -146,11 +156,11 @@ export function isGroup(value: unknown): value is Group {
   );
 }
 
-export function isGroupTask(value: unknown): value is GroupTask {
+export function isChannelTask(value: unknown): value is ChannelTask {
   return (
     isDynamicRecord(value) &&
     isIdentifier(value.id) &&
-    isIdentifier(value.groupId) &&
+    isIdentifier(value.channelId) &&
     isIdentifier(value.rootTaskId) &&
     (value.parentTaskId === null || isIdentifier(value.parentTaskId)) &&
     (value.ownerAgentId === null || isIdentifier(value.ownerAgentId)) &&
@@ -170,11 +180,11 @@ export function isGroupTask(value: unknown): value is GroupTask {
   );
 }
 
-export function isGroupMessage(value: unknown): value is GroupMessage {
+export function isChannelMessage(value: unknown): value is ChannelMessage {
   return (
     isDynamicRecord(value) &&
     isIdentifier(value.id) &&
-    isIdentifier(value.groupId) &&
+    isIdentifier(value.channelId) &&
     sequence(value.sequence) &&
     isDynamicRecord(value.author) &&
     isOneOf(["member", "agent", "coordinator"] as const, value.author.kind) &&
@@ -186,26 +196,26 @@ export function isGroupMessage(value: unknown): value is GroupMessage {
   );
 }
 
-export function decodeGroup(value: unknown): Group {
-  if (!isGroup(value)) throw new Error("Invalid group response.");
+export function decodeChannel(value: unknown): Channel {
+  if (!isChannel(value)) throw new Error("Invalid channel response.");
   return value;
 }
 
-export function decodeGroupPage(value: unknown): GroupPage {
+export function decodeChannelPage(value: unknown): ChannelPage {
   if (
     !isDynamicRecord(value) ||
-    !isGroup(value.group) ||
+    !isChannel(value.channel) ||
     !Array.isArray(value.messages) ||
-    !value.messages.every(isGroupMessage) ||
+    !value.messages.every(isChannelMessage) ||
     !Array.isArray(value.tasks) ||
-    !value.tasks.every(isGroupTask) ||
+    !value.tasks.every(isChannelTask) ||
     !(value.olderCursor === null || sequence(value.olderCursor)) ||
     !sequence(value.throughSequence)
   ) {
-    throw new Error("Invalid group conversation response.");
+    throw new Error("Invalid channel conversation response.");
   }
   return {
-    group: value.group,
+    channel: value.channel,
     messages: value.messages,
     tasks: value.tasks,
     olderCursor: value.olderCursor,
@@ -213,31 +223,46 @@ export function decodeGroupPage(value: unknown): GroupPage {
   };
 }
 
-export function decodeGroupSummaries(value: unknown): GroupSummary[] {
-  if (!Array.isArray(value) || !value.every(isGroupSummary)) throw new Error("Invalid group list response.");
+export function decodeChannelSummaries(value: unknown): ChannelSummary[] {
+  if (!Array.isArray(value) || !value.every(isChannelSummary)) throw new Error("Invalid channel list response.");
   return value;
 }
 
-function isGroupSummary(value: unknown): value is GroupSummary {
-  return isDynamicRecord(value) && isGroup(value) && sequence(value.unreadCount) && sequence(value.activeTasks);
+function isChannelSummary(value: unknown): value is ChannelSummary {
+  return (
+    isDynamicRecord(value) &&
+    isChannel(value) &&
+    sequence(value.unreadCount) &&
+    sequence(value.activeTasks) &&
+    (value.lastMessage === null || isChannelPreview(value.lastMessage))
+  );
 }
 
-export function parseGroupRead(value: unknown): GroupReadInput {
+function isChannelPreview(value: unknown): value is ChannelPreview {
+  return (
+    isDynamicRecord(value) &&
+    isBoundedString(value.authorName, INPUT_LIMITS.agentName) &&
+    isBoundedString(value.text, CHANNEL_PREVIEW_LIMIT) &&
+    isBoundedString(value.at, 80)
+  );
+}
+
+export function parseChannelRead(value: unknown): ChannelReadInput {
   if (
     !isDynamicRecord(value) ||
-    !isIdentifier(value.groupId) ||
+    !isIdentifier(value.channelId) ||
     !(value.beforeSequence === undefined || sequence(value.beforeSequence))
   ) {
-    throw new Error("Provide a valid group and message cursor.");
+    throw new Error("Provide a valid channel and message cursor.");
   }
-  return { groupId: value.groupId, beforeSequence: value.beforeSequence };
+  return { channelId: value.channelId, beforeSequence: value.beforeSequence };
 }
 
-export function parseGroupCommand(value: unknown): GroupCommand {
-  if (!isDynamicRecord(value) || !isIdentifier(value.operationId) || !isIdentifier(value.groupId))
-    throw new Error("Provide a valid group command.");
-  const common = { operationId: value.operationId, groupId: value.groupId };
-  if (value.type === "save" && isGroupDraft(value.draft)) return { ...common, type: value.type, draft: value.draft };
+export function parseChannelCommand(value: unknown): ChannelCommand {
+  if (!isDynamicRecord(value) || !isIdentifier(value.operationId) || !isIdentifier(value.channelId))
+    throw new Error("Provide a valid channel command.");
+  const common = { operationId: value.operationId, channelId: value.channelId };
+  if (value.type === "save" && isChannelDraft(value.draft)) return { ...common, type: value.type, draft: value.draft };
   if (value.type === "archive" || value.type === "restore") return { ...common, type: value.type };
   if (value.type === "read" && sequence(value.throughSequence))
     return { ...common, type: value.type, throughSequence: value.throughSequence };
@@ -265,5 +290,5 @@ export function parseGroupCommand(value: unknown): GroupCommand {
       attachmentDraftIds: value.attachmentDraftIds,
     };
   }
-  throw new Error("Provide a valid group command.");
+  throw new Error("Provide a valid channel command.");
 }

@@ -8,11 +8,11 @@ import { queueAfterTurnCompleted } from "../../queue-reconciliation";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useBrowserTabs } from "../browser/browser-context";
+import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
 import { agentConversationKey, promptRequestKey } from "../conversation/conversation-keys";
 import { latestIncomingConversationMessage } from "../conversation/conversation-read-state";
 import { reconcileQueuesWithRuntimeWork } from "../dynamic-island/dynamic-island-coordinator";
-import { useGroups } from "../groups/groups-context";
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { cleanAgentMessageText } from "./agent-message-text";
@@ -37,7 +37,7 @@ import { useAgents } from "./agents-context";
  * Conversation invalidations also cover read cursors changed on another device.
  */
 export function AgentEventBridge() {
-  const groups = useGroups();
+  const channels = useChannels();
   const platform = usePlatform();
   const { activeServerId } = useServers();
   const { invalidateAccountUsage } = useAuth();
@@ -228,7 +228,7 @@ export function AgentEventBridge() {
         }));
         return;
       case "runtime-snapshot":
-        void groups.refresh();
+        void channels.refresh();
         applyAgentRuntimeSnapshot(event.snapshot);
         return;
       case "browser-takeover-requested":
@@ -267,8 +267,8 @@ export function AgentEventBridge() {
 
   onSettled(() => {
     const unsubscribe = window.openbot.agent.onEvent((event) => {
-      if (event.type === "groups-changed") {
-        void groups.refresh();
+      if (event.type === "channels-changed") {
+        void channels.refresh();
         return;
       }
       flush(() => handleAgentEvent(event));

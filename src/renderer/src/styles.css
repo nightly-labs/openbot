@@ -17,7 +17,7 @@
 @import "./features/account/account-update-island.css";
 @import "./features/servers/join-server-dialog.css";
 @import "./features/conversation/conversation.css";
-@import "./features/groups/groups.css";
+@import "./features/channels/channels.css";
 @import "./features/settings/settings-modal.css";
 @import "./features/settings/settings-mobile-connect.css";
 @import "./features/settings/settings-hosted-sites.css";
@@ -64,6 +64,11 @@
   --page-exit-enabled: 1;
   --page-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --page-fade-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --resize-dur: 300ms;
+  --resize-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --acc-expand: 250ms;
+  --acc-collapse: 250ms;
+  --acc-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --shake-distance: 6px;
   --shake-overshoot: 4px;
   --shake-dur-a: 80ms;

@@ -43,7 +43,7 @@ export function SidebarTopbar() {
         <DropdownMenu.Root placement="bottom-end" gutter={4}>
           <DropdownMenu.Trigger
             class="sidebar-icon-button sidebar-new-button no-drag"
-            aria-label="New agent or group"
+            aria-label="New agent or channel"
             aria-hidden={props.compact ? "true" : undefined}
             tabindex={props.compact ? -1 : 0}
           >
@@ -55,10 +55,10 @@ export function SidebarTopbar() {
                 <Bot aria-hidden="true" />
                 New agent
               </DropdownMenu.Item>
-              <Show when={props.onCreateGroup}>
-                <DropdownMenu.Item onSelect={() => props.onCreateGroup?.()}>
+              <Show when={props.onCreateChannel}>
+                <DropdownMenu.Item onSelect={() => props.onCreateChannel?.()}>
                   <Hash aria-hidden="true" />
-                  New group
+                  New channel
                 </DropdownMenu.Item>
               </Show>
             </DropdownMenu.Content>

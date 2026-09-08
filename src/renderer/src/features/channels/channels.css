@@ -1,0 +1,366 @@
+.channel-navigation {
+  display: flex;
+  flex-direction: column;
+  padding: var(--openbot-space-2);
+  gap: var(--openbot-space-1);
+}
+.channel-dialog-header,
+.channel-editor-footer,
+.channel-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+}
+.channel-member-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--openbot-space-1);
+}
+.channel-member-copy > span,
+.channel-empty-copy,
+.channel-editor-footer > span {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+.channel-avatar {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: var(--openbot-space-8);
+  height: var(--openbot-space-8);
+  color: var(--openbot-text-muted);
+}
+.channel-avatar .agent-avatar {
+  width: var(--openbot-space-8);
+  height: var(--openbot-space-8);
+  flex-shrink: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface);
+}
+.channel-avatar .agent-avatar + .agent-avatar {
+  margin-left: calc(-1 * var(--openbot-space-4));
+}
+.channel-actions,
+.channel-confirm,
+.channel-task-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-2);
+}
+.channel-confirm {
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+}
+.channel-title {
+  height: auto;
+  text-align: left;
+  justify-content: flex-start;
+}
+.channel-title h1,
+.channel-panel-header h2,
+.channel-dialog-header h2 {
+  margin: 0;
+  font-size: var(--openbot-text-xl);
+  line-height: var(--openbot-leading-xl);
+  font-weight: var(--openbot-weight-semibold);
+}
+.channel-empty {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+}
+.channel-empty h2 {
+  font-size: var(--openbot-text-2xl);
+  color: var(--openbot-text-primary);
+  margin: var(--openbot-space-2) 0 0;
+}
+.channel-empty p {
+  margin: 0;
+}
+/* Same overlay the agent chat uses for its settings panel, entrance animation included. */
+.channel-panel {
+  animation: settings-panel-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  position: absolute;
+  z-index: 15;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  width: var(--settings-panel-width, 296px);
+  flex-direction: column;
+  padding: var(--openbot-space-4);
+  border-left: 1px solid var(--openbot-border);
+  background: var(--openbot-bg-canvas);
+  overflow: auto;
+  gap: var(--openbot-space-4);
+}
+/* The panel sits above the chat, so give the chat back the width the panel covers. */
+.conversation-panel:has(.channel-panel) .conversation-header,
+.conversation-panel:has(.channel-panel) .conversation-scroll,
+.conversation-panel:has(.channel-panel) .composer-wrap {
+  width: calc(100% - var(--settings-panel-width, 296px));
+}
+.channel-task p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.channel-member-row {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+.channel-member-copy strong {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+.channel-task {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-3);
+  margin-bottom: var(--openbot-space-2);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+}
+.channel-tasks {
+  min-width: 0;
+}
+.channel-editor,
+.channel-create-form,
+.channel-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-3);
+}
+.channel-field {
+  gap: var(--openbot-space-2);
+}
+.channel-picker,
+.channel-links {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.channel-picker legend,
+.channel-links legend {
+  margin-bottom: var(--openbot-space-2);
+}
+.channel-picker-list {
+  margin-top: var(--openbot-space-2);
+  max-height: calc(var(--openbot-space-8) * 7);
+  overflow: auto;
+}
+.channel-picker-entry {
+  padding: var(--openbot-space-2) 0;
+}
+.channel-member-row {
+  cursor: pointer;
+}
+.channel-member-options {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--openbot-space-1);
+  margin-top: var(--openbot-space-2);
+}
+.channel-links .channel-member-row {
+  padding: var(--openbot-space-2) 0;
+}
+.channel-editor-footer {
+  padding-top: var(--openbot-space-3);
+  border-top: 1px solid var(--openbot-border);
+}
+.channel-search-icon {
+  width: var(--openbot-space-4);
+  height: var(--openbot-space-4);
+  color: var(--openbot-text-muted);
+  flex-shrink: 0;
+}
+.channel-picker-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-6) var(--openbot-space-3);
+  text-align: center;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+.channel-picker-empty > svg {
+  width: var(--openbot-space-6);
+  height: var(--openbot-space-6);
+  margin-bottom: var(--openbot-space-1);
+}
+.channel-picker-empty p {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+}
+
+.channel-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--openbot-layer-dialog);
+  display: grid;
+  place-items: center;
+  padding: var(--openbot-space-6);
+}
+.channel-create-dialog {
+  /* One inset for the header, the fields, every row and the footer. */
+  --channel-dialog-inset: var(--openbot-space-4);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(440px, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow: hidden;
+  outline: 0;
+  background: var(--openbot-bg-surface);
+}
+.channel-create-dialog .channel-dialog-header {
+  padding: var(--channel-dialog-inset);
+}
+.channel-create-dialog .channel-dialog-header .ui-button svg {
+  width: var(--openbot-space-4);
+  height: var(--openbot-space-4);
+}
+.channel-create-form {
+  min-height: 0;
+  gap: var(--openbot-space-4);
+}
+.channel-create-form > .ui-field,
+.channel-create-form > .ui-alert {
+  margin-inline: var(--channel-dialog-inset);
+}
+.channel-create-form .channel-picker {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* No gap: the chips row collapses to zero height, and a gap would leave a strip behind it. */
+  gap: 0;
+}
+.channel-create-form .channel-picker legend {
+  margin-inline: var(--channel-dialog-inset);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-sm);
+}
+/*
+ * The shared `.search-field` row from `app-shell.css`, which the sidebar search also uses: it
+ * carries the borderless input and the calm focus treatment (a dim border, and the focus ring only
+ * for keyboard focus). Only the size is local, to match the name field above it.
+ */
+.channel-create-form .channel-member-search {
+  height: var(--openbot-control-lg);
+  margin-inline: var(--channel-dialog-inset);
+  padding-inline: var(--openbot-space-3);
+  gap: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-md);
+}
+.channel-create-form .channel-member-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.channel-create-form .channel-picker-list {
+  min-height: 0;
+  max-height: calc(var(--openbot-space-8) * 7);
+  margin-top: var(--openbot-space-2);
+  padding: 0;
+}
+.channel-create-form .channel-picker-body {
+  display: flex;
+  flex-direction: column;
+}
+/* Rows run edge to edge: the selected and hover surfaces read as one list, not as cards. */
+.channel-create-form .channel-picker-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-2) var(--channel-dialog-inset);
+  border-radius: 0;
+  transition: background-color var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .channel-create-form .channel-picker-entry {
+    transition: none;
+  }
+}
+.channel-create-form .channel-picker-entry:hover {
+  background: var(--openbot-bg-control-hover);
+}
+.channel-create-form .channel-picker-entry:has(.ui-checkbox-input:checked) {
+  background: var(--openbot-accent-soft);
+}
+.channel-create-form .channel-member-copy {
+  gap: 0;
+}
+.channel-create-form .channel-member-copy > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channel-create-form .channel-member-copy strong {
+  font-weight: var(--openbot-weight-regular);
+}
+.channel-create-form .channel-picker-entry .agent-avatar {
+  width: var(--openbot-space-8);
+  height: var(--openbot-space-8);
+}
+.channel-selected-members {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  /*
+   * The avatar blob is drawn larger than its box on purpose (`.agent-avatar > svg` is 128%), so the
+   * row needs vertical room of its own; without it the blob passes under the opaque search row.
+   * The margin belongs here and not on `.t-acc-panel-inner`, whose height the collapse animates.
+   */
+  padding-block: var(--openbot-space-1);
+  margin-inline: var(--channel-dialog-inset);
+  margin-bottom: var(--openbot-space-1);
+}
+.channel-selected-members .ui-button {
+  background: var(--openbot-bg-surface-raised);
+  border-radius: var(--openbot-radius-pill);
+}
+.channel-selected-members .agent-avatar {
+  width: var(--openbot-space-4);
+  height: var(--openbot-space-4);
+}
+.channel-selected-members .ui-button > svg {
+  width: var(--openbot-space-3);
+  height: var(--openbot-space-3);
+}
+.channel-create-form .channel-editor-footer {
+  justify-content: flex-end;
+  padding: var(--channel-dialog-inset);
+}
+
+.virtual-chat-row .ui-message-avatar {
+  align-self: flex-start;
+}
+
+.channel-title h1 {
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
+}
+.channel-title .channel-avatar {
+  width: calc(var(--openbot-space-8) + var(--openbot-space-2));
+  height: var(--openbot-space-6);
+}
+.channel-title .agent-avatar {
+  width: var(--openbot-space-6);
+  height: var(--openbot-space-6);
+}

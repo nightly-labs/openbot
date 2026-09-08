@@ -87,9 +87,9 @@ import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import type { AgentClient, AgentProvider } from "./agent-client";
 import type { AgentStore } from "./agent-store";
 import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
+import { ChannelService } from "./channel-service";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "./conversation-read-store";
 import { mergeConversationSnapshots } from "./conversation-snapshots";
-import { GroupService } from "./group-service";
 import type { MailboxStore } from "./mailbox-store";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
@@ -114,7 +114,7 @@ export interface ResolvedSharedFile {
 }
 
 export class AgentService extends EventEmitter<AgentServiceEvents> {
-  readonly groups: GroupService;
+  readonly channels: ChannelService;
   readonly #profileSave: ProfileSave;
   readonly #profileClients = new Set<AgentClient>();
   readonly #deletingAgents = new Set<string>();
@@ -223,7 +223,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         onProvidersReady: async () => {
           await this.#boot.reconcileUnresolvedDeliveries();
-          await this.groups.recover();
+          await this.channels.recover();
           void this.#boot.backfillProviderHistory();
           for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
         },
@@ -312,10 +312,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mailboxSync: this.#mailboxSync,
       hooks: {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
-        executionThreads: () => this.groups.store.executionThreads(),
+        executionThreads: () => this.channels.store.executionThreads(),
         deliveryThreadId: (deliveryId) => {
-          const assignment = this.groups.store.assignmentForDelivery(deliveryId);
-          return assignment ? this.groups.store.context(assignment.groupId, assignment.agentId).threadId : null;
+          const assignment = this.channels.store.assignmentForDelivery(deliveryId);
+          return assignment ? this.channels.store.context(assignment.channelId, assignment.agentId).threadId : null;
         },
       },
     });
@@ -345,14 +345,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
       },
     });
-    this.groups = new GroupService(store.database, mailbox, {
+    this.channels = new ChannelService(store.database, mailbox, {
       agents: () => this.listAgents(),
       generate: async (lead, prompt) => {
         await this.#providers.ensureProvider(lead.provider);
         const model = this.#providers
           .listModels()
           .find((item) => item.provider === lead.provider && item.id === lead.model);
-        if (!model) throw new Error("The group lead model is unavailable.");
+        if (!model) throw new Error("The channel lead model is unavailable.");
         const client = this.#providers.createProfileClient(lead.provider);
         this.#profileClients.add(client);
         try {
@@ -374,7 +374,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       normalBusy: () =>
         this.#mailbox
           .unresolvedDeliveries()
-          .some((item) => !this.groups.store.assignmentForDelivery(item.delivery.id)) ||
+          .some((item) => !this.channels.store.assignmentForDelivery(item.delivery.id)) ||
         [...this.#conversation.activeSnapshots()].some(
           ([, snapshot]) => snapshot.activeTurnId && !this.#conversation.isExecutionThread(snapshot.threadId),
         ),
@@ -402,11 +402,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         }
       },
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId),
-      changed: (groupId, revision) => this.#emit({ type: "groups-changed", groupId, revision }),
-      error: (error) => this.#emitError("group_coordination_failed", error),
+      changed: (channelId, revision) => this.#emit({ type: "channels-changed", channelId, revision }),
+      error: (error) => this.#emitError("channel_coordination_failed", error),
     });
     this.#drain = new DrainScheduler({
-      groups: this.groups,
+      channels: this.channels,
       store,
       mailbox,
       mailboxSync: this.#mailboxSync,
@@ -847,7 +847,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#stopping = false;
     await this.#store.initialize();
     await this.#mailbox.initialize();
-    this.groups.restoreDeliveryLinks();
+    this.channels.restoreDeliveryLinks();
     await this.#threads.reconcileProviderSessionFiles();
     this.#boot.recoverPersistedTurns();
     this.#hostedSites.restore();
@@ -881,7 +881,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async stop(): Promise<void> {
     this.#stopping = true;
-    const groupStop = this.groups.stop();
+    const channelStop = this.channels.stop();
     this.#initialized = false;
     this.#routines.dispose();
     this.#hostedSites.dispose();
@@ -907,7 +907,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#drain.dispose();
     this.#browser.clearControls();
     await Promise.all(clients.map((client) => client.stop().catch(() => undefined)));
-    await groupStop;
+    await channelStop;
     await Promise.allSettled(this.#drain.pendingTasks());
     await Promise.allSettled(this.#images.pendingPromises());
     this.#images.dispose();
@@ -1011,15 +1011,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   async cancelQueuedMessage(agentId: string, deliveryId: string): Promise<void> {
-    if (this.groups.store.assignmentForDelivery(deliveryId))
-      throw new Error("Use the group task controls for this assignment.");
+    if (this.channels.store.assignmentForDelivery(deliveryId))
+      throw new Error("Use the channel task controls for this assignment.");
     await this.#mailbox.cancel(agentId, deliveryId);
     this.#mailboxSync.emitQueue(agentId);
   }
 
   async updateQueuedMessage(input: UpdateQueuedMessageInput): Promise<void> {
-    if (this.groups.store.assignmentForDelivery(input.deliveryId))
-      throw new Error("Use the group task controls for this assignment.");
+    if (this.channels.store.assignmentForDelivery(input.deliveryId))
+      throw new Error("Use the channel task controls for this assignment.");
     await this.#mailbox.updateQueuedMessage(
       input.agentId,
       input.deliveryId,
@@ -1034,8 +1034,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   async reorderQueue(input: ReorderQueueInput): Promise<void> {
-    if (input.deliveryIds.some((id) => this.groups.store.assignmentForDelivery(id)))
-      throw new Error("Use the group task controls for group work.");
+    if (input.deliveryIds.some((id) => this.channels.store.assignmentForDelivery(id)))
+      throw new Error("Use the channel task controls for channel work.");
     await this.#mailbox.reorderQueue(input.agentId, input.deliveryIds);
     this.#mailboxSync.emitQueue(input.agentId);
   }
@@ -1048,8 +1048,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!session || !snapshot.activeTurnId || snapshot.activeTurnId !== input.expectedTurnId) {
       throw new Error("The active turn changed before this message could be steered.");
     }
-    if (this.groups.store.assignmentForDelivery(input.deliveryId))
-      throw new Error("Use the group task controls for this assignment.");
+    if (this.channels.store.assignmentForDelivery(input.deliveryId))
+      throw new Error("Use the channel task controls for this assignment.");
     const context = this.#mailbox.getDelivery(input.deliveryId);
     if (!context || context.delivery.recipientAgentId !== agent.id || context.delivery.status !== "queued") {
       throw new Error("Only queued messages can be steered.");
@@ -1271,14 +1271,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!senderAgentId) throw new Error("The sending OpenBot agent is unknown.");
 
     const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
-    const groupId = this.groups.store.groupForThread(executionThreadId);
-    if (groupId && (params.tool.startsWith("group_") || params.tool === "send_message")) {
-      if (params.tool === "send_message") throw new Error("Use group_assign or group_transfer for group work.");
+    const channelId = this.channels.store.channelForThread(executionThreadId);
+    if (channelId && (params.tool.startsWith("channel_") || params.tool === "send_message")) {
+      if (params.tool === "send_message") throw new Error("Use channel_assign or channel_transfer for channel work.");
       return openBotToolResult(
-        await this.groups.tool(groupId, senderAgentId, params.turnId, params.callId, params.tool, params.arguments),
+        await this.channels.tool(channelId, senderAgentId, params.turnId, params.callId, params.tool, params.arguments),
       );
     }
-    if (params.tool.startsWith("group_")) throw new Error("Group tools require an active group assignment.");
+    if (params.tool.startsWith("channel_")) throw new Error("Channel tools require an active channel assignment.");
 
     if (params.tool === "list_sites") {
       return openBotToolResult({ sites: await this.#hostedSites.listSites(), limit: 10 });
@@ -1464,7 +1464,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #emit(event: AgentEvent): void {
-    if (this.groups?.event(event)) return;
+    if (this.channels?.event(event)) return;
     this.emit("event", event);
   }
 }

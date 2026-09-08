@@ -1,15 +1,15 @@
 import {
   decodeAgentProfileDraft,
-  decodeGroup,
-  decodeGroupPage,
-  decodeGroupSummaries,
+  decodeChannel,
+  decodeChannelPage,
+  decodeChannelSummaries,
   decodeSaveAgentProfileResult,
+  parseChannelCommand,
+  parseChannelRead,
   parseGenerateAgentProfile,
-  parseGroupCommand,
-  parseGroupRead,
   parseSaveAgentProfile,
 } from "@openbot/contracts/ipc";
-import { GROUP_ROUTES } from "@openbot/contracts/team-protocol/groups-v1";
+import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 // An agent's core surface: status, agents, conversations, the queue and the prompts
 // a turn can raise. Memories, routines and attachments are their own registrars.
 // Every one of these routes to the local service or to a remote server by the
@@ -126,26 +126,26 @@ export function agentIpcHandlers({
               : Promise.resolve([]),
         });
       }),
-      listGroups: payloadHandler(parseAgentRequest, (scoped) =>
+      listChannels: payloadHandler(parseAgentRequest, (scoped) =>
         routeToServer(scoped.serverId, {
-          local: () => service.groups.store.list(host.groupActor().id),
-          remote: (serverId) => remoteServers.request(serverId, GROUP_ROUTES.list, decodeGroupSummaries),
+          local: () => service.channels.store.list(host.channelActor().id),
+          remote: (serverId) => remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries),
         }),
       ),
-      readGroup: payloadHandler(parseAgentRequest, (scoped) => {
-        const input = parseGroupRead(scoped.payload);
+      readChannel: payloadHandler(parseAgentRequest, (scoped) => {
+        const input = parseChannelRead(scoped.payload);
         return routeToServer(scoped.serverId, {
-          local: () => service.groups.store.page(input.groupId, input.beforeSequence),
+          local: () => service.channels.store.page(input.channelId, input.beforeSequence),
           remote: (serverId) =>
-            remoteServers.request(serverId, GROUP_ROUTES.read, decodeGroupPage, { method: "POST", body: input }),
+            remoteServers.request(serverId, CHANNEL_ROUTES.read, decodeChannelPage, { method: "POST", body: input }),
         });
       }),
-      groupCommand: payloadHandler(parseAgentRequest, (scoped) => {
-        const input = parseGroupCommand(scoped.payload);
+      channelCommand: payloadHandler(parseAgentRequest, (scoped) => {
+        const input = parseChannelCommand(scoped.payload);
         return routeToServer(scoped.serverId, {
-          local: () => service.groups.command(input, host.groupActor()),
+          local: () => service.channels.command(input, host.channelActor()),
           remote: (serverId) =>
-            remoteServers.request(serverId, GROUP_ROUTES.command, decodeGroup, { method: "POST", body: input }),
+            remoteServers.request(serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: input }),
         });
       }),
       getSidebarLayout: payloadHandler(parseAgentRequest, (parsed): Promise<SidebarLayoutSnapshot> => {

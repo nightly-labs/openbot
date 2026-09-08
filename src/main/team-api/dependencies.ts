@@ -1,4 +1,4 @@
-import type { GroupService } from "../../backend/group-service";
+import type { ChannelService } from "../../backend/channel-service";
 // What `TeamApiServer` needs from the rest of the main process, and nothing else.
 //
 // Every service arrives as a `Pick<>` of the real class. The point is not brevity: the Team API is
@@ -120,7 +120,7 @@ export type TeamApiRemoteScreen = Pick<
 >;
 
 export interface TeamApiOptions {
-  groups?: GroupService;
+  channels?: ChannelService;
   appVersion?: string;
   store: TeamStore;
   agents: TeamApiAgents;

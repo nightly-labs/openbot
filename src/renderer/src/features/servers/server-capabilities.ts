@@ -12,7 +12,7 @@ export function serverSupportsCapability(
   capability: TeamCurrentCapability,
 ): boolean {
   if (
-    (capability === "group-chats-v1" || capability === "agent-duplication" || capability === "model-scoped-usage") &&
+    (capability === "channel-chats-v1" || capability === "agent-duplication" || capability === "model-scoped-usage") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;

@@ -5,10 +5,10 @@ import { useNavigation } from "../../navigation";
 import { useTurns } from "../../turns";
 import { useAgentActions } from "../agents/agent-actions";
 import { useAgents } from "../agents/agents-context";
+import { ChannelsSection } from "../channels/ChannelsSection";
+import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
-import { GroupsSection } from "../groups/GroupsSection";
-import { useGroups } from "../groups/groups-context";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
@@ -29,7 +29,7 @@ import { useSidebar } from "./sidebar-context";
  */
 export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const layout = useLayout();
-  const groups = useGroups();
+  const channels = useChannels();
   const { activeServer, activeServerSupportsCapability } = useServers();
   const { openServerSettings } = useServerSettings();
   const { setSkillsMarketplaceOpen } = useSettings();
@@ -65,18 +65,20 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
 
   return (
     <Sidebar
-      groups={<GroupsSection />}
-      hasGroups={groups.supported() && groups.state.groups.some((group) => group.archived === groups.state.archived)}
-      showingArchivedGroups={groups.state.archived}
-      onToggleArchivedGroups={groups.supported() ? groups.toggleArchived : undefined}
-      onCreateGroup={groups.supported() ? groups.create : undefined}
+      channels={<ChannelsSection />}
+      hasChannels={
+        channels.supported() && channels.state.channels.some((channel) => channel.archived === channels.state.archived)
+      }
+      showingArchivedChannels={channels.state.archived}
+      onToggleArchivedChannels={channels.supported() ? channels.toggleArchived : undefined}
+      onCreateChannel={channels.supported() ? channels.create : undefined}
       serverName={activeServer()?.name ?? "Local"}
       onOpenServerSettings={(trigger) => {
         const server = activeServer();
         if (server) openServerSettings(server.id, trigger);
       }}
       agents={agentList()}
-      activeAgentId={activeDirectMember() || groups.state.selectedId ? "" : (activeAgent()?.id ?? "")}
+      activeAgentId={activeDirectMember() || channels.state.selectedId ? "" : (activeAgent()?.id ?? "")}
       showPeople={props.peopleEnabled}
       people={directPeople()}
       directThreads={directThreads()}
@@ -94,16 +96,16 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       onReorderPinned={reorderPinnedSidebarItems}
       onReorderPeople={reorderSidebarPeople}
       onSelectAgent={(id) => {
-        groups.close();
+        channels.close();
         selectAgent(id);
       }}
       onSelectPerson={(memberId) => {
-        groups.close();
+        channels.close();
         void selectDirectMember(memberId);
       }}
       onPreloadDirectConversation={props.peopleEnabled ? () => void DirectConversation.preload() : undefined}
       onCreateAgent={() => {
-        groups.close();
+        channels.close();
         openBotSetup();
       }}
       onEditAgent={editAgent}
@@ -121,7 +123,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
               avatarSeed: agentSetupDraft().avatarSeed,
               avatarHue: agentSetupDraft().avatarHue,
               onSelect: () => {
-                groups.close();
+                channels.close();
                 openBotSetup();
               },
             }

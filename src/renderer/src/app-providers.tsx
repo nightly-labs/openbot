@@ -8,6 +8,7 @@ import { AgentEventBridge } from "./features/agents/agent-event-bridge";
 import { AgentReadTrackingProvider } from "./features/agents/agent-read-tracking";
 import { AgentsProvider } from "./features/agents/agents-context";
 import { BrowserTabsProvider } from "./features/browser/browser-context";
+import { ChannelsProvider } from "./features/channels/channels-context";
 import { ConversationProvider } from "./features/conversation/conversation-context";
 import {
   createServerConversationState,
@@ -17,7 +18,6 @@ import { ConversationControllerProvider } from "./features/conversation/conversa
 import { DirectMessagesProvider } from "./features/conversation/direct-messages-context";
 import { DynamicIslandBridge } from "./features/dynamic-island/dynamic-island-bridge";
 import { DynamicIslandProvider } from "./features/dynamic-island/dynamic-island-context";
-import { GroupsProvider } from "./features/groups/groups-context";
 import { SetupProvider } from "./features/onboarding/onboarding-context";
 import { RemoteDesktopProvider } from "./features/remote-desktop/remote-desktop-context";
 import { ServerScopeProvider } from "./features/servers/server-scope";
@@ -159,7 +159,7 @@ function ScopedProviders(props: ParentProps<ScopedConversationProps>): JSX.Eleme
       <PresenceProvider>
         <DirectMessagesProvider>
           <AgentsProvider>
-            <GroupsProvider>
+            <ChannelsProvider>
               <ProvidersProvider>
                 <TurnsProvider>
                   <ConversationProvider>
@@ -181,7 +181,7 @@ function ScopedProviders(props: ParentProps<ScopedConversationProps>): JSX.Eleme
                   </ConversationProvider>
                 </TurnsProvider>
               </ProvidersProvider>
-            </GroupsProvider>
+            </ChannelsProvider>
           </AgentsProvider>
         </DirectMessagesProvider>
       </PresenceProvider>

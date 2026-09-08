@@ -42,7 +42,7 @@ export function SidebarNav() {
       <div class="agent-list-content">
         <Show
           when={
-            props.hasGroups ||
+            props.hasChannels ||
             resolvedPinnedItems().length > 0 ||
             filteredAgents().length > 0 ||
             (props.showPeople !== false && filteredPeople().length > 0) ||
@@ -51,14 +51,14 @@ export function SidebarNav() {
           fallback={<SidebarEmptyState />}
         >
           <SidebarPinnedGroup />
-          {props.groups}
+          {props.channels}
           <SidebarSectionList />
         </Show>
         <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
           {reorderAnnouncement()}
         </span>
       </div>
-      <Show when={layoutMutable() || props.onToggleArchivedGroups}>
+      <Show when={layoutMutable() || props.onToggleArchivedChannels}>
         <ContextMenu.Root modal={false}>
           <ContextMenu.Trigger class="sidebar-list-context-trigger" aria-label="Sidebar free area" />
           <ContextMenu.Portal>
@@ -69,9 +69,9 @@ export function SidebarNav() {
                   <span>New section</span>
                 </ContextMenu.Item>
               </Show>
-              <Show when={props.onToggleArchivedGroups}>
-                <ContextMenu.Item onSelect={() => props.onToggleArchivedGroups?.()}>
-                  {props.showingArchivedGroups ? "Show active chats" : "Archived chats"}
+              <Show when={props.onToggleArchivedChannels}>
+                <ContextMenu.Item onSelect={() => props.onToggleArchivedChannels?.()}>
+                  {props.showingArchivedChannels ? "Show active chats" : "Archived chats"}
                 </ContextMenu.Item>
               </Show>
             </ContextMenu.Content>

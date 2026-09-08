@@ -1,23 +1,23 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { GroupDraft, GroupMessage } from "@openbot/contracts/ipc";
+import type { ChannelDraft, ChannelMessage } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stores } from "./agent-service-test-harness";
-import { GroupHistory } from "./group-history";
-import { GroupService, resourcesConflict } from "./group-service";
+import { ChannelHistory } from "./channel-history";
+import { ChannelService, resourcesConflict } from "./channel-service";
 
 let root: string;
-let service: GroupService;
+let service: ChannelService;
 let data: ReturnType<typeof stores>;
-let draft: GroupDraft;
+let draft: ChannelDraft;
 const actor = { id: "human-1", name: "Alex" };
 const changed = vi.fn();
 const generate = vi.fn(async () => JSON.stringify({ agentId: "agent-a" }));
 let count = 0;
 const operationId = () => `command-${++count}`;
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), "openbot-groups-"));
+  root = await mkdtemp(join(tmpdir(), "openbot-channels-"));
   data = stores(root);
   await data.store.initialize();
   await data.mailbox.initialize();
@@ -31,7 +31,7 @@ beforeEach(async () => {
     linkedThreadIds: [],
   };
   generate.mockClear();
-  service = new GroupService(data.store.database, data.mailbox, {
+  service = new ChannelService(data.store.database, data.mailbox, {
     agents: () => data.store.list(),
     generate,
     schedule: () => undefined,
@@ -42,7 +42,7 @@ beforeEach(async () => {
       throw error;
     },
   });
-  await service.command({ type: "save", groupId: "group-1", operationId: operationId(), draft }, actor);
+  await service.command({ type: "save", channelId: "channel-1", operationId: operationId(), draft }, actor);
 });
 afterEach(async () => {
   await service.stop();
@@ -53,7 +53,7 @@ async function send(text: string, recipientAgentId: string | null = "agent-a") {
   await service.command(
     {
       type: "send",
-      groupId: "group-1",
+      channelId: "channel-1",
       operationId: operationId(),
       text,
       recipientAgentId,
@@ -62,15 +62,15 @@ async function send(text: string, recipientAgentId: string | null = "agent-a") {
     },
     actor,
   );
-  await vi.waitFor(() => expect(service.store.assignments("group-1").some((item) => item.deliveryId)).toBe(true));
-  return required(service.store.tasks("group-1")[0]);
+  await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
+  return required(service.store.tasks("channel-1")[0]);
 }
-describe("shared group coordination", () => {
+describe("shared channel coordination", () => {
   it("addresses one member and keeps the agent normal thread and provider session", async () => {
     const threadId = await data.store.ensureThreadId("agent-a");
     data.store.bindProviderSession("agent-a", "normal-provider-session");
     const task = await send("Prepare the report");
-    const assignment = required(service.store.assignments("group-1")[0]);
+    const assignment = required(service.store.assignments("channel-1")[0]);
     const context = required(data.mailbox.getDelivery(required(assignment.deliveryId)));
     const execution = await service.prepare(context);
     expect(execution?.threadId).not.toBe(threadId);
@@ -84,7 +84,7 @@ describe("shared group coordination", () => {
   it("saves one visible request when a command is retried", async () => {
     const command = {
       type: "send" as const,
-      groupId: "group-1",
+      channelId: "channel-1",
       operationId: operationId(),
       text: "Prepare the report",
       recipientAgentId: "agent-a",
@@ -93,34 +93,34 @@ describe("shared group coordination", () => {
     };
     await service.command(command, actor);
     await service.command(command, actor);
-    expect(service.store.messages("group-1").filter((item) => item.author.kind === "member")).toHaveLength(1);
-    expect(service.store.tasks("group-1")).toHaveLength(1);
+    expect(service.store.messages("channel-1").filter((item) => item.author.kind === "member")).toHaveLength(1);
+    expect(service.store.tasks("channel-1")).toHaveLength(1);
   });
   it("stops queued assignments and resumes with the current task revision", async () => {
     const task = await send("Prepare the report");
-    const first = required(service.store.assignments("group-1")[0]);
+    const first = required(service.store.assignments("channel-1")[0]);
     await service.command(
-      { type: "stop", groupId: "group-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
+      { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
       actor,
     );
     expect(data.mailbox.getDelivery(required(first.deliveryId))?.delivery.status).toBe("cancelled");
-    expect(service.store.tasks("group-1")[0]?.state).toBe("paused");
+    expect(service.store.tasks("channel-1")[0]?.state).toBe("paused");
     await service.command(
-      { type: "resume", groupId: "group-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
+      { type: "resume", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
       actor,
     );
-    await vi.waitFor(() => expect(service.store.assignments("group-1")).toHaveLength(2));
-    expect(service.store.assignments("group-1")[1]?.taskRevision).toBe(2);
+    await vi.waitFor(() => expect(service.store.assignments("channel-1")).toHaveLength(2));
+    expect(service.store.assignments("channel-1")[1]?.taskRevision).toBe(2);
   });
   it("stops a turn accepted after Stop and retries an interrupted control without dispatching again", async () => {
     const task = await send("Prepare the report");
-    const assignment = required(service.store.assignments("group-1")[0]);
+    const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
     await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
     await data.mailbox.markStarting(deliveryId);
     const stop = {
       type: "stop" as const,
-      groupId: "group-1",
+      channelId: "channel-1",
       operationId: operationId(),
       taskId: task.id,
       recipientAgentId: null,
@@ -134,21 +134,22 @@ describe("shared group coordination", () => {
       expect(interrupt).toHaveBeenCalledWith(
         "agent-a",
         "late-turn",
-        service.store.context("group-1", "agent-a").threadId,
+        service.store.context("channel-1", "agent-a").threadId,
       ),
     );
-    expect(service.store.tasks("group-1")[0]?.state).toBe("paused");
+    expect(service.store.tasks("channel-1")[0]?.state).toBe("paused");
     interrupt.mockRejectedValueOnce(new Error("Provider unavailable"));
     await expect(service.command(stop, actor)).rejects.toThrow("Provider unavailable");
     await service.command(stop, actor);
-    expect(service.store.tasks("group-1")[0]?.revision).toBe(1);
-    expect(service.store.assignments("group-1")).toHaveLength(1);
+    expect(service.store.tasks("channel-1")[0]?.revision).toBe(1);
+    expect(service.store.assignments("channel-1")).toHaveLength(1);
     expect(data.mailbox.nextQueued("agent-a")).toBeNull();
   });
   it("does not lose messages at a page boundary and replays the same transcript", () => {
-    const messages: GroupMessage[] = Array.from({ length: 105 }, (_, i) => ({
+    expect(service.store.list(actor.id)[0]?.lastMessage).toBeNull();
+    const messages: ChannelMessage[] = Array.from({ length: 105 }, (_, i) => ({
       id: `message-${i}`,
-      groupId: "group-1",
+      channelId: "channel-1",
       sequence: 0,
       author: { kind: "member", ...actor },
       taskId: null,
@@ -161,34 +162,38 @@ describe("shared group coordination", () => {
         status: "completed",
       },
     }));
-    service.store.update(service.store.get("group-1"), { messages });
-    const page = service.store.page("group-1");
+    service.store.update(service.store.get("channel-1"), { messages });
+    const page = service.store.page("channel-1");
     expect(page.messages).toHaveLength(100);
-    const older = service.store.page("group-1", required(page.olderCursor));
+    const older = service.store.page("channel-1", required(page.olderCursor));
     expect(older.messages).toHaveLength(5);
     expect(new Set([...older.messages, ...page.messages].map((item) => item.id)).size).toBe(105);
-    service.store.context("group-1", "agent-a");
-    const context = service.store.context("group-1", "agent-a");
-    service.store.acceptContext("group-1", "agent-a", "session-1", 105, 1);
-    service.store.saveSummary("group-1", { version: 1, throughSequence: 50, text: "Decisions with references" });
-    service.store.markRead("group-1", actor.id, 105, operationId());
-    const before = service.store.page("group-1");
-    service.store.rebuild("group-1");
-    expect(service.store.page("group-1")).toEqual(before);
-    expect(service.store.context("group-1", "agent-a").threadId).toBe(context.threadId);
-    expect(service.store.summary("group-1").text).toBe("Decisions with references");
+    service.store.context("channel-1", "agent-a");
+    const context = service.store.context("channel-1", "agent-a");
+    service.store.acceptContext("channel-1", "agent-a", "session-1", 105, 1);
+    service.store.saveSummary("channel-1", { version: 1, throughSequence: 50, text: "Decisions with references" });
+    service.store.markRead("channel-1", actor.id, 105, operationId());
+    const before = service.store.page("channel-1");
+    service.store.rebuild("channel-1");
+    expect(service.store.page("channel-1")).toEqual(before);
+    expect(service.store.context("channel-1", "agent-a").threadId).toBe(context.threadId);
+    expect(service.store.summary("channel-1").text).toBe("Decisions with references");
     expect(service.store.list(actor.id)[0]?.unreadCount).toBe(0);
+    expect(service.store.list(actor.id)[0]?.lastMessage).toMatchObject({
+      authorName: actor.name,
+      text: "Request 104",
+    });
   });
   it("keeps an uncertain accepted turn paused after restart", async () => {
     await send("Write a file");
-    const assignment = required(service.store.assignments("group-1")[0]);
+    const assignment = required(service.store.assignments("channel-1")[0]);
     await data.mailbox.markStarting(required(assignment.deliveryId));
     await data.mailbox.markRunning(required(assignment.deliveryId), "turn-1");
     service.accepted(required(assignment.deliveryId), "session-1", "turn-1");
     await data.mailbox.markTerminal(required(assignment.deliveryId), "interrupted");
     await service.recover();
-    expect(service.store.tasks("group-1")[0]?.state).toBe("paused");
-    expect(service.store.tasks("group-1")[0]?.error).toContain("no confirmed result");
+    expect(service.store.tasks("channel-1")[0]?.state).toBe("paused");
+    expect(service.store.tasks("channel-1")[0]?.error).toContain("no confirmed result");
     expect(data.mailbox.nextQueued("agent-a")).toBeNull();
   });
   it("asks one visible question for ambiguous routing and never broadcasts", async () => {
@@ -196,7 +201,7 @@ describe("shared group coordination", () => {
     await service.command(
       {
         type: "send",
-        groupId: "group-1",
+        channelId: "channel-1",
         operationId: operationId(),
         text: "Can someone help?",
         recipientAgentId: null,
@@ -205,16 +210,16 @@ describe("shared group coordination", () => {
       },
       actor,
     );
-    await vi.waitFor(() => expect(service.store.tasks("group-1")[0]?.state).toBe("paused"));
-    expect(service.store.messages("group-1").filter((item) => item.author.kind === "coordinator")).toHaveLength(1);
-    expect(service.store.assignments("group-1")).toEqual([]);
+    await vi.waitFor(() => expect(service.store.tasks("channel-1")[0]?.state).toBe("paused"));
+    expect(service.store.messages("channel-1").filter((item) => item.author.kind === "coordinator")).toHaveLength(1);
+    expect(service.store.assignments("channel-1")).toEqual([]);
     expect(data.mailbox.nextQueued("agent-a")).toBeNull();
     expect(data.mailbox.nextQueued("agent-b")).toBeNull();
     generate.mockResolvedValueOnce(JSON.stringify({ agentId: "agent-a", idle: true }));
     await service.command(
       {
         type: "send",
-        groupId: "group-1",
+        channelId: "channel-1",
         operationId: operationId(),
         text: "Research a second project",
         recipientAgentId: null,
@@ -223,9 +228,9 @@ describe("shared group coordination", () => {
       },
       actor,
     );
-    await vi.waitFor(() => expect(service.store.tasks("group-1").at(-1)?.state).toBe("paused"));
-    expect(service.store.messages("group-1").filter((item) => item.author.kind === "coordinator")).toHaveLength(2);
-    expect(service.store.assignments("group-1")).toEqual([]);
+    await vi.waitFor(() => expect(service.store.tasks("channel-1").at(-1)?.state).toBe("paused"));
+    expect(service.store.messages("channel-1").filter((item) => item.author.kind === "coordinator")).toHaveLength(2);
+    expect(service.store.assignments("channel-1")).toEqual([]);
   });
   it("discards routing after the membership changes", async () => {
     let resolve!: (value: string) => void;
@@ -238,7 +243,7 @@ describe("shared group coordination", () => {
     await service.command(
       {
         type: "send",
-        groupId: "group-1",
+        channelId: "channel-1",
         operationId: operationId(),
         text: "Research this project",
         recipientAgentId: null,
@@ -251,15 +256,15 @@ describe("shared group coordination", () => {
     await service.command(
       {
         type: "save",
-        groupId: "group-1",
+        channelId: "channel-1",
         operationId: operationId(),
         draft: { ...draft, members: draft.members.filter((item) => item.agentId !== "agent-b") },
       },
       actor,
     );
     resolve(JSON.stringify({ agentId: "agent-b" }));
-    await vi.waitFor(() => expect(service.store.assignments("group-1").some((item) => item.deliveryId)).toBe(true));
-    expect(service.store.tasks("group-1")[0]?.ownerAgentId).toBe("agent-a");
+    await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
+    expect(service.store.tasks("channel-1")[0]?.ownerAgentId).toBe("agent-a");
     expect(data.mailbox.nextQueued("agent-b")).toBeNull();
   });
   it("keeps a routing decision when an ordinary progress message arrives", async () => {
@@ -273,7 +278,7 @@ describe("shared group coordination", () => {
     await service.command(
       {
         type: "send",
-        groupId: "group-1",
+        channelId: "channel-1",
         operationId: operationId(),
         text: "Research this project",
         recipientAgentId: null,
@@ -283,11 +288,11 @@ describe("shared group coordination", () => {
       actor,
     );
     await vi.waitFor(() => expect(generate).toHaveBeenCalled());
-    service.store.update(service.store.get("group-1"), {
+    service.store.update(service.store.get("channel-1"), {
       messages: [
         {
           id: "progress",
-          groupId: "group-1",
+          channelId: "channel-1",
           sequence: 0,
           author: { kind: "agent", id: "agent-b", name: "B" },
           taskId: null,
@@ -302,19 +307,19 @@ describe("shared group coordination", () => {
         },
       ],
     });
-    const revision = service.store.get("group-1").revision;
+    const revision = service.store.get("channel-1").revision;
     resolve(JSON.stringify({ agentId: "agent-b" }));
     await vi.waitFor(() => expect(data.mailbox.nextQueued("agent-b")).not.toBeNull());
-    expect(service.store.tasks("group-1")[0]?.ownerAgentId).toBe("agent-b");
+    expect(service.store.tasks("channel-1")[0]?.ownerAgentId).toBe("agent-b");
     expect(generate).toHaveBeenCalledTimes(1);
-    expect(service.store.get("group-1").revision).toBeGreaterThan(revision);
+    expect(service.store.get("channel-1").revision).toBeGreaterThan(revision);
   });
   it("runs independent child tasks and returns their results to the parent once", async () => {
     await data.store.getOrCreate("agent-c");
     await service.command(
       {
         type: "save",
-        groupId: "group-1",
+        channelId: "channel-1",
         operationId: operationId(),
         draft: { ...draft, members: [...draft.members, { agentId: "agent-c", responsibility: "Review" }] },
       },
@@ -325,13 +330,13 @@ describe("shared group coordination", () => {
       await vi.waitFor(() =>
         expect(
           service.store
-            .assignments("group-1")
+            .assignments("channel-1")
             .some((item) => item.taskId === taskId && item.deliveryId && item.state === "starting"),
         ).toBe(true),
       );
       const assignment = required(
         service.store
-          .assignments("group-1")
+          .assignments("channel-1")
           .filter((item) => item.taskId === taskId)
           .at(-1),
       );
@@ -343,21 +348,21 @@ describe("shared group coordination", () => {
       return { assignment, execution };
     };
     const finish = async (taskId: string, turnId: string) => {
-      const assignment = required(service.store.assignments("group-1").find((item) => item.turnId === turnId));
+      const assignment = required(service.store.assignments("channel-1").find((item) => item.turnId === turnId));
       await data.mailbox.markTerminal(required(assignment.deliveryId), "completed");
-      const threadId = service.store.context("group-1", assignment.agentId).threadId;
+      const threadId = service.store.context("channel-1", assignment.agentId).threadId;
       service.event({ type: "turn-completed", agentId: assignment.agentId, threadId, turnId, status: "completed" });
-      expect(service.store.tasks("group-1").find((item) => item.id === taskId)?.state).not.toBe("running");
+      expect(service.store.tasks("channel-1").find((item) => item.id === taskId)?.state).not.toBe("running");
     };
     await begin(parent.id, "parent-turn");
-    await service.tool("group-1", "agent-a", "parent-turn", "child-1", "group_assign", {
+    await service.tool("channel-1", "agent-a", "parent-turn", "child-1", "channel_assign", {
       recipientAgentId: "agent-b",
       task: "Inspect project B",
       expectedResult: "Findings B",
       sourceMessageIds: [parent.requestMessageId],
       resources: ["workspace:/work/b"],
     });
-    await service.tool("group-1", "agent-a", "parent-turn", "child-2", "group_assign", {
+    await service.tool("channel-1", "agent-a", "parent-turn", "child-2", "channel_assign", {
       recipientAgentId: "agent-c",
       task: "Inspect project C",
       expectedResult: "Findings C",
@@ -365,28 +370,28 @@ describe("shared group coordination", () => {
       resources: ["workspace:/work/c"],
     });
     await finish(parent.id, "parent-turn");
-    const children = service.store.tasks("group-1").filter((item) => item.parentTaskId === parent.id);
+    const children = service.store.tasks("channel-1").filter((item) => item.parentTaskId === parent.id);
     await begin(required(children[0]).id, "child-turn-b");
     await begin(required(children[1]).id, "child-turn-c");
-    expect(service.store.tasks("group-1").filter((item) => item.state === "running")).toHaveLength(2);
-    await service.tool("group-1", "agent-b", "child-turn-b", "result-b", "group_result", { text: "Findings B" });
-    await service.tool("group-1", "agent-b", "child-turn-b", "result-b", "group_result", { text: "Findings B" });
+    expect(service.store.tasks("channel-1").filter((item) => item.state === "running")).toHaveLength(2);
+    await service.tool("channel-1", "agent-b", "child-turn-b", "result-b", "channel_result", { text: "Findings B" });
+    await service.tool("channel-1", "agent-b", "child-turn-b", "result-b", "channel_result", { text: "Findings B" });
     await finish(required(children[0]).id, "child-turn-b");
-    expect(service.store.tasks("group-1").find((item) => item.id === parent.id)?.state).toBe("waiting");
-    await service.tool("group-1", "agent-c", "child-turn-c", "result-c", "group_result", { text: "Findings C" });
+    expect(service.store.tasks("channel-1").find((item) => item.id === parent.id)?.state).toBe("waiting");
+    await service.tool("channel-1", "agent-c", "child-turn-c", "result-c", "channel_result", { text: "Findings C" });
     await finish(required(children[1]).id, "child-turn-c");
     const resumed = await begin(parent.id, "parent-result-turn");
     expect(resumed.execution?.text).toContain("Findings B");
     expect(resumed.execution?.text).toContain("Findings C");
     await finish(parent.id, "parent-result-turn");
-    expect(service.store.tasks("group-1").find((item) => item.id === parent.id)?.state).toBe("completed");
-    expect(service.store.messages("group-1").filter((item) => item.message.text === "Findings B")).toHaveLength(1);
-    expect(service.store.assignments("group-1").filter((item) => item.taskId === parent.id)).toHaveLength(2);
+    expect(service.store.tasks("channel-1").find((item) => item.id === parent.id)?.state).toBe("completed");
+    expect(service.store.messages("channel-1").filter((item) => item.message.text === "Findings B")).toHaveLength(1);
+    expect(service.store.assignments("channel-1").filter((item) => item.taskId === parent.id)).toHaveLength(2);
   });
 
   it("accepts a correction before completing its turn and keeps earlier output superseded", async () => {
     const task = await send("Prepare the report");
-    const assignment = required(service.store.assignments("group-1")[0]);
+    const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
     const execution = required(await service.prepare(required(data.mailbox.getDelivery(deliveryId))));
     await data.mailbox.markStarting(deliveryId);
@@ -413,13 +418,13 @@ describe("shared group coordination", () => {
     });
     service.hooks.steer = async (_agentId, threadId, turnId) => {
       service.event({ type: "turn-completed", agentId: "agent-a", threadId, turnId, status: "completed" });
-      expect(service.store.tasks("group-1").find((item) => item.id === task.id)?.state).toBe("queued");
+      expect(service.store.tasks("channel-1").find((item) => item.id === task.id)?.state).toBe("queued");
       return "accepted";
     };
     await service.command(
       {
         type: "send",
-        groupId: "group-1",
+        channelId: "channel-1",
         operationId: operationId(),
         text: "Actually use the revised figures",
         recipientAgentId: null,
@@ -428,19 +433,19 @@ describe("shared group coordination", () => {
       },
       actor,
     );
-    expect(service.store.tasks("group-1")[0]).toMatchObject({
+    expect(service.store.tasks("channel-1")[0]).toMatchObject({
       id: task.id,
       state: "completed",
       revision: 1,
       instruction: "Actually use the revised figures",
     });
-    expect(service.store.messages("group-1").find((item) => item.id === "partial")?.superseded).toBe(true);
-    expect(service.store.assignments("group-1")).toHaveLength(1);
+    expect(service.store.messages("channel-1").find((item) => item.id === "partial")?.superseded).toBe(true);
+    expect(service.store.assignments("channel-1")).toHaveLength(1);
   });
 
   it("pauses work before a pending correction returns and ignores its late acceptance", async () => {
     const task = await send("Write the report");
-    const assignment = required(service.store.assignments("group-1")[0]);
+    const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
     await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
     await data.mailbox.markStarting(deliveryId);
@@ -458,7 +463,7 @@ describe("shared group coordination", () => {
       {
         type: "send",
         operationId: operationId(),
-        groupId: "group-1",
+        channelId: "channel-1",
         text: "Actually use new figures",
         recipientAgentId: null,
         replyToMessageId: task.requestMessageId,
@@ -468,33 +473,33 @@ describe("shared group coordination", () => {
     );
     await vi.waitFor(() => expect(steer).toHaveBeenCalled());
     const stopping = service.command(
-      { type: "stop", operationId: operationId(), groupId: "group-1", taskId: task.id, recipientAgentId: null },
+      { type: "stop", operationId: operationId(), channelId: "channel-1", taskId: task.id, recipientAgentId: null },
       actor,
     );
     try {
-      await vi.waitFor(() => expect(service.store.tasks("group-1")[0]?.state).toBe("paused"));
+      await vi.waitFor(() => expect(service.store.tasks("channel-1")[0]?.state).toBe("paused"));
     } finally {
       resolve("accepted");
       await Promise.all([correcting, stopping]);
     }
-    expect(service.store.tasks("group-1")[0]).toMatchObject({ state: "paused", revision: 2 });
-    expect(service.store.assignments("group-1")[0]?.taskRevision).toBe(0);
+    expect(service.store.tasks("channel-1")[0]).toMatchObject({ state: "paused", revision: 2 });
+    expect(service.store.assignments("channel-1")[0]?.taskRevision).toBe(0);
   });
   it("does not repeat an unconfirmed correction after restart", async () => {
     const task = await send("Write the report");
-    const assignment = required(service.store.assignments("group-1")[0]);
+    const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
     await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
     await data.mailbox.markStarting(deliveryId);
     await data.mailbox.markRunning(deliveryId, "turn-before-restart");
     service.accepted(deliveryId, "session-before-restart", "turn-before-restart");
-    service.store.update(service.store.get("group-1"), {
+    service.store.update(service.store.get("channel-1"), {
       tasks: [{ ...task, revision: 1, instruction: "Use new figures", state: "queued" }],
       assignments: [{ ...assignment, turnId: "turn-before-restart", state: "running", pendingRevision: 1 }],
     });
     await data.mailbox.markTerminal(deliveryId, "completed");
     await service.recover();
-    expect(service.store.tasks("group-1")[0]).toMatchObject({
+    expect(service.store.tasks("channel-1")[0]).toMatchObject({
       state: "paused",
       revision: 1,
       instruction: "Use new figures",
@@ -504,7 +509,7 @@ describe("shared group coordination", () => {
 
   it("resumes an uncertain correction after the provider confirms termination", async () => {
     const task = await send("Write the report");
-    const assignment = required(service.store.assignments("group-1")[0]);
+    const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
     const execution = required(await service.prepare(required(data.mailbox.getDelivery(deliveryId))));
     await data.mailbox.markStarting(deliveryId);
@@ -515,7 +520,7 @@ describe("shared group coordination", () => {
       {
         type: "send",
         operationId: operationId(),
-        groupId: "group-1",
+        channelId: "channel-1",
         text: "Actually use new figures",
         recipientAgentId: null,
         replyToMessageId: task.requestMessageId,
@@ -531,20 +536,20 @@ describe("shared group coordination", () => {
       turnId: "uncertain-turn",
       status: "completed",
     });
-    expect(service.store.tasks("group-1")[0]?.state).toBe("paused");
+    expect(service.store.tasks("channel-1")[0]?.state).toBe("paused");
     await service.command(
-      { type: "resume", operationId: operationId(), groupId: "group-1", taskId: task.id, recipientAgentId: null },
+      { type: "resume", operationId: operationId(), channelId: "channel-1", taskId: task.id, recipientAgentId: null },
       actor,
     );
     await vi.waitFor(() => expect(data.mailbox.nextQueued("agent-a")).not.toBeNull());
-    expect(service.store.assignments("group-1")).toHaveLength(2);
-    expect(service.store.tasks("group-1")[0]).toMatchObject({ revision: 2, instruction: "Actually use new figures" });
+    expect(service.store.assignments("channel-1")).toHaveLength(2);
+    expect(service.store.tasks("channel-1")[0]).toMatchObject({ revision: 2, instruction: "Actually use new figures" });
   });
   it("retains full history while a late member receives the shared summary", async () => {
     const task = await send("Apply the shared decision");
-    const messages: GroupMessage[] = Array.from({ length: 150 }, (_, index) => ({
+    const messages: ChannelMessage[] = Array.from({ length: 150 }, (_, index) => ({
       id: `history-${index}`,
-      groupId: "group-1",
+      channelId: "channel-1",
       sequence: 0,
       author: { kind: "member", ...actor },
       taskId: task.id,
@@ -557,25 +562,25 @@ describe("shared group coordination", () => {
         createdAt: "2026-09-07T12:00:00.000Z",
       },
     }));
-    service.store.update(service.store.get("group-1"), { messages });
+    service.store.update(service.store.get("channel-1"), { messages });
     const model = vi.fn(async () => "DECISION_A applies. Source: history-0.");
-    const history = new GroupHistory(service.store, model);
+    const history = new ChannelHistory(service.store, model);
     const agents = data.store.list();
     const first = await history.prepare(task, required(agents[0]), required(agents[0]));
-    const summary = service.store.summary("group-1");
+    const summary = service.store.summary("channel-1");
     expect(summary.throughSequence).toBeGreaterThan(0);
-    expect(summary.throughSequence).toBeLessThan(service.store.page("group-1").throughSequence);
+    expect(summary.throughSequence).toBeLessThan(service.store.page("channel-1").throughSequence);
     expect(first.text).toContain("DECISION_A applies");
     const late = await history.prepare(task, required(agents[1]), required(agents[0]));
     expect(late.text).toContain("DECISION_A applies");
     expect(late.text).toContain("Apply the shared decision");
-    expect(service.store.messages("group-1")).toHaveLength(151);
+    expect(service.store.messages("channel-1")).toHaveLength(151);
     expect(late.text.length).toBeLessThanOrEqual(120_000);
   });
 
   it("transfers one owner and waits for the declared task dependency", async () => {
     const task = await send("Write the report");
-    const assignment = required(service.store.assignments("group-1")[0]);
+    const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
     const execution = required(await service.prepare(required(data.mailbox.getDelivery(deliveryId))));
     await data.mailbox.markStarting(deliveryId);
@@ -585,7 +590,7 @@ describe("shared group coordination", () => {
       {
         type: "send",
         operationId: operationId(),
-        groupId: "group-1",
+        channelId: "channel-1",
         text: "Check the figures",
         recipientAgentId: "agent-b",
         replyToMessageId: null,
@@ -594,9 +599,9 @@ describe("shared group coordination", () => {
       actor,
     );
     const dependency = required(
-      service.store.tasks("group-1").find((item) => item.instruction === "Check the figures"),
+      service.store.tasks("channel-1").find((item) => item.instruction === "Check the figures"),
     );
-    await service.tool("group-1", "agent-a", "transfer-turn", "transfer", "group_transfer", {
+    await service.tool("channel-1", "agent-a", "transfer-turn", "transfer", "channel_transfer", {
       recipientAgentId: "agent-b",
       task: "Finish the report",
       expectedResult: "The final report",
@@ -604,7 +609,7 @@ describe("shared group coordination", () => {
       dependencies: [dependency.id],
       resources: ["none"],
     });
-    expect(service.store.tasks("group-1").find((item) => item.id === task.id)).toMatchObject({
+    expect(service.store.tasks("channel-1").find((item) => item.id === task.id)).toMatchObject({
       ownerAgentId: "agent-b",
       state: "queued",
       dependencies: [dependency.id],
@@ -620,11 +625,11 @@ describe("shared group coordination", () => {
     });
     await vi.waitFor(() => expect(data.mailbox.nextQueued("agent-b")).not.toBeNull());
     expect(data.mailbox.nextQueued("agent-b")?.delivery.text).toBe("Check the figures");
-    expect(service.store.tasks("group-1").find((item) => item.id === task.id)?.state).toBe("queued");
+    expect(service.store.tasks("channel-1").find((item) => item.id === task.id)?.state).toBe("queued");
   });
   it("waits for the previous turn to stop before reassignment", async () => {
     const task = await send("Prepare the report");
-    const first = required(service.store.assignments("group-1")[0]);
+    const first = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(first.deliveryId);
     const execution = required(await service.prepare(required(data.mailbox.getDelivery(deliveryId))));
     await data.mailbox.markStarting(deliveryId);
@@ -640,7 +645,7 @@ describe("shared group coordination", () => {
     const changing = service.command(
       {
         type: "reassign",
-        groupId: "group-1",
+        channelId: "channel-1",
         operationId: operationId(),
         taskId: task.id,
         recipientAgentId: "agent-b",
@@ -650,7 +655,7 @@ describe("shared group coordination", () => {
     await vi.waitFor(() => expect(service.hooks.interrupt).toHaveBeenCalled());
     service.wake();
     expect(data.mailbox.nextQueued("agent-b")).toBeNull();
-    expect(service.store.assignments("group-1")).toHaveLength(1);
+    expect(service.store.assignments("channel-1")).toHaveLength(1);
     await data.mailbox.markTerminal(deliveryId, "interrupted");
     service.event({
       type: "turn-completed",
@@ -662,7 +667,7 @@ describe("shared group coordination", () => {
     finish();
     await changing;
     await vi.waitFor(() => expect(data.mailbox.nextQueued("agent-b")).not.toBeNull());
-    expect(service.store.tasks("group-1")[0]?.ownerAgentId).toBe("agent-b");
+    expect(service.store.tasks("channel-1")[0]?.ownerAgentId).toBe("agent-b");
     expect(data.mailbox.nextQueued("agent-a")).toBeNull();
   });
 
@@ -671,7 +676,7 @@ describe("shared group coordination", () => {
     await service.command(
       {
         type: "save",
-        groupId: "group-1",
+        channelId: "channel-1",
         operationId: operationId(),
         draft: {
           ...draft,
@@ -681,17 +686,17 @@ describe("shared group coordination", () => {
       },
       actor,
     );
-    expect(service.store.tasks("group-1")[0]?.state).toBe("paused");
+    expect(service.store.tasks("channel-1")[0]?.state).toBe("paused");
     expect(data.mailbox.nextQueued("agent-a")).toBeNull();
-    await service.command({ type: "archive", groupId: "group-1", operationId: operationId() }, actor);
-    await service.command({ type: "restore", groupId: "group-1", operationId: operationId() }, actor);
-    expect(service.store.tasks("group-1")[0]?.state).toBe("paused");
-    expect(service.store.messages("group-1")[0]?.message.text).toBe("Keep the conversation");
+    await service.command({ type: "archive", channelId: "channel-1", operationId: operationId() }, actor);
+    await service.command({ type: "restore", channelId: "channel-1", operationId: operationId() }, actor);
+    expect(service.store.tasks("channel-1")[0]?.state).toBe("paused");
+    expect(service.store.messages("channel-1")[0]?.message.text).toBe("Keep the conversation");
     expect(data.store.list()).toHaveLength(2);
     await service.command(
       {
         type: "reassign",
-        groupId: "group-1",
+        channelId: "channel-1",
         operationId: operationId(),
         taskId: task.id,
         recipientAgentId: "agent-b",
@@ -703,7 +708,7 @@ describe("shared group coordination", () => {
 
   it("rejects dependency cycles and pauses the root at the automatic assignment limit", async () => {
     const task = await send("Coordinate the report");
-    const first = required(service.store.assignments("group-1")[0]);
+    const first = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(first.deliveryId);
     await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
     await data.mailbox.markStarting(deliveryId);
@@ -716,24 +721,24 @@ describe("shared group coordination", () => {
       sourceMessageIds: [task.requestMessageId],
     };
     await expect(
-      service.tool("group-1", "agent-a", "parent-limit-turn", "cycle", "group_assign", {
+      service.tool("channel-1", "agent-a", "parent-limit-turn", "cycle", "channel_assign", {
         ...args,
         dependencies: [task.id],
       }),
     ).rejects.toThrow("Invalid task dependencies");
     await expect(
-      service.tool("group-1", "agent-a", "parent-limit-turn", "duplicate-source", "group_assign", {
+      service.tool("channel-1", "agent-a", "parent-limit-turn", "duplicate-source", "channel_assign", {
         ...args,
         sourceMessageIds: [task.requestMessageId, task.requestMessageId],
       }),
-    ).rejects.toThrow("Invalid group task");
-    expect(service.store.tasks("group-1")).toHaveLength(1);
+    ).rejects.toThrow("Invalid channel task");
+    expect(service.store.tasks("channel-1")).toHaveLength(1);
     for (let index = 0; index < 8; index++)
-      await service.tool("group-1", "agent-a", "parent-limit-turn", `child-${index}`, "group_assign", args);
-    expect(service.store.tasks("group-1")).toHaveLength(9);
-    await service.tool("group-1", "agent-a", "parent-limit-turn", "child-over-limit", "group_assign", args);
-    expect(service.store.tasks("group-1")).toHaveLength(9);
-    expect(service.store.tasks("group-1").every((item) => item.state === "paused")).toBe(true);
+      await service.tool("channel-1", "agent-a", "parent-limit-turn", `child-${index}`, "channel_assign", args);
+    expect(service.store.tasks("channel-1")).toHaveLength(9);
+    await service.tool("channel-1", "agent-a", "parent-limit-turn", "child-over-limit", "channel_assign", args);
+    expect(service.store.tasks("channel-1")).toHaveLength(9);
+    expect(service.store.tasks("channel-1").every((item) => item.state === "paused")).toBe(true);
     expect(data.mailbox.nextQueued("agent-b")).toBeNull();
   });
 

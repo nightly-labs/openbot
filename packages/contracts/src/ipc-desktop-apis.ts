@@ -56,6 +56,7 @@ import type {
   BrowserTab,
   BrowserVisibilityInput,
 } from "./ipc-browser";
+import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
 import type {
   ConversationPage,
   ConversationReadState,
@@ -76,7 +77,6 @@ import type {
   SetDynamicIslandInteractiveInput,
   SetDynamicIslandPreferenceInput,
 } from "./ipc-dynamic-island";
-import type { Group, GroupCommand, GroupPage, GroupReadInput, GroupSummary } from "./ipc-groups";
 import type {
   DeleteHostedSiteInput,
   HostedSiteSummary,
@@ -159,9 +159,9 @@ import type {
 import type { VoiceModelStatus, VoiceTranscriptionInput, VoiceTranscriptionResult } from "./ipc-voice";
 
 export interface AgentDesktopApi {
-  listGroups: () => Promise<GroupSummary[]>;
-  readGroup: (input: GroupReadInput) => Promise<GroupPage>;
-  groupCommand: (input: GroupCommand) => Promise<Group>;
+  listChannels: () => Promise<ChannelSummary[]>;
+  readChannel: (input: ChannelReadInput) => Promise<ChannelPage>;
+  channelCommand: (input: ChannelCommand) => Promise<Channel>;
   getStatus: () => Promise<AgentStatus>;
   getUsage: (agentId: string) => Promise<AccountUsage>;
   listModels: () => Promise<AgentModelOption[]>;

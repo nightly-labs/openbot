@@ -3,8 +3,8 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { channelRequest, channelResponse, isChannelRoute } from "@openbot/contracts/team-protocol/channels-v1";
 import { supportsTeamSemanticTags, TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
-import { groupRequest, groupResponse, isGroupRoute } from "@openbot/contracts/team-protocol/groups-v1";
 import { encodeTeamProtocolV1ClientEvent } from "@openbot/contracts/team-protocol/v1";
 import {
   decodeTeamProtocolV2AuthFrame,
@@ -429,7 +429,7 @@ export class TeamWebRtcHostPeer {
             : input.body === null
               ? undefined
               : JSON.stringify(
-                  (isGroupRoute(input.path) ? groupRequestForMethod : decodeTeamProtocolV3WebRtcHttpRequest)(
+                  (isChannelRoute(input.path) ? channelRequestForMethod : decodeTeamProtocolV3WebRtcHttpRequest)(
                     input.method,
                     input.path,
                     input.body,
@@ -467,7 +467,7 @@ export class TeamWebRtcHostPeer {
     }
     return {
       status: response.status,
-      body: (isGroupRoute(input.path) ? groupResponseForMethod : encodeTeamProtocolV3WebRtcHttpResponse)(
+      body: (isChannelRoute(input.path) ? channelResponseForMethod : encodeTeamProtocolV3WebRtcHttpResponse)(
         input.method,
         input.path,
         response.status,
@@ -757,9 +757,9 @@ class GatewayError extends Error {
   }
 }
 
-function groupRequestForMethod(_method: string, path: string, value: unknown) {
-  return groupRequest(path, value);
+function channelRequestForMethod(_method: string, path: string, value: unknown) {
+  return channelRequest(path, value);
 }
-function groupResponseForMethod(_method: string, path: string, status: number, value: unknown) {
-  return groupResponse(path, status, value);
+function channelResponseForMethod(_method: string, path: string, status: number, value: unknown) {
+  return channelResponse(path, status, value);
 }

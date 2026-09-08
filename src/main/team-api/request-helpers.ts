@@ -1,4 +1,4 @@
-import { groupRequest, isGroupRoute } from "@openbot/contracts/team-protocol/groups-v1";
+import { channelRequest, isChannelRoute } from "@openbot/contracts/team-protocol/channels-v1";
 // Reading a Team API request: the parsers, the validators and the capability filters that every
 // route module needs and none of them owns.
 //
@@ -176,9 +176,9 @@ export async function readJson(request: IncomingMessage): Promise<DynamicRecord>
   }
   try {
     const value = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-    if (isGroupRoute(request.url ?? "/")) {
-      const input = groupRequest(request.url ?? "/", value);
-      if (!isDynamicRecord(input)) throw new Error("Invalid group request.");
+    if (isChannelRoute(request.url ?? "/")) {
+      const input = channelRequest(request.url ?? "/", value);
+      if (!isDynamicRecord(input)) throw new Error("Invalid channel request.");
       return input;
     }
     return requestProtocol(request) === TEAM_PROTOCOL_V3

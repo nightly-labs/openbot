@@ -222,21 +222,21 @@ The draft is reviewed before OpenBot saves it; generating a draft does not creat
 an OpenBot conversation or change an existing agent. The provider's own data and
 CLI retention policies still apply.
 
-## Shared desktop groups
+## Shared desktop channels
 
-Group names, purposes, participating agents, linked conversation references, messages, tasks,
+Channel names, purposes, participating agents, linked conversation references, messages, tasks,
 assignment records, history summaries, and human read positions are stored in the host's SQLite
-database. All authenticated members of that server can read and use its groups. Agent membership
+database. All authenticated members of that server can read and use its channels. Agent membership
 selects participating agents; it is not a separate human access boundary.
 
-The selected lead's provider receives relevant group content for routing and history summaries in
-separate sessions without work tools. Assigned agents receive the group purpose, responsibilities,
+The selected lead's provider receives relevant channel content for routing and history summaries in
+separate sessions without work tools. Assigned agents receive the channel purpose, responsibilities,
 request, relevant source messages, shared history summary, recent messages, and attachment references.
-Agents can retrieve earlier group messages and other conversations on that server when needed.
+Agents can retrieve earlier channel messages and other conversations on that server when needed.
 Unrelated conversations are not sent automatically. Provider session internals remain internal.
 The provider's own data policies apply to content it receives.
 
-Archiving a group stops its work and retains its transcript. Restore makes the group available again.
-These actions do not remove agents, their memories, or linked conversations. Group traffic between
+Archiving a channel stops its work and retains its transcript. Restore makes the channel available again.
+These actions do not remove agents, their memories, or linked conversations. Channel traffic between
 desktop clients and a host uses the existing host transport. The account API and Signal service do
-not store group chats or make routing decisions. This feature adds no mobile chat interface.
+not store channel chats or make routing decisions. This feature adds no mobile chat interface.

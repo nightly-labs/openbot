@@ -32,7 +32,7 @@ function isAgentTurnOrigin(value: unknown): value is AgentTurnOrigin {
 }
 
 export type AgentEvent =
-  | { type: "groups-changed"; groupId: string; revision: number }
+  | { type: "channels-changed"; channelId: string; revision: number }
   | { type: "status"; status: AgentStatus }
   | { type: "usage-changed"; usage: AccountUsage }
   | { type: "agents-changed"; agents: AgentSummary[] }
@@ -89,9 +89,9 @@ export type AgentEvent =
 export function isAgentEvent(value: unknown): value is AgentEvent {
   if (!isDynamicRecord(value) || !isString(value.type)) return false;
   switch (value.type) {
-    case "groups-changed":
+    case "channels-changed":
       return (
-        isIdentifier(value.groupId) &&
+        isIdentifier(value.channelId) &&
         typeof value.revision === "number" &&
         Number.isSafeInteger(value.revision) &&
         value.revision >= 0

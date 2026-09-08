@@ -16,7 +16,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_MODEL_SCOPED_USAGE_CAPABILITY,
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
-  "group-chats-v1",
+  "channel-chats-v1",
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];

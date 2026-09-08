@@ -37,7 +37,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type { AgentService } from "../backend/agent-service";
-import type { GroupService } from "../backend/group-service";
+import type { ChannelService } from "../backend/channel-service";
 import type { TeamChatStore } from "../backend/team-chat-store";
 import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
@@ -68,7 +68,7 @@ interface HostEvents {
 type ForwardedApiOptions = ConstructorParameters<typeof TeamApiServer>[0];
 
 interface HostServiceOptions {
-  groups?: GroupService;
+  channels?: ChannelService;
   appVersion: string;
   store: TeamStore;
   agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads">;
@@ -199,7 +199,7 @@ export class HostService extends EventEmitter<HostEvents> {
       appVersion: options.appVersion,
       store: options.store,
       agents: options.agents,
-      groups: options.groups,
+      channels: options.channels,
       skills: options.skills,
       sidebarLayout: options.sidebarLayout,
       mailbox: options.mailbox,
@@ -958,7 +958,7 @@ export class HostService extends EventEmitter<HostEvents> {
     return memberId;
   }
 
-  groupActor(): { id: string; name: string } {
+  channelActor(): { id: string; name: string } {
     let user: CentralAuthUser;
     try {
       user = this.#options.getSignedInUser();

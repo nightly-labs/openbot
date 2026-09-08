@@ -15,11 +15,11 @@ const handoff = {
   dependencies: z.array(z.string()).optional(),
 };
 
-export const GROUP_TOOL_DEFINITIONS: readonly { name: string; description: string; shape: z.ZodRawShape }[] = [
+export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: string; shape: z.ZodRawShape }[] = [
   {
-    name: "group_history",
+    name: "channel_history",
     description:
-      "Read earlier shared group messages or an agent conversation on this server. This never starts another agent.",
+      "Read earlier shared channel messages or an agent conversation on this server. This never starts another agent.",
     shape: {
       beforeSequence: z.number().int().min(0).optional(),
       threadId: z.string().optional(),
@@ -28,18 +28,18 @@ export const GROUP_TOOL_DEFINITIONS: readonly { name: string; description: strin
     },
   },
   {
-    name: "group_assign",
+    name: "channel_assign",
     description:
-      "Assign one specific subtask to another group member. Keep ownership of the parent task. End your turn while waiting for required results.",
+      "Assign one specific subtask to another channel member. Keep ownership of the parent task. End your turn while waiting for required results.",
     shape: handoff,
   },
   {
-    name: "group_transfer",
-    description: "Transfer this task to another group member. End your turn after the transfer.",
+    name: "channel_transfer",
+    description: "Transfer this task to another channel member. End your turn after the transfer.",
     shape: handoff,
   },
   {
-    name: "group_result",
+    name: "channel_result",
     description: "Publish the requested task result once in the shared chat. End your turn without repeating it.",
     shape: { text: z.string().min(1).max(INPUT_LIMITS.messageText) },
   },

@@ -104,13 +104,13 @@ describe("HostService account binding", () => {
   const first = { id: "account-a", email: "a@example.com", name: "A", avatarUrl: null };
   const second = { id: "account-b", email: "b@example.com", name: "B", avatarUrl: null };
 
-  it("uses the local caller for groups without requiring a cloud account", async () => {
+  it("uses the local caller for channels without requiring a cloud account", async () => {
     const { service, announce } = await createHostService();
-    expect(service.groupActor()).toEqual({ id: "local", name: "You" });
+    expect(service.channelActor()).toEqual({ id: "local", name: "You" });
     announce(first);
-    expect(service.groupActor()).toEqual({ id: "local-user:account-a", name: "A" });
+    expect(service.channelActor()).toEqual({ id: "local-user:account-a", name: "A" });
     announce(second);
-    expect(service.groupActor()).toEqual({ id: "local-user:account-b", name: "B" });
+    expect(service.channelActor()).toEqual({ id: "local-user:account-b", name: "B" });
   });
 
   it("stops reporting the previous account's server when the account changes", async () => {
