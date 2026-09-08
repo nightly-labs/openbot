@@ -68,6 +68,8 @@ export interface ProviderHooks {
   onProviderLost(client: AgentClient): void;
   /** True once stop() has begun, so a client exiting during shutdown does not trigger a restart. */
   isStopping(): boolean;
+  /** True while an agent on this provider runs a turn, which replacing its CLI would cut short. */
+  hasActiveTurns(provider: AgentProvider): boolean;
 }
 
 /**
@@ -207,6 +209,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #accounts = new Map<AgentProvider, AccountReadResult["account"]>();
   readonly #providerStarts = new Map<AgentProvider, Promise<void>>();
   readonly #providerConnectionCommands = new Map<AgentProvider, Promise<void>>();
+  readonly #replacingCli = new Set<AgentProvider>();
   #status: AgentStatus = structuredClone(INITIAL_STATUS);
   #providerRefresh: Promise<AgentStatus> | null = null;
   #codexLogin: PendingCodexLogin | null = null;
@@ -400,36 +403,49 @@ export class ProviderRuntime implements ProviderPort {
       if (cli.source === "managed") {
         throw new Error(`OpenBot manages this ${providerLabel(provider)} CLI and updates it with the app.`);
       }
-      this.#setProviderConnectionState(provider, "connecting");
-      let reason: () => string | null = () => null;
-      try {
-        const child = spawn(cli.executable, [...command.argv], {
-          cwd: process.cwd(),
-          env: { ...process.env, ...command.env(cli) },
-          // Only the error stream is read. An updater that refuses - a CLI installed by a package
-          // manager that wants to own the upgrade, most often - says why there, and its own reason
-          // is worth more to the user than an exit code.
-          stdio: ["ignore", "ignore", "pipe"],
-          shell: false,
-          windowsHide: process.platform === "win32",
-        });
-        reason = readProcessReason(child);
-        await waitForSuccessfulProcess(child, command.timeoutMs, "Provider update");
-      } catch (error) {
-        this.#setProviderConnectionFailure(
-          provider,
-          new Error(`OpenBot could not update the ${providerLabel(provider)} CLI. ${reason() ?? "Try again."}`),
-          cli.version,
-        );
-        throw error;
+      // The update replaces the binary under a running client, and the client is restarted after
+      // it. A turn in flight would lose its process, so the user is asked to wait instead.
+      if (this.#hooks.hasActiveTurns(provider)) {
+        throw new Error(`The ${providerLabel(provider)} CLI is working on a turn. Wait for it to finish, then update.`);
       }
-      // The running client still executes the binary the updater replaced, so it is restarted here.
-      // Its version is what the row shows, and the new one is the whole point of the command.
+      this.#setProviderConnectionState(provider, "connecting");
+      // No turn may start on this provider until the new client is ready. Deliveries wait in the
+      // mailbox and #activateProviderClient schedules them again.
+      this.#replacingCli.add(provider);
       try {
-        await this.#reloadProviderCli(provider);
-      } catch (error) {
-        this.#setProviderConnectionFailure(provider, error, cli.version);
-        throw error;
+        let reason: () => string | null = () => null;
+        try {
+          const child = spawn(cli.executable, [...command.argv], {
+            cwd: process.cwd(),
+            env: { ...process.env, ...command.env(cli) },
+            // Only the error stream is read. An updater that refuses - a CLI installed by a package
+            // manager that wants to own the upgrade, most often - says why there, and its own reason
+            // is worth more to the user than an exit code.
+            stdio: ["ignore", "ignore", "pipe"],
+            shell: false,
+            windowsHide: process.platform === "win32",
+          });
+          reason = readProcessReason(child);
+          await waitForSuccessfulProcess(child, command.timeoutMs, "Provider update");
+        } catch (error) {
+          // One error for both readers: the row and the caller each get the updater's own reason.
+          const failure = new Error(
+            `OpenBot could not update the ${providerLabel(provider)} CLI. ${reason() ?? "Try again."}`,
+            { cause: error },
+          );
+          this.#setProviderConnectionFailure(provider, failure, cli.version);
+          throw failure;
+        }
+        // The running client still executes the binary the updater replaced, so it is restarted
+        // here. Its version is what the row shows, and the new one is the point of the command.
+        try {
+          await this.#reloadProviderCli(provider);
+        } catch (error) {
+          this.#setProviderConnectionFailure(provider, error, cli.version);
+          throw error;
+        }
+      } finally {
+        this.#replacingCli.delete(provider);
       }
       return this.status();
     });
@@ -437,6 +453,11 @@ export class ProviderRuntime implements ProviderPort {
 
   clientForAgent(agent: AgentSummary): AgentClient | null {
     return this.#clients.get(providerForAgent(agent)) ?? null;
+  }
+
+  /** True while the CLI's own updater runs and the client that used the old binary is replaced. */
+  isReplacingCli(provider: AgentProvider): boolean {
+    return this.#replacingCli.has(provider);
   }
 
   requireReadyClient(provider: AgentProvider): AgentClient {

@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { join } from "node:path";
+import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "../agent-client";
 import { AgentService } from "../agent-service";
@@ -547,6 +548,30 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       expect.objectContaining({ id: "claude", state: "available", version: "2.1.246" }),
     );
   });
+  it("refuses to replace a CLI that is running a turn", async () => {
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => new FakeAgentClient(provider, "", false),
+    );
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Keep working." });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+
+    // The updater would replace the binary under the running turn, so it is not started at all.
+    await expect(service.updateProviderCli("codex")).rejects.toThrow(/working on a turn/u);
+
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "codex", state: "available", version: "0.144.1" }),
+    );
+  });
+
   it("keeps the CLI's own reason when its updater refuses", async () => {
     const claude = await createUpdatableFakeClaude(root, "2.1.250", "Installed by Homebrew. Run brew upgrade.");
     process.env.OPENBOT_CLAUDE_PATH = claude.executable;
@@ -561,7 +586,8 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
     await service.initialize();
 
-    await expect(service.updateProviderCli("claude")).rejects.toThrow();
+    // The caller and the provider row get the same reason: the CLI's own words.
+    await expect(service.updateProviderCli("claude")).rejects.toThrow(/Installed by Homebrew\. Run brew upgrade\./u);
 
     expect(service.getStatus().providers).toContainEqual(
       expect.objectContaining({

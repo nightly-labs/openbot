@@ -134,6 +134,9 @@ export class DrainScheduler {
       const context = this.#mailbox.nextQueued(agentId);
       if (!context) return;
       const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+      // The provider's CLI is being replaced. The delivery stays queued, and the new client
+      // schedules this drain again once it is ready.
+      if (agent && this.#providers.isReplacingCli(providerForAgent(agent))) return;
       const session = agent ? this.#store.activeProviderSession(agentId) : null;
       if (session && this.#compaction.reserve(agentId, session.externalSessionId)) {
         await this.#compaction.request(agentId, session.externalSessionId);

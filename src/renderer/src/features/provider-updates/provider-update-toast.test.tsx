@@ -256,7 +256,7 @@ it("keeps the CLI's own reason on the notification and retries from it", async (
 it("stops offering a version the CLI's own updater leaves uninstalled", async () => {
   const updateSystemCli = vi.fn(async () => {});
   // The CLI reports the same version it started on: its channel has nothing newer for it.
-  const { store } = systemCliHarness(updateSystemCli, true, "0.146.0");
+  const { store, setInstalled } = systemCliHarness(updateSystemCli, true, "0.146.0");
 
   fireEvent.click(await screen.findByRole("button", { name: "Update" }));
   await waitFor(() => expect(updateSystemCli).toHaveBeenCalledWith("codex"));
@@ -264,6 +264,11 @@ it("stops offering a version the CLI's own updater leaves uninstalled", async ()
   expect(screen.getByText("v0.146.0")).toBeInTheDocument();
   await waitFor(() => expect(store.providerAvailableVersions().codex).toBeNull());
   expect(screen.queryByRole("button", { name: "Update" })).not.toBeInTheDocument();
+
+  // The CLI moved on its own, so it is a different install and the pinned version is offered again.
+  setInstalled("0.150.0");
+  flush();
+  expect(store.providerAvailableVersions().codex).toBe("0.153.4");
 });
 
 it("announces an offer that only becomes one once the agent status lands", async () => {

@@ -34,7 +34,8 @@ export function createProviderRuntimeStore(
     createSignal<ProviderRuntimeSnapshot>(FALLBACK_PROVIDER_RUNTIMES);
   const updating = new Set<AgentProviderId>();
   /**
-   * A version the user's own CLI updater will not install, per provider.
+   * A version the user's own CLI updater will not install, per provider, with the version it stayed
+   * on. Both are needed: a CLI that moves later is a different install, and the offer is live again.
    *
    * The updater can report success and leave the CLI exactly where it was: its release channel
    * decides what "latest" means for it, and that answer can be older than the version OpenBot pins.
@@ -42,7 +43,9 @@ export function createProviderRuntimeStore(
    * lasting record - it survives a restart, and it owns every version comparison - so this is only
    * the immediate echo, which settles the notification without waiting for the next snapshot.
    */
-  const [refusedVersions, setRefusedVersions] = createSignal<Partial<Record<AgentProviderId, string>>>({});
+  const [refusedVersions, setRefusedVersions] = createSignal<
+    Partial<Record<AgentProviderId, { installed: string; offered: string }>>
+  >({});
   /** What the user was last told about, so one offer is not announced twice. */
   let announced: ProviderUpdate[] = [];
   let disposed = false;
@@ -50,16 +53,15 @@ export function createProviderRuntimeStore(
     const runtime = snapshot.providers[provider];
     const systemVersion = owners.systemCliVersion?.(provider) ?? null;
     const availableVersion = runtime.availableVersion ?? null;
+    const refused = refusedVersions()[provider];
     return {
       provider,
       name: provider === "codex" ? "ChatGPT" : provider === "claude" ? "Claude" : "Grok",
-      // A CLI the user installed has no managed download, so its runtime stays "not-downloaded"
-      // while the provider runs perfectly well. It is installed, on the version it reports.
-      runtime:
-        systemVersion && runtime.phase === "not-downloaded"
-          ? { ...runtime, phase: "ready", version: systemVersion }
-          : runtime,
-      availableVersion: refusedVersions()[provider] === availableVersion ? null : availableVersion,
+      // A CLI the user installed is the one the provider runs, whatever the managed runtime holds.
+      // It is installed, on the version it reports.
+      runtime: systemVersion ? { ...runtime, phase: "ready", version: systemVersion } : runtime,
+      availableVersion:
+        refused?.offered === availableVersion && refused.installed === systemVersion ? null : availableVersion,
     };
   }
 
@@ -100,8 +102,9 @@ export function createProviderRuntimeStore(
     // An updater that finished on the version it started on has given its answer: the version
     // OpenBot pins is not one it will install, and repeating the offer would only repeat this.
     const offered = update.availableVersion;
-    const refused = offered !== null && owners.systemCliVersion?.(provider) === update.runtime.version;
-    if (refused) setRefusedVersions((current) => ({ ...current, [provider]: offered }));
+    const installed = owners.systemCliVersion?.(provider) ?? null;
+    const refused = offered !== null && installed !== null && installed === update.runtime.version;
+    if (refused && installed) setRefusedVersions((current) => ({ ...current, [provider]: { installed, offered } }));
     const settled = providerUpdate(provider);
     // Read locally rather than through the signal just written: the write lands on the next flush.
     reportProviderUpdateToast(

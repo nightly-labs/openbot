@@ -210,7 +210,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(await screen.findByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
     const picker = screen.getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
-    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5, default" }));
+    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5" }));
 
     await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(2));
     expect(await screen.findByRole("button", { name: "Weekly usage, 18% left" })).toBeInTheDocument();
@@ -454,7 +454,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
     expect(window.openbot.agent.updateAgent).not.toHaveBeenCalled();
     expect(within(picker).getByText("2.1.231 (Claude Code)")).toBeInTheDocument();
-    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5, default" }));
+    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5" }));
 
     await waitFor(() =>
       expect(window.openbot.agent.updateAgent).toHaveBeenCalledWith({
@@ -494,7 +494,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
     const picker = screen.getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
-    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5, default" }));
+    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5" }));
     const effort = within(picker).getByRole("button", { name: /Agent reasoning effort/ });
     await fireEvent.pointerDown(effort, { pointerType: "mouse", button: 0 });
     await fireEvent.click(screen.getByRole("option", { name: "High" }));
@@ -556,8 +556,8 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
     const picker = screen.getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
-    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5, default" }));
-    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Sonnet 5" }));
+    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5" }));
+    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Sonnet 5, default" }));
     expect(window.openbot.agent.updateAgent).toHaveBeenCalledOnce();
 
     await fireEvent.keyDown(picker, { key: "Escape" });
@@ -822,7 +822,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(within(settings).getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
     let picker = within(settings).getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
-    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5, default" }));
+    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5" }));
 
     await fireEvent.click(screen.getByRole("button", { name: /Sales Outbound/ }));
     await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
@@ -832,7 +832,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(within(settings).getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
     picker = within(settings).getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
-    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5, default" }));
+    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5" }));
     await waitFor(() =>
       expect(window.openbot.agent.updateAgent).toHaveBeenCalledWith({
         agentId: "sales-outbound",

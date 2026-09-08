@@ -44,7 +44,7 @@ describe("AgentSettingsPanel", () => {
     await fireEvent.click(await screen.findByRole("button", { name: "Agent model: GPT-5.6 Sol" }));
     const dialog = screen.getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(dialog).getByRole("tab", { name: /^Claude:/ }));
-    await fireEvent.click(within(dialog).getByRole("option", { name: "Claude Sonnet 5" }));
+    await fireEvent.click(within(dialog).getByRole("option", { name: "Claude Sonnet 5, default" }));
 
     await waitFor(() =>
       expect(onUpdateRuntimeSettings).toHaveBeenCalledWith(

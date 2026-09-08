@@ -234,6 +234,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#browser.clearControls();
         },
         isStopping: () => this.#stopping,
+        hasActiveTurns: (provider) =>
+          this.#store
+            .list()
+            .some(
+              (agent) =>
+                providerForAgent(agent) === provider && this.#conversation.snapshot(agent.id)?.activeTurnId != null,
+            ),
       },
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),

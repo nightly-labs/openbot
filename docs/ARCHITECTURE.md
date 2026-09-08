@@ -455,8 +455,14 @@ one Update button, and one entry point in the runtime store, `startProviderUpdat
 behind it differs: a `system` install goes to `updateProviderCli`, which runs that CLI's own updater
 (`codex update`) and then restarts the provider on the binary now on disk. That updater reports no
 progress, so the notification holds its indeterminate step until the provider comes back, and a
-failure keeps the reason the CLI gave. OpenBot downloads nothing on this path, so the pinned artifact checksums are untouched. The
-managed copy refuses this command, because the runtime manager replaces that installation whole.
+failure keeps the reason the CLI gave, in one error that goes to the provider row and to the caller.
+OpenBot downloads nothing on this path, so the pinned artifact checksums are untouched. The managed
+copy refuses this command, because the runtime manager replaces that installation whole.
+
+The update replaces the binary under a running client. A provider that has an agent in a turn
+therefore refuses the command and tells the user to wait, and no turn may start on that provider
+until the new client is ready: the drain scheduler skips an agent whose provider reports
+`isReplacingCli`, and the delivery waits in the mailbox until the new client schedules it again.
 
 That updater decides for itself what the newest version is, and its release channel can name an
 older one than the lock: `grok update` can report success and leave the CLI where it was. The IPC
