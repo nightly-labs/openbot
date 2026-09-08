@@ -1225,59 +1225,6 @@ describe("OpenBotDatabase", () => {
     migrated.close();
   });
 
-  // A thread can outlive the agent row that named it: no foreign key ties the two, `replaceAgents`
-  // truncates the roster, and `ensureThreadProjection` never deletes. Such a thread already keyed at the
-  // rename target is invisible to a `taken` check that reads the roster alone, and the collision it
-  // causes raises nothing: the live thread's `thread_id` is rewritten onto the orphan's, the row-level
-  // `OR REPLACE` deletes the orphan, and the messages of both are rewritten onto the one surviving
-  // thread. The user opens their chat to find another conversation mixed into it and the record that
-  // separated them gone -- which is why the assertions below count the threads and the message in each,
-  // not just that the migration finished. The rename is skipped instead: the stale spelling stays.
-  it("keeps a legacy agent id rather than colliding with a thread no agent claims", async () => {
-    const root = await mkdtemp(join(tmpdir(), "openbot-db-ids-orphan-"));
-    roots.push(root);
-    const database = new OpenBotDatabase(root);
-    await database.initialize();
-    database.close();
-
-    const legacyId = "bot-4a5b6c7d-8e9f-4a1b-8c2d-3e4f5a6b7c8d";
-    const agentId = `agent-${legacyId.slice("bot-".length)}`;
-    const legacy = new DatabaseSync(database.path);
-    downgradeToV11(legacy);
-    seedLegacyAgent(legacy, legacyId, `/Users/dev/OpenBot/Bots/${legacyId}`);
-    seedUnclaimedThread(legacy, agentId);
-    legacy.close();
-
-    const migrated = new OpenBotDatabase(root);
-    await migrated.initialize();
-
-    expect(migrated.connection.prepare("SELECT version FROM schema_migrations WHERE version = 13").get()).toEqual({
-      version: 13,
-    });
-    expect(migrated.connection.prepare("SELECT agent_id FROM projection_agents").all()).toEqual([
-      { agent_id: legacyId },
-    ]);
-    expect(
-      migrated.connection.prepare("SELECT thread_id, agent_id FROM projection_threads ORDER BY thread_id").all(),
-    ).toEqual([
-      { thread_id: `openbot-thread-${agentId}`, agent_id: agentId },
-      { thread_id: `openbot-thread-${legacyId}`, agent_id: legacyId },
-    ]);
-    expect(
-      migrated.connection
-        .prepare("SELECT thread_id, message_id FROM projection_thread_messages ORDER BY thread_id")
-        .all(),
-    ).toEqual([
-      { thread_id: `openbot-thread-${agentId}`, message_id: "message-unclaimed" },
-      { thread_id: `openbot-thread-${legacyId}`, message_id: "message-1" },
-    ]);
-    expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
-    expect(migrated.readConversationPage(legacyId, `openbot-thread-${legacyId}`).messages).toEqual([
-      expect.objectContaining({ id: "message-1" }),
-    ]);
-    migrated.close();
-  });
-
   it("rolls back a failed agent id rewrite and succeeds on retry", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-db-ids-rollback-"));
     roots.push(root);
@@ -1641,36 +1588,6 @@ function seedLegacyAgent(database: DatabaseSync, legacyId: string, workspacePath
        VALUES (?, ?, 'agent-roster', 'agent-roster', 'agents.replaced', '2026-09-01T12:00:00.000Z', ?)`,
     )
     .run(`roster-${legacyId}`, `agents-replaced:${legacyId}`, rosterJson);
-}
-
-/**
- * A thread row, with a message in it, that no `projection_agents` row claims -- the state any `#persist`
- * made with an incomplete roster leaves behind.
- */
-function seedUnclaimedThread(database: DatabaseSync, agentId: string): void {
-  const threadId = `openbot-thread-${agentId}`;
-  database
-    .prepare(
-      `INSERT INTO projection_threads (thread_id, agent_id, title, active_turn_id, created_at, updated_at, last_event_sequence)
-       VALUES (?, ?, 'Chief', NULL, '2026-09-01T12:00:00.000Z', '2026-09-01T12:00:00.000Z', 1)`,
-    )
-    .run(threadId, agentId);
-  database
-    .prepare(
-      `INSERT INTO projection_thread_messages
-         (thread_id, message_id, turn_id, author, status, item_type, created_at, ordinal, message_json, last_event_sequence)
-       VALUES (?, 'message-unclaimed', NULL, 'user', 'completed', NULL, '2026-09-01T12:00:00.000Z', 0, ?, 1)`,
-    )
-    .run(
-      threadId,
-      JSON.stringify({
-        id: "message-unclaimed",
-        author: "user",
-        status: "completed",
-        text: "Where did my chat go?",
-        createdAt: "2026-09-01T12:00:00.000Z",
-      }),
-    );
 }
 
 function downgradeReactionsToV7(database: DatabaseSync): void {
