@@ -184,15 +184,17 @@ it("refreshes cross-device memberships only while active and stops on shutdown",
   const refresh = vi.fn(async () => undefined);
   const stop = watchRemoteHostDirectory({ isActive: () => active, refresh });
   try {
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(15 * 60_000);
     expect(refresh).not.toHaveBeenCalled();
     active = true;
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(15 * 60_000 - 1);
+    expect(refresh).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
     expect(refresh).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(29_999);
+    await vi.advanceTimersByTimeAsync(15 * 60_000 - 1);
     expect(refresh).toHaveBeenCalledTimes(1);
     stop();
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(15 * 60_000);
     expect(refresh).toHaveBeenCalledTimes(1);
   } finally {
     stop();
