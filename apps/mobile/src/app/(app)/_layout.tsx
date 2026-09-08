@@ -84,6 +84,7 @@ function AuthenticatedStack() {
             title: "Edit agent",
           }}
         />
+        <Stack.Screen name="scan-invite" options={{ title: "Scan invitation", presentation: "fullScreenModal" }} />
         <Stack.Screen
           name="add-server"
           options={{
@@ -112,6 +113,16 @@ function AuthenticatedStack() {
             headerShown: false,
             presentation: "formSheet",
             sheetAllowedDetents: "fitToContents",
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
+          name="server-settings"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
           }}
         />

@@ -2,7 +2,7 @@ import { type RemoteRecoveryStatus, remoteRecoveryMessage } from "@openbot/team-
 import type { MobileServer, MobileServerState } from "./workspace-types";
 
 const LABELS: Record<MobileServerState, string> = {
-  unknown: "Unknown",
+  unknown: "Not connected",
   connecting: "Connecting…",
   online: "Online",
   offline: "Offline",
@@ -50,4 +50,8 @@ export function resetServerStatus(server: MobileServer): MobileServer {
     connectionMessage: null,
     recoveryStatus: undefined,
   };
+}
+
+export function serverKind(hostId: string, pairedHostId: string | undefined): MobileServer["kind"] {
+  return hostId === pairedHostId ? "local" : "remote";
 }

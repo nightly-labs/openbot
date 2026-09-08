@@ -300,7 +300,7 @@ export interface ServersDesktopApi {
   revokeInvite: (serverId: string, inviteId: string) => Promise<void>;
   createInvite: (serverId: string, input: CreateTeamInviteInput) => Promise<InviteSummary>;
   setTyping: (input: SetTeamTypingInput) => Promise<void>;
-  onPresence: (listener: (snapshot: TeamPresenceSnapshot) => void) => () => void;
+  onPresence: (listener: (snapshot: TeamPresenceSnapshot) => void, serverId?: string) => () => void;
   listDirectThreads: () => Promise<DirectThreadSummary[]>;
   readDirectConversation: (memberId: string) => Promise<DirectConversationSnapshot>;
   readDirectConversationPage: (input: ReadDirectConversationPageInput) => Promise<DirectConversationPage>;

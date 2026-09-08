@@ -1561,9 +1561,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         email: input.email ?? null,
       }),
       setTyping: async (_input: SetTeamTypingInput) => undefined,
-      onPresence: (listener) => {
-        presenceListeners.add(listener);
-        return () => presenceListeners.delete(listener);
+      onPresence: (listener, serverId) => {
+        const receive = (snapshot: TeamPresenceSnapshot) => {
+          if (
+            !serverId ||
+            snapshot.serverId === serverId ||
+            (serverId === "local" && snapshot.serverId === hostStatus.serverId)
+          )
+            listener(snapshot);
+        };
+        presenceListeners.add(receive);
+        return () => presenceListeners.delete(receive);
       },
       listDirectThreads: async () => clone(directThreads),
       readDirectConversation: async (memberId) =>

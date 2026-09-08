@@ -28,12 +28,6 @@ export function SettingsScreen() {
         <SettingsRow onPress={() => router.push("/settings/general")} supportingText="Appearance and conversations">
           <Typography.Paragraph type="body-sm">General</Typography.Paragraph>
         </SettingsRow>
-        <SettingsRow
-          onPress={() => router.push("/settings/connections")}
-          supportingText="Your desktop and team servers"
-        >
-          <Typography.Paragraph type="body-sm">Connections</Typography.Paragraph>
-        </SettingsRow>
       </SettingsSection>
       <SettingsSection>
         <SettingsRow onPress={() => router.push("/settings/about")}>

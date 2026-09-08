@@ -53,6 +53,7 @@ export class RemoteEventRefresh {
   readonly #conversations = new Map<string, ConversationRefresh>();
   readonly #queues = new Map<string, QueueRefresh>();
   readonly #generations = new Map<string, number>();
+  readonly #rosterLoads = new Map<string, Promise<void>>();
 
   constructor(options: RemoteEventRefreshOptions) {
     this.#request = options.request;
@@ -67,6 +68,7 @@ export class RemoteEventRefresh {
    */
   forward(serverId: string, event: AgentEvent, bufferedLive = false): void {
     this.#advance(serverId);
+    if (event.type === "agents-changed") this.#rosterLoads.delete(serverId);
     if (event.type === "conversation-invalidated") {
       void this.#refreshConversationPage(serverId, event.agentId, event.revision);
     } else if (event.type === "queue-invalidated") {
@@ -105,7 +107,24 @@ export class RemoteEventRefresh {
     );
   }
 
+  /** Runtime snapshots omit the roster. Reload it once when a WebRTC connection recovers. */
+  refreshAgentRoster(serverId: string): Promise<void> {
+    const pending = this.#rosterLoads.get(serverId);
+    if (pending) return pending;
+    const operation = this.#request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)
+      .then((agents) => {
+        if (this.#rosterLoads.get(serverId) !== operation || !this.#hasServer(serverId)) return;
+        this.#emit(serverId, { type: "agents-changed", agents });
+      })
+      .finally(() => {
+        if (this.#rosterLoads.get(serverId) === operation) this.#rosterLoads.delete(serverId);
+      });
+    this.#rosterLoads.set(serverId, operation);
+    return operation;
+  }
+
   forget(serverId: string): void {
+    this.#rosterLoads.delete(serverId);
     this.#generations.delete(serverId);
     for (const key of this.#conversations.keys()) {
       if (key.startsWith(`${serverId}\0`)) this.#conversations.delete(key);
@@ -116,6 +135,7 @@ export class RemoteEventRefresh {
   }
 
   clear(): void {
+    this.#rosterLoads.clear();
     this.#generations.clear();
     this.#conversations.clear();
     this.#queues.clear();

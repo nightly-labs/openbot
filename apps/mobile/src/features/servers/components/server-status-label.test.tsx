@@ -34,6 +34,7 @@ const server: MobileServer = {
   accent: "",
   publicKey: "key",
   membershipId: "member",
+  role: "owner",
 };
 const container = document.createElement("div");
 document.body.append(container);
@@ -46,7 +47,7 @@ afterEach(async () => {
 describe("server status indicator", () => {
   it("updates visible and accessible status through connection loss and recovery", async () => {
     const states: [MobileServerState, boolean, string][] = [
-      ["unknown", true, "Unknown"],
+      ["unknown", true, "Not connected"],
       ["connecting", true, "Connecting…"],
       ["online", false, "Online"],
       ["offline", false, "Offline"],
@@ -54,7 +55,7 @@ describe("server status indicator", () => {
       ["error", false, "Connection error"],
       ["connecting", false, "Offline"],
       ["online", false, "Online"],
-      ["unknown", true, "Unknown"],
+      ["unknown", true, "Not connected"],
     ];
     for (const [state, initialConnectionPending, label] of states) {
       await act(() =>

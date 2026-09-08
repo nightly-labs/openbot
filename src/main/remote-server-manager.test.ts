@@ -303,6 +303,7 @@ describe("remote server links", () => {
     const request = vi
       .spyOn(transport, "request")
       .mockImplementation(async (_hostId, path): Promise<TeamProtocolV2Json> => {
+        if (path === "/v1/agents") return [];
         if (path === "/v1/compatibility") {
           return {
             appVersion: "0.4.0",
@@ -342,7 +343,10 @@ describe("remote server links", () => {
           .map((server) => server.id),
       ).toEqual([betaId, alphaId, gammaId]);
       expect(manager.list().find((server) => server.id === betaId)?.remoteDesktopAvailable).toBe(false);
+      const roster = vi.fn();
+      manager.on("agent", roster);
       transport.emit("connected", betaId);
+      await vi.waitFor(() => expect(roster).toHaveBeenCalledWith(betaId, { type: "agents-changed", agents: [] }));
       await vi.waitFor(() =>
         expect(manager.list().find((server) => server.id === betaId)?.remoteDesktopAvailable).toBe(true),
       );
@@ -373,11 +377,19 @@ describe("remote server links", () => {
       expect(manager.list().some((server) => server.id === gammaId)).toBe(false);
       expect(removeMember).not.toHaveBeenCalledWith(gammaId, `${gammaId}-member`);
       expect(JSON.parse(await readFile(statePath, "utf8"))).toMatchObject({ hiddenHostIds: [gammaId] });
+      const directoryChanged = vi.fn(() => {
+        void manager.syncRemoteHosts();
+      });
+      manager.on("directoryInvalidated", directoryChanged);
+      hosts = hosts.filter((host) => host.hostId !== betaId);
       transport.emit("error", betaId, "session_revoked", "The remote session was revoked.");
       expect(manager.list().find((server) => server.id === betaId)).toMatchObject({
         state: "error",
         issue: { code: "authentication_required", retryable: false },
       });
+      await vi.waitFor(() => expect(manager.list().some((server) => server.id === betaId)).toBe(false));
+      expect(directoryChanged).toHaveBeenCalledOnce();
+      expect(manager.activeServerId).toBe("local");
     } finally {
       await manager.stop();
       await rm(directory, { recursive: true, force: true });
@@ -742,6 +754,46 @@ describe("remote connection failures", () => {
     await fixture.manager.retryConnection(hostId);
     transport.emit("disconnected", hostId);
     expect(fixture.server(hostId)).toMatchObject({ state: "offline" });
+  });
+
+  it("loads agents after reconnecting a host whose previous protocol error is fixed", async () => {
+    const hostId = "00000000-0000-4000-8000-0000000000fd";
+    const transport = fakeWebRtcTransport([
+      {
+        hostId,
+        name: "Host",
+        logoKey: null,
+        devicePublicKey: null,
+        authEpoch: 1,
+        membershipId: "member-1",
+        role: "member",
+      },
+    ]);
+    vi.spyOn(transport, "request").mockImplementation(async (_hostId, path): Promise<TeamProtocolV2Json> => {
+      if (path === "/v1/compatibility")
+        return { appVersion: "0.4.0", protocol: { minimum: 2, maximum: 2 }, capabilities: [] };
+      return [];
+    });
+    const fixture = await createRemoteManager({
+      servers: [storedHttpsServer(hostId, { transport: "webrtc-v2", apiUrl: `webrtc://${hostId}` })],
+      appVersion: "0.4.0",
+      managerOptions: { webrtcTransport: transport },
+    });
+    await expect(
+      fixture.manager.request(hostId, "/v1/agents", () => {
+        throw new Error("Old invalid payload.");
+      }),
+    ).rejects.toThrow("could not safely use");
+    const roster = vi.fn();
+    fixture.manager.on("agent", roster);
+    const disconnect = vi.spyOn(transport, "disconnect");
+    vi.spyOn(transport, "connect").mockImplementation(async () => {
+      transport.emit("connected", hostId);
+    });
+    await fixture.manager.retryConnection(hostId);
+    await vi.waitFor(() => expect(roster).toHaveBeenCalledWith(hostId, { type: "agents-changed", agents: [] }));
+    expect(fixture.server(hostId)).toMatchObject({ state: "online", issue: null });
+    expect(disconnect).not.toHaveBeenCalled();
   });
 
   // A retry has to leave a working host reading as working. `connect` on a channel that never
