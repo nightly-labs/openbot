@@ -80,7 +80,11 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     } catch {
       // A background refresh that fails leaves the last good report where it is rather
       // than replacing it with an error the user cannot act on; the next turn retries.
-      if (!background && request === generation && props.serverId === serverId && state.range.agentId === agentId)
+      // Only while a report is on screen, though: a background request that overtakes the
+      // first load takes the generation with it, so the foreground response is discarded
+      // too, and a silent failure would leave the panel on Loading with no Retry.
+      if (background && state.result) return;
+      if (request === generation && props.serverId === serverId && state.range.agentId === agentId)
         setState((draft) => {
           draft.result = null;
           draft.phase = "error";

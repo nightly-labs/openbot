@@ -109,6 +109,22 @@ describe("Agent usage", () => {
       expect(screen.getByRole("status")).toHaveTextContent("This host does not support agent analytics"),
     );
   });
+  it("reports a background failure while the first load is still in flight", async () => {
+    // A completed turn can refresh before the first response arrives. The refresh takes the
+    // generation with it, so the first response is discarded; if the refresh then fails
+    // quietly, the panel keeps Loading forever with Refresh disabled and no Retry.
+    vi.mocked(window.openbot.agent.getHostAnalytics)
+      .mockReturnValueOnce(new Promise(() => {}))
+      .mockRejectedValueOnce(new Error("offline"));
+    show();
+    await vi.waitFor(() => expect(window.openbot.agent.getHostAnalytics).toHaveBeenCalled());
+    emitScopedAgentEvent?.({
+      serverId: "host-a",
+      event: { type: "turn-completed", agentId: "a", threadId: "thread-1", turnId: "turn-1", status: "completed" },
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not load usage");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  });
   it("discards data from a previous host even when the agent id is the same", async () => {
     let completeOld: (value: HostAnalytics) => void = () => {
       throw new Error("No pending request");
