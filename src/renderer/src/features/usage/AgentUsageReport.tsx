@@ -214,7 +214,9 @@ export function AgentUsageReport(props: {
                             <UsageProviderMark provider={model.provider} />
                             <span>
                               {model.model || "Unknown model"}
-                              <small>{usageProviderName(model.provider)}</small>
+                              {/* The logo carries the provider for a reader who sees it, and the
+                                  row stays one line high; the name is still spoken. */}
+                              <span class="sr-only">{usageProviderName(model.provider)}</span>
                             </span>
                           </span>
                         </th>

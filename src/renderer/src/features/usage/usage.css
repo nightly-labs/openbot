@@ -192,7 +192,7 @@
 .agent-usage-table th,
 .agent-usage-table td {
   text-align: right;
-  padding: var(--openbot-space-4) var(--openbot-space-3);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
   border-bottom: 1px solid var(--openbot-border-strong);
   white-space: nowrap;
   font-weight: 400;
@@ -218,12 +218,6 @@
   gap: var(--openbot-space-3);
   overflow-wrap: anywhere;
   min-width: 10rem;
-}
-.agent-usage-model-name small {
-  display: block;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  margin-top: var(--openbot-space-1);
 }
 .agent-usage-footer {
   display: flex;
