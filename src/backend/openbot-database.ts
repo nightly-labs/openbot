@@ -132,6 +132,14 @@ export class OpenBotDatabase {
     return this.#roster.listAgents();
   }
 
+  unclaimedThreads(): { threadId: string; agentId: string }[] {
+    return this.#roster.unclaimedThreads();
+  }
+
+  latestRosterAgents(): unknown[] {
+    return this.#roster.latestRosterAgents();
+  }
+
   replaceAgents(commandId: string, agents: AgentSummary[], eventType: string): void {
     this.#roster.replaceAgents(commandId, agents, eventType);
   }

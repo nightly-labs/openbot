@@ -165,6 +165,7 @@ export class AgentStore {
         examplesInitialized: true,
         agents: persisted.map(normalizeStoredAgent),
       };
+      this.#restoreRosterFromEvents();
     } else {
       const legacy = await this.#readState();
       await this.#database.backupLegacyFile(this.#statePath);
@@ -199,6 +200,9 @@ export class AgentStore {
     await this.#profileCreationRecovery.recover(this.#database, async (agentId) => {
       await this.deleteAgent(agentId);
     });
+    // Last, so that a thread belonging to an agent the two recoveries above have just removed is gone
+    // rather than re-adopted.
+    this.#reconcileUnclaimedThreads();
   }
 
   list(): AgentSummary[] {
@@ -829,6 +833,39 @@ export class AgentStore {
   }
 
   /**
+   * Gives an agent back a thread that fell out of the roster, so its history stops being unreachable.
+   *
+   * A thread nothing claims is not visible and not reportable: the sidebar is the roster, no foreign key
+   * ties `projection_threads` to `projection_agents`, and nothing enumerates threads. The user sees an
+   * empty chat, or no chat, while every message is still on disk. Two ways in are covered -- an agent
+   * rebuilt under its own id by the `getOrCreate` on the conversation read path, which comes back with
+   * no thread while its old row still names it; and a thread whose `agent_id` kept a pre-rename
+   * spelling, which `#agentByEitherSpelling` resolves.
+   *
+   * An agent that already holds a thread keeps it. It is reading that one, and handing it a second would
+   * hide the first -- the same trade `#reconcileWorkspaceDirectory` makes for an ambiguous pair. That
+   * also settles two threads naming one agent: the first in the ordering wins and the rest are reported.
+   *
+   * The repair is one `#persist`, because `replaceAgents` runs `ensureThreadProjection` for every agent
+   * that holds a thread, which is what rewrites the row's `agent_id` to the spelling the roster uses.
+   * Nothing here may stop the app, so a thread this cannot place is counted and left alone.
+   */
+  #reconcileUnclaimedThreads(): void {
+    const unclaimed = this.#database.unclaimedThreads();
+    if (unclaimed.length === 0) return;
+    let adopted = 0;
+    for (const thread of unclaimed) {
+      const agent = this.#agentByEitherSpelling(thread.agentId);
+      if (!agent || agent.threadId) continue;
+      agent.threadId = thread.threadId;
+      adopted += 1;
+    }
+    if (adopted > 0) this.#persist("thread.reclaimed");
+    const stranded = unclaimed.length - adopted;
+    if (stranded > 0) logger.warn("Threads remain that no agent claims.", stranded);
+  }
+
+  /**
    * The agent an id names, whether it is spelled the way this build writes ids or the way the build that
    * wrote the file on disk did. The exact spelling is tried first, because migration v13 leaves a `bot-`
    * id alone when the `agent-` spelling is already taken and both agents can then exist at once.
@@ -877,10 +914,21 @@ export class AgentStore {
     return this.ensureThreadIdNow(id);
   }
 
+  /**
+   * Derived from the agent id, never minted at random, and that is what makes losing a roster row
+   * survivable. Both conversation read paths call `getOrCreate`, so reading a chat whose
+   * `projection_agents` row is gone rebuilds the agent with no `threadId` and lands here. A random id
+   * would file the rebuilt agent against an empty thread and leave the user's own thread -- still on
+   * disk, with every message in it -- addressable by nothing, because no foreign key ties the two
+   * tables and nothing in the app enumerates threads. The stable id re-adopts the row the history is
+   * already under. The legacy `bots.json` import has always derived it this way.
+   *
+   * An agent that already holds a `threadId` keeps it, so no existing agent is repointed.
+   */
   ensureThreadIdNow(id: string): string {
     const agent = this.#requireAgent(id);
     if (agent.threadId) return agent.threadId;
-    agent.threadId = `openbot-thread-${randomUUID()}`;
+    agent.threadId = stableThreadId(id);
     agent.updatedAt = new Date().toISOString();
     this.#persist("thread.created");
     return agent.threadId;
@@ -946,6 +994,46 @@ export class AgentStore {
       }
       throw error;
     }
+  }
+
+  /**
+   * Put back any agent the roster projection has lost but the event log still names.
+   *
+   * `orchestration_events` is the source of truth and every roster write appends the whole list to one
+   * aggregate, but nothing read it back. An agent missing from the projection is therefore silent: the
+   * startup guard above accepts what it finds -- `.every()` on an empty list is true -- the agent has no
+   * chat in the sidebar, and the next `#persist` writes the shortened list as the new truth while each
+   * thread and message row stays on disk.
+   *
+   * Per agent, not only for an empty roster. A partial loss is the more likely half: `replaceAgents`
+   * truncates the roster and re-inserts the in-memory list, so a persist made with one agent missing
+   * drops that one row and keeps the rest. It is also the more dangerous half, because a later
+   * `getOrCreate` rebuilds the missing agent with `threadId: null` and both conversation read paths
+   * then report an empty history. The restored profile carries the `threadId` the event holds, which is
+   * what reaches a thread minted under a random id by an earlier build.
+   *
+   * The newest event only, never a fold over the aggregate: `hardDeleteAgent` appends the *remaining*
+   * agents, so an agent the user deleted on purpose is in no later payload and is never brought back.
+   * A profile the current guards reject is dropped rather than thrown on, because the event that holds
+   * it can be older than any shape this build knows and nothing here may stop the app from starting.
+   * The result is persisted so the repair survives the next launch, and it runs before
+   * `#reconcileUnclaimedThreads` so a restored agent can then claim the thread that names it.
+   */
+  #restoreRosterFromEvents(): void {
+    const replayed = this.#database.latestRosterAgents();
+    if (replayed.length === 0) return;
+    const readable = replayed.filter(isStoredAgent).map(normalizeStoredAgent);
+    const present = new Set(this.#state.agents.map((agent) => agent.id));
+    // Appended rather than put back at its old index: the sidebar orders agents by the layout's own
+    // `agentOrder`, so the position here is not what the user sees, and appending keeps the agents that
+    // survived exactly where they are.
+    const restored = readable.filter((agent) => !present.has(agent.id));
+    if (restored.length === 0) return;
+    const dropped = replayed.length - readable.length;
+    if (dropped > 0) logger.warn("Agent profiles in the roster event log cannot be read.", dropped);
+    this.#state = { ...this.#state, agents: [...this.#state.agents, ...restored] };
+    this.#persist("agents.replaced");
+    logger.warn("Agents were restored to the roster from the event log.", restored.length);
   }
 
   #persist(eventType: string): void {

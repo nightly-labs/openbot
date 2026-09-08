@@ -1,26 +1,227 @@
-import type { ConversationPage, ConversationReadState, DirectConversationSnapshot } from "@openbot/contracts/ipc";
+import type {
+  ConversationPage,
+  ConversationReadState,
+  DirectConversationPage,
+  DirectConversationSnapshot,
+  DirectThreadSummary,
+} from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
+import { AppAccessGate } from "./AppView";
 import { AppProviders } from "./app-providers";
 import {
   emitAgentEvent,
   emitDirectMessage,
   emitDynamicIslandAction,
   emitPresence,
+  emitServers,
   installOpenbotStub,
   presenceMember,
   testConversationPage,
   testServer,
 } from "./app-test-harness";
 import { useConversation } from "./features/conversation/conversation-context";
+import { useDirectMessages } from "./features/conversation/direct-messages-context";
 import { useServerScope } from "./features/servers/server-scope";
 
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
     installOpenbotStub();
   });
+
+  it.each(["older response", "older failure", "latest failure"])(
+    "retains current direct-thread unread state after an %s",
+    async (outcome) => {
+      let refresh = async (): Promise<void> => {
+        throw new Error("The provider is not ready.");
+      };
+      function Probe() {
+        const direct = useDirectMessages();
+        const scope = useServerScope();
+        refresh = direct.refreshDirectThreads;
+        return (
+          <output aria-label="Direct unread">
+            {scope.loaded() ? (direct.directThreads()[0]?.unreadCount ?? 0) : "Loading"}
+          </output>
+        );
+      }
+      render(() => (
+        <AppProviders>
+          <Probe />
+        </AppProviders>
+      ));
+      await waitFor(() => expect(screen.getByLabelText("Direct unread")).toHaveTextContent("0"));
+      emitPresence?.({
+        serverId: "local",
+        updatedAt: "2026-09-08T00:00:00Z",
+        members: [presenceMember("self", "person@example.com", "Person")],
+      });
+      const threads: DirectThreadSummary[] = [
+        {
+          threadId: "direct-1",
+          otherMemberId: "alice",
+          unreadCount: 2,
+          updatedAt: "2026-09-08T00:00:00Z",
+          lastMessage: {
+            id: "message-1",
+            threadId: "direct-1",
+            senderMemberId: "alice",
+            recipientMemberId: "self",
+            text: "Hello",
+            sequence: 2,
+            createdAt: "2026-09-08T00:00:00Z",
+          },
+        },
+      ];
+      vi.mocked(window.openbot.servers.listDirectThreads).mockResolvedValueOnce(threads);
+      await refresh();
+      flush();
+      expect(screen.getByLabelText("Direct unread")).toHaveTextContent("2");
+      let resolvePending: ((value: DirectThreadSummary[]) => void) | undefined;
+      let rejectPending: ((error: Error) => void) | undefined;
+      vi.mocked(window.openbot.servers.listDirectThreads).mockReturnValueOnce(
+        new Promise((resolve, reject) => {
+          resolvePending = resolve;
+          rejectPending = reject;
+        }),
+      );
+      const pending = refresh();
+      if (outcome !== "latest failure") {
+        vi.mocked(window.openbot.servers.listDirectThreads).mockResolvedValueOnce(threads);
+        await refresh();
+      }
+      if (outcome === "older response") resolvePending?.([]);
+      else rejectPending?.(new Error("The host is offline."));
+      await pending;
+      flush();
+      expect(screen.getByLabelText("Direct unread")).toHaveTextContent("2");
+    },
+  );
+
+  it.each(["success", "failure", "late response", "received message", "visible message", "sent message"])(
+    "refreshes the open direct conversation on reconnect (%s)",
+    async (outcome) => {
+      const remote = { ...testServer("remote-1", true), connectionSequence: 1 };
+      vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([remote]);
+      vi.mocked(window.openbot.servers.getPresence).mockResolvedValue({
+        serverId: remote.id,
+        updatedAt: "2026-09-08T00:00:00Z",
+        members: [
+          presenceMember("self", "person@example.com", "Person"),
+          presenceMember("alice", "alice@example.com", "Alice"),
+        ],
+      });
+      const page = (text: string, revision: number): DirectConversationPage => ({
+        threadId: "direct-1",
+        otherMemberId: "alice",
+        revision,
+        messages: [
+          {
+            id: `message-${revision}`,
+            threadId: "direct-1",
+            senderMemberId: "alice",
+            recipientMemberId: "self",
+            text,
+            sequence: revision,
+            createdAt: "2026-09-08T00:00:00Z",
+          },
+        ],
+        readState: { unreadCount: 0, firstUnreadMessageId: null, throughSequence: revision },
+        pageInfo: { hasOlder: false, olderCursor: null },
+      });
+      vi.mocked(window.openbot.servers.readDirectConversationPage).mockResolvedValueOnce(
+        page("Cached direct message", 1),
+      );
+      let loadedMessage: () => string | undefined = () => undefined;
+      let readState: () => DirectConversationSnapshot["readState"] = () => undefined;
+      let send = async (): Promise<void> => {
+        throw new Error("The provider is not ready.");
+      };
+      function Probe() {
+        const direct = useDirectMessages();
+        loadedMessage = () => direct.directConversations().alice?.messages[0]?.text;
+        readState = () => direct.directConversations().alice?.readState;
+        send = async () => {
+          await direct.sendDirectMessage("Sent during refresh", "sent-3");
+        };
+        return null;
+      }
+      render(() => (
+        <AppProviders peopleEnabled>
+          <AppAccessGate />
+          <Probe />
+        </AppProviders>
+      ));
+      await fireEvent.click(await screen.findByRole("button", { name: /Alice/ }));
+      await screen.findByText("Cached direct message");
+      let resolvePage: ((value: DirectConversationPage) => void) | undefined;
+      let rejectPage: ((error: Error) => void) | undefined;
+      const pendingPage = new Promise<DirectConversationPage>((resolve, reject) => {
+        resolvePage = resolve;
+        rejectPage = reject;
+      });
+      vi.mocked(window.openbot.servers.readDirectConversationPage).mockReturnValueOnce(pendingPage);
+      emitServers?.([{ ...remote, connectionSequence: 2 }]);
+      await waitFor(() => expect(window.openbot.servers.readDirectConversationPage).toHaveBeenCalledTimes(2));
+      expect(screen.getByText("Cached direct message")).toBeInTheDocument();
+      if (outcome === "late response") {
+        vi.mocked(window.openbot.servers.readDirectConversationPage).mockResolvedValueOnce(
+          page("Missed direct message", 3),
+        );
+        emitServers?.([{ ...remote, connectionSequence: 3 }]);
+        await screen.findByText("Missed direct message");
+      }
+      const incoming = outcome === "received message" || outcome === "visible message";
+      if (incoming) {
+        if (outcome === "received message") window.dispatchEvent(new Event("blur"));
+        emitDirectMessage?.({
+          type: "team-direct-message",
+          memberIds: ["self", "alice"],
+          message: {
+            id: "live-3",
+            threadId: "direct-1",
+            senderMemberId: "alice",
+            recipientMemberId: "self",
+            text: "Received during refresh",
+            sequence: 3,
+            createdAt: "2026-09-08T00:00:00Z",
+          },
+        });
+        await screen.findByText("Received during refresh");
+      }
+      if (outcome === "sent message") {
+        vi.mocked(window.openbot.servers.sendDirectMessage).mockResolvedValueOnce({
+          id: "sent-3",
+          threadId: "direct-1",
+          senderMemberId: "self",
+          recipientMemberId: "alice",
+          text: "Sent during refresh",
+          sequence: 3,
+          createdAt: "2026-09-08T00:00:00Z",
+        });
+        await send();
+      }
+      if (outcome === "visible message" || outcome === "sent message") {
+        await waitFor(() => expect(readState()?.throughSequence).toBe(3));
+      }
+      if (outcome === "failure") rejectPage?.(new Error("The host is offline."));
+      else resolvePage?.(page(outcome === "late response" ? "Stale direct message" : "Missed direct message", 2));
+      await pendingPage.catch(() => undefined);
+      flush();
+      expect(loadedMessage()).toBe(outcome === "failure" ? "Cached direct message" : "Missed direct message");
+      if (incoming) {
+        expect(await screen.findByText("Received during refresh")).toBeInTheDocument();
+        expect(readState()?.unreadCount).toBe(outcome === "received message" ? 1 : 0);
+      }
+      if (outcome === "sent message") expect(await screen.findByText("Sent during refresh")).toBeInTheDocument();
+      if (outcome === "visible message" || outcome === "sent message") expect(readState()?.throughSequence).toBe(3);
+      expect(
+        await screen.findByText(outcome === "failure" ? "Cached direct message" : "Missed direct message"),
+      ).toBeInTheDocument();
+    },
+  );
 
   it("clears desktop unread state when the same member reads on another device", async () => {
     vi.mocked(window.openbot.agent.readConversationPage).mockResolvedValue(
