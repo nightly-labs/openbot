@@ -215,6 +215,44 @@ describe("AgentStore", () => {
     ]);
   });
 
+  it("rebuilds a roster its projection lost from the event log", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
+    temporaryRoots.push(root);
+    const userData = join(root, "user-data");
+    const home = join(root, "home");
+    const store = new AgentStore(userData, home);
+    await store.initialize();
+    await store.getOrCreate("chief");
+    const threadId = await store.ensureThreadId("chief");
+    store.database.appendConversationMessage({
+      agentId: "chief",
+      threadId,
+      activeTurnId: null,
+      message: {
+        id: "message-1",
+        author: "user",
+        text: "Where did my chat go?",
+        createdAt: "2026-09-01T12:00:00.000Z",
+        status: "completed",
+      },
+      eventType: "turn.started",
+    });
+    // The state the replay answers: the roster projection is empty while its event log still holds the
+    // whole list. Without the replay every chat is gone and the next persist makes that permanent.
+    store.database.connection.exec("DELETE FROM projection_agents");
+
+    const restored = new AgentStore(userData, home);
+    await restored.initialize();
+
+    expect(restored.list().find((agent) => agent.id === "chief")?.threadId).toBe(threadId);
+    expect(restored.database.readConversationPage("chief", threadId).messages).toEqual([
+      expect.objectContaining({ id: "message-1", text: "Where did my chat go?" }),
+    ]);
+    const reopened = new AgentStore(userData, home);
+    await reopened.initialize();
+    expect(reopened.list().map((agent) => agent.id)).toContain("chief");
+  });
+
   it("persists marketplace installation versions", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
     temporaryRoots.push(root);

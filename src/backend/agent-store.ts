@@ -165,6 +165,7 @@ export class AgentStore {
         examplesInitialized: true,
         agents: persisted.map(normalizeStoredAgent),
       };
+      if (persisted.length === 0) this.#restoreRosterFromEvents();
     } else {
       const legacy = await this.#readState();
       await this.#database.backupLegacyFile(this.#statePath);
@@ -987,6 +988,32 @@ export class AgentStore {
       }
       throw error;
     }
+  }
+
+  /**
+   * Put the roster back when the projection is empty and the event log is not.
+   *
+   * The two conditions together are not a state the app can reach on purpose: `hasAggregateEvents`
+   * says the user has had agents, and `listAgents` says they have none. `.every()` on an empty list is
+   * true, so the guard above passes it silently, and the next `#persist` writes the empty list as the
+   * new truth -- every chat gone for good, with each thread and message row still on disk. The event
+   * log is the source of truth and carries the whole list, so it is read back instead.
+   *
+   * A profile the current guards reject is dropped rather than thrown on, because the event that holds
+   * it can be older than any shape this build knows and nothing here may stop the app from starting.
+   * The result is persisted so the repair survives the next launch, and it runs before
+   * `#reconcileUnclaimedThreads` so a restored agent can then claim the thread that names it.
+   */
+  #restoreRosterFromEvents(): void {
+    const replayed = this.#database.latestRosterAgents();
+    if (replayed.length === 0) return;
+    const agents = replayed.filter(isStoredAgent).map(normalizeStoredAgent);
+    const dropped = replayed.length - agents.length;
+    if (dropped > 0) logger.warn("Agent profiles in the roster event log cannot be read.", dropped);
+    if (agents.length === 0) return;
+    this.#state = { ...this.#state, agents };
+    this.#persist("agents.replaced");
+    logger.warn("The agent roster was rebuilt from the event log.", agents.length);
   }
 
   #persist(eventType: string): void {

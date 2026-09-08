@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import type { DatabaseCore } from "./database-core";
-import { databaseRows, requiredStringColumn } from "./database-rows";
+import { databaseRow, databaseRows, requiredStringColumn } from "./database-rows";
 
 export interface AgentRosterOptions {
   core: DatabaseCore;
@@ -61,6 +61,36 @@ export class AgentRoster {
       threadId: requiredStringColumn(row, "thread_id"),
       agentId: requiredStringColumn(row, "agent_id"),
     }));
+  }
+
+  /**
+   * The agent list the newest roster event carries, for a roster projection that has lost its rows.
+   *
+   * `orchestration_events` is the source of truth and every roster write appends the whole list to one
+   * aggregate, so the newest event on it is the roster. Nothing else reads events back into
+   * `projection_agents`: the projection is written only by `replaceAgents`, and an empty projection
+   * beside a non-empty log reads as "no agents" -- every chat gone, with each thread and message row
+   * still on disk.
+   *
+   * Newest only, never a fold over the whole aggregate. `hardDeleteAgent` appends the *remaining*
+   * agents, so a fold would resurrect an agent the user deleted on purpose, and a newest event with an
+   * empty list correctly means the user has no agents. The rows are returned unvalidated because the
+   * roster class holds no agent decoder; the caller validates each entry and drops the ones that fail.
+   */
+  latestRosterAgents(): unknown[] {
+    const row = databaseRow(
+      this.#core.connection
+        .prepare(
+          `SELECT payload_json FROM orchestration_events
+           WHERE aggregate_type = 'agents' AND aggregate_id = 'agents'
+           ORDER BY sequence DESC LIMIT 1`,
+        )
+        .get(),
+    );
+    if (!row) return [];
+    const payload = databaseRow(JSON.parse(requiredStringColumn(row, "payload_json")));
+    if (!payload || !Array.isArray(payload.agents)) return [];
+    return payload.agents;
   }
 
   replaceAgents(commandId: string, agents: AgentSummary[], eventType: string): void {
