@@ -1803,6 +1803,54 @@ describe("OpenBot connected desktop shell", () => {
     expect(await screen.findByRole("status", { name: "1 new message" })).toBeInTheDocument();
   });
 
+  it("uncovers the conversation a global search result opens", async () => {
+    const result = {
+      id: "sales-search-hit",
+      author: "assistant" as const,
+      source: "assistant" as const,
+      text: "Found while the report was open",
+      createdAt: "2026-08-19T09:05:00.000Z",
+      status: "completed" as const,
+    };
+    vi.mocked(window.openbot.agent.searchConversationMessages).mockResolvedValue({
+      results: [{ agentId: "sales-outbound", message: result }],
+      total: 1,
+      nextCursor: null,
+    });
+    vi.mocked(window.openbot.agent.readConversation).mockImplementation(async (agentId) => ({
+      agentId,
+      threadId: null,
+      activeTurnId: null,
+      revision: 1,
+      messages: agentId === "sales-outbound" ? [result] : [],
+      readState:
+        agentId === "sales-outbound"
+          ? { unreadCount: 1, firstUnreadMessageId: result.id, throughMessageId: null }
+          : { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },
+    }));
+
+    render(() => (
+      <AppProviders>
+        <AppAccessGate />
+        <UsageProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+    flush();
+
+    // Command K reaches the document while the report is open, so the report has to give
+    // way to the conversation the result names: opening it reads every message through
+    // the match, and a read behind the report is a read of messages nobody saw.
+    await fireEvent.keyDown(window, { key: "k", metaKey: true });
+    await fireEvent.click(await screen.findByRole("tab", { name: "Messages" }));
+    await fireEvent.input(screen.getByRole("combobox", { name: "Search OpenBot" }), { target: { value: "report" } });
+    await fireEvent.click(await screen.findByRole("option", { name: /Found while the report was open/ }));
+
+    expect(await screen.findByRole("heading", { name: "Sales Outbound" })).toBeInTheDocument();
+  });
+
   it("clears unread messages when entering an agent chat", async () => {
     const unreadState = {
       unreadCount: 1,

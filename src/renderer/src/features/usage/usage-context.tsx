@@ -36,18 +36,30 @@ const context = createSimpleContext({
       previousServer = serverId;
     });
 
+    function clear() {
+      setState((draft) => {
+        draft.serverId = null;
+        draft.agentId = undefined;
+      });
+    }
+
     return {
       state,
       openUsage,
       closeUsage() {
-        setState((draft) => {
-          draft.serverId = null;
-          draft.agentId = undefined;
-        });
+        clear();
         queueMicrotask(() => {
           if (trigger?.isConnected) trigger.focus({ preventScroll: true });
         });
       },
+      /**
+       * Back gives focus to the element the report was opened from; this does not.
+       * A command that opens a conversation - a global search result, a Dynamic
+       * Island action - has to uncover it first, and the destination owns focus
+       * from there: the transcript scrolls to the message the user picked, and
+       * pulling focus back to the rail button would undo that.
+       */
+      dismissUsage: clear,
     };
   },
 });

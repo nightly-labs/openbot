@@ -7,6 +7,7 @@ import { useConversation } from "./features/conversation/conversation-context";
 import { useDirectMessages } from "./features/conversation/direct-messages-context";
 import { useServers } from "./features/servers/servers-context";
 import { usePresence } from "./features/team/team-context";
+import { useUsage } from "./features/usage/usage-context";
 import { usePlatform } from "./platform";
 import { createScopeGuard } from "./scope-lifetime";
 import { createSimpleContext } from "./simple-context";
@@ -49,6 +50,7 @@ const Navigation = createSimpleContext({
       appendUiError,
     } = useAgents();
     const { setDirectTyping, clearDirectSelection, openDirectConversation } = useDirectMessages();
+    const { dismissUsage } = useUsage();
     const scopeIsCurrent = createScopeGuard();
     const {
       pruneInactiveAgentHistory,
@@ -67,6 +69,11 @@ const Navigation = createSimpleContext({
 
     function selectAgent(agentId: string) {
       if (agentSetupOpen() && creatingAgent()) return;
+      // Opening a chat that the Usage report covers would read messages nobody saw:
+      // `requestConversationRead` below is the explicit read, and a global search
+      // result also runs `openAgentMessage`, which marks everything up to the match.
+      // Every caller here is a command to show a conversation, so uncover it.
+      dismissUsage();
       const previousAgentId = activeAgentId();
       if (previousAgentId && previousAgentId !== agentId) pruneInactiveAgentHistory(previousAgentId);
       setAgentSetupOpen(false);
