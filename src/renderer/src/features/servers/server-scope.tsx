@@ -43,7 +43,7 @@ const ServerScope = createSimpleContext({
   init: () => {
     const { centralAuth } = useAuth();
     const { setupState } = useSetup();
-    const { servers, activeServerId, initialServersReady, serverLoadRequest, currentServerSelection } = useServers();
+    const { servers, activeServerId, initialServersReady, serverLoadRequest } = useServers();
     const { pendingAgentSelection, setPendingAgentSelection } = useServerSwitch();
     const { setTeamPresence } = usePresence();
     const { activeDirectMemberId, directConversations, refreshDirectThreads, markDirectMessagesRead } =
@@ -69,8 +69,7 @@ const ServerScope = createSimpleContext({
     let loadGeneration = 0;
     function loadWorkspace(): void {
       const generation = ++loadGeneration;
-      const selectionIsCurrent = currentServerSelection();
-      const isCurrent = () => scopeIsCurrent() && selectionIsCurrent() && generation === loadGeneration;
+      const isCurrent = () => scopeIsCurrent() && generation === loadGeneration;
       if (!isCurrent()) return;
       const serverId = activeServerId();
       const server = servers().find((candidate) => candidate.id === serverId);

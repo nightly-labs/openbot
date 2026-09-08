@@ -277,7 +277,7 @@ network/service error keeps the credential for retry; a late result cannot clear
 The desktop keeps remote connection errors visible in the workspace during retries. A successful
 connection clears the error. A new connection sequence or a return to online reloads the active
 workspace without remounting its providers, so failed refreshes retain cached data. Server switches
-still dispose the old scope; load generations and selection guards reject late responses.
+still dispose the old scope; load generations and scope guards reject late responses.
 
 Hosts opt in with the additive Signal hello `multiplex` flag; legacy desktops keep their one-peer
 limit so a second phone cannot replace an existing client's connection. Signal multiplexes

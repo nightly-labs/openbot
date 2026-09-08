@@ -66,6 +66,25 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByRole("button", { name: "Studio Mac server" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("finishes the pending workspace load when the active server is selected again", async () => {
+    const local = testServer("local", false);
+    const remote = testServer("remote-1", true);
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, remote]);
+    vi.mocked(window.openbot.servers.select).mockResolvedValueOnce([local, remote]);
+    let resolveAgents: ((agents: typeof AGENTS) => void) | undefined;
+    vi.mocked(window.openbot.agent.listAgents).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveAgents = resolve;
+      }),
+    );
+    render(() => <App />);
+    await waitFor(() => expect(window.openbot.agent.listAgents).toHaveBeenCalledOnce());
+    await fireEvent.click(screen.getByRole("button", { name: "Studio Mac server" }));
+    await waitFor(() => expect(window.openbot.servers.select).toHaveBeenCalledWith(remote.id));
+    resolveAgents?.(AGENTS);
+    expect(await screen.findByRole("heading", { name: "Chief" })).toBeInTheDocument();
+  });
+
   it("blocks an incompatible remote workspace and offers a manual retry", async () => {
     vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
       { ...testServer("local", false) },
