@@ -212,7 +212,7 @@ describe("SkillsMarketplaceModal", () => {
     expect(calls[0]?.[0].receiptId).not.toBe(calls[1]?.[0].receiptId);
   });
 
-  it("reports a view failure when agent details cannot load", async () => {
+  it("blocks concurrent agent detail requests and permits another selection after failure", async () => {
     const agent = {
       id: "research-agent",
       name: "Research Agent",
@@ -231,14 +231,26 @@ describe("SkillsMarketplaceModal", () => {
       updatedAt: "2026-08-25T00:00:00.000Z",
     } as const;
     window.openbot.marketplaceAgents.list = vi.fn(async (query) => ({
-      agents: query?.category && query.category !== "other" ? [] : [agent],
+      agents:
+        query?.category && query.category !== "other"
+          ? []
+          : [agent, { ...agent, id: "writer-agent", name: "Writer Agent" }],
       nextCursor: null,
     }));
-    window.openbot.marketplaceAgents.get = vi.fn().mockRejectedValue(new Error("private response"));
+    const pending = Promise.withResolvers<MarketplaceAgentDetail>();
+    window.openbot.marketplaceAgents.get = vi
+      .fn()
+      .mockReturnValueOnce(pending.promise)
+      .mockRejectedValue(new Error("private response"));
 
     render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
     screen.getByRole("button", { name: "Agents" }).click();
-    (await screen.findByRole("button", { name: "View Research Agent details" })).click();
+    const research = await screen.findByRole("button", { name: "View Research Agent details" });
+    const writer = await screen.findByRole("button", { name: "View Writer Agent details" });
+    fireEvent.click(research);
+    fireEvent.click(writer);
+    expect(window.openbot.marketplaceAgents.get).toHaveBeenCalledTimes(1);
+    pending.reject(new Error("private response"));
 
     await waitFor(() =>
       expect(trackMarketplaceAnalytics).toHaveBeenCalledWith("marketplace_action", {
@@ -249,6 +261,8 @@ describe("SkillsMarketplaceModal", () => {
       }),
     );
     expect(window.openbot.marketplaceAgents.install).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole("button", { name: "View Writer Agent details" }));
+    await waitFor(() => expect(window.openbot.marketplaceAgents.get).toHaveBeenCalledWith("writer-agent"));
   });
 
   it("offers updates separately and allows installing agents that are already current", async () => {

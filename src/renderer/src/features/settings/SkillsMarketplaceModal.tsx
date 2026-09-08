@@ -866,6 +866,7 @@ function AgentMarketplacePanel(props: {
   const [catalogRefresh, setCatalogRefresh] = createSignal(0);
   let initialized = false;
   let handledAddVersion = 0;
+  let openingAgent = false;
 
   createEffect(
     () => [props.view, props.refreshVersion] as const,
@@ -906,6 +907,8 @@ function AgentMarketplacePanel(props: {
   }
 
   async function openAgent(agent: MarketplaceAgentSummary) {
+    if (openingAgent) return;
+    openingAgent = true;
     const analytics = desktopAnalytics.scope();
     props.onEnterDetail();
     setLoading(true);
@@ -921,6 +924,7 @@ function AgentMarketplacePanel(props: {
         state.detail = value;
       });
     } else props.onLeaveDetail();
+    openingAgent = false;
     setLoading(false);
   }
 
@@ -1031,7 +1035,7 @@ function AgentMarketplacePanel(props: {
   return (
     <section class="skills-marketplace-panel agent-marketplace-panel" aria-label="Agent marketplace">
       <Show when={props.view === "discover"}>
-        <div hidden={Boolean(market.detail)} inert={Boolean(market.detail)}>
+        <div hidden={Boolean(market.detail) || panel.loading} inert={Boolean(market.detail) || panel.loading}>
           <MarketplaceCatalog
             kind="agents"
             refreshVersion={catalogRefresh()}
@@ -1045,6 +1049,11 @@ function AgentMarketplacePanel(props: {
             onOpen={openAgent}
           />
         </div>
+        <Show when={panel.loading}>
+          <div class="skills-marketplace-state" role="status">
+            Loading agent details…
+          </div>
+        </Show>
         <Show when={market.detail} keyed>
           {(agent) => (
             <MarketplaceDetail
