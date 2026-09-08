@@ -20,6 +20,26 @@ import { useServerScope } from "./features/servers/server-scope";
 import { useServers } from "./features/servers/servers-context";
 import { useUsage } from "./features/usage/usage-context";
 
+/**
+ * The tree `App` mounts, plus controls that open and close the Usage report. The report
+ * covers the workspace content and marks it inert, so a message that arrives or waits
+ * behind it was never seen, however focused the window is.
+ */
+function UsageProbe() {
+  const { activeServerId } = useServers();
+  const usage = useUsage();
+  return (
+    <>
+      <button type="button" onClick={() => usage.openUsage(activeServerId(), null)}>
+        Open usage
+      </button>
+      <button type="button" onClick={() => usage.closeUsage()}>
+        Close usage
+      </button>
+    </>
+  );
+}
+
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
     installOpenbotStub();
@@ -1559,24 +1579,6 @@ describe("OpenBot connected desktop shell", () => {
       },
     );
 
-    // The same tree `App` mounts, plus a control that opens the report. The report covers the
-    // workspace content and marks it inert, so a reply that arrives behind it was never seen -
-    // without the Usage guard the chat still counts as open and the reply is read on arrival.
-    function UsageProbe() {
-      const { activeServerId } = useServers();
-      const usage = useUsage();
-      return (
-        <>
-          <button type="button" onClick={() => usage.openUsage(activeServerId(), null)}>
-            Open usage
-          </button>
-          <button type="button" onClick={() => usage.closeUsage()}>
-            Close usage
-          </button>
-        </>
-      );
-    }
-
     render(() => (
       <AppProviders>
         <AppAccessGate />
@@ -1954,6 +1956,56 @@ describe("OpenBot connected desktop shell", () => {
       }),
     );
     await waitFor(() => expect(screen.queryByRole("status", { name: "1 new message" })).not.toBeInTheDocument());
+  });
+
+  it("keeps a private message unread when focus returns to the Usage report", async () => {
+    render(() => (
+      <AppProviders peopleEnabled>
+        <AppAccessGate />
+        <UsageProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+    emitPresence?.({
+      serverId: "server-1",
+      updatedAt: "2026-08-19T10:00:00.000Z",
+      members: [
+        presenceMember("member-self", "person@example.com", "Person"),
+        presenceMember("member-alice", "alice@example.com", "Alice"),
+      ],
+    });
+    await fireEvent.click(await screen.findByRole("button", { name: /Alice/ }));
+    await waitFor(() => expect(window.openbot.servers.readDirectConversationPage).toHaveBeenCalled());
+    vi.mocked(window.openbot.servers.markDirectRead).mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+    flush();
+    window.dispatchEvent(new Event("blur"));
+    emitDirectMessage?.({
+      type: "team-direct-message",
+      memberIds: ["member-alice", "member-self"],
+      message: {
+        id: "direct-behind-usage",
+        threadId: "thread-member-alice",
+        senderMemberId: "member-alice",
+        recipientMemberId: "member-self",
+        text: "Private result behind the report",
+        createdAt: "2026-08-19T10:01:00.000Z",
+        sequence: 1,
+      },
+    });
+
+    // Focus returns to the report, not to the conversation the report covers.
+    window.dispatchEvent(new Event("focus"));
+    flush();
+
+    // Back uncovers the conversation, and the message is still waiting there. The unread
+    // state is queryable only now: the covered content is aria-hidden, which is the same
+    // reason the message must not count as seen. Reaching this badge is also the barrier
+    // that lets the negative assertion below see a read the focus handler started.
+    fireEvent.click(screen.getByRole("button", { name: "Close usage" }));
+    expect(await screen.findByRole("status", { name: "1 new message" })).toBeInTheDocument();
+    expect(window.openbot.servers.markDirectRead).not.toHaveBeenCalled();
   });
 
   it("extends an in-flight focus read to a newer visible private message", async () => {

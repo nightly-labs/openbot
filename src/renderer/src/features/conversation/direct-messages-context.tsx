@@ -466,6 +466,7 @@ const DirectMessages = createSimpleContext({
       openDirectMessage,
       sendDirectMessage,
       markDirectMessagesRead,
+      conversationVisible,
       setDirectTyping,
       clearDirectSelection,
       cancelDirectConversationRequests,
