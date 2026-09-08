@@ -73,6 +73,7 @@ describe("OpenBotDatabase", () => {
       { version: 13 },
       { version: 14 },
       { version: 15 },
+      { version: 16 },
     ]);
     database.close();
   });
@@ -750,7 +751,7 @@ describe("OpenBotDatabase", () => {
     const legacy = new DatabaseSync(database.path);
     removeAnalyticsSchema(legacy);
     legacy.exec("PRAGMA journal_mode = WAL");
-    legacy.prepare("DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15)").run();
+    legacy.prepare("DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16)").run();
     legacy
       .prepare("INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (3, ?)")
       .run("2026-08-20T10:00:00.000Z");
@@ -827,7 +828,7 @@ describe("OpenBotDatabase", () => {
       DROP TABLE projection_routine_triggers;
       DROP TABLE projection_agent_routines;
       DROP TABLE projection_agent_memories;
-      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15);
+      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16);
       INSERT OR IGNORE INTO schema_migrations(version, applied_at)
         VALUES (4, '2026-08-20T10:00:00.000Z');
     `);
@@ -860,6 +861,7 @@ describe("OpenBotDatabase", () => {
       { version: 13 },
       { version: 14 },
       { version: 15 },
+      { version: 16 },
     ]);
     migrated.close();
   });
@@ -933,6 +935,7 @@ describe("OpenBotDatabase", () => {
       { version: 13 },
       { version: 14 },
       { version: 15 },
+      { version: 16 },
     ]);
     retried.close();
   });
@@ -1329,7 +1332,10 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const newer = new DatabaseSync(database.path);
-    newer.prepare("INSERT INTO schema_migrations(version, applied_at) VALUES (16, ?)").run("2026-08-20T10:00:00.000Z");
+    // One past the latest this application knows, whatever that is today.
+    newer
+      .prepare("INSERT INTO schema_migrations(version, applied_at) SELECT MAX(version) + 1, ? FROM schema_migrations")
+      .run("2026-08-20T10:00:00.000Z");
     newer.close();
 
     const downgradedApp = new OpenBotDatabase(root);
@@ -1399,7 +1405,7 @@ describe("OpenBotDatabase", () => {
       ALTER TABLE projection_provider_sessions_v6 RENAME TO projection_provider_sessions;
       CREATE INDEX provider_sessions_thread
         ON projection_provider_sessions(thread_id, provider, state);
-      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15);
+      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16);
       INSERT OR IGNORE INTO schema_migrations(version, applied_at)
         VALUES (6, '2026-08-20T10:00:00.000Z');
       PRAGMA foreign_keys = ON;
@@ -1621,7 +1627,7 @@ function downgradeReactionsToV7(database: DatabaseSync): void {
     );
     DROP TABLE projection_reactions;
     ALTER TABLE projection_reactions_v7 RENAME TO projection_reactions;
-    DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15);
+    DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16);
     INSERT OR IGNORE INTO schema_migrations(version, applied_at)
       VALUES (7, '2026-08-20T10:00:00.000Z');
   `);
@@ -1696,6 +1702,8 @@ function conversationSnapshot(agent: AgentSummary, text: string): ConversationSn
 // Older-release fixtures start from today's schema, so remove the new tables before downgrading.
 function removeAnalyticsSchema(database: DatabaseSync): void {
   database.exec(
-    "DROP TABLE agent_usage_records; DROP TABLE agent_usage_checkpoints; DROP TABLE agent_usage_activity; DELETE FROM schema_migrations WHERE version = 15",
+    // Every version from 15 up goes: a history that keeps 16 and drops 15 has a gap, which
+    // the schema check rejects before any upgrade runs.
+    "DROP TABLE agent_usage_records; DROP TABLE agent_usage_checkpoints; DROP TABLE agent_usage_activity; DELETE FROM schema_migrations WHERE version >= 15",
   );
 }
