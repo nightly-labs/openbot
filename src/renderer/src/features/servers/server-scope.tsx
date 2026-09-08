@@ -43,7 +43,7 @@ const ServerScope = createSimpleContext({
   init: () => {
     const { centralAuth } = useAuth();
     const { setupState } = useSetup();
-    const { servers, activeServerId, initialServersReady } = useServers();
+    const { servers, activeServerId, initialServersReady, serverLoadRequest, currentServerSelection } = useServers();
     const { pendingAgentSelection, setPendingAgentSelection } = useServerSwitch();
     const { setTeamPresence } = usePresence();
     const { activeDirectMemberId, directConversations, refreshDirectThreads, markDirectMessagesRead } =
@@ -65,6 +65,77 @@ const ServerScope = createSimpleContext({
     const owner = getOwner();
     /** This scope still owns the screen - the successor to `activeServerId() !== serverId`. */
     const scopeIsCurrent = (): boolean => !(owner && isDisposed(owner));
+
+    let loadGeneration = 0;
+    function loadWorkspace(): void {
+      const generation = ++loadGeneration;
+      const selectionIsCurrent = currentServerSelection();
+      const isCurrent = () => scopeIsCurrent() && selectionIsCurrent() && generation === loadGeneration;
+      if (!isCurrent()) return;
+      const serverId = activeServerId();
+      const server = servers().find((candidate) => candidate.id === serverId);
+      if (server?.kind === "remote" && (server.state === "incompatible" || server.issue != null)) {
+        return;
+      }
+      void Promise.all([
+        window.openbot.agent
+          .getStatus()
+          .then((value) => {
+            if (isCurrent()) setAgentStatus(value);
+          })
+          .catch(() => undefined),
+        window.openbot.agent
+          .listModels()
+          .then((value) => {
+            if (isCurrent()) setModelOptions(value);
+          })
+          .catch(() => undefined),
+        window.openbot.agent
+          .listAgents()
+          .then((storedAgents) => {
+            if (!isCurrent()) return;
+            applyStoredAgents(storedAgents);
+            reconcileActiveServerPins(storedAgents.map((agent) => agent.id));
+          })
+          .catch((error) => {
+            if (!isCurrent()) return;
+            setAgentStatus((current) => ({ ...current, message: String(error) }));
+          }),
+        loadSidebarLayout(server)
+          .then((value) => {
+            if (isCurrent()) setSidebarLayout(value);
+          })
+          .catch(() => undefined),
+        window.openbot.agent
+          .listConversationReads()
+          .then((value) => {
+            if (isCurrent()) applyConversationReads(value);
+          })
+          .catch(() => undefined),
+      ]).finally(() => {
+        if (isCurrent()) setLoaded(true);
+      });
+      if (supportsBrowser(server)) {
+        const applyDisplayState = beginBrowserLoad();
+        void loadBrowserDisplayState(server)
+          .then((value) => {
+            if (isCurrent()) applyDisplayState(value);
+          })
+          .catch(() => undefined);
+        void loadBrowserControlState(server)
+          .then((value) => {
+            if (isCurrent()) setBrowserControlState(value);
+          })
+          .catch(() => undefined);
+      }
+      void window.openbot.servers
+        .getPresence()
+        .then((value) => {
+          if (isCurrent()) setTeamPresence(value);
+        })
+        .catch(() => undefined);
+      void refreshDirectThreads();
+    }
 
     onSettled(() => {
       const handleGlobalSearchShortcut = (event: KeyboardEvent) => {
@@ -100,62 +171,20 @@ const ServerScope = createSimpleContext({
       };
       window.addEventListener("focus", handleWindowFocus);
 
-      void initialServersReady.then(() => {
-        if (!scopeIsCurrent()) return;
-        const serverId = activeServerId();
-        const server = servers().find((candidate) => candidate.id === serverId);
-        if (server?.kind === "remote" && (server.state === "incompatible" || server.issue?.code === "protocol_error")) {
-          return;
-        }
-        void Promise.all([
-          window.openbot.agent
-            .getStatus()
-            .then(setAgentStatus)
-            .catch(() => undefined),
-          window.openbot.agent
-            .listModels()
-            .then(setModelOptions)
-            .catch(() => undefined),
-          window.openbot.agent
-            .listAgents()
-            .then((storedAgents) => {
-              applyStoredAgents(storedAgents);
-              reconcileActiveServerPins(storedAgents.map((agent) => agent.id));
-            })
-            .catch((error) => {
-              setAgentStatus((current) => ({ ...current, message: String(error) }));
-            }),
-          loadSidebarLayout(server)
-            .then(setSidebarLayout)
-            .catch(() => undefined),
-          window.openbot.agent
-            .listConversationReads()
-            .then(applyConversationReads)
-            .catch(() => undefined),
-        ]).finally(() => {
-          if (scopeIsCurrent()) setLoaded(true);
-        });
-        if (supportsBrowser(server)) {
-          const applyDisplayState = beginBrowserLoad();
-          void loadBrowserDisplayState(server)
-            .then(applyDisplayState)
-            .catch(() => undefined);
-          void loadBrowserControlState(server)
-            .then(setBrowserControlState)
-            .catch(() => undefined);
-        }
-        void window.openbot.servers
-          .getPresence()
-          .then(setTeamPresence)
-          .catch(() => undefined);
-        void refreshDirectThreads();
-      });
+      void initialServersReady.then(loadWorkspace);
 
       return () => {
         window.removeEventListener("keydown", handleGlobalSearchShortcut);
         window.removeEventListener("focus", handleWindowFocus);
       };
     });
+
+    createEffect(
+      () => serverLoadRequest(),
+      (request) => {
+        if (request?.serverId === activeServerId()) loadWorkspace();
+      },
+    );
 
     // "Select this agent once you are on its server" - written before the switch
     // by the marketplace and the Dynamic Island, consumed by whichever scope the

@@ -195,59 +195,67 @@ describe("SignalService", () => {
     expect(service.metrics().activePeerConnections).toBe(1);
   });
 
-  it("keeps phones on the same account isolated across reconnect, revocation and host recovery", async () => {
-    const service = new SignalService(fakeTokens(), 8);
-    const host = socket("host");
-    await hello(service, host, "host-ticket", "host");
-    const first = socket("first-client");
-    await hello(service, first, "client-ticket", "client");
-    const second = socket("second-client");
-    await hello(service, second, "second-client-ticket", "client");
-    expect(first.closed).toBe(false);
-    expect(second.closed).toBe(false);
-    expect(service.metrics().activePeerConnections).toBe(2);
-    const secondId = JSON.parse(second.messages.at(-1) ?? "{}").connectionId;
-    expect(secondId).toEqual(expect.any(String));
-    await service.receive(
-      host,
-      JSON.stringify({ type: "offer", version: 1, channel: "team", connectionId: secondId, sdp: "second-only" }),
-    );
-    expect(second.messages.at(-1)).toContain("second-only");
-    expect(first.messages.some((message) => message.includes("second-only"))).toBe(false);
-    await service.receive(
-      first,
-      JSON.stringify({ type: "offer", version: 1, channel: "team", connectionId: secondId, sdp: "cross-device" }),
-    );
-    expect(first.messages.at(-1)).toContain('"code":"permission_denied"');
+  it.each([false, true])(
+    "keeps devices isolated across reconnect, revocation and host recovery (reverse order: %s)",
+    async (reverse) => {
+      const service = new SignalService(fakeTokens(), 8);
+      const host = socket("host");
+      await hello(service, host, "host-ticket", "host");
+      const first = socket("first-client");
+      const second = socket("second-client");
+      if (reverse) {
+        await hello(service, second, "second-client-ticket", "client");
+        await hello(service, first, "client-ticket", "client");
+      } else {
+        await hello(service, first, "client-ticket", "client");
+        await hello(service, second, "second-client-ticket", "client");
+      }
+      expect(first.closed).toBe(false);
+      expect(second.closed).toBe(false);
+      expect(service.metrics().activePeerConnections).toBe(2);
+      const secondId = JSON.parse(second.messages.at(-1) ?? "{}").connectionId;
+      expect(secondId).toEqual(expect.any(String));
+      await service.receive(
+        host,
+        JSON.stringify({ type: "offer", version: 1, channel: "team", connectionId: secondId, sdp: "second-only" }),
+      );
+      expect(second.messages.at(-1)).toContain("second-only");
+      expect(first.messages.some((message) => message.includes("second-only"))).toBe(false);
+      await service.receive(
+        first,
+        JSON.stringify({ type: "offer", version: 1, channel: "team", connectionId: secondId, sdp: "cross-device" }),
+      );
+      expect(first.messages.at(-1)).toContain('"code":"permission_denied"');
 
-    service.disconnect(first);
-    const resumed = socket("resumed-client");
-    await hello(service, resumed, "resume-client", "client");
-    expect(service.metrics().activePeerConnections).toBe(2);
-    expect(second.closed).toBe(false);
-    service.disconnect(host);
-    const recoveredHost = socket("recovered-host");
-    await hello(service, recoveredHost, "resume-host", "host");
-    expect(service.metrics().activePeerConnections).toBe(2);
-    expect(recoveredHost.messages.filter((message) => message.includes('"type":"peer-ready"'))).toHaveLength(2);
+      service.disconnect(first);
+      const resumed = socket("resumed-client");
+      await hello(service, resumed, "resume-client", "client");
+      expect(service.metrics().activePeerConnections).toBe(2);
+      expect(second.closed).toBe(false);
+      service.disconnect(host);
+      const recoveredHost = socket("recovered-host");
+      await hello(service, recoveredHost, "resume-host", "host");
+      expect(service.metrics().activePeerConnections).toBe(2);
+      expect(recoveredHost.messages.filter((message) => message.includes('"type":"peer-ready"'))).toHaveLength(2);
 
-    service.revokeSession("client-session");
-    expect(resumed.closed).toBe(true);
-    expect(second.closed).toBe(false);
-    expect(service.metrics().activePeerConnections).toBe(1);
-    const remainingId = JSON.parse(second.messages.at(-1) ?? "{}").connectionId;
-    await service.receive(
-      recoveredHost,
-      JSON.stringify({
-        type: "answer",
-        version: 1,
-        channel: "team",
-        connectionId: remainingId,
-        sdp: "still-connected",
-      }),
-    );
-    expect(second.messages.at(-1)).toContain("still-connected");
-  });
+      service.revokeSession("client-session");
+      expect(resumed.closed).toBe(true);
+      expect(second.closed).toBe(false);
+      expect(service.metrics().activePeerConnections).toBe(1);
+      const remainingId = JSON.parse(second.messages.at(-1) ?? "{}").connectionId;
+      await service.receive(
+        recoveredHost,
+        JSON.stringify({
+          type: "answer",
+          version: 1,
+          channel: "team",
+          connectionId: remainingId,
+          sdp: "still-connected",
+        }),
+      );
+      expect(second.messages.at(-1)).toContain("still-connected");
+    },
+  );
 
   it("does not send a second phone to an older desktop without multiplex support", async () => {
     const service = new SignalService(fakeTokens(), 8);

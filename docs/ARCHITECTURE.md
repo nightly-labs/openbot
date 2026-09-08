@@ -274,6 +274,11 @@ Mobile sign-out keeps the encrypted credential and local session until the accou
 revocation. If the DELETE response fails, mobile validates that same token: a 401 confirms it is no
 longer active and completes sign-out immediately. A successful session check or an inconclusive
 network/service error keeps the credential for retry; a late result cannot clear a newer login.
+The desktop keeps remote connection errors visible in the workspace during retries. A successful
+connection clears the error. A new connection sequence or a return to online reloads the active
+workspace without remounting its providers, so failed refreshes retain cached data. Server switches
+still dispose the old scope; load generations and selection guards reject late responses.
+
 Hosts opt in with the additive Signal hello `multiplex` flag; legacy desktops keep their one-peer
 limit so a second phone cannot replace an existing client's connection. Signal multiplexes
 connections by logical session, and the hidden desktop renderer owns a separate

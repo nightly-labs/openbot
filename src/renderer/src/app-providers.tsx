@@ -1,5 +1,5 @@
 import type { JSX } from "@solidjs/web";
-import { createMemo, type ParentProps, Show } from "solid-js";
+import { type ParentProps, Show } from "solid-js";
 import { AnsweredPromptsProvider } from "./answered-prompts";
 import { AppBootstrap } from "./app-bootstrap";
 import { AuthProvider } from "./features/account/account-context";
@@ -113,28 +113,11 @@ export function AppProviders(props: ParentProps<AppProps>): JSX.Element {
   );
 }
 
-/**
- * The keyed boundary. Its `when` is the active server id, so changing servers
- * disposes every provider below and mounts a fresh set - the unmount *is* the
- * per-server teardown, and the mount *is* the per-server load.
- *
- * The nonce is the second half of the key, and it is what let the
- * `serverLoadRequest` effect in `server-selection.tsx` go away. `servers.tsx`
- * publishes that request for a server that is already active but has not been
- * loaded - a remote that just negotiated a protocol, or one whose compatibility
- * retry succeeded - which the id alone cannot express, because the id did not
- * change. Folding the nonce into the key turns "please load this server" into
- * "please mount this server again", and there is only one mechanism left.
- */
+/** Server switches dispose scoped state; reconnects reload it without clearing cached data. */
 function ServerScopeBoundary(props: ParentProps<ScopedConversationProps>): JSX.Element {
-  const { activeServerId, serverLoadRequest } = useServers();
-  const scopeKey = createMemo(() => {
-    const serverId = activeServerId();
-    const request = serverLoadRequest();
-    return request?.serverId === serverId ? `${serverId}\u0000${request.nonce}` : serverId;
-  });
+  const { activeServerId } = useServers();
   return (
-    <Show keyed when={scopeKey()}>
+    <Show keyed when={activeServerId()}>
       <ScopedProviders stableConversation={props.stableConversation}>{props.children}</ScopedProviders>
     </Show>
   );
