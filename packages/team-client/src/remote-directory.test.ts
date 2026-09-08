@@ -477,9 +477,9 @@ describe("directory refresh", () => {
     });
     const refresh = createRemoteDirectoryRefresh(load, () => now);
     await Promise.allSettled([refresh.refresh(), refresh.refresh(), refresh.refresh(true)]);
-    now = 29_999;
+    now = 15 * 60_000 - 1;
     await refresh.refresh().catch(() => undefined);
-    now = 30_000;
+    now = 15 * 60_000;
     await refresh.refresh().catch(() => undefined);
     await refresh.refresh(true).catch(() => undefined);
     expect(load).toHaveBeenCalledTimes(3);
@@ -511,11 +511,13 @@ it("finds memberships accepted on another device and stops polling on cleanup", 
         role: "member",
       },
     ];
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(15 * 60_000 - 1);
+    expect(visible).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
     expect(visible).toEqual([HOST_ID]);
     stop();
     hosts = [];
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(15 * 60_000);
     expect(visible).toEqual([HOST_ID]);
   } finally {
     stop();

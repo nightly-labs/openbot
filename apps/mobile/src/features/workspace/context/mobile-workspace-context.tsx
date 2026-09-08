@@ -51,7 +51,7 @@ import {
 } from "@/features/workspace/components/server-connection";
 import { type MobileAgentActivities, reduceAgentActivity } from "@/features/workspace/model/agent-activity";
 import { decodeConversation } from "@/features/workspace/model/conversation";
-import { applyServerRecovery, resetServerStatus, serverKind } from "@/features/workspace/model/server-status";
+import { applyServerRecovery, serverKind } from "@/features/workspace/model/server-status";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
 import type {
   MobileAgent,
@@ -114,7 +114,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const connections = useRef(new Map<string, ServerConnectionHandle>());
   const loadGeneration = useRef(0);
   const directoryGeneration = useRef(0);
-  const [foreground, setForeground] = useState(AppState.currentState === "active");
+  const [foreground, setForeground] = useState(AppState.currentState !== "background");
   const [servers, setServers] = useState<MobileServer[]>([]);
   const [serverDirectoryState, setServerDirectoryState] = useState<MobileServerDirectoryState>("loading");
   const [serverDirectoryError, setServerDirectoryError] = useState<string | null>(null);
@@ -311,21 +311,24 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
+    let connectionActive = AppState.currentState !== "background";
     const subscription = AppState.addEventListener("change", (state) => {
+      // iOS system overlays report inactive without putting the app in the background.
+      if (state === "inactive") return;
       const active = state === "active";
+      if (active === connectionActive) return;
+      connectionActive = active;
       setForeground(active);
       if (!active) {
         loadGeneration.current += 1;
-        setServers((current) => current.map(resetServerStatus));
       }
-      if (active) void directoryRefresh.refresh(true).catch(() => undefined);
     });
     return () => subscription.remove();
-  }, [directoryRefresh]);
+  }, []);
 
   useEffect(() => {
     if (!foreground) return;
-    return watchRemoteDirectory(() => directoryRefresh.refresh(true));
+    return watchRemoteDirectory(() => directoryRefresh.refresh());
   }, [foreground, directoryRefresh]);
 
   const loadConversation = useCallback(

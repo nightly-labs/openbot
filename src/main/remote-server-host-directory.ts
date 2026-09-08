@@ -21,6 +21,7 @@
 // Order is preserved deliberately: surviving stored servers keep their positions, and hosts the
 // user has not seen before are appended in directory order. The user drags this list.
 
+import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import type { RemoteHostSummary } from "./central-auth-manager";
 import type { PreservedHostIdentity, StoredRemoteServerView } from "./remote-server-store";
 import type { StoredRemoteServer } from "./remote-server-stored-shape";
@@ -30,7 +31,7 @@ import { fingerprint } from "./team-store";
 export function watchRemoteHostDirectory(options: { isActive(): boolean; refresh(): Promise<void> }): () => void {
   const timer = setInterval(() => {
     if (options.isActive()) void options.refresh().catch(() => undefined);
-  }, 30_000);
+  }, REMOTE_ACCOUNT_CHECK_INTERVAL_MS);
   timer.unref();
   return () => clearInterval(timer);
 }

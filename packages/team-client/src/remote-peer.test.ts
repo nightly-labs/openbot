@@ -38,7 +38,7 @@ describe("browser remote peer recovery", () => {
     await network.connect();
     try {
       network.socket().receive({ type: "account-profile-changed", version: 1 });
-      await vi.waitFor(() => expect(refreshProfile).toHaveBeenCalledTimes(2));
+      await vi.waitFor(() => expect(refreshProfile).toHaveBeenCalledTimes(1));
       const result = await network.runtime.execute({
         id: "after-profile",
         type: "request",
@@ -141,7 +141,7 @@ describe("browser remote peer recovery", () => {
       } else await initial;
       const closed =
         mode === "disconnect" ? network.runtime.execute({ id: "disconnect", type: "disconnect" }) : Promise.resolve();
-      if (mode === "reconnect") network.connection().drop("disconnected");
+      if (mode === "reconnect") network.connection().drop("failed");
       const reconnecting = network.connect();
       await vi.advanceTimersByTimeAsync(0);
       cleanup.resolve();
@@ -298,12 +298,63 @@ describe("browser remote peer recovery", () => {
     await network.runtime.dispose();
   });
 
-  it("does not reuse an authenticated peer whose browser missed the disconnect event", async () => {
+  it("waits for RTC recovery on resume even if the browser missed the disconnect event", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const endSession = vi.fn(async () => {});
+    const network = await setupNetwork({ endSession });
+    await network.connect();
+    network.runtime.setActive(false);
+    network.connection().connectionState = "disconnected";
+    network.runtime.setActive(true);
+    const reconnect = network.connect();
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(endSession).not.toHaveBeenCalled();
+    network.connection().drop("connected");
+    await expect(reconnect).resolves.toMatchObject({ ok: true });
+    expect(network.bootstraps()).toBe(1);
+    await network.runtime.dispose();
+  });
+
+  it("ends an unrecoverable RTC session after the resume grace period", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const endSession = vi.fn(async () => {});
+    const network = await setupNetwork({ endSession });
+    await network.connect();
+    network.runtime.setActive(false);
+    network.connection().drop("disconnected");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(endSession).not.toHaveBeenCalled();
+    network.runtime.setActive(true);
+    const reconnect = network.connect();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(reconnect).resolves.toMatchObject({ ok: false });
+    expect(endSession).toHaveBeenCalledTimes(1);
+    await expect(network.connect()).resolves.toMatchObject({ ok: true });
+    expect(network.bootstraps()).toBe(2);
+    await network.runtime.dispose();
+  });
+
+  it("reports canceled reads for data synchronization without replacing the healthy peer", async () => {
     const network = await setupNetwork();
     await network.connect();
-    network.connection().connectionState = "disconnected";
-    await expect(network.connect()).resolves.toMatchObject({ ok: true });
-    expect(network.connections).toHaveLength(2);
+    network.updates.length = 0;
+    network.runtime.setActive(false);
+    network.runtime.setActive(true);
+    expect(network.updates).toEqual([]);
+    const read = network.runtime.execute({
+      id: "canceled",
+      type: "request",
+      method: "GET",
+      path: "/v1/agents/slow/conversation",
+      body: {},
+    });
+    await network.slowRequest.promise;
+    network.updates.length = 0;
+    network.runtime.setActive(false);
+    await read;
+    network.runtime.setActive(true);
+    expect(network.updates).toEqual([{ hostId: "host", state: "online", message: null, resync: true }]);
+    expect(network.bootstraps()).toBe(1);
     await network.runtime.dispose();
   });
 
