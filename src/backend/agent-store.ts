@@ -165,7 +165,7 @@ export class AgentStore {
         examplesInitialized: true,
         agents: persisted.map(normalizeStoredAgent),
       };
-      if (persisted.length === 0) this.#restoreRosterFromEvents();
+      this.#restoreRosterFromEvents();
     } else {
       const legacy = await this.#readState();
       await this.#database.backupLegacyFile(this.#statePath);
@@ -997,14 +997,23 @@ export class AgentStore {
   }
 
   /**
-   * Put the roster back when the projection is empty and the event log is not.
+   * Put back any agent the roster projection has lost but the event log still names.
    *
-   * The two conditions together are not a state the app can reach on purpose: `hasAggregateEvents`
-   * says the user has had agents, and `listAgents` says they have none. `.every()` on an empty list is
-   * true, so the guard above passes it silently, and the next `#persist` writes the empty list as the
-   * new truth -- every chat gone for good, with each thread and message row still on disk. The event
-   * log is the source of truth and carries the whole list, so it is read back instead.
+   * `orchestration_events` is the source of truth and every roster write appends the whole list to one
+   * aggregate, but nothing read it back. An agent missing from the projection is therefore silent: the
+   * startup guard above accepts what it finds -- `.every()` on an empty list is true -- the agent has no
+   * chat in the sidebar, and the next `#persist` writes the shortened list as the new truth while each
+   * thread and message row stays on disk.
    *
+   * Per agent, not only for an empty roster. A partial loss is the more likely half: `replaceAgents`
+   * truncates the roster and re-inserts the in-memory list, so a persist made with one agent missing
+   * drops that one row and keeps the rest. It is also the more dangerous half, because a later
+   * `getOrCreate` rebuilds the missing agent with `threadId: null` and both conversation read paths
+   * then report an empty history. The restored profile carries the `threadId` the event holds, which is
+   * what reaches a thread minted under a random id by an earlier build.
+   *
+   * The newest event only, never a fold over the aggregate: `hardDeleteAgent` appends the *remaining*
+   * agents, so an agent the user deleted on purpose is in no later payload and is never brought back.
    * A profile the current guards reject is dropped rather than thrown on, because the event that holds
    * it can be older than any shape this build knows and nothing here may stop the app from starting.
    * The result is persisted so the repair survives the next launch, and it runs before
@@ -1013,13 +1022,18 @@ export class AgentStore {
   #restoreRosterFromEvents(): void {
     const replayed = this.#database.latestRosterAgents();
     if (replayed.length === 0) return;
-    const agents = replayed.filter(isStoredAgent).map(normalizeStoredAgent);
-    const dropped = replayed.length - agents.length;
+    const readable = replayed.filter(isStoredAgent).map(normalizeStoredAgent);
+    const present = new Set(this.#state.agents.map((agent) => agent.id));
+    // Appended rather than put back at its old index: the sidebar orders agents by the layout's own
+    // `agentOrder`, so the position here is not what the user sees, and appending keeps the agents that
+    // survived exactly where they are.
+    const restored = readable.filter((agent) => !present.has(agent.id));
+    if (restored.length === 0) return;
+    const dropped = replayed.length - readable.length;
     if (dropped > 0) logger.warn("Agent profiles in the roster event log cannot be read.", dropped);
-    if (agents.length === 0) return;
-    this.#state = { ...this.#state, agents };
+    this.#state = { ...this.#state, agents: [...this.#state.agents, ...restored] };
     this.#persist("agents.replaced");
-    logger.warn("The agent roster was rebuilt from the event log.", agents.length);
+    logger.warn("Agents were restored to the roster from the event log.", restored.length);
   }
 
   #persist(eventType: string): void {

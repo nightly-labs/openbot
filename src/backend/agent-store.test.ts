@@ -223,6 +223,7 @@ describe("AgentStore", () => {
     const store = new AgentStore(userData, home);
     await store.initialize();
     await store.getOrCreate("chief");
+    await store.getOrCreate("sales-outbound");
     const threadId = await store.ensureThreadId("chief");
     store.database.appendConversationMessage({
       agentId: "chief",
@@ -237,20 +238,41 @@ describe("AgentStore", () => {
       },
       eventType: "turn.started",
     });
-    // The state the replay answers: the roster projection is empty while its event log still holds the
-    // whole list. Without the replay every chat is gone and the next persist makes that permanent.
-    store.database.connection.exec("DELETE FROM projection_agents");
+    // The state the replay answers, in its more likely half: one roster row is gone while the rest of
+    // the roster is intact, which is what a persist made with an agent missing leaves behind. The agent
+    // has no chat in the sidebar, a later `getOrCreate` rebuilds it with no thread, and both read paths
+    // then report an empty history -- while the thread and every message stay on disk.
+    store.database.connection.prepare("DELETE FROM projection_agents WHERE agent_id = ?").run("chief");
 
     const restored = new AgentStore(userData, home);
     await restored.initialize();
 
+    expect(restored.list().map((agent) => agent.id)).toEqual(["sales-outbound", "chief"]);
     expect(restored.list().find((agent) => agent.id === "chief")?.threadId).toBe(threadId);
     expect(restored.database.readConversationPage("chief", threadId).messages).toEqual([
       expect.objectContaining({ id: "message-1", text: "Where did my chat go?" }),
     ]);
+
+    // The whole roster gone is the same repair. Both agents come back, and the repair is persisted, so a
+    // third launch reads them out of the projection with no replay at all.
+    restored.database.connection.exec("DELETE FROM projection_agents");
+    const rebuilt = new AgentStore(userData, home);
+    await rebuilt.initialize();
+
+    expect(
+      rebuilt
+        .list()
+        .map((agent) => agent.id)
+        .sort(),
+    ).toEqual(["chief", "sales-outbound"]);
     const reopened = new AgentStore(userData, home);
     await reopened.initialize();
-    expect(reopened.list().map((agent) => agent.id)).toContain("chief");
+    expect(
+      reopened
+        .list()
+        .map((agent) => agent.id)
+        .sort(),
+    ).toEqual(["chief", "sales-outbound"]);
   });
 
   it("persists marketplace installation versions", async () => {
