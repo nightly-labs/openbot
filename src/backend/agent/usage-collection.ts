@@ -78,6 +78,10 @@ export function collectProviderUsage(
     }
     return;
   }
+  // ACP `Usage` is session-cumulative by contract: its fields are documented as "Sum of all token
+  // types across session" and "Total input tokens across all turns". So one counter per session,
+  // like Codex, and the first report of a session that predates collection is a baseline: it
+  // carries tokens spent before analytics existed.
   const value = getRecord(params, "usage");
   if (!value) return;
   const input = count(value.inputTokens);
