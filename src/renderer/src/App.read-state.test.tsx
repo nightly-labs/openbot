@@ -1883,6 +1883,14 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Create new agent" }));
 
     expect(await screen.findByRole("main", { name: "Create a new agent" })).toBeInTheDocument();
+
+    // The form is open now, so the second press only has the report to remove. It has
+    // to: the press does nothing else the user can see.
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+    flush();
+    await fireEvent.click(screen.getByRole("button", { name: "Create new agent" }));
+
+    expect(await screen.findByRole("main", { name: "Create a new agent" })).toBeInTheDocument();
   });
 
   it("clears unread messages when entering an agent chat", async () => {

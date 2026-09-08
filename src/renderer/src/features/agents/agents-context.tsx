@@ -123,12 +123,14 @@ const Agents = createSimpleContext({
     }
 
     function openBotSetup(): void {
-      if (agentSetupOpen()) return;
       // The form renders in the workspace content the Usage report covers, and the
-      // sidebar button that asks for it is outside that markup. The automatic open
-      // above is deliberately not this: a server with no agents must not take the
-      // report away from a user who asked for it.
+      // sidebar button that asks for it is outside that markup. Above the guard
+      // below, so a second press reveals a form that is already open rather than
+      // doing nothing visible; the guard still protects the draft from a reset.
+      // The automatic open above is deliberately not this: a server with no agents
+      // must not take the report away from a user who asked for it.
       dismissUsage();
+      if (agentSetupOpen()) return;
       setDirectTyping(false);
       setAgentSetupDraft(createFirstAgentDraft());
       setAgentSetupError(null);
