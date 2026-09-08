@@ -5,6 +5,7 @@ export { default as Bell } from "lucide-solid/icons/bell";
 export { default as Brain } from "lucide-solid/icons/brain";
 export { default as CalendarClock } from "lucide-solid/icons/calendar-clock";
 export { default as Camera } from "lucide-solid/icons/camera";
+export { default as ChartArea } from "lucide-solid/icons/chart-area";
 export { default as Check } from "lucide-solid/icons/check";
 export { default as ChevronDown } from "lucide-solid/icons/chevron-down";
 export { default as ChevronLeft } from "lucide-solid/icons/chevron-left";

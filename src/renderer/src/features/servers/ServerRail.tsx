@@ -2,7 +2,7 @@ import type { ServerSummary } from "@openbot/contracts/ipc";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
-import { buttonVariants, ContextMenu, ServerGradientLogo, Tooltip } from "../../components/ui";
+import { buttonVariants, ChartArea, ContextMenu, ServerGradientLogo, Tooltip } from "../../components/ui";
 
 const SERVER_RAIL_TOOLTIP_OPEN_DELAY = 150;
 
@@ -355,7 +355,8 @@ function ServerRailButton(props: {
             <ContextMenu.Content class="agent-context-menu" aria-label="Server actions">
               <Show when={props.onOpenUsage}>
                 <ContextMenu.Item onSelect={() => props.onOpenUsage?.(props.server.id, trigger)}>
-                  Usage
+                  <ChartArea class="agent-context-icon size-4" aria-hidden="true" />
+                  <span>Usage</span>
                 </ContextMenu.Item>
               </Show>
               <ContextMenu.Item onSelect={() => props.onOpenSettings(props.server.id, trigger)}>
