@@ -380,6 +380,12 @@ export interface OpenBotDesktopApi {
   openExternal: (destination: ExternalDestination) => Promise<void>;
   connectProvider: (provider: AgentProviderId) => Promise<AgentStatus>;
   refreshAgentProviders: () => Promise<AgentStatus>;
+  /**
+   * Runs the provider CLI's own updater, for a CLI the user installed themselves. It is their copy,
+   * so the version they end on is whatever that updater fetches, which owes nothing to the version
+   * OpenBot pins for the runtime it manages.
+   */
+  updateProviderCli: (provider: AgentProviderId) => Promise<AgentStatus>;
   providerRuntimes: ProviderRuntimesDesktopApi;
   openUrl: (url: string) => Promise<void>;
   voice: VoiceDesktopApi;

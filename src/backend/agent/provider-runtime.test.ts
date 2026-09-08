@@ -7,6 +7,7 @@ import {
   createFakeClaude,
   createFakeGrok,
   createPendingFakeClaude,
+  createUpdatableFakeClaude,
   FakeAgentClient,
   fakeBrowser,
   readTextOrEmpty,
@@ -83,20 +84,14 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
     expect(availableOrder).toEqual(["claude", "grok", "codex"]);
 
+    // The CLI also reports gpt-reserve, gpt-5.5, gpt-5.4-mini and codex-auto-review, the models
+    // this product does not offer.
     expect(
       service
         .listModels()
         .filter((model) => model.provider === "codex")
         .map((model) => model.id),
-    ).toEqual([
-      "gpt-5.6-luna",
-      "gpt-5.6-terra",
-      "gpt-5.6-sol",
-      "gpt-5.5",
-      "gpt-5.4",
-      "gpt-5.4-mini",
-      "gpt-5.3-codex-spark",
-    ]);
+    ).toEqual(["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.4", "gpt-5.3-codex-spark"]);
   });
   it("uses startup fallbacks when provider discovery is unavailable", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
@@ -129,7 +124,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
             defaultReasoningEffort: "high",
             supportedReasoningEfforts: [{ reasoningEffort: "high" }],
           },
-          { model: "hidden-model", hidden: true },
+          { model: "hidden-model", hidden: true, displayName: "Hidden model" },
         ],
       };
       let failure = false;
@@ -144,6 +139,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       );
       await service.initialize();
       const catalog = () => service?.listModels().filter((model) => model.provider === provider);
+      // A model the CLI marks hidden is still offered: the CLI runs it, so the picker lists it.
       expect(catalog()).toEqual([
         {
           provider,
@@ -152,6 +148,14 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
           description: expect.any(String),
           defaultReasoningEffort: "high",
           supportedReasoningEfforts: ["high"],
+        },
+        {
+          provider,
+          id: "hidden-model",
+          name: "Hidden model",
+          description: expect.any(String),
+          defaultReasoningEffort: "medium",
+          supportedReasoningEfforts: ["medium"],
         },
       ]);
 
@@ -172,7 +176,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       };
       failure = true;
       await refresh();
-      expect(catalog()?.map((model) => model.id)).toEqual([id]);
+      expect(catalog()?.map((model) => model.id)).toEqual([id, "hidden-model"]);
       failure = false;
       response = { data: [{ model: id }, { model: "newly-available" }] };
       await refresh();
@@ -185,6 +189,47 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       expect(catalog()).toEqual([]);
     },
   );
+
+  it("keeps the whole display name the provider CLI reports", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    client.modelList = () => ({
+      data: [
+        { model: "gpt-5.6-sol", displayName: "GPT-5.6 Sol" },
+        { model: "gpt-6-astra", displayName: "GPT-6 Astra" },
+      ],
+    });
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    expect(
+      service
+        .listModels()
+        .filter((model) => model.provider === "codex")
+        .map((model) => model.name),
+    ).toEqual(["GPT-5.6 Sol", "GPT-6 Astra"]);
+  });
+
+  it("names a Claude model by the model, not by the pick Claude Code calls it", async () => {
+    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("claude");
+    client.modelList = () => ({
+      data: [
+        { model: "claude-sonnet-5", displayName: "Default (recommended)" },
+        { model: "claude-haiku-4-5-20251001", displayName: "Haiku" },
+        { model: "claude-fable-5-1[1m]", displayName: "Fable" },
+        { model: "claude-next", displayName: "Next" },
+      ],
+    });
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "claude", () => client);
+    await service.initialize();
+    expect(
+      service
+        .listModels()
+        .filter((model) => model.provider === "claude")
+        .map((model) => model.name),
+    ).toEqual(["Claude Sonnet 5", "Claude Haiku 4.5", "Claude Fable 5.1 (1M context)", "Next"]);
+  });
 
   it("collects all ChatGPT pages and keeps the previous catalog when pagination fails", async () => {
     const { store, mailbox } = stores(root);
@@ -206,7 +251,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     ).toEqual(["gpt-5.6-sol", "gpt-6-astra"]);
     expect(client.requests).toContainEqual({
       method: "model/list",
-      params: { limit: 100, includeHidden: false, cursor: "page-2" },
+      params: { limit: 100, includeHidden: true, cursor: "page-2" },
     });
     const previous = service.listModels();
     repeat = true;
@@ -450,5 +495,81 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
     expect(activeClient?.running).toBe(false);
     expect(codexClients[2]?.running).toBe(true);
+  });
+
+  it("runs the user's own CLI updater and reports the version the provider now runs", async () => {
+    const claude = await createUpdatableFakeClaude(root, "2.1.250");
+    process.env.OPENBOT_CLAUDE_PATH = claude.executable;
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "claude",
+      (provider) => new FakeAgentClient(provider),
+    );
+    await service.initialize();
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "claude", version: "2.1.246", cliSource: "system" }),
+    );
+
+    const status = await service.updateProviderCli("claude");
+
+    expect(await readTextOrEmpty(claude.marker)).toContain("updated");
+    expect(status.providers).toContainEqual(
+      expect.objectContaining({ id: "claude", state: "available", version: "2.1.250" }),
+    );
+  });
+
+  it("refuses to run a self-updater against the CLI copy OpenBot manages", async () => {
+    const claude = await createUpdatableFakeClaude(root, "2.1.250");
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "claude",
+      (provider) => new FakeAgentClient(provider),
+      undefined,
+      claude.executable,
+    );
+    await service.initialize();
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "claude", version: "2.1.246", cliSource: "managed" }),
+    );
+
+    await expect(service.updateProviderCli("claude")).rejects.toThrow(/manages/u);
+
+    expect(await readTextOrEmpty(claude.marker)).toBe("");
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "claude", state: "available", version: "2.1.246" }),
+    );
+  });
+  it("keeps the CLI's own reason when its updater refuses", async () => {
+    const claude = await createUpdatableFakeClaude(root, "2.1.250", "Installed by Homebrew. Run brew upgrade.");
+    process.env.OPENBOT_CLAUDE_PATH = claude.executable;
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "claude",
+      (provider) => new FakeAgentClient(provider),
+    );
+    await service.initialize();
+
+    await expect(service.updateProviderCli("claude")).rejects.toThrow();
+
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({
+        id: "claude",
+        state: "available",
+        version: "2.1.246",
+        message: expect.stringContaining("Installed by Homebrew. Run brew upgrade."),
+      }),
+    );
   });
 });

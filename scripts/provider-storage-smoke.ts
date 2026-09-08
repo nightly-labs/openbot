@@ -57,7 +57,7 @@ async function runOptionalGrok(database: OpenBotDatabase): Promise<boolean> {
   try {
     await client.request("initialize", {}, decodeRecordResponse);
     const account = await client.request("account/read", {}, decodeAccountReadResult);
-    const models = await client.request("model/list", { limit: 100, includeHidden: false }, decodeModelListResponse);
+    const models = await client.request("model/list", { limit: 100, includeHidden: true }, decodeModelListResponse);
     model = account.account ? (models.data.find((candidate) => candidate.model)?.model ?? null) : null;
   } catch {
     // This is an optional smoke and an unauthenticated local Grok installation is a valid skip.

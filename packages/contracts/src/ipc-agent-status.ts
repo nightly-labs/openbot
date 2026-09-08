@@ -40,6 +40,13 @@ export interface AgentProviderStatus {
   email?: string | null;
   connectionState?: "connecting";
   checkError?: string | null;
+  /**
+   * Who owns the CLI binary in use. `system` is an install the user made and can update themselves,
+   * with the CLI's own updater; `managed` is the pinned copy OpenBot downloaded, which only an
+   * OpenBot release moves. The two have different update stories, so the picker has to tell them
+   * apart, and only the provider that resolved a CLI reports one at all.
+   */
+  cliSource?: "system" | "managed";
 }
 
 function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
@@ -51,7 +58,8 @@ function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
     isNullableBoundedString(value.message, INPUT_LIMITS.messageText) &&
     (value.email === undefined || isNullableBoundedString(value.email, INPUT_LIMITS.email)) &&
     (value.connectionState === undefined || isBoundedString(value.connectionState, INPUT_LIMITS.identifier)) &&
-    (value.checkError === undefined || isNullableBoundedString(value.checkError, INPUT_LIMITS.messageText))
+    (value.checkError === undefined || isNullableBoundedString(value.checkError, INPUT_LIMITS.messageText)) &&
+    (value.cliSource === undefined || isBoundedString(value.cliSource, INPUT_LIMITS.identifier))
   );
 }
 

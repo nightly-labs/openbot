@@ -23,6 +23,7 @@ export const IPC_CHANNELS = {
   openExternal: "app:open-external",
   connectProvider: "app:connect-provider",
   refreshAgentProviders: "app:refresh-agent-providers",
+  updateProviderCli: "app:update-provider-cli",
   providerRuntimesGetStatus: "provider-runtimes:get-status",
   providerRuntimesDownload: "provider-runtimes:download",
   providerRuntimesCancel: "provider-runtimes:cancel",

@@ -37,6 +37,10 @@ export interface ProviderPickerProps {
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
+  /**
+   * Starts the update the row offers. Whether that re-downloads the managed runtime or runs the
+   * CLI's own updater is decided by the caller, which knows who owns the install.
+   */
   onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
@@ -207,7 +211,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       size="xs"
                       class="provider-picker-install"
                       aria-label={`Update ${option().name} to ${option().availableVersion}`}
-                      disabled={props.disabled || props.refreshingProviders}
+                      disabled={props.disabled || props.refreshingProviders || connecting()}
                       onClick={() => void props.onUpdateProvider?.(option().id)}
                     >
                       Update

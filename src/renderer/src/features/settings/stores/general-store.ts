@@ -30,9 +30,15 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
         connectionState: agent?.connectionState,
         checkError: agent?.checkError,
         availableVersion: props.providerAvailableVersions?.[provider] ?? null,
+        /*
+         * A CLI the user installed themselves has no managed download, so its runtime stays
+         * "not-downloaded" while the provider works perfectly well. The row reads that as ready, on
+         * the version the provider reports - including when an update is offered for it, which is
+         * the user's own install being newer-able, not a runtime waiting to be downloaded.
+         */
         runtimeStatus:
           runtime?.phase === "not-downloaded" &&
-          !runtime.availableVersion &&
+          (agent?.cliSource === "system" || !runtime.availableVersion) &&
           (agent?.state === "available" || agent?.state === "sign-in-required")
             ? { ...runtime, phase: "ready", version: agent.version ?? null }
             : runtime,

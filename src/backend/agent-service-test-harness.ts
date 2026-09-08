@@ -149,6 +149,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
         data:
           this.provider === "codex"
             ? [
+                "gpt-reserve",
                 "gpt-5.6-luna",
                 "gpt-5.6-terra",
                 "gpt-5.6-sol",
@@ -156,6 +157,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
                 "gpt-5.4",
                 "gpt-5.4-mini",
                 "gpt-5.3-codex-spark",
+                "codex-auto-review",
               ].map((model) => ({ model }))
             : this.provider === "grok"
               ? ["grok-4.5", "grok-fast"].map((model) => ({ model }))
@@ -541,6 +543,43 @@ fi
   );
   await chmod(executable, 0o755);
   return executable;
+}
+
+/**
+ * A Claude CLI that can update itself: `claude update` writes the marker, and every later
+ * `--version` reports `updatedVersion`, the way a real self-update changes the binary underfoot.
+ * The marker path is also what a test reads to see whether the updater ran at all.
+ */
+export async function createUpdatableFakeClaude(
+  directory: string,
+  updatedVersion: string,
+  updateError?: string,
+): Promise<{ executable: string; marker: string }> {
+  const executable = join(directory, "claude-updatable");
+  const marker = join(directory, "claude-update-marker");
+  await writeFile(
+    executable,
+    `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  if [ -f '${marker}' ]; then
+    printf '%s\\n' '${updatedVersion} (Claude Code)'
+  else
+    printf '%s\\n' '2.1.246 (Claude Code)'
+  fi
+elif [ "$1" = "auth" ]; then
+  printf '%s' '{"loggedIn":true,"email":"claude@example.com","subscriptionType":"max"}'
+elif [ "$1" = "update" ]; then
+${
+  updateError
+    ? `  printf '%s\\n' '${updateError}' >&2
+  exit 1`
+    : `  printf '%s\\n' 'updated' > '${marker}'`
+}
+fi
+`,
+  );
+  await chmod(executable, 0o755);
+  return { executable, marker };
 }
 
 export async function createPendingFakeClaude(directory: string): Promise<string> {

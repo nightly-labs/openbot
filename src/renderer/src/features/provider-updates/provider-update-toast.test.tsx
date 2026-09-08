@@ -1,10 +1,11 @@
 import type {
+  AgentProviderId,
   ProviderRuntimeSnapshot,
   ProviderRuntimeStatus,
   ProviderRuntimesDesktopApi,
 } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
-import { flush } from "solid-js";
+import { createSignal, flush } from "solid-js";
 import { afterEach, expect, it, vi } from "vitest";
 import { FALLBACK_UPDATE_STATUS } from "../../app-defaults";
 import { TOAST_DURATION, Toaster } from "../../components/ui";
@@ -30,6 +31,7 @@ const update = () => {};
 
 afterEach(() => {
   dismissProviderUpdateToast("claude");
+  dismissProviderUpdateToast("codex");
   vi.useRealTimers();
 });
 
@@ -126,10 +128,10 @@ function runtimeHarness() {
   return { store, api, emit, onOpenChange };
 }
 
-it("opens a notification from Settings and follows only current snapshots", async () => {
+it("announces an offer and follows only current snapshots", async () => {
   const { store, emit } = runtimeHarness();
   await waitFor(() => expect(store.providerAvailableVersions().claude).toBe("2.1.250"));
-  expect(screen.queryByText("Claude update available")).not.toBeInTheDocument();
+  expect(await screen.findByText("Claude update available")).toBeInTheDocument();
   fireEvent.click(await screen.findByRole("button", { name: "Update Claude to 2.1.250" }));
   expect(await screen.findByText("Updating Claude")).toBeInTheDocument();
   const stale = emit({ phase: "downloading", progress: 42 });
@@ -178,4 +180,98 @@ it("keeps Settings open when the update notification is closed", async () => {
   fireEvent.click(close);
   expect(onOpenChange).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: "Close settings" })).toBeInTheDocument();
+});
+
+/** A provider whose CLI the user installed: nothing managed on disk, and a newer version pinned. */
+function systemCliHarness(
+  updateSystemCli: (provider: AgentProviderId) => Promise<void>,
+  startInstalled = true,
+  installedAfterUpdate = "0.153.4",
+) {
+  const status: ProviderRuntimeStatus = { phase: "not-downloaded", progress: null, message: null, version: null };
+  const snapshot: ProviderRuntimeSnapshot = {
+    revision: 1,
+    providers: {
+      codex: { ...status, availableVersion: "0.153.4" },
+      claude: { ...status, availableVersion: null },
+      grok: { ...status, availableVersion: null },
+    },
+  };
+  const api: ProviderRuntimesDesktopApi = {
+    getStatus: async () => snapshot,
+    download: vi.fn(async () => snapshot),
+    cancel: async () => snapshot,
+    onEvent: () => () => {},
+  };
+  // A signal, because this is what the agent status is: it lands on its own, after the snapshot as
+  // often as before it.
+  const [installed, setInstalled] = createSignal<string | null>(startInstalled ? "0.146.0" : null);
+  let store: ReturnType<typeof createProviderRuntimeStore> | undefined;
+  render(() => {
+    store = createProviderRuntimeStore(api, {
+      systemCliVersion: (provider) => (provider === "codex" ? installed() : null),
+      updateSystemCli: async (provider) => {
+        await updateSystemCli(provider);
+        setInstalled(installedAfterUpdate);
+      },
+    });
+    return <Toaster />;
+  });
+  if (!store) throw new Error("The provider runtime store did not mount.");
+  return { store, api, setInstalled };
+}
+
+it("updates a CLI the user installed from the notification, without downloading anything", async () => {
+  const updateSystemCli = vi.fn(async () => {});
+  const { api } = systemCliHarness(updateSystemCli);
+
+  expect(await screen.findByText("ChatGPT update available")).toBeInTheDocument();
+  expect(screen.getByText("v0.146.0 → v0.153.4")).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole("button", { name: "Update" }));
+
+  expect(await screen.findByText("Updating ChatGPT")).toBeInTheDocument();
+  await waitFor(() => expect(updateSystemCli).toHaveBeenCalledWith("codex"));
+  expect(await screen.findByText("ChatGPT is up to date")).toBeInTheDocument();
+  expect(screen.getByText("v0.153.4")).toBeInTheDocument();
+  expect(api.download).not.toHaveBeenCalled();
+});
+
+it("keeps the CLI's own reason on the notification and retries from it", async () => {
+  const updateSystemCli = vi
+    .fn<(provider: AgentProviderId) => Promise<void>>()
+    .mockRejectedValueOnce(new Error("OpenBot could not update the ChatGPT CLI. Installed by Homebrew."))
+    .mockResolvedValue(undefined);
+  systemCliHarness(updateSystemCli);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Update" }));
+  expect(
+    await screen.findByText("OpenBot could not update the ChatGPT CLI. Installed by Homebrew."),
+  ).toBeInTheDocument();
+
+  fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+  expect(await screen.findByText("ChatGPT is up to date")).toBeInTheDocument();
+  expect(updateSystemCli).toHaveBeenCalledTimes(2);
+});
+
+it("stops offering a version the CLI's own updater leaves uninstalled", async () => {
+  const updateSystemCli = vi.fn(async () => {});
+  // The CLI reports the same version it started on: its channel has nothing newer for it.
+  const { store } = systemCliHarness(updateSystemCli, true, "0.146.0");
+
+  fireEvent.click(await screen.findByRole("button", { name: "Update" }));
+  await waitFor(() => expect(updateSystemCli).toHaveBeenCalledWith("codex"));
+  expect(await screen.findByText("ChatGPT is up to date")).toBeInTheDocument();
+  expect(screen.getByText("v0.146.0")).toBeInTheDocument();
+  await waitFor(() => expect(store.providerAvailableVersions().codex).toBeNull());
+  expect(screen.queryByRole("button", { name: "Update" })).not.toBeInTheDocument();
+});
+
+it("announces an offer that only becomes one once the agent status lands", async () => {
+  const { setInstalled } = systemCliHarness(async () => {}, false);
+
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Close notification" })).not.toBeInTheDocument());
+
+  setInstalled("0.146.0");
+  flush();
+  expect(await screen.findByText("ChatGPT update available")).toBeInTheDocument();
 });

@@ -438,10 +438,36 @@ installation is display metadata until the pinned runtime passes the existing do
 checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
 preload decoder. Cancellation and failure preserve the previous installation and its update offer.
 
-Settings starts the shared renderer runtime store. An explicit update opens one notification;
-revisioned snapshots move it through progress, failure, retry, and completion. Closing the
-notification does not cancel the download, and later reports do not reopen it. Fresh provider
-downloads retain their existing flow. These actions apply only to the local desktop host.
+Settings starts the shared renderer runtime store. The store announces each provider that gains an
+offer as one notification, from an effect over both the runtime snapshot and the agent status,
+because the two arrive separately and either one can complete an offer. An explicit update opens
+the same notification; revisioned snapshots move it through progress, failure, retry, and
+completion. Only the crossing into "update available" is announced, so a dismissed notification
+stays dismissed until the offer changes. Closing the notification does not cancel the download,
+and later reports do not reopen it. Fresh provider downloads retain their existing flow. These
+actions apply only to the local desktop host.
+
+A CLI the user installed themselves is not managed, but it is still compared against the lock.
+Each provider status row reports `cliSource`, and main passes the version of a `system` row to
+`ProviderRuntimeManager.setSystemVersion`, which compares it against the pinned version exactly as
+it compares a managed installation. The row and the notification therefore use the one update offer, the
+one Update button, and one entry point in the runtime store, `startProviderUpdate`. Only the work
+behind it differs: a `system` install goes to `updateProviderCli`, which runs that CLI's own updater
+(`codex update`) and then restarts the provider on the binary now on disk. That updater reports no
+progress, so the notification holds its indeterminate step until the provider comes back, and a
+failure keeps the reason the CLI gave. OpenBot downloads nothing on this path, so the pinned artifact checksums are untouched. The
+managed copy refuses this command, because the runtime manager replaces that installation whole.
+
+That updater decides for itself what the newest version is, and its release channel can name an
+older one than the lock: `grok update` can report success and leave the CLI where it was. The IPC
+handler therefore reports the version before and after the run to
+`ProviderRuntimeManager.noteSystemCliUpdate`. An update that finishes on the version it started on
+is the updater's answer: the manager records that pair of versions in `cli-update-refusals.json`
+beside the managed runtimes, and drops the offer from `availableVersion`, so the row and the
+notification stop offering an update that cannot happen. The record is kept against both the
+installed and the pinned version, so a new pinned version is a new offer, and so is a CLI the user
+moves by other means. The runtime store keeps the same answer in memory for the run that produced
+it, only to settle the notification before the next snapshot arrives.
 
 ## Agent usage analytics
 

@@ -61,9 +61,9 @@ describe("ProviderModelPicker", () => {
       />
     ));
 
-    await fireEvent.click(view.getByRole("button", { name: "Agent model: Luna" }));
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
     const dialog = view.getByRole("dialog", { name: "Choose agent model" });
-    await fireEvent.click(within(dialog).getByRole("option", { name: "Sol" }));
+    await fireEvent.click(within(dialog).getByRole("option", { name: "GPT-5.6 Sol" }));
 
     expect(onChange).toHaveBeenCalledWith("gpt-5.6-sol", "codex");
     expect(dialog).toBeInTheDocument();
@@ -92,7 +92,7 @@ describe("ProviderModelPicker", () => {
       />
     ));
 
-    await fireEvent.click(view.getByRole("button", { name: "Agent model: Luna" }));
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
     const dialog = view.getByRole("dialog", { name: "Choose agent model" });
     expect(within(dialog).getByRole("tab", { name: /ChatGPT:/ })).toBeInTheDocument();
     const grok = within(dialog).getByRole("tab", { name: /Grok:/ });
@@ -104,7 +104,7 @@ describe("ProviderModelPicker", () => {
     );
 
     await fireEvent.click(within(dialog).getByRole("tab", { name: /Claude:/ }));
-    expect(within(dialog).getByRole("option", { name: "Claude Opus 5, default" })).toBeDisabled();
+    expect(within(dialog).getByRole("option", { name: "Claude Sonnet 5, default" })).toBeDisabled();
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -118,7 +118,7 @@ describe("ProviderModelPicker", () => {
         onChange={vi.fn()}
       />
     ));
-    const trigger = view.getByRole("button", { name: "Agent model: Luna" });
+    const trigger = view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" });
 
     await fireEvent.click(trigger);
     const dialog = view.getByRole("dialog", { name: "Choose agent model" });
