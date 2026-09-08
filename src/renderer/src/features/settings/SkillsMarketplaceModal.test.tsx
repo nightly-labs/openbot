@@ -563,6 +563,63 @@ describe("SkillsMarketplaceModal", () => {
     await waitFor(() => expect(submit).toHaveBeenCalledWith(expect.objectContaining({ showCreatorAvatar: true })));
   });
 
+  it("updates the publication preview when the selected agent changes and ignores stale previews", async () => {
+    const preview = (agentId: string) => ({
+      agentId,
+      name: `${agentId} preview`,
+      title: "",
+      description: "Prepared for publication.",
+      avatarSeed: agentId,
+      avatarHue: null,
+      avatarUrl: null,
+      skills: [],
+      routines: [],
+    });
+    let resolveFirst!: (value: ReturnType<typeof preview>) => void;
+    const first = new Promise<ReturnType<typeof preview>>((resolve) => {
+      resolveFirst = resolve;
+    });
+    window.openbot.marketplaceAgents.preview = vi.fn((id) => (id === "first" ? first : Promise.resolve(preview(id))));
+    render(() => (
+      <SkillsMarketplaceModal
+        open
+        agents={[
+          { id: "first", name: "First" },
+          { id: "second", name: "Second" },
+        ]}
+        activeAgentId="first"
+        onOpenChange={() => undefined}
+      />
+    ));
+    await fireEvent.pointerDown(screen.getByRole("button", { name: "Marketplace menu" }), {
+      pointerType: "mouse",
+      button: 0,
+    });
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "My submissions" }), { button: 0 });
+    const selector = await screen.findByRole("combobox", { name: "Agent to publish" });
+    fireEvent.change(selector, { target: { value: "second" } });
+    expect(await screen.findByText("second preview")).toBeInTheDocument();
+    fireEvent.change(selector, { target: { value: "first" } });
+    await waitFor(() => expect(window.openbot.marketplaceAgents.preview).toHaveBeenCalledWith("first"));
+    expect(screen.getByText("second preview")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Submit for review" })).toBeDisabled();
+    const category = screen.getByRole("combobox", { name: "Agent category" });
+    category.focus();
+    fireEvent.change(screen.getByRole("combobox", { name: "Agent to publish" }), { target: { value: "second" } });
+    expect(await screen.findByText("second preview")).toBeInTheDocument();
+    resolveFirst(preview("first"));
+    await first;
+    await waitFor(() => expect(screen.getByRole("button", { name: "Submit for review" })).toBeEnabled());
+    expect(category).toHaveFocus();
+    fireEvent.click(await screen.findByRole("button", { name: "Submit for review" }));
+    await waitFor(() =>
+      expect(window.openbot.marketplaceAgents.submit).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: "second" }),
+      ),
+    );
+    expect(screen.queryByText("first preview")).not.toBeInTheDocument();
+  });
+
   it("opens pending submission details from its row", async () => {
     const submissions: SkillSubmission[] = [
       {

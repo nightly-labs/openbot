@@ -87,3 +87,13 @@ Do not use the separate `skills:seed`, `agents:seed`, or `dev:seed` demo scripts
 ## Attribution
 
 The 15 original OpenBot team Skills use the repository PolyForm Noncommercial 1.0.0 license. The five existing adapted Skills retain their pinned OpenAI or Anthropic source attribution and Apache-2.0 license. Each generated bundle contains the applicable LICENSE.txt and NOTICE.txt; the build also produces UPSTREAM_NOTICES.md.
+
+## Check Agent preview switching
+
+With this worktree's dev app running and at least two local Agents, run:
+
+```sh
+bun scripts/marketplace-preview-e2e.ts --allow-mutations
+```
+
+The check switches Agents in My submissions, verifies focus and category retention, and reports card position and height for visual QA. It also switches quickly back and forth. It does not submit, install, or delete anything.

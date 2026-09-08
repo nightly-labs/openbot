@@ -741,10 +741,13 @@ function AgentMarketplacePanel(props: {
   let initialized = false;
   let handledAddVersion = 0;
   let openingAgent = false;
+  let publicationRequest = 0;
 
   createEffect(
     () => [props.view, props.refreshVersion] as const,
     ([view]) => {
+      publicationRequest += 1;
+      setBusy(null);
       setMarket((state) => {
         state.detail = null;
         state.publication.preview = null;
@@ -861,18 +864,24 @@ function AgentMarketplacePanel(props: {
       const previous = state.submissions.find((item) => item.listingId === listingId);
       state.publication.category = previous?.category ?? "other";
     });
+    await refreshPublicationPreview(agentId);
+  }
+
+  async function refreshPublicationPreview(agentId: string) {
+    const request = ++publicationRequest;
     setBusy("publish");
     const value = await run(() => window.openbot.marketplaceAgents.preview(agentId));
-    if (value) {
-      setMarket((state) => {
-        state.publication.preview = value;
-      });
-    }
+    if (request !== publicationRequest) return;
+    setMarket((state) => {
+      state.publication.preview = value ?? null;
+    });
     setBusy(null);
   }
 
   /** Drops the previewed publication and the agent it was going to update. */
   function discardPublication(): void {
+    publicationRequest += 1;
+    setBusy(null);
     setMarket((state) => {
       state.publication.preview = null;
       state.publication.listingId = undefined;
@@ -881,7 +890,7 @@ function AgentMarketplacePanel(props: {
 
   async function submitPublication() {
     const value = market.publication.preview;
-    if (!value) return;
+    if (!value || panel.busy !== null) return;
     const analytics = desktopAnalytics.scope();
     const listingId = market.publication.listingId;
     setBusy("submit");
@@ -907,7 +916,11 @@ function AgentMarketplacePanel(props: {
   }
 
   return (
-    <section class="skills-marketplace-panel agent-marketplace-panel" aria-label="Agent marketplace">
+    <section
+      class="skills-marketplace-panel agent-marketplace-panel"
+      aria-label="Agent marketplace"
+      data-preview-loading={panel.busy === "publish" ? "" : undefined}
+    >
       <Show when={props.view === "discover"}>
         <div hidden={Boolean(market.detail) || panel.loading} inert={Boolean(market.detail) || panel.loading}>
           <MarketplaceCatalog
@@ -1028,6 +1041,7 @@ function AgentMarketplacePanel(props: {
                   setMarket((state) => {
                     state.publication.sourceAgentId = agentId;
                   });
+                  void refreshPublicationPreview(agentId);
                 }}
                 disabled={!props.agents.length}
               >
@@ -1037,57 +1051,60 @@ function AgentMarketplacePanel(props: {
               </NativeSelect>
               <ChevronDown aria-hidden="true" />
             </span>
-            <Button loading={panel.busy !== null} onClick={() => void preparePublication()}>
+            <Button disabled={panel.busy !== null} onClick={() => void preparePublication()}>
               <Plus /> Add agent
             </Button>
           </div>
         </div>
-        <Show when={market.publication.preview} keyed>
-          {(value) => (
-            <div class="skills-publish-card agent-publish-card">
-              <div class="skills-publish-summary">
-                <AgentAvatar seed={value.avatarSeed} hue={value.avatarHue} url={value.avatarUrl} motion="hover" />
-                <div>
-                  <h2>{value.name}</h2>
-                  <p>{value.description}</p>
-                  <small>
-                    {value.skills.length} skills · {value.routines.length} routines
-                  </small>
+        <Show when={market.publication.preview}>
+          <div class="skills-publish-card agent-publish-card" aria-busy={panel.busy === "publish" ? "true" : "false"}>
+            <Show when={market.publication.preview} keyed>
+              {(value) => (
+                <div class="skills-publish-summary">
+                  <AgentAvatar seed={value.avatarSeed} hue={value.avatarHue} url={value.avatarUrl} motion="hover" />
+                  <div>
+                    <h2>{value.name}</h2>
+                    <p>{value.description}</p>
+                    <small>
+                      {value.skills.length} skills · {value.routines.length} routines
+                    </small>
+                  </div>
                 </div>
-              </div>
-              <p>Conversation history, memories, model settings, and workspace files are not included.</p>
-              <label class="marketplace-publication-category">
-                Category
-                <NativeSelect
-                  aria-label="Agent category"
-                  value={market.publication.category}
-                  onChange={(event) => {
-                    const category = event.currentTarget.value;
-                    if (isSkillCategory(category))
-                      setMarket((state) => {
-                        state.publication.category = category;
-                      });
-                  }}
-                >
-                  <For each={SKILL_CATEGORIES}>
-                    {(category) => <option value={category}>{CATEGORY_LABELS[category]}</option>}
-                  </For>
-                </NativeSelect>
-              </label>
-              <div class="skills-publish-actions">
-                <Button variant="ghost" onClick={discardPublication}>
-                  Cancel
-                </Button>
-                <Button
-                  loading={panel.busy !== null}
-                  loadingLabel="Submitting…"
-                  onClick={() => void submitPublication()}
-                >
-                  Submit for review
-                </Button>
-              </div>
+              )}
+            </Show>
+            <p>Conversation history, memories, model settings, and workspace files are not included.</p>
+            <label class="marketplace-publication-category">
+              Category
+              <NativeSelect
+                aria-label="Agent category"
+                value={market.publication.category}
+                onChange={(event) => {
+                  const category = event.currentTarget.value;
+                  if (isSkillCategory(category))
+                    setMarket((state) => {
+                      state.publication.category = category;
+                    });
+                }}
+              >
+                <For each={SKILL_CATEGORIES}>
+                  {(category) => <option value={category}>{CATEGORY_LABELS[category]}</option>}
+                </For>
+              </NativeSelect>
+            </label>
+            <div class="skills-publish-actions">
+              <Button variant="ghost" onClick={discardPublication}>
+                Cancel
+              </Button>
+              <Button
+                loading={panel.busy === "submit"}
+                disabled={panel.busy !== null}
+                loadingLabel="Submitting…"
+                onClick={() => void submitPublication()}
+              >
+                Submit for review
+              </Button>
             </div>
-          )}
+          </div>
         </Show>
         <Show when={!market.publication.preview}>
           <Show when={!panel.loading} fallback={<div class="skills-marketplace-state">Loading submissions…</div>}>

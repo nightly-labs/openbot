@@ -746,7 +746,12 @@
 .skills-publish-summary small {
   color: var(--openbot-text-muted);
 }
+.agent-publish-card .skills-publish-summary {
+  height: calc(var(--openbot-leading-xl) * 6);
+}
 .agent-publish-card .skills-publish-summary > div {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  flex: 1;
   display: grid;
   gap: var(--openbot-space-2);
   min-width: 0;
@@ -755,6 +760,10 @@
 .agent-publish-card .skills-publish-summary p {
   margin: 0;
   line-height: var(--openbot-leading-xl);
+}
+.agent-publish-card .skills-publish-summary p {
+  overflow: auto;
+  scrollbar-gutter: stable;
 }
 .agent-publish-card .skills-publish-summary small {
   line-height: var(--openbot-leading-md);
@@ -946,7 +955,7 @@
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  align-self: center;
+  align-self: end;
   overflow: hidden;
   overflow-wrap: anywhere;
   line-height: var(--openbot-leading-lg);
@@ -1228,4 +1237,16 @@
   display: grid;
   gap: var(--openbot-space-2);
   margin-top: var(--openbot-space-6);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .agent-publish-card .skills-publish-summary {
+    animation: marketplace-placeholder-enter var(--openbot-duration-normal) var(--openbot-ease-out) both;
+  }
+}
+
+/* Brief preview requests keep actions visually stable while clicks remain blocked. */
+.agent-marketplace-panel[data-preview-loading] .agent-marketplace-publish-picker > .ui-button:disabled,
+.agent-marketplace-panel[data-preview-loading] .agent-publish-card .skills-publish-actions > .ui-button:disabled {
+  opacity: 1;
 }
