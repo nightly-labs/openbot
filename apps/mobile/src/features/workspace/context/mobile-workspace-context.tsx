@@ -23,6 +23,7 @@ import {
   type RemoteTeamHost,
   type RemoteWorkspacePreferences,
   resyncRemoteConversations,
+  watchRemoteDirectory,
 } from "@openbot/team-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { fetch } from "expo/fetch";
@@ -316,10 +317,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         loadGeneration.current += 1;
         setServers((current) => current.map(resetServerStatus));
       }
-      if (active) void directoryRefresh.refresh().catch(() => undefined);
+      if (active) void directoryRefresh.refresh(true).catch(() => undefined);
     });
     return () => subscription.remove();
   }, [directoryRefresh]);
+
+  useEffect(() => {
+    if (!foreground) return;
+    return watchRemoteDirectory(() => directoryRefresh.refresh(true));
+  }, [foreground, directoryRefresh]);
 
   const loadConversation = useCallback(
     async (agentId: string, serverId = activeServerIdRef.current) => {

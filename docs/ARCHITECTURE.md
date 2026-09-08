@@ -238,13 +238,15 @@ Both clients read account-wide membership from D1's indexed `remote_memberships`
 join. An offline paired desktop does not remove other memberships, and mobile connects directly
 to each host independently. Desktop window focus refreshes the directory immediately. While its main
 window is focused and the account is signed in, desktop also checks at 30-second intervals for joins
-on other devices. Concurrent reads coalesce; unfocused windows do not poll. Mobile foreground entry
-limits automatic directory refresh to once per 30 seconds. Session revocation, explicit refresh,
+on other devices. Concurrent reads coalesce; unfocused windows do not poll. Mobile refreshes immediately on
+foreground entry and checks at 30-second intervals while active; background entry stops the timer. Session revocation, explicit refresh,
 and completed invitation acceptance can refresh sooner. A lost healthy connection also requests
 membership reconciliation; a transport failure alone never removes a server. Mobile member controls
 use the same account endpoints: owners and admins can invite, while only owners can change another
 member's role or remove access. D1 retains revoked membership records and invalidates affected
-sessions; both clients exclude inactive members from the visible list. Released restore endpoints
+sessions; both clients exclude inactive members from the visible list. Mobile separates shareable
+links from email invitations. Email mode creates an address-bound invitation and sends it through
+the same delivery endpoint as desktop; failed delivery attempts revoke the new invitation. Released restore endpoints
 remain compatible with older clients. Member and invitation lists refresh after changes or on explicit request.
 Conversation read cursors belong to a team member and are shared across that member's devices.
 Advancing a cursor emits a conversation invalidation without the reader's identity or cursor;

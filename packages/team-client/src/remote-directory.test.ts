@@ -1,7 +1,12 @@
 import { createInviteUrl } from "@openbot/contracts/invite-links";
 import { describe, expect, it, vi } from "vitest";
 
-import { createRemoteDirectoryRefresh, type RemoteHostKeyStore, RemoteTeamDirectoryClient } from "./remote-directory";
+import {
+  createRemoteDirectoryRefresh,
+  type RemoteHostKeyStore,
+  RemoteTeamDirectoryClient,
+  watchRemoteDirectory,
+} from "./remote-directory";
 
 const API_URL = "https://api.openbot.run";
 const HOST_ID = "11111111-1111-4111-8111-111111111111";
@@ -383,6 +388,62 @@ describe("mobile member management", () => {
     });
   });
 
+  it("sends the created email invitation through the delivery endpoint", async () => {
+    const requests: Array<{ path: string; body: unknown }> = [];
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "mobile-session",
+      fetch: async (url, init) => {
+        const path = new URL(url.toString()).pathname;
+        requests.push({ path, body: typeof init?.body === "string" ? JSON.parse(init.body) : null });
+        return path.endsWith("/email")
+          ? new Response(null, { status: 204 })
+          : Response.json({ inviteId: "invite-1", token: "t".repeat(32), expiresAt: 1234 });
+      },
+    });
+    const invite = await client.sendInviteEmail(
+      { hostId: HOST_ID, devicePublicKey: HOST_KEY, name: "My desktop" },
+      { role: "member", email: "member@example.com" },
+    );
+    expect(requests).toEqual([
+      { path: `/v2/remote/hosts/${HOST_ID}/invites`, body: { role: "member", email: "member@example.com" } },
+      {
+        path: "/v1/team-invitations/email",
+        body: {
+          role: "member",
+          email: "member@example.com",
+          serverName: "My desktop",
+          inviteUrl: INVITE,
+        },
+      },
+    ]);
+    expect(invite.inviteUrl).toBe(INVITE);
+  });
+
+  it("revokes an undelivered invitation and reports the delivery failure", async () => {
+    const revoked: string[] = [];
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "mobile-session",
+      fetch: async (url, init) => {
+        const path = new URL(url.toString()).pathname;
+        if (init?.method === "DELETE") {
+          revoked.push(path);
+          return new Response(null, { status: 204 });
+        }
+        if (path.endsWith("/email")) return Response.json({ message: "Email delivery unavailable" }, { status: 503 });
+        return Response.json({ inviteId: "invite-1", token: "t".repeat(32), expiresAt: 1234 });
+      },
+    });
+    await expect(
+      client.sendInviteEmail(
+        { hostId: HOST_ID, devicePublicKey: HOST_KEY, name: "My desktop" },
+        { role: "member", email: "member@example.com" },
+      ),
+    ).rejects.toThrow();
+    expect(revoked).toEqual(["/v2/remote/invites/invite-1"]);
+  });
+
   it("returns member and invitation data and preserves permission failures", async () => {
     const member = {
       membershipId: "member-1",
@@ -423,4 +484,41 @@ describe("directory refresh", () => {
     await refresh.refresh(true).catch(() => undefined);
     expect(load).toHaveBeenCalledTimes(3);
   });
+});
+
+it("finds memberships accepted on another device and stops polling on cleanup", async () => {
+  vi.useFakeTimers();
+  let hosts: object[] = [];
+  const client = new RemoteTeamDirectoryClient({
+    apiUrl: API_URL,
+    token: "mobile-session",
+    fetch: async () => Response.json({ hosts }),
+  });
+  let visible: string[] = [];
+  const refresh = createRemoteDirectoryRefresh(async () => {
+    visible = (await client.listHosts()).map((host) => host.hostId);
+  });
+  const stop = watchRemoteDirectory(() => refresh.refresh(true));
+  try {
+    await refresh.refresh(true);
+    hosts = [
+      {
+        hostId: HOST_ID,
+        name: "Desktop",
+        logoKey: null,
+        devicePublicKey: HOST_KEY,
+        membershipId: "membership-1",
+        role: "member",
+      },
+    ];
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(visible).toEqual([HOST_ID]);
+    stop();
+    hosts = [];
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(visible).toEqual([HOST_ID]);
+  } finally {
+    stop();
+    vi.useRealTimers();
+  }
 });

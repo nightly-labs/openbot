@@ -178,6 +178,23 @@ export class RemoteTeamDirectoryClient {
     };
   }
 
+  async sendInviteEmail(
+    host: { hostId: string; devicePublicKey: string; name: string },
+    input: { role: "admin" | "member"; email: string },
+  ): Promise<{ inviteId: string; inviteUrl: string; expiresAt: number }> {
+    const invite = await this.createInvite(host, input);
+    try {
+      await this.#request("/v1/team-invitations/email", {
+        method: "POST",
+        body: { ...input, serverName: host.name, inviteUrl: invite.inviteUrl },
+      });
+    } catch (error) {
+      await this.revokeInvite(invite.inviteId).catch(() => undefined);
+      throw error;
+    }
+    return invite;
+  }
+
   async revokeInvite(inviteId: string): Promise<void> {
     await this.#request(`/v2/remote/invites/${encodeURIComponent(inviteId)}`, { method: "DELETE" });
   }
@@ -380,6 +397,12 @@ function decodeInvite(value: unknown): RemoteTeamInvite {
     usedAt: value.usedAt,
     revokedAt: value.revokedAt,
   };
+}
+
+/** The caller starts this watcher in the foreground and stops it on background entry. */
+export function watchRemoteDirectory(refresh: () => Promise<void>): () => void {
+  const timer = setInterval(() => void refresh().catch(() => undefined), 30_000);
+  return () => clearInterval(timer);
 }
 
 /** Refresh on demand or foreground entry; coalesce requests and rate-limit automatic retries. */

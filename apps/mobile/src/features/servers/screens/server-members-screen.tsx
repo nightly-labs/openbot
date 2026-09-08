@@ -26,9 +26,15 @@ export function ServerMembersScreen() {
   const { session, sessionScope } = useMobileSession();
   const server = servers.find((candidate) => candidate.id === serverId);
   const canInvite = server?.role === "owner" || server?.role === "admin";
+  const [inviteMode, setInviteMode] = useState<"email" | "link">("link");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "member">("member");
-  const [created, setCreated] = useState<{ inviteId: string; inviteUrl: string; expiresAt: number } | null>(null);
+  const [created, setCreated] = useState<{
+    inviteId: string;
+    inviteUrl: string;
+    expiresAt: number;
+    email?: string;
+  } | null>(null);
   const [copied, setCopied] = useState(false);
   const locked = useRef(false);
   const members = useQuery({
@@ -108,18 +114,43 @@ export function ServerMembersScreen() {
       {canInvite ? (
         <View className="gap-2">
           <SettingsSection title="Invite people">
-            <View className="px-4 py-3">
-              <SheetFormField
-                label="Email (optional)"
-                placeholder="name@example.com"
-                autoCapitalize="none"
-                autoCorrect={false}
-                inputMode="email"
-                editable={!action.isPending}
-                value={email}
-                onChangeText={setEmail}
-              />
-            </View>
+            <SettingsRow
+              disclosure={false}
+              trailing={
+                <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
+                  <Picker
+                    selectedValue={inviteMode}
+                    enabled={!action.isPending}
+                    onValueChange={(value) => {
+                      setInviteMode(value);
+                      setCreated(null);
+                      setCopied(false);
+                      action.reset();
+                    }}
+                  >
+                    <Picker.Item label="Invite link" value="link" />
+                    <Picker.Item label="Email" value="email" />
+                  </Picker>
+                </Host>
+              }
+            >
+              <Typography.Paragraph type="body-sm">Invite with</Typography.Paragraph>
+            </SettingsRow>
+            {inviteMode === "email" ? (
+              <View className="px-4 py-3">
+                <SheetFormField
+                  label="Email"
+                  isRequired
+                  placeholder="name@example.com"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  inputMode="email"
+                  editable={!action.isPending}
+                  value={email}
+                  onChangeText={setEmail}
+                />
+              </View>
+            ) : null}
             <SettingsRow
               disclosure={false}
               trailing={
@@ -138,20 +169,27 @@ export function ServerMembersScreen() {
               disabled={action.isPending}
               onPress={() =>
                 perform(async () => {
-                  const normalized = email.trim() ? normalizeEmailAddress(email) : undefined;
-                  if (email.trim() && !normalized) throw new Error("Enter a valid email address.");
-                  setCreated(
-                    await teamDirectory.createInvite(
-                      { hostId: server.id, devicePublicKey: server.publicKey },
-                      { role, ...(normalized ? { email: normalized } : {}) },
-                    ),
-                  );
+                  const host = { hostId: server.id, devicePublicKey: server.publicKey, name: server.name };
+                  if (inviteMode === "email") {
+                    const normalized = normalizeEmailAddress(email);
+                    if (!normalized) throw new Error("Enter a valid email address.");
+                    const invite = await teamDirectory.sendInviteEmail(host, { role, email: normalized });
+                    setCreated({ ...invite, email: normalized });
+                  } else {
+                    setCreated(await teamDirectory.createInvite(host, { role }));
+                  }
                   setCopied(false);
                 })
               }
             >
               <Typography.Paragraph type="body-sm" className="text-accent">
-                {created ? "Create new link" : "Create invite link"}
+                {inviteMode === "email"
+                  ? created
+                    ? "Send another invitation"
+                    : "Send invitation"
+                  : created
+                    ? "Create new link"
+                    : "Create invite link"}
               </Typography.Paragraph>
             </SettingsRow>
           </SettingsSection>
@@ -160,26 +198,34 @@ export function ServerMembersScreen() {
               <SettingsNote>
                 {inviteUsed
                   ? "Invitation accepted. The member joined this server."
-                  : `Share this one-time link. Expires ${new Date(created.expiresAt).toLocaleString()}.`}
+                  : created.email
+                    ? `Invitation sent to ${created.email}.`
+                    : `Share this one-time link. Expires ${new Date(created.expiresAt).toLocaleString()}.`}
               </SettingsNote>
-              <SettingsSection>
-                <SettingsRow
-                  disclosure={false}
-                  disabled={inviteUsed}
-                  onPress={() => {
-                    void Clipboard.setStringAsync(created.inviteUrl)
-                      .then(() => setCopied(true))
-                      .catch(() => Alert.alert("Copy failed", "Try again."));
-                  }}
-                >
-                  <Typography.Paragraph type="body-sm" className="text-accent">
-                    {copied ? "Copied" : "Copy link"}
-                  </Typography.Paragraph>
-                </SettingsRow>
-              </SettingsSection>
+              {!created.email ? (
+                <SettingsSection>
+                  <SettingsRow
+                    disclosure={false}
+                    disabled={inviteUsed}
+                    onPress={() => {
+                      void Clipboard.setStringAsync(created.inviteUrl)
+                        .then(() => setCopied(true))
+                        .catch(() => Alert.alert("Copy failed", "Try again."));
+                    }}
+                  >
+                    <Typography.Paragraph type="body-sm" className="text-accent">
+                      {copied ? "Copied" : "Copy link"}
+                    </Typography.Paragraph>
+                  </SettingsRow>
+                </SettingsSection>
+              ) : null}
             </>
           ) : (
-            <SettingsNote>Leave the email empty to share a one-time link.</SettingsNote>
+            <SettingsNote>
+              {inviteMode === "email"
+                ? "Send a one-time invitation to an email address."
+                : "Share a one-time link to invite someone to this server."}
+            </SettingsNote>
           )}
         </View>
       ) : null}
