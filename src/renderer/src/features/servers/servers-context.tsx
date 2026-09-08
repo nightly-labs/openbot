@@ -22,8 +22,8 @@ import { serverSupportsCapability } from "./server-capabilities";
  * - **`serverLoadRequest` is how this domain asks for that anyway.** A retried
  *   incompatible host, or a remote that only just reported its version, has to
  *   be loaded again the moment the summaries say so. Rather than call downward,
- *   `applyServerSummaries` publishes the request and whoever owns `selectServer`
- *   reacts to it - the same `{ id, nonce }` shape the renderer already uses for
+ *   `applyServerSummaries` publishes the request and the active server scope reloads its data.
+ *   It uses the same `{ id, nonce }` shape the renderer already uses for
  *   `settingsRequest` and `messageFocusRequest`. The nonce is load-bearing: the
  *   same server can need loading twice in a row.
  *
@@ -111,7 +111,17 @@ const Servers = createSimpleContext({
           Boolean(server.compatibility?.hostAppVersion)
         );
       });
-      const loadTarget = retryTarget ?? negotiatedTarget;
+      const reconnectedTarget = value.find((server) => {
+        const old = previous.get(server.id);
+        return (
+          old?.active &&
+          server.active &&
+          server.kind === "remote" &&
+          server.state === "online" &&
+          (old.state !== "online" || (server.connectionSequence ?? 0) > (old.connectionSequence ?? 0))
+        );
+      });
+      const loadTarget = retryTarget ?? negotiatedTarget ?? reconnectedTarget;
       if (loadTarget) {
         pendingCompatibilityRetryServerId = null;
         loadRequestNonce += 1;
@@ -154,7 +164,7 @@ const Servers = createSimpleContext({
         await window.openbot.servers.retryConnection(serverId);
       } catch (error) {
         pendingCompatibilityRetryServerId = null;
-        toast.error("The host is still incompatible", {
+        toast.error("The connection failed", {
           description: error instanceof Error ? error.message : String(error),
         });
       }

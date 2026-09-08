@@ -75,6 +75,10 @@ into drain and waits for the allocations to finish. A single coturn instance is 
 failure. Forcing a coturn restart ends active relay sessions. The client performs an ICE restart and resumes
 a file transfer from the last acknowledged offset once the service is back.
 
-The first version supports one active logical client session per host. Reconnecting the same session replaces
-the old Signal socket. A second session gets a `host_busy` error and can retry once the first session has
-ended.
+Current hosts advertise `multiplex: true` and support independent device sessions at the same time.
+Reconnecting one session replaces only that session's Signal socket. Disconnecting or revoking one device
+must not end another device's session. Legacy hosts that omit `multiplex` keep the one-client limit:
+a second session receives `host_busy` without interrupting the first.
+
+See [the issue #325 deployment procedure](../docs/remote-session-deployment.md) for the production evidence,
+a Signal-only update, rollback commands, and the required desktop/mobile checks.

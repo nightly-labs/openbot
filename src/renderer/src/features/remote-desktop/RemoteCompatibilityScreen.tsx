@@ -1,5 +1,5 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 import { Alert, AlertContent, AlertDescription, Button } from "../../components/ui";
 
 /**
@@ -13,7 +13,8 @@ export function RemoteCompatibilityScreen(props: { server: ServerSummary; onRetr
   const title = () => {
     if (props.server.issue?.code === "client_update_required") return "Update this OpenBot app";
     if (props.server.issue?.code === "host_update_required") return `Update OpenBot on ${props.server.name}`;
-    return "The host returned unsafe data";
+    if (props.server.issue?.code === "protocol_error") return "The host returned unsafe data";
+    return `Cannot connect to ${props.server.name}`;
   };
   const description = () => {
     if (props.server.issue?.code === "client_update_required") {
@@ -21,6 +22,9 @@ export function RemoteCompatibilityScreen(props: { server: ServerSummary; onRetr
     }
     if (props.server.issue?.code === "host_update_required") {
       return "The host supports only older protocols than this app. Update the host, then try again.";
+    }
+    if (props.server.issue?.code !== "protocol_error") {
+      return props.server.issue?.message ?? "The host is not reachable.";
     }
     return "OpenBot stopped this connection because a known payload was invalid. Your current workspace data was not changed.";
   };
@@ -41,16 +45,18 @@ export function RemoteCompatibilityScreen(props: { server: ServerSummary; onRetr
           <AlertDescription>{description()}</AlertDescription>
         </AlertContent>
       </Alert>
-      <dl class="remote-compatibility-details">
-        <For each={details()}>
-          {([label, value]) => (
-            <div>
-              <dt>{label}</dt>
-              <dd>{value}</dd>
-            </div>
-          )}
-        </For>
-      </dl>
+      <Show when={props.server.state === "incompatible" || props.server.issue?.code === "protocol_error"}>
+        <dl class="remote-compatibility-details">
+          <For each={details()}>
+            {([label, value]) => (
+              <div>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            )}
+          </For>
+        </dl>
+      </Show>
       <Button onClick={() => void props.onRetry()}>Retry</Button>
     </main>
   );

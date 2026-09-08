@@ -16,6 +16,37 @@ import { usePresence } from "../team/team-context";
 import { useUsage } from "../usage/usage-context";
 import { preserveKnownDirectUnread } from "./conversation-read-state";
 
+/** Keep live messages and completed reads that arrived after the recovery page was read. */
+function recoveredDirectConversation(
+  page: DirectConversationPage,
+  cached: DirectConversationSnapshot | undefined,
+  currentMemberId: string | undefined,
+): DirectConversationPage {
+  if (!cached || cached.threadId !== page.threadId) return page;
+  const newer = cached.messages.filter((message) => message.sequence > page.revision);
+  const messages = [...page.messages, ...newer];
+  let readState = page.readState;
+  if (cached.readState && (!readState || cached.readState.throughSequence > readState.throughSequence)) {
+    readState = preserveKnownDirectUnread(
+      cached.readState,
+      cached.readState.throughSequence,
+      messages,
+      currentMemberId,
+    );
+  } else if (readState) {
+    const throughSequence = readState.throughSequence;
+    const unread = newer.filter(
+      (message) => message.senderMemberId !== currentMemberId && message.sequence > throughSequence,
+    );
+    readState = {
+      ...readState,
+      unreadCount: readState.unreadCount + unread.length,
+      firstUnreadMessageId: readState.firstUnreadMessageId ?? unread[0]?.id ?? null,
+    };
+  }
+  return { ...page, messages, revision: Math.max(page.revision, cached.revision), readState };
+}
+
 /**
  * Person-to-person conversations on the active team server: the thread list, the
  * page of messages open for each member, and who is typing.
@@ -79,20 +110,25 @@ const DirectMessages = createSimpleContext({
     const [directTypingMemberIds, setDirectTypingMemberIds] = createSignal<Set<string>>(new Set());
     const directConversationReadOperations = new Map<string, Promise<void>>();
     let directConversationRequest = 0;
+    let directThreadsRequest = 0;
 
     const activeDirectMember = createMemo(() =>
       peopleEnabled ? directPeople().find((member) => member.id === activeDirectMemberId()) : undefined,
     );
 
     async function refreshDirectThreads(): Promise<void> {
+      const request = ++directThreadsRequest;
+      if (!scopeIsCurrent()) return;
       if (!currentTeamMember() || !activeServerSupportsCapability("direct-messages")) {
         setDirectThreads([]);
         return;
       }
       try {
-        setDirectThreads(await window.openbot.servers.listDirectThreads());
+        const threads = await window.openbot.servers.listDirectThreads();
+        if (!scopeIsCurrent() || request !== directThreadsRequest) return;
+        setDirectThreads(threads);
       } catch {
-        setDirectThreads([]);
+        // A failed refresh does not mean the server has no conversations.
       }
     }
 
@@ -122,16 +158,30 @@ const DirectMessages = createSimpleContext({
           .catch(() => undefined);
       }
       setActiveDirectMemberId(memberId);
-      setDirectConversationLoading(true);
+      await loadDirectConversation(memberId, false);
+    }
+
+    async function refreshDirectConversation(): Promise<void> {
+      const memberId = activeDirectMemberId();
+      if (!memberId || !scopeIsCurrent() || !activeServerSupportsCapability("direct-messages")) return;
+      await loadDirectConversation(memberId, true);
+    }
+
+    async function loadDirectConversation(memberId: string, retainCached: boolean): Promise<void> {
+      const hasCached = retainCached && Boolean(directConversations()[memberId]);
+      setDirectConversationLoading(!hasCached);
       setDirectConversationError(null);
       const request = ++directConversationRequest;
       try {
-        const snapshot = await window.openbot.servers.readDirectConversationPage({
+        const page = await window.openbot.servers.readDirectConversationPage({
           memberId,
           anchor: { type: "latest" },
           limit: 50,
         });
-        if (request !== directConversationRequest) return;
+        if (!scopeIsCurrent() || request !== directConversationRequest) return;
+        const snapshot = retainCached
+          ? recoveredDirectConversation(page, directConversations()[memberId], currentTeamMember()?.id)
+          : page;
         setDirectConversations((current) => ({
           ...current,
           [memberId]: snapshot,
@@ -141,10 +191,11 @@ const DirectMessages = createSimpleContext({
           void markDirectMessagesRead(memberId, snapshot.messages.at(-1)?.sequence).catch(() => undefined);
         }
       } catch (error) {
-        if (request !== directConversationRequest) return;
-        setDirectConversationError(error instanceof Error ? error.message : "The messages could not load.");
+        if (!scopeIsCurrent() || request !== directConversationRequest) return;
+        if (!hasCached)
+          setDirectConversationError(error instanceof Error ? error.message : "The messages could not load.");
       } finally {
-        if (request === directConversationRequest) setDirectConversationLoading(false);
+        if (scopeIsCurrent() && request === directConversationRequest) setDirectConversationLoading(false);
       }
     }
 
@@ -425,13 +476,8 @@ const DirectMessages = createSimpleContext({
 
     createEffect(
       () => currentTeamMember()?.id ?? null,
-      (memberId) => {
-        if (!peopleEnabled) return;
-        if (!memberId) {
-          setDirectThreads([]);
-          return;
-        }
-        void refreshDirectThreads();
+      () => {
+        if (peopleEnabled) void refreshDirectThreads();
       },
     );
 
@@ -461,6 +507,7 @@ const DirectMessages = createSimpleContext({
       directOlderErrors,
       directTypingMemberIds,
       refreshDirectThreads,
+      refreshDirectConversation,
       openDirectConversation,
       loadOlderDirectMessages,
       openDirectMessage,
