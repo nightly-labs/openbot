@@ -40,6 +40,11 @@
 .agent-usage-identity {
   flex-wrap: wrap;
 }
+/* What lines up with the header's inset is the arrow, not the 32px hit area around it, so
+   the button hangs its padding back into the header rather than pushing the glyph right. */
+.agent-usage-identity .ui-icon-button {
+  margin-left: calc(-1 * var(--openbot-space-2));
+}
 .agent-usage-identity h2 {
   display: flex;
   gap: var(--openbot-space-3);
