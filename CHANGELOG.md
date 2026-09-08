@@ -5,6 +5,12 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-08
+
+### Fixed
+
+- Fix Usage reports failing to load in the desktop app because Electron could not clone the request.
+
 ## [0.6.0] - 2026-09-08
 
 ### Added
