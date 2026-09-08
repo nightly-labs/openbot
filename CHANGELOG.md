@@ -5,6 +5,20 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-08
+
+### Added
+
+- Add agent and host-wide usage reports with model, provider and daily cost details.
+- Add mobile server settings, member management and invite QR flows.
+- Add marketplace presentation controls for agent categories and creator avatars.
+- Show all integrated provider models and let users update a provider CLI from OpenBot.
+
+### Changed
+
+- Check for desktop updates every four minutes while OpenBot is running.
+- Preserve mobile sign-out when offline by deferring account revocation.
+
 ## [0.5.0] - 2026-09-07
 
 ### Added
