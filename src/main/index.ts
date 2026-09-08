@@ -2,6 +2,7 @@ import { join, resolve } from "node:path";
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
 import { type CentralAuthState, IPC_CHANNELS } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
 import { app, type BrowserWindow, dialog, powerMonitor, protocol, screen } from "electron";
 import { readAppVariant, resolveAppIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
@@ -38,6 +39,7 @@ import {
   showMainWindow,
 } from "./main-window";
 import { ensureMacApplicationPresence } from "./main-window-state";
+import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
@@ -553,6 +555,31 @@ if (!hasSingleInstanceLock) {
       }
       void built.agentInitialization.start().catch((error) => {
         logger.error("Unable to initialize the local agent backend:", toLogValue(error));
+      });
+
+      const directoryRefresh = createRemoteDirectoryRefresh(() => {
+        const generation = centralAuthGeneration;
+        remoteAccountSync = remoteAccountSync
+          .then(async () => {
+            if (generation !== centralAuthGeneration || built.centralAuth.getState().status !== "signed_in") return;
+            await remoteServers.syncRemoteHosts();
+          })
+          .catch((error) => logger.error("Unable to refresh joined servers:", toLogValue(error)));
+        return remoteAccountSync;
+      });
+      app.on("browser-window-focus", (_event, window) => {
+        if (window === windowHolder.current) void directoryRefresh.refresh(true);
+      });
+      const refreshMemberships = () => void directoryRefresh.refresh(true);
+      remoteServers.on("directoryInvalidated", refreshMemberships);
+      const stopDirectoryWatch = watchRemoteHostDirectory({
+        isActive: () =>
+          Boolean(windowHolder.current?.isFocused()) && built.centralAuth.getState().status === "signed_in",
+        refresh: () => directoryRefresh.refresh(true),
+      });
+      teardown.push(0, "joined-server directory refresh", () => {
+        stopDirectoryWatch();
+        remoteServers.off("directoryInvalidated", refreshMemberships);
       });
 
       app.on("activate", () => {

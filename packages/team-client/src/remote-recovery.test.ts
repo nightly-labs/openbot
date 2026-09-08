@@ -2,6 +2,7 @@ import type { ConversationSnapshot } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createRemoteConnectionRecovery,
+  createRemoteReadRefresh,
   mergeRemoteUnreadIds,
   remoteConnectionFailure,
   remoteRecoveryMessage,
@@ -11,7 +12,13 @@ import {
 afterEach(() => vi.useRealTimers());
 
 describe("remote connection recovery", () => {
-  it("keeps a safe failure reason visible through retries and clears it when connected", async () => {
+  it.each([
+    "The host already has an active remote session.",
+    "Too many active remote connections.",
+    "The server request failed.",
+    "The remote session is not active.",
+    "The account session has ended.",
+  ])("keeps safe failure %s visible through retries and clears it when connected", async (reason) => {
     vi.useFakeTimers();
     let failure: string | null = null;
     let message: string | null = null;
@@ -26,10 +33,10 @@ describe("remote connection recovery", () => {
     );
     recovery.setActive(true);
     await vi.advanceTimersByTimeAsync(0);
-    recovery.offline(new Error("The host already has an active remote session."));
-    expect(message).toContain("Connecting to the desktop: The host already has an active remote session.");
+    recovery.offline(new Error(reason));
+    expect(message).toContain(`Connecting to the desktop: ${reason}`);
     await vi.advanceTimersByTimeAsync(1_000);
-    expect(message).toContain("Connecting to the desktop: The host already has an active remote session.");
+    expect(message).toContain(`Connecting to the desktop: ${reason}`);
     await vi.advanceTimersByTimeAsync(9_000);
     expect(message).toBeNull();
     recovery.dispose();
@@ -51,6 +58,58 @@ describe("remote connection recovery", () => {
         remoteConnectionFailure("connection", new Error("The desktop did not connect.")),
       ),
     ).toContain("Connecting to the desktop: The desktop did not connect.");
+  });
+
+  it("does not let an initial read overwrite a newer event refresh", async () => {
+    const refresh = createRemoteReadRefresh();
+    let unread = ["agent"];
+    const apply = (reads: Record<string, { unreadCount: number }>) => {
+      unread = mergeRemoteUnreadIds(unread, reads);
+    };
+    const initial = deferredReads();
+    const loading = refresh.refresh(
+      "host",
+      () => initial.promise,
+      apply,
+      () => true,
+    );
+    await refresh.refresh(
+      "host",
+      async () => ({ agent: { unreadCount: 0 } }),
+      apply,
+      () => true,
+    );
+    initial.resolve({ agent: { unreadCount: 1 } });
+    await loading;
+    expect(unread).toEqual([]);
+  });
+
+  it("invalidates pending reads when a cursor changes without discarding another server's read", async () => {
+    const refresh = createRemoteReadRefresh();
+    let unread = ["agent"];
+    const apply = (reads: Record<string, { unreadCount: number }>) => {
+      unread = mergeRemoteUnreadIds(unread, reads);
+    };
+    const initial = deferredReads();
+    const other = deferredReads();
+    const loading = refresh.refresh(
+      "host",
+      () => initial.promise,
+      apply,
+      () => true,
+    );
+    const loadingOther = refresh.refresh(
+      "other",
+      () => other.promise,
+      apply,
+      () => true,
+    );
+    refresh.invalidate("host");
+    apply({ agent: { unreadCount: 0 } });
+    initial.resolve({ agent: { unreadCount: 1 } });
+    other.resolve({ remote: { unreadCount: 1 } });
+    await Promise.all([loading, loadingOther]);
+    expect(unread).toEqual(["remote"]);
   });
 
   it("applies live unread changes without erasing another server's unread agents", () => {
@@ -105,7 +164,6 @@ describe("remote connection recovery", () => {
     expect(attempts).toBe(5);
     desktopOnline = true;
     recovery.setActive(true);
-    recovery.refresh();
     recovery.offline();
     expect(messages.at(-1)).toBe("Connection failed after 5 attempts. Retrying in 1:00.");
     await vi.advanceTimersByTimeAsync(59_999);
@@ -161,6 +219,58 @@ describe("remote connection recovery", () => {
     recovery.dispose();
   });
 
+  it("retries immediately on manual refresh without overlapping a pending attempt", async () => {
+    vi.useFakeTimers();
+    let rejectInitial = (_error: Error) => {};
+    const initial = new Promise<void>((_resolve, reject) => {
+      rejectInitial = reject;
+    });
+    let attempts = 0;
+    let phase = "";
+    const controller = createRemoteConnectionRecovery(
+      async () => {
+        attempts += 1;
+        if (attempts === 1) await initial;
+        if (attempts < 3) throw new Error("Offline");
+      },
+      () => {},
+      (status) => {
+        phase = status.phase;
+      },
+    );
+    controller.setActive(true);
+    controller.refresh();
+    rejectInitial(new Error("Offline"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect({ attempts, phase }).toEqual({ attempts: 2, phase: "waiting" });
+    controller.refresh();
+    await vi.advanceTimersByTimeAsync(0);
+    expect({ attempts, phase }).toEqual({ attempts: 3, phase: "online" });
+    controller.dispose();
+  });
+
+  it("does not report online when a suspended in-flight attempt finishes", async () => {
+    vi.useFakeTimers();
+    let resolveConnection = () => {};
+    const connection = new Promise<void>((resolve) => {
+      resolveConnection = resolve;
+    });
+    let phase = "";
+    const controller = createRemoteConnectionRecovery(
+      () => connection,
+      () => {},
+      (status) => {
+        phase = status.phase;
+      },
+    );
+    controller.setActive(true);
+    controller.suspend();
+    resolveConnection();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(phase).toBe("suspended");
+    controller.dispose();
+  });
+
   it("does not overlap connection attempts and ignores a disposed server", async () => {
     vi.useFakeTimers();
     let resolve = () => {};
@@ -178,7 +288,6 @@ describe("remote connection recovery", () => {
     recovery.setActive(true);
     recovery.offline();
     recovery.offline();
-    recovery.refresh();
     await vi.advanceTimersByTimeAsync(180_000);
     expect(attempts).toBe(1);
     resolve();
@@ -218,7 +327,6 @@ describe("remote connection recovery", () => {
     recovery.offline();
     expect(message).toBe("Connection failed after 5 attempts. Retrying in 2:00.");
     recovery.offline();
-    recovery.refresh();
     await vi.advanceTimersByTimeAsync(1_000);
     expect(message).toBe("Connection failed after 5 attempts. Retrying in 1:59.");
     rejectFifth(new Error("Connection command finished cleaning up"));
@@ -320,3 +428,11 @@ describe("conversation recovery after an event reset", () => {
     expect(displayed.revision).toBe(1);
   });
 });
+
+function deferredReads() {
+  let resolve: (value: Record<string, { unreadCount: number }>) => void = () => {};
+  const promise = new Promise<Record<string, { unreadCount: number }>>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}

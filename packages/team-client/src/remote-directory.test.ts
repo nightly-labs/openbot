@@ -1,7 +1,12 @@
 import { createInviteUrl } from "@openbot/contracts/invite-links";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { type RemoteHostKeyStore, RemoteTeamDirectoryClient } from "./remote-directory";
+import {
+  createRemoteDirectoryRefresh,
+  type RemoteHostKeyStore,
+  RemoteTeamDirectoryClient,
+  watchRemoteDirectory,
+} from "./remote-directory";
 
 const API_URL = "https://api.openbot.run";
 const HOST_ID = "11111111-1111-4111-8111-111111111111";
@@ -24,6 +29,24 @@ const PREVIEW = {
 const ACCEPTED = { hostId: HOST_ID, membershipId: "membership-1", role: "member" };
 
 describe("RemoteTeamDirectoryClient", () => {
+  it("removes a revoked paired desktop while keeping the other memberships available", async () => {
+    const remote = {
+      hostId: "other",
+      name: "Other",
+      logoKey: null,
+      devicePublicKey: "other-key",
+      membershipId: "other-member",
+      role: "member",
+    };
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "session",
+      pairedHost: { hostId: HOST_ID, fingerprint: HOST_FINGERPRINT },
+      fetch: async () => Response.json({ hosts: [remote] }),
+    });
+    await expect(client.listHosts()).resolves.toEqual([remote]);
+  });
+
   it("pins the QR's exact host even when another owned desktop is first", async () => {
     const pinned = new Map<string, string>();
     const client = new RemoteTeamDirectoryClient({
@@ -319,4 +342,183 @@ describe("RemoteTeamDirectoryClient", () => {
       expect(paths).toEqual(["/v2/remote/invites/preview"]);
     }
   });
+});
+
+describe("mobile member management", () => {
+  it("uses the account API for member actions even while the desktop is offline", async () => {
+    const requests: Array<{ path: string; method: string; body: string | null }> = [];
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "mobile-session",
+      fetch: async (url, init) => {
+        requests.push({
+          path: new URL(url.toString()).pathname,
+          method: init?.method ?? "GET",
+          body: typeof init?.body === "string" ? init.body : null,
+        });
+        return new Response(null, { status: 204 });
+      },
+    });
+    await client.updateMember(HOST_ID, "member/id", "admin");
+    await client.updateMember(HOST_ID, "member/id", "member", true);
+    await client.leaveHost(HOST_ID, "member/id");
+    await client.revokeInvite("invite/id");
+    expect(requests).toEqual([
+      { path: `/v2/remote/hosts/${HOST_ID}/members/member%2Fid`, method: "PATCH", body: '{"role":"admin"}' },
+      {
+        path: `/v2/remote/hosts/${HOST_ID}/members/member%2Fid`,
+        method: "PATCH",
+        body: '{"role":"member","reactivate":true}',
+      },
+      { path: `/v2/remote/hosts/${HOST_ID}/members/member%2Fid`, method: "DELETE", body: null },
+      { path: "/v2/remote/invites/invite%2Fid", method: "DELETE", body: null },
+    ]);
+  });
+
+  it("creates a shareable invitation bound to the selected host key", async () => {
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "mobile-session",
+      fetch: async () => Response.json({ inviteId: "invite-1", token: "t".repeat(32), expiresAt: 1234 }),
+    });
+    expect(await client.createInvite({ hostId: HOST_ID, devicePublicKey: HOST_KEY }, { role: "member" })).toEqual({
+      inviteId: "invite-1",
+      inviteUrl: INVITE,
+      expiresAt: 1234,
+    });
+  });
+
+  it("sends the created email invitation through the delivery endpoint", async () => {
+    const requests: Array<{ path: string; body: unknown }> = [];
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "mobile-session",
+      fetch: async (url, init) => {
+        const path = new URL(url.toString()).pathname;
+        requests.push({ path, body: typeof init?.body === "string" ? JSON.parse(init.body) : null });
+        return path.endsWith("/email")
+          ? new Response(null, { status: 204 })
+          : Response.json({ inviteId: "invite-1", token: "t".repeat(32), expiresAt: 1234 });
+      },
+    });
+    const invite = await client.sendInviteEmail(
+      { hostId: HOST_ID, devicePublicKey: HOST_KEY, name: "My desktop" },
+      { role: "member", email: "member@example.com" },
+    );
+    expect(requests).toEqual([
+      { path: `/v2/remote/hosts/${HOST_ID}/invites`, body: { role: "member", email: "member@example.com" } },
+      {
+        path: "/v1/team-invitations/email",
+        body: {
+          role: "member",
+          email: "member@example.com",
+          serverName: "My desktop",
+          inviteUrl: INVITE,
+        },
+      },
+    ]);
+    expect(invite.inviteUrl).toBe(INVITE);
+  });
+
+  it("revokes an undelivered invitation and reports the delivery failure", async () => {
+    const revoked: string[] = [];
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "mobile-session",
+      fetch: async (url, init) => {
+        const path = new URL(url.toString()).pathname;
+        if (init?.method === "DELETE") {
+          revoked.push(path);
+          return new Response(null, { status: 204 });
+        }
+        if (path.endsWith("/email")) return Response.json({ message: "Email delivery unavailable" }, { status: 503 });
+        return Response.json({ inviteId: "invite-1", token: "t".repeat(32), expiresAt: 1234 });
+      },
+    });
+    await expect(
+      client.sendInviteEmail(
+        { hostId: HOST_ID, devicePublicKey: HOST_KEY, name: "My desktop" },
+        { role: "member", email: "member@example.com" },
+      ),
+    ).rejects.toThrow();
+    expect(revoked).toEqual(["/v2/remote/invites/invite-1"]);
+  });
+
+  it("returns member and invitation data and preserves permission failures", async () => {
+    const member = {
+      membershipId: "member-1",
+      email: "member@example.com",
+      name: null,
+      role: "member",
+      status: "revoked",
+    };
+    const invite = { inviteId: "invite-1", email: null, role: "admin", expiresAt: 1234, usedAt: null, revokedAt: null };
+    let denied = false;
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "mobile-session",
+      fetch: async (url) =>
+        denied
+          ? Response.json({ error: "Owner access required." }, { status: 403 })
+          : Response.json(url.toString().endsWith("members/") ? { members: [member] } : { invites: [invite] }),
+    });
+    const result = [await client.listMembers(HOST_ID), await client.listInvites(HOST_ID)];
+    expect(result).toEqual([[member], [invite]]);
+    denied = true;
+    await expect(client.updateMember(HOST_ID, "member-1", "admin")).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("directory refresh", () => {
+  it("coalesces simultaneous requests and limits automatic refreshes, including failures", async () => {
+    let now = 0;
+    const load = vi.fn(async () => {
+      throw new Error("Offline");
+    });
+    const refresh = createRemoteDirectoryRefresh(load, () => now);
+    await Promise.allSettled([refresh.refresh(), refresh.refresh(), refresh.refresh(true)]);
+    now = 29_999;
+    await refresh.refresh().catch(() => undefined);
+    now = 30_000;
+    await refresh.refresh().catch(() => undefined);
+    await refresh.refresh(true).catch(() => undefined);
+    expect(load).toHaveBeenCalledTimes(3);
+  });
+});
+
+it("finds memberships accepted on another device and stops polling on cleanup", async () => {
+  vi.useFakeTimers();
+  let hosts: object[] = [];
+  const client = new RemoteTeamDirectoryClient({
+    apiUrl: API_URL,
+    token: "mobile-session",
+    fetch: async () => Response.json({ hosts }),
+  });
+  let visible: string[] = [];
+  const refresh = createRemoteDirectoryRefresh(async () => {
+    visible = (await client.listHosts()).map((host) => host.hostId);
+  });
+  const stop = watchRemoteDirectory(() => refresh.refresh(true));
+  try {
+    await refresh.refresh(true);
+    hosts = [
+      {
+        hostId: HOST_ID,
+        name: "Desktop",
+        logoKey: null,
+        devicePublicKey: HOST_KEY,
+        membershipId: "membership-1",
+        role: "member",
+      },
+    ];
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(visible).toEqual([HOST_ID]);
+    stop();
+    hosts = [];
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(visible).toEqual([HOST_ID]);
+  } finally {
+    stop();
+    vi.useRealTimers();
+  }
 });

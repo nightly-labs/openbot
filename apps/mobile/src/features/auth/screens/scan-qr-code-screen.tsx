@@ -1,10 +1,11 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Stack } from "expo-router";
+import { useIsFocused } from "expo-router/react-navigation";
 import { StatusBar } from "expo-status-bar";
 import { Alert, Button, Card, Spinner, Surface } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Camera, ScanLine } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppState, Linking, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 
 import { redeemMobileConnectUrl } from "@/features/auth/api/mobile-auth";
@@ -51,7 +52,7 @@ function ScannerStatus({ scanState, onRetry }: { scanState: ScanState; onRetry: 
           </Card.Title>
           <Card.Description className="font-sans text-caption">
             {scanState.status === "connecting"
-              ? "Verifying the one-time pairing request."
+              ? "Verifying the one-time code."
               : "Keep the QR code centered inside the frame."}
           </Card.Description>
         </View>
@@ -61,31 +62,37 @@ function ScannerStatus({ scanState, onRetry }: { scanState: ScanState; onRetry: 
 }
 
 export function ScanQrCodeScreen() {
+  const { connect: finishSignIn } = useMobileSession();
+  return <QrScanner onScan={async (data) => finishSignIn(await redeemMobileConnectUrl(data))} />;
+}
+
+export function QrScanner({ onScan }: { onScan: (data: string) => Promise<void> }) {
+  const scanLocked = useRef(false);
+  const focused = useIsFocused();
+  const [foreground, setForeground] = useState(AppState.currentState === "active");
   const [permission, requestPermission, getPermission] = useCameraPermissions();
   const [scanState, setScanState] = useState<ScanState>({ status: "idle" });
-  const [foreground, accentForeground] = useThemeColor(["foreground", "accent-foreground"]);
+  const [foregroundColor, accentForeground] = useThemeColor(["foreground", "accent-foreground"]);
   const { width: windowWidth } = useWindowDimensions();
   const scannerFrameSize = Math.min(windowWidth - 80, 280);
-  const { connect: finishSignIn } = useMobileSession();
-
   useEffect(() => {
-    if (permission?.granted || permission?.canAskAgain !== false) return;
-
     let previousState = AppState.currentState;
     const subscription = AppState.addEventListener("change", (state) => {
       const returnedToForeground = state === "active" && previousState !== "active";
       previousState = state;
-      if (returnedToForeground) void getPermission();
+      setForeground(state === "active");
+      if (returnedToForeground && !permission?.granted) void getPermission();
     });
 
     return () => subscription.remove();
-  }, [getPermission, permission?.canAskAgain, permission?.granted]);
+  }, [getPermission, permission?.granted]);
 
   async function connect(data: string): Promise<void> {
-    if (scanState.status !== "idle") return;
+    if (scanLocked.current) return;
+    scanLocked.current = true;
     setScanState({ status: "connecting" });
     try {
-      finishSignIn(await redeemMobileConnectUrl(data));
+      await onScan(data);
     } catch (error) {
       setScanState({
         status: "error",
@@ -97,7 +104,7 @@ export function ScanQrCodeScreen() {
   if (!permission) {
     return (
       <>
-        <Stack.Screen options={{ headerTintColor: foreground }} />
+        <Stack.Screen options={{ headerTintColor: foregroundColor }} />
         <View className="flex-1 items-center justify-center bg-background">
           <Spinner color="default" accessibilityLabel="Loading camera" />
         </View>
@@ -110,7 +117,7 @@ export function ScanQrCodeScreen() {
 
     return (
       <>
-        <Stack.Screen options={{ headerTintColor: foreground }} />
+        <Stack.Screen options={{ headerTintColor: foregroundColor }} />
         <ScrollView
           className="flex-1 bg-background"
           contentContainerClassName="min-h-full grow px-5 pb-safe-offset-8 pt-8"
@@ -120,7 +127,7 @@ export function ScanQrCodeScreen() {
             <Card variant="secondary" className="gap-6 rounded-3xl p-5">
               <Card.Header>
                 <Surface variant="tertiary" className="size-14 items-center justify-center rounded-2xl p-0">
-                  <Camera size={27} color={foreground} strokeWidth={1.75} />
+                  <Camera size={27} color={foregroundColor} strokeWidth={1.75} />
                 </Surface>
               </Card.Header>
 
@@ -131,7 +138,7 @@ export function ScanQrCodeScreen() {
                 <Card.Description className="font-sans text-body leading-6 text-text-secondary">
                   {canRequestPermission
                     ? "OpenBot uses the camera only to scan the one-time QR code shown in the desktop app."
-                    : "Camera access is blocked. Enable it for OpenBot in device settings, then return here to pair your phone."}
+                    : "Camera access is blocked. Enable it for OpenBot in device settings, then return here to scan the code."}
                 </Card.Description>
               </Card.Body>
 
@@ -165,12 +172,14 @@ export function ScanQrCodeScreen() {
       />
       <StatusBar style="light" />
       <View className="flex-1 bg-black">
-        <CameraView
-          style={StyleSheet.absoluteFill}
-          facing="back"
-          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-          onBarcodeScanned={scanState.status === "idle" ? ({ data }) => void connect(data) : undefined}
-        />
+        {focused && foreground ? (
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+            onBarcodeScanned={scanState.status === "idle" ? ({ data }) => void connect(data) : undefined}
+          />
+        ) : null}
 
         <View pointerEvents="none" className="absolute inset-0 items-center justify-center px-10 pb-24">
           <View
@@ -180,7 +189,13 @@ export function ScanQrCodeScreen() {
         </View>
 
         <View className="absolute inset-x-5 bottom-safe-offset-5">
-          <ScannerStatus scanState={scanState} onRetry={() => setScanState({ status: "idle" })} />
+          <ScannerStatus
+            scanState={scanState}
+            onRetry={() => {
+              scanLocked.current = false;
+              setScanState({ status: "idle" });
+            }}
+          />
         </View>
       </View>
     </>

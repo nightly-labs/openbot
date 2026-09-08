@@ -7,9 +7,8 @@ const rendererPort = readRendererPort(process.env.OPENBOT_DEV_RENDERER_PORT);
 
 export default defineConfig({
   main: {
-    // Workspace sources ship as TypeScript; like contracts, logging must be
-    // bundled, otherwise the packaged app would require .ts at runtime.
-    plugins: [externalizeDepsPlugin({ exclude: ["@openbot/contracts", "@openbot/logging"] })],
+    // Workspace sources ship as TypeScript and must be bundled for the packaged app.
+    plugins: [externalizeDepsPlugin({ exclude: ["@openbot/contracts", "@openbot/logging", "@openbot/team-client"] })],
   },
   preload: {
     plugins: [externalizeDepsPlugin({ exclude: ["@openbot/contracts"] })],

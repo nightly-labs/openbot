@@ -38,6 +38,10 @@ const SAFE_CONNECTION_ERRORS = new Set([
   "The desktop did not connect.",
   "The desktop connection needs to be restored.",
   "The host already has an active remote session.",
+  "Too many active remote connections.",
+  "The server request failed.",
+  "The remote session is not active.",
+  "The account session has ended.",
   "The host is offline.",
   "The remote session ended.",
   "Remote ticket is invalid or expired.",
@@ -149,12 +153,16 @@ export function createRemoteConnectionRecovery(
       retryRequested = true;
     } finally {
       running = false;
-      if (retryRequested) scheduleRetry();
-      else {
-        attempt = 0;
-        retryAt = null;
-        if (!disposed) onStatus({ phase: "online", attempt: 0, remainingSeconds: 0 });
-        if (refreshRequested) void run();
+      if (!disposed && !suspended && active) {
+        if (refreshRequested) {
+          retryAt = null;
+          void run();
+        } else if (retryRequested) scheduleRetry();
+        else {
+          attempt = 0;
+          retryAt = null;
+          onStatus({ phase: "online", attempt: 0, remainingSeconds: 0 });
+        }
       }
     }
   }
@@ -197,14 +205,42 @@ export function createRemoteConnectionRecovery(
       onStatus({ phase: "suspended", attempt: 0, remainingSeconds: 0 });
     },
     refresh() {
+      if (disposed) return;
       suspended = false;
+      retryAt = null;
+      attempt = 0;
+      cancelTimer();
       if (running) refreshRequested = true;
-      else if (retryAt !== null) scheduleRetry();
       else void run();
     },
     dispose() {
       disposed = true;
       cancelTimer();
+    },
+  };
+}
+
+/** Order initial and event reads together, without invalidating another server's responses. */
+export function createRemoteReadRefresh() {
+  const requests = new Map<string, number>();
+  const cursors = new Map<string, number>();
+  return {
+    invalidate(serverId: string): () => boolean {
+      const cursor = (cursors.get(serverId) ?? 0) + 1;
+      cursors.set(serverId, cursor);
+      return () => cursors.get(serverId) === cursor;
+    },
+    async refresh<T>(
+      serverId: string,
+      load: () => Promise<T>,
+      apply: (value: T) => void,
+      isCurrent: () => boolean,
+    ): Promise<void> {
+      const request = (requests.get(serverId) ?? 0) + 1;
+      requests.set(serverId, request);
+      const cursor = cursors.get(serverId);
+      const value = await load();
+      if (requests.get(serverId) === request && cursors.get(serverId) === cursor && isCurrent()) apply(value);
     },
   };
 }
