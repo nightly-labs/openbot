@@ -1,3 +1,4 @@
+export * from "./ipc-agent-analytics";
 export * from "./ipc-agent-events";
 export * from "./ipc-agent-identity";
 export * from "./ipc-agent-memories";
@@ -16,6 +17,7 @@ export * from "./ipc-conversations";
 export * from "./ipc-desktop-apis";
 export * from "./ipc-dynamic-island";
 export * from "./ipc-endpoints";
+export * from "./ipc-host-analytics";
 export * from "./ipc-hosted-sites";
 export * from "./ipc-marketplace-agents";
 export * from "./ipc-queue";

@@ -1,4 +1,6 @@
 import type {
+  AgentAnalytics,
+  AgentAnalyticsInput,
   AvatarHue,
   ConversationSnapshot,
   CreateAgentInput,
@@ -64,6 +66,7 @@ export interface MobileWorkspaceContextValue {
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
   deleteAgent: (agentId: string) => Promise<void>;
   duplicateAgent: (agentId: string) => Promise<void>;
+  loadAgentAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
   loadConversation: (agentId: string) => Promise<ConversationSnapshot>;
   respondToPrompt: (agentId: string, input: RespondToPromptInput) => Promise<void>;
   sendMessage: (agentId: string, text: string) => Promise<void>;

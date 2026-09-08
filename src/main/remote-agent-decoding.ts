@@ -1,3 +1,4 @@
+import { decodeAgentAnalytics, decodeHostAnalytics } from "@openbot/contracts/ipc";
 // Agent-shaped wire payloads: summaries, status, models, skills, memories, routines, queue.
 // See `remote-host-decoding.ts` for why the `FromHost` suffix exists and must not be merged away.
 
@@ -198,4 +199,12 @@ export function decodeQueuedMessageReceipt(value: unknown): QueuedMessageReceipt
     throw new Error("Invalid remote message receipt.");
   }
   return value;
+}
+
+export function decodeAgentAnalyticsFromHost(value: unknown) {
+  return decodeAgentAnalytics(value);
+}
+
+export function decodeHostAnalyticsFromHost(value: unknown) {
+  return decodeHostAnalytics(value);
 }

@@ -1,5 +1,5 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
-import { createMemo, Show } from "solid-js";
+import { createEffect, createMemo, Show } from "solid-js";
 import { WorkspaceAccountDock } from "./features/account/WorkspaceAccountDock";
 import { useAgents } from "./features/agents/agents-context";
 import { WorkspaceAgentSetup } from "./features/agents/WorkspaceAgentSetup";
@@ -11,6 +11,8 @@ import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-conte
 import { useServers } from "./features/servers/servers-context";
 import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
 import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
+import { AgentUsagePanel } from "./features/usage/AgentUsagePanel";
+import { useUsage } from "./features/usage/usage-context";
 import { useLayout } from "./layout";
 import { LEFT_PANEL_COMPACT } from "./layout-constants";
 import { usePlatform } from "./platform";
@@ -36,6 +38,13 @@ import { WorkspaceOverlays } from "./WorkspaceOverlays";
  */
 export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   const platform = usePlatform();
+  const usage = useUsage();
+  const { servers, activeServerId } = useServers();
+  let previousServer = activeServerId();
+  createEffect(activeServerId, (serverId) => {
+    if (serverId !== previousServer && usage.state.serverId) usage.openUsage(serverId, null);
+    previousServer = serverId;
+  });
   const layout = useLayout();
   const { activeServer, activeServerSupportsCapability, retryServerConnection } = useServers();
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
@@ -59,6 +68,7 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
         {
           "app-frame-sidebar-compact": layout.leftPanelCompact(),
           "app-frame-with-server-rail": platform.serverRailVisible(),
+          "app-frame-usage-open": !!usage.state.serverId,
           "app-frame-platform-darwin": platform.appInfo()?.platform === "darwin",
         },
       ]}
@@ -69,17 +79,35 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
       <WorkspaceSidebar peopleEnabled={activePeopleEnabled()} />
       <WorkspaceAccountDock account={props.account} />
       <WorkspaceLeftPanelResizer />
-      <Show when={blockedRemoteServer()} keyed>
-        {(server) => <RemoteCompatibilityScreen server={server} onRetry={() => retryServerConnection(server.id)} />}
-      </Show>
-      <Show when={!blockedRemoteServer() && agentSetupOpen()}>
-        <WorkspaceAgentSetup />
-      </Show>
-      <Show when={!blockedRemoteServer() && activePeopleEnabled() && !agentSetupOpen() && activeDirectMember()} keyed>
-        {(member) => <WorkspaceDirectConversation member={member} />}
-      </Show>
-      <Show when={!blockedRemoteServer() && !agentSetupOpen() && !activeDirectMember()}>
-        <WorkspaceConversation account={props.account} />
+      <div
+        class="usage-workspace-content"
+        inert={!!usage.state.serverId}
+        aria-hidden={usage.state.serverId ? "true" : undefined}
+      >
+        <Show when={blockedRemoteServer()} keyed>
+          {(server) => <RemoteCompatibilityScreen server={server} onRetry={() => retryServerConnection(server.id)} />}
+        </Show>
+        <Show when={!blockedRemoteServer() && agentSetupOpen()}>
+          <WorkspaceAgentSetup />
+        </Show>
+        <Show when={!blockedRemoteServer() && activePeopleEnabled() && !agentSetupOpen() && activeDirectMember()} keyed>
+          {(member) => <WorkspaceDirectConversation member={member} />}
+        </Show>
+        <Show when={!blockedRemoteServer() && !agentSetupOpen() && !activeDirectMember()}>
+          <WorkspaceConversation account={props.account} />
+        </Show>
+      </div>
+      <Show when={usage.state.serverId}>
+        {(serverId) => (
+          <div class="conversation-panel agent-usage-workspace">
+            <AgentUsagePanel
+              serverId={serverId()}
+              hostName={servers().find((server) => server.id === serverId())?.name ?? "Host"}
+              agentId={usage.state.agentId}
+              onBack={usage.closeUsage}
+            />
+          </div>
+        )}
       </Show>
       <WorkspaceOverlays account={props.account} />
     </div>

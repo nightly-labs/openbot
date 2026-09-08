@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  analyticsRange,
+  assertAnalyticsScope,
+  emptyAnalyticsTotals,
+  parseAgentAnalyticsInput,
+} from "../ipc-agent-analytics";
+import { assertHostAnalyticsScope, parseHostAnalyticsInput } from "../ipc-host-analytics";
+import {
   TEAM_AGENT_ACTIVITY_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_EML_ATTACHMENTS_CAPABILITY,
@@ -52,6 +59,63 @@ const currentResponseFixture = {
 const scopedUsagePath = "/v1/agents/bot-source/usage";
 
 describe("Team protocol v3", () => {
+  it("validates host analytics across HTTP and WebRTC without changing agent analytics", () => {
+    const path = "/v1/analytics";
+    const input = { startDate: "2026-09-01", endDate: "2026-09-07", timeZone: "UTC" };
+    const value = {
+      ...input,
+      collectionStartedAt: "2026-09-01T00:00:00Z",
+      updatedAt: null,
+      totals: emptyAnalyticsTotals(),
+      daily: [],
+      models: [],
+    };
+    expect(TEAM_CURRENT_CAPABILITIES).toContain("host-analytics");
+    expect(TEAM_PROTOCOL_V3_CAPABILITIES).not.toContain("host-analytics");
+    expect(parseHostAnalyticsInput(input)).toEqual(input);
+    expect(() => parseHostAnalyticsInput({ ...input, agentId: "" })).toThrow("agent filter");
+    expect(() => parseHostAnalyticsInput({ ...input, timeZone: "invalid" })).toThrow("time zone");
+    expect(() => assertHostAnalyticsScope({ ...value, agentId: "a" }, input)).toThrow("does not match");
+    expect(encodeTeamProtocolV3WebRtcHttpRequest("GET", path, {})).toEqual({});
+    expect(JSON.parse(encodeTeamProtocolV3CurrentHttpResponse("GET", path, 200, value))).toEqual(value);
+    expect(decodeTeamProtocolV3WebRtcHttpResponse("GET", path, 200, value)).toEqual(value);
+    expect(() =>
+      decodeTeamProtocolV3CurrentHttpResponse("GET", path, 200, {
+        ...value,
+        totals: { ...value.totals, sessions: -1 },
+      }),
+    ).toThrow("number");
+    expect(
+      decodeTeamProtocolV3CurrentHttpResponse("GET", path, 200, { ...value, prompt: "private" }),
+    ).not.toHaveProperty("prompt");
+  });
+  it("adds validated analytics without changing released adapters", () => {
+    const path = "/v1/agents/agent-a/analytics?startDate=2026-09-01&endDate=2026-09-07&timeZone=UTC";
+    const value = {
+      ...analyticsRange("agent-a"),
+      collectionStartedAt: "2026-09-01T00:00:00Z",
+      updatedAt: null,
+      totals: emptyAnalyticsTotals(),
+      daily: [],
+      models: [],
+    };
+    expect(TEAM_CURRENT_CAPABILITIES).toContain("agent-analytics");
+    expect(() => assertAnalyticsScope({ ...value, agentId: "another-agent" }, value)).toThrow("does not match");
+    expect(() => assertAnalyticsScope({ ...value, endDate: "2026-01-01" }, value)).toThrow("does not match");
+    expect(() => parseAgentAnalyticsInput({ ...value, timeZone: "invalid" })).toThrow("time zone");
+    expect(() => parseAgentAnalyticsInput({ ...value, agentId: "" })).toThrow("request");
+    expect(TEAM_PROTOCOL_V3_CAPABILITIES).not.toContain("agent-analytics");
+    expect(encodeTeamProtocolV3WebRtcHttpRequest("GET", path, {})).toEqual({});
+    expect(JSON.parse(encodeTeamProtocolV3CurrentHttpResponse("GET", path, 200, value))).toEqual(value);
+    expect(decodeTeamProtocolV3WebRtcHttpResponse("GET", path, 200, value)).toEqual(value);
+    expect(() => decodeTeamProtocolV1HttpRequest("GET", path, {})).toThrow();
+    expect(() =>
+      decodeTeamProtocolV3CurrentHttpResponse("GET", path, 200, { ...value, totals: { ...value.totals, output: -1 } }),
+    ).toThrow("Invalid analytics number");
+    expect(
+      decodeTeamProtocolV3CurrentHttpResponse("GET", path, 200, { ...value, prompt: "private" }),
+    ).not.toHaveProperty("prompt");
+  });
   it("adds explicit mark-unread without changing the frozen read operation", () => {
     const path = "/v1/agents/bot-source/conversation/unread";
     const state = { unreadCount: 2, firstUnreadMessageId: "first-reply", throughMessageId: null };

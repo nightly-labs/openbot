@@ -17,7 +17,7 @@ const config = {
         chunkSizeWarningLimit: 1_200,
       },
       optimizeDeps: {
-        include: ["@norbert_bodziony/bloub"],
+        include: ["@norbert_bodziony/bloub", "solid-recharts"],
       },
       resolve: {
         alias: [{ find: "solid-js/web", replacement: "@solidjs/web" }],

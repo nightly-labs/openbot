@@ -11,7 +11,7 @@ const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 import { Loading, lazy, Show } from "solid-js";
 
 /** @internal Stable HMR boundary for conversation panels. */
-export function ConversationPanels() {
+export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButtonElement) => void }) {
   const {
     activateBrowserTab,
     activeBrowserControl,
@@ -119,6 +119,7 @@ export function ConversationPanels() {
         {(agent) => (
           <Loading>
             <AgentSettingsPanel
+              onOpenUsage={panelProps.onOpenUsage}
               agent={agent()}
               runtimeSettings={{
                 provider: settingsProvider(),

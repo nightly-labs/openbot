@@ -301,7 +301,44 @@ const V12_REACTIONS_TABLE_SQL = `  CREATE TABLE IF NOT EXISTS projection_reactio
     PRIMARY KEY(agent_id, message_id, actor_kind, actor_agent_id)
   );`;
 
-const LATEST_SCHEMA_SQL = substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL);
+const ANALYTICS_SCHEMA_SQL = `
+  CREATE TABLE agent_usage_records (
+    agent_id TEXT NOT NULL,
+    record_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    turn_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    occurred_at TEXT NOT NULL,
+    tokens_json TEXT NOT NULL CHECK(json_valid(tokens_json)),
+    estimated_cost_usd REAL,
+    rate_basis TEXT,
+    recorded_at TEXT NOT NULL,
+    PRIMARY KEY(agent_id, record_id)
+  );
+  CREATE INDEX agent_usage_date ON agent_usage_records(agent_id, occurred_at);
+  CREATE TABLE agent_usage_checkpoints (
+    agent_id TEXT NOT NULL,
+    counter_id TEXT NOT NULL,
+    tokens_json TEXT NOT NULL CHECK(json_valid(tokens_json)),
+    PRIMARY KEY(agent_id, counter_id)
+  );
+  CREATE TABLE agent_usage_activity (
+    agent_id TEXT NOT NULL,
+    activity_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    turn_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('turn', 'user', 'assistant')),
+    occurred_at TEXT NOT NULL,
+    PRIMARY KEY(agent_id, activity_id)
+  );
+  CREATE INDEX agent_usage_activity_date ON agent_usage_activity(agent_id, occurred_at);
+`;
+
+const LATEST_SCHEMA_SQL =
+  substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL) + ANALYTICS_SCHEMA_SQL;
 
 // Silence here would ship new installs a table the migrations never produce, so an edit to the baseline
 // that moves this declaration out from under the substitution has to be loud.
@@ -360,6 +397,7 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     version: 14,
     up: refreshProviderSessionsForDynamicTools,
   },
+  { version: 15, up: (db) => db.exec(ANALYTICS_SCHEMA_SQL) },
 ];
 
 const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? BASELINE_SCHEMA_VERSION;

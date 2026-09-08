@@ -351,3 +351,48 @@ Settings starts the shared renderer runtime store. An explicit update opens one 
 revisioned snapshots move it through progress, failure, retry, and completion. Closing the
 notification does not cancel the download, and later reports do not reopen it. Fresh provider
 downloads retain their existing flow. These actions apply only to the local desktop host.
+
+## Agent usage analytics
+
+`AgentUsage` owns local numeric usage records, cumulative counter checkpoints, and activity counts.
+Migration 15 adds these tables on both database creation paths. They do not reference conversation
+projections: clearing a conversation must retain usage. Agent deletion removes usage, checkpoints,
+activity, and related command receipts in its existing transaction.
+
+The turn lifecycle accepts usage only for a provider session belonging to the agent. Codex totals
+use durable session checkpoints; restored totals establish a baseline for pre-feature sessions.
+Claude uses per-model query totals and a separate counter identity for each query process. ACP usage
+is optional. Missing fields remain unknown. Completed assistant messages exclude commentary and tool
+output. Only post-install messages enter activity counts.
+
+`agent:get-analytics` and the capability-gated `GET /v1/agents/:agentId/analytics` return aggregates.
+They are separate from provider account limits. A request names the agent, inclusive calendar dates,
+and viewer time zone. The host groups records into calendar days in that zone. Date comparisons use
+an inclusive start and exclusive next-day boundary; custom ranges are limited to 367 days. Desktop
+names the host explicitly, and mobile binds reads to its authenticated active host. Every member of
+that host team can read totals. The public web and Signal service store no usage records.
+
+The Usage views show 7, 30, 90, or custom days, with 30 days as the default. Both expose exact daily
+values beside the SVG charts. Cost is a USD API-equivalent estimate, not a subscription charge.
+The bundled rates cite official sources and carry a verification date. Claude list-price estimates
+come from SDK model usage; unknown or managed pricing is not treated as a list-price estimate.
+Unknown models, missing cache data, and unresolvable context or cache-write pricing stay unpriced.
+Tool and media fees are outside the estimate. Stored estimates retain their price basis.
+
+
+### Host-wide Usage
+
+Desktop opens Usage from the server context menu. It keeps the previous workspace mounted and
+inert until Back, so conversation drafts and settings survive navigation. Agent settings opens
+the same report with an agent filter. Host changes clear the filter and stale responses are rejected.
+
+`host:get-analytics` and the optional `host-analytics` capability expose `GET /v1/analytics`.
+The host queries its local usage tables once for the date range and optional agent filter; it does
+not add per-agent API responses. Session and turn identities include agent and provider. HTTP and
+WebRTC use an explicit host analytics codec. Existing agent analytics and account limits keep their
+contracts. All authenticated team members can read these aggregates; no additional analytics data
+is stored by the account service or Signal service.
+
+The desktop chart adapts Zaidan's chart and interactive area composition. The pinned
+`solid-recharts` dependency has a Solid 2 compatibility patch and uses the application's single
+Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact accessible values.

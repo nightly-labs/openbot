@@ -203,6 +203,7 @@
     "marked": "catalog:",
     "qrcode": "^1.5.4",
     "solid-js": "2.0.0-rc.0",
+    "solid-recharts": "1.0.1",
     "solid-sonner": "0.3.2",
     "ws": "8.21.3",
     "yaml": "catalog:",
@@ -239,6 +240,7 @@
     "dmg-builder@26.15.7": "patches/dmg-builder@26.15.7.patch",
     "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch",
     "expo-router@57.0.17": "patches/expo-router@57.0.17.patch",
-    "react-native-keyboard-controller@1.21.9": "patches/react-native-keyboard-controller@1.21.9.patch"
+    "react-native-keyboard-controller@1.21.9": "patches/react-native-keyboard-controller@1.21.9.patch",
+    "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch"
   }
 }

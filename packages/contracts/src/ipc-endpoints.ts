@@ -132,6 +132,8 @@ export const IPC_ENDPOINTS = {
   },
   agent: {
     getStatus: request(IPC_CHANNELS.agentGetStatus),
+    getAnalytics: request(IPC_CHANNELS.agentGetAnalytics),
+    getHostAnalytics: request(IPC_CHANNELS.hostGetAnalytics),
     getUsage: request(IPC_CHANNELS.agentGetUsage),
     listModels: request(IPC_CHANNELS.agentListModels),
     list: request(IPC_CHANNELS.agentList),

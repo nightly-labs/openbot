@@ -5,6 +5,7 @@ import { basename } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AccountUsage,
+  AgentAnalyticsInput,
   AgentEvent,
   AgentMemory,
   AgentModelOption,
@@ -28,6 +29,7 @@ import type {
   DraftAttachment,
   DuplicateAgentResult,
   GenerateAgentProfileInput,
+  HostAnalyticsInput,
   ListRoutineRunsInput,
   QueuedMessageReceipt,
   QueueSnapshot,
@@ -377,6 +379,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   getStatus(): AgentStatus {
     return this.#providers.status();
+  }
+
+  getAnalytics(input: AgentAnalyticsInput) {
+    if (!this.listAgents().some((agent) => agent.id === input.agentId)) throw new Error("Agent not found.");
+    return this.#store.database.usage.read(input);
+  }
+
+  getHostAnalytics(input: HostAnalyticsInput) {
+    if (input.agentId && !this.listAgents().some((agent) => agent.id === input.agentId))
+      throw new Error("Agent not found.");
+    return this.#store.database.usage.readHost(input);
   }
 
   async getUsage(agentId?: string): Promise<AccountUsage> {

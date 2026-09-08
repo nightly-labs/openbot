@@ -21,6 +21,7 @@ import {
   RemoteTeamDirectoryClient,
   type RemoteTeamHost,
   type RemoteWorkspacePreferences,
+  readAgentAnalytics,
   remoteConnectionFailure,
   resyncRemoteConversations,
 } from "@openbot/team-client";
@@ -540,6 +541,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         setActiveServerId(host.hostId);
         // Membership is already committed. Directory failure must not reuse the consumed invite.
         void refreshHosts().catch(() => undefined);
+      },
+      loadAgentAnalytics: async (input, serverId) => {
+        if (
+          serverId !== activeServerId ||
+          !agents.some((agent) => agent.id === input.agentId && agent.serverId === serverId)
+        )
+          throw new Error("Agent is not on the selected host.");
+        return readAgentAnalytics(request, serverCapabilities.current.get(serverId) ?? [], input);
       },
       createAgent: async (input: CreateAgentInput) => {
         const created = await request("POST", TEAM_API_ROUTES.agents.all, decodeAgent, {

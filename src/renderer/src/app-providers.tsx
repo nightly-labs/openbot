@@ -29,6 +29,7 @@ import { SidebarProvider } from "./features/sidebar/sidebar-context";
 import { PresenceProvider } from "./features/team/team-context";
 import { notifyTeamTyping } from "./features/team/team-typing";
 import { UpdatesProvider } from "./features/updates/updates-context";
+import { UsageProvider } from "./features/usage/usage-context";
 import { LayoutProvider } from "./layout";
 import { NavigationProvider } from "./navigation";
 import { PlatformProvider } from "./platform";
@@ -91,12 +92,14 @@ export function AppProviders(props: ParentProps<AppProps>): JSX.Element {
                         <ServerSwitchProvider>
                           <AnsweredPromptsProvider>
                             <UiErrorsProvider>
-                              <AgentReadTrackingProvider>
-                                <AppBootstrap />
-                                <ServerScopeBoundary stableConversation={stableConversation}>
-                                  {props.children}
-                                </ServerScopeBoundary>
-                              </AgentReadTrackingProvider>
+                              <UsageProvider>
+                                <AgentReadTrackingProvider>
+                                  <AppBootstrap />
+                                  <ServerScopeBoundary stableConversation={stableConversation}>
+                                    {props.children}
+                                  </ServerScopeBoundary>
+                                </AgentReadTrackingProvider>
+                              </UsageProvider>
                             </UiErrorsProvider>
                           </AnsweredPromptsProvider>
                         </ServerSwitchProvider>

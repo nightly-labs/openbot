@@ -92,6 +92,9 @@ describe.sequential("GrokAgentClient", () => {
         decodeTurnResponse,
       );
       await waitFor(() => notifications.some((notification) => notification.method === "turn/completed"));
+      expect(notifications.find((event) => event.method === "openbot/usage")?.params).toMatchObject({
+        usage: { inputTokens: 300, outputTokens: 50, cachedReadTokens: 200 },
+      });
       const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
       const messages = history.thread.turns?.[0]?.items;
       expect(messages).toEqual([
@@ -720,7 +723,7 @@ createInterface({ input: process.stdin }).on("line", (line) => {
         { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "answer." } },
       ];
       for (const update of updates) write({ method: "session/update", params: { sessionId: message.params.sessionId, update } });
-      write({ id: message.id, result: { stopReason: mode } });
+      write({ id: message.id, result: { stopReason: mode, usage: { totalTokens: 350, inputTokens: 300, outputTokens: 50, cachedReadTokens: 200, cachedWriteTokens: 0 } } });
       return;
     }
     promptCounter += 1;

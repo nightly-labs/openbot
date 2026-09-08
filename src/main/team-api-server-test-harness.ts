@@ -59,6 +59,8 @@ export function createAgents(overrides: Partial<TeamApiAgents> = {}, events = ne
       events.off(event, listener);
     },
     getStatus: unimplemented,
+    getAnalytics: unimplemented,
+    getHostAnalytics: unimplemented,
     getRuntimeSnapshot: () => ({
       agents: [],
       activeTurns: [],
