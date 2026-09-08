@@ -388,6 +388,7 @@ export async function createApplicationServices({
     mailbox,
     browser,
     chat: teamChatStore,
+    groups: service.groups,
     teamWebRtcBridge,
     registerRemoteHost: (input) => centralAuth.registerRemoteHost(input),
     issueRemoteHostTicket: (hostId) => centralAuth.issueRemoteHostTicket(hostId),

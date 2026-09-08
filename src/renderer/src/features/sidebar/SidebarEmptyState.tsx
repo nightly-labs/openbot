@@ -43,7 +43,6 @@ export function SidebarEmptyState() {
               </span>
             </span>
           </Button>
-          <p class="sidebar-first-agent-empty">No chats yet</p>
         </div>
       )}
     </Show>

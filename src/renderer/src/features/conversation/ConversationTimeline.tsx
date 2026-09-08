@@ -1,13 +1,5 @@
 import { createMemo, For, Loading, lazy, Show, untrack } from "solid-js";
-import {
-  Bubble,
-  BubbleContent,
-  BubbleReactions,
-  type BubbleVariant,
-  Button,
-  Message,
-  MessageContent,
-} from "../../components/ui";
+import { Bubble, BubbleContent, BubbleReactions, Button, Message, MessageContent } from "../../components/ui";
 import type { AgentMessage, ChatActionMarkerModel } from "../../data";
 import { AgentActivityIndicator } from "./AgentActivity";
 import { AttachmentCards } from "./AttachmentCards";
@@ -16,18 +8,9 @@ import { ChatSearch } from "./ChatSearch";
 import { BrowserTakeoverCard } from "./ConversationPrompts";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
-import { messageContentBlocks } from "./DataTable";
 import { ScrollToLatestButton } from "./MessageNavigation";
-import { MessageActions, MessageBody } from "./MessageRendering";
+import { conversationBubbleVariant, MessageActions, MessageBody } from "./MessageRendering";
 import { UnreadMessagesBanner, UnreadMessagesDivider } from "./UnreadMessages";
-
-function conversationBubbleVariant(message: AgentMessage): BubbleVariant {
-  if (message.author === "you") return "secondary";
-  if (message.imageGeneration || (!message.body.trim() && message.attachments?.length)) return "ghost";
-  const contentBlocks = messageContentBlocks(message.body, message.streaming === true);
-  if (contentBlocks.some((block) => block.type === "table" || block.type === "comparison-table")) return "muted";
-  return contentBlocks.some((block) => block.type !== "text") ? "ghost" : "muted";
-}
 
 /** A message that renders only an action marker, with no bubble of its own. */
 function markerOnlyMessage(message: AgentMessage): boolean {

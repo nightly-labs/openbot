@@ -298,11 +298,16 @@ export class TurnLifecycle {
         this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.delivery.id);
       }
       const relayDelivery = deliveries.find((delivery) => delivery.delivery.sender.kind === "agent");
-      if (terminal === "completed" && latestAssistant && relayDelivery) {
+      if (
+        !this.#conversation.isExecutionThread(snapshot.threadId) &&
+        terminal === "completed" &&
+        latestAssistant &&
+        relayDelivery
+      ) {
         await this.#relayAgentResult(agentId, turnId, relayDelivery, latestAssistant.text);
       }
     }
-    if (latestAssistant) {
+    if (latestAssistant && !this.#conversation.isExecutionThread(snapshot.threadId)) {
       await this.#store.updatePreview(agentId, latestAssistant.text);
       this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
     }

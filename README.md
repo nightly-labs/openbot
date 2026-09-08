@@ -23,6 +23,7 @@ messaging in one desktop app.
 - Per-agent context monitoring with automatic compaction before long threads exhaust the model window.
 - FIFO message queues with pause, resume, cancellation, and crash-safe persistence.
 - Agent-to-agent messages, replies, reactions, images, and managed file transfers.
+- Shared desktop group chats with one task owner, explicit delegation, shared history, and Stop, Resume, Reassign, Archive, and Restore controls.
 - A persistent embedded browser that agents can open, inspect, and control.
 - Optional Computer Use integration for macOS through a locally installed Codex plugin.
 - Per-agent model, reasoning, profile, notification, browser, and panel state.

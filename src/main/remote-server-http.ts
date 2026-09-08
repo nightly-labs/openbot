@@ -1,3 +1,4 @@
+import { groupRequest, groupResponse, isGroupRoute } from "@openbot/contracts/team-protocol/groups-v1";
 // Putting one Team API call on the wire, and reading what came back off it.
 //
 // Two encodings live here and must not be collapsed into one. A negotiated V3 host is framed by
@@ -72,13 +73,15 @@ export async function requestJson<T>(
       body:
         options.body === undefined
           ? undefined
-          : options.protocol === TEAM_PROTOCOL_V3
-            ? encodeTeamProtocolV3CurrentHttpRequest(method, path, options.body, {
-                preserveSemanticTags: options.preserveSemanticTags,
-              })
-            : encodeTeamProtocolV1CurrentHttpRequest(method, path, options.body, {
-                preserveSemanticTags: options.preserveSemanticTags,
-              }),
+          : isGroupRoute(path)
+            ? JSON.stringify(groupRequest(path, options.body))
+            : options.protocol === TEAM_PROTOCOL_V3
+              ? encodeTeamProtocolV3CurrentHttpRequest(method, path, options.body, {
+                  preserveSemanticTags: options.preserveSemanticTags,
+                })
+              : encodeTeamProtocolV1CurrentHttpRequest(method, path, options.body, {
+                  preserveSemanticTags: options.preserveSemanticTags,
+                }),
     },
     options.timeoutMs,
   );
@@ -98,8 +101,9 @@ export async function requestJson<T>(
   }
   if (value !== undefined) {
     try {
-      value =
-        options.protocol === TEAM_PROTOCOL_V3
+      value = isGroupRoute(path)
+        ? groupResponse(path, response.status, value)
+        : options.protocol === TEAM_PROTOCOL_V3
           ? decodeTeamProtocolV3CurrentHttpResponse(method, path, response.status, value)
           : decodeTeamProtocolV1CurrentHttpResponse(method, path, response.status, value);
     } catch (error) {

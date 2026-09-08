@@ -17,6 +17,7 @@
 @import "./features/account/account-update-island.css";
 @import "./features/servers/join-server-dialog.css";
 @import "./features/conversation/conversation.css";
+@import "./features/groups/groups.css";
 @import "./features/settings/settings-modal.css";
 @import "./features/settings/settings-mobile-connect.css";
 @import "./features/settings/settings-hosted-sites.css";

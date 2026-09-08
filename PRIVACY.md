@@ -221,3 +221,22 @@ request does not include conversation history, saved memories, or workspace file
 The draft is reviewed before OpenBot saves it; generating a draft does not create
 an OpenBot conversation or change an existing agent. The provider's own data and
 CLI retention policies still apply.
+
+## Shared desktop groups
+
+Group names, purposes, participating agents, linked conversation references, messages, tasks,
+assignment records, history summaries, and human read positions are stored in the host's SQLite
+database. All authenticated members of that server can read and use its groups. Agent membership
+selects participating agents; it is not a separate human access boundary.
+
+The selected lead's provider receives relevant group content for routing and history summaries in
+separate sessions without work tools. Assigned agents receive the group purpose, responsibilities,
+request, relevant source messages, shared history summary, recent messages, and attachment references.
+Agents can retrieve earlier group messages and other conversations on that server when needed.
+Unrelated conversations are not sent automatically. Provider session internals remain internal.
+The provider's own data policies apply to content it receives.
+
+Archiving a group stops its work and retains its transcript. Restore makes the group available again.
+These actions do not remove agents, their memories, or linked conversations. Group traffic between
+desktop clients and a host uses the existing host transport. The account API and Signal service do
+not store group chats or make routing decisions. This feature adds no mobile chat interface.

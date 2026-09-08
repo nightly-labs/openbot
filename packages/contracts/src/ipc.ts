@@ -16,6 +16,7 @@ export * from "./ipc-conversations";
 export * from "./ipc-desktop-apis";
 export * from "./ipc-dynamic-island";
 export * from "./ipc-endpoints";
+export * from "./ipc-groups";
 export * from "./ipc-hosted-sites";
 export * from "./ipc-marketplace-agents";
 export * from "./ipc-queue";

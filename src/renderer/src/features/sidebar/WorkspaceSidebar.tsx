@@ -7,6 +7,8 @@ import { useAgentActions } from "../agents/agent-actions";
 import { useAgents } from "../agents/agents-context";
 import { useConversation } from "../conversation/conversation-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
+import { GroupsSection } from "../groups/GroupsSection";
+import { useGroups } from "../groups/groups-context";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
@@ -27,6 +29,7 @@ import { useSidebar } from "./sidebar-context";
  */
 export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const layout = useLayout();
+  const groups = useGroups();
   const { activeServer, activeServerSupportsCapability } = useServers();
   const { openServerSettings } = useServerSettings();
   const { setSkillsMarketplaceOpen } = useSettings();
@@ -62,13 +65,18 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
 
   return (
     <Sidebar
+      groups={<GroupsSection />}
+      hasGroups={groups.supported() && groups.state.groups.some((group) => group.archived === groups.state.archived)}
+      showingArchivedGroups={groups.state.archived}
+      onToggleArchivedGroups={groups.supported() ? groups.toggleArchived : undefined}
+      onCreateGroup={groups.supported() ? groups.create : undefined}
       serverName={activeServer()?.name ?? "Local"}
       onOpenServerSettings={(trigger) => {
         const server = activeServer();
         if (server) openServerSettings(server.id, trigger);
       }}
       agents={agentList()}
-      activeAgentId={activeDirectMember() ? "" : (activeAgent()?.id ?? "")}
+      activeAgentId={activeDirectMember() || groups.state.selectedId ? "" : (activeAgent()?.id ?? "")}
       showPeople={props.peopleEnabled}
       people={directPeople()}
       directThreads={directThreads()}
@@ -85,10 +93,19 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       onUnpin={unpinSidebarItem}
       onReorderPinned={reorderPinnedSidebarItems}
       onReorderPeople={reorderSidebarPeople}
-      onSelectAgent={selectAgent}
-      onSelectPerson={(memberId) => void selectDirectMember(memberId)}
+      onSelectAgent={(id) => {
+        groups.close();
+        selectAgent(id);
+      }}
+      onSelectPerson={(memberId) => {
+        groups.close();
+        void selectDirectMember(memberId);
+      }}
       onPreloadDirectConversation={props.peopleEnabled ? () => void DirectConversation.preload() : undefined}
-      onCreateAgent={openBotSetup}
+      onCreateAgent={() => {
+        groups.close();
+        openBotSetup();
+      }}
       onEditAgent={editAgent}
       duplicateSupported={activeServerSupportsCapability("agent-duplication")}
       duplicatingAgentIds={duplicatingAgentIds()}
@@ -103,7 +120,10 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
               label: "Create your first agent",
               avatarSeed: agentSetupDraft().avatarSeed,
               avatarHue: agentSetupDraft().avatarHue,
-              onSelect: openBotSetup,
+              onSelect: () => {
+                groups.close();
+                openBotSetup();
+              },
             }
           : undefined
       }

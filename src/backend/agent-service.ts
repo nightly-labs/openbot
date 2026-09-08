@@ -73,7 +73,7 @@ import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-sit
 import { isHostedSiteMutationTool } from "./agent/hosted-site-events";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { MailboxSync } from "./agent/mailbox-sync";
-import { generateProfile } from "./agent/profile-generation";
+import { generateProfile, generateTextWithoutTools } from "./agent/profile-generation";
 import { ProfileSave } from "./agent/profile-save";
 import { createAgentToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
 import { type AgentClientFactory, ProviderRuntime } from "./agent/provider-runtime";
@@ -81,7 +81,7 @@ import { type RoutineMutationOptions, RoutineScheduler } from "./agent/routine-s
 import { type OpenBotToolResponse, openBotToolResult } from "./agent/routine-tools";
 import { fitRuntimeSnapshot } from "./agent/runtime-snapshot";
 import { type AgentSidebar, handleSidebarTool } from "./agent/sidebar-tools";
-import { isDynamicToolCall, providerForAgent, providerLabel } from "./agent/thread-items";
+import { isDynamicToolCall, isRequestTimeout, providerForAgent, providerLabel } from "./agent/thread-items";
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import type { AgentClient, AgentProvider } from "./agent-client";
@@ -89,6 +89,7 @@ import type { AgentStore } from "./agent-store";
 import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "./conversation-read-store";
 import { mergeConversationSnapshots } from "./conversation-snapshots";
+import { GroupService } from "./group-service";
 import type { MailboxStore } from "./mailbox-store";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
@@ -113,6 +114,7 @@ export interface ResolvedSharedFile {
 }
 
 export class AgentService extends EventEmitter<AgentServiceEvents> {
+  readonly groups: GroupService;
   readonly #profileSave: ProfileSave;
   readonly #profileClients = new Set<AgentClient>();
   readonly #deletingAgents = new Set<string>();
@@ -221,6 +223,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         onProvidersReady: async () => {
           await this.#boot.reconcileUnresolvedDeliveries();
+          await this.groups.recover();
           void this.#boot.backfillProviderHistory();
           for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
         },
@@ -307,7 +310,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       providers: this.#providers,
       conversation: this.#conversation,
       mailboxSync: this.#mailboxSync,
-      hooks: { emitError: (code, error, agentId) => this.#emitError(code, error, agentId) },
+      hooks: {
+        emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        executionThreads: () => this.groups.store.executionThreads(),
+        deliveryThreadId: (deliveryId) => {
+          const assignment = this.groups.store.assignmentForDelivery(deliveryId);
+          return assignment ? this.groups.store.context(assignment.groupId, assignment.agentId).threadId : null;
+        },
+      },
     });
     this.#attachments = new AttachmentGateway({
       conversation: this.#conversation,
@@ -335,7 +345,68 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
       },
     });
+    this.groups = new GroupService(store.database, mailbox, {
+      agents: () => this.listAgents(),
+      generate: async (lead, prompt) => {
+        await this.#providers.ensureProvider(lead.provider);
+        const model = this.#providers
+          .listModels()
+          .find((item) => item.provider === lead.provider && item.id === lead.model);
+        if (!model) throw new Error("The group lead model is unavailable.");
+        const client = this.#providers.createProfileClient(lead.provider);
+        this.#profileClients.add(client);
+        try {
+          return await generateTextWithoutTools(
+            client,
+            { ...model, defaultReasoningEffort: lead.reasoningEffort },
+            prompt,
+          );
+        } finally {
+          this.#profileClients.delete(client);
+        }
+      },
+      schedule: (agentId) => this.#drain.scheduleDrain(agentId),
+      contextCharacters: (agentId, threadId) => {
+        const agent = this.#store.list().find((item) => item.id === agentId);
+        const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
+        return session ? this.#compaction.contextInputCharacters(session.externalSessionId) : 120_000;
+      },
+      normalBusy: () =>
+        this.#mailbox
+          .unresolvedDeliveries()
+          .some((item) => !this.groups.store.assignmentForDelivery(item.delivery.id)) ||
+        [...this.#conversation.activeSnapshots()].some(
+          ([, snapshot]) => snapshot.activeTurnId && !this.#conversation.isExecutionThread(snapshot.threadId),
+        ),
+      busy: (agentId) =>
+        Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)),
+      steer: async (agentId, threadId, turnId, messageId, text) => {
+        const agent = this.#store.list().find((item) => item.id === agentId);
+        const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
+        const client = agent ? this.#providers.clientForAgent(agent) : null;
+        if (!session || !client) return "rejected";
+        try {
+          await client.request(
+            "turn/steer",
+            {
+              threadId: session.externalSessionId,
+              expectedTurnId: turnId,
+              clientUserMessageId: messageId,
+              input: [{ type: "text", text }],
+            },
+            decodeRecordResponse,
+          );
+          return "accepted";
+        } catch (error) {
+          return isRequestTimeout(error, "turn/steer") ? "uncertain" : "rejected";
+        }
+      },
+      interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId),
+      changed: (groupId, revision) => this.#emit({ type: "groups-changed", groupId, revision }),
+      error: (error) => this.#emitError("group_coordination_failed", error),
+    });
     this.#drain = new DrainScheduler({
+      groups: this.groups,
       store,
       mailbox,
       mailboxSync: this.#mailboxSync,
@@ -626,10 +697,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         throw new Error("Changing provider requires an atomic provider and model selection.");
       }
       const hasPendingWork = this.#mailbox
-        .listQueue(input.agentId)
-        .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
+        .unresolvedDeliveries()
+        .some((item) => item.delivery.recipientAgentId === input.agentId);
       const activeTurn =
-        this.#conversation.snapshot(input.agentId)?.activeTurnId ??
+        this.#conversation.workingSnapshot(input.agentId)?.activeTurnId ??
         (previous.threadId
           ? this.#store.database.readConversation(input.agentId, previous.threadId).activeTurnId
           : null);
@@ -720,9 +791,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (this.#deletingAgents.has(agentId)) throw new Error("Agent deletion is already in progress.");
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     const hasPendingWork = this.#mailbox
-      .listQueue(agentId)
-      .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
-    if (hasPendingWork || this.#conversation.snapshot(agentId)?.activeTurnId) {
+      .unresolvedDeliveries()
+      .some((item) => item.delivery.recipientAgentId === agentId);
+    if (hasPendingWork || this.#conversation.workingSnapshot(agentId)?.activeTurnId) {
       throw new Error("Stop the agent and cancel its queued messages before deleting it.");
     }
 
@@ -776,6 +847,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#stopping = false;
     await this.#store.initialize();
     await this.#mailbox.initialize();
+    this.groups.restoreDeliveryLinks();
     await this.#threads.reconcileProviderSessionFiles();
     this.#boot.recoverPersistedTurns();
     this.#hostedSites.restore();
@@ -809,6 +881,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async stop(): Promise<void> {
     this.#stopping = true;
+    const groupStop = this.groups.stop();
     this.#initialized = false;
     this.#routines.dispose();
     this.#hostedSites.dispose();
@@ -823,13 +896,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#profileClients.clear();
     for (const [agentId, snapshot] of this.#conversation.activeSnapshots()) {
       if (!snapshot.activeTurnId) continue;
-      const session = this.#store.activeProviderSession(agentId);
+      const agent = this.#store.list().find((item) => item.id === agentId);
+      const session =
+        agent && snapshot.threadId
+          ? this.#store.database.activeProviderSession(snapshot.threadId, agent.provider)
+          : null;
       if (session) this.#images.interrupt(agentId, session.externalSessionId, snapshot.activeTurnId);
     }
     this.#turn.dispose();
     this.#drain.dispose();
     this.#browser.clearControls();
     await Promise.all(clients.map((client) => client.stop().catch(() => undefined)));
+    await groupStop;
     await Promise.allSettled(this.#drain.pendingTasks());
     await Promise.allSettled(this.#images.pendingPromises());
     this.#images.dispose();
@@ -933,11 +1011,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   async cancelQueuedMessage(agentId: string, deliveryId: string): Promise<void> {
+    if (this.groups.store.assignmentForDelivery(deliveryId))
+      throw new Error("Use the group task controls for this assignment.");
     await this.#mailbox.cancel(agentId, deliveryId);
     this.#mailboxSync.emitQueue(agentId);
   }
 
   async updateQueuedMessage(input: UpdateQueuedMessageInput): Promise<void> {
+    if (this.groups.store.assignmentForDelivery(input.deliveryId))
+      throw new Error("Use the group task controls for this assignment.");
     await this.#mailbox.updateQueuedMessage(
       input.agentId,
       input.deliveryId,
@@ -952,6 +1034,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   async reorderQueue(input: ReorderQueueInput): Promise<void> {
+    if (input.deliveryIds.some((id) => this.groups.store.assignmentForDelivery(id)))
+      throw new Error("Use the group task controls for group work.");
     await this.#mailbox.reorderQueue(input.agentId, input.deliveryIds);
     this.#mailboxSync.emitQueue(input.agentId);
   }
@@ -964,6 +1048,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!session || !snapshot.activeTurnId || snapshot.activeTurnId !== input.expectedTurnId) {
       throw new Error("The active turn changed before this message could be steered.");
     }
+    if (this.groups.store.assignmentForDelivery(input.deliveryId))
+      throw new Error("Use the group task controls for this assignment.");
     const context = this.#mailbox.getDelivery(input.deliveryId);
     if (!context || context.delivery.recipientAgentId !== agent.id || context.delivery.status !== "queued") {
       throw new Error("Only queued messages can be steered.");
@@ -1041,10 +1127,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#conversation.emitConversation(current);
   }
 
-  async interrupt(agentId: string, turnId: string): Promise<void> {
+  async interrupt(agentId: string, turnId: string, executionThreadId?: string): Promise<void> {
     const agent = await this.#store.getOrCreate(agentId);
     const client = this.#providers.requireReadyClient(providerForAgent(agent));
-    const session = this.#store.activeProviderSession(agentId);
+    const snapshot = [...this.#conversation.activeSnapshots()].find(
+      ([id, snapshot]) => id === agentId && snapshot.activeTurnId === turnId,
+    )?.[1];
+    const targetThreadId = executionThreadId ?? snapshot?.threadId;
+    const session = targetThreadId
+      ? this.#store.database.activeProviderSession(targetThreadId, agent.provider)
+      : this.#store.activeProviderSession(agentId);
     if (!session) return;
     this.#images.interrupt(agentId, session.externalSessionId, turnId);
     await client.request("turn/interrupt", { threadId: session.externalSessionId, turnId }, decodeRecordResponse);
@@ -1057,7 +1149,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (!snapshot.threadId || !snapshot.activeTurnId) continue;
       const agent = this.#store.list().find((candidate) => candidate.id === agentId);
       const client = agent ? this.#providers.clientForAgent(agent) : null;
-      const session = agent ? this.#store.activeProviderSession(agent.id) : null;
+      const session = agent ? this.#store.database.activeProviderSession(snapshot.threadId, agent.provider) : null;
       if (!client || !session) continue;
       this.#images.interrupt(agentId, session.externalSessionId, snapshot.activeTurnId);
       requests.push(
@@ -1178,6 +1270,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const senderAgentId = this.#conversation.agentForThread(params.threadId);
     if (!senderAgentId) throw new Error("The sending OpenBot agent is unknown.");
 
+    const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
+    const groupId = this.groups.store.groupForThread(executionThreadId);
+    if (groupId && (params.tool.startsWith("group_") || params.tool === "send_message")) {
+      if (params.tool === "send_message") throw new Error("Use group_assign or group_transfer for group work.");
+      return openBotToolResult(
+        await this.groups.tool(groupId, senderAgentId, params.turnId, params.callId, params.tool, params.arguments),
+      );
+    }
+    if (params.tool.startsWith("group_")) throw new Error("Group tools require an active group assignment.");
+
     if (params.tool === "list_sites") {
       return openBotToolResult({ sites: await this.#hostedSites.listSites(), limit: 10 });
     }
@@ -1207,7 +1309,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           name: agent.name,
           title: agent.title,
           description: agent.description,
-          status: this.#conversation.snapshot(agent.id)?.activeTurnId
+          status: this.#conversation.workingSnapshot(agent.id)?.activeTurnId
             ? "working"
             : queue.deliveries.some((delivery) => delivery.status === "queued")
               ? "queued"
@@ -1362,6 +1464,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #emit(event: AgentEvent): void {
+    if (this.groups?.event(event)) return;
     this.emit("event", event);
   }
 }

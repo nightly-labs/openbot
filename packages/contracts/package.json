@@ -28,7 +28,8 @@
     "./team-protocol/v3": "./src/team-protocol/v3.ts",
     "./team-protocol/v3-adapter": "./src/team-protocol/v3-adapter.ts",
     "./team-protocol/v3-webrtc-adapter": "./src/team-protocol/v3-webrtc-adapter.ts",
-    "./validation": "./src/validation.ts"
+    "./validation": "./src/validation.ts",
+    "./team-protocol/groups-v1": "./src/team-protocol/groups-v1.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",

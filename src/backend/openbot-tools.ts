@@ -7,6 +7,7 @@ import {
   deleteSectionToolSchema,
   renameSectionToolSchema,
 } from "./agent/sidebar-tools";
+import { GROUP_TOOL_DEFINITIONS } from "./group-tools";
 import { routineScheduleZodSchema } from "./routine-tool-schema";
 
 interface OpenBotToolDefinition {
@@ -17,6 +18,7 @@ interface OpenBotToolDefinition {
 
 /** Shared declarations for Codex, Grok, and Claude. Service handlers enforce execution rules. */
 export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
+  ...GROUP_TOOL_DEFINITIONS,
   {
     name: "list_sites",
     description: "List static sites hosted by the signed-in OpenBot user. Use this before retrying a hosting mutation.",

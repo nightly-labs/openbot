@@ -6,6 +6,9 @@ import { WorkspaceAgentSetup } from "./features/agents/WorkspaceAgentSetup";
 import { useDirectMessages } from "./features/conversation/direct-messages-context";
 import { WorkspaceConversation } from "./features/conversation/WorkspaceConversation";
 import { WorkspaceDirectConversation } from "./features/conversation/WorkspaceDirectConversation";
+import { GroupConversation } from "./features/groups/GroupConversation";
+import { GroupCreateDialog } from "./features/groups/GroupEditor";
+import { useGroups } from "./features/groups/groups-context";
 import { RemoteCompatibilityScreen } from "./features/remote-desktop/RemoteCompatibilityScreen";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { useServers } from "./features/servers/servers-context";
@@ -36,6 +39,8 @@ import { WorkspaceOverlays } from "./WorkspaceOverlays";
  */
 export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   const platform = usePlatform();
+  const groups = useGroups();
+  const groupOpen = () => groups.state.selectedId !== null;
   const layout = useLayout();
   const { activeServer, activeServerSupportsCapability, retryServerConnection } = useServers();
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
@@ -75,13 +80,24 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
       <Show when={!blockedRemoteServer() && agentSetupOpen()}>
         <WorkspaceAgentSetup />
       </Show>
-      <Show when={!blockedRemoteServer() && activePeopleEnabled() && !agentSetupOpen() && activeDirectMember()} keyed>
+      <Show
+        when={
+          !blockedRemoteServer() && activePeopleEnabled() && !agentSetupOpen() && !groupOpen() && activeDirectMember()
+        }
+        keyed
+      >
         {(member) => <WorkspaceDirectConversation member={member} />}
       </Show>
-      <Show when={!blockedRemoteServer() && !agentSetupOpen() && !activeDirectMember()}>
+      <Show when={!blockedRemoteServer() && !agentSetupOpen() && !groupOpen() && !activeDirectMember()}>
         <WorkspaceConversation account={props.account} />
       </Show>
+      <Show when={!blockedRemoteServer() && !agentSetupOpen() && groupOpen()}>
+        <GroupConversation />
+      </Show>
       <WorkspaceOverlays account={props.account} />
+      <Show when={groups.state.editing === "create"}>
+        <GroupCreateDialog />
+      </Show>
     </div>
   );
 }

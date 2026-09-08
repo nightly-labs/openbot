@@ -2188,17 +2188,6 @@ textarea {
   flex: 0 0 auto;
 }
 
-.sidebar-first-agent-empty {
-  display: grid;
-  flex: 1;
-  place-items: center;
-  margin: 0;
-  padding-bottom: 54px;
-  color: var(--openbot-text-readable);
-  font-size: var(--openbot-text-md);
-  text-align: center;
-}
-
 .account-dock {
   position: absolute;
   z-index: 70;

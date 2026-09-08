@@ -251,7 +251,6 @@ export const EmptyWorkspace: Story = {
     />
   ),
   play: async ({ canvas }) => {
-    await expect(canvas.findByText("No chats yet")).resolves.toBeInTheDocument();
     await expect(canvas.queryByRole("heading", { name: "People" })).not.toBeInTheDocument();
     await expect(canvas.queryByRole("button", { name: "OpenBot team server" })).not.toBeInTheDocument();
     await expect(canvas.getAllByRole("listitem")).toHaveLength(6);

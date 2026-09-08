@@ -56,6 +56,7 @@ export class MailboxSync {
   }
 
   syncMailboxMessages(snapshot: ConversationSnapshot): void {
+    if (this.#conversation.isExecutionThread(snapshot.threadId)) return;
     const indexes = new Map(snapshot.messages.map((message, index) => [message.id, index]));
     for (const mailboxMessage of this.#mailbox.conversationMessages(snapshot.agentId)) {
       const index = indexes.get(mailboxMessage.id);

@@ -156,8 +156,17 @@ describe.sequential("AgentService: restart", () => {
       { agentId: "chief", threadId, activeTurnId: null, revision: 0, messages: [local] },
       "test.saved-before-upgrade",
     );
-    // Version 14 changes session state only. Reopen the version 13 database to run the shipped upgrade.
-    store.database.connection.prepare("DELETE FROM schema_migrations WHERE version = 14").run();
+    // Remove later group tables to reopen a version 13 database and run the shipped session upgrade.
+    store.database.connection.exec(`
+      DROP TABLE projection_group_reads;
+      DROP TABLE projection_group_summaries;
+      DROP TABLE projection_group_contexts;
+      DROP TABLE projection_group_assignments;
+      DROP TABLE projection_group_tasks;
+      DROP TABLE projection_group_messages;
+      DROP TABLE projection_groups;
+      DELETE FROM schema_migrations WHERE version >= 14;
+    `);
     store.database.close();
 
     let failRead = true;

@@ -76,6 +76,7 @@ import type {
   SetDynamicIslandInteractiveInput,
   SetDynamicIslandPreferenceInput,
 } from "./ipc-dynamic-island";
+import type { Group, GroupCommand, GroupPage, GroupReadInput, GroupSummary } from "./ipc-groups";
 import type {
   DeleteHostedSiteInput,
   HostedSiteSummary,
@@ -158,6 +159,9 @@ import type {
 import type { VoiceModelStatus, VoiceTranscriptionInput, VoiceTranscriptionResult } from "./ipc-voice";
 
 export interface AgentDesktopApi {
+  listGroups: () => Promise<GroupSummary[]>;
+  readGroup: (input: GroupReadInput) => Promise<GroupPage>;
+  groupCommand: (input: GroupCommand) => Promise<Group>;
   getStatus: () => Promise<AgentStatus>;
   getUsage: (agentId: string) => Promise<AccountUsage>;
   listModels: () => Promise<AgentModelOption[]>;

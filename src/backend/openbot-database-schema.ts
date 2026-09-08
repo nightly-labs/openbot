@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isGeneratedAgentId } from "@openbot/contracts/validation";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { GROUP_SCHEMA_SQL } from "./group-schema";
 
 const BASELINE_SCHEMA_VERSION = 8;
 
@@ -301,7 +302,8 @@ const V12_REACTIONS_TABLE_SQL = `  CREATE TABLE IF NOT EXISTS projection_reactio
     PRIMARY KEY(agent_id, message_id, actor_kind, actor_agent_id)
   );`;
 
-const LATEST_SCHEMA_SQL = substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL);
+const LATEST_SCHEMA_SQL =
+  substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL) + GROUP_SCHEMA_SQL;
 
 // Silence here would ship new installs a table the migrations never produce, so an edit to the baseline
 // that moves this declaration out from under the substitution has to be loud.
@@ -359,6 +361,10 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
   {
     version: 14,
     up: refreshProviderSessionsForDynamicTools,
+  },
+  {
+    version: 15,
+    up: (db) => db.exec(GROUP_SCHEMA_SQL),
   },
 ];
 

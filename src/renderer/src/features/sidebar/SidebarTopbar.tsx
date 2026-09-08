@@ -1,7 +1,7 @@
 /** The server name, the marketplace or expand toggle, and new agent - plus the window drag region. */
 
 import { Show } from "solid-js";
-import { Button, Puzzle } from "../../components/ui";
+import { Bot, Button, DropdownMenu, Hash, Puzzle } from "../../components/ui";
 import { PlusIcon, SidebarToggleIcon } from "./SidebarIcons";
 import { useSidebarScope } from "./sidebar-scope";
 
@@ -40,17 +40,30 @@ export function SidebarTopbar() {
             <SidebarToggleIcon />
           </Show>
         </Button>
-        <Button
-          variant="ghost"
-          type="button"
-          class="sidebar-icon-button sidebar-new-button no-drag"
-          onClick={props.onCreateAgent}
-          aria-label="Create new agent"
-          aria-hidden={props.compact ? "true" : undefined}
-          tabindex={props.compact ? -1 : 0}
-        >
-          <PlusIcon />
-        </Button>
+        <DropdownMenu.Root placement="bottom-end" gutter={4}>
+          <DropdownMenu.Trigger
+            class="sidebar-icon-button sidebar-new-button no-drag"
+            aria-label="New agent or group"
+            aria-hidden={props.compact ? "true" : undefined}
+            tabindex={props.compact ? -1 : 0}
+          >
+            <PlusIcon />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content>
+              <DropdownMenu.Item onSelect={props.onCreateAgent}>
+                <Bot aria-hidden="true" />
+                New agent
+              </DropdownMenu.Item>
+              <Show when={props.onCreateGroup}>
+                <DropdownMenu.Item onSelect={() => props.onCreateGroup?.()}>
+                  <Hash aria-hidden="true" />
+                  New group
+                </DropdownMenu.Item>
+              </Show>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div>
     </div>
   );

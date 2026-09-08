@@ -1,7 +1,7 @@
 import type { AttachmentSummary, InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import { MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
-import { Button, DropdownMenu } from "../../components/ui";
+import { type BubbleVariant, Button, DropdownMenu } from "../../components/ui";
 import { prefersReducedMotion } from "../../components/ui/utils";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { AttachmentCards } from "./AttachmentCards";
@@ -15,6 +15,14 @@ import { ImageGeneration } from "./ImageGeneration";
 import { MarkdownInlineText, MarkdownMessageText } from "./MarkdownMessageText";
 import { RichMessageText } from "./RichMessageText";
 import { parseSelectionInstruction } from "./SelectionActions";
+
+export function conversationBubbleVariant(message: AgentMessage): BubbleVariant {
+  if (message.author === "you") return "secondary";
+  if (message.imageGeneration || (!message.body.trim() && message.attachments?.length)) return "ghost";
+  const contentBlocks = messageContentBlocks(message.body, message.streaming === true);
+  if (contentBlocks.some((block) => block.type === "table" || block.type === "comparison-table")) return "muted";
+  return contentBlocks.some((block) => block.type !== "text") ? "ghost" : "muted";
+}
 
 const STREAMING_TEXT_GAP_FALLBACK_MS = 60;
 const STREAMING_WORD_WITH_SEPARATOR = /^(?:\s*(?:(?:#{1,6}|[-+*>]|\d+[.)])\s+)?\S+\s+)/u;

@@ -1,3 +1,4 @@
+import { groupEvent } from "@openbot/contracts/team-protocol/groups-v1";
 // The live event channel for HTTPS servers, and the reconnect policy both transports share.
 //
 // This is the only part of the remote-server family that owns a clock. Everything it does -- the
@@ -365,7 +366,9 @@ export class RemoteEventStream {
             return;
           }
           try {
-            const decoded = decodeTeamProtocolV1CurrentEvent(JSON.parse(message.data));
+            const value = JSON.parse(message.data);
+            const group = groupEvent(value);
+            const decoded = group ? { kind: "known" as const, event: group } : decodeTeamProtocolV1CurrentEvent(value);
             if (decoded.kind === "unknown") return;
             if (decoded.kind === "invalid") {
               protocolFailed = true;

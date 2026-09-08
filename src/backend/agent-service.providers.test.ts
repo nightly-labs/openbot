@@ -40,6 +40,103 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentService: providers", () => {
+  it("runs a group turn in a separate session and returns to the unchanged normal conversation", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE");
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "This is my normal conversation." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const agent = service.listAgents().find((item) => item.id === "chief");
+    if (!agent?.threadId) throw new Error("Normal conversation did not start.");
+    const normalSession = store.activeProviderSession(agent.id)?.externalSessionId;
+    const before = await service.readConversation(agent.id);
+    const actor = { id: "human", name: "Alex" };
+    await service.groups.command(
+      {
+        type: "save",
+        groupId: "group-1",
+        operationId: "create",
+        draft: {
+          name: "Project",
+          purpose: "Shared work",
+          members: [{ agentId: agent.id, responsibility: "Lead" }],
+          leadAgentId: agent.id,
+          linkedThreadIds: [agent.threadId],
+        },
+      },
+      actor,
+    );
+    await service.groups.command(
+      {
+        type: "send",
+        groupId: "group-1",
+        operationId: "send",
+        text: "Work only in this group.",
+        recipientAgentId: agent.id,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    await waitFor(() => service?.groups.store.tasks("group-1")[0]?.state === "completed");
+    expect(
+      service.groups.store
+        .messages("group-1")
+        .filter((item) => item.author.kind === "agent")
+        .map((item) => item.message.text),
+    ).toEqual(["CODEX_DONE"]);
+    expect((await service.readConversation(agent.id)).messages).toEqual(before.messages);
+    expect(store.activeProviderSession(agent.id)?.externalSessionId).toBe(normalSession);
+    expect(store.list().find((item) => item.id === agent.id)?.threadId).toBe(agent.threadId);
+    const execution = service.groups.store.context("group-1", agent.id);
+    expect(store.database.activeProviderSession(execution.threadId, agent.provider)?.externalSessionId).not.toBe(
+      normalSession,
+    );
+    await service.sendMessage({ agentId: agent.id, text: "Continue in the normal conversation." });
+    await waitFor(() => service?.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"));
+    expect(store.activeProviderSession(agent.id)?.externalSessionId).toBe(normalSession);
+  });
+
+  it("keeps an agent with active group work from being deleted", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "", false);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.groups.command(
+      {
+        type: "save",
+        groupId: "group-busy",
+        operationId: "create-busy",
+        draft: {
+          name: "Project",
+          purpose: "Shared work",
+          members: [{ agentId: "chief", responsibility: "Lead" }],
+          leadAgentId: "chief",
+          linkedThreadIds: [],
+        },
+      },
+      { id: "human", name: "Alex" },
+    );
+    await service.groups.command(
+      {
+        type: "send",
+        groupId: "group-busy",
+        operationId: "send-busy",
+        text: "Continue working",
+        recipientAgentId: "chief",
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      { id: "human", name: "Alex" },
+    );
+    await waitFor(() => service?.groups.store.tasks("group-busy")[0]?.state === "running");
+    expect(service.listQueue("chief").deliveries).toEqual([]);
+    await expect(service.deleteAgent("chief")).rejects.toThrow("Stop the agent");
+    expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(true);
+  });
+
   it("refreshes outdated Codex tools while preserving the agent and conversation, then resumes unchanged tools", async () => {
     const { store, mailbox } = stores(root);
     let rejectTurn = false;

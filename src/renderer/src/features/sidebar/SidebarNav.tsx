@@ -42,6 +42,7 @@ export function SidebarNav() {
       <div class="agent-list-content">
         <Show
           when={
+            props.hasGroups ||
             resolvedPinnedItems().length > 0 ||
             filteredAgents().length > 0 ||
             (props.showPeople !== false && filteredPeople().length > 0) ||
@@ -50,21 +51,29 @@ export function SidebarNav() {
           fallback={<SidebarEmptyState />}
         >
           <SidebarPinnedGroup />
+          {props.groups}
           <SidebarSectionList />
         </Show>
         <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
           {reorderAnnouncement()}
         </span>
       </div>
-      <Show when={layoutMutable()}>
+      <Show when={layoutMutable() || props.onToggleArchivedGroups}>
         <ContextMenu.Root modal={false}>
           <ContextMenu.Trigger class="sidebar-list-context-trigger" aria-label="Sidebar free area" />
           <ContextMenu.Portal>
             <ContextMenu.Content class="agent-context-menu" aria-label="Sidebar actions">
-              <ContextMenu.Item onSelect={() => startCreateSection()}>
-                <FolderPlus class="agent-context-icon size-4" aria-hidden="true" />
-                <span>New section</span>
-              </ContextMenu.Item>
+              <Show when={layoutMutable()}>
+                <ContextMenu.Item onSelect={() => startCreateSection()}>
+                  <FolderPlus class="agent-context-icon size-4" aria-hidden="true" />
+                  <span>New section</span>
+                </ContextMenu.Item>
+              </Show>
+              <Show when={props.onToggleArchivedGroups}>
+                <ContextMenu.Item onSelect={() => props.onToggleArchivedGroups?.()}>
+                  {props.showingArchivedGroups ? "Show active chats" : "Archived chats"}
+                </ContextMenu.Item>
+              </Show>
             </ContextMenu.Content>
           </ContextMenu.Portal>
         </ContextMenu.Root>

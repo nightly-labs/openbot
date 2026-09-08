@@ -43,6 +43,7 @@ import { isRecord } from "./protocol";
 
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
 interface StoredMessage {
+  groupId?: string;
   id: string;
   sender:
     | { kind: "user" }
@@ -85,6 +86,7 @@ interface StoredReaction {
 }
 
 interface EnqueueInput {
+  groupId?: string;
   sender: StoredMessage["sender"];
   recipientAgentIds: string[];
   text: string;
@@ -191,6 +193,12 @@ export class MailboxStore {
     return this.#deliveryGate.prepare(agentIds);
   }
 
+  deliveryForKey(key: string): DeliveryContext | null {
+    const messageId = this.#state.idempotency[key];
+    const delivery = this.#state.deliveries.find((item) => item.messageId === messageId);
+    return delivery ? this.#context(delivery) : null;
+  }
+
   async enqueue(input: EnqueueInput): Promise<QueuedMessageReceipt> {
     if (input.idempotencyKey) {
       const existingMessageId = this.#state.idempotency[input.idempotencyKey];
@@ -245,6 +253,7 @@ export class MailboxStore {
     }
     const committedByDraftId = new Map(drafts.map((draft, index) => [draft.id, attachments[index]] as const));
     const message: StoredMessage = {
+      groupId: input.groupId,
       id: messageId,
       sender: input.sender,
       text: rewriteAttachmentReferences(text, (reference) => {
@@ -292,11 +301,14 @@ export class MailboxStore {
   }
 
   listQueue(agentId: string): QueueSnapshot {
+    const groupMessageIds = new Set(
+      this.#state.messages.filter((message) => message.groupId).map((message) => message.id),
+    );
     const positions = this.#queuedPositions();
     return {
       agentId,
       deliveries: this.#state.deliveries
-        .filter((delivery) => delivery.recipientAgentId === agentId)
+        .filter((delivery) => delivery.recipientAgentId === agentId && !groupMessageIds.has(delivery.messageId))
         .map((delivery) => this.#publicDelivery(delivery, positions)),
     };
   }
@@ -353,6 +365,7 @@ export class MailboxStore {
       deliveriesByMessage.set(delivery.messageId, deliveries);
     }
     for (const message of this.#state.messages) {
+      if (message.groupId) continue;
       const deliveries = deliveriesByMessage.get(message.id) ?? [];
       if (message.sender.kind === "agent" && message.sender.agentId === agentId) {
         messages.push({
@@ -1198,6 +1211,7 @@ function isStoredDraft(value: unknown): value is StoredDraft {
 function isStoredMessage(value: unknown): value is StoredMessage {
   return (
     isRecord(value) &&
+    (value.groupId === undefined || isString(value.groupId)) &&
     isString(value.id) &&
     isRecord(value.sender) &&
     (value.sender.kind === "user" ||

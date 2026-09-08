@@ -27,6 +27,7 @@ import {
   TEAM_CURRENT_CAPABILITIES,
   type TeamCurrentCapability,
 } from "@openbot/contracts/team-protocol/current";
+import { groupEvent, groupResponse, isGroupRoute } from "@openbot/contracts/team-protocol/groups-v1";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_PROTOCOL_V1,
@@ -63,6 +64,7 @@ import { routeAgents } from "./team-api/route-agents";
 import { routeBrowser } from "./team-api/route-browser";
 import { routeDirect } from "./team-api/route-direct";
 import { routeFiles } from "./team-api/route-files";
+import { routeGroups } from "./team-api/route-groups";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
 import { routeTeam } from "./team-api/route-team";
 import { TeamStoreError } from "./team-store";
@@ -500,6 +502,7 @@ export class TeamApiServer {
       if ((await this.#routeDirect(context)) === "handled") return;
       if ((await this.#routeBrowser(context)) === "handled") return;
       if ((await this.#routeFiles(context)) === "handled") return;
+      if ((await routeGroups(context, this.#options.groups)) === "handled") return;
       if ((await this.#routeAgents(context)) === "handled") return;
 
       // The only 404 in the Team API.
@@ -607,7 +610,10 @@ export class TeamApiServer {
         continue;
       }
       let outgoing: string;
-      if (event.type === "conversation" && supportsRuntimeSnapshots) {
+      if (event.type === "groups-changed") {
+        if (!connection.capabilities.has("group-chats-v1")) continue;
+        outgoing = JSON.stringify(groupEvent(event));
+      } else if (event.type === "conversation" && supportsRuntimeSnapshots) {
         conversationInvalidation ??=
           encodeTeamProtocolV1CurrentEvent({
             type: "conversation-invalidated",
@@ -984,8 +990,9 @@ export class TeamApiServer {
     // the headers already sent that throw could neither answer the caller nor end the request: it
     // surfaced as a hung socket and an `ERR_HTTP_HEADERS_SENT` rejection out of `#handle`'s own
     // error path. Encoding first lets that failure become the 500 the caller can read.
-    const body =
-      route.protocol === TEAM_PROTOCOL_V3
+    const body = isGroupRoute(route.path)
+      ? JSON.stringify(groupResponse(route.path, status, value))
+      : route.protocol === TEAM_PROTOCOL_V3
         ? encodeTeamProtocolV3CurrentHttpResponse(route.method, route.path, status, value, options)
         : encodeTeamProtocolV1CurrentHttpResponse(route.method, route.path, status, value, options);
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
@@ -997,7 +1004,9 @@ export class TeamApiServer {
     return {
       appVersion: this.#options.appVersion ?? "0.0.0",
       protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V3 },
-      capabilities: [...TEAM_CURRENT_CAPABILITIES],
+      capabilities: TEAM_CURRENT_CAPABILITIES.filter(
+        (capability) => capability !== "group-chats-v1" || this.#options.groups !== undefined,
+      ),
     };
   }
 

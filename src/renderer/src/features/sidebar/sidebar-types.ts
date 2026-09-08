@@ -5,6 +5,7 @@ import type {
   SidebarLayoutSnapshot,
   TeamPresenceMember,
 } from "@openbot/contracts/ipc";
+import type { JSX } from "@solidjs/web";
 import type { AgentProfile } from "../../data";
 import type { SidebarPinnedItem } from "./sidebar-pins";
 
@@ -16,6 +17,11 @@ import type { SidebarPinnedItem } from "./sidebar-pins";
  * view to borrow a name.
  */
 export interface SidebarProps {
+  groups?: JSX.Element;
+  hasGroups?: boolean;
+  showingArchivedGroups?: boolean;
+  onToggleArchivedGroups?: () => void;
+  onCreateGroup?: () => void;
   serverName: string;
   onOpenServerSettings: (trigger: HTMLElement) => void;
   agents: AgentProfile[];

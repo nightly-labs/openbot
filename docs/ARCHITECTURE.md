@@ -406,3 +406,57 @@ Settings starts the shared renderer runtime store. An explicit update opens one 
 revisioned snapshots move it through progress, failure, retry, and completion. Closing the
 notification does not cancel the download, and later reports do not reopen it. Fresh provider
 downloads retain their existing flow. These actions apply only to the local desktop host.
+
+## Shared desktop group chats
+
+Groups are separate from sidebar sections. A group has one host, a purpose, participating agents,
+a selected lead, and linked agent conversations. Agent membership selects who can receive work.
+It does not restrict human access: each authenticated server member can read and use its groups.
+The Electron app provides the group interface. A creation dialog provides member search and optional
+coordination settings. The chat shows each author and keeps details, settings, and task controls in
+a side panel. The mobile interface is unchanged.
+
+`GroupStore` stores the canonical transcript, group configuration, tasks, assignments, summaries,
+execution threads, and human read positions in SQLite. Migration 15 adds these projections without
+changing existing agent data. Group commands use the orchestration log and command receipts.
+Messages have stable IDs and per-group sequences. A group projection can be rebuilt from its events.
+Archiving stops group work and retains its records. Restore makes the chat available again; paused
+work requires Resume. Neither action removes agents or linked conversations.
+
+Each group-agent pair has a separate execution thread in `projection_threads`. The normal agent
+thread is never replaced. Provider sessions, turns, questions, approvals, attachments, compaction,
+and restart recovery use the explicit execution thread. These internal execution records do not
+create extra navigation entries. The per-agent drain scheduler remains the authority for work.
+
+`GroupService` selects one owner. A selected recipient has priority, followed by the task attached
+to a reply and a clear follow-up to the sole open task. Other requests use the lead's provider,
+model, and reasoning setting in a separate session with no work tools. Invalid or stale routing
+cannot broadcast a request. Routing can select an existing task, ask a question, or indicate that
+no work is needed.
+
+Group tools retrieve history, assign a child task, transfer ownership, and report results. The
+runtime supplies group and caller identity. A child keeps its parent owner; a transfer changes it.
+Only assignments and awaited results start turns. Completed child results are combined before the
+owner returns. The limit is eight automatic assignments per root request and two active assignments
+per group. One agent runs at most one work turn across all chats. Declared workspace and browser
+resources are serialized; undeclared resources reserve the host. These controls do not restrict
+provider process privileges.
+
+Each turn receives bounded group context: purpose, responsibilities, the current request, source
+messages and replies, shared decisions, recent messages, and attachment references. A versioned
+summary covers older messages, with a sequence and source IDs. Full messages remain retrievable.
+The provider acceptance cursor records context delivery. Context packets remain self-contained so
+provider replacement or compaction does not remove shared decisions. Unrelated server conversations
+are available through paginated retrieval and are not inserted automatically. Agent memories keep
+their existing meaning.
+
+Task revisions prevent an old assignment from completing a corrected request. Stop pauses a task
+and its descendants and interrupts active work. Reassign waits for the old assignment to finish
+stopping. Restart recovery checks accepted provider work before retrying. Unknown outcomes require
+attention. Command, assignment, and result IDs prevent duplicate dispatch and visible results;
+external side effects do not have an exactly-once guarantee.
+
+Desktop IPC and remote desktop transports expose `group-chats-v1` as an optional capability with
+separate payload codecs. Released Team API adapters keep their existing meaning. A host advertises
+the capability only when its group service is connected. Unsupported remote hosts show an explanation
+in place of group controls. The account API and Signal service add no group storage or routing.

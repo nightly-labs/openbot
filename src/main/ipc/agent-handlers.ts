@@ -1,9 +1,15 @@
 import {
   decodeAgentProfileDraft,
+  decodeGroup,
+  decodeGroupPage,
+  decodeGroupSummaries,
   decodeSaveAgentProfileResult,
   parseGenerateAgentProfile,
+  parseGroupCommand,
+  parseGroupRead,
   parseSaveAgentProfile,
 } from "@openbot/contracts/ipc";
+import { GROUP_ROUTES } from "@openbot/contracts/team-protocol/groups-v1";
 // An agent's core surface: status, agents, conversations, the queue and the prompts
 // a turn can raise. Memories, routines and attachments are their own registrars.
 // Every one of these routes to the local service or to a remote server by the
@@ -118,6 +124,28 @@ export function agentIpcHandlers({
               ?.compatibility?.capabilities.includes("installed-skills")
               ? remoteServers.request(serverId, TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkillsFromHost)
               : Promise.resolve([]),
+        });
+      }),
+      listGroups: payloadHandler(parseAgentRequest, (scoped) =>
+        routeToServer(scoped.serverId, {
+          local: () => service.groups.store.list(host.groupActor().id),
+          remote: (serverId) => remoteServers.request(serverId, GROUP_ROUTES.list, decodeGroupSummaries),
+        }),
+      ),
+      readGroup: payloadHandler(parseAgentRequest, (scoped) => {
+        const input = parseGroupRead(scoped.payload);
+        return routeToServer(scoped.serverId, {
+          local: () => service.groups.store.page(input.groupId, input.beforeSequence),
+          remote: (serverId) =>
+            remoteServers.request(serverId, GROUP_ROUTES.read, decodeGroupPage, { method: "POST", body: input }),
+        });
+      }),
+      groupCommand: payloadHandler(parseAgentRequest, (scoped) => {
+        const input = parseGroupCommand(scoped.payload);
+        return routeToServer(scoped.serverId, {
+          local: () => service.groups.command(input, host.groupActor()),
+          remote: (serverId) =>
+            remoteServers.request(serverId, GROUP_ROUTES.command, decodeGroup, { method: "POST", body: input }),
         });
       }),
       getSidebarLayout: payloadHandler(parseAgentRequest, (parsed): Promise<SidebarLayoutSnapshot> => {
