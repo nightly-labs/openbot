@@ -158,24 +158,27 @@
   margin-bottom: var(--openbot-space-4);
 }
 
+/* One line, never two. A wrapped second row put two entries under five and read as a
+   second, more important group; the entries are a tail of decreasing interest instead, so
+   a panel too narrow to hold them all drops the last ones rather than rewrapping. */
 .agent-usage-totals {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--openbot-space-6);
+  display: flex;
+  flex-wrap: nowrap;
+  gap: calc(var(--openbot-space-6) * 2);
   margin-top: var(--openbot-space-4);
+  overflow: hidden;
 }
 .agent-usage-totals dt {
   font-size: var(--openbot-text-sm);
   color: var(--openbot-text-muted);
-  margin-bottom: var(--openbot-space-2);
-  /* The longest label wraps to a second line, and the reserved height is what keeps its
-     number on the same baseline as the labels beside it that fit on one. */
-  min-height: 2lh;
+  margin-bottom: var(--openbot-space-1);
+  white-space: nowrap;
 }
 .agent-usage-totals dd {
   margin: 0;
-  font-size: var(--openbot-text-3xl);
+  font-size: var(--openbot-text-xl);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .agent-usage-table {
   overflow-x: auto;
@@ -266,8 +269,32 @@
     padding: var(--openbot-space-8) calc(var(--openbot-space-6) * 2);
     gap: calc(var(--openbot-space-6) * 2);
   }
-  .agent-usage-totals {
-    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+}
+/* The drop order is the reading order reversed: message counts go before token
+   categories, and the processed total is the one entry that always stays. */
+@container (max-width: 1000px) {
+  .agent-usage-totals > div:nth-child(n + 7) {
+    display: none;
+  }
+}
+@container (max-width: 820px) {
+  .agent-usage-totals > div:nth-child(n + 6) {
+    display: none;
+  }
+}
+@container (max-width: 660px) {
+  .agent-usage-totals > div:nth-child(n + 5) {
+    display: none;
+  }
+}
+@container (max-width: 540px) {
+  .agent-usage-totals > div:nth-child(n + 4) {
+    display: none;
+  }
+}
+@container (max-width: 400px) {
+  .agent-usage-totals > div:nth-child(n + 3) {
+    display: none;
   }
 }
 @container (max-width: 480px) {
