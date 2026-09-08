@@ -186,7 +186,7 @@
 
 .server-settings-invite-composer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 112px 104px;
+  grid-template-columns: minmax(0, 1fr) 112px auto;
   align-items: start;
   gap: var(--openbot-space-2);
 }
@@ -425,7 +425,8 @@
     grid-template-columns: minmax(0, 1fr) 118px;
   }
 
-  .server-settings-invite-composer > .ui-button {
+  .server-settings-invite-composer > .ui-button,
+  .server-settings-invite-share {
     grid-column: 1 / -1;
   }
 
@@ -470,7 +471,8 @@
   }
 
   .server-settings-role-select,
-  .server-settings-invite-composer > .ui-button {
+  .server-settings-invite-composer > .ui-button,
+  .server-settings-invite-share {
     width: 100%;
     grid-column: 1;
   }
@@ -479,6 +481,40 @@
 @media (prefers-reduced-motion: reduce) {
   .server-settings-confirm-backdrop,
   .server-settings-confirm-dialog {
+    animation: none;
+  }
+}
+
+.server-settings-invite-share {
+  display: flex;
+  gap: var(--openbot-space-1);
+}
+
+.server-settings-invite-share > .ui-button:last-child {
+  animation: server-settings-invite-qr-in var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+@keyframes server-settings-invite-qr-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(-1 * var(--openbot-space-4)));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.server-settings-invite-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .server-settings-invite-share > .ui-button:last-child {
     animation: none;
   }
 }

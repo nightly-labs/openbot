@@ -144,9 +144,11 @@ interface PeerState {
   connectedResolve: (() => void) | null;
   connectedReject: ((error: Error) => void) | null;
   connectedTimer: ReturnType<typeof setTimeout> | null;
+  disconnectedTimer: ReturnType<typeof setTimeout> | null;
 }
 
 const CHANNELS: ChannelKind[] = ["rpc", "events", "files", "desktop"];
+const DISCONNECT_GRACE_MS = 5_000;
 const REQUEST_TIMEOUT_MS = 10 * 60_000 + 30_000;
 
 export function createRemoteTeamPeer(actions: ActionsRef) {
@@ -171,6 +173,8 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
         state.reconnectTimer = null;
         state.turnRefreshTimer = null;
+        rejectRequests(new Error("The app is in the background."));
+        if (!state.authenticated) failPeer(state, new Error("The app is in the background."), actions);
       } else {
         if (!isPeerOnline(state)) {
           failPeer(state, new Error("The desktop connection needs to be restored."), actions);
@@ -273,6 +277,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       connectedResolve: null,
       connectedReject: null,
       connectedTimer: null,
+      disconnectedTimer: null,
     };
     peer = state;
     const connected = new Promise<void>((resolve, reject) => {
@@ -429,8 +434,21 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       if (kind) bindChannel(state, kind, event.channel, actions);
     };
     connection.onconnectionstatechange = () => {
-      if (state.connection !== connection) return;
-      if (["disconnected", "failed", "closed"].includes(connection.connectionState)) {
+      if (state.connection !== connection || state.closed || peer !== state) return;
+      if (connection.connectionState === "disconnected") {
+        // ICE can recover a short network interruption without replacing the authenticated session.
+        state.disconnectedTimer ??= setTimeout(() => {
+          state.disconnectedTimer = null;
+          if (connection.connectionState !== "connected")
+            failPeer(state, new Error("The desktop went offline."), actions);
+        }, DISCONNECT_GRACE_MS);
+        return;
+      }
+      if (connection.connectionState === "connected" && state.disconnectedTimer !== null) {
+        clearTimeout(state.disconnectedTimer);
+        state.disconnectedTimer = null;
+      }
+      if (connection.connectionState === "failed" || connection.connectionState === "closed") {
         failPeer(state, new Error("The desktop went offline."), actions);
       }
     };
@@ -753,6 +771,14 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     void closePeer(actions.current.endSession);
   }
 
+  function rejectRequests(error: Error): void {
+    for (const pending of pendingRequests.values()) {
+      clearTimeout(pending.timer);
+      pending.reject(error);
+    }
+    pendingRequests.clear();
+  }
+
   async function closePeer(endSession: (sessionId: string) => Promise<void>): Promise<void> {
     const state = peer;
     peer = null;
@@ -762,15 +788,12 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
     if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
     if (state.connectedTimer !== null) clearTimeout(state.connectedTimer);
+    if (state.disconnectedTimer !== null) clearTimeout(state.disconnectedTimer);
     state.socket?.close();
     state.connection?.close();
     for (const decoder of Object.values(state.decoders)) decoder?.reset();
     state.channelChains = {};
-    for (const [requestId, pending] of pendingRequests) {
-      clearTimeout(pending.timer);
-      pendingRequests.delete(requestId);
-      pending.reject(new Error("The server disconnected."));
-    }
+    rejectRequests(new Error("The server disconnected."));
     rejectConnection(state, new Error("The server disconnected."));
     const cleanup = (closingSessions.get(state.hostId) ?? Promise.resolve())
       .then(() => endSession(state.sessionId))

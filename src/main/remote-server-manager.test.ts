@@ -303,6 +303,7 @@ describe("remote server links", () => {
     const request = vi
       .spyOn(transport, "request")
       .mockImplementation(async (_hostId, path): Promise<TeamProtocolV2Json> => {
+        if (path === "/v1/agents") return [];
         if (path === "/v1/compatibility") {
           return {
             appVersion: "0.4.0",
@@ -342,7 +343,10 @@ describe("remote server links", () => {
           .map((server) => server.id),
       ).toEqual([betaId, alphaId, gammaId]);
       expect(manager.list().find((server) => server.id === betaId)?.remoteDesktopAvailable).toBe(false);
+      const roster = vi.fn();
+      manager.on("agent", roster);
       transport.emit("connected", betaId);
+      await vi.waitFor(() => expect(roster).toHaveBeenCalledWith(betaId, { type: "agents-changed", agents: [] }));
       await vi.waitFor(() =>
         expect(manager.list().find((server) => server.id === betaId)?.remoteDesktopAvailable).toBe(true),
       );

@@ -75,6 +75,12 @@ into drain and waits for the allocations to finish. A single coturn instance is 
 failure. Forcing a coturn restart ends active relay sessions. The client performs an ICE restart and resumes
 a file transfer from the last acknowledged offset once the service is back.
 
-The first version supports one active logical client session per host. Reconnecting the same session replaces
-the old Signal socket. A second session gets a `host_busy` error and can retry once the first session has
-ended.
+Current desktop hosts register with multiplex support and accept separate authenticated device sessions.
+Reconnecting the same device session replaces only its old Signal socket. Legacy hosts without multiplex
+support still return `host_busy` for a second session.
+
+A desktop package does not deploy Signal or the account Worker. Multi-device connections also require the
+current Signal service, the account Worker, and D1 migration `0018_remote_device_sessions.sql`. That migration
+replaces the account-wide active-session index with a device-scoped index. Apply migrations before deploying
+the Worker, as the normal account deployment does. Update the `remote-api` service on the production Linux
+host; rebuilding the desktop or a local Docker service does not update the production Signal service.

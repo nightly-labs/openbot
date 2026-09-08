@@ -11,7 +11,13 @@ import {
 afterEach(() => vi.useRealTimers());
 
 describe("remote connection recovery", () => {
-  it("keeps a safe failure reason visible through retries and clears it when connected", async () => {
+  it.each([
+    "The host already has an active remote session.",
+    "Too many active remote connections.",
+    "The server request failed.",
+    "The remote session is not active.",
+    "The account session has ended.",
+  ])("keeps safe failure %s visible through retries and clears it when connected", async (reason) => {
     vi.useFakeTimers();
     let failure: string | null = null;
     let message: string | null = null;
@@ -26,10 +32,10 @@ describe("remote connection recovery", () => {
     );
     recovery.setActive(true);
     await vi.advanceTimersByTimeAsync(0);
-    recovery.offline(new Error("The host already has an active remote session."));
-    expect(message).toContain("Connecting to the desktop: The host already has an active remote session.");
+    recovery.offline(new Error(reason));
+    expect(message).toContain(`Connecting to the desktop: ${reason}`);
     await vi.advanceTimersByTimeAsync(1_000);
-    expect(message).toContain("Connecting to the desktop: The host already has an active remote session.");
+    expect(message).toContain(`Connecting to the desktop: ${reason}`);
     await vi.advanceTimersByTimeAsync(9_000);
     expect(message).toBeNull();
     recovery.dispose();
@@ -105,7 +111,6 @@ describe("remote connection recovery", () => {
     expect(attempts).toBe(5);
     desktopOnline = true;
     recovery.setActive(true);
-    recovery.refresh();
     recovery.offline();
     expect(messages.at(-1)).toBe("Connection failed after 5 attempts. Retrying in 1:00.");
     await vi.advanceTimersByTimeAsync(59_999);
@@ -161,6 +166,58 @@ describe("remote connection recovery", () => {
     recovery.dispose();
   });
 
+  it("retries immediately on manual refresh without overlapping a pending attempt", async () => {
+    vi.useFakeTimers();
+    let rejectInitial = (_error: Error) => {};
+    const initial = new Promise<void>((_resolve, reject) => {
+      rejectInitial = reject;
+    });
+    let attempts = 0;
+    let phase = "";
+    const controller = createRemoteConnectionRecovery(
+      async () => {
+        attempts += 1;
+        if (attempts === 1) await initial;
+        if (attempts < 3) throw new Error("Offline");
+      },
+      () => {},
+      (status) => {
+        phase = status.phase;
+      },
+    );
+    controller.setActive(true);
+    controller.refresh();
+    rejectInitial(new Error("Offline"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect({ attempts, phase }).toEqual({ attempts: 2, phase: "waiting" });
+    controller.refresh();
+    await vi.advanceTimersByTimeAsync(0);
+    expect({ attempts, phase }).toEqual({ attempts: 3, phase: "online" });
+    controller.dispose();
+  });
+
+  it("does not report online when a suspended in-flight attempt finishes", async () => {
+    vi.useFakeTimers();
+    let resolveConnection = () => {};
+    const connection = new Promise<void>((resolve) => {
+      resolveConnection = resolve;
+    });
+    let phase = "";
+    const controller = createRemoteConnectionRecovery(
+      () => connection,
+      () => {},
+      (status) => {
+        phase = status.phase;
+      },
+    );
+    controller.setActive(true);
+    controller.suspend();
+    resolveConnection();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(phase).toBe("suspended");
+    controller.dispose();
+  });
+
   it("does not overlap connection attempts and ignores a disposed server", async () => {
     vi.useFakeTimers();
     let resolve = () => {};
@@ -178,7 +235,6 @@ describe("remote connection recovery", () => {
     recovery.setActive(true);
     recovery.offline();
     recovery.offline();
-    recovery.refresh();
     await vi.advanceTimersByTimeAsync(180_000);
     expect(attempts).toBe(1);
     resolve();
@@ -218,7 +274,6 @@ describe("remote connection recovery", () => {
     recovery.offline();
     expect(message).toBe("Connection failed after 5 attempts. Retrying in 2:00.");
     recovery.offline();
-    recovery.refresh();
     await vi.advanceTimersByTimeAsync(1_000);
     expect(message).toBe("Connection failed after 5 attempts. Retrying in 1:59.");
     rejectFifth(new Error("Connection command finished cleaning up"));

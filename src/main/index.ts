@@ -2,6 +2,7 @@ import { join, resolve } from "node:path";
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
 import { type CentralAuthState, IPC_CHANNELS } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
 import { app, type BrowserWindow, dialog, powerMonitor, protocol, screen } from "electron";
 import { readAppVariant, resolveAppIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
@@ -553,6 +554,20 @@ if (!hasSingleInstanceLock) {
       }
       void built.agentInitialization.start().catch((error) => {
         logger.error("Unable to initialize the local agent backend:", toLogValue(error));
+      });
+
+      const directoryRefresh = createRemoteDirectoryRefresh(() => {
+        const generation = centralAuthGeneration;
+        remoteAccountSync = remoteAccountSync
+          .then(async () => {
+            if (generation !== centralAuthGeneration || built.centralAuth.getState().status !== "signed_in") return;
+            await remoteServers.syncRemoteHosts();
+          })
+          .catch((error) => logger.error("Unable to refresh joined servers:", toLogValue(error)));
+        return remoteAccountSync;
+      });
+      app.on("browser-window-focus", (_event, window) => {
+        if (window === windowHolder.current) void directoryRefresh.refresh();
       });
 
       app.on("activate", () => {

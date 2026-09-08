@@ -89,10 +89,10 @@ export function ServerDrawerContent({
               accessibilityState={{ selected }}
               accessibilityLabel={`${serverItem.name}, ${serverLabel}, ${serverStatusLabel(serverItem)}`}
               accessibilityActions={
-                serverItem.kind === "remote" ? [{ name: "leave", label: "Leave server" }] : undefined
+                serverItem.role !== "owner" ? [{ name: "leave", label: "Leave server" }] : undefined
               }
               onAccessibilityAction={(event) => {
-                if (event.nativeEvent.actionName === "leave" && serverItem.kind === "remote") confirmLeave(serverItem);
+                if (event.nativeEvent.actionName === "leave" && serverItem.role !== "owner") confirmLeave(serverItem);
               }}
               className="min-h-16 flex-row items-center gap-3 rounded-2xl px-3 py-2"
               onPress={() => onSelectServer(serverItem.id)}
@@ -125,7 +125,7 @@ export function ServerDrawerContent({
               </View>
             </Pressable>
           );
-          return serverItem.kind === "remote" ? (
+          return serverItem.role !== "owner" ? (
             <MenuView
               key={serverItem.id}
               shouldOpenOnLongPress

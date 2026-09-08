@@ -80,6 +80,7 @@ function AuthenticatedStack() {
             title: "Edit agent",
           }}
         />
+        <Stack.Screen name="scan-invite" options={{ title: "Scan invitation", presentation: "fullScreenModal" }} />
         <Stack.Screen
           name="add-server"
           options={{

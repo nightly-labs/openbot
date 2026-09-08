@@ -67,10 +67,15 @@ export function ConnectionSettingsScreen() {
         </SettingsRow>
         {error || serverDirectoryError ? <SettingsNote>{error || serverDirectoryError}</SettingsNote> : null}
       </SettingsSection>
-      {servers
-        .filter((server) => server.kind === "remote")
-        .map((server) => (
-          <SettingsSection key={server.id} title={server.name}>
+      {servers.map((server) => (
+        <SettingsSection key={server.id} title={server.name}>
+          {server.connectionMessage ? <SettingsNote>{server.connectionMessage}</SettingsNote> : null}
+          <SettingsRow
+            onPress={() => router.push({ pathname: "/settings/server-members", params: { serverId: server.id } })}
+          >
+            <Typography.Paragraph type="body-sm">Members</Typography.Paragraph>
+          </SettingsRow>
+          {server.role !== "owner" ? (
             <SettingsRow
               disclosure={false}
               disabled={busy}
@@ -89,8 +94,9 @@ export function ConnectionSettingsScreen() {
                 Leave server
               </Typography.Paragraph>
             </SettingsRow>
-          </SettingsSection>
-        ))}
+          ) : null}
+        </SettingsSection>
+      ))}
     </SettingsContent>
   );
 }

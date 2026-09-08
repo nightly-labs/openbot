@@ -1,7 +1,7 @@
 import { createInviteUrl } from "@openbot/contracts/invite-links";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { type RemoteHostKeyStore, RemoteTeamDirectoryClient } from "./remote-directory";
+import { createRemoteDirectoryRefresh, type RemoteHostKeyStore, RemoteTeamDirectoryClient } from "./remote-directory";
 
 const API_URL = "https://api.openbot.run";
 const HOST_ID = "11111111-1111-4111-8111-111111111111";
@@ -318,5 +318,91 @@ describe("RemoteTeamDirectoryClient", () => {
       await expect(client.acceptInvite(INVITE)).rejects.toThrow(pinned ? "conflicts" : "Keychain locked");
       expect(paths).toEqual(["/v2/remote/invites/preview"]);
     }
+  });
+});
+
+describe("mobile member management", () => {
+  it("uses the account API for member actions even while the desktop is offline", async () => {
+    const requests: Array<{ path: string; method: string; body: string | null }> = [];
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "mobile-session",
+      fetch: async (url, init) => {
+        requests.push({
+          path: new URL(url.toString()).pathname,
+          method: init?.method ?? "GET",
+          body: typeof init?.body === "string" ? init.body : null,
+        });
+        return new Response(null, { status: 204 });
+      },
+    });
+    await client.updateMember(HOST_ID, "member/id", "admin");
+    await client.updateMember(HOST_ID, "member/id", "member", true);
+    await client.leaveHost(HOST_ID, "member/id");
+    await client.revokeInvite("invite/id");
+    expect(requests).toEqual([
+      { path: `/v2/remote/hosts/${HOST_ID}/members/member%2Fid`, method: "PATCH", body: '{"role":"admin"}' },
+      {
+        path: `/v2/remote/hosts/${HOST_ID}/members/member%2Fid`,
+        method: "PATCH",
+        body: '{"role":"member","reactivate":true}',
+      },
+      { path: `/v2/remote/hosts/${HOST_ID}/members/member%2Fid`, method: "DELETE", body: null },
+      { path: "/v2/remote/invites/invite%2Fid", method: "DELETE", body: null },
+    ]);
+  });
+
+  it("creates a shareable invitation bound to the selected host key", async () => {
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "mobile-session",
+      fetch: async () => Response.json({ inviteId: "invite-1", token: "t".repeat(32), expiresAt: 1234 }),
+    });
+    expect(await client.createInvite({ hostId: HOST_ID, devicePublicKey: HOST_KEY }, { role: "member" })).toEqual({
+      inviteId: "invite-1",
+      inviteUrl: INVITE,
+      expiresAt: 1234,
+    });
+  });
+
+  it("returns member and invitation data and preserves permission failures", async () => {
+    const member = {
+      membershipId: "member-1",
+      email: "member@example.com",
+      name: null,
+      role: "member",
+      status: "revoked",
+    };
+    const invite = { inviteId: "invite-1", email: null, role: "admin", expiresAt: 1234, usedAt: null, revokedAt: null };
+    let denied = false;
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "mobile-session",
+      fetch: async (url) =>
+        denied
+          ? Response.json({ error: "Owner access required." }, { status: 403 })
+          : Response.json(url.toString().endsWith("members/") ? { members: [member] } : { invites: [invite] }),
+    });
+    const result = [await client.listMembers(HOST_ID), await client.listInvites(HOST_ID)];
+    expect(result).toEqual([[member], [invite]]);
+    denied = true;
+    await expect(client.updateMember(HOST_ID, "member-1", "admin")).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("directory refresh", () => {
+  it("coalesces simultaneous requests and limits automatic refreshes, including failures", async () => {
+    let now = 0;
+    const load = vi.fn(async () => {
+      throw new Error("Offline");
+    });
+    const refresh = createRemoteDirectoryRefresh(load, () => now);
+    await Promise.allSettled([refresh.refresh(), refresh.refresh(), refresh.refresh(true)]);
+    now = 29_999;
+    await refresh.refresh().catch(() => undefined);
+    now = 30_000;
+    await refresh.refresh().catch(() => undefined);
+    await refresh.refresh(true).catch(() => undefined);
+    expect(load).toHaveBeenCalledTimes(3);
   });
 });

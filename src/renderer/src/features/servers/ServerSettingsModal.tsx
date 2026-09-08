@@ -42,7 +42,9 @@ import {
   Monitor,
   Pause,
   Play,
+  QrCode,
   RefreshCw,
+  ScanLine,
   Search,
   Select,
   SelectContent,
@@ -123,6 +125,7 @@ interface InvitePanel {
   link: string;
   mode: InviteMode;
   result: InviteSummary | null;
+  showQr: boolean;
   role: InviteRole;
 }
 
@@ -156,7 +159,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       savedLogoUrl: null,
       savedName: "",
     },
-    invite: { email: "", emailError: null, link: "", mode: "email", result: null, role: "member" },
+    invite: { email: "", emailError: null, link: "", mode: "email", result: null, showQr: false, role: "member" },
     members: { removeId: null, search: "" },
   });
   const [section, setSection] = createSignal<Section>("general");
@@ -233,6 +236,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           state.identity.nameTouched = false;
           state.identity.nameShaking = false;
           state.invite.result = null;
+          state.invite.showQr = false;
           state.members.search = "";
         });
         resetInviteLink();
@@ -459,6 +463,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       setPanels((state) => {
         state.invite.mode = value;
         state.invite.result = null;
+        state.invite.showQr = false;
         state.invite.emailError = null;
       });
       resetInviteLink();
@@ -972,18 +977,43 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 }
               >
                 {(result) => (
-                  <CopyButton
-                    class="server-settings-invite-copy"
-                    value={result().inviteUrl}
-                    label="Copy link"
-                    copiedLabel="Copied"
-                    size="sm"
-                    variant="default"
-                    onCopyError={showCopyError}
-                  />
+                  <div class="server-settings-invite-share">
+                    <CopyButton
+                      class="server-settings-invite-copy"
+                      value={result().inviteUrl}
+                      label="Copy link"
+                      copiedLabel="Copied"
+                      size="sm"
+                      variant="default"
+                      onCopyError={showCopyError}
+                    />
+                    <Button
+                      size="icon-sm"
+                      variant="default"
+                      aria-label="Show invitation QR code"
+                      aria-expanded={panels.invite.showQr ? "true" : "false"}
+                      onClick={() =>
+                        setPanels((state) => {
+                          state.invite.showQr = !state.invite.showQr;
+                        })
+                      }
+                    >
+                      <ScanLine />
+                    </Button>
+                  </div>
                 )}
               </Show>
             </div>
+            <Show when={panels.invite.showQr && panels.invite.mode === "link" && panels.invite.result}>
+              {(result) => (
+                <div class="server-settings-invite-qr">
+                  <QrCode value={result().inviteUrl} label="Invitation QR code" />
+                  <Text variant="caption" tone="muted">
+                    Scan this code in OpenBot Mobile to join this server.
+                  </Text>
+                </div>
+              )}
+            </Show>
             <Show when={panels.invite.result?.email ? panels.invite.result : null}>
               {(result) => (
                 <Alert class="server-settings-invite-result" tone="success" role="status">

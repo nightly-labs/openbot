@@ -213,13 +213,16 @@ In Expo Go, an Expo DOM component owns the browser `RTCPeerConnection` inside a 
 passes only serializable, validated commands and events to the native React UI; no native WebRTC
 module or development build is required.
 Mobile server labels in the drawer and connection settings describe the authenticated application
-connection, not membership or Signal presence. Only the selected server has a live connection;
-unselected/unobserved servers show Unknown. Switching servers or backgrounding clears the previous
-status. Connecting becomes Online after compatibility and workspace synchronization succeed;
+connection, not membership or Signal presence. Each membership has its own transport and recovery controller while mobile is active.
+Switching servers changes the visible workspace without closing other connections. Backgrounding
+clears observed status to Not connected and pauses recovery. Only the paired desktop is Local;
+other servers are Remote regardless of the account role. Connecting becomes Online after compatibility and workspace synchronization succeed;
 transport failures and reconnect attempts show Offline, and protocol failures show Connection error.
 The existing RTC connection updates and recovery controller are the source of truth; the indicator
 adds no polling or health requests. Foreground resume, invite selection and manual refresh reuse
-that controller. RTC disconnection/failure events clear Online and drive recovery after network loss.
+that controller. A transient RTC disconnected state has a five-second recovery window; failed or closed states
+drive recovery immediately. Backgrounding cancels pending reads so they cannot block resume.
+Explicit refresh bypasses the retry cooldown without overlapping a pending connection attempt.
 The native/DOM mailbox carries concurrent commands by ID. Switching or disconnecting cancels
 pending callers immediately; peer generations reject late callbacks from a superseded host.
 The persisted hosting preference is restored on startup in both the normal desktop and the
@@ -228,6 +231,17 @@ needs the published host. The separate development test-client role never auto-p
 Mobile Connect tickets and QR codes bind the started host ID and SHA-256 public-key fingerprint.
 Mobile verifies that binding at redemption and against the directory, pins the key, and selects
 that host rather than the first account-owned desktop. Legacy unbound QR codes require regeneration.
+Desktop invitation QR codes contain the same one-use link as Copy link. The signed-in mobile
+scanner validates that link and opens the invitation review before acceptance. These codes join
+one server; Mobile Connect codes sign in to the desktop account and select the paired host.
+Both clients read account-wide membership from D1's indexed `remote_memberships` / `remote_hosts`
+join. An offline paired desktop does not remove other memberships, and mobile connects directly
+to each host independently. Desktop window focus and mobile foreground entry refresh the directory at
+most once per 30 seconds, coalescing concurrent requests, without background polling. Explicit
+refresh and completed invitation acceptance can refresh sooner. Mobile member controls use the
+same account endpoints: owners and admins can invite, while only owners can change another
+member's role or revoke/restore access. D1 applies those permissions and invalidates affected
+sessions; member and invitation lists refresh after changes or on explicit request.
 Conversation read cursors belong to a team member and are shared across that member's devices.
 Advancing a cursor emits a conversation invalidation without the reader's identity or cursor;
 clients reload their own read state even when the conversation content revision is unchanged.

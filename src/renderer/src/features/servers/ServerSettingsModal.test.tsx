@@ -396,5 +396,9 @@ describe("ServerSettingsModal", () => {
     await waitFor(() => expect(onCreateInvite).toHaveBeenCalledWith({ role: "member" }));
     expect(await screen.findByRole("button", { name: "Copy link" })).toBeInTheDocument();
     await waitFor(() => expect(inviteLink).toHaveValue("https://studio.example.com/invite/new"));
+    await fireEvent.click(screen.getByRole("button", { name: "Show invitation QR code" }));
+    expect(await screen.findByRole("img", { name: "Invitation QR code" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Show invitation QR code" }));
+    expect(screen.queryByRole("img", { name: "Invitation QR code" })).not.toBeInTheDocument();
   });
 });

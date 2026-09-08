@@ -5,7 +5,7 @@ import type {
   RespondToPromptInput,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
-import type { RemoteRecoveryStatus } from "@openbot/team-client";
+import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { MobileAgentActivities } from "./agent-activity";
 
 export type MobileServerKind = "local" | "remote";
@@ -24,6 +24,7 @@ export interface MobileServer {
   accent: string;
   publicKey: string;
   membershipId: string;
+  role: "owner" | "admin" | "member";
 }
 
 export interface MobileAgent {
@@ -46,6 +47,7 @@ interface AddRemoteServerInput {
 
 export interface MobileWorkspaceContextValue {
   servers: MobileServer[];
+  teamDirectory: RemoteTeamDirectoryClient;
   serverDirectoryState: MobileServerDirectoryState;
   serverDirectoryError: string | null;
   agents: MobileAgent[];

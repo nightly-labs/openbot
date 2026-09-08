@@ -76,6 +76,33 @@ function harness() {
 }
 
 describe("RemoteEventRefresh", () => {
+  it("reloads the roster once after reconnect despite unrelated activity events", async () => {
+    const { refresh, paths, replies, emitted } = harness();
+    const first = refresh.refreshAgentRoster("server");
+    const second = refresh.refreshAgentRoster("server");
+    refresh.forward("server", { type: "usage-changed", usage: { limits: [] } });
+    replies[0]?.resolve([]);
+    await Promise.all([first, second]);
+    expect({ paths, events: emitted.map((entry) => entry.event) }).toEqual({
+      paths: ["/v1/agents"],
+      events: [
+        { type: "usage-changed", usage: { limits: [] } },
+        { type: "agents-changed", agents: [] },
+      ],
+    });
+  });
+
+  it.each(["event", "forget", "clear"] as const)("discards a roster load superseded by %s", async (action) => {
+    const { refresh, replies, emitted } = harness();
+    const pending = refresh.refreshAgentRoster("server");
+    if (action === "event") refresh.forward("server", { type: "agents-changed", agents: [] });
+    else if (action === "forget") refresh.forget("server");
+    else refresh.clear();
+    replies[0]?.resolve([]);
+    await pending;
+    expect(emitted).toHaveLength(action === "event" ? 1 : 0);
+  });
+
   it("holds a burst to one fetch in flight, then refetches once for what arrived during it", async () => {
     const { refresh, paths, replies, emitted, nextRequest, nextEmit } = harness();
 
