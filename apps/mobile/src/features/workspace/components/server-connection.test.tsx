@@ -144,3 +144,43 @@ it("refreshes membership after revocation without waiting for a foreground trans
   );
   expect(refreshMemberships).toHaveBeenCalledTimes(1);
 });
+
+it("retains background failures and defers membership requests and retries until resume", async () => {
+  vi.useFakeTimers();
+  const directory = new RemoteTeamDirectoryClient({ apiUrl: "https://example.com", token: "test", fetch });
+  const memberships = vi.fn(async () => {});
+  const load = vi.fn(async (id: string, key: string, client: RemoteTeamTransportRef) => client.connect(id, key));
+  const register = () => {};
+  const status = vi.fn();
+  const event = () => {};
+  const render = (active: boolean) =>
+    root.render(
+      <ServerConnection
+        hostId="host"
+        publicKey="key"
+        active={active}
+        directory={directory}
+        register={register}
+        load={load}
+        onStatus={status}
+        onTeamEvent={event}
+        onMembershipChanged={memberships}
+      />,
+    );
+  await act(async () => render(true));
+  await act(async () => render(false));
+  await act(async () => render(true));
+  expect(load).toHaveBeenCalledTimes(1);
+  await act(async () => render(false));
+  await act(async () =>
+    endpoints.get("host")?.update({ hostId: "host", state: "offline", code: "session_revoked", message: null }),
+  );
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60_000);
+  });
+  expect(memberships).not.toHaveBeenCalled();
+  await act(async () => render(true));
+  expect(memberships).toHaveBeenCalledTimes(1);
+  expect(load).toHaveBeenCalledTimes(2);
+  expect(status).toHaveBeenLastCalledWith("host", { phase: "online", attempt: 0, remainingSeconds: 0 }, null);
+});

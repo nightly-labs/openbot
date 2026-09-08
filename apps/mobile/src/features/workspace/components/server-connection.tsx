@@ -49,6 +49,7 @@ export function ServerConnection({
   activeRef.current = active;
   const generation = useRef(0);
   const wasOnline = useRef(false);
+  const membershipRefreshPending = useRef(false);
   const attach = useCallback((value: RemoteTeamTransportRef | null) => setClient(value), []);
 
   useEffect(() => {
@@ -69,7 +70,7 @@ export function ServerConnection({
         failure = remoteConnectionFailure(context.stage, error);
       },
       (status) => {
-        if (!activeRef.current || disposed) return;
+        if (disposed) return;
         if (status.phase === "online") failure = null;
         onStatus(hostId, status, failure);
       },
@@ -89,7 +90,11 @@ export function ServerConnection({
   useEffect(() => {
     if (!active) generation.current += 1;
     controller.current?.setActive(active);
-  }, [active]);
+    if (active && membershipRefreshPending.current) {
+      membershipRefreshPending.current = false;
+      void onMembershipChanged?.().catch(() => undefined);
+    }
+  }, [active, onMembershipChanged]);
 
   return (
     <RemoteTeamTransport
@@ -98,11 +103,13 @@ export function ServerConnection({
       directory={directory}
       onTeamEvent={onTeamEvent}
       onConnectionUpdate={(update) => {
-        if (!activeRef.current || update.hostId !== hostId) return;
+        if (update.hostId !== hostId) return;
         if (update.state === "online") wasOnline.current = true;
         if (update.state === "offline") {
-          if (update.code === "session_revoked" || wasOnline.current)
-            void onMembershipChanged?.().catch(() => undefined);
+          if (update.code === "session_revoked" || wasOnline.current) {
+            if (activeRef.current) void onMembershipChanged?.().catch(() => undefined);
+            else membershipRefreshPending.current = true;
+          }
           wasOnline.current = false;
           const error = new Error(update.message ?? "The desktop went offline.");
           if (update.code === "protocol_error") controller.current?.suspend(error);

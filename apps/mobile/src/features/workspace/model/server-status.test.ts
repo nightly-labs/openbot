@@ -1,12 +1,6 @@
 import { createRemoteConnectionRecovery, REMOTE_RETRY_INTERVAL_MS } from "@openbot/team-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  applyServerFailure,
-  applyServerRecovery,
-  resetServerStatus,
-  serverKind,
-  serverStatusLabel,
-} from "./server-status";
+import { applyServerFailure, applyServerRecovery, serverKind, serverStatusLabel } from "./server-status";
 import type { MobileServer } from "./workspace-types";
 
 const server: MobileServer = {
@@ -27,7 +21,7 @@ afterEach(() => vi.useRealTimers());
 
 describe("mobile server availability", () => {
   it("keeps the protocol error visible when suspending RTC rejects an in-flight workspace load", async () => {
-    let current = resetServerStatus(server);
+    let current: MobileServer = { ...server, state: "unknown" };
     let connection = Promise.withResolvers<void>();
     const onError = vi.fn(() => {
       current = applyServerFailure(current, "The desktop request failed.");
@@ -61,7 +55,7 @@ describe("mobile server availability", () => {
 
   it("shows retry, protocol error, and recovery states from the live connection controller", async () => {
     vi.useFakeTimers();
-    let current = { ...resetServerStatus(server), initialConnectionPending: true };
+    let current: MobileServer = { ...server, state: "unknown", initialConnectionPending: true };
     let connection = Promise.withResolvers<void>();
     const controller = createRemoteConnectionRecovery(
       () => connection.promise,
@@ -91,17 +85,6 @@ describe("mobile server availability", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(current.state).toBe("online");
     controller.dispose();
-  });
-  it("stops claiming a server is online when its connection is no longer observed", () => {
-    const reset = resetServerStatus({
-      ...server,
-      recoveryStatus: { phase: "online", attempt: 0, remainingSeconds: 0 },
-    });
-    expect(serverStatusLabel(reset)).toBe("Not connected");
-    expect(reset.recoveryStatus).toBeUndefined();
-    expect(reset.initialConnectionPending).toBe(false);
-    expect(reset.publicKey).toBe(server.publicKey);
-    expect(serverStatusLabel({ ...server, state: "error" })).toBe("Connection error");
   });
 });
 
