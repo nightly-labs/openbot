@@ -15,6 +15,37 @@ import { useServers } from "../servers/servers-context";
 import { usePresence } from "../team/team-context";
 import { preserveKnownDirectUnread } from "./conversation-read-state";
 
+/** Keep live messages and completed reads that arrived after the recovery page was read. */
+function recoveredDirectConversation(
+  page: DirectConversationPage,
+  cached: DirectConversationSnapshot | undefined,
+  currentMemberId: string | undefined,
+): DirectConversationPage {
+  if (!cached || cached.threadId !== page.threadId) return page;
+  const newer = cached.messages.filter((message) => message.sequence > page.revision);
+  const messages = [...page.messages, ...newer];
+  let readState = page.readState;
+  if (cached.readState && (!readState || cached.readState.throughSequence > readState.throughSequence)) {
+    readState = preserveKnownDirectUnread(
+      cached.readState,
+      cached.readState.throughSequence,
+      messages,
+      currentMemberId,
+    );
+  } else if (readState) {
+    const throughSequence = readState.throughSequence;
+    const unread = newer.filter(
+      (message) => message.senderMemberId !== currentMemberId && message.sequence > throughSequence,
+    );
+    readState = {
+      ...readState,
+      unreadCount: readState.unreadCount + unread.length,
+      firstUnreadMessageId: readState.firstUnreadMessageId ?? unread[0]?.id ?? null,
+    };
+  }
+  return { ...page, messages, revision: Math.max(page.revision, cached.revision), readState };
+}
+
 /**
  * Person-to-person conversations on the active team server: the thread list, the
  * page of messages open for each member, and who is typing.
@@ -136,12 +167,15 @@ const DirectMessages = createSimpleContext({
       setDirectConversationError(null);
       const request = ++directConversationRequest;
       try {
-        const snapshot = await window.openbot.servers.readDirectConversationPage({
+        const page = await window.openbot.servers.readDirectConversationPage({
           memberId,
           anchor: { type: "latest" },
           limit: 50,
         });
         if (!scopeIsCurrent() || request !== directConversationRequest) return;
+        const snapshot = retainCached
+          ? recoveredDirectConversation(page, directConversations()[memberId], currentTeamMember()?.id)
+          : page;
         setDirectConversations((current) => ({
           ...current,
           [memberId]: snapshot,
