@@ -31,6 +31,8 @@ type TeamApiAgentMethods = Pick<
   | "getStatus"
   | "getRuntimeSnapshot"
   | "getUsage"
+  | "getAnalytics"
+  | "getHostAnalytics"
   | "listModels"
   | "listAgents"
   | "listConversationReads"

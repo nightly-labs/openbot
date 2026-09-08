@@ -7,6 +7,7 @@ import { createSimpleContext } from "../../simple-context";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServerSwitch } from "../servers/server-switch";
 import { useServers } from "../servers/servers-context";
+import { useUsage } from "../usage/usage-context";
 import { activeTabAfterLoad, browserTabsAfterClose } from "./browser-tab-reconciliation";
 
 /** What `browser.getDisplayState()` answers, and what a remote list is folded into. */
@@ -26,9 +27,11 @@ interface BrowserDisplayState {
  * close - and read by `beginBrowserLoad`, so a load started before either one
  * lands is discarded instead of repainting a stale list.
  *
- * `browserVisibilitySuspended` is read here but owned by `server-switch.tsx`:
- * it describes the gap between two server scopes, so it has to outlive both this
- * provider and the switch that replaces it.
+ * `browserVisibilitySuspended` is composed here from two owners. The switch half is
+ * `server-switch.tsx`'s: it describes the gap between two server scopes, so it has to outlive
+ * both this provider and the switch that replaces it. The Usage half is the report covering
+ * the conversation. Every consumer reads the pair through this provider, which is why the
+ * composition belongs here and not at one of them.
  *
  * `loadDisplayState`/`loadControlState` build the reads rather than performing
  * them so their caller can put them in the same `Promise.all` as the rest of a
@@ -43,7 +46,12 @@ const BrowserTabs = createSimpleContext({
   init: () => {
     const { landingPreview } = usePlatform();
     const { currentServerSelection } = useServers();
-    const { browserVisibilitySuspended } = useServerSwitch();
+    const { browserVisibilitySuspended: switchHidesBrowser } = useServerSwitch();
+    const usage = useUsage();
+    // The browser is a separate Electron view, so hiding renderer content leaves it painted
+    // over whatever replaced the conversation. Usage suspends it for the same reason a server
+    // switch does, and Back restores it because this is derived rather than set.
+    const browserVisibilitySuspended = () => switchHidesBrowser() || !!usage.state.serverId;
     const scopeIsCurrent = createScopeGuard();
 
     const [browserTabs, setBrowserTabs] = createSignal<BrowserTab[]>([]);

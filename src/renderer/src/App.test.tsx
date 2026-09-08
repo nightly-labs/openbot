@@ -32,6 +32,36 @@ describe("OpenBot connected desktop shell", () => {
     installOpenbotStub();
   });
 
+  it("returns from full-page Usage with the conversation draft and settings intact", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    const composer = await screen.findByRole("textbox", { name: "Message Chief" });
+    composer.textContent = "Keep this conversation draft";
+    await fireEvent.input(composer);
+    await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
+    const settings = await screen.findByRole("complementary", { name: "Agent settings" });
+    const name = within(settings).getByRole("textbox", { name: "Agent name" });
+    await fireEvent.input(name, { target: { value: "Draft agent name" } });
+    const usageTrigger = within(settings).getByRole("button", { name: "Usage" });
+    await fireEvent.click(usageTrigger);
+    const usage = await screen.findByRole("region", { name: "Agent usage" });
+    expect(screen.queryByRole("main", { name: "Conversation" })).not.toBeInTheDocument();
+    expect(within(usage).getByRole("heading", { name: "Usage Local" })).toBeInTheDocument();
+    await fireEvent.click(within(usage).getByRole("button", { name: "Back" }));
+    expect(screen.getByRole("main", { name: "Conversation" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Agent name" })).toHaveValue("Draft agent name");
+    expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Keep this conversation draft");
+    await waitFor(() => expect(usageTrigger).toHaveFocus());
+    const server = screen.getByRole("button", { name: "Local server" });
+    await fireEvent.keyDown(server, { key: "F10", shiftKey: true });
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Usage" }), { button: 0 });
+    await screen.findByRole("region", { name: "Agent usage" });
+    expect(screen.getByRole("button", { name: /^Usage agents/ })).toHaveTextContent("All agents");
+    await fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    await waitFor(() => expect(server).toHaveFocus());
+    expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Keep this conversation draft");
+  });
+
   it("keeps shell state and subscriptions when a view boundary remounts", async () => {
     function ShellProbe() {
       const conversation = useConversation();

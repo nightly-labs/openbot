@@ -52,6 +52,7 @@ const ServerScope = createSimpleContext({
       refreshDirectThreads,
       refreshDirectConversation,
       markDirectMessagesRead,
+      conversationVisible,
     } = useDirectMessages();
     const { setModelOptions, activeAgent, setAgentStatus, applyStoredAgents } = useAgents();
     const {
@@ -168,8 +169,11 @@ const ServerScope = createSimpleContext({
           if (agentId && isAgentChatOpen(agentId) && (conversations[agentId]?.read?.unreadCount ?? 0) > 0) {
             requestConversationRead(agentId);
           }
+          // `conversationVisible` rather than the bare focus this listener runs on: the
+          // agent branch above asks the same question through `isAgentChatOpen`, and a
+          // direct message the Usage report covers was no more seen than an agent reply.
           const memberId = activeDirectMemberId();
-          if (memberId && (directConversations()[memberId]?.readState?.unreadCount ?? 0) > 0) {
+          if (memberId && conversationVisible() && (directConversations()[memberId]?.readState?.unreadCount ?? 0) > 0) {
             void markDirectMessagesRead(memberId).catch(() => undefined);
           }
         });

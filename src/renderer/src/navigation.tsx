@@ -7,6 +7,7 @@ import { useConversation } from "./features/conversation/conversation-context";
 import { useDirectMessages } from "./features/conversation/direct-messages-context";
 import { useServers } from "./features/servers/servers-context";
 import { usePresence } from "./features/team/team-context";
+import { useUsage } from "./features/usage/usage-context";
 import { usePlatform } from "./platform";
 import { createScopeGuard } from "./scope-lifetime";
 import { createSimpleContext } from "./simple-context";
@@ -49,6 +50,7 @@ const Navigation = createSimpleContext({
       appendUiError,
     } = useAgents();
     const { setDirectTyping, clearDirectSelection, openDirectConversation } = useDirectMessages();
+    const { dismissUsage } = useUsage();
     const scopeIsCurrent = createScopeGuard();
     const {
       pruneInactiveAgentHistory,
@@ -67,6 +69,12 @@ const Navigation = createSimpleContext({
 
     function selectAgent(agentId: string) {
       if (agentSetupOpen() && creatingAgent()) return;
+      // The rail and the sidebar sit outside the markup the report covers, so a
+      // conversation is one click away while the report hides where it opens. Opening
+      // one that stays hidden also reads it: `requestConversationRead` below is the
+      // explicit read, and a search result runs `openAgentMessage`, which marks every
+      // message through the match. Both would be messages nobody saw.
+      dismissUsage();
       const previousAgentId = activeAgentId();
       if (previousAgentId && previousAgentId !== agentId) pruneInactiveAgentHistory(previousAgentId);
       setAgentSetupOpen(false);
@@ -82,6 +90,8 @@ const Navigation = createSimpleContext({
     async function selectDirectMember(memberId: string): Promise<void> {
       if (agentSetupOpen() && creatingAgent()) return;
       if (!peopleEnabled || !currentTeamMember() || !directPeople().some((member) => member.id === memberId)) return;
+      // Past the guards, so a call that opens nothing leaves the report alone.
+      dismissUsage();
       const previousAgentId = activeAgentId();
       if (previousAgentId) pruneInactiveAgentHistory(previousAgentId);
       setExplicitlyOpenedAgentChatId(null);

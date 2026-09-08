@@ -514,6 +514,8 @@ export function installOpenbotStub(): void {
           message: null,
           fullAccess: true,
         }),
+        getAnalytics: vi.fn().mockResolvedValue(null),
+        getHostAnalytics: vi.fn().mockResolvedValue(null),
         getUsage: vi.fn().mockResolvedValue({
           limits: [
             {

@@ -22,6 +22,8 @@ import {
   type DynamicIslandPreference,
   type DynamicIslandPresentation,
   decodeAgentProfileDraft,
+  decodeOptionalAgentAnalytics,
+  decodeOptionalHostAnalytics,
   decodeSaveAgentProfileResult,
   type FilePreview,
   type HostedSiteSummary,
@@ -815,9 +817,16 @@ const openbotApi: OpenBotDesktopApi = {
   },
   agent: {
     getStatus: () => invokeAgent(IPC_CHANNELS.agentGetStatus, null, decodeAgentStatusFromMain),
+    getHostAnalytics: (input, serverId) =>
+      invokeAgentForServer(serverId, IPC_CHANNELS.hostGetAnalytics, input, decodeHostAnalyticsFromMain),
+    getAnalytics: (input, serverId) =>
+      invokeAgentForServer(serverId, IPC_CHANNELS.agentGetAnalytics, input, decodeAgentAnalyticsFromMain),
     getUsage: (agentId) => invokeAgent(IPC_CHANNELS.agentGetUsage, agentId, decodeAccountUsageFromMain),
     listModels: () => invokeAgent(IPC_CHANNELS.agentListModels, null, decodeAgentModels),
-    listAgents: () => invokeAgent(IPC_CHANNELS.agentList, null, decodeAgents),
+    listAgents: (serverId) =>
+      serverId === undefined
+        ? invokeAgent(IPC_CHANNELS.agentList, null, decodeAgents)
+        : invokeAgentForServer(serverId, IPC_CHANNELS.agentList, null, decodeAgents),
     listInstalledSkills: (agentId) =>
       invokeAgent(IPC_CHANNELS.agentListInstalledSkills, agentId, decodeInstalledSkillsFromMain),
     getSidebarLayout: () => invokeAgent(IPC_CHANNELS.agentGetSidebarLayout, null, decodeSidebarLayout),
@@ -1038,3 +1047,11 @@ const openbotApi: OpenBotDesktopApi = {
 };
 
 contextBridge.exposeInMainWorld("openbot", openbotApi);
+
+function decodeAgentAnalyticsFromMain(value: unknown) {
+  return decodeOptionalAgentAnalytics(value);
+}
+
+function decodeHostAnalyticsFromMain(value: unknown) {
+  return decodeOptionalHostAnalytics(value);
+}

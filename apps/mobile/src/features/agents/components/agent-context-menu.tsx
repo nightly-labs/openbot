@@ -80,6 +80,14 @@ export function useAgentContextMenu(agent: MobileAgent) {
       >
         Hide
       </Link.MenuAction>
+      <Link.MenuAction
+        icon="chart.bar"
+        onPress={() =>
+          router.push({ pathname: "/agent-usage/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } })
+        }
+      >
+        Usage
+      </Link.MenuAction>
       <Link.Menu icon="ellipsis" title="More">
         <Link.MenuAction
           icon="pencil"

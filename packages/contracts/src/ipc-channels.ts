@@ -74,6 +74,8 @@ export const IPC_CHANNELS = {
   maintenanceExportData: "maintenance:export-data",
   maintenanceExportDiagnostics: "maintenance:export-diagnostics",
   agentGetStatus: "agent:get-status",
+  hostGetAnalytics: "host:get-analytics",
+  agentGetAnalytics: "agent:get-analytics",
   agentGetUsage: "agent:get-usage",
   agentListModels: "agent:list-models",
   agentList: "agent:list",

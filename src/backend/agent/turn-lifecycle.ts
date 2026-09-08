@@ -28,6 +28,7 @@ import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
 import { isNonActionableCodexWarning, toolProgressText, toThreadItem } from "./thread-items";
+import { collectProviderUsage } from "./usage-collection";
 
 export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTarget {
   onChanged(listener: (tabs: BrowserTab[], activeTabId: string | null) => void): () => void;
@@ -132,6 +133,26 @@ export class TurnLifecycle {
     const params = notification.params;
     const threadId = getString(params, "threadId");
     const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
+
+    if (
+      threadId &&
+      agentId &&
+      ["turn/started", "thread/tokenUsage/updated", "openbot/usage", "model/rerouted"].includes(notification.method)
+    ) {
+      const agent = this.#store.list().find((entry) => entry.id === agentId);
+      const session = agent?.threadId
+        ? this.#store.database
+            .listProviderSessions(agent.threadId)
+            .find((entry) => entry.externalSessionId === threadId && entry.provider === source.provider)
+        : undefined;
+      if (agent && session) {
+        try {
+          collectProviderUsage(this.#store.database.usage, agent, session, notification.method, params);
+        } catch {
+          this.#hooks.emitError("usage_collection_failed", new Error("Usage data could not be saved."), agentId);
+        }
+      }
+    }
 
     switch (notification.method) {
       case "account/login/completed": {

@@ -25,6 +25,28 @@ import {
 import { useConversation } from "./features/conversation/conversation-context";
 import { useDirectMessages } from "./features/conversation/direct-messages-context";
 import { useServerScope } from "./features/servers/server-scope";
+import { useServers } from "./features/servers/servers-context";
+import { useUsage } from "./features/usage/usage-context";
+
+/**
+ * The tree `App` mounts, plus controls that open and close the Usage report. The report
+ * covers the workspace content and marks it inert, so a message that arrives or waits
+ * behind it was never seen, however focused the window is.
+ */
+function UsageProbe() {
+  const { activeServerId } = useServers();
+  const usage = useUsage();
+  return (
+    <>
+      <button type="button" onClick={() => usage.openUsage(activeServerId(), null)}>
+        Open usage
+      </button>
+      <button type="button" onClick={() => usage.closeUsage()}>
+        Close usage
+      </button>
+    </>
+  );
+}
 
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
@@ -1735,6 +1757,142 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
+  it("keeps an agent reply unread while the Usage report covers the conversation", async () => {
+    const unreadPage = testConversationPage(
+      "chief",
+      [
+        {
+          id: "agent-hidden-answer",
+          author: "assistant",
+          text: "Ready while the report was open",
+          createdAt: "2026-08-19T09:04:00.000Z",
+          status: "completed",
+        },
+      ],
+      {
+        revision: 2,
+        readState: {
+          unreadCount: 1,
+          firstUnreadMessageId: "agent-hidden-answer",
+          throughMessageId: null,
+        },
+      },
+    );
+
+    render(() => (
+      <AppProviders>
+        <AppAccessGate />
+        <UsageProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+    vi.mocked(window.openbot.agent.markConversationRead).mockClear();
+    vi.mocked(window.openbot.agent.readConversationPage).mockResolvedValue(unreadPage);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+    flush();
+    emitAgentEvent?.({ type: "conversation-page", page: unreadPage });
+
+    expect(await screen.findByText("Ready while the report was open")).toBeInTheDocument();
+    expect(window.openbot.agent.markConversationRead).not.toHaveBeenCalled();
+
+    // Back uncovers the conversation, and the reply is still waiting there. The unread state
+    // is queryable only now: while the report is open the content it covers is aria-hidden,
+    // which is the same reason the reply must not count as seen.
+    fireEvent.click(screen.getByRole("button", { name: "Close usage" }));
+    expect(await screen.findByRole("status", { name: "1 new message" })).toBeInTheDocument();
+  });
+
+  it("uncovers the conversation a global search result opens", async () => {
+    const result = {
+      id: "sales-search-hit",
+      author: "assistant" as const,
+      source: "assistant" as const,
+      text: "Found while the report was open",
+      createdAt: "2026-08-19T09:05:00.000Z",
+      status: "completed" as const,
+    };
+    vi.mocked(window.openbot.agent.searchConversationMessages).mockResolvedValue({
+      results: [{ agentId: "sales-outbound", message: result }],
+      total: 1,
+      nextCursor: null,
+    });
+    vi.mocked(window.openbot.agent.readConversation).mockImplementation(async (agentId) => ({
+      agentId,
+      threadId: null,
+      activeTurnId: null,
+      revision: 1,
+      messages: agentId === "sales-outbound" ? [result] : [],
+      readState:
+        agentId === "sales-outbound"
+          ? { unreadCount: 1, firstUnreadMessageId: result.id, throughMessageId: null }
+          : { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },
+    }));
+
+    render(() => (
+      <AppProviders>
+        <AppAccessGate />
+        <UsageProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+    flush();
+
+    // Command K reaches the document while the report is open, so the report has to give
+    // way to the conversation the result names: opening it reads every message through
+    // the match, and a read behind the report is a read of messages nobody saw.
+    await fireEvent.keyDown(window, { key: "k", metaKey: true });
+    await fireEvent.click(await screen.findByRole("tab", { name: "Messages" }));
+    await fireEvent.input(screen.getByRole("combobox", { name: "Search OpenBot" }), { target: { value: "report" } });
+    await fireEvent.click(await screen.findByRole("option", { name: /Found while the report was open/ }));
+
+    expect(await screen.findByRole("heading", { name: "Sales Outbound" })).toBeInTheDocument();
+  });
+
+  it("uncovers the workspace when the sidebar opens a person or the create-agent form", async () => {
+    render(() => (
+      <AppProviders peopleEnabled>
+        <AppAccessGate />
+        <UsageProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+    emitPresence?.({
+      serverId: "server-1",
+      updatedAt: "2026-08-19T10:00:00.000Z",
+      members: [
+        presenceMember("member-self", "person@example.com", "Person"),
+        presenceMember("member-alice", "alice@example.com", "Alice"),
+      ],
+    });
+    await screen.findByRole("button", { name: /Alice/ });
+
+    // The sidebar is outside the markup the report covers, so both of these are one
+    // click away while the report hides the place they open. Opening a private
+    // conversation also reads it, and neither destination was seen behind the report.
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+    flush();
+    await fireEvent.click(screen.getByRole("button", { name: /Alice/ }));
+
+    expect(await screen.findByRole("main", { name: "Direct conversation with Alice" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+    flush();
+    await fireEvent.click(screen.getByRole("button", { name: "Create new agent" }));
+
+    expect(await screen.findByRole("main", { name: "Create a new agent" })).toBeInTheDocument();
+
+    // The form is open now, so the second press only has the report to remove. It has
+    // to: the press does nothing else the user can see.
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+    flush();
+    await fireEvent.click(screen.getByRole("button", { name: "Create new agent" }));
+
+    expect(await screen.findByRole("main", { name: "Create a new agent" })).toBeInTheDocument();
+  });
+
   it("clears unread messages when entering an agent chat", async () => {
     const unreadState = {
       unreadCount: 1,
@@ -2088,6 +2246,56 @@ describe("OpenBot connected desktop shell", () => {
       }),
     );
     await waitFor(() => expect(screen.queryByRole("status", { name: "1 new message" })).not.toBeInTheDocument());
+  });
+
+  it("keeps a private message unread when focus returns to the Usage report", async () => {
+    render(() => (
+      <AppProviders peopleEnabled>
+        <AppAccessGate />
+        <UsageProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+    emitPresence?.({
+      serverId: "server-1",
+      updatedAt: "2026-08-19T10:00:00.000Z",
+      members: [
+        presenceMember("member-self", "person@example.com", "Person"),
+        presenceMember("member-alice", "alice@example.com", "Alice"),
+      ],
+    });
+    await fireEvent.click(await screen.findByRole("button", { name: /Alice/ }));
+    await waitFor(() => expect(window.openbot.servers.readDirectConversationPage).toHaveBeenCalled());
+    vi.mocked(window.openbot.servers.markDirectRead).mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+    flush();
+    window.dispatchEvent(new Event("blur"));
+    emitDirectMessage?.({
+      type: "team-direct-message",
+      memberIds: ["member-alice", "member-self"],
+      message: {
+        id: "direct-behind-usage",
+        threadId: "thread-member-alice",
+        senderMemberId: "member-alice",
+        recipientMemberId: "member-self",
+        text: "Private result behind the report",
+        createdAt: "2026-08-19T10:01:00.000Z",
+        sequence: 1,
+      },
+    });
+
+    // Focus returns to the report, not to the conversation the report covers.
+    window.dispatchEvent(new Event("focus"));
+    flush();
+
+    // Back uncovers the conversation, and the message is still waiting there. The unread
+    // state is queryable only now: the covered content is aria-hidden, which is the same
+    // reason the message must not count as seen. Reaching this badge is also the barrier
+    // that lets the negative assertion below see a read the focus handler started.
+    fireEvent.click(screen.getByRole("button", { name: "Close usage" }));
+    expect(await screen.findByRole("status", { name: "1 new message" })).toBeInTheDocument();
+    expect(window.openbot.servers.markDirectRead).not.toHaveBeenCalled();
   });
 
   it("extends an in-flight focus read to a newer visible private message", async () => {

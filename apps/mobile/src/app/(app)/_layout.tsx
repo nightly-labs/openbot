@@ -41,6 +41,10 @@ function AuthenticatedStack() {
           sheetExpandsWhenScrolledToEdge: false,
         }}
       >
+        <Stack.Screen
+          name="agent-usage/[agentId]"
+          options={{ title: "Usage", contentStyle: { backgroundColor: background } }}
+        />
         <Stack.Screen name="connected" options={{ animation: "fade", gestureEnabled: false, title: "" }} />
         <Stack.Screen
           name="chat/[agentId]"

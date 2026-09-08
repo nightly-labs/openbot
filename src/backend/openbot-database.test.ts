@@ -72,6 +72,8 @@ describe("OpenBotDatabase", () => {
       { version: 12 },
       { version: 13 },
       { version: 14 },
+      { version: 15 },
+      { version: 16 },
     ]);
     database.close();
   });
@@ -747,8 +749,9 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
+    removeAnalyticsSchema(legacy);
     legacy.exec("PRAGMA journal_mode = WAL");
-    legacy.prepare("DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14)").run();
+    legacy.prepare("DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16)").run();
     legacy
       .prepare("INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (3, ?)")
       .run("2026-08-20T10:00:00.000Z");
@@ -819,12 +822,13 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
+    removeAnalyticsSchema(legacy);
     legacy.exec(`
       DROP TABLE projection_routine_runs;
       DROP TABLE projection_routine_triggers;
       DROP TABLE projection_agent_routines;
       DROP TABLE projection_agent_memories;
-      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14);
+      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16);
       INSERT OR IGNORE INTO schema_migrations(version, applied_at)
         VALUES (4, '2026-08-20T10:00:00.000Z');
     `);
@@ -856,6 +860,8 @@ describe("OpenBotDatabase", () => {
       { version: 12 },
       { version: 13 },
       { version: 14 },
+      { version: 15 },
+      { version: 16 },
     ]);
     migrated.close();
   });
@@ -868,6 +874,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
+    removeAnalyticsSchema(legacy);
     downgradeReactionsToV7(legacy);
     legacy.close();
 
@@ -900,6 +907,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
+    removeAnalyticsSchema(legacy);
     downgradeReactionsToV7(legacy);
     legacy.exec("CREATE TABLE projection_reactions_v8 (blocker TEXT)");
     legacy.close();
@@ -926,6 +934,8 @@ describe("OpenBotDatabase", () => {
       { version: 12 },
       { version: 13 },
       { version: 14 },
+      { version: 15 },
+      { version: 16 },
     ]);
     retried.close();
   });
@@ -948,6 +958,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
+    removeAnalyticsSchema(legacy);
     legacy.prepare("DELETE FROM schema_migrations WHERE version >= 10").run();
     legacy.close();
 
@@ -978,6 +989,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
+    removeAnalyticsSchema(legacy);
     legacy.prepare("DELETE FROM schema_migrations WHERE version >= 11").run();
     legacy.close();
 
@@ -1011,6 +1023,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
+    removeAnalyticsSchema(legacy);
     legacy.exec(`
       DELETE FROM schema_migrations WHERE version >= 11;
       CREATE TRIGGER reject_session_refresh
@@ -1050,6 +1063,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
+    removeAnalyticsSchema(legacy);
     downgradeToV11(legacy);
     legacy.exec(`
       INSERT INTO projection_reactions (
@@ -1081,6 +1095,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
+    removeAnalyticsSchema(legacy);
     downgradeToV11(legacy);
     legacy.exec(`
       INSERT INTO projection_reactions (
@@ -1135,6 +1150,7 @@ describe("OpenBotDatabase", () => {
     const legacyWorkspace = `/Users/dev/OpenBot/Agents/${legacyId}`;
     const workspace = `/Users/dev/OpenBot/Agents/${agentId}`;
     const legacy = new DatabaseSync(database.path);
+    removeAnalyticsSchema(legacy);
     downgradeToV11(legacy);
     seedLegacyAgent(legacy, legacyId, legacyWorkspace);
     legacy.close();
@@ -1234,6 +1250,7 @@ describe("OpenBotDatabase", () => {
 
     const legacyId = "bot-6d3e8b17-9c04-4f21-8a55-1b2c3d4e5f60";
     const legacy = new DatabaseSync(database.path);
+    removeAnalyticsSchema(legacy);
     downgradeToV11(legacy);
     seedLegacyAgent(legacy, legacyId, `/Users/dev/OpenBot/Bots/${legacyId}`);
     // This migration rewrites every text column in the database with foreign keys switched off, which is
@@ -1277,6 +1294,7 @@ describe("OpenBotDatabase", () => {
     // one onto the other is a primary-key collision the substitution resolves by dropping a row -- so an
     // agent nobody touched disappears on upgrade.
     const legacy = new DatabaseSync(database.path);
+    removeAnalyticsSchema(legacy);
     downgradeToV11(legacy);
     seedLegacyAgent(legacy, "bot-research", "/Users/dev/OpenBot/Agents/bot-research");
     seedLegacyAgent(legacy, "agent-research", "/Users/dev/OpenBot/Agents/agent-research");
@@ -1314,7 +1332,10 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const newer = new DatabaseSync(database.path);
-    newer.prepare("INSERT INTO schema_migrations(version, applied_at) VALUES (15, ?)").run("2026-08-20T10:00:00.000Z");
+    // One past the latest this application knows, whatever that is today.
+    newer
+      .prepare("INSERT INTO schema_migrations(version, applied_at) SELECT MAX(version) + 1, ? FROM schema_migrations")
+      .run("2026-08-20T10:00:00.000Z");
     newer.close();
 
     const downgradedApp = new OpenBotDatabase(root);
@@ -1362,6 +1383,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
+    removeAnalyticsSchema(legacy);
     legacy.exec(`
       PRAGMA foreign_keys = OFF;
       CREATE TABLE projection_provider_sessions_v6 (
@@ -1383,7 +1405,7 @@ describe("OpenBotDatabase", () => {
       ALTER TABLE projection_provider_sessions_v6 RENAME TO projection_provider_sessions;
       CREATE INDEX provider_sessions_thread
         ON projection_provider_sessions(thread_id, provider, state);
-      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14);
+      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16);
       INSERT OR IGNORE INTO schema_migrations(version, applied_at)
         VALUES (6, '2026-08-20T10:00:00.000Z');
       PRAGMA foreign_keys = ON;
@@ -1605,7 +1627,7 @@ function downgradeReactionsToV7(database: DatabaseSync): void {
     );
     DROP TABLE projection_reactions;
     ALTER TABLE projection_reactions_v7 RENAME TO projection_reactions;
-    DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14);
+    DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16);
     INSERT OR IGNORE INTO schema_migrations(version, applied_at)
       VALUES (7, '2026-08-20T10:00:00.000Z');
   `);
@@ -1675,4 +1697,13 @@ function conversationSnapshot(agent: AgentSummary, text: string): ConversationSn
       },
     ],
   };
+}
+
+// Older-release fixtures start from today's schema, so remove the new tables before downgrading.
+function removeAnalyticsSchema(database: DatabaseSync): void {
+  database.exec(
+    // Every version from 15 up goes: a history that keeps 16 and drops 15 has a gap, which
+    // the schema check rejects before any upgrade runs.
+    "DROP TABLE agent_usage_records; DROP TABLE agent_usage_checkpoints; DROP TABLE agent_usage_activity; DELETE FROM schema_migrations WHERE version >= 15",
+  );
 }

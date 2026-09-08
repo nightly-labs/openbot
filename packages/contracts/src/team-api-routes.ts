@@ -34,6 +34,7 @@ function segment(value: string): string {
 const REMOTE_SCREEN = "/v1/remote-screen";
 
 export const TEAM_API_ROUTES = {
+  analytics: "/v1/analytics",
   compatibility: "/v1/compatibility",
   identity: "/v1/identity",
   events: "/v1/events",
@@ -124,6 +125,7 @@ export const TEAM_API_ROUTES = {
   agent: {
     // PATCH updates, DELETE removes.
     one: (agentId: string) => `/v1/agents/${segment(agentId)}`,
+    analytics: (agentId: string) => `/v1/agents/${segment(agentId)}/analytics`,
     usage: (agentId: string) => `/v1/agents/${segment(agentId)}/usage`,
     skills: (agentId: string) => `/v1/agents/${segment(agentId)}/skills`,
     duplicate: (agentId: string) => `/v1/agents/${segment(agentId)}/duplicate`,

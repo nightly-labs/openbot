@@ -1,4 +1,9 @@
-import { parseGenerateAgentProfile, parseSaveAgentProfile } from "@openbot/contracts/ipc";
+import {
+  parseAgentAnalyticsInput,
+  parseGenerateAgentProfile,
+  parseHostAnalyticsInput,
+  parseSaveAgentProfile,
+} from "@openbot/contracts/ipc";
 // Agents: the collection, the sidebar that arranges them, and everything under one agent's id.
 //
 // The order in this file is the one thing about it that is not free. The static collection paths -
@@ -54,6 +59,19 @@ export async function routeAgents(
 ): Promise<RouteOutcome> {
   const { method, url, request, response, member, capabilities, json, empty } = context;
 
+  if (method === "GET" && url.pathname === TEAM_API_ROUTES.analytics) {
+    if (!capabilities.has("host-analytics"))
+      throw new HttpError(400, "Host analytics is not supported by this client.");
+    const input = parseHostAnalyticsInput({
+      ...(url.searchParams.has("agentId") ? { agentId: url.searchParams.get("agentId") } : {}),
+      startDate: url.searchParams.get("startDate"),
+      endDate: url.searchParams.get("endDate"),
+      timeZone: url.searchParams.get("timeZone"),
+    });
+    if (input.agentId && !agents.listAgents().some((agent) => agent.id === input.agentId))
+      throw new HttpError(404, "Agent not found.");
+    return json(200, agents.getHostAnalytics(input));
+  }
   if (
     method === "POST" &&
     (url.pathname === TEAM_API_ROUTES.agents.generateProfile || url.pathname === TEAM_API_ROUTES.agents.saveProfile)
@@ -118,6 +136,18 @@ export async function routeAgents(
   if (agentMatch) {
     const agentId = pathIdentifier(agentMatch[1], "agentId");
     const action = agentMatch[2] ?? "";
+    if (method === "GET" && action === "analytics") {
+      if (!capabilities.has("agent-analytics"))
+        throw new HttpError(400, "Agent analytics is not supported by this client.");
+      if (!agents.listAgents().some((agent) => agent.id === agentId)) throw new HttpError(404, "Agent not found.");
+      const input = parseAgentAnalyticsInput({
+        agentId,
+        startDate: url.searchParams.get("startDate"),
+        endDate: url.searchParams.get("endDate"),
+        timeZone: url.searchParams.get("timeZone"),
+      });
+      return json(200, agents.getAnalytics(input));
+    }
     if (method === "GET" && action === "usage") {
       return json(200, await agents.getUsage(agentId));
     }

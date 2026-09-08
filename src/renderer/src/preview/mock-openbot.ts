@@ -102,6 +102,7 @@ import {
   STORY_UPDATE_STATUS,
   STORY_USAGE,
 } from "./fixtures";
+import { mockAgentAnalytics, mockHostAnalytics } from "./mock-agent-analytics";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 
 type Listener<T> = (value: T) => void;
@@ -908,6 +909,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     agent: {
       getStatus: async () => clone(agentStatus),
+      getHostAnalytics: async (input) => mockHostAnalytics(input, agents),
+      getAnalytics: async (input) => {
+        const agent = agents.find((entry) => entry.id === input.agentId);
+        if (!agent) throw new Error("Agent not found.");
+        return mockAgentAnalytics(input, agent);
+      },
       getUsage: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
         return clone(agent && `${agent.provider}:${agent.model}` === usageTargetKey ? usage : { limits: [] });

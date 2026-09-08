@@ -157,7 +157,9 @@ describe.sequential("AgentService: restart", () => {
       "test.saved-before-upgrade",
     );
     // Version 14 changes session state only. Reopen the version 13 database to run the shipped upgrade.
-    store.database.connection.prepare("DELETE FROM schema_migrations WHERE version = 14").run();
+    // Every later version goes too: a history that keeps 15 but drops 14 has a gap, which the
+    // schema check rejects before any upgrade runs.
+    store.database.connection.prepare("DELETE FROM schema_migrations WHERE version >= 14").run();
     store.database.close();
 
     let failRead = true;

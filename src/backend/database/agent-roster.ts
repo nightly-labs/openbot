@@ -141,6 +141,14 @@ export class AgentRoster {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? 0;
+        for (const table of ["agent_usage_records", "agent_usage_checkpoints", "agent_usage_activity"])
+          db.prepare(`DELETE FROM ${table} WHERE agent_id = ?`).run(agentId);
+        db.prepare(
+          "DELETE FROM orchestration_command_receipts WHERE command_id IN (SELECT command_id FROM orchestration_events WHERE aggregate_type = 'agent-usage' AND aggregate_id = ?)",
+        ).run(agentId);
+        db.prepare("DELETE FROM orchestration_events WHERE aggregate_type = 'agent-usage' AND aggregate_id = ?").run(
+          agentId,
+        );
         const memoryIds = databaseRows(
           db.prepare("SELECT memory_id FROM projection_agent_memories WHERE agent_id = ?").all(agentId),
         ).map((row) => requiredStringColumn(row, "memory_id"));

@@ -60,6 +60,12 @@ export interface ConversationProps {
   browserTabs: BrowserTab[];
   activeBrowserTabId: string | null;
   browserVisibilitySuspended: boolean;
+  /**
+   * The workspace content is covered by a panel above it, the Usage report today.
+   * The conversation stays mounted, so its document-level keyboard listeners are
+   * still registered; `inert` on the covered markup does not reach them.
+   */
+  workspaceCovered?: boolean;
   browserControlState: BrowserControlState;
   server: ServerSummary | undefined;
   presence: TeamPresenceSnapshot;

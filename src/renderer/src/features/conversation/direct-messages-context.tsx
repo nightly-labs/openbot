@@ -13,6 +13,7 @@ import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useServers } from "../servers/servers-context";
 import { usePresence } from "../team/team-context";
+import { useUsage } from "../usage/usage-context";
 import { preserveKnownDirectUnread } from "./conversation-read-state";
 
 /** Keep live messages and completed reads that arrived after the recovery page was read. */
@@ -87,6 +88,11 @@ const DirectMessages = createSimpleContext({
   name: "Direct messages",
   init: () => {
     const { appFocused, peopleEnabled } = usePlatform();
+    const usage = useUsage();
+    // Every automatic read below asks whether the user can see the message it is about to mark
+    // read. Usage covers the workspace content, so a conversation under it is not visible
+    // however focused the window is.
+    const conversationVisible = () => appFocused() && !usage.state.serverId;
     const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
     const { currentTeamMember, directPeople } = usePresence();
     const scopeIsCurrent = createScopeGuard();
@@ -181,7 +187,7 @@ const DirectMessages = createSimpleContext({
           [memberId]: snapshot,
         }));
         setDirectConversationPages((current) => ({ ...current, [memberId]: snapshot.pageInfo }));
-        if (appFocused() && (snapshot.readState?.unreadCount ?? 0) > 0) {
+        if (conversationVisible() && (snapshot.readState?.unreadCount ?? 0) > 0) {
           void markDirectMessagesRead(memberId, snapshot.messages.at(-1)?.sequence).catch(() => undefined);
         }
       } catch (error) {
@@ -319,7 +325,7 @@ const DirectMessages = createSimpleContext({
             const currentSnapshot = current[memberId];
             if (!currentSnapshot) return current;
             const nextReadState =
-              appFocused() && activeDirectMemberId() === memberId
+              conversationVisible() && activeDirectMemberId() === memberId
                 ? readState
                 : preserveKnownDirectUnread(readState, boundary, currentSnapshot.messages, currentTeamMember()?.id);
             return { ...current, [memberId]: { ...currentSnapshot, readState: nextReadState } };
@@ -328,7 +334,7 @@ const DirectMessages = createSimpleContext({
           const latestSequence = directConversations()[memberId]?.messages.at(-1)?.sequence ?? boundary;
           if (
             directConversationReadOperations.get(requestKey) === operation &&
-            appFocused() &&
+            conversationVisible() &&
             activeDirectMemberId() === memberId &&
             latestSequence > boundary
           ) {
@@ -336,7 +342,7 @@ const DirectMessages = createSimpleContext({
               const latestVisibleSequence = directConversations()[memberId]?.messages.at(-1)?.sequence ?? boundary;
               if (
                 scopeIsCurrent() &&
-                appFocused() &&
+                conversationVisible() &&
                 activeDirectMemberId() === memberId &&
                 latestVisibleSequence > boundary
               ) {
@@ -378,7 +384,7 @@ const DirectMessages = createSimpleContext({
         };
         const incomingUnread =
           message.senderMemberId !== currentTeamMember()?.id && message.sequence > readState.throughSequence;
-        const visibleIncomingMessage = incomingUnread && activeDirectMemberId() === memberId && appFocused();
+        const visibleIncomingMessage = incomingUnread && activeDirectMemberId() === memberId && conversationVisible();
         let nextReadState = readState;
         if (visibleIncomingMessage && readState.unreadCount === 0) {
           nextReadState = {
@@ -415,7 +421,7 @@ const DirectMessages = createSimpleContext({
       const markVisibleMessageRead =
         event.message.senderMemberId !== currentMemberId &&
         activeDirectMemberId() === otherMemberId &&
-        appFocused() &&
+        conversationVisible() &&
         (directConversations()[otherMemberId]?.readState?.unreadCount ?? 0) === 0;
       mergeDirectMessage(otherMemberId, event.message);
       if (markVisibleMessageRead) {
@@ -507,6 +513,7 @@ const DirectMessages = createSimpleContext({
       openDirectMessage,
       sendDirectMessage,
       markDirectMessagesRead,
+      conversationVisible,
       setDirectTyping,
       clearDirectSelection,
       cancelDirectConversationRequests,

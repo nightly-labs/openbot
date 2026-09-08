@@ -1,3 +1,4 @@
+import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
 import type { AgentEvent, ScopedAgentEvent } from "./ipc-agent-events";
 import type { AgentModelOption } from "./ipc-agent-identity";
 import type {
@@ -76,6 +77,7 @@ import type {
   SetDynamicIslandInteractiveInput,
   SetDynamicIslandPreferenceInput,
 } from "./ipc-dynamic-island";
+import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type {
   DeleteHostedSiteInput,
   HostedSiteSummary,
@@ -159,9 +161,11 @@ import type { VoiceModelStatus, VoiceTranscriptionInput, VoiceTranscriptionResul
 
 export interface AgentDesktopApi {
   getStatus: () => Promise<AgentStatus>;
+  getAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
+  getHostAnalytics: (input: HostAnalyticsInput, serverId: string) => Promise<HostAnalytics | null>;
   getUsage: (agentId: string) => Promise<AccountUsage>;
   listModels: () => Promise<AgentModelOption[]>;
-  listAgents: () => Promise<AgentSummary[]>;
+  listAgents: (serverId?: string) => Promise<AgentSummary[]>;
   listInstalledSkills: (agentId: string) => Promise<InstalledSkill[]>;
   getSidebarLayout: () => Promise<SidebarLayoutSnapshot>;
   mutateSidebarLayout: (action: SidebarLayoutAction) => Promise<SidebarLayoutSnapshot>;

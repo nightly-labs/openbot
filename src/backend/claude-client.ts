@@ -70,6 +70,8 @@ interface ActiveTurn {
 
 interface ThreadRuntime {
   id: string;
+  usageCounterId: string;
+  usageCost: number;
   config: ThreadConfig;
   appliedEffort?: string;
   input: AsyncMessageQueue;
@@ -94,6 +96,8 @@ interface ClaudeStreamMessage {
   result?: string;
   errors?: string[];
   terminal_reason?: string;
+  modelUsage?: unknown;
+  total_cost_usd?: number;
 }
 
 interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
@@ -396,6 +400,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
     const runtime: ThreadRuntime = {
       id: threadId,
+      usageCounterId: randomUUID(),
+      usageCost: 0,
       config,
       appliedEffort,
       input,
@@ -552,6 +558,24 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
 
     if (message.type !== "result") return;
+    if (
+      message.subtype === "success" &&
+      message.total_cost_usd !== undefined &&
+      message.total_cost_usd < runtime.usageCost
+    )
+      runtime.usageCounterId = randomUUID();
+    if (message.subtype === "success" || (message.total_cost_usd ?? 0) > runtime.usageCost)
+      runtime.usageCost = message.total_cost_usd ?? runtime.usageCost;
+    if (runtime.activeTurn && message.modelUsage)
+      this.emit("notification", {
+        method: "openbot/usage",
+        params: {
+          threadId: runtime.id,
+          turnId: runtime.activeTurn.id,
+          counterId: runtime.usageCounterId,
+          modelUsage: message.modelUsage,
+        },
+      });
     const fallback = message.subtype === "success" ? message.result : "";
     const errors = message.errors ?? [];
     const turn = runtime.activeTurn;
