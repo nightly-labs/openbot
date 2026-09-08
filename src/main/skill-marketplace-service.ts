@@ -10,7 +10,6 @@ import type {
   MarketplaceSkillPage,
   MarketplaceSkillQuery,
   MarketplaceSkillSummary,
-  SetMarketplaceCreatorAvatarInput,
   SkillPackagePreview,
   SkillSubmission,
   SubmitSkillInput,
@@ -54,20 +53,6 @@ export class SkillMarketplaceService {
     private readonly listAgents: () => AgentSummary[],
     private readonly refreshAgentRuntime: (agentId: string) => Promise<void> = async () => undefined,
   ) {}
-
-  async setCreatorAvatar(input: SetMarketplaceCreatorAvatarInput): Promise<void> {
-    await this.auth.requestAuthorized(
-      `/v1/skills/${encodeURIComponent(input.listingId)}`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ showCreatorAvatar: input.showCreatorAvatar }),
-      },
-      (value) => {
-        if (!isDynamicRecord(value) || value.updated !== true) throw new Error("Invalid creator photo response.");
-      },
-    );
-  }
 
   async list(query: MarketplaceSkillQuery = {}): Promise<MarketplaceSkillPage> {
     const params = new URLSearchParams();

@@ -782,7 +782,6 @@ const openbotApi: OpenBotDesktopApi = {
     },
   },
   skills: {
-    setCreatorAvatar: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsSetCreatorAvatar, input).then(() => undefined),
     list: (query) => ipcRenderer.invoke(IPC_CHANNELS.skillsList, query ?? null).then(decodeSkillPage),
     get: (skillId) => ipcRenderer.invoke(IPC_CHANNELS.skillsGet, skillId).then(decodeSkillDetail),
     listMine: () => ipcRenderer.invoke(IPC_CHANNELS.skillsListMine).then(decodeSubmissions),
@@ -801,8 +800,6 @@ const openbotApi: OpenBotDesktopApi = {
     delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesDelete, input).then(decodeVoid),
   },
   marketplaceAgents: {
-    setCreatorAvatar: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.marketplaceAgentsSetCreatorAvatar, input).then(() => undefined),
     list: (query) =>
       ipcRenderer.invoke(IPC_CHANNELS.marketplaceAgentsList, query ?? null).then(decodeMarketplaceAgentPage),
     get: (agentId) => ipcRenderer.invoke(IPC_CHANNELS.marketplaceAgentsGet, agentId).then(decodeMarketplaceAgentDetail),

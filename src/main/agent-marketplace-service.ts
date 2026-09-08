@@ -13,7 +13,6 @@ import type {
   MarketplaceAgentSkill,
   MarketplaceAgentSummary,
   RoutineSchedule,
-  SetMarketplaceCreatorAvatarInput,
   SubmitMarketplaceAgentInput,
 } from "@openbot/contracts/ipc";
 import { isAvatarHue, isAvatarSeed, isRoutineSchedule, isSkillCategory } from "@openbot/contracts/ipc";
@@ -82,20 +81,6 @@ export class AgentMarketplaceService {
     private readonly agents: AgentMarketplaceAgents,
     private readonly skills: AgentMarketplaceSkills,
   ) {}
-
-  async setCreatorAvatar(input: SetMarketplaceCreatorAvatarInput): Promise<void> {
-    await this.auth.requestAuthorized(
-      `/v1/marketplace/agents/${encodeURIComponent(input.listingId)}`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ showCreatorAvatar: input.showCreatorAvatar }),
-      },
-      (value) => {
-        if (!isDynamicRecord(value) || value.updated !== true) throw new Error("Invalid creator photo response.");
-      },
-    );
-  }
 
   async list(query: MarketplaceAgentQuery = {}): Promise<MarketplaceAgentPage> {
     const params = new URLSearchParams();

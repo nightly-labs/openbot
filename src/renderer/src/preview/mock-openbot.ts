@@ -666,12 +666,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     skills: {
-      setCreatorAvatar: async (input) => {
-        creatorPhotoConsent.set(input.listingId, input.showCreatorAvatar);
-        skillSubmissions = skillSubmissions.map((item) =>
-          item.skillId === input.listingId ? { ...item, showCreatorAvatar: input.showCreatorAvatar } : item,
-        );
-      },
       list: async (query) => {
         const matches = marketplaceSkills.filter(
           (skill) =>
@@ -775,12 +769,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     marketplaceAgents: {
-      setCreatorAvatar: async (input) => {
-        creatorPhotoConsent.set(input.listingId, input.showCreatorAvatar);
-        marketplaceAgentSubmissions = marketplaceAgentSubmissions.map((item) =>
-          item.listingId === input.listingId ? { ...item, showCreatorAvatar: input.showCreatorAvatar } : item,
-        );
-      },
       list: async (query) => {
         const matches = STORY_MARKETPLACE_AGENTS.filter(
           (agent) =>

@@ -107,8 +107,3 @@ export function isSkillCategory(value: unknown): value is SkillCategory {
 }
 
 import { isOneOf } from "./runtime-values";
-
-export interface SetMarketplaceCreatorAvatarInput {
-  listingId: string;
-  showCreatorAvatar: boolean;
-}

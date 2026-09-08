@@ -46,7 +46,6 @@ import {
   parseProfileName,
   parseProvider,
   parseProviderId,
-  parseSetMarketplaceCreatorAvatar,
   parseSubmitMarketplaceAgent,
   parseSubmitSkill,
   parseUpdatePreference,
@@ -74,13 +73,6 @@ describe("app IPC input parsing", () => {
     expect(
       parseSubmitSkill({ draftId: "draft", category: "coding", icon: null, showCreatorAvatar: true }),
     ).toMatchObject({ showCreatorAvatar: true });
-    expect(parseSetMarketplaceCreatorAvatar({ listingId: "listing", showCreatorAvatar: false })).toEqual({
-      listingId: "listing",
-      showCreatorAvatar: false,
-    });
-    expect(() => parseSetMarketplaceCreatorAvatar({ listingId: "listing", showCreatorAvatar: "false" })).toThrow(
-      "Invalid creator photo setting.",
-    );
     expect(() => parseSubmitMarketplaceAgent({ agentId: "agent-1", category: "invalid" })).toThrow(
       "Unknown agent category.",
     );

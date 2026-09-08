@@ -55,7 +55,6 @@ describe("SkillsMarketplaceModal", () => {
       nextCursor: null,
     };
     const skills: OpenBotDesktopApi["skills"] = {
-      setCreatorAvatar: vi.fn(),
       list: vi.fn(async (query) => (query?.category === "documents" ? page : { skills: [], nextCursor: null })),
       get: vi.fn(async () => {
         const skill = page.skills[0];
@@ -77,7 +76,6 @@ describe("SkillsMarketplaceModal", () => {
     };
     window.openbot = { ...window.openbot, skills };
     window.openbot.marketplaceAgents = {
-      setCreatorAvatar: vi.fn(),
       list: vi.fn(async () => ({ agents: [], nextCursor: null })),
       get: vi.fn(),
       listMine: vi.fn(async () => []),

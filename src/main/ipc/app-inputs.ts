@@ -13,7 +13,6 @@ import type {
   PublishHostedSiteInput,
   ReplaceHostedSiteInput,
   SetAnalyticsPreferenceInput,
-  SetMarketplaceCreatorAvatarInput,
   SubmitMarketplaceAgentInput,
   SubmitSkillInput,
   UninstallSkillInput,
@@ -227,13 +226,4 @@ export function parseInstallMarketplaceAgent(input: unknown): InstallMarketplace
 function creatorAvatarOption(input: DynamicRecord): { showCreatorAvatar?: boolean } {
   const showCreatorAvatar = optionalBoolean(input.showCreatorAvatar, "showCreatorAvatar");
   return showCreatorAvatar === undefined ? {} : { showCreatorAvatar };
-}
-
-export function parseSetMarketplaceCreatorAvatar(input: unknown): SetMarketplaceCreatorAvatarInput {
-  if (!isObject(input) || typeof input.showCreatorAvatar !== "boolean")
-    throw new Error("Invalid creator photo setting.");
-  return {
-    listingId: requireString(input.listingId, "listingId", INPUT_LIMITS.identifier),
-    showCreatorAvatar: input.showCreatorAvatar,
-  };
 }

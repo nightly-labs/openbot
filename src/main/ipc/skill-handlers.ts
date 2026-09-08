@@ -2,13 +2,7 @@
 
 import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
-import {
-  parseInstallSkill,
-  parseMarketplaceSkillQuery,
-  parseSetMarketplaceCreatorAvatar,
-  parseSubmitSkill,
-  parseUninstallSkill,
-} from "./app-inputs";
+import { parseInstallSkill, parseMarketplaceSkillQuery, parseSubmitSkill, parseUninstallSkill } from "./app-inputs";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { nullishPayload, stringPayload } from "./validation";
 
@@ -20,7 +14,6 @@ export interface SkillIpcDependencies {
 export function skillIpcHandlers({ skills, getMainWindow }: SkillIpcDependencies): Pick<IpcGroupHandlers, "skills"> {
   return {
     skills: {
-      setCreatorAvatar: payloadHandler(parseSetMarketplaceCreatorAvatar, (input) => skills.setCreatorAvatar(input)),
       list: payloadHandler(nullishPayload(parseMarketplaceSkillQuery), (query) => skills.list(query)),
       get: payloadHandler(stringPayload("skillId"), (skillId) => skills.get(skillId)),
       listMine: handler(() => skills.listMine()),
