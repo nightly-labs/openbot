@@ -15,6 +15,7 @@ import { createSimpleContext } from "../../simple-context";
 import { useUiErrors } from "../../ui-errors";
 import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useServers } from "../servers/servers-context";
+import { useUsage } from "../usage/usage-context";
 import { createFirstAgentDraft, type FirstAgentDraft } from "./FirstAgentSetup";
 
 /**
@@ -58,6 +59,7 @@ const Agents = createSimpleContext({
   init: () => {
     const { activeServer, activeServerId } = useServers();
     const { activeDirectMember, setDirectTyping } = useDirectMessages();
+    const { dismissUsage } = useUsage();
     const { uiErrors, setUiErrors, appendUiError } = useUiErrors();
 
     const [agentList, setAgentList] = createSignal<AgentProfile[]>([]);
@@ -122,6 +124,11 @@ const Agents = createSimpleContext({
 
     function openBotSetup(): void {
       if (agentSetupOpen()) return;
+      // The form renders in the workspace content the Usage report covers, and the
+      // sidebar button that asks for it is outside that markup. The automatic open
+      // above is deliberately not this: a server with no agents must not take the
+      // report away from a user who asked for it.
+      dismissUsage();
       setDirectTyping(false);
       setAgentSetupDraft(createFirstAgentDraft());
       setAgentSetupError(null);

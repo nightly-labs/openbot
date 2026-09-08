@@ -1851,6 +1851,40 @@ describe("OpenBot connected desktop shell", () => {
     expect(await screen.findByRole("heading", { name: "Sales Outbound" })).toBeInTheDocument();
   });
 
+  it("uncovers the workspace when the sidebar opens a person or the create-agent form", async () => {
+    render(() => (
+      <AppProviders peopleEnabled>
+        <AppAccessGate />
+        <UsageProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+    emitPresence?.({
+      serverId: "server-1",
+      updatedAt: "2026-08-19T10:00:00.000Z",
+      members: [
+        presenceMember("member-self", "person@example.com", "Person"),
+        presenceMember("member-alice", "alice@example.com", "Alice"),
+      ],
+    });
+    await screen.findByRole("button", { name: /Alice/ });
+
+    // The sidebar is outside the markup the report covers, so both of these are one
+    // click away while the report hides the place they open. Opening a private
+    // conversation also reads it, and neither destination was seen behind the report.
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+    flush();
+    await fireEvent.click(screen.getByRole("button", { name: /Alice/ }));
+
+    expect(await screen.findByRole("main", { name: "Direct conversation with Alice" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+    flush();
+    await fireEvent.click(screen.getByRole("button", { name: "Create new agent" }));
+
+    expect(await screen.findByRole("main", { name: "Create a new agent" })).toBeInTheDocument();
+  });
+
   it("clears unread messages when entering an agent chat", async () => {
     const unreadState = {
       unreadCount: 1,
