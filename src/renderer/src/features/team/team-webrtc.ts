@@ -148,7 +148,6 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
 function connectSignal(state: PeerState): void {
   if (state.closed || state.socket) return;
   const socket = new WebSocket(state.signalUrl);
-  let accountRefreshed = false;
   state.socket = socket;
   socket.addEventListener("open", () => {
     state.reconnectAttempt = 0;
@@ -173,10 +172,6 @@ function connectSignal(state: PeerState): void {
           return failSignalProtocol(state, error);
         }
         // A frame type this build does not know is a newer Signal service, not a broken connection.
-        if (message?.type === "ready" && !accountRefreshed) {
-          accountRefreshed = true;
-          post({ type: "account-profile-changed", peerId: state.id });
-        }
         if (message) await handleSignal(state, message);
       })
       // Only what handling a frame this peer did read can throw -- an ICE or SDP operation the

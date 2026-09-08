@@ -12,6 +12,60 @@ import {
 afterEach(() => vi.useRealTimers());
 
 describe("remote connection recovery", () => {
+  it("keeps a healthy connection online across background transitions and data refreshes", async () => {
+    vi.useFakeTimers();
+    const load = vi.fn(async () => {});
+    const status = vi.fn();
+    const recovery = createRemoteConnectionRecovery(load, () => {}, status);
+    recovery.setActive(true);
+    await vi.advanceTimersByTimeAsync(0);
+    status.mockClear();
+    recovery.setActive(false);
+    recovery.setActive(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(status).not.toHaveBeenCalled();
+    recovery.refresh();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(status.mock.calls.map(([value]) => value.phase)).toEqual(["online"]);
+    recovery.dispose();
+  });
+
+  it("retains a data invalidation received in the background until resume", async () => {
+    vi.useFakeTimers();
+    const load = vi.fn(async () => {});
+    const recovery = createRemoteConnectionRecovery(load, () => {});
+    recovery.setActive(true);
+    await vi.advanceTimersByTimeAsync(0);
+    recovery.setActive(false);
+    recovery.refresh();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(load).toHaveBeenCalledTimes(1);
+    recovery.setActive(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(load).toHaveBeenCalledTimes(2);
+    recovery.dispose();
+  });
+
+  it("replaces interrupted reads once after resume without overlapping them", async () => {
+    vi.useFakeTimers();
+    let finish = () => {};
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const load = vi.fn().mockReturnValueOnce(pending).mockResolvedValue(undefined);
+    const recovery = createRemoteConnectionRecovery(load, () => {});
+    recovery.setActive(true);
+    recovery.setActive(false);
+    recovery.setActive(true);
+    expect(load).toHaveBeenCalledTimes(1);
+    finish();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(load).toHaveBeenCalledTimes(2);
+    recovery.dispose();
+  });
+
   it.each([
     "The host already has an active remote session.",
     "Too many active remote connections.",

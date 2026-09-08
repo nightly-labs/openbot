@@ -134,9 +134,7 @@ it("routes two phones independently and disconnects or resumes only the addresse
   signal.message({ type: "ready", version: 1, connectionId: null, resumeToken: "resume", iceServers: [] });
   signal.message({ type: "account-profile-changed", version: 1 });
   await vi.waitFor(() =>
-    expect(posted("account-profile-changed")).toEqual(
-      Array(2).fill({ type: "account-profile-changed", peerId: "host-1" }),
-    ),
+    expect(posted("account-profile-changed")).toEqual([{ type: "account-profile-changed", peerId: "host-1" }]),
   );
   for (const index of [1, 2])
     signal.message({

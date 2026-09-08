@@ -141,7 +141,9 @@ interface PeerState {
   turnRefreshTimer: ReturnType<typeof setTimeout> | null;
   iceServers: RTCIceServer[];
   lastEventSequence: number;
+  needsResync: boolean;
   connectedResolve: (() => void) | null;
+  connectedPromise: Promise<void> | null;
   connectedReject: ((error: Error) => void) | null;
   connectedTimer: ReturnType<typeof setTimeout> | null;
   disconnectedTimer: ReturnType<typeof setTimeout> | null;
@@ -171,18 +173,27 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       if (!active) {
         if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
         if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
+        if (state.disconnectedTimer !== null) clearTimeout(state.disconnectedTimer);
+        state.disconnectedTimer = null;
         state.reconnectTimer = null;
         state.turnRefreshTimer = null;
         // The host can commit a sent write while the app is inactive. Keep its
         // response registered so the caller does not offer to send it again.
+        state.needsResync ||= [...pendingRequests.values()].some(
+          (request) => request.method === "GET" || request.method === "HEAD",
+        );
         rejectRequests(new Error("The app is in the background."), true);
         if (!state.authenticated) failPeer(state, new Error("The app is in the background."), actions);
       } else {
-        if (!isPeerOnline(state)) {
+        if (canRecoverPeer(state)) {
+          scheduleDisconnectedCheck(state, actions);
+          if (!state.socket) openSignal(state, actions);
+        } else if (!isPeerOnline(state)) {
           failPeer(state, new Error("The desktop connection needs to be restored."), actions);
         } else {
           scheduleTurnRefresh(state);
           if (!state.socket) openSignal(state, actions);
+          resyncIfNeeded(state, actions);
         }
       }
     },
@@ -194,11 +205,46 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       CHANNELS.every((kind) => state.channels[kind]?.readyState === "open")
     );
   }
+  function canRecoverPeer(state: PeerState): boolean {
+    return (
+      state.authenticated &&
+      state.connection?.connectionState === "disconnected" &&
+      CHANNELS.every((kind) => state.channels[kind]?.readyState === "open")
+    );
+  }
+
+  function scheduleDisconnectedCheck(state: PeerState, actions: ActionsRef): void {
+    if (!active || state.disconnectedTimer !== null) return;
+    state.disconnectedTimer = setTimeout(() => {
+      state.disconnectedTimer = null;
+      if (!isPeerOnline(state)) failPeer(state, new Error("The desktop went offline."), actions);
+    }, DISCONNECT_GRACE_MS);
+  }
+
+  function resyncIfNeeded(state: PeerState, actions: ActionsRef): void {
+    if (!active || !isPeerOnline(state) || !state.needsResync) return;
+    state.needsResync = false;
+    void actions.current.onConnectionUpdate({ hostId: state.hostId, state: "online", message: null, resync: true });
+  }
   async function executeCommand(command: RemoteTeamCommand, actions: ActionsRef): Promise<RemoteTeamCommandResult> {
     let commandGeneration = generation;
     try {
       if (command.type === "connect") {
         if (!active) throw new Error("The app is in the background.");
+        if (peer && peer.hostId === command.hostId && peer.hostPublicKey === command.hostPublicKey) {
+          if (canRecoverPeer(peer)) {
+            const recovering = peer;
+            scheduleDisconnectedCheck(recovering, actions);
+            recovering.connectedPromise ??= new Promise<void>((resolve, reject) => {
+              recovering.connectedResolve = resolve;
+              recovering.connectedReject = reject;
+            });
+          }
+          if (peer.connectedPromise) {
+            await peer.connectedPromise;
+            return { commandId: command.id, ok: true };
+          }
+        }
         if (
           peer &&
           isPeerOnline(peer) &&
@@ -276,7 +322,9 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       turnRefreshTimer: null,
       iceServers: [],
       lastEventSequence: 0,
+      needsResync: false,
       connectedResolve: null,
+      connectedPromise: null,
       connectedReject: null,
       connectedTimer: null,
       disconnectedTimer: null,
@@ -290,6 +338,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         30_000,
       );
     });
+    state.connectedPromise = connected;
     try {
       openSignal(state, actions);
     } catch (error) {
@@ -301,7 +350,6 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
   function openSignal(state: PeerState, actions: ActionsRef): void {
     if (!active || state.closed || peer !== state || state.socket) return;
     const socket = new WebSocket(state.signalUrl);
-    let accountRefreshed = false;
     state.socket = socket;
     socket.onopen = () => {
       if (state.closed || peer !== state || state.socket !== socket) return;
@@ -331,10 +379,6 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
             return failPeer(state, error, actions, "protocol_error");
           }
           // A frame type this build does not know is a newer Signal service, not a broken connection.
-          if (message?.type === "ready" && !accountRefreshed) {
-            accountRefreshed = true;
-            void actions.current.onAccountProfileChanged?.().catch(() => undefined);
-          }
           if (message) await handleSignal(state, message, actions);
         })
         // Only what handling a frame this peer did read can throw -- an ICE or SDP operation the
@@ -443,16 +487,17 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       if (state.connection !== connection || state.closed || peer !== state) return;
       if (connection.connectionState === "disconnected") {
         // ICE can recover a short network interruption without replacing the authenticated session.
-        state.disconnectedTimer ??= setTimeout(() => {
-          state.disconnectedTimer = null;
-          if (connection.connectionState !== "connected")
-            failPeer(state, new Error("The desktop went offline."), actions);
-        }, DISCONNECT_GRACE_MS);
+        scheduleDisconnectedCheck(state, actions);
         return;
       }
       if (connection.connectionState === "connected" && state.disconnectedTimer !== null) {
         clearTimeout(state.disconnectedTimer);
         state.disconnectedTimer = null;
+      }
+      if (isPeerOnline(state)) {
+        if (active && state.turnRefreshTimer === null) scheduleTurnRefresh(state);
+        settleConnected(state);
+        resyncIfNeeded(state, actions);
       }
       if (connection.connectionState === "failed" || connection.connectionState === "closed") {
         failPeer(state, new Error("The desktop went offline."), actions);
@@ -638,7 +683,10 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
 
   async function request(method: string, path: string, body: TeamProtocolV2Json) {
     const state = peer;
-    if (!state || !isPeerOnline(state)) throw new Error("The selected server is offline.");
+    if (!state || !isPeerOnline(state)) {
+      if (state && (method === "GET" || method === "HEAD")) state.needsResync = true;
+      throw new Error("The selected server is offline.");
+    }
     const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
     const result = new Promise<{ status: number; body: TeamProtocolV2Json }>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -824,6 +872,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     state.connectedResolve?.();
     state.connectedResolve = null;
     state.connectedReject = null;
+    state.connectedPromise = null;
   }
 
   function rejectConnection(state: PeerState, error: Error): void {
@@ -832,6 +881,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     state.connectedReject?.(error);
     state.connectedResolve = null;
     state.connectedReject = null;
+    state.connectedPromise = null;
   }
 
   function channelLabel(kind: ChannelKind): string {

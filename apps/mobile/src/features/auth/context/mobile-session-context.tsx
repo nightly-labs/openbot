@@ -1,3 +1,4 @@
+import { watchRemoteDirectory } from "@openbot/team-client";
 import {
   createContext,
   type PropsWithChildren,
@@ -95,15 +96,22 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     let checking = false;
     let refreshAgain = false;
     let appState: AppStateStatus = AppState.currentState;
+    let stopPeriodicCheck: (() => void) | null = null;
 
     async function checkSession(): Promise<void> {
       const current = sessionRef.current;
-      if (!active || appState !== "active" || !current) return;
+      if (!active || !current) return;
+      if (appState === "background") {
+        refreshAgain = true;
+        return;
+      }
       if (checking) {
         refreshAgain = true;
         return;
       }
       checking = true;
+      refreshAgain = false;
+      startPeriodicCheck();
       try {
         await validateMobileSession(current, (validated) => {
           if (active) {
@@ -122,18 +130,31 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       }
     }
 
+    function startPeriodicCheck() {
+      stopPeriodicCheck?.();
+      stopPeriodicCheck = appState === "background" ? null : watchRemoteDirectory(() => checkSession());
+    }
+    startPeriodicCheck();
+
     const appStateSubscription = AppState.addEventListener("change", (nextAppState) => {
-      const resumed = (appState === "background" || appState === "inactive") && nextAppState === "active";
+      if (nextAppState === "inactive") return;
+      const resumed = appState === "background" && nextAppState === "active";
       appState = nextAppState;
+      if (nextAppState === "background") {
+        stopPeriodicCheck?.();
+        stopPeriodicCheck = null;
+      }
       if (resumed) {
         void retryMobileSessionRevocations();
-        void checkSession();
+        startPeriodicCheck();
+        if (refreshAgain) void checkSession();
       }
     });
     refreshProfileRef.current = checkSession;
 
     return () => {
       active = false;
+      stopPeriodicCheck?.();
       appStateSubscription.remove();
     };
   }, [setCurrentSession]);

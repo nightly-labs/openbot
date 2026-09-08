@@ -399,9 +399,11 @@ function decodeInvite(value: unknown): RemoteTeamInvite {
   };
 }
 
+export const REMOTE_ACCOUNT_CHECK_INTERVAL_MS = 15 * 60_000;
+
 /** The caller starts this watcher in the foreground and stops it on background entry. */
 export function watchRemoteDirectory(refresh: () => Promise<void>): () => void {
-  const timer = setInterval(() => void refresh().catch(() => undefined), 30_000);
+  const timer = setInterval(() => void refresh().catch(() => undefined), REMOTE_ACCOUNT_CHECK_INTERVAL_MS);
   return () => clearInterval(timer);
 }
 
@@ -412,7 +414,7 @@ export function createRemoteDirectoryRefresh(load: () => Promise<void>, now = Da
   return {
     refresh(force = false): Promise<void> {
       if (pending) return pending;
-      if (!force && now() - lastAttempt < 30_000) return Promise.resolve();
+      if (!force && now() - lastAttempt < REMOTE_ACCOUNT_CHECK_INTERVAL_MS) return Promise.resolve();
       lastAttempt = now();
       const operation = load();
       pending = operation;

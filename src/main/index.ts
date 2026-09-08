@@ -568,15 +568,22 @@ if (!hasSingleInstanceLock) {
         return remoteAccountSync;
       });
       app.on("browser-window-focus", (_event, window) => {
-        if (window === windowHolder.current) void directoryRefresh.refresh(true);
+        if (window === windowHolder.current) {
+          startDirectoryWatch();
+        }
       });
       const refreshMemberships = () => void directoryRefresh.refresh(true);
       remoteServers.on("directoryInvalidated", refreshMemberships);
-      const stopDirectoryWatch = watchRemoteHostDirectory({
-        isActive: () =>
-          Boolean(windowHolder.current?.isFocused()) && built.centralAuth.getState().status === "signed_in",
-        refresh: () => directoryRefresh.refresh(true),
-      });
+      let stopDirectoryWatch = () => {};
+      const startDirectoryWatch = () => {
+        stopDirectoryWatch();
+        stopDirectoryWatch = watchRemoteHostDirectory({
+          isActive: () =>
+            Boolean(windowHolder.current?.isFocused()) && built.centralAuth.getState().status === "signed_in",
+          refresh: () => directoryRefresh.refresh(),
+        });
+      };
+      startDirectoryWatch();
       teardown.push(0, "joined-server directory refresh", () => {
         stopDirectoryWatch();
         remoteServers.off("directoryInvalidated", refreshMemberships);

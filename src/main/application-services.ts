@@ -32,6 +32,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { IPC_CHANNELS } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, safeStorage, screen, shell } from "electron";
 import electronUpdater from "electron-updater";
 import { AgentService } from "../backend/agent-service";
@@ -267,10 +268,24 @@ export async function createApplicationServices({
       profileRefreshing = false;
     }
   };
-  mainWindow.on("focus", refreshAccountProfile);
+  let profileTimer: ReturnType<typeof setInterval> | null = null;
+  const stopProfileTimer = () => {
+    if (profileTimer !== null) clearInterval(profileTimer);
+    profileTimer = null;
+  };
+  const startProfileTimer = () => {
+    stopProfileTimer();
+    profileTimer = setInterval(() => void refreshAccountProfile(), REMOTE_ACCOUNT_CHECK_INTERVAL_MS);
+    profileTimer.unref();
+  };
+  if (mainWindow.isFocused()) startProfileTimer();
+  mainWindow.on("focus", startProfileTimer);
+  mainWindow.on("blur", stopProfileTimer);
   teardown.push(TEARDOWN_ORDER.updater, "account profile refresh", () => {
     profileRefreshActive = false;
-    mainWindow.removeListener("focus", refreshAccountProfile);
+    stopProfileTimer();
+    mainWindow.removeListener("focus", startProfileTimer);
+    mainWindow.removeListener("blur", stopProfileTimer);
     centralAuth.stopProfileRefresh();
   });
   const store = new AgentStore(app.getPath("userData"), homedir());
