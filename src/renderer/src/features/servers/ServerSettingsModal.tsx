@@ -206,6 +206,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     );
   const inviteExpired = () => Boolean(panels.invite.result && Date.parse(panels.invite.result.expiresAt) <= now());
   const activeMembers = createMemo(() => props.members.filter((member) => !member.disabled));
+  const inactiveLegacyMembers = createMemo(() =>
+    props.server.kind === "remote" && /^https?:\/\//u.test(props.server.apiUrl ?? "")
+      ? props.members.filter((member) => member.disabled && member.role !== "owner")
+      : [],
+  );
   const filteredMembers = createMemo(() => {
     const query = panels.members.search.trim().toLowerCase();
     if (!query) return activeMembers();
@@ -877,6 +882,13 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             </Show>
           </ItemGroup>
         </SettingsSection>
+        <Show when={canManage() && inactiveLegacyMembers().length > 0}>
+          <SettingsSection title="Inactive members" description="Remove an inactive member before inviting them again.">
+            <ItemGroup class="settings-modal-card server-settings-members-list">
+              <For each={inactiveLegacyMembers()}>{(member) => memberRow(member)}</For>
+            </ItemGroup>
+          </SettingsSection>
+        </Show>
         <Show when={canManage()}>{pendingInvites()}</Show>
       </>
     );
@@ -1289,14 +1301,13 @@ function MemberActionsMenu(props: {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal mount={props.mount}>
         <DropdownMenu.Content class="server-settings-member-menu">
-          <DropdownMenu.Item
-            disabled={props.member.disabled}
-            onSelect={() => props.onRoleChange(props.member.role === "admin" ? "member" : "admin")}
-          >
-            {props.member.role === "admin" ? <UserRound aria-hidden="true" /> : <ShieldCheck aria-hidden="true" />}
-            {props.member.role === "admin" ? "Make member" : "Make admin"}
-          </DropdownMenu.Item>
-          <DropdownMenu.Separator />
+          <Show when={!props.member.disabled}>
+            <DropdownMenu.Item onSelect={() => props.onRoleChange(props.member.role === "admin" ? "member" : "admin")}>
+              {props.member.role === "admin" ? <UserRound aria-hidden="true" /> : <ShieldCheck aria-hidden="true" />}
+              {props.member.role === "admin" ? "Make member" : "Make admin"}
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+          </Show>
           <DropdownMenu.Item
             class="ui-action-menu-danger"
             onSelect={() => triggerElement && props.onRemove(triggerElement)}

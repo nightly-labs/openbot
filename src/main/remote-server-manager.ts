@@ -201,9 +201,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         })
       : null;
     this.#webrtcTransport?.on("connected", (serverId) => {
-      void this.#refresh.refreshAgentRoster(serverId).catch(() => undefined);
       this.#events.clearReconnectBackoff(serverId);
       this.#connections.markConnected(serverId);
+      void this.#refresh.refreshAgentRoster(serverId).catch(() => undefined);
       this.#emitChanged();
       void this.#client
         .refreshWebRtcCompatibility(serverId)

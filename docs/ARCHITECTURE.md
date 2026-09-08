@@ -244,7 +244,9 @@ and completed invitation acceptance can refresh sooner. A lost healthy connectio
 membership reconciliation; a transport failure alone never removes a server. Mobile member controls
 use the same account endpoints: owners and admins can invite, while only owners can change another
 member's role or remove access. D1 retains revoked membership records and invalidates affected
-sessions; both clients exclude inactive members from the visible list. Mobile separates shareable
+sessions; both clients exclude inactive members from the active list and count. On legacy HTTP(S)
+hosts, desktop exposes inactive records separately for removal before a new invitation; it does not
+restore the pause/restore controls or change the released invitation rules. Mobile separates shareable
 links from email invitations. Email mode creates an address-bound invitation and sends it through
 the same delivery endpoint as desktop; failed delivery attempts revoke the new invitation. Released restore endpoints
 remain compatible with older clients. Member and invitation lists refresh after changes or on explicit request.

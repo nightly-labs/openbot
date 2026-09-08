@@ -756,6 +756,46 @@ describe("remote connection failures", () => {
     expect(fixture.server(hostId)).toMatchObject({ state: "offline" });
   });
 
+  it("loads agents after reconnecting a host whose previous protocol error is fixed", async () => {
+    const hostId = "00000000-0000-4000-8000-0000000000fd";
+    const transport = fakeWebRtcTransport([
+      {
+        hostId,
+        name: "Host",
+        logoKey: null,
+        devicePublicKey: null,
+        authEpoch: 1,
+        membershipId: "member-1",
+        role: "member",
+      },
+    ]);
+    vi.spyOn(transport, "request").mockImplementation(async (_hostId, path): Promise<TeamProtocolV2Json> => {
+      if (path === "/v1/compatibility")
+        return { appVersion: "0.4.0", protocol: { minimum: 2, maximum: 2 }, capabilities: [] };
+      return [];
+    });
+    const fixture = await createRemoteManager({
+      servers: [storedHttpsServer(hostId, { transport: "webrtc-v2", apiUrl: `webrtc://${hostId}` })],
+      appVersion: "0.4.0",
+      managerOptions: { webrtcTransport: transport },
+    });
+    await expect(
+      fixture.manager.request(hostId, "/v1/agents", () => {
+        throw new Error("Old invalid payload.");
+      }),
+    ).rejects.toThrow("could not safely use");
+    const roster = vi.fn();
+    fixture.manager.on("agent", roster);
+    const disconnect = vi.spyOn(transport, "disconnect");
+    vi.spyOn(transport, "connect").mockImplementation(async () => {
+      transport.emit("connected", hostId);
+    });
+    await fixture.manager.retryConnection(hostId);
+    await vi.waitFor(() => expect(roster).toHaveBeenCalledWith(hostId, { type: "agents-changed", agents: [] }));
+    expect(fixture.server(hostId)).toMatchObject({ state: "online", issue: null });
+    expect(disconnect).not.toHaveBeenCalled();
+  });
+
   // A retry has to leave a working host reading as working. `connect` on a channel that never
   // dropped announces nothing -- there is no new session to announce -- so nothing else clears the
   // "connecting" the retry itself just set, and the host read as reconnecting for as long as it

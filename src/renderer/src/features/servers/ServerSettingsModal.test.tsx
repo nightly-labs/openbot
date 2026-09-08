@@ -371,7 +371,7 @@ describe("ServerSettingsModal", () => {
     render(() => (
       <ServerSettingsModal
         {...props({
-          server: remoteServer,
+          server: { ...remoteServer, apiUrl: "webrtc://remote-1" },
           hostStatus: null,
           members: members.map((member) => ({ ...member, disabled: member.id === "alice-1" })),
         })}
@@ -381,6 +381,37 @@ describe("ServerSettingsModal", () => {
     expect(screen.getByText("Server Owner")).toBeInTheDocument();
     expect(screen.queryByText("Alice Chen")).not.toBeInTheDocument();
     expect(screen.getByText("1 members")).toBeInTheDocument();
+  });
+
+  it("lets the owner remove an inactive legacy member before inviting them again", async () => {
+    const [currentMembers, setCurrentMembers] = createSignal(
+      members.map((member) => ({ ...member, disabled: member.id === "alice-1" })),
+    );
+    const onRemoveMember = vi.fn(async (memberId: string) => {
+      setCurrentMembers((current) => current.filter((member) => member.id !== memberId));
+    });
+    render(() => (
+      <ServerSettingsModal
+        {...props({
+          server: { ...remoteServer, role: "owner" },
+          hostStatus: null,
+          members: currentMembers(),
+          onRemoveMember,
+        })}
+      />
+    ));
+    await fireEvent.click(screen.getByRole("tab", { name: "Members" }));
+    expect(screen.getByText("1 members")).toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Actions for Alice Chen" });
+    await fireEvent.pointerDown(trigger, { button: 0 });
+    await fireEvent.pointerUp(trigger, { button: 0 });
+    expect(screen.queryByRole("menuitem", { name: "Restore access" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Make admin" })).not.toBeInTheDocument();
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Remove member" }), { button: 0 });
+    await fireEvent.click(await screen.findByRole("button", { name: "Remove member" }));
+    await waitFor(() => expect(onRemoveMember).toHaveBeenCalledWith("alice-1"));
+    await waitFor(() => expect(screen.queryByText("Alice Chen")).not.toBeInTheDocument());
+    expect(screen.getByText("Server Owner")).toBeInTheDocument();
   });
 
   it("shows when the invitation is accepted and stops offering its consumed QR", async () => {
