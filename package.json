@@ -93,6 +93,8 @@
     "dev:test-client": "bun scripts/dev-services.ts test-client",
     "dev:all": "bun scripts/dev-services.ts all",
     "mobile": "bun run --cwd apps/mobile start",
+    "mobile:go": "bun run --cwd apps/mobile start:go",
+    "mobile:go:tunnel": "bun run --cwd apps/mobile start:go:tunnel",
     "mobile:android": "bun run --cwd apps/mobile android",
     "mobile:ios": "bun run --cwd apps/mobile ios",
     "mobile:lint": "bun run --cwd apps/mobile lint",

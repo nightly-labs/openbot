@@ -79,6 +79,8 @@
   },
   "scripts": {
     "start": "expo start",
+    "start:go": "bunx expo start --go --clear",
+    "start:go:tunnel": "bunx expo start --go --clear --tunnel",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "lint": "biome check --max-diagnostics=none src",

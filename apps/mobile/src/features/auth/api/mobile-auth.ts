@@ -19,6 +19,7 @@ import { z } from "zod";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
 const MOBILE_SESSION_KEY = "openbot.mobile.session.v1";
+const MOBILE_REVOCATIONS_KEY = "openbot.mobile.pending-revocations.v1";
 const MOBILE_DEVICE_ID_KEY = "openbot.mobile.device-id.v1";
 const MOBILE_AUTH_REQUEST_TIMEOUT_MS = 10_000;
 
@@ -41,6 +42,7 @@ export interface MobileSession {
 type MobileCredential = Pick<MobileSession, "apiUrl" | "sessionToken">;
 
 export async function redeemMobileConnectUrl(value: string): Promise<MobileSession> {
+  void retryMobileSessionRevocations();
   const payload = parseMobileConnectUrl(value);
   if (!payload) {
     throw new Error("This is not a valid OpenBot Mobile Connect code.");
@@ -89,6 +91,7 @@ export async function redeemMobileConnectUrl(value: string): Promise<MobileSessi
 }
 
 export async function readMobileSession(): Promise<MobileSession | null> {
+  void retryMobileSessionRevocations();
   return serializeMobileSessionStorage(() => readStoredSessionAndRevokeInvalid(false));
 }
 
@@ -103,6 +106,11 @@ async function readStoredSessionAndRevokeInvalid(requireRevocation: boolean): Pr
   try {
     const value = JSON.parse(stored);
     credential = decodeStoredMobileCredential(value);
+    const storedCredential = credential;
+    if ((await readPendingRevocations()).some((pending) => sameCredential(pending, storedCredential))) {
+      await SecureStore.deleteItemAsync(MOBILE_SESSION_KEY);
+      return null;
+    }
     return decodeStoredMobileSession(value);
   } catch {
     if (credential) {
@@ -124,6 +132,7 @@ export function validateMobileSession(
   session: MobileSession,
   onValidated?: (validated: MobileSession | null) => void,
 ): Promise<MobileSession | null> {
+  void retryMobileSessionRevocations();
   return serializeMobileProfile(async () => {
     const validated = await refreshMobileProfile(session);
     onValidated?.(validated);
@@ -257,8 +266,67 @@ async function writeMobileProfile(session: MobileSession, change: MobileProfileC
 }
 
 export async function logoutMobileSession(session: MobileSession): Promise<void> {
-  await revokeMobileCredential(session);
-  await deleteMobileSessionIfCurrent(session.sessionToken);
+  await serializeMobileSessionStorage(async () => {
+    const pending = await readPendingRevocations();
+    if (!pending.some((item) => sameCredential(item, session))) {
+      pending.push({ apiUrl: session.apiUrl, sessionToken: session.sessionToken });
+      await SecureStore.setItemAsync(MOBILE_REVOCATIONS_KEY, JSON.stringify(pending), {
+        keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+      });
+    }
+    const stored = await SecureStore.getItemAsync(MOBILE_SESSION_KEY);
+    if (stored && sameCredential(decodeStoredMobileCredential(JSON.parse(stored)), session)) {
+      await SecureStore.deleteItemAsync(MOBILE_SESSION_KEY);
+    }
+  });
+  void retryMobileSessionRevocations();
+}
+
+function sameCredential(left: MobileCredential, right: MobileCredential): boolean {
+  return left.apiUrl === right.apiUrl && left.sessionToken === right.sessionToken;
+}
+
+async function readPendingRevocations(): Promise<MobileCredential[]> {
+  const stored = await SecureStore.getItemAsync(MOBILE_REVOCATIONS_KEY);
+  if (!stored) return [];
+  return z.array(z.unknown()).parse(JSON.parse(stored)).map(decodeStoredMobileCredential);
+}
+
+let revocationRetry: Promise<void> | null = null;
+
+// Pending tokens are never restored as logins. Keep them in Keychain until the
+// account service confirms revocation, without blocking local sign-out or login.
+export function retryMobileSessionRevocations(): Promise<void> {
+  if (revocationRetry) return revocationRetry;
+  revocationRetry = (async () => {
+    const pending = await serializeMobileSessionStorage(readPendingRevocations);
+    await Promise.all(
+      pending.map(async (credential) => {
+        try {
+          await revokeMobileCredential(credential);
+          await serializeMobileSessionStorage(async () => {
+            const remaining = (await readPendingRevocations()).filter((item) => !sameCredential(item, credential));
+            if (remaining.length === 0) {
+              await SecureStore.deleteItemAsync(MOBILE_REVOCATIONS_KEY);
+            } else {
+              await SecureStore.setItemAsync(MOBILE_REVOCATIONS_KEY, JSON.stringify(remaining), {
+                keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+              });
+            }
+          });
+        } catch {
+          // Retry on startup, foreground validation, or the next QR scan.
+        }
+      }),
+    );
+  })()
+    .catch(() => {
+      // A storage failure must not produce an unhandled background rejection.
+    })
+    .finally(() => {
+      revocationRetry = null;
+    });
+  return revocationRetry;
 }
 
 async function revokeMobileCredential(session: MobileCredential): Promise<void> {
