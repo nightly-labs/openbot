@@ -22,6 +22,8 @@ const FORBIDDEN_NAMES = new Set([".env", ".env.local", "id_rsa", "id_ed25519"]);
 const NESTED_ARCHIVE = /\.(?:zip|tar|tgz|gz|7z|rar)$/iu;
 
 interface ApprovedRow {
+  creator_avatar_url: string | null;
+  show_creator_avatar: number;
   id: string;
   slug: string;
   installs: number;
@@ -41,6 +43,7 @@ interface ApprovedRow {
 }
 
 interface SubmissionRow {
+  show_creator_avatar?: number;
   id: string;
   skill_id: string;
   slug: string;
@@ -77,9 +80,11 @@ export class SkillMarketplace {
     const values: unknown[] = [];
     const queryInput = normalizeMarketplaceQuery(input.query);
     if (queryInput) {
-      clauses.push("(lower(versions.name) LIKE ? ESCAPE '\\' OR lower(versions.description) LIKE ? ESCAPE '\\')");
+      clauses.push(
+        "(lower(versions.name) LIKE ? ESCAPE '\\' OR lower(versions.description) LIKE ? ESCAPE '\\' OR lower(coalesce(nullif(trim(users.name), ''), users.email)) LIKE ? ESCAPE '\\')",
+      );
       const query = marketplaceLikePattern(queryInput);
-      values.push(query, query);
+      values.push(query, query, query);
     }
     if (input.category) {
       if (!isSkillCategory(input.category))
@@ -110,7 +115,7 @@ export class SkillMarketplace {
       `SELECT skills.id, skills.slug, skills.installs, skills.featured, skills.updated_at,
               versions.id AS version_id, versions.name, versions.description, versions.category,
               versions.version, versions.bundle_sha256, versions.files_json, versions.icon_key,
-              users.name AS creator_name, users.email AS creator_email
+              skills.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name, users.email AS creator_email
        FROM marketplace_skills skills
        JOIN marketplace_skill_versions versions ON ${clauses.join(" AND ")}
        JOIN users ON users.id = skills.owner_user_id
@@ -166,11 +171,20 @@ export class SkillMarketplace {
     };
   }
 
+  async setCreatorAvatar(userId: string, listingId: string, show: boolean): Promise<void> {
+    const result = await this.bindings.DB.prepare(
+      "UPDATE marketplace_skills SET show_creator_avatar = ? WHERE id = ? AND owner_user_id = ?",
+    )
+      .bind(show ? 1 : 0, listingId, userId)
+      .run();
+    if (!result.meta.changes) throw new SkillMarketplaceError(404, "skill_not_found", "The owned skill was not found.");
+  }
+
   async mine(userId: string) {
     const result = await this.bindings.DB.prepare(
       `SELECT versions.id, versions.skill_id, skills.slug, versions.name, versions.description,
               versions.category, versions.version, versions.status, versions.rejection_note,
-              versions.icon_key, versions.created_at
+              versions.icon_key, versions.created_at, skills.show_creator_avatar
        FROM marketplace_skill_versions versions
        JOIN marketplace_skills skills ON skills.id = versions.skill_id
        WHERE skills.owner_user_id = ?
@@ -187,6 +201,7 @@ export class SkillMarketplace {
     category: SkillCategory;
     icon: { bytes: Uint8Array; mimeType: string } | null;
     skillId?: string;
+    showCreatorAvatar?: boolean;
   }) {
     if (!isSkillCategory(input.category))
       throw new SkillMarketplaceError(400, "invalid_category", "Unknown skill category.");
@@ -274,6 +289,8 @@ export class SkillMarketplace {
           now,
         )
         .run();
+      if (input.showCreatorAvatar !== undefined)
+        await this.setCreatorAvatar(input.user.id, skillId, input.showCreatorAvatar);
       await this.bindings.DB.prepare("UPDATE marketplace_skills SET updated_at = ? WHERE id = ?")
         .bind(now, skillId)
         .run();
@@ -301,6 +318,14 @@ export class SkillMarketplace {
       rejection_note: null,
       icon_key: iconKey,
       created_at: now,
+      show_creator_avatar:
+        input.showCreatorAvatar === undefined
+          ? ((
+              await this.bindings.DB.prepare("SELECT show_creator_avatar FROM marketplace_skills WHERE id = ?")
+                .bind(skillId)
+                .first<{ show_creator_avatar: number }>()
+            )?.show_creator_avatar ?? 0)
+          : Number(input.showCreatorAvatar),
     });
   }
 
@@ -379,7 +404,7 @@ export class SkillMarketplace {
     const result = await this.bindings.DB.prepare(
       `SELECT versions.id, versions.skill_id, skills.slug, versions.name, versions.description,
               versions.category, versions.version, versions.status, versions.rejection_note,
-              versions.icon_key, versions.created_at
+              versions.icon_key, versions.created_at, skills.show_creator_avatar
        FROM marketplace_skill_versions versions JOIN marketplace_skills skills ON skills.id = versions.skill_id
        WHERE versions.status = 'pending' ORDER BY versions.created_at`,
     ).all<SubmissionRow>();
@@ -400,7 +425,7 @@ export class SkillMarketplace {
       `SELECT skills.id, skills.slug, skills.installs, skills.featured, skills.updated_at,
               versions.id AS version_id, versions.name, versions.description, versions.category,
               versions.version, versions.bundle_key, versions.bundle_sha256, versions.files_json, versions.icon_key,
-              users.name AS creator_name, users.email AS creator_email
+              skills.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name, users.email AS creator_email
        FROM marketplace_skills skills
        JOIN marketplace_skill_versions versions ON versions.id = skills.approved_version_id
        JOIN users ON users.id = skills.owner_user_id
@@ -415,7 +440,7 @@ export class SkillMarketplace {
       `SELECT skills.id, skills.slug, skills.installs, skills.featured, skills.updated_at,
               versions.name, versions.description, versions.category, versions.version,
               versions.id AS version_id, versions.bundle_key, versions.bundle_sha256,
-              versions.files_json, versions.icon_key, users.name AS creator_name, users.email AS creator_email
+              versions.files_json, versions.icon_key, skills.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name, users.email AS creator_email
        FROM marketplace_skills skills
        JOIN marketplace_skill_versions versions ON versions.skill_id = skills.id
        JOIN users ON users.id = skills.owner_user_id
@@ -577,6 +602,7 @@ function publicSummary(row: ApprovedRow) {
     description: row.description,
     category: row.category,
     creatorName: row.creator_name?.trim() || row.creator_email,
+    creatorAvatarUrl: row.show_creator_avatar === 1 ? row.creator_avatar_url : null,
     version: row.version,
     installs: row.installs,
     featured: row.featured === 1,
@@ -588,6 +614,7 @@ function submission(row: SubmissionRow) {
   return {
     id: row.id,
     skillId: row.skill_id,
+    showCreatorAvatar: row.show_creator_avatar === 1,
     slug: row.slug,
     name: row.name,
     description: row.description,

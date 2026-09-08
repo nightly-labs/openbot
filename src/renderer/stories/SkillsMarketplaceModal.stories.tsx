@@ -1,5 +1,5 @@
 import type { AgentSummary } from "@openbot/contracts/ipc";
-import { createSignal, onCleanup } from "solid-js";
+import { createSignal, onCleanup, untrack } from "solid-js";
 import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { Button, Heading, Text, Toaster, toast } from "../src/components/ui";
@@ -11,9 +11,51 @@ const storyAgents: Array<Pick<AgentSummary, "id" | "name" | "marketplaceSource">
   (agent) => ({ id: agent.id, name: agent.name }),
 );
 
-function SkillsMarketplaceModalStory(props: { initialOpen: boolean }) {
+function SkillsMarketplaceModalStory(props: {
+  initialOpen: boolean;
+  catalogState?: "empty" | "loading" | "loading-transition" | "missing-images" | "four-featured";
+}) {
+  const catalogState = untrack(() => props.catalogState);
   const previousApi = window.openbot;
   const mock = createMockOpenBot();
+  if (catalogState === "empty") {
+    mock.api.skills.list = async () => ({ skills: [], nextCursor: null });
+    mock.api.marketplaceAgents.list = async () => ({ agents: [], nextCursor: null });
+  } else if (catalogState === "loading") {
+    mock.api.skills.list = () => new Promise(() => undefined);
+    mock.api.marketplaceAgents.list = () => new Promise(() => undefined);
+  } else if (catalogState === "loading-transition") {
+    const skillsList = mock.api.skills.list;
+    const agentsList = mock.api.marketplaceAgents.list;
+    const skillDetail = mock.api.skills.get;
+    // Simulated network latency makes the loading-to-content transition reviewable.
+    const responseDelay = () => new Promise<void>((resolve) => setTimeout(resolve, 800));
+    mock.api.skills.list = async (query) => {
+      await responseDelay();
+      return skillsList(query);
+    };
+    mock.api.marketplaceAgents.list = async (query) => {
+      await responseDelay();
+      return agentsList(query);
+    };
+    mock.api.skills.get = async (id) => {
+      await responseDelay();
+      return skillDetail(id);
+    };
+  } else if (catalogState === "missing-images" || catalogState === "four-featured") {
+    const list = mock.api.skills.list;
+    mock.api.skills.list = async (query) => {
+      const page = await list(catalogState === "four-featured" && query?.featured ? { limit: 4 } : query);
+      return {
+        ...page,
+        skills: page.skills.map((skill) =>
+          catalogState === "missing-images"
+            ? { ...skill, iconUrl: "/missing-marketplace-icon.png", creatorAvatarUrl: "/missing-creator-photo.png" }
+            : skill,
+        ),
+      };
+    };
+  }
   window.openbot = mock.api;
   onCleanup(() => {
     mock.dispose();
@@ -93,20 +135,12 @@ export const SkillDetail: Story = {
   },
 };
 
-export const InstalledSkills: Story = {
-  render: () => <SkillsMarketplaceModalStory initialOpen />,
-  play: async ({ userEvent }) => {
-    const body = within(document.body);
-    await userEvent.click(await body.findByRole("button", { name: "Installed" }));
-    await expect(await body.findByText("Inbox triage")).toBeVisible();
-  },
-};
-
 export const MySubmissions: Story = {
   render: () => <SkillsMarketplaceModalStory initialOpen />,
   play: async ({ userEvent }) => {
     const body = within(document.body);
-    await userEvent.click(await body.findByRole("button", { name: "My submissions" }));
+    await userEvent.click(await body.findByRole("button", { name: "Marketplace menu" }));
+    await userEvent.click(await body.findByRole("menuitem", { name: "My submissions" }));
     await expect(await body.findByText("Standup digest")).toBeVisible();
   },
 };
@@ -116,6 +150,35 @@ export const AgentMarketplace: Story = {
   play: async ({ userEvent }) => {
     const body = within(document.body);
     await userEvent.click(await body.findByRole("button", { name: "Agents" }));
-    await expect(await body.findByText("Release Manager")).toBeVisible();
+    await expect(await body.findByRole("button", { name: "View Release Manager details" })).toBeVisible();
   },
+};
+
+export const AgentDetail: Story = {
+  render: () => <SkillsMarketplaceModalStory initialOpen />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("button", { name: "Agents" }));
+    await userEvent.click(await body.findByRole("button", { name: "View Release Manager details" }));
+    await expect(await body.findByRole("region", { name: "Release Manager details" })).toBeVisible();
+  },
+};
+
+export const NarrowAgentDetail: Story = {
+  ...AgentDetail,
+  globals: { viewport: { value: "marketplaceNarrow", isRotated: false } },
+};
+
+export const EmptyCatalog: Story = { render: () => <SkillsMarketplaceModalStory initialOpen catalogState="empty" /> };
+export const LoadingCatalog: Story = {
+  render: () => <SkillsMarketplaceModalStory initialOpen catalogState="loading" />,
+};
+export const LoadingTransition: Story = {
+  render: () => <SkillsMarketplaceModalStory initialOpen catalogState="loading-transition" />,
+};
+export const MissingImages: Story = {
+  render: () => <SkillsMarketplaceModalStory initialOpen catalogState="missing-images" />,
+};
+export const FourFeatured: Story = {
+  render: () => <SkillsMarketplaceModalStory initialOpen catalogState="four-featured" />,
 };

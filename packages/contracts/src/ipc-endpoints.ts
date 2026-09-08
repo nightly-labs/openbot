@@ -87,6 +87,7 @@ export const IPC_ENDPOINTS = {
     listMine: request(IPC_CHANNELS.skillsListMine),
     choosePackage: request(IPC_CHANNELS.skillsChoosePackage),
     submit: request(IPC_CHANNELS.skillsSubmit),
+    setCreatorAvatar: request(IPC_CHANNELS.skillsSetCreatorAvatar),
     listInstalled: request(IPC_CHANNELS.skillsListInstalled),
     install: request(IPC_CHANNELS.skillsInstall),
     uninstall: request(IPC_CHANNELS.skillsUninstall),
@@ -104,6 +105,7 @@ export const IPC_ENDPOINTS = {
     listMine: request(IPC_CHANNELS.marketplaceAgentsListMine),
     preview: request(IPC_CHANNELS.marketplaceAgentsPreview),
     submit: request(IPC_CHANNELS.marketplaceAgentsSubmit),
+    setCreatorAvatar: request(IPC_CHANNELS.marketplaceAgentsSetCreatorAvatar),
     install: request(IPC_CHANNELS.marketplaceAgentsInstall),
   },
   auth: {

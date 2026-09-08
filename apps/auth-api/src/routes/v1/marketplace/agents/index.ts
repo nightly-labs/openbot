@@ -1,3 +1,4 @@
+import { isSkillCategory } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
 import { readMultipartFormData } from "../../../../server/json-body";
@@ -20,10 +21,14 @@ export const Route = createFileRoute("/v1/marketplace/agents/")({
       GET: async ({ request }) => {
         try {
           const url = new URL(request.url);
+          const category = url.searchParams.get("category") ?? undefined;
+          if (category !== undefined && !isSkillCategory(category))
+            return apiError(400, "invalid_category", "Unknown agent category.");
           const sort = url.searchParams.get("sort") ?? undefined;
           if (sort && sort !== "installs") return apiError(400, "invalid_sort", "Unknown agent sort order.");
           return publicMarketplaceJson(
             await requestAgentMarketplace().list({
+              ...(category ? { category } : {}),
               query: normalizeMarketplaceQuery(url.searchParams.get("query") ?? undefined),
               featured: url.searchParams.get("featured") === "true",
               sort: sort === "installs" ? sort : undefined,
@@ -41,6 +46,12 @@ export const Route = createFileRoute("/v1/marketplace/agents/")({
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
           await enforceMarketplaceMutationRateLimit("upload", user.id);
           const form = await readMultipartFormData(request, AGENT_SUBMISSION_BODY_LIMIT);
+          const showCreatorAvatar = form.get("showCreatorAvatar");
+          if (showCreatorAvatar !== null && showCreatorAvatar !== "true" && showCreatorAvatar !== "false")
+            return apiError(400, "invalid_consent", "Choose whether to show your creator photo.");
+          const category = form.get("category");
+          if (category !== null && !isSkillCategory(category))
+            return apiError(400, "invalid_category", "Unknown agent category.");
           const snapshotText = form.get("snapshot");
           const avatar = form.get("avatar");
           const agentId = form.get("agentId");
@@ -50,7 +61,9 @@ export const Route = createFileRoute("/v1/marketplace/agents/")({
           return json(
             await requestAgentMarketplace().submit({
               user,
+              ...(showCreatorAvatar !== null ? { showCreatorAvatar: showCreatorAvatar === "true" } : {}),
               snapshot: JSON.parse(snapshotText),
+              ...(category ? { category } : {}),
               avatar:
                 avatar instanceof File
                   ? { bytes: new Uint8Array(await avatar.arrayBuffer()), mimeType: avatar.type }

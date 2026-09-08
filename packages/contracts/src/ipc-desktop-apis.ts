@@ -118,6 +118,7 @@ import type {
   MarketplaceSkillDetail,
   MarketplaceSkillPage,
   MarketplaceSkillQuery,
+  SetMarketplaceCreatorAvatarInput,
   SkillPackagePreview,
   SkillSubmission,
   SubmitSkillInput,
@@ -213,6 +214,7 @@ export interface AgentDesktopApi {
 }
 
 export interface MarketplaceAgentsDesktopApi {
+  setCreatorAvatar: (input: SetMarketplaceCreatorAvatarInput) => Promise<void>;
   list: (query?: MarketplaceAgentQuery) => Promise<MarketplaceAgentPage>;
   get: (agentId: string) => Promise<MarketplaceAgentDetail>;
   listMine: () => Promise<AgentSubmission[]>;
@@ -343,6 +345,7 @@ export interface VoiceDesktopApi {
 }
 
 export interface SkillsDesktopApi {
+  setCreatorAvatar: (input: SetMarketplaceCreatorAvatarInput) => Promise<void>;
   list: (query?: MarketplaceSkillQuery) => Promise<MarketplaceSkillPage>;
   get: (skillId: string) => Promise<MarketplaceSkillDetail>;
   listMine: () => Promise<SkillSubmission[]>;
