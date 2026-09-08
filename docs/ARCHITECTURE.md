@@ -459,9 +459,15 @@ failure keeps the reason the CLI gave, in one error that goes to the provider ro
 OpenBot downloads nothing on this path, so the pinned artifact checksums are untouched. The managed
 copy refuses this command, because the runtime manager replaces that installation whole.
 
+Every runtime the store reaches is on this computer: `window.openbot.providerRuntimes` addresses no
+other one, while the agent status beside it describes whichever server is open. The store therefore
+takes `isLocalServer`, and a workspace on another computer announces no offer and starts no update -
+the same rule the provider row and the picker already follow.
+
 The update replaces the binary under a running client. A provider that has an agent in a turn -
-or a delivery on its way to one, which holds no turn id yet - therefore refuses the command and
-tells the user to wait. No turn may start on that provider until the new client is ready: the drain
+a delivery on its way to one, which holds no turn id yet, or a context compaction, whose
+`turn/started` `ContextCompaction.claimTurn` takes away from the agent - therefore refuses the
+command and tells the user to wait. No turn may start on that provider until the new client is ready: the drain
 scheduler skips an agent whose provider reports `isReplacingCli`, before it can reschedule the
 delivery, and `onProviderResumed` schedules the held deliveries when the replacement ends, after a
 failure as well as after a success.

@@ -605,6 +605,46 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     releaseTurnStart?.();
   });
 
+  it("refuses to replace a CLI that is compacting a thread", async () => {
+    let releaseCompaction: (() => void) | undefined;
+    const blocked = new Promise<void>((resolve) => {
+      releaseCompaction = resolve;
+    });
+    let compactionReached = false;
+    let client: FakeAgentClient | undefined;
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+      const created = new FakeAgentClient(provider, "", true, true, {}, async (method, target) => {
+        if (method !== "thread/compact/start" || target !== "codex") return;
+        compactionReached = true;
+        await blocked;
+      });
+      if (provider === "codex") client = created;
+      return created;
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "First large task" });
+    await waitFor(() => events.some((event) => event.type === "turn-completed"));
+
+    // A pressured thread compacts before its next message, and that compaction is a provider turn
+    // the agent never owns: it holds no active turn id, so only its own guard reports it.
+    client?.emit("notification", {
+      method: "thread/tokenUsage/updated",
+      params: {
+        threadId: "codex-session-1",
+        tokenUsage: { last: { totalTokens: 82_000 }, modelContextWindow: 100_000 },
+      },
+    });
+    void service.sendMessage({ agentId: "chief", text: "Run after compaction" });
+    await waitFor(() => compactionReached);
+
+    await expect(service.updateProviderCli("codex")).rejects.toThrow(/working on a turn/u);
+
+    releaseCompaction?.();
+  });
+
   it("delivers a message queued while a failed update held the CLI", async () => {
     const gate = join(root, "claude-update-gate");
     const claude = await createUpdatableFakeClaude(root, "2.1.250", "Installed by Homebrew.", gate);

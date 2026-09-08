@@ -206,6 +206,9 @@ function systemCliHarness(
   // A signal, because this is what the agent status is: it lands on its own, after the snapshot as
   // often as before it.
   const [installed, setInstalled] = createSignal<string | null>(startInstalled ? "0.146.0" : null);
+  // The workspace on screen, which decides whether the CLIs this store reaches are the ones the user
+  // is looking at. Every one of them is on this computer.
+  const [local, setLocal] = createSignal(true);
   let store: ReturnType<typeof createProviderRuntimeStore> | undefined;
   render(() => {
     store = createProviderRuntimeStore(api, {
@@ -214,11 +217,12 @@ function systemCliHarness(
         await updateSystemCli(provider);
         setInstalled(installedAfterUpdate);
       },
+      isLocalServer: local,
     });
     return <Toaster />;
   });
   if (!store) throw new Error("The provider runtime store did not mount.");
-  return { store, api, setInstalled };
+  return { store, api, setInstalled, setLocal };
 }
 
 it("updates a CLI the user installed from the notification, without downloading anything", async () => {
@@ -277,6 +281,25 @@ it("announces an offer that only becomes one once the agent status lands", async
   await waitFor(() => expect(screen.queryByRole("button", { name: "Close notification" })).not.toBeInTheDocument());
 
   setInstalled("0.146.0");
+  flush();
+  expect(await screen.findByText("ChatGPT update available")).toBeInTheDocument();
+});
+
+it("offers no CLI update while a workspace on another computer is open", async () => {
+  const updateSystemCli = vi.fn(async () => {});
+  const { store, setLocal } = systemCliHarness(updateSystemCli);
+  setLocal(false);
+  flush();
+
+  // The runtimes this store reaches are on this computer, and the open workspace is not, so there is
+  // nothing to offer and nothing an Update button here could put right. The offer itself is what the
+  // notification would be raised from, so waiting for it is waiting for the moment it is not raised.
+  await waitFor(() => expect(store.providerAvailableVersions().codex).toBe("0.153.4"));
+  expect(screen.queryByRole("button", { name: "Update" })).not.toBeInTheDocument();
+  await expect(store.startProviderUpdate("codex")).rejects.toThrow(/computer that hosts them/u);
+  expect(updateSystemCli).not.toHaveBeenCalled();
+
+  setLocal(true);
   flush();
   expect(await screen.findByText("ChatGPT update available")).toBeInTheDocument();
 });

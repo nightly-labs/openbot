@@ -236,12 +236,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         isStopping: () => this.#stopping,
         isProviderBusy: (provider) =>
           this.#drain.hasStartingDeliveries(provider) ||
-          this.#store
-            .list()
-            .some(
-              (agent) =>
-                providerForAgent(agent) === provider && this.#conversation.snapshot(agent.id)?.activeTurnId != null,
-            ),
+          this.#store.list().some(
+            (agent) =>
+              providerForAgent(agent) === provider &&
+              // A compaction is a provider turn as well, and it holds no active turn id: its
+              // `turn/started` belongs to the compaction, not to the agent, so `claimTurn` takes
+              // it away. Only its own guard reports the turn the CLI is running.
+              (this.#conversation.snapshot(agent.id)?.activeTurnId != null || !this.#compaction.mayDrain(agent.id)),
+          ),
         onProviderResumed: (provider) => {
           for (const agent of this.#store.list()) {
             if (providerForAgent(agent) === provider) this.#drain.scheduleDrain(agent.id);

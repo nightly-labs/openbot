@@ -3,6 +3,7 @@ import { createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { useAgents } from "./features/agents/agents-context";
 import { createProviderRuntimeStore } from "./features/provider-updates/provider-runtime-store";
+import { useServers } from "./features/servers/servers-context";
 import { createSimpleContext } from "./simple-context";
 
 /**
@@ -28,6 +29,7 @@ const Providers = createSimpleContext({
   name: "Providers",
   init: () => {
     const { agentStatus, setAgentStatus } = useAgents();
+    const { activeServer } = useServers();
     const [refreshingProviders, setRefreshingProviders] = createSignal(false);
     /**
      * A CLI the user installed themselves, and the version it reports. Only the agent status knows
@@ -41,6 +43,7 @@ const Providers = createSimpleContext({
     const runtimes = createProviderRuntimeStore(window.openbot.providerRuntimes, {
       systemCliVersion,
       updateSystemCli: (provider) => updateProviderCli(provider),
+      isLocalServer: () => activeServer()?.kind === "local",
     });
     /** Connect attempts still waiting for the status that says how they ended. */
     const pendingProviderConnections = new Map<AgentProviderId, ReturnType<typeof desktopAnalytics.scope>>();

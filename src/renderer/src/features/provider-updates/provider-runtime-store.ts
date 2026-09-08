@@ -23,6 +23,15 @@ export interface ProviderCliOwners {
   systemCliVersion?: (provider: AgentProviderId) => string | null;
   /** Runs that CLI's own updater. OpenBot downloads nothing on this path. */
   updateSystemCli?: (provider: AgentProviderId) => Promise<void>;
+  /**
+   * Whether the workspace on screen is this computer. Left out, it is.
+   *
+   * Every runtime this store reaches is local - `window.openbot.providerRuntimes` addresses no other
+   * computer - while the agent status beside it describes whichever server is open. A remote
+   * workspace therefore has no offer to make here, and an Update button it raised would change a
+   * runtime the user is not looking at.
+   */
+  isLocalServer?: () => boolean;
 }
 
 /** The real download flow, shared by Settings and the other local provider controls. */
@@ -49,6 +58,7 @@ export function createProviderRuntimeStore(
   /** What the user was last told about, so one offer is not announced twice. */
   let announced: ProviderUpdate[] = [];
   let disposed = false;
+  const isLocalServer = owners.isLocalServer ?? (() => true);
   function providerUpdate(provider: AgentProviderId, snapshot = providerRuntimeSnapshot()): ProviderUpdate {
     const runtime = snapshot.providers[provider];
     const systemVersion = owners.systemCliVersion?.(provider) ?? null;
@@ -70,6 +80,7 @@ export function createProviderRuntimeStore(
    * Retry the notification offers after a failure. Who does the work depends on who owns the CLI.
    */
   function startProviderUpdate(provider: AgentProviderId): Promise<void> {
+    if (!isLocalServer()) return Promise.reject(new Error("Provider CLI updates run on the computer that hosts them."));
     return owners.systemCliVersion?.(provider) ? updateSystemCli(provider) : downloadProviderRuntime(provider);
   }
 
@@ -213,8 +224,11 @@ export function createProviderRuntimeStore(
    * provider - and every progress tick is one - leaves a dismissed notification dismissed.
    */
   createEffect(
-    () => PROVIDERS.map((provider) => providerUpdate(provider)),
+    () => (isLocalServer() ? PROVIDERS.map((provider) => providerUpdate(provider)) : null),
     (next) => {
+      // A remote workspace announces nothing, and leaves the record of what was announced alone:
+      // it says what the user was told about this computer, which the open server does not change.
+      if (!next) return;
       for (const update of providerUpdatesToAnnounce(announced, next)) {
         showProviderUpdateToast(update, () => void startProviderUpdate(update.provider));
       }
