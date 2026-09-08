@@ -32,7 +32,6 @@ import {
   Puzzle,
   RefreshCw,
   Skeleton,
-  Trash2,
   Upload,
   X,
 } from "../../components/ui";
@@ -49,7 +48,7 @@ interface SkillsMarketplaceModalProps {
   onAgentInstalled?: (agent: AgentSummary) => void | Promise<void>;
 }
 
-type Tab = "discover" | "installed" | "mine";
+type Tab = "discover" | "mine";
 type MarketplaceKind = "skills" | "agents";
 /**
  * What the detail layer shows. Three signals allowed a combination the product does not have - a
@@ -112,7 +111,6 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   let detailTrigger: HTMLElement | null = null;
 
   const installedById = createMemo(() => new Map(market.installed.map((item) => [item.skillId, item])));
-  const targetAgent = createMemo(() => props.agents.find((agent) => agent.id === market.browse.targetAgentId) ?? null);
   // The arms of the detail union, so the JSX narrows here once instead of at every read.
   const detailOpen = () => market.detail.kind !== "none";
   const detailLoading = () => market.detail.kind === "loading";
@@ -185,7 +183,6 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   function refresh(next: Tab = market.browse.tab) {
     if (next === "discover") void loadSkills();
     if (next === "mine") void loadMine();
-    if (next === "installed") void loadInstalled();
   }
 
   function selectTab(next: Tab) {
@@ -308,46 +305,6 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       ...(result ? {} : { failure_code: action === "update" ? "update_failed" : "install_failed" }),
     });
     if (result) await loadInstalled(agentId);
-    setBusy(null);
-  }
-
-  async function updateInstalled(item: InstalledSkill) {
-    const analytics = desktopAnalytics.scope();
-    const listing = await run(() => window.openbot.skills.get(item.skillId));
-    if (!listing) {
-      analytics.track("marketplace_action", {
-        entity: "skill",
-        action: "update",
-        result: "failed",
-        failure_code: "load_failed",
-      });
-      return;
-    }
-    const replace = item.state === "modified";
-    if (replace && !window.confirm(`Replace local changes in ${item.name}?`)) return;
-    await install(listing, replace, "update");
-  }
-
-  async function uninstall(item: InstalledSkill) {
-    const modified = item.state === "modified";
-    if (!window.confirm(modified ? `Delete ${item.name} and its local changes?` : `Uninstall ${item.name}?`)) return;
-    const analytics = desktopAnalytics.scope();
-    setBusy(item.skillId);
-    const removed = await run(async () => {
-      await window.openbot.skills.uninstall({
-        agentId: market.browse.targetAgentId,
-        skillId: item.skillId,
-        ...(modified ? { removeModified: true } : {}),
-      });
-      return true;
-    });
-    analytics.track("marketplace_action", {
-      entity: "skill",
-      action: "uninstall",
-      result: removed ? "succeeded" : "failed",
-      ...(removed ? {} : { failure_code: "uninstall_failed" }),
-    });
-    if (removed) await loadInstalled();
     setBusy(null);
   }
 
@@ -500,88 +457,6 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                       onOpen={openDetails}
                     />
                   </div>
-                </Show>
-
-                <Show when={market.browse.tab === "installed"}>
-                  <section class="skills-marketplace-panel">
-                    <div class="skills-marketplace-heading">
-                      <div>
-                        <h1>Installed</h1>
-                        <p>Manage marketplace-owned skills for one local agent.</p>
-                      </div>
-                      <AgentSelect
-                        agents={props.agents}
-                        value={market.browse.targetAgentId}
-                        onChange={(agentId) =>
-                          setMarket((state) => {
-                            state.browse.targetAgentId = agentId;
-                          })
-                        }
-                      />
-                    </div>
-                    <Show
-                      when={targetAgent()}
-                      fallback={
-                        <div class="skills-marketplace-state">
-                          Switch to Local and choose an agent to manage skills.
-                        </div>
-                      }
-                    >
-                      <Show
-                        when={market.installed.length}
-                        fallback={
-                          <div class="skills-marketplace-state">
-                            No marketplace skills are installed for this agent.
-                          </div>
-                        }
-                      >
-                        <div class="skills-installed-list">
-                          <For each={market.installed}>
-                            {(item) => (
-                              <article class="skills-installed-row">
-                                <Button
-                                  variant="ghost"
-                                  type="button"
-                                  class="skills-marketplace-row-hitarea"
-                                  aria-label={`View ${item.name} details`}
-                                  onClick={() => void openDetailsById(item.skillId)}
-                                />
-                                <span class="skills-marketplace-default-icon">
-                                  <Puzzle />
-                                </span>
-                                <div>
-                                  <h3>{item.name}</h3>
-                                  <p>
-                                    v{item.installedVersion}
-                                    {item.availableVersion > item.installedVersion
-                                      ? ` · v${item.availableVersion} available`
-                                      : ""}
-                                  </p>
-                                </div>
-                                <span class="skills-installed-state" data-state={item.state}>
-                                  {item.state.replaceAll("-", " ")}
-                                </span>
-                                <Button
-                                  size="sm"
-                                  loading={panel.busy === item.skillId}
-                                  onClick={() => void updateInstalled(item)}
-                                >
-                                  <RefreshCw /> {item.state === "installed" ? "Repair" : "Update"}
-                                </Button>
-                                <IconButton
-                                  label={`Uninstall ${item.name}`}
-                                  variant="ghost"
-                                  onClick={() => void uninstall(item)}
-                                >
-                                  <Trash2 />
-                                </IconButton>
-                              </article>
-                            )}
-                          </For>
-                        </div>
-                      </Show>
-                    </Show>
-                  </section>
                 </Show>
 
                 <Show when={market.browse.tab === "mine"}>
@@ -1135,42 +1010,6 @@ function AgentMarketplacePanel(props: {
               ]}
             />
           )}
-        </Show>
-      </Show>
-
-      <Show when={props.view === "installed"}>
-        <div class="skills-marketplace-heading">
-          <div>
-            <h1>Installed</h1>
-            <p>Agents available in your local sidebar.</p>
-          </div>
-        </div>
-        <Show
-          when={props.agents.length}
-          fallback={<div class="skills-marketplace-state">No agents installed yet.</div>}
-        >
-          <section class="skills-marketplace-category-section">
-            <div class="skills-marketplace-section-title">
-              <h2>Local agents</h2>
-              <span>{props.agents.length} installed</span>
-            </div>
-            <div class="skills-marketplace-grid agent-marketplace-grid">
-              <For each={props.agents}>
-                {(agent) => (
-                  <article class="skills-marketplace-card agent-marketplace-card">
-                    <AgentAvatar seed={agent.id} hue={null} motion="hover" />
-                    <div class="skills-marketplace-card-copy">
-                      <div>
-                        <h3>{agent.name}</h3>
-                        <span>Installed</span>
-                      </div>
-                      <p>Available in Local</p>
-                    </div>
-                  </article>
-                )}
-              </For>
-            </div>
-          </section>
         </Show>
       </Show>
 

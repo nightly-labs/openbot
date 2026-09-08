@@ -61,7 +61,6 @@
   color: var(--openbot-text-muted);
   opacity: 0.58;
 }
-.skills-installed-row svg,
 .skills-marketplace-card button svg {
   width: 15px;
   height: 15px;
@@ -274,14 +273,12 @@
   min-width: 0;
 }
 .skills-marketplace-card h3,
-.skills-installed-row h3,
 .skills-submission-row h3 {
   margin: 0;
   font-size: var(--openbot-text-md);
 }
 .skills-marketplace-card-copy span,
 .skills-marketplace-card-copy small,
-.skills-installed-row p,
 .skills-submission-row p,
 .skills-submission-row small {
   color: var(--openbot-text-muted);
@@ -310,10 +307,6 @@
   color: var(--openbot-text-muted);
 }
 
-.agent-marketplace-card {
-  grid-template-columns: 42px minmax(0, 1fr);
-}
-.agent-marketplace-card .agent-avatar,
 .agent-submission-row .agent-avatar,
 .agent-publish-card .agent-avatar {
   width: 42px;
@@ -562,22 +555,18 @@
   .skills-marketplace-card-hitarea:hover:not(:disabled):not([data-disabled]) {
     background: transparent;
   }
-  .skills-installed-row > .skills-marketplace-row-hitarea:hover:not(:disabled):not([data-disabled]),
   .skills-submission-row > .skills-marketplace-row-hitarea:hover:not(:disabled):not([data-disabled]) {
     background: transparent;
   }
-  .skills-installed-row:hover,
   .skills-submission-row:hover {
     background: var(--openbot-bg-surface);
   }
 }
-.skills-installed-list,
 .skills-submission-list {
   overflow: hidden;
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-lg);
 }
-.skills-installed-row,
 .skills-submission-row {
   position: relative;
   display: grid;
@@ -588,7 +577,6 @@
   border-bottom: 1px solid var(--openbot-border);
   cursor: pointer;
 }
-.skills-installed-row > button:first-child,
 .skills-submission-row > button:first-child {
   position: absolute;
   z-index: 1;
@@ -602,13 +590,11 @@
   cursor: pointer;
   transition: none;
 }
-.skills-installed-row > button:first-child:focus-visible,
 .skills-submission-row > button:first-child:focus-visible {
   border-radius: var(--openbot-radius-lg);
   outline: 2px solid var(--openbot-accent-strong);
   outline-offset: -2px;
 }
-.skills-installed-row > .ui-button:not(:first-child),
 .skills-submission-row > .ui-button:not(:first-child) {
   position: relative;
   z-index: 2;
@@ -616,15 +602,12 @@
 .skills-submission-row {
   grid-template-columns: 42px minmax(0, 1fr) auto auto;
 }
-.skills-installed-row:last-child,
 .skills-submission-row:last-child {
   border-bottom: 0;
 }
-.skills-installed-row p,
 .skills-submission-row p {
   margin: 3px 0 0;
 }
-.skills-installed-state,
 .skills-submission-status {
   padding: 3px 8px;
   border-radius: var(--openbot-radius-pill);
@@ -633,12 +616,10 @@
   font-size: var(--openbot-text-sm);
   text-transform: capitalize;
 }
-.skills-installed-state[data-state="installed"],
 .skills-submission-status[data-status="approved"] {
   background: var(--openbot-success-soft);
   color: var(--openbot-success);
 }
-.skills-installed-state[data-state="modified"],
 .skills-submission-status[data-status="rejected"] {
   background: var(--openbot-danger-soft);
   color: var(--openbot-danger);
