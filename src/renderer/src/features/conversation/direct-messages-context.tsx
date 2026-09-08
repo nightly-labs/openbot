@@ -73,20 +73,25 @@ const DirectMessages = createSimpleContext({
     const [directTypingMemberIds, setDirectTypingMemberIds] = createSignal<Set<string>>(new Set());
     const directConversationReadOperations = new Map<string, Promise<void>>();
     let directConversationRequest = 0;
+    let directThreadsRequest = 0;
 
     const activeDirectMember = createMemo(() =>
       peopleEnabled ? directPeople().find((member) => member.id === activeDirectMemberId()) : undefined,
     );
 
     async function refreshDirectThreads(): Promise<void> {
+      const request = ++directThreadsRequest;
+      if (!scopeIsCurrent()) return;
       if (!currentTeamMember() || !activeServerSupportsCapability("direct-messages")) {
         setDirectThreads([]);
         return;
       }
       try {
-        setDirectThreads(await window.openbot.servers.listDirectThreads());
+        const threads = await window.openbot.servers.listDirectThreads();
+        if (!scopeIsCurrent() || request !== directThreadsRequest) return;
+        setDirectThreads(threads);
       } catch {
-        setDirectThreads([]);
+        // A failed refresh does not mean the server has no conversations.
       }
     }
 
@@ -419,13 +424,8 @@ const DirectMessages = createSimpleContext({
 
     createEffect(
       () => currentTeamMember()?.id ?? null,
-      (memberId) => {
-        if (!peopleEnabled) return;
-        if (!memberId) {
-          setDirectThreads([]);
-          return;
-        }
-        void refreshDirectThreads();
+      () => {
+        if (peopleEnabled) void refreshDirectThreads();
       },
     );
 

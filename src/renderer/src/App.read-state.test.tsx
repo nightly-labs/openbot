@@ -1,4 +1,9 @@
-import type { ConversationPage, ConversationReadState, DirectConversationSnapshot } from "@openbot/contracts/ipc";
+import type {
+  ConversationPage,
+  ConversationReadState,
+  DirectConversationSnapshot,
+  DirectThreadSummary,
+} from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
@@ -15,12 +20,82 @@ import {
   testServer,
 } from "./app-test-harness";
 import { useConversation } from "./features/conversation/conversation-context";
+import { useDirectMessages } from "./features/conversation/direct-messages-context";
 import { useServerScope } from "./features/servers/server-scope";
 
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
     installOpenbotStub();
   });
+
+  it.each(["older response", "older failure", "latest failure"])(
+    "retains current direct-thread unread state after an %s",
+    async (outcome) => {
+      let refresh = async (): Promise<void> => {
+        throw new Error("The provider is not ready.");
+      };
+      function Probe() {
+        const direct = useDirectMessages();
+        const scope = useServerScope();
+        refresh = direct.refreshDirectThreads;
+        return (
+          <output aria-label="Direct unread">
+            {scope.loaded() ? (direct.directThreads()[0]?.unreadCount ?? 0) : "Loading"}
+          </output>
+        );
+      }
+      render(() => (
+        <AppProviders>
+          <Probe />
+        </AppProviders>
+      ));
+      await waitFor(() => expect(screen.getByLabelText("Direct unread")).toHaveTextContent("0"));
+      emitPresence?.({
+        serverId: "local",
+        updatedAt: "2026-09-08T00:00:00Z",
+        members: [presenceMember("self", "person@example.com", "Person")],
+      });
+      const threads: DirectThreadSummary[] = [
+        {
+          threadId: "direct-1",
+          otherMemberId: "alice",
+          unreadCount: 2,
+          updatedAt: "2026-09-08T00:00:00Z",
+          lastMessage: {
+            id: "message-1",
+            threadId: "direct-1",
+            senderMemberId: "alice",
+            recipientMemberId: "self",
+            text: "Hello",
+            sequence: 2,
+            createdAt: "2026-09-08T00:00:00Z",
+          },
+        },
+      ];
+      vi.mocked(window.openbot.servers.listDirectThreads).mockResolvedValueOnce(threads);
+      await refresh();
+      flush();
+      expect(screen.getByLabelText("Direct unread")).toHaveTextContent("2");
+      let resolvePending: ((value: DirectThreadSummary[]) => void) | undefined;
+      let rejectPending: ((error: Error) => void) | undefined;
+      vi.mocked(window.openbot.servers.listDirectThreads).mockReturnValueOnce(
+        new Promise((resolve, reject) => {
+          resolvePending = resolve;
+          rejectPending = reject;
+        }),
+      );
+      const pending = refresh();
+      if (outcome !== "latest failure") {
+        vi.mocked(window.openbot.servers.listDirectThreads).mockResolvedValueOnce(threads);
+        await refresh();
+      }
+      if (outcome === "older response") resolvePending?.([]);
+      else rejectPending?.(new Error("The host is offline."));
+      await pending;
+      flush();
+      expect(screen.getByLabelText("Direct unread")).toHaveTextContent("2");
+    },
+  );
 
   it("clears desktop unread state when the same member reads on another device", async () => {
     vi.mocked(window.openbot.agent.readConversationPage).mockResolvedValue(
