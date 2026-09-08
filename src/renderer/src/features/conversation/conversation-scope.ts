@@ -519,9 +519,26 @@ export function createConversationViewScope(props: ConversationProps) {
     };
     const keyboardTarget = conversationPanel?.ownerDocument ?? document;
     const keyboardWindow = keyboardTarget.defaultView ?? window;
-    keyboardTarget.addEventListener("keydown", closeOnEscape);
+    /**
+     * A panel over the workspace content leaves this conversation mounted, so these
+     * listeners stay on the document; `inert` on the covered markup does not reach
+     * them. Escape would then cancel a queued-message edit the user cannot see -
+     * restoring the previous draft and discarding the attachments added to it - and
+     * the search shortcut would open a search behind the panel. Both belong to the
+     * pane the user is looking at, and that is no longer this one.
+     *
+     * `closeActiveRemoteBrowserTab` needs no wrapper: it already returns early on
+     * `browserVisibilitySuspended`, which the same panel sets.
+     */
+    const whenVisible = (handler: (event: KeyboardEvent) => void) => (event: KeyboardEvent) => {
+      if (props.workspaceCovered) return;
+      handler(event);
+    };
+    const escapeListener = whenVisible(closeOnEscape);
+    const chatSearchListener = whenVisible(handleChatSearchShortcut);
+    keyboardTarget.addEventListener("keydown", escapeListener);
     keyboardWindow.addEventListener("keydown", closeActiveRemoteBrowserTab);
-    keyboardTarget.addEventListener("keydown", handleChatSearchShortcut);
+    keyboardTarget.addEventListener("keydown", chatSearchListener);
     window.addEventListener("pointerdown", closeMessageMenus);
     scrollResizeObserver = new ResizeObserver(() => {
       updateVirtualScrollMargin();
@@ -543,9 +560,9 @@ export function createConversationViewScope(props: ConversationProps) {
       scrollResizeObserver?.disconnect();
       scrollResizeObserver = undefined;
       unsubscribeImport();
-      keyboardTarget.removeEventListener("keydown", closeOnEscape);
+      keyboardTarget.removeEventListener("keydown", escapeListener);
       keyboardWindow.removeEventListener("keydown", closeActiveRemoteBrowserTab);
-      keyboardTarget.removeEventListener("keydown", handleChatSearchShortcut);
+      keyboardTarget.removeEventListener("keydown", chatSearchListener);
       window.removeEventListener("pointerdown", closeMessageMenus);
     };
   });
