@@ -1,10 +1,13 @@
 // @vitest-environment node
+import { existsSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "../agent-client";
 import { AgentService } from "../agent-service";
 import {
+  CREATE_AGENT_INPUT,
   createFakeClaude,
   createFakeGrok,
   createPendingFakeClaude,
@@ -570,6 +573,75 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(service.getStatus().providers).toContainEqual(
       expect.objectContaining({ id: "codex", state: "available", version: "0.144.1" }),
     );
+  });
+
+  it("refuses to replace a CLI while a delivery is on its way to a turn", async () => {
+    let releaseTurnStart: (() => void) | undefined;
+    const blocked = new Promise<void>((resolve) => {
+      releaseTurnStart = resolve;
+    });
+    let turnStartReached = false;
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) =>
+        new FakeAgentClient(provider, "", false, true, {}, async (method, target) => {
+          if (method !== "turn/start" || target !== "codex") return;
+          turnStartReached = true;
+          await blocked;
+        }),
+    );
+    await service.initialize();
+    void service.sendMessage({ agentId: "chief", text: "Keep working." });
+    // The delivery has no turn id yet, and the client it is about to prompt must not be replaced.
+    await waitFor(() => turnStartReached);
+
+    await expect(service.updateProviderCli("codex")).rejects.toThrow(/working on a turn/u);
+
+    releaseTurnStart?.();
+  });
+
+  it("delivers a message queued while a failed update held the CLI", async () => {
+    const gate = join(root, "claude-update-gate");
+    const claude = await createUpdatableFakeClaude(root, "2.1.250", "Installed by Homebrew.", gate);
+    process.env.OPENBOT_CLAUDE_PATH = claude.executable;
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "claude",
+      (provider) => new FakeAgentClient(provider),
+    );
+    const running = service;
+    const started: string[] = [];
+    service.on("event", (event) => {
+      if (event.type === "turn-started") started.push(event.agentId);
+    });
+    await service.initialize();
+    const agent = await service.createAgent(CREATE_AGENT_INPUT);
+    // The agent's own first message has to be delivered and finished, or it is the turn the
+    // assertion below sees.
+    await waitFor(() => started.includes(agent.id));
+    await waitFor(async () => (await running.readConversation(agent.id)).activeTurnId === null);
+    const turnsBefore = started.filter((agentId) => agentId === agent.id).length;
+
+    const update = service.updateProviderCli("claude");
+    await waitFor(() => existsSync(claude.started));
+    await service.sendMessage({ agentId: agent.id, text: "Take this when you are back." });
+    // The CLI under the client is being replaced, so the delivery waits in the mailbox.
+    expect(started.filter((agentId) => agentId === agent.id)).toHaveLength(turnsBefore);
+
+    await writeFile(gate, "go");
+    // A refused update replaces no client, so nothing else would deliver what it held back.
+    await expect(update).rejects.toThrow(/Installed by Homebrew\./u);
+
+    await waitFor(() => started.filter((agentId) => agentId === agent.id).length > turnsBefore);
   });
 
   it("keeps the CLI's own reason when its updater refuses", async () => {

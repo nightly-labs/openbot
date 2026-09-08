@@ -550,13 +550,19 @@ fi
  * `--version` reports `updatedVersion`, the way a real self-update changes the binary underfoot.
  * The marker path is also what a test reads to see whether the updater ran at all.
  */
+/**
+ * A fake Claude CLI that can update itself. With `gate`, the updater waits for that file to
+ * appear, which is how a test holds the CLI in mid-replacement and acts while it is there.
+ */
 export async function createUpdatableFakeClaude(
   directory: string,
   updatedVersion: string,
   updateError?: string,
-): Promise<{ executable: string; marker: string }> {
+  gate?: string,
+): Promise<{ executable: string; marker: string; started: string }> {
   const executable = join(directory, "claude-updatable");
   const marker = join(directory, "claude-update-marker");
+  const started = join(directory, "claude-update-started");
   await writeFile(
     executable,
     `#!/bin/sh
@@ -569,6 +575,8 @@ if [ "$1" = "--version" ]; then
 elif [ "$1" = "auth" ]; then
   printf '%s' '{"loggedIn":true,"email":"claude@example.com","subscriptionType":"max"}'
 elif [ "$1" = "update" ]; then
+  printf '%s\\n' 'started' > '${started}'
+${gate ? `  while [ ! -f '${gate}' ]; do sleep 0.02; done` : ""}
 ${
   updateError
     ? `  printf '%s\\n' '${updateError}' >&2
@@ -579,7 +587,7 @@ fi
 `,
   );
   await chmod(executable, 0o755);
-  return { executable, marker };
+  return { executable, marker, started };
 }
 
 export async function createPendingFakeClaude(directory: string): Promise<string> {

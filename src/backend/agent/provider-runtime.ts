@@ -68,8 +68,10 @@ export interface ProviderHooks {
   onProviderLost(client: AgentClient): void;
   /** True once stop() has begun, so a client exiting during shutdown does not trigger a restart. */
   isStopping(): boolean;
-  /** True while an agent on this provider runs a turn, which replacing its CLI would cut short. */
-  hasActiveTurns(provider: AgentProvider): boolean;
+  /** True while a turn on this provider runs or starts, which replacing its CLI would cut short. */
+  isProviderBusy(provider: AgentProvider): boolean;
+  /** Runs after a CLI replacement, so deliveries held back during it are delivered. */
+  onProviderResumed(provider: AgentProvider): void;
 }
 
 /**
@@ -405,7 +407,7 @@ export class ProviderRuntime implements ProviderPort {
       }
       // The update replaces the binary under a running client, and the client is restarted after
       // it. A turn in flight would lose its process, so the user is asked to wait instead.
-      if (this.#hooks.hasActiveTurns(provider)) {
+      if (this.#hooks.isProviderBusy(provider)) {
         throw new Error(`The ${providerLabel(provider)} CLI is working on a turn. Wait for it to finish, then update.`);
       }
       this.#setProviderConnectionState(provider, "connecting");
@@ -446,6 +448,8 @@ export class ProviderRuntime implements ProviderPort {
         }
       } finally {
         this.#replacingCli.delete(provider);
+        // Also after a failure: nothing else schedules the deliveries this update held back.
+        this.#hooks.onProviderResumed(provider);
       }
       return this.status();
     });
