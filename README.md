@@ -137,6 +137,8 @@ Use `bun run dev:seed --dry-run` to inspect the target and fixture counts withou
 | --- | --- |
 | `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`, and `--isolated` gives the worktree a profile of its own keyed to its path instead of the shared `OpenBot Dev` one. |
 | `bun run preview` | Preview the built Electron client with the green preview icon. |
+| `bun run mobile:go` | Start the mobile app in Expo Go and clear the Metro cache. |
+| `bun run mobile:go:tunnel` | Start the mobile app in Expo Go through a Metro tunnel and clear the cache. The OpenBot API and Signal still need their own reachable addresses. |
 | `bun run dev:api` | Start the TanStack Start API and its local D1 database on `127.0.0.1:3100`. |
 | `bun run api:start` | Build and preview the Cloudflare Worker locally. |
 | `bun run api:migrate:local` | Apply D1 migrations to the local development database. |
@@ -183,6 +185,21 @@ records, and public assets. It does not carry chats, files, commands, or remote 
 The development runner advertises both Mobile Connect and its Signal service on the preferred private
 LAN interface. Restart the runner after changing networks so newly generated QR codes contain the
 current address.
+
+`mobile:go:tunnel` exposes only the Expo development server. It does not expose the local account
+API, Signal, or TURN. A phone on 5G cannot use the default LAN addresses. For a test across networks,
+use a VPN that connects both devices, or provide HTTPS and WSS endpoints that forward to this dev
+stack's account API and Signal ports. Set `OPENBOT_MOBILE_AUTH_API_URL` to the reachable account API
+origin and `REMOTE_SIGNAL_URL` to the reachable Signal URL, including `/v1/signal`, before starting
+`bun run dev`. Use the ports reported by `bun run dev:status`; they can differ between worktrees.
+If direct WebRTC cannot connect, `TURN_HOST` must name a reachable coturn service and
+`TURN_SHARED_SECRET` must match that service. An HTTP tunnel cannot forward TURN traffic.
+Generate and scan a new Mobile Connect code after changing the account API address; an existing
+mobile session retains its original address.
+
+Mobile sign-out removes the local login even when the account API is unavailable. The app keeps
+only the credential in secure storage for revocation retries at startup, on return to the foreground,
+and on the next connection attempt. Remote revocation completes when the account API is reachable.
 
 For manual team testing, `bun run dev:test-client` starts a complete two-client harness. The second
 client uses the isolated `OpenBot Dev Test Client` profile and renderer port 5174. `dev:reset` also

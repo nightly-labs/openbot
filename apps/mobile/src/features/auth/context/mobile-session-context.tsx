@@ -16,6 +16,7 @@ import {
   type MobileSession,
   MobileSessionExpiredError,
   readMobileSession,
+  retryMobileSessionRevocations,
   updateMobileProfile,
   validateMobileSession,
 } from "@/features/auth/api/mobile-auth";
@@ -124,7 +125,10 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     const appStateSubscription = AppState.addEventListener("change", (nextAppState) => {
       const resumed = (appState === "background" || appState === "inactive") && nextAppState === "active";
       appState = nextAppState;
-      if (resumed) void checkSession();
+      if (resumed) {
+        void retryMobileSessionRevocations();
+        void checkSession();
+      }
     });
     refreshProfileRef.current = checkSession;
 
@@ -138,7 +142,7 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     const current = sessionRef.current;
     if (!current) return;
     await logoutMobileSession(current);
-    if (sessionRef.current?.sessionToken === current.sessionToken) {
+    if (sessionRef.current?.sessionToken === current.sessionToken && sessionRef.current?.apiUrl === current.apiUrl) {
       setCurrentSession(null);
     }
   }, [setCurrentSession]);
