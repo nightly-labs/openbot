@@ -180,16 +180,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
   };
   let authState = clone<CentralAuthState>(options.authState ?? defaultAuthState);
-  const creatorPhotoConsent = new Map<string, boolean>();
-  function withCreatorPhoto<T extends { id: string }>(item: T): T {
-    if (!creatorPhotoConsent.has(item.id)) return item;
-    return {
-      ...item,
-      creatorAvatarUrl:
-        creatorPhotoConsent.get(item.id) && authState.status === "signed_in" ? authState.user.avatarUrl : null,
-    };
-  }
-
   let setupState = clone<AppSetupState>(options.setupState ?? { completed: true, preferredProvider: "codex" });
   let analyticsPreference = clone<AnalyticsPreference>(options.analyticsPreference ?? { enabled: true });
   let dynamicIslandPreference: DynamicIslandPreference = { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
@@ -676,14 +666,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         const start = Number(query?.cursor ?? 0);
         const end = start + (query?.limit ?? 50);
         return clone({
-          skills: matches.slice(start, end).map(withCreatorPhoto),
+          skills: matches.slice(start, end),
           nextCursor: end < matches.length ? String(end) : null,
         });
       },
       get: async (skillId) => {
         const detail = STORY_MARKETPLACE_SKILL_DETAILS[skillId];
         if (!detail) throw new Error("Skill not found");
-        return clone(withCreatorPhoto(detail));
+        return clone(detail);
       },
       listMine: async () => clone(skillSubmissions),
       choosePackage: async () => clone(STORY_SKILL_PACKAGE_PREVIEW),
@@ -779,14 +769,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         const start = Number(query?.cursor ?? 0);
         const end = start + (query?.limit ?? 50);
         return clone({
-          agents: matches.slice(start, end).map(withCreatorPhoto),
+          agents: matches.slice(start, end),
           nextCursor: end < matches.length ? String(end) : null,
         });
       },
       get: async (listingId) => {
         const detail = STORY_MARKETPLACE_AGENT_DETAILS[listingId];
         if (!detail) throw new Error("Agent not found");
-        return clone(withCreatorPhoto(detail));
+        return clone(detail);
       },
       listMine: async () => clone(marketplaceAgentSubmissions),
       preview: async (agentId) => {
