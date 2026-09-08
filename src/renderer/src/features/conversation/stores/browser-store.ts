@@ -368,7 +368,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     activateBrowserTab,
     reloadBrowserTab,
     navigateBrowserTab,
-    getPreviousBrowserTabCount: () => previousBrowserTabCount,
   };
 }
 

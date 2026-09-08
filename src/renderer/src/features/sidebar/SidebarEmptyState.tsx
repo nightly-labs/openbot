@@ -25,7 +25,7 @@ export function SidebarEmptyState() {
           <Button
             variant="ghost"
             type="button"
-            class="agent-row-active sidebar-first-agent-action"
+            class="agent-row agent-row-active sidebar-first-agent-action"
             aria-label={action().label}
             aria-pressed="true"
             data-avatar-seed={action().avatarSeed}

@@ -135,8 +135,10 @@ Use `bun run dev:seed --dry-run` to inspect the target and fixture counts withou
 
 | Command | Purpose |
 | --- | --- |
-| `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. |
+| `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`, and `--isolated` gives the worktree a profile of its own keyed to its path instead of the shared `OpenBot Dev` one. |
 | `bun run preview` | Preview the built Electron client with the green preview icon. |
+| `bun run mobile:go` | Start the mobile app in Expo Go and clear the Metro cache. |
+| `bun run mobile:go:tunnel` | Start the mobile app in Expo Go through a Metro tunnel and clear the cache. The OpenBot API and Signal still need their own reachable addresses. |
 | `bun run dev:api` | Start the TanStack Start API and its local D1 database on `127.0.0.1:3100`. |
 | `bun run api:start` | Build and preview the Cloudflare Worker locally. |
 | `bun run api:migrate:local` | Apply D1 migrations to the local development database. |
@@ -150,11 +152,17 @@ Use `bun run dev:seed --dry-run` to inspect the target and fixture counts withou
 | `bun run dev:test-client` | Start the Auth API, Signal service, local instance, and an isolated second client for team testing. |
 | `bun run dev:seed` | Replace only the app development profile with deterministic showcase data. |
 | `bun run dev:reset` | Delete the local app, test-client, and legacy host development state. |
+| `bun run dev:status` | Print, as JSON, every dev stack and dev app instance live on this machine: services, ports, pids, which of them belong to this worktree, and which are orphaned - a supervisor that is gone with its children still holding the ports. Each recorded process carries the state a stop command acts on: `live`, `gone` with `groupLive` for a survivor of a dead leader, and `unverified` for a pid this machine cannot date. |
+| `bun run dev:stop` | Stop this worktree's dev stack, children included, using the pids in the registry rather than a process-name pattern. It signals only a pid whose start time still matches the record, so a recycled pid is never sent SIGTERM; anything it cannot confirm is reported, left running and kept in the registry, and the command exits non-zero. `--pid=<supervisor pid>` stops one other stack, `--all` stops every stack on the machine. |
+| `bun run dev:forget` | Drop this worktree's stack record without signalling anything, for the one case `dev:stop` refuses to resolve on its own. It is also the only command that reads a dead record: nothing else deletes one, because a reader that removes what it judged can remove a record the supervisor rewrote in between. Takes the same `--pid=` and `--all`. |
+| `bun run storybook` | Start Storybook on a port allocated through the same registry, so two worktrees never announce one port. `OPENBOT_STORYBOOK_PORT` moves where the search starts; `--port` is refused. |
+| `bun run build-storybook` | Build static Storybook. CI sets `OPENBOT_STORYBOOK_CHECK=true` to skip automatic prop documentation during its build check. |
 | `bun run dev:automation` | Drive the running dev app over CDP: `instances`, `pages`, `snapshot`, `screenshot`, `click`/`type` by accessible role. `--page=<target-id\|url-substring>` aims at any window, including embedded browser views; `--wait-for=<role>,<name>` settles on an accessible target instead of polling; mutations need `--allow-mutations` and a named instance (this worktree's record, `--instance=<id>` or `--port=`). |
 | `bun run check` | Run Biome, both typechecks, offline tests, the browser smoke test, and the production build. |
+| `bun run typecheck` | Check all 11 projects in parallel with a separate incremental cache for each project in this worktree. |
 | `bun run check:ui` | Check the renderer against the design system: shared primitives, Kobalte and Lucide confined to `components/ui`, palette tokens instead of colour, size, radius and transition literals. Reads the whole renderer in 60 ms. |
 | `bun run test:backend` | Run backend tests only. |
-| `bun run test:browser` | Run the local embedded-browser smoke test. |
+| `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, or `--scenario=wait-deadlines` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
 | `bun run package` | Build an unpacked local ARM64 application. |
 | `bun run package:verify` | Build and verify the real ARM64 app bundle, icon, metadata, ASAR, and fuses. |
@@ -178,10 +186,28 @@ The development runner advertises both Mobile Connect and its Signal service on 
 LAN interface. Restart the runner after changing networks so newly generated QR codes contain the
 current address.
 
+`mobile:go:tunnel` exposes only the Expo development server. It does not expose the local account
+API, Signal, or TURN. A phone on 5G cannot use the default LAN addresses. For a test across networks,
+use a VPN that connects both devices, or provide HTTPS and WSS endpoints that forward to this dev
+stack's account API and Signal ports. Set `OPENBOT_MOBILE_AUTH_API_URL` to the reachable account API
+origin and `REMOTE_SIGNAL_URL` to the reachable Signal URL, including `/v1/signal`, before starting
+`bun run dev`. Use the ports reported by `bun run dev:status`; they can differ between worktrees.
+If direct WebRTC cannot connect, `TURN_HOST` must name a reachable coturn service and
+`TURN_SHARED_SECRET` must match that service. An HTTP tunnel cannot forward TURN traffic.
+Generate and scan a new Mobile Connect code after changing the account API address; an existing
+mobile session retains its original address.
+
+Mobile sign-out removes the local login even when the account API is unavailable. The app keeps
+only the credential in secure storage for revocation retries at startup, on return to the foreground,
+and on the next connection attempt. Remote revocation completes when the account API is reachable.
+
 For manual team testing, `bun run dev:test-client` starts a complete two-client harness. The second
 client uses the isolated `OpenBot Dev Test Client` profile and renderer port 5174. `dev:reset` also
 removes that profile and the legacy `OpenBot Dev Host` profile. Press `Ctrl+C` in the runner terminal
-to stop only the processes started by that runner.
+to stop only the processes started by that runner, or run `bun run dev:stop` from the worktree once
+that terminal is gone. Never stop a dev stack with `pkill -f electron` or `pkill -f bun`: on a
+machine running several worktrees those kill the other checkouts' work mid-write, which is what
+`dev:status` and `dev:stop` exist to make unnecessary.
 
 Set `OPENBOT_DEV_ICE_TRANSPORT_POLICY=relay` before this command to force Team API traffic through
 coturn. This test option works only with the development renderer. Production always starts with `all`.
@@ -222,6 +248,15 @@ Cloudflare Workers
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for dependency direction, state ownership, and
 rules for new modules.
+
+## Chat attachments
+
+Attach MP3 audio and MOV video through the file picker or drag and drop. The limits are 100 MB per
+file, 250 MB per message, and 10 files per message. OpenBot gives the agent the original file; it does
+not play, decode, transcribe, or validate the recording during import. Damaged recordings can be
+attached for inspection. Analysis depends on the tools available to the agent. For other audio or
+video formats, export as MP3 or MOV, or attach a text transcript. Remote hosts must advertise the
+`media-attachments` capability; update the host if this feature is unavailable.
 
 ## Local data and network boundaries
 

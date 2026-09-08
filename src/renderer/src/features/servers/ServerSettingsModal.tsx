@@ -64,6 +64,7 @@ import {
 import { truncateMiddle } from "../../components/ui/utils";
 import { SettingsDialogShell } from "../settings/SettingsDialogShell";
 import { teamMemberName } from "../team/TeamPersonAvatar";
+import { serverSupportsCapability } from "./server-capabilities";
 
 export interface ServerSettingsModalProps {
   open: boolean;
@@ -1121,6 +1122,33 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   }
 
   function remoteDesktopConnection() {
+    const status = () => {
+      const server = props.server;
+      if (server.issue) {
+        return {
+          title:
+            server.issue.code === "client_update_required"
+              ? "Client update required"
+              : server.issue.code === "host_update_required"
+                ? "Host update required"
+                : "Connection unavailable",
+          message: server.issue.message,
+        };
+      }
+      if (server.state !== "online") {
+        return { title: "Host is offline", message: "Reconnect to the host before you open its desktop." };
+      }
+      if (!serverSupportsCapability(server, "remote-desktop")) {
+        return { title: "Host update required", message: "Update OpenBot on the host to use remote control." };
+      }
+      return server.remoteDesktopAvailable
+        ? { title: "Service available", message: "WebRTC control is available for all active members." }
+        : {
+            title: "Service not ready",
+            message:
+              "Start Remote Control to check the host components and permissions. The host will report any setup error.",
+          };
+    };
     return (
       <Item size="spacious">
         <ItemMedia class="server-settings-desktop-icon">
@@ -1128,17 +1156,13 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         </ItemMedia>
         <ItemContent>
           <ItemTitle>Remote control</ItemTitle>
-          <ItemDescription class="server-settings-desktop-description">
-            {props.server.remoteDesktopAvailable
-              ? "WebRTC control is available for all active members."
-              : "Update required or remote control is unavailable."}
-          </ItemDescription>
+          <ItemDescription class="server-settings-desktop-description">{status().message}</ItemDescription>
           <Badge
             class="server-settings-desktop-status"
-            tone={props.server.remoteDesktopAvailable ? "success" : "warning"}
+            tone={status().title === "Service available" ? "success" : "warning"}
             shape="pill"
           >
-            {props.server.remoteDesktopAvailable ? "Service available" : "Update required"}
+            {status().title}
           </Badge>
         </ItemContent>
         <ItemActions class="server-settings-desktop-hint">

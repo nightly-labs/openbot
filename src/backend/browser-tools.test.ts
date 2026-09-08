@@ -5,6 +5,7 @@ import {
   BROWSER_TOOL_DEFINITIONS,
   OPENBOT_BROWSER_NAMESPACE,
   parseBrowserToolArguments,
+  parseBrowserToolCall,
 } from "./browser-tools";
 
 describe("browser tool catalog", () => {
@@ -96,6 +97,50 @@ describe("browser tool catalog", () => {
         "Invalid browser tool arguments",
       );
     }
+  });
+
+  it("rejects inputs that the browser host cannot execute", () => {
+    for (const [tool, args] of [
+      ["snapshot", { tabId: "   " }],
+      ["open", { url: "\t" }],
+      ["press", { tabId: "tab", key: " " }],
+      ["click", { tabId: "tab", target: { kind: "point", x: 1, y: 1 }, modifiers: [] }],
+      ["wait_for", { tabId: "tab", text: "", state: "load" }],
+      ["wait_for", { tabId: "tab", url: " ", state: "load" }],
+      ["act", { tabId: "tab", revision: 1, action: { type: "click" } }],
+      ["act", { tabId: "tab", revision: 1, action: { type: "type", ref: "ref", text: "" } }],
+      ["act", { tabId: "tab", revision: 1, action: { type: "key", key: "x".repeat(33) } }],
+      ["act", { tabId: "tab", revision: 1, action: { type: "scroll" } }],
+      ["upload_files", { tabId: "tab", target: { kind: "point", x: 1, y: 1 }, paths: [""] }],
+    ] as const) {
+      expect(() => parseBrowserToolCall(tool, args)).toThrow("Invalid browser tool arguments");
+    }
+  });
+
+  it("preserves input text, empty selections, and legacy unused fields", () => {
+    const target = { kind: "point", x: 1, y: 1 };
+    expect(parseBrowserToolCall("type", { tabId: " tab ", target, text: "", timeoutMs: 0 })).toEqual({
+      tool: "type",
+      args: { tabId: " tab ", target, text: "", timeoutMs: 0 },
+    });
+    expect(parseBrowserToolCall("press", { tabId: "tab", key: " Enter " }).args).toMatchObject({ key: " Enter " });
+    expect(parseBrowserToolCall("select_option", { tabId: "tab", target, values: [""] }).args).toMatchObject({
+      values: [""],
+    });
+    expect(parseBrowserToolCall("upload_files", { tabId: "tab", target, paths: [" "] }).args).toMatchObject({
+      paths: [" "],
+    });
+    expect(
+      parseBrowserToolCall("click", { tabId: "tab", target: { kind: "ref", ref: " ", revision: 1 } }).args,
+    ).toMatchObject({
+      target: { ref: " " },
+    });
+    expect(
+      parseBrowserToolCall("act", { tabId: "tab", revision: 1, action: { type: "back", ref: " ", text: "" } }).args,
+    ).toMatchObject({
+      action: { type: "back" },
+    });
+    expect(() => parseBrowserToolCall("missing-tool", {})).toThrow("Unknown browser tool: missing-tool");
   });
 
   it("keeps detailed local activity compatible with frozen Team API v1", () => {

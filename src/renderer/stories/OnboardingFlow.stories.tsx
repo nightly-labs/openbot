@@ -262,6 +262,17 @@ type Story = StoryObj<typeof meta>;
 
 export const Initial: Story = {};
 
+export const NarrowProviderVersions: Story = {
+  globals: { viewport: "onboardingNarrow" },
+  args: {
+    providerRuntimeStatuses: {
+      codex: { phase: "ready", progress: null, message: null, version: "0.149.1" },
+      claude: { phase: "ready", progress: null, message: null, version: "2.1.246" },
+      grok: { phase: "ready", progress: null, message: null, version: "1.0.5" },
+    },
+  },
+};
+
 export const OptionalPermissions: Story = {
   render: (storyArgs) => <MockedOnboardingFlow args={storyArgs} permissions />,
 };

@@ -10,6 +10,7 @@ import { createSignal, onCleanup } from "solid-js";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { Button, Heading, Text, Toaster, toast } from "../src/components/ui";
+import { createProviderRuntimeStore } from "../src/features/provider-updates/provider-runtime-store";
 import { DEFAULT_GENERAL_SETTINGS } from "../src/features/settings/app-settings";
 import { SettingsModal } from "../src/features/settings/SettingsModal";
 import { createMockOpenBot } from "./mock-openbot";
@@ -60,15 +61,40 @@ const providerRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   grok: { phase: "downloading", progress: 72, message: null, version: null },
 };
 
+/** Three connected runtimes, one of which has a newer version waiting. */
+const providerUpdateAgentStatus: AgentStatus = {
+  ...providerAgentStatus,
+  phase: "ready",
+  providers: (["codex", "claude", "grok"] as const).map((id) => ({
+    id,
+    state: "available",
+    version: id === "claude" ? "2.1.246" : "1.0.0",
+    message: null,
+  })),
+};
+const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
+  codex: { phase: "ready", progress: 100, message: null, version: "0.149.1" },
+  claude: { phase: "ready", progress: 100, message: null, version: "2.1.246", availableVersion: "2.1.250" },
+  grok: { phase: "ready", progress: 100, message: null, version: "1.0.5" },
+};
+
 function SettingsModalStory(props: {
   initialOpen: boolean;
   initialUpdateStatus?: UpdateStatus;
   mockDownloadUpdate?: boolean;
   providerDownloads?: boolean;
+  providerUpdate?: boolean;
+  providerUpdateFailure?: boolean;
   simulateMobileConnection?: boolean;
 }) {
   const previousApi = window.openbot;
-  const mock = createMockOpenBot();
+  const mock = createMockOpenBot({
+    providerRuntimeSnapshot: props.providerUpdate
+      ? { revision: 0, providers: providerUpdateRuntimeStatuses }
+      : undefined,
+    providerRuntimeFailure: props.providerUpdateFailure,
+  });
+  const runtimes = createProviderRuntimeStore(props.providerUpdate ? mock.api.providerRuntimes : undefined);
   window.openbot = mock.api;
   onCleanup(() => {
     mock.dispose();
@@ -169,11 +195,25 @@ function SettingsModalStory(props: {
             setMobileDevices((current) => current.filter((device) => device.sessionId !== sessionId));
           }}
           onUpdateAction={runUpdateAction}
-          agentStatus={props.providerDownloads ? providerAgentStatus : undefined}
-          providerRuntimeStatuses={props.providerDownloads ? providerRuntimeStatuses : undefined}
-          onDownloadProvider={props.providerDownloads ? fn() : undefined}
-          onCancelProviderDownload={props.providerDownloads ? fn() : undefined}
-          onConnectProvider={props.providerDownloads ? fn() : undefined}
+          agentStatus={
+            props.providerUpdate ? providerUpdateAgentStatus : props.providerDownloads ? providerAgentStatus : undefined
+          }
+          providerRuntimeStatuses={
+            props.providerUpdate
+              ? runtimes.providerRuntimeStatuses()
+              : props.providerDownloads
+                ? providerRuntimeStatuses
+                : undefined
+          }
+          providerAvailableVersions={props.providerUpdate ? runtimes.providerAvailableVersions() : undefined}
+          onUpdateProvider={props.providerUpdate ? runtimes.downloadProviderRuntime : undefined}
+          onDownloadProvider={
+            props.providerUpdate ? runtimes.downloadProviderRuntime : props.providerDownloads ? fn() : undefined
+          }
+          onCancelProviderDownload={
+            props.providerUpdate ? runtimes.cancelProviderRuntimeDownload : props.providerDownloads ? fn() : undefined
+          }
+          onConnectProvider={props.providerDownloads || props.providerUpdate ? fn() : undefined}
         />
       </main>
       <Toaster />
@@ -238,6 +278,29 @@ export const Narrow: Story = {
 export const ProviderDownloads: Story = {
   render: () => <SettingsModalStory initialOpen providerDownloads />,
   parameters: { viewport: { defaultViewport: "settingsPhone" } },
+};
+
+/** The durable surface: the update the toast offers is still here after the toast is gone. */
+export const ProviderUpdateAvailable: Story = {
+  render: () => <SettingsModalStory initialOpen providerUpdate />,
+  play: async () => {
+    const body = within(document.body);
+    await expect(body.findByRole("button", { name: "Update Claude to 2.1.250" })).resolves.toBeEnabled();
+  },
+};
+
+export const ProviderUpdateFromSettings: Story = {
+  render: () => <SettingsModalStory initialOpen providerUpdate />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("button", { name: "Update Claude to 2.1.250" }));
+    await expect(body.findByText("Updating Claude")).resolves.toBeInTheDocument();
+    await expect(body.findByText("Claude is up to date", undefined, { timeout: 8_000 })).resolves.toBeInTheDocument();
+  },
+};
+
+export const ProviderUpdateRetry: Story = {
+  render: () => <SettingsModalStory initialOpen providerUpdate providerUpdateFailure />,
 };
 
 export const Profile: Story = {

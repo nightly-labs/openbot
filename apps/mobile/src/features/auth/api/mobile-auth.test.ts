@@ -8,6 +8,7 @@ import {
   MobileSessionExpiredError,
   readMobileSession,
   redeemMobileConnectUrl,
+  retryMobileSessionRevocations,
   revokeMobileAccountSession,
   updateMobileProfile,
   validateMobileSession,
@@ -44,108 +45,134 @@ beforeEach(() => {
   native.storage.set(key, JSON.stringify(session));
   native.fetch.mockReset();
 });
-afterEach(() => vi.useRealTimers());
+afterEach(async () => {
+  await retryMobileSessionRevocations();
+  vi.useRealTimers();
+});
 
 describe("mobile session revocation", () => {
   it.each(["network", "timeout", 500, 401] as const)(
-    "retains the credential after %s so logout can be retried",
+    "signs out locally after %s and retains only a pending revocation",
     async (failure) => {
       vi.useFakeTimers();
       failNextLogout(failure);
       native.fetch.mockResolvedValueOnce(Response.json(session.user));
-      const result = logoutMobileSession(session).then(
-        () => "signed-out",
-        () => "failed",
-      );
-      await vi.advanceTimersByTimeAsync(10_000);
-      expect(await result).toBe("failed");
-      expect(await readMobileSession()).toEqual(session);
-
-      native.fetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
       await logoutMobileSession(session);
+      expect(native.storage.has(key)).toBe(false);
+      expect(JSON.parse(native.storage.get("openbot.mobile.pending-revocations.v1") ?? "null")).toEqual([
+        { apiUrl: session.apiUrl, sessionToken: session.sessionToken },
+      ]);
+      const retry = retryMobileSessionRevocations();
+      await vi.advanceTimersByTimeAsync(20_000);
+      await retry;
+      expect(native.storage.has("openbot.mobile.pending-revocations.v1")).toBe(true);
+      native.fetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
       expect(await readMobileSession()).toBeNull();
+      await retryMobileSessionRevocations();
+      expect(native.storage.has("openbot.mobile.pending-revocations.v1")).toBe(false);
     },
   );
 
-  it.each(["network", "timeout", 500, 401] as const)(
-    "finishes logout immediately when %s hides a completed server revocation",
-    async (failure) => {
-      vi.useFakeTimers();
-      failNextLogout(failure);
-      native.fetch.mockResolvedValueOnce(Response.json({ error: { code: "unauthorized" } }, { status: 401 }));
-      const result = logoutMobileSession(session).then(
-        () => "signed-out",
-        () => "failed",
-      );
-      await vi.advanceTimersByTimeAsync(10_000);
-      expect(await result).toBe("signed-out");
-      expect(await readMobileSession()).toBeNull();
-      expect(native.fetch).toHaveBeenLastCalledWith(
-        "https://api.openbot.run/v1/mobile-auth/session",
-        expect.objectContaining({
-          headers: { Authorization: "Bearer test-session-token" },
-        }),
-      );
-    },
-  );
-
-  it.each(["network", 500, "malformed"] as const)(
-    "keeps the credential when the follow-up session check fails (%s)",
-    async (failure) => {
-      failNextLogout(500);
-      native.fetch.mockImplementationOnce(async () => {
-        if (failure === "network") throw new TypeError("Network unavailable");
-        return failure === "malformed" ? Response.json({}) : new Response(null, { status: failure });
-      });
-      await expect(logoutMobileSession(session)).rejects.toThrow("Could not confirm sign-out.");
-      expect(await readMobileSession()).toEqual(session);
-    },
-  );
-
-  it("does not clear a newer login when the follow-up check confirms the old token was revoked", async () => {
-    failNextLogout(401);
-    let confirm!: (response: Response) => void;
-    native.fetch.mockImplementationOnce(
-      () =>
-        new Promise<Response>((resolve) => {
-          confirm = resolve;
-        }),
-    );
-    const pending = logoutMobileSession(session).then(
-      () => "signed-out",
-      () => "failed",
-    );
-    await vi.waitFor(() => expect(native.fetch).toHaveBeenCalledTimes(2));
-    const replacement = { ...session, sessionToken: "new-test-session-token" };
+  it("processes a sign-out queued during a retry without repeating failed credentials", async () => {
+    const started = Promise.withResolvers<void>();
+    const response = Promise.withResolvers<Response>();
+    const replacement = { ...session, apiUrl: "https://other.example.com", sessionToken: "replacement-token" };
+    native.fetch.mockImplementation(async (url, init) => {
+      if (url === `${replacement.apiUrl}/v1/mobile-auth/session`) return new Response(null, { status: 204 });
+      if (init?.method === "DELETE") {
+        started.resolve();
+        return response.promise;
+      }
+      return Response.json(session.user);
+    });
+    await logoutMobileSession(session);
+    await started.promise;
+    const retry = retryMobileSessionRevocations();
     native.storage.set(key, JSON.stringify(replacement));
-    confirm(Response.json({ error: { code: "unauthorized" } }, { status: 401 }));
-    expect(await pending).toBe("signed-out");
-    expect(await readMobileSession()).toEqual(replacement);
+    await logoutMobileSession(replacement);
+    response.resolve(new Response(null, { status: 500 }));
+    await retry;
+    expect(native.fetch.mock.calls.map(([url, init]) => [url, init?.method ?? "GET"])).toEqual([
+      [`${session.apiUrl}/v1/mobile-auth/session`, "DELETE"],
+      [`${session.apiUrl}/v1/mobile-auth/session`, "GET"],
+      [`${replacement.apiUrl}/v1/mobile-auth/session`, "DELETE"],
+    ]);
+    expect(JSON.parse(native.storage.get("openbot.mobile.pending-revocations.v1") ?? "null")).toEqual([
+      { apiUrl: session.apiUrl, sessionToken: session.sessionToken },
+    ]);
+    expect(native.storage.has(key)).toBe(false);
   });
 
-  it.each([false, true])("waits for confirmed revocation and preserves a newer login (%s)", async (newLogin) => {
-    let confirm!: (response: Response) => void;
-    native.fetch.mockImplementationOnce(
-      () =>
-        new Promise<Response>((resolve) => {
-          confirm = resolve;
-        }),
+  it("does not restore a login if the app stopped after queuing sign-out", async () => {
+    native.storage.set(
+      "openbot.mobile.pending-revocations.v1",
+      JSON.stringify([{ apiUrl: session.apiUrl, sessionToken: session.sessionToken }]),
     );
-    const pending = logoutMobileSession(session);
-    await vi.waitFor(() => expect(native.fetch).toHaveBeenCalledOnce());
-    expect(await readMobileSession()).toEqual(session);
-    const replacement = { ...session, sessionToken: "new-test-session-token" };
-    if (newLogin) native.storage.set(key, JSON.stringify(replacement));
-    confirm(new Response(null, { status: 204 }));
-    await pending;
-    expect(await readMobileSession()).toEqual(newLogin ? replacement : null);
-    expect(native.fetch).toHaveBeenCalledWith(
+    native.fetch.mockRejectedValue(new TypeError("Network unavailable"));
+    expect(await readMobileSession()).toBeNull();
+    await retryMobileSessionRevocations();
+    expect(native.storage.has(key)).toBe(false);
+    expect(native.storage.has("openbot.mobile.pending-revocations.v1")).toBe(true);
+  });
+
+  it("allows a new QR login while the old account service is unreachable", async () => {
+    native.storage.set("openbot.mobile.device-id.v1", "existing-device");
+    const replacement = { ...session, apiUrl: "https://other.example.com", sessionToken: "replacement-token" };
+    native.fetch.mockImplementation(async (url, init) => {
+      if (url === `${replacement.apiUrl}/v1/mobile-auth/redeem` && init?.method === "POST") {
+        return Response.json(replacement);
+      }
+      throw new TypeError("Old account service is unreachable");
+    });
+    await logoutMobileSession(session);
+    await retryMobileSessionRevocations();
+    const code = createMobileConnectUrl({ apiUrl: replacement.apiUrl, ticket: "t".repeat(32), host: session.host });
+    expect(await redeemMobileConnectUrl(code)).toEqual(replacement);
+    expect(await readMobileSession()).toEqual(replacement);
+    await retryMobileSessionRevocations();
+    expect(JSON.parse(native.storage.get("openbot.mobile.pending-revocations.v1") ?? "null")).toEqual([
+      { apiUrl: session.apiUrl, sessionToken: session.sessionToken },
+    ]);
+  });
+
+  it("removes a pending token when a lost response hides successful revocation", async () => {
+    failNextLogout("network");
+    native.fetch.mockResolvedValueOnce(new Response(null, { status: 401 }));
+    await logoutMobileSession(session);
+    await retryMobileSessionRevocations();
+    expect(native.storage.has(key)).toBe(false);
+    expect(native.storage.has("openbot.mobile.pending-revocations.v1")).toBe(false);
+    expect(native.fetch).toHaveBeenLastCalledWith(
       "https://api.openbot.run/v1/mobile-auth/session",
-      expect.objectContaining({
-        method: "DELETE",
-        headers: { Authorization: "Bearer test-session-token" },
-      }),
+      expect.objectContaining({ headers: { Authorization: "Bearer test-session-token" } }),
     );
+  });
+
+  it("does not wait for the network or clear a replacement login", async () => {
+    const started = Promise.withResolvers<void>();
+    const response = Promise.withResolvers<Response>();
+    native.fetch.mockImplementationOnce(() => {
+      started.resolve();
+      return response.promise;
+    });
+    await logoutMobileSession(session);
+    await started.promise;
+    expect(native.storage.has(key)).toBe(false);
+    const replacement = { ...session, sessionToken: "new-test-session-token" };
+    native.storage.set(key, JSON.stringify(replacement));
+    response.resolve(new Response(null, { status: 204 }));
+    await retryMobileSessionRevocations();
+    expect(await readMobileSession()).toEqual(replacement);
+    expect(native.storage.has("openbot.mobile.pending-revocations.v1")).toBe(false);
+  });
+
+  it("preserves a login at another API with the same token", async () => {
+    const replacement = { ...session, apiUrl: "https://other.example.com" };
+    native.storage.set(key, JSON.stringify(replacement));
+    native.fetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await logoutMobileSession(session);
+    await retryMobileSessionRevocations();
+    expect(await readMobileSession()).toEqual(replacement);
   });
 });
 

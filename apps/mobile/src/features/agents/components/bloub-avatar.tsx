@@ -16,6 +16,7 @@ interface BloubAvatarProps {
   hue: AvatarHue | null;
   seed: string;
   size?: number;
+  animateIdle?: boolean;
 }
 
 const AVATAR_PAPER = "#f9f9f9";
@@ -34,7 +35,7 @@ function AvatarDot({ frame, index, color }: { frame: DerivedValue<BloubActivityF
   return <AnimatedCircle fill={color} animatedProps={props} />;
 }
 
-export function BloubAvatar({ agentId, hue, seed, size = 54 }: BloubAvatarProps) {
+export function BloubAvatar({ agentId, hue, seed, size = 54, animateIdle = true }: BloubAvatarProps) {
   const { agents, servers } = useMobileWorkspace();
   const serverId = agents.find((agent) => agent.id === agentId)?.serverId;
   const disconnected = !servers.some((server) => server.id === serverId && server.state === "online");
@@ -44,6 +45,7 @@ export function BloubAvatar({ agentId, hue, seed, size = 54 }: BloubAvatarProps)
       hue={hue}
       seed={seed}
       size={size}
+      animateIdle={animateIdle}
       disconnected={disconnected}
       working={!disconnected && Boolean(activity && activity.phase !== "waiting")}
     />
@@ -56,11 +58,12 @@ export const BloubAvatarPreview = memo(function BloubAvatarPreview({
   size = 54,
   disconnected = false,
   working = false,
+  animateIdle = true,
 }: Omit<BloubAvatarProps, "agentId"> & { disconnected?: boolean; working?: boolean }) {
   const appearance = useConnectionAppearance(disconnected);
   const colorProps = useAnimatedProps(() => ({ values: [appearance.get().saturation] }));
   const appearanceProps = useAnimatedProps(() => ({ opacity: appearance.get().opacity }));
-  const frame = useBloubActivityFrame(seed, working, !disconnected);
+  const frame = useBloubActivityFrame(seed, working, animateIdle && !disconnected);
   const bodyProps = useAnimatedProps(() => frame.get().body);
   const maskId = `bloub-${useId().replaceAll(":", "")}`;
   const color = getBloubAvatarColor(seed, hue);

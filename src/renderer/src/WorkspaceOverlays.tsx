@@ -200,6 +200,7 @@ function AppSettings(props: AccountProps) {
     useSettings();
   const {
     providerRuntimeStatuses,
+    providerAvailableVersions,
     providerRuntimeDownloadsAvailable,
     downloadProviderRuntime,
     cancelProviderRuntimeDownload,
@@ -230,6 +231,8 @@ function AppSettings(props: AccountProps) {
         onRevokeAccountSession={auth.revokeAccountSession}
         agentStatus={agentStatus()}
         providerRuntimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
+        providerAvailableVersions={localProviderDownloads() ? providerAvailableVersions() : undefined}
+        onUpdateProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
         onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
         onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
         onConnectProvider={localProviderDownloads() ? connectProvider : undefined}

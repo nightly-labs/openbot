@@ -6,6 +6,7 @@ import type {
   ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
 import { createEffect, createUniqueId, For, Show } from "solid-js";
+import { providerUpdateAvailable, providerVersionLabel } from "../features/provider-updates/provider-update";
 import { Badge, Button, Input, RefreshCw, Spinner } from "./ui";
 
 export interface ProviderPickerOption {
@@ -18,6 +19,8 @@ export interface ProviderPickerOption {
   connectionState?: "connecting";
   checkError?: string | null;
   runtimeStatus?: ProviderRuntimeStatus;
+  /** The newer runtime main says exists. The renderer never works this out itself. */
+  availableVersion?: string | null;
 }
 
 export interface ProviderPickerProps {
@@ -34,6 +37,7 @@ export interface ProviderPickerProps {
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
+  onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onRefreshProviders?: () => void | Promise<void>;
@@ -100,8 +104,19 @@ export function ProviderPicker(props: ProviderPickerProps) {
             const runtimeStatus = () => option().runtimeStatus;
             const connecting = () => option().connectionState === "connecting";
             const available = () => state() === "available";
-            const visualState = () => providerVisualState(state(), connecting(), runtimeStatus());
-            const runtimeAction = () => providerRuntimeAction(state(), connecting(), runtimeStatus());
+            const updatable = () => {
+              const runtime = runtimeStatus();
+              return runtime ? providerUpdateAvailable(runtime, option().availableVersion ?? null) : false;
+            };
+            const version = () => {
+              const runtime = runtimeStatus();
+              return runtime ? providerVersionLabel(runtime) : null;
+            };
+            const visualState = () => providerVisualState(state(), connecting(), runtimeStatus(), updatable());
+            const runtimeAction = () =>
+              updatable() && props.onUpdateProvider && runtimeStatus()?.phase === "not-downloaded"
+                ? undefined
+                : providerRuntimeAction(state(), connecting(), runtimeStatus());
             const inputId = () => `${pickerId}-${option().id}`;
             return (
               <div
@@ -138,98 +153,126 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       {(checkError) => <small class="provider-picker-check-error">{checkError()}</small>}
                     </Show>
                   </span>
-                  <Show when={runtimeStatus()?.phase !== "not-downloaded"}>
-                    <Badge
-                      class={`provider-picker-status provider-picker-status-${visualState()}`}
-                      tone={providerStatusTone(visualState())}
-                      shape="pill"
-                    >
-                      {providerStatusLabel(state(), connecting(), runtimeStatus())}
-                    </Badge>
-                  </Show>
+                  {/* The version reads with the badge rather than with the name: which runtime is
+                      installed is a fact about its state, and the two share the row's last column so
+                      that neither starts a column of its own. */}
+                  <span class="provider-picker-state">
+                    <Show when={version()}>
+                      {(installed) => <small class="provider-picker-version">{installed()}</small>}
+                    </Show>
+                    <Show when={runtimeStatus()?.phase !== "not-downloaded" || updatable()}>
+                      <Badge
+                        class={`provider-picker-status provider-picker-status-${visualState()}`}
+                        tone={providerStatusTone(visualState())}
+                        shape="pill"
+                      >
+                        {providerStatusLabel(state(), connecting(), runtimeStatus(), updatable())}
+                      </Badge>
+                    </Show>
+                  </span>
                 </label>
-                <Show when={runtimeAction()}>
-                  {(action) => (
+                {/* The row is a two-column grid, so every action shares one cell. A second button
+                    left as a sibling starts a grid row of its own and stretches across it. */}
+                <div class="provider-picker-actions">
+                  <Show when={runtimeAction()}>
+                    {(action) => (
+                      <Button
+                        type="button"
+                        variant={action() === "Download" ? "default" : "outline"}
+                        size="xs"
+                        class="provider-picker-install"
+                        aria-label={`${action()} ${option().name}`}
+                        disabled={props.disabled || props.refreshingProviders}
+                        onClick={() => {
+                          if (action() === "Cancel") {
+                            void props.onCancelProviderDownload?.(option().id);
+                          } else if (["Connect", "Reconnect", "Restart"].includes(action())) {
+                            void props.onConnectProvider?.(option().id);
+                          } else {
+                            void props.onDownloadProvider?.(option().id);
+                          }
+                        }}
+                      >
+                        {action()}
+                      </Button>
+                    )}
+                  </Show>
+                  {/* Beside the runtime action, never instead of it: an offered update must not take
+                    Connect or Reconnect away from a provider that is ready to use as it is. It sits
+                    last so the emphasized action is the one at the edge of the row. */}
+                  <Show when={updatable() && props.onUpdateProvider}>
                     <Button
                       type="button"
-                      variant={action() === "Download" ? "default" : "outline"}
+                      variant="default"
                       size="xs"
                       class="provider-picker-install"
-                      aria-label={`${action()} ${option().name}`}
+                      aria-label={`Update ${option().name} to ${option().availableVersion}`}
                       disabled={props.disabled || props.refreshingProviders}
-                      onClick={() => {
-                        if (action() === "Cancel") {
-                          void props.onCancelProviderDownload?.(option().id);
-                        } else if (["Connect", "Reconnect", "Restart"].includes(action())) {
-                          void props.onConnectProvider?.(option().id);
-                        } else {
-                          void props.onDownloadProvider?.(option().id);
-                        }
-                      }}
+                      onClick={() => void props.onUpdateProvider?.(option().id)}
                     >
-                      {action()}
+                      Update
                     </Button>
-                  )}
-                </Show>
-                <Show
-                  when={
-                    !runtimeStatus() &&
-                    option().id === "claude" &&
-                    state() === "not-installed" &&
-                    !props.onConnectProvider &&
-                    props.onInstallProvider
-                  }
-                >
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    class="provider-picker-install"
-                    aria-label={`Install ${option().name}`}
-                    disabled={props.disabled || props.refreshingProviders}
-                    onClick={() => void props.onInstallProvider?.(option().id)}
+                  </Show>
+                  <Show
+                    when={
+                      !runtimeStatus() &&
+                      option().id === "claude" &&
+                      state() === "not-installed" &&
+                      !props.onConnectProvider &&
+                      props.onInstallProvider
+                    }
                   >
-                    Install
-                  </Button>
-                </Show>
-                <Show when={!runtimeStatus() && props.onConnectProvider}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    class="provider-picker-install"
-                    aria-label={`${providerActionLabel(state(), connecting())} ${option().name}`}
-                    aria-busy={connecting() ? "true" : undefined}
-                    disabled={props.disabled || props.refreshingProviders}
-                    onClick={() => void props.onConnectProvider?.(option().id)}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      class="provider-picker-install"
+                      aria-label={`Install ${option().name}`}
+                      disabled={props.disabled || props.refreshingProviders}
+                      onClick={() => void props.onInstallProvider?.(option().id)}
+                    >
+                      Install
+                    </Button>
+                  </Show>
+                  <Show when={!runtimeStatus() && props.onConnectProvider}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      class="provider-picker-install"
+                      aria-label={`${providerActionLabel(state(), connecting())} ${option().name}`}
+                      aria-busy={connecting() ? "true" : undefined}
+                      disabled={props.disabled || props.refreshingProviders}
+                      onClick={() => void props.onConnectProvider?.(option().id)}
+                    >
+                      <Show when={connecting()}>
+                        <Spinner size="sm" />
+                      </Show>
+                      {providerActionLabel(state(), connecting())}
+                    </Button>
+                  </Show>
+                  <Show
+                    when={
+                      !runtimeStatus() &&
+                      option().id === "claude" &&
+                      state() === "sign-in-required" &&
+                      !props.onConnectProvider &&
+                      props.onSignInProvider
+                    }
                   >
-                    <Show when={connecting()}>
-                      <Spinner size="sm" />
-                    </Show>
-                    {providerActionLabel(state(), connecting())}
-                  </Button>
-                </Show>
-                <Show
-                  when={
-                    !runtimeStatus() &&
-                    option().id === "claude" &&
-                    state() === "sign-in-required" &&
-                    !props.onConnectProvider &&
-                    props.onSignInProvider
-                  }
-                >
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    class="provider-picker-install"
-                    aria-label={`Sign in to ${option().name}`}
-                    disabled={props.disabled || props.refreshingProviders}
-                    onClick={() => void props.onSignInProvider?.(option().id)}
-                  >
-                    Sign in
-                  </Button>
-                </Show>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      class="provider-picker-install"
+                      aria-label={`Sign in to ${option().name}`}
+                      disabled={props.disabled || props.refreshingProviders}
+                      onClick={() => void props.onSignInProvider?.(option().id)}
+                    >
+                      Sign in
+                    </Button>
+                  </Show>
+                </div>
               </div>
             );
           }}
@@ -240,13 +283,14 @@ export function ProviderPicker(props: ProviderPickerProps) {
   );
 }
 
-type ProviderVisualState = AgentProviderState | ProviderRuntimePhase | "connecting";
+type ProviderVisualState = AgentProviderState | ProviderRuntimePhase | "connecting" | "update-available";
 
 function providerStatusTone(state: ProviderVisualState): "success" | "warning" | "danger" | "neutral" {
   if (state === "available") return "success";
   if (state === "ready") return "success";
   if (state === "error" || state === "download-error") return "danger";
   if (state === "sign-in-required" || state === "outdated" || state === "finishing") return "warning";
+  if (state === "update-available") return "warning";
   return "neutral";
 }
 
@@ -254,16 +298,23 @@ function providerStatusLabel(
   state: AgentProviderState,
   connecting = false,
   runtimeStatus?: ProviderRuntimeStatus,
+  updatable = false,
 ): string {
   if (connecting && state !== "available") return "Connecting";
-  if (state === "available") return "Connected";
-  if (runtimeStatus?.phase === "not-downloaded") return "Not downloaded";
+  // Ahead of both "Connected" and "Ready": an offer the row does not show is an
+  // offer the user never sees, and "ready" is the phase every update starts from.
+  if (updatable) return "Update available";
+  // A download outranks "Connected": an update runs on a provider that is connected already, so
+  // reporting the connection instead would hide both the progress the Cancel button reverses and
+  // the failure the Retry button beside it answers.
   if (runtimeStatus?.phase === "downloading") {
     return `${Math.round(Math.max(0, Math.min(100, runtimeStatus.progress ?? 0)))}%`;
   }
   if (runtimeStatus?.phase === "finishing") return "Setting up";
-  if (runtimeStatus?.phase === "ready") return "Ready";
   if (runtimeStatus?.phase === "download-error") return "Download failed";
+  if (state === "available") return "Connected";
+  if (runtimeStatus?.phase === "not-downloaded") return "Not downloaded";
+  if (runtimeStatus?.phase === "ready") return "Ready";
   if (state === "sign-in-required") return "Not connected";
   if (state === "not-installed") return "Not installed";
   if (state === "outdated") return "Update required";
@@ -275,10 +326,14 @@ function providerVisualState(
   state: AgentProviderState,
   connecting: boolean,
   runtimeStatus?: ProviderRuntimeStatus,
+  updatable = false,
 ): ProviderVisualState {
   if (connecting && state !== "available") return "connecting";
+  if (updatable) return "update-available";
+  const phase = runtimeStatus?.phase;
+  if (phase === "downloading" || phase === "finishing" || phase === "download-error") return phase;
   if (state === "available") return "available";
-  return runtimeStatus?.phase ?? state;
+  return phase ?? state;
 }
 
 function providerRuntimeAction(

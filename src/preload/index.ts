@@ -57,7 +57,6 @@ import {
   type MarketplaceSkillDetail,
   type MarketplaceSkillPage,
   type OpenBotDesktopApi,
-  type ProviderRuntimeSnapshot,
   type QueuedMessageReceipt,
   type QueueSnapshot,
   type ScopedAgentEvent,
@@ -82,6 +81,7 @@ import {
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { clipboardFiles } from "./clipboard-files";
+import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 
 const attachmentImportListeners = new Set<(event: AttachmentImportEvent) => void>();
 let selectedServerId: string = LOCAL_SERVER_ID;
@@ -294,34 +294,6 @@ function decodeFilePreview(value: unknown): FilePreview {
 function decodeAgentStatusFromMain(value: unknown): AgentStatus {
   if (!isAgentStatus(value)) throw new Error("Invalid agent status response.");
   return value;
-}
-
-function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSnapshot {
-  if (!isDynamicRecord(value) || !isNumber(value.revision) || !isDynamicRecord(value.providers)) {
-    throw new Error("Invalid provider runtime response.");
-  }
-  const decoded: Partial<ProviderRuntimeSnapshot["providers"]> = {};
-  for (const provider of ["codex", "claude", "grok"] as const) {
-    const status = value.providers[provider];
-    if (
-      !isDynamicRecord(status) ||
-      !isOneOf(["not-downloaded", "downloading", "finishing", "ready", "download-error"] as const, status.phase) ||
-      (status.progress !== null && !isNumber(status.progress)) ||
-      (status.message !== null && !isString(status.message)) ||
-      (status.version !== null && !isString(status.version))
-    ) {
-      throw new Error("Invalid provider runtime response.");
-    }
-    decoded[provider] = {
-      phase: status.phase,
-      progress: status.progress,
-      message: status.message,
-      version: status.version,
-    };
-  }
-  const { codex, claude, grok } = decoded;
-  if (!codex || !claude || !grok) throw new Error("Invalid provider runtime response.");
-  return { revision: value.revision, providers: { codex, claude, grok } };
 }
 
 function decodeAccountUsageFromMain(value: unknown): AccountUsage {

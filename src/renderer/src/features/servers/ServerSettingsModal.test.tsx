@@ -110,6 +110,54 @@ function props(overrides: Partial<ServerSettingsModalProps> = {}): ServerSetting
 }
 
 describe("ServerSettingsModal", () => {
+  it.each([true, false])("does not request an update for a compatible host with availability %s", async (ready) => {
+    render(() => (
+      <ServerSettingsModal
+        {...props({
+          server: {
+            ...remoteServer,
+            remoteDesktopAvailable: ready,
+            compatibility: {
+              localAppVersion: "0.5.0",
+              hostAppVersion: "0.5.0",
+              localProtocol: { minimum: 1, maximum: 3 },
+              hostProtocol: { minimum: 1, maximum: 3 },
+              negotiatedProtocol: 3,
+              capabilities: ["remote-desktop"],
+            },
+          },
+        })}
+      />
+    ));
+    await fireEvent.click(screen.getByRole("tab", { name: "Remote desktop" }));
+    expect(await screen.findByText(ready ? "Service available" : "Service not ready")).toBeInTheDocument();
+    expect(screen.queryByText(/update required/iu)).not.toBeInTheDocument();
+  });
+
+  it.each(["client_update_required", "host_update_required"] as const)(
+    "identifies the end that needs an update: %s",
+    async (code) => {
+      const message = code === "client_update_required" ? "Update this OpenBot app." : "Update OpenBot on the host.";
+      render(() => (
+        <ServerSettingsModal
+          {...props({
+            server: {
+              ...remoteServer,
+              state: "incompatible",
+              remoteDesktopAvailable: false,
+              issue: { code, message, retryable: true },
+            },
+          })}
+        />
+      ));
+      await fireEvent.click(screen.getByRole("tab", { name: "Remote desktop" }));
+      expect(
+        await screen.findByText(code === "client_update_required" ? "Client update required" : "Host update required"),
+      ).toBeInTheDocument();
+      expect(screen.getByText(message)).toBeInTheDocument();
+    },
+  );
+
   it("saves the first local identity without publishing it", async () => {
     const onSaveIdentity = vi.fn(async () => undefined);
     const onSetPublished = vi.fn(async () => undefined);

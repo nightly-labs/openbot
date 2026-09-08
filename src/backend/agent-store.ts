@@ -558,17 +558,18 @@ export class AgentStore {
     };
   }
 
-  async deleteAgent(id: string): Promise<AgentSummary> {
-    const agent = this.#requireAgent(id);
-    this.#state.agents = this.#state.agents.filter((candidate) => candidate.id !== id);
-    this.#database.hardDeleteAgent(`agents:hard-delete:${randomUUID()}`, id, agent.threadId, this.#state.agents);
-    await Promise.all([
-      rm(join(this.#avatarsRoot, id), { recursive: true, force: true }),
-      rm(`${join(this.#avatarsRoot, id)}.openbot-stage`, { recursive: true, force: true }),
-      rm(join(this.#agentsRoot, id), { recursive: true, force: true }),
-      rm(`${join(this.#agentsRoot, id)}.openbot-stage`, { recursive: true, force: true }),
-      rm(this.#duplicationMarkerPath(id), { force: true }),
-    ]);
+  async deleteAgent(id: string): Promise<AgentSummary | null> {
+    validateAgentId(id);
+    const agent = this.#state.agents.find((candidate) => candidate.id === id);
+    for (const path of [
+      join(this.#avatarsRoot, id),
+      `${join(this.#avatarsRoot, id)}.openbot-stage`,
+      join(this.#agentsRoot, id),
+      `${join(this.#agentsRoot, id)}.openbot-stage`,
+    ]) {
+      await rm(path, { recursive: true, force: true });
+    }
+    await rm(this.#duplicationMarkerPath(id), { force: true });
     // A workspace that could not follow the rename legitimately sits under the pre-rename root, and deleting
     // only the derived path would leave that agent's files behind. Every path here is derived rather than
     // read from `workspacePath`, because that column comes out of the user's own database file and a
@@ -583,8 +584,13 @@ export class AgentStore {
     if (legacyId !== null) {
       legacyPaths.push(join(this.#avatarsRoot, legacyId), join(this.#legacyAgentsRoot, legacyId));
     }
-    await Promise.all(legacyPaths.map((path) => rm(path, { recursive: true, force: true })));
-    return { ...agent };
+    for (const path of legacyPaths) await rm(path, { recursive: true, force: true });
+    // Keep the record for retry until every managed path is removed. Publish the new
+    // in-memory list only after the database transaction succeeds.
+    const remaining = this.#state.agents.filter((candidate) => candidate.id !== id);
+    this.#database.hardDeleteAgent(`agents:hard-delete:${randomUUID()}`, id, agent?.threadId ?? null, remaining);
+    this.#state.agents = remaining;
+    return agent ? { ...agent } : null;
   }
 
   async getOrCreate(id: string, name?: string, title?: string): Promise<AgentSummary> {

@@ -724,63 +724,76 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
-  it("opens, hides, resumes, and disconnects Remote Control from the header", async () => {
-    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
-      {
-        id: "remote-1",
-        name: "Studio Mac",
-        logoUrl: null,
-        kind: "remote",
-        state: "online",
-        apiUrl: "https://studio-mac-k7m4q2pz-host.openbot.run",
-        remoteDesktopAvailable: true,
-        role: "owner",
-        active: true,
-      },
-    ]);
-    vi.mocked(window.openbot.remoteDesktop.connect).mockResolvedValueOnce({
-      id: "desktop-1",
-      serverId: "remote-1",
-      viewerUrl: "https://studio-mac-k7m4q2pz-host.openbot.run/v1/remote-screen/sessions/desktop-1/viewer",
-      viewerGrant: "viewer-grant",
-      displays: [],
-      selectedDisplayId: null,
-      phase: "connecting",
-      transport: "unknown",
-      errorCode: null,
-      message: "Connecting…",
-      createdAt: "2026-08-18T12:00:00.000Z",
-      grantExpiresAt: "2026-08-18T12:01:00.000Z",
-    });
+  it.each([true, false])(
+    "opens, hides, resumes, and disconnects Remote Control with cached availability %s",
+    async (remoteDesktopAvailable) => {
+      vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
+        {
+          id: "remote-1",
+          name: "Studio Mac",
+          logoUrl: null,
+          kind: "remote",
+          state: "online",
+          apiUrl: "https://studio-mac-k7m4q2pz-host.openbot.run",
+          remoteDesktopAvailable,
+          role: "owner",
+          active: true,
+        },
+      ]);
+      const setupError = "The host has not allowed OpenBot to record its screen.";
+      if (!remoteDesktopAvailable) {
+        vi.mocked(window.openbot.remoteDesktop.connect).mockRejectedValueOnce(new Error(setupError));
+      }
+      vi.mocked(window.openbot.remoteDesktop.connect).mockResolvedValueOnce({
+        id: "desktop-1",
+        serverId: "remote-1",
+        viewerUrl: "https://studio-mac-k7m4q2pz-host.openbot.run/v1/remote-screen/sessions/desktop-1/viewer",
+        viewerGrant: "viewer-grant",
+        displays: [],
+        selectedDisplayId: null,
+        phase: "connecting",
+        transport: "unknown",
+        errorCode: null,
+        message: "Connecting…",
+        createdAt: "2026-08-18T12:00:00.000Z",
+        grantExpiresAt: "2026-08-18T12:01:00.000Z",
+      });
 
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    expect(window.openbot.remoteDesktop.connect).not.toHaveBeenCalled();
-    expect(screen.queryByTitle("Sunshine remote desktop")).not.toBeInTheDocument();
-    const openButton = screen.getByRole("button", { name: "Open remote control" });
-    await fireEvent.click(openButton);
+      render(() => <App />);
+      await screen.findByRole("heading", { name: "Chief" });
+      expect(window.openbot.remoteDesktop.connect).not.toHaveBeenCalled();
+      expect(screen.queryByTitle("Sunshine remote desktop")).not.toBeInTheDocument();
+      const openButton = screen.getByRole("button", { name: "Open remote control" });
+      await fireEvent.click(openButton);
 
-    const remoteDesktop = await screen.findByRole("main", { name: "Remote control" });
-    const appFrame = document.querySelector<HTMLElement>(".app-frame");
-    if (!appFrame) throw new Error("App frame is missing.");
-    expect(appFrame.inert).toBe(true);
-    expect(appFrame).toHaveAttribute("aria-hidden", "true");
-    await waitFor(() => expect(window.openbot.remoteDesktop.connect).toHaveBeenCalledWith({ serverId: "remote-1" }));
+      const remoteDesktop = await screen.findByRole("main", { name: "Remote control" });
+      const appFrame = document.querySelector<HTMLElement>(".app-frame");
+      if (!appFrame) throw new Error("App frame is missing.");
+      expect(appFrame.inert).toBe(true);
+      expect(appFrame).toHaveAttribute("aria-hidden", "true");
+      await waitFor(() => expect(window.openbot.remoteDesktop.connect).toHaveBeenCalledWith({ serverId: "remote-1" }));
 
-    await screen.findByTitle("Sunshine remote desktop");
-    await fireEvent.click(within(remoteDesktop).getByRole("button", { name: "Back to OpenBot" }));
-    await waitFor(() => expect(appFrame.inert).toBe(false));
-    // Hiding keeps the session alive, so resuming must not open a second one.
-    expect(window.openbot.remoteDesktop.disconnect).not.toHaveBeenCalled();
+      if (!remoteDesktopAvailable) {
+        expect(await screen.findByRole("alert")).toHaveTextContent(setupError);
+        expect(screen.queryByText("Update required")).not.toBeInTheDocument();
+        await fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      }
+      await screen.findByTitle("Sunshine remote desktop");
+      expect(screen.queryByText("Update required")).not.toBeInTheDocument();
+      await fireEvent.click(within(remoteDesktop).getByRole("button", { name: "Back to OpenBot" }));
+      await waitFor(() => expect(appFrame.inert).toBe(false));
+      // Hiding keeps the session alive, so resuming must not open a second one.
+      expect(window.openbot.remoteDesktop.disconnect).not.toHaveBeenCalled();
 
-    await fireEvent.click(screen.getByRole("button", { name: "Resume remote control" }));
-    expect(await screen.findByTitle("Sunshine remote desktop")).toBeInTheDocument();
-    expect(window.openbot.remoteDesktop.connect).toHaveBeenCalledTimes(1);
-    await fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
-    await waitFor(() => expect(window.openbot.remoteDesktop.disconnect).toHaveBeenCalledWith("desktop-1"));
-    await waitFor(() => expect(screen.queryByTitle("Sunshine remote desktop")).not.toBeInTheDocument());
-    expect(screen.getByRole("button", { name: "Open remote control" })).toBeInTheDocument();
-  });
+      await fireEvent.click(screen.getByRole("button", { name: "Resume remote control" }));
+      expect(await screen.findByTitle("Sunshine remote desktop")).toBeInTheDocument();
+      expect(window.openbot.remoteDesktop.connect).toHaveBeenCalledTimes(remoteDesktopAvailable ? 1 : 2);
+      await fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+      await waitFor(() => expect(window.openbot.remoteDesktop.disconnect).toHaveBeenCalledWith("desktop-1"));
+      await waitFor(() => expect(screen.queryByTitle("Sunshine remote desktop")).not.toBeInTheDocument());
+      expect(screen.getByRole("button", { name: "Open remote control" })).toBeInTheDocument();
+    },
+  );
 
   it("disconnects a hidden Remote Control session when the server changes", async () => {
     const servers = [
