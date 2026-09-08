@@ -117,7 +117,13 @@ export function usageSeries(
     rows: daily.map((day) => {
       const row: UsageSeriesRow = { date: day.date };
       const cellsForDay = byDate.get(day.date);
-      for (const provider of series) row[provider] = cellsForDay?.get(provider) ?? 0;
+      for (const provider of series) {
+        // Absent and unpriced are different answers. No cell means the provider spent nothing
+        // that day, which is a real zero; a cell whose cost estimate is null means the day is
+        // unavailable, and `connectNulls={false}` draws that as the gap it is.
+        const value = cellsForDay?.get(provider);
+        row[provider] = value === undefined ? 0 : value;
+      }
       return row;
     }),
   };

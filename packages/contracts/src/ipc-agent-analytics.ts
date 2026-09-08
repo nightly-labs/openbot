@@ -59,13 +59,27 @@ export interface AgentAnalytics {
   models: AnalyticsModel[];
 }
 
-export function analyticsDate(date: Date, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
+// One formatter per time zone, not per call. A report walks every usage and activity row
+// through `analyticsDate`, so a host with 100,000 records used to construct 100,000 formatters
+// synchronously in the main process. The zone is validated before it reaches here - a string of
+// at most 100 characters that `Intl` accepts - so the key space is the IANA list, not user text.
+const dateFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function dateFormatter(timeZone: string): Intl.DateTimeFormat {
+  const cached = dateFormatters.get(timeZone);
+  if (cached) return cached;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).formatToParts(date);
+  });
+  dateFormatters.set(timeZone, formatter);
+  return formatter;
+}
+
+export function analyticsDate(date: Date, timeZone: string): string {
+  const parts = dateFormatter(timeZone).formatToParts(date);
   const part = (type: string) => parts.find((value) => value.type === type)?.value;
   return `${part("year")}-${part("month")}-${part("day")}`;
 }

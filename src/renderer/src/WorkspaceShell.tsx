@@ -1,5 +1,5 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, Show } from "solid-js";
+import { createMemo, Show } from "solid-js";
 import { WorkspaceAccountDock } from "./features/account/WorkspaceAccountDock";
 import { useAgents } from "./features/agents/agents-context";
 import { WorkspaceAgentSetup } from "./features/agents/WorkspaceAgentSetup";
@@ -39,12 +39,7 @@ import { WorkspaceOverlays } from "./WorkspaceOverlays";
 export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   const platform = usePlatform();
   const usage = useUsage();
-  const { servers, activeServerId } = useServers();
-  let previousServer = activeServerId();
-  createEffect(activeServerId, (serverId) => {
-    if (serverId !== previousServer && usage.state.serverId) usage.openUsage(serverId, null);
-    previousServer = serverId;
-  });
+  const { servers } = useServers();
   const layout = useLayout();
   const { activeServer, activeServerSupportsCapability, retryServerConnection } = useServers();
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();

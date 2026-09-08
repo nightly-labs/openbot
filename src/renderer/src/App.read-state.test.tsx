@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-lib
 import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
+import { AppAccessGate } from "./AppView";
 import { AppProviders } from "./app-providers";
 import {
   emitAgentEvent,
@@ -16,6 +17,8 @@ import {
 } from "./app-test-harness";
 import { useConversation } from "./features/conversation/conversation-context";
 import { useServerScope } from "./features/servers/server-scope";
+import { useServers } from "./features/servers/servers-context";
+import { useUsage } from "./features/usage/usage-context";
 
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
@@ -1532,6 +1535,70 @@ describe("OpenBot connected desktop shell", () => {
         "local",
       ),
     );
+  });
+
+  it("keeps an agent reply unread while the Usage report covers the conversation", async () => {
+    const unreadPage = testConversationPage(
+      "chief",
+      [
+        {
+          id: "agent-hidden-answer",
+          author: "assistant",
+          text: "Ready while the report was open",
+          createdAt: "2026-08-19T09:04:00.000Z",
+          status: "completed",
+        },
+      ],
+      {
+        revision: 2,
+        readState: {
+          unreadCount: 1,
+          firstUnreadMessageId: "agent-hidden-answer",
+          throughMessageId: null,
+        },
+      },
+    );
+
+    // The same tree `App` mounts, plus a control that opens the report. The report covers the
+    // workspace content and marks it inert, so a reply that arrives behind it was never seen -
+    // without the Usage guard the chat still counts as open and the reply is read on arrival.
+    function UsageProbe() {
+      const { activeServerId } = useServers();
+      const usage = useUsage();
+      return (
+        <>
+          <button type="button" onClick={() => usage.openUsage(activeServerId(), null)}>
+            Open usage
+          </button>
+          <button type="button" onClick={() => usage.closeUsage()}>
+            Close usage
+          </button>
+        </>
+      );
+    }
+
+    render(() => (
+      <AppProviders>
+        <AppAccessGate />
+        <UsageProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+    vi.mocked(window.openbot.agent.markConversationRead).mockClear();
+    vi.mocked(window.openbot.agent.readConversationPage).mockResolvedValue(unreadPage);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+    flush();
+    emitAgentEvent?.({ type: "conversation-page", page: unreadPage });
+
+    expect(await screen.findByText("Ready while the report was open")).toBeInTheDocument();
+    expect(window.openbot.agent.markConversationRead).not.toHaveBeenCalled();
+
+    // Back uncovers the conversation, and the reply is still waiting there. The unread state
+    // is queryable only now: while the report is open the content it covers is aria-hidden,
+    // which is the same reason the reply must not count as seen.
+    fireEvent.click(screen.getByRole("button", { name: "Close usage" }));
+    expect(await screen.findByRole("status", { name: "1 new message" })).toBeInTheDocument();
   });
 
   it("clears unread messages when entering an agent chat", async () => {

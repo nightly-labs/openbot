@@ -2,6 +2,8 @@ import type { AgentEvent, ConversationMessage, ServerSummary } from "@openbot/co
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
+import { AppAccessGate } from "./AppView";
+import { AppProviders } from "./app-providers";
 import {
   AGENTS,
   attachment,
@@ -15,7 +17,9 @@ import {
   subscriberCounts,
   testServer,
 } from "./app-test-harness";
+import { useServers } from "./features/servers/servers-context";
 import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins";
+import { useUsage } from "./features/usage/usage-context";
 import { TestResizeObserver } from "./setupTests";
 
 describe("OpenBot connected desktop shell", () => {
@@ -1248,5 +1252,39 @@ describe("OpenBot connected desktop shell", () => {
 
     expect(subscriberCounts()).toEqual(afterMount);
     expect(TestResizeObserver.instances.size).toBe(observersAfterMount);
+  });
+  it("follows the host switch with an open Usage report", async () => {
+    const servers = [testServer("local", true), testServer("remote-1", false)];
+    const activate = (activeId: string) => servers.map((server) => ({ ...server, active: server.id === activeId }));
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce(activate("local"));
+    vi.mocked(window.openbot.servers.select).mockResolvedValueOnce(activate("remote-1"));
+
+    // The report outlives a server switch, so it has to notice one. `ServerScopeBoundary` is
+    // keyed on the active server and rebuilds everything under it, which is why the effect that
+    // observes the switch cannot live in the shell that renders the panel.
+    function UsageProbe() {
+      const { activeServerId } = useServers();
+      const usage = useUsage();
+      return (
+        <button type="button" onClick={() => usage.openUsage(activeServerId(), null)}>
+          Open usage
+        </button>
+      );
+    }
+
+    render(() => (
+      <AppProviders>
+        <AppAccessGate />
+        <UsageProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+    expect(await screen.findByRole("heading", { name: /Usage.*Local/ })).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Studio Mac server" }));
+    await waitFor(() => expect(window.openbot.servers.select).toHaveBeenCalledWith("remote-1"));
+
+    expect(await screen.findByRole("heading", { name: /Usage.*Studio Mac/ })).toBeInTheDocument();
   });
 });
