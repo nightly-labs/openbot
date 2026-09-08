@@ -1,27 +1,32 @@
 .skills-marketplace-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 160;
+  z-index: calc(var(--openbot-layer-dialog) + var(--openbot-layer-popover));
   display: grid;
   place-items: center;
   padding: var(--openbot-space-4);
 }
 
 .skills-marketplace {
-  width: min(1062px, calc(90vw - 28.8px));
-  height: min(738px, calc(90vh - 28.8px));
+  width: min(800px, calc(100vw - 32px));
+  border: 1px solid var(--openbot-border-grouped);
+  border-radius: var(--openbot-radius-card);
+  height: min(704px, calc(100vh - 32px));
   overflow: hidden;
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);
 }
 
+.marketplace-menu {
+  z-index: calc(var(--openbot-layer-dialog) + var(--openbot-layer-popover) + 1);
+}
+
 .skills-marketplace-topbar {
-  height: 48px;
+  height: 88px;
   display: flex;
   align-items: center;
   gap: var(--openbot-space-2);
-  padding: 0 var(--openbot-space-2) 0 var(--openbot-space-3);
-  border-bottom: 1px solid var(--openbot-border);
+  padding: 0 var(--openbot-space-6) 0 var(--openbot-space-8);
 }
 
 .skills-marketplace-kind-tabs {
@@ -33,16 +38,6 @@
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-control);
 }
-.skills-marketplace-view-tabs {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-1);
-}
-.skills-marketplace-topbar-divider {
-  width: 1px;
-  height: 18px;
-  background: var(--openbot-border);
-}
 .skills-marketplace-kind-tab {
   min-width: 68px;
   height: 26px;
@@ -50,44 +45,31 @@
   border-radius: var(--openbot-radius-md);
   color: var(--openbot-text-muted);
 }
-.skills-marketplace-tab {
-  height: var(--openbot-control-sm);
-  padding-inline: var(--openbot-space-3);
-  border-radius: var(--openbot-radius-sm);
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
-  line-height: var(--openbot-leading-sm);
-  font-weight: var(--openbot-weight-medium);
+.skills-marketplace-kind-tab svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
 }
-.skills-marketplace-kind-tab[data-active],
-.skills-marketplace-tab[data-active] {
-  background: var(--openbot-bg-surface);
-  color: var(--openbot-text-primary);
+.skills-marketplace-kind-tab .agent-avatar {
+  width: var(--openbot-space-6);
+  height: var(--openbot-space-6);
 }
-.skills-marketplace-kind-tab[data-active] {
-  box-shadow: 0 1px 2px var(--openbot-shadow-popover-ambient);
+.skills-marketplace-kind-tab .agent-avatar > svg {
+  width: 100%;
+  height: 100%;
 }
 .skills-marketplace-kind-tab:disabled {
   color: var(--openbot-text-muted);
   opacity: 0.58;
 }
-.skills-marketplace-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--openbot-space-1);
-  margin-left: auto;
-}
-.skills-marketplace-actions svg,
-.skills-installed-row svg,
 .skills-marketplace-card button svg {
   width: 15px;
   height: 15px;
 }
 .skills-marketplace-body {
   position: relative;
-  height: calc(100% - 48px);
+  height: calc(100% - 88px);
   overflow: auto;
+  scrollbar-gutter: stable;
 }
 .skills-marketplace-body[data-detail-open] {
   overflow: hidden;
@@ -96,10 +78,10 @@
 .skills-marketplace-panel {
   width: min(1020px, calc(100% - 64px));
   margin: 0 auto;
-  padding: 42px 0 64px;
+  padding: var(--openbot-space-3) 0 var(--openbot-space-8);
 }
 .agent-marketplace-panel {
-  padding-top: 56px;
+  padding-top: var(--openbot-space-3);
 }
 .skills-marketplace-heading {
   display: flex;
@@ -151,7 +133,7 @@
   min-width: 160px;
   height: var(--openbot-control-md);
   padding: 0 30px 0 var(--openbot-space-3);
-  border: 1px solid var(--openbot-border-strong);
+  border: 1px solid var(--openbot-border-grouped);
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-bg-control);
   color: var(--openbot-text-primary);
@@ -171,10 +153,14 @@
 }
 .skills-marketplace-search input {
   width: 100%;
-  height: 42px;
-  padding-left: 40px;
+  height: var(--openbot-control-md);
+  border-radius: var(--openbot-radius-pill);
+  padding-left: var(--openbot-space-8);
   border-color: var(--openbot-border-strong);
   background: var(--openbot-bg-surface);
+}
+.skills-marketplace-search input::placeholder {
+  font-size: var(--openbot-text-sm);
 }
 .skills-marketplace-categories {
   display: flex;
@@ -183,7 +169,7 @@
   padding: var(--openbot-space-3) 0 var(--openbot-space-8);
 }
 .skills-marketplace-categories button {
-  border: 1px solid var(--openbot-border-strong);
+  border: 1px solid var(--openbot-border-grouped);
   background: transparent;
   color: var(--openbot-text-secondary);
 }
@@ -203,7 +189,6 @@
   align-items: center;
   justify-content: space-between;
   padding-bottom: var(--openbot-space-2);
-  border-bottom: 1px solid var(--openbot-border);
 }
 .skills-marketplace-section-title h2 {
   margin: 0;
@@ -228,12 +213,12 @@
   position: relative;
   min-width: 0;
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-columns: 42px minmax(0, 1fr);
   gap: var(--openbot-space-3);
   align-items: center;
-  min-height: 72px;
-  padding: var(--openbot-space-3);
-  border-bottom: 1px solid var(--openbot-border);
+  min-height: 68px;
+  padding: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-md);
   cursor: pointer;
 }
 .skills-marketplace-card-hitarea {
@@ -254,10 +239,6 @@
   outline: 2px solid var(--openbot-accent-strong);
   outline-offset: -2px;
 }
-.skills-marketplace-card-action {
-  position: relative;
-  z-index: 2;
-}
 .skills-marketplace-icon,
 .skills-marketplace-default-icon {
   width: 42px;
@@ -270,6 +251,10 @@
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-control);
   color: var(--openbot-accent-text);
+}
+.skills-marketplace-icon:has(img) {
+  border: 0;
+  background: transparent;
 }
 .skills-marketplace-icon img {
   width: 100%;
@@ -291,14 +276,12 @@
   min-width: 0;
 }
 .skills-marketplace-card h3,
-.skills-installed-row h3,
 .skills-submission-row h3 {
   margin: 0;
   font-size: var(--openbot-text-md);
 }
 .skills-marketplace-card-copy span,
 .skills-marketplace-card-copy small,
-.skills-installed-row p,
 .skills-submission-row p,
 .skills-submission-row small {
   color: var(--openbot-text-muted);
@@ -327,18 +310,10 @@
   color: var(--openbot-text-muted);
 }
 
-.agent-marketplace-card {
-  grid-template-columns: 42px minmax(0, 1fr) auto;
-}
-.agent-marketplace-card .agent-avatar,
 .agent-submission-row .agent-avatar,
 .agent-publish-card .agent-avatar {
   width: 42px;
   height: 42px;
-}
-.agent-marketplace-detail .skills-marketplace-detail-hero > .agent-avatar {
-  width: 64px;
-  height: 64px;
 }
 .agent-marketplace-publish-picker {
   display: flex;
@@ -378,80 +353,14 @@
 .agent-marketplace-routine-list small {
   color: var(--openbot-text-muted);
 }
-.skills-marketplace-detail-content.agent-marketplace-detail-content {
-  grid-template-columns: 1fr;
-  gap: var(--openbot-space-6);
-}
-.agent-marketplace-detail-remit {
-  display: grid;
-  gap: var(--openbot-space-3);
-}
-.agent-marketplace-detail-remit p,
-.agent-marketplace-detail-section > p {
-  margin: 0;
-  color: var(--openbot-text-secondary);
+.agent-publish-card > p {
+  margin: var(--openbot-space-4) 0 0;
+  color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-lg);
 }
-.agent-marketplace-detail-columns {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0;
-  align-items: start;
-}
-.agent-marketplace-detail-section {
-  padding: var(--openbot-space-6) 0;
-  border-top: 1px solid var(--openbot-border);
-}
-.agent-marketplace-detail-section > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--openbot-space-3);
-  padding-block: var(--openbot-space-2);
-  margin-bottom: var(--openbot-space-4);
-}
-.agent-publish-card > p {
-  margin: 0;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-}
 .agent-submission-row {
   cursor: default;
-}
-.skills-marketplace-skeleton-section-label {
-  width: 92px;
-  height: 20px;
-}
-.skills-marketplace-skeleton-count {
-  width: 44px;
-  height: 14px;
-}
-.skills-marketplace-card-skeleton {
-  cursor: default;
-}
-.skills-marketplace-skeleton-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: var(--openbot-radius-lg);
-}
-.skills-marketplace-skeleton-name {
-  width: min(132px, 48%);
-  height: 18px;
-}
-.skills-marketplace-skeleton-installs {
-  width: 64px;
-  height: 13px;
-}
-.skills-marketplace-skeleton-description {
-  width: min(260px, 82%);
-  height: 16px;
-  margin-top: 3px;
-}
-.skills-marketplace-skeleton-action {
-  width: 62px;
-  height: 28px;
-  border-radius: var(--openbot-radius-md);
 }
 .skills-marketplace-detail-layer {
   position: absolute;
@@ -649,22 +558,18 @@
   .skills-marketplace-card-hitarea:hover:not(:disabled):not([data-disabled]) {
     background: transparent;
   }
-  .skills-installed-row > .skills-marketplace-row-hitarea:hover:not(:disabled):not([data-disabled]),
   .skills-submission-row > .skills-marketplace-row-hitarea:hover:not(:disabled):not([data-disabled]) {
     background: transparent;
   }
-  .skills-installed-row:hover,
   .skills-submission-row:hover {
     background: var(--openbot-bg-surface);
   }
 }
-.skills-installed-list,
 .skills-submission-list {
   overflow: hidden;
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-lg);
 }
-.skills-installed-row,
 .skills-submission-row {
   position: relative;
   display: grid;
@@ -675,7 +580,6 @@
   border-bottom: 1px solid var(--openbot-border);
   cursor: pointer;
 }
-.skills-installed-row > button:first-child,
 .skills-submission-row > button:first-child {
   position: absolute;
   z-index: 1;
@@ -689,13 +593,11 @@
   cursor: pointer;
   transition: none;
 }
-.skills-installed-row > button:first-child:focus-visible,
 .skills-submission-row > button:first-child:focus-visible {
   border-radius: var(--openbot-radius-lg);
   outline: 2px solid var(--openbot-accent-strong);
   outline-offset: -2px;
 }
-.skills-installed-row > .ui-button:not(:first-child),
 .skills-submission-row > .ui-button:not(:first-child) {
   position: relative;
   z-index: 2;
@@ -703,15 +605,12 @@
 .skills-submission-row {
   grid-template-columns: 42px minmax(0, 1fr) auto auto;
 }
-.skills-installed-row:last-child,
 .skills-submission-row:last-child {
   border-bottom: 0;
 }
-.skills-installed-row p,
 .skills-submission-row p {
   margin: 3px 0 0;
 }
-.skills-installed-state,
 .skills-submission-status {
   padding: 3px 8px;
   border-radius: var(--openbot-radius-pill);
@@ -720,12 +619,10 @@
   font-size: var(--openbot-text-sm);
   text-transform: capitalize;
 }
-.skills-installed-state[data-state="installed"],
 .skills-submission-status[data-status="approved"] {
   background: var(--openbot-success-soft);
   color: var(--openbot-success);
 }
-.skills-installed-state[data-state="modified"],
 .skills-submission-status[data-status="rejected"] {
   background: var(--openbot-danger-soft);
   color: var(--openbot-danger);
@@ -830,7 +727,7 @@
 }
 .skills-publish-card {
   padding: var(--openbot-space-6);
-  border: 1px solid var(--openbot-border-strong);
+  border: 1px solid var(--openbot-border-grouped);
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-control);
 }
@@ -848,6 +745,28 @@
 }
 .skills-publish-summary small {
   color: var(--openbot-text-muted);
+}
+.agent-publish-card .skills-publish-summary {
+  height: calc(var(--openbot-leading-xl) * 6);
+}
+.agent-publish-card .skills-publish-summary > div {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  flex: 1;
+  display: grid;
+  gap: var(--openbot-space-2);
+  min-width: 0;
+}
+.agent-publish-card .skills-publish-summary h2,
+.agent-publish-card .skills-publish-summary p {
+  margin: 0;
+  line-height: var(--openbot-leading-xl);
+}
+.agent-publish-card .skills-publish-summary p {
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+.agent-publish-card .skills-publish-summary small {
+  line-height: var(--openbot-leading-md);
 }
 .skills-publish-fields {
   display: grid;
@@ -919,15 +838,6 @@
 }
 
 @media (max-width: 800px) {
-  .skills-marketplace-view-tabs {
-    overflow-x: auto;
-  }
-  .skills-marketplace-actions > button:first-child {
-    display: none;
-  }
-  .skills-marketplace-grid {
-    grid-template-columns: 1fr;
-  }
   .skills-marketplace-discover,
   .skills-marketplace-panel {
     width: calc(100% - 32px);
@@ -935,8 +845,7 @@
   }
   .skills-submission-guide-grid,
   .skills-submission-example,
-  .skills-marketplace-detail-content,
-  .agent-marketplace-detail-columns {
+  .skills-marketplace-detail-content {
     grid-template-columns: 1fr;
   }
   .skills-marketplace-detail {
@@ -954,4 +863,390 @@
     opacity: 0;
     transform: scale(0.98);
   }
+}
+
+/* The marketplace uses the shared dark palette in every app theme. */
+.marketplace-title {
+  margin: 0;
+  margin-right: auto;
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-medium);
+}
+.skills-marketplace-kind-tabs {
+  gap: var(--openbot-space-2);
+  background: transparent;
+  border: 0;
+}
+.skills-marketplace-kind-tab {
+  border: 1px solid var(--openbot-border-grouped);
+  border-radius: var(--openbot-radius-pill);
+  background: transparent;
+  transition: none;
+}
+.skills-marketplace-kind-tab[data-active] {
+  border-color: var(--openbot-text-primary);
+}
+.skills-marketplace-categories button[data-active] {
+  background: var(--openbot-text-primary);
+  color: var(--openbot-bg-sidebar);
+  border-color: var(--openbot-text-primary);
+}
+.marketplace-management,
+.marketplace-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-1) var(--openbot-space-3);
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: transparent;
+  color: var(--openbot-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.marketplace-management svg,
+.marketplace-more svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+.skills-marketplace-categories button {
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control-active);
+}
+.skills-marketplace-categories {
+  padding-bottom: var(--openbot-space-6);
+}
+.marketplace-featured {
+  margin-bottom: var(--openbot-space-4);
+}
+.marketplace-catalog h2 {
+  margin: 0 0 var(--openbot-space-3);
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-medium);
+}
+.marketplace-featured-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--openbot-space-4);
+}
+.marketplace-featured-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--openbot-space-4);
+  height: calc(var(--openbot-space-8) * 6);
+  padding: var(--openbot-space-4);
+  border: 1px solid var(--openbot-border-grouped);
+  border-radius: var(--openbot-radius-lg);
+  white-space: normal;
+  text-align: center;
+  color: var(--openbot-text-primary);
+}
+.marketplace-featured-card > span {
+  display: grid;
+  grid-template-rows: calc(var(--openbot-leading-lg) * 2) var(--openbot-leading-sm);
+  gap: var(--openbot-space-1);
+  width: 100%;
+  min-width: 0;
+}
+.marketplace-featured-card strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  align-self: end;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: var(--openbot-leading-lg);
+  font-weight: var(--openbot-weight-medium);
+}
+.marketplace-featured-card small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  font-weight: var(--openbot-weight-regular);
+  color: var(--openbot-text-muted);
+}
+.marketplace-identity {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  flex: none;
+}
+.marketplace-identity > .agent-avatar,
+.marketplace-identity > .skills-marketplace-icon {
+  width: 64px;
+  height: 64px;
+}
+.marketplace-creator-avatar {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: var(--openbot-space-8);
+  height: var(--openbot-space-8);
+  overflow: hidden;
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-secondary);
+  border: 2px solid var(--openbot-bg-sidebar);
+  font-size: var(--openbot-text-sm);
+}
+.marketplace-creator-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.skills-marketplace-card-copy h3 {
+  flex-shrink: 0;
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+.skills-marketplace-card-copy > div {
+  gap: var(--openbot-space-1);
+}
+.skills-marketplace-card > .agent-avatar {
+  width: 42px;
+  height: 42px;
+}
+.skills-marketplace-section-title > .ui-button {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+.marketplace-catalog-skeleton {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--openbot-space-4);
+}
+.marketplace-row-skeleton {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  min-height: 52px;
+}
+.marketplace-placeholder-avatar {
+  flex: none;
+  width: calc(var(--openbot-space-8) + var(--openbot-space-2));
+  height: calc(var(--openbot-space-8) + var(--openbot-space-2));
+  border-radius: var(--openbot-radius-pill);
+}
+.marketplace-featured-placeholder .marketplace-placeholder-avatar {
+  width: 72px;
+  height: 72px;
+}
+.marketplace-placeholder-copy {
+  display: grid;
+  gap: var(--openbot-space-2);
+  width: 100%;
+}
+.marketplace-placeholder-copy > .ui-skeleton {
+  height: var(--openbot-text-sm);
+}
+.marketplace-placeholder-copy > .ui-skeleton:first-child {
+  width: 65%;
+}
+.marketplace-featured-placeholder .marketplace-placeholder-copy > .ui-skeleton {
+  margin-inline: auto;
+}
+@keyframes marketplace-content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--openbot-space-1));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes marketplace-placeholder-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .marketplace-catalog .skills-marketplace-card,
+  .marketplace-featured:not(.marketplace-featured-placeholder) .marketplace-featured-card,
+  .marketplace-detail-heading,
+  .marketplace-detail-sections {
+    animation: marketplace-content-enter var(--openbot-duration-slow) var(--openbot-ease-out) both;
+  }
+  .marketplace-catalog .skills-marketplace-card:nth-child(2),
+  .marketplace-featured-card:nth-child(2) {
+    animation-delay: calc(var(--openbot-duration-fast) / 6);
+  }
+  .marketplace-catalog .skills-marketplace-card:nth-child(3),
+  .marketplace-featured-card:nth-child(3) {
+    animation-delay: calc(var(--openbot-duration-fast) / 3);
+  }
+  .marketplace-catalog .skills-marketplace-card:nth-child(n + 4),
+  .marketplace-featured-card:nth-child(n + 4),
+  .marketplace-detail-sections {
+    animation-delay: calc(var(--openbot-duration-fast) / 2);
+  }
+  .marketplace-featured-placeholder,
+  .marketplace-catalog-skeleton,
+  .skills-marketplace-detail-skeleton {
+    animation: marketplace-placeholder-enter var(--openbot-duration-normal) var(--openbot-ease-out)
+      var(--openbot-duration-dialog) both;
+  }
+}
+.skills-marketplace-topbar[data-detail] {
+  height: 40px;
+  justify-content: flex-end;
+}
+.skills-marketplace-topbar[data-detail] > :not(:last-child) {
+  display: none;
+}
+.skills-marketplace-topbar[data-detail] + .skills-marketplace-body {
+  height: calc(100% - 40px);
+}
+.marketplace-detail-page {
+  position: relative;
+  width: calc(100% - 64px);
+  padding-top: calc(var(--openbot-space-8) + var(--openbot-space-4));
+}
+.agent-marketplace-panel:has(.marketplace-detail-page) {
+  width: 100%;
+  padding: 0;
+}
+.marketplace-detail-back {
+  position: absolute;
+  top: 0;
+  left: calc(var(--openbot-space-4) * -1);
+}
+.marketplace-detail-heading {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--openbot-space-4);
+  padding: 0 var(--openbot-space-4) var(--openbot-space-6);
+  border-bottom: 1px solid var(--openbot-border-strong);
+}
+.marketplace-detail-copy {
+  grid-column: 1 / -1;
+}
+.marketplace-detail-copy h1 {
+  margin: 0;
+  font-size: var(--openbot-text-3xl);
+  font-weight: var(--openbot-weight-medium);
+}
+.marketplace-detail-copy p {
+  margin: var(--openbot-space-3) 0 0;
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-lg);
+  white-space: pre-wrap;
+}
+.marketplace-detail-copy .marketplace-detail-creator {
+  margin-top: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+.marketplace-detail-action {
+  display: flex;
+  align-items: start;
+  gap: var(--openbot-space-2);
+}
+.marketplace-detail-action > .ui-button {
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-primary);
+  color: var(--openbot-bg-sidebar);
+}
+.marketplace-detail-action:has(.skills-agent-select) {
+  gap: var(--openbot-space-3);
+}
+.marketplace-detail-action:has(.skills-agent-select) > .ui-button {
+  height: var(--openbot-control-md);
+  padding-inline: var(--openbot-space-6);
+}
+.marketplace-detail-sections {
+  display: grid;
+  grid-template-columns: 192px minmax(0, 1fr);
+  gap: var(--openbot-space-6);
+  padding-top: var(--openbot-space-6);
+  align-items: start;
+}
+.marketplace-detail-sections nav {
+  display: grid;
+  gap: var(--openbot-space-1);
+}
+.marketplace-detail-sections nav button {
+  display: flex;
+  height: auto;
+  flex-direction: column;
+  align-items: start;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-3);
+  white-space: normal;
+  text-align: left;
+}
+.marketplace-detail-sections nav button[data-active] {
+  background: var(--openbot-bg-control-active);
+}
+.marketplace-detail-sections nav small {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+}
+.marketplace-detail-section {
+  padding: var(--openbot-space-4);
+  border-radius: var(--openbot-radius-xl);
+  background: var(--openbot-marketplace-detail-bg);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-xl);
+  overflow-wrap: anywhere;
+}
+.marketplace-detail-section p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.marketplace-detail-section ul {
+  margin: var(--openbot-space-3) 0 0;
+  padding-left: var(--openbot-space-4);
+}
+@media (max-width: 600px) {
+  .marketplace-featured-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .marketplace-detail-sections,
+  .skills-marketplace-grid {
+    grid-template-columns: 1fr;
+  }
+  .marketplace-detail-sections nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .marketplace-detail-action {
+    flex-direction: column;
+  }
+  .skills-marketplace-topbar {
+    padding-inline: var(--openbot-space-3);
+  }
+}
+
+.marketplace-publication-category {
+  display: grid;
+  gap: var(--openbot-space-2);
+  margin-top: var(--openbot-space-6);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .agent-publish-card .skills-publish-summary {
+    animation: marketplace-placeholder-enter var(--openbot-duration-normal) var(--openbot-ease-out) both;
+  }
+}
+
+/* Brief preview requests keep actions visually stable while clicks remain blocked. */
+.agent-marketplace-panel[data-preview-loading] .agent-marketplace-publish-picker > .ui-button:disabled,
+.agent-marketplace-panel[data-preview-loading] .agent-publish-card .skills-publish-actions > .ui-button:disabled {
+  opacity: 1;
 }

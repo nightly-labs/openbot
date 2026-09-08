@@ -14,7 +14,7 @@ const logger = createOpenBotLogger("build-production-catalog");
 const scriptRoot = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptRoot, "..");
 const sourceRoot = join(projectRoot, "marketplace", "production-catalog");
-const defaultOutput = join(projectRoot, "out", "marketplace-production", "v1");
+const defaultOutput = join(projectRoot, "out", "marketplace-production");
 const zipTimestamp = new Date("1980-01-01T00:00:00.000Z");
 const dependencyPattern =
   /(?:\bMCP\b|\bconnectors?\b|https?:\/\/|\b(?:npm|pnpm|yarn|bun|pipx?|uv|brew|apt(?:-get)?|cargo)\s+(?:add|install)\b)/iu;
@@ -24,14 +24,15 @@ interface UpstreamSource {
   commit: string;
 }
 
-interface SkillSpec {
+type SkillSpec = {
   slug: string;
   category: SkillCategory;
-  source: "openai" | "anthropic";
-  upstreamSkill: string;
-}
+  featured: boolean;
+} & ({ source: "openbot" } | { source: "openai" | "anthropic"; upstreamSkill: string });
 
 interface AgentSpec {
+  category: SkillCategory;
+  featured: boolean;
   slug: string;
   name: string;
   title: string;
@@ -43,7 +44,7 @@ interface AgentSpec {
 interface CatalogSpec {
   schemaVersion: number;
   catalogVersion: string;
-  sources: Record<SkillSpec["source"], UpstreamSource>;
+  sources: Record<"openai" | "anthropic", UpstreamSource>;
   skills: SkillSpec[];
   agents: AgentSpec[];
 }
@@ -59,22 +60,26 @@ interface BuiltSkill {
   bundle: string;
   bundleSha256: string;
   files: string[];
-  license: "Apache-2.0";
-  source: {
-    provider: SkillSpec["source"];
-    upstreamSkill: string;
-    repository: string;
-    commit: string;
-    url: string;
-  };
+  featured: boolean;
+  license: "Apache-2.0" | "PolyForm-Noncommercial-1.0.0";
+  source:
+    | { provider: "openbot"; url: string }
+    | {
+        provider: "openai" | "anthropic";
+        upstreamSkill: string;
+        repository: string;
+        commit: string;
+        url: string;
+      };
 }
 
-export async function buildProductionCatalog(outputArgument = defaultOutput): Promise<string> {
-  const output = resolve(outputArgument);
-  validateOutputTarget(output);
+export async function buildProductionCatalog(outputArgument?: string): Promise<string> {
   const spec = await loadCatalogSpec();
+  const output = resolve(outputArgument ?? join(defaultOutput, spec.catalogVersion));
+  validateOutputTarget(output);
   const version = catalogVersionNumber(spec.catalogVersion);
   const license = await readFile(join(sourceRoot, "licenses", "APACHE-2.0.txt"), "utf8");
+  const openbotLicense = await readFile(join(projectRoot, "LICENSE"), "utf8");
   const staging = await mkdtemp(join(tmpdir(), "openbot-production-catalog-"));
 
   try {
@@ -85,11 +90,13 @@ export async function buildProductionCatalog(outputArgument = defaultOutput): Pr
     for (const skill of spec.skills) {
       const markdown = await readFile(join(sourceRoot, "skills", skill.slug, "SKILL.md"), "utf8");
       validateSkillMarkdown(skill.slug, markdown);
-      const upstream = spec.sources[skill.source];
-      const notice = createSkillNotice(skill, upstream);
+      const notice =
+        skill.source === "openbot"
+          ? "Original Skill instructions by the OpenBot team. Licensed under PolyForm Noncommercial 1.0.0 (LICENSE.txt).\n"
+          : createSkillNotice(skill, spec.sources[skill.source]);
       const archive = zipSync(
         {
-          "LICENSE.txt": [utf8Bytes(license), { mtime: zipTimestamp }],
+          "LICENSE.txt": [utf8Bytes(skill.source === "openbot" ? openbotLicense : license), { mtime: zipTimestamp }],
           "NOTICE.txt": [utf8Bytes(notice), { mtime: zipTimestamp }],
           "SKILL.md": [utf8Bytes(markdown), { mtime: zipTimestamp }],
         },
@@ -113,14 +120,21 @@ export async function buildProductionCatalog(outputArgument = defaultOutput): Pr
         bundle,
         bundleSha256,
         files: preview.files,
-        license: "Apache-2.0",
-        source: {
-          provider: skill.source,
-          upstreamSkill: skill.upstreamSkill,
-          repository: upstream.repository,
-          commit: upstream.commit,
-          url: upstreamSkillUrl(skill, upstream),
-        },
+        featured: skill.featured,
+        license: skill.source === "openbot" ? "PolyForm-Noncommercial-1.0.0" : "Apache-2.0",
+        source:
+          skill.source === "openbot"
+            ? {
+                provider: "openbot",
+                url: `marketplace/production-catalog/skills/${skill.slug}/SKILL.md`,
+              }
+            : {
+                provider: skill.source,
+                upstreamSkill: skill.upstreamSkill,
+                repository: spec.sources[skill.source].repository,
+                commit: spec.sources[skill.source].commit,
+                url: upstreamSkillUrl(skill, spec.sources[skill.source]),
+              },
       });
     }
 
@@ -213,6 +227,8 @@ function buildAgent(agent: AgentSpec, skills: BuiltSkill[], version: number) {
     slug: agent.slug,
     name: agent.name,
     title: agent.title,
+    category: agent.category,
+    featured: agent.featured,
     description: agent.description,
     avatarSeed: `openbot-curated-agent-${agent.slug}`,
     avatarHue: agent.avatarHue,
@@ -273,12 +289,16 @@ function parseSkillSpec(value: unknown): SkillSpec {
     !isDynamicRecord(value) ||
     !isString(value.slug) ||
     !isSkillCategory(value.category) ||
-    (value.source !== "openai" && value.source !== "anthropic") ||
-    !isString(value.upstreamSkill)
+    (value.source !== "openai" && value.source !== "anthropic" && value.source !== "openbot") ||
+    (value.source !== "openbot" && !isString(value.upstreamSkill)) ||
+    (value.featured !== undefined && typeof value.featured !== "boolean")
   ) {
     throw new Error("Production catalog contains an invalid skill.");
   }
-  return { slug: value.slug, category: value.category, source: value.source, upstreamSkill: value.upstreamSkill };
+  const base = { slug: value.slug, category: value.category, featured: value.featured === true };
+  if (value.source === "openbot") return { ...base, source: "openbot" };
+  if (!isString(value.upstreamSkill)) throw new Error("Upstream skill is required.");
+  return { ...base, source: value.source, upstreamSkill: value.upstreamSkill };
 }
 
 function parseAgentSpec(value: unknown): AgentSpec {
@@ -287,6 +307,8 @@ function parseAgentSpec(value: unknown): AgentSpec {
     !isString(value.slug) ||
     !isString(value.name) ||
     !isString(value.title) ||
+    !isSkillCategory(value.category) ||
+    (value.featured !== undefined && typeof value.featured !== "boolean") ||
     !isString(value.description) ||
     !isNumber(value.avatarHue) ||
     !isAvatarHue(value.avatarHue) ||
@@ -299,25 +321,28 @@ function parseAgentSpec(value: unknown): AgentSpec {
     slug: value.slug,
     name: value.name,
     title: value.title,
+    category: value.category,
+    featured: value.featured === true,
     description: value.description,
     avatarHue: value.avatarHue,
     skills: value.skills,
   };
 }
 
-function createSkillNotice(skill: SkillSpec, upstream: UpstreamSource): string {
+function createSkillNotice(skill: Extract<SkillSpec, { upstreamSkill: string }>, upstream: UpstreamSource): string {
   return `OpenBot production catalog\n\nThis skill is an OpenBot-authored derivative of ${skill.upstreamSkill}\nfrom ${upstream.repository} at commit ${upstream.commit}.\n\nThe instructions were modified for brand-neutral use, reduced to prompt-only content,\nand stripped of external service, connector, executable, and package requirements.\n\nUpstream source: ${upstreamSkillUrl(skill, upstream)}\nLicense: Apache License 2.0 (included as LICENSE.txt)\n`;
 }
 
 function createUpstreamNotices(spec: CatalogSpec, skills: BuiltSkill[]): string {
-  const entries = skills.map(
-    (skill) =>
-      `- **${skill.slug}** — derivative of [${skill.source.upstreamSkill}](${skill.source.url}) from ${skill.source.provider} commit \`${skill.source.commit}\`.`,
+  const entries = skills.map((skill) =>
+    skill.source.provider === "openbot"
+      ? `- **${skill.slug}** — original OpenBot team instructions; PolyForm Noncommercial 1.0.0.`
+      : `- **${skill.slug}** — derivative of [${skill.source.upstreamSkill}](${skill.source.url}) from ${skill.source.provider} commit \`${skill.source.commit}\`.`,
   );
-  return `# Upstream Notices\n\nThis catalog contains OpenBot-authored derivatives of skills from the pinned OpenAI and Anthropic repositories. Each generated bundle includes the Apache License 2.0 and a modification notice.\n\n${entries.join("\n")}\n\nCatalog version: \`${spec.catalogVersion}\`\n`;
+  return `# Upstream Notices\n\nThis catalog contains original OpenBot team skills under PolyForm Noncommercial 1.0.0 and derivatives from the pinned OpenAI and Anthropic repositories under Apache License 2.0. Each bundle includes its applicable license and notice.\n\n${entries.join("\n")}\n\nCatalog version: \`${spec.catalogVersion}\`\n`;
 }
 
-function upstreamSkillUrl(skill: SkillSpec, upstream: UpstreamSource): string {
+function upstreamSkillUrl(skill: Extract<SkillSpec, { upstreamSkill: string }>, upstream: UpstreamSource): string {
   const segment = skill.source === "openai" ? "skills/.curated" : "skills";
   return `${upstream.repository}/tree/${upstream.commit}/${segment}/${skill.upstreamSkill}`;
 }
@@ -393,12 +418,12 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-function parseArguments(args: string[]): string {
+function parseArguments(args: string[]): string | undefined {
   if (args.includes("--help")) {
     process.stdout.write("Usage: bun run marketplace:build -- [--output <directory>]\n");
     process.exit(0);
   }
-  if (args.length === 0) return defaultOutput;
+  if (args.length === 0) return undefined;
   if (args.length === 2 && args[0] === "--output" && args[1]) return args[1];
   throw new Error("Usage: bun run marketplace:build -- [--output <directory>]");
 }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "v1",
+  "catalogVersion": "v2",
   "sources": {
     "openai": {
       "repository": "https://github.com/openai/skills",
@@ -41,6 +41,96 @@
       "category": "productivity",
       "source": "anthropic",
       "upstreamSkill": "discernment-nudge"
+    },
+    {
+      "slug": "change-review",
+      "category": "coding",
+      "source": "openbot",
+      "featured": true
+    },
+    {
+      "slug": "bug-triage",
+      "category": "coding",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "interface-critique",
+      "category": "design",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "evidence-brief",
+      "category": "research",
+      "source": "openbot",
+      "featured": true
+    },
+    {
+      "slug": "competitor-comparison",
+      "category": "research",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "launch-notes",
+      "category": "documents",
+      "source": "openbot",
+      "featured": true
+    },
+    {
+      "slug": "meeting-actions",
+      "category": "productivity",
+      "source": "openbot",
+      "featured": true
+    },
+    {
+      "slug": "project-plan",
+      "category": "productivity",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "support-reply",
+      "category": "documents",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "account-brief",
+      "category": "research",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "outreach-draft",
+      "category": "documents",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "campaign-analysis",
+      "category": "data-analytics",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "data-quality-review",
+      "category": "data-analytics",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "workflow-playbook",
+      "category": "automation",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "hiring-scorecard",
+      "category": "other",
+      "source": "openbot",
+      "featured": false
     }
   ],
   "agents": [
@@ -50,7 +140,8 @@
       "title": "Finds concrete risks and builds actionable threat models",
       "description": "Reviews supported codebases for security weaknesses and maps realistic abuse paths to prioritized mitigations.",
       "avatarHue": 30,
-      "skills": ["secure-code-guidance", "repository-threat-model"]
+      "skills": ["secure-code-guidance", "repository-threat-model"],
+      "category": "coding"
     },
     {
       "slug": "product-design-lead",
@@ -58,7 +149,8 @@
       "title": "Turns product intent into distinctive, usable interfaces",
       "description": "Shapes clear product briefs and carries their intent through deliberate visual direction, interaction, and interface copy.",
       "avatarHue": 280,
-      "skills": ["distinctive-frontend-design"]
+      "skills": ["distinctive-frontend-design"],
+      "category": "design"
     },
     {
       "slug": "communications-partner",
@@ -66,7 +158,128 @@
       "title": "Makes important writing clear, useful, and decision-ready",
       "description": "Coauthors structured documents and internal updates while surfacing assumptions that deserve a final check.",
       "avatarHue": 185,
-      "skills": ["internal-communications", "decision-quality-check"]
+      "skills": ["internal-communications", "decision-quality-check"],
+      "category": "documents"
+    },
+    {
+      "slug": "code-review-partner",
+      "name": "Code Review Partner",
+      "title": "Finds actionable bugs before changes ship",
+      "category": "coding",
+      "description": "Review the proposed change against its intended behavior. Trace affected callers and report only findings with a concrete trigger and consequence. Use the security skill when the changed code crosses a relevant trust boundary. Keep optional style suggestions separate. Work in review mode unless the user asks for edits; report which checks actually ran.",
+      "avatarHue": 215,
+      "skills": ["change-review", "secure-code-guidance"],
+      "featured": true
+    },
+    {
+      "slug": "debugging-partner",
+      "name": "Debugging Partner",
+      "title": "Turns a bug report into a verified fix path",
+      "category": "coding",
+      "description": "Help reproduce a reported failure, distinguish plausible causes, and identify the smallest correction. Start from evidence in the supplied report, logs, and code. Prefer one diagnostic step that separates hypotheses over several speculative edits. When asked to implement a fix, verify the original failure and a regression check, then explain remaining uncertainty.",
+      "avatarHue": 30,
+      "skills": ["bug-triage", "change-review"],
+      "featured": false
+    },
+    {
+      "slug": "research-analyst",
+      "name": "Research Analyst",
+      "title": "Builds cited briefs and useful comparisons",
+      "category": "research",
+      "description": "Answer a specific research question with traceable evidence. Establish the audience and decision first. Use provided documents or available research tools when requested. Separate verified facts, dated source claims, and your own inference. Compare alternatives against explicit criteria. Deliver a concise answer with evidence and unresolved questions; never invent a source or claim to have read material you could not access.",
+      "avatarHue": 185,
+      "skills": ["evidence-brief", "competitor-comparison"],
+      "featured": true
+    },
+    {
+      "slug": "launch-coordinator",
+      "name": "Launch Coordinator",
+      "title": "Turns release scope into clear launch work",
+      "category": "productivity",
+      "description": "Coordinate a launch from supplied release scope, milestones, and meeting notes. Maintain a clear distinction between completed work, plans, and blockers. Produce release notes and a launch checklist with owners and acceptance checks. Identify missing decisions early. Draft follow-ups when requested, but do not publish announcements or create external tasks without authorization.",
+      "avatarHue": 320,
+      "skills": ["launch-notes", "project-plan", "meeting-actions"],
+      "featured": true
+    },
+    {
+      "slug": "project-partner",
+      "name": "Project Partner",
+      "title": "Makes scope, dependencies, and next steps clear",
+      "category": "productivity",
+      "description": "Turn the user goal into a practical plan with a small first deliverable. Make scope, assumptions, dependencies, and acceptance checks explicit. Use the decision check for material tradeoffs or commitments, rather than questioning every routine choice. Keep estimates provisional when evidence is limited. End with the next concrete actions and the decisions that block them.",
+      "avatarHue": 150,
+      "skills": ["project-plan", "decision-quality-check"],
+      "featured": true
+    },
+    {
+      "slug": "meeting-assistant",
+      "name": "Meeting Assistant",
+      "title": "Captures decisions and follows through on commitments",
+      "category": "productivity",
+      "description": "Convert supplied meeting notes or transcripts into a concise record of decisions and actions. Preserve who committed to what; do not invent owners or deadlines. Highlight unresolved questions and conflicting statements. Prepare a follow-up draft for the specified audience when asked. Do not imply that you attended a meeting or accessed a calendar you were not given.",
+      "avatarHue": 280,
+      "skills": ["meeting-actions", "internal-communications"],
+      "featured": false
+    },
+    {
+      "slug": "customer-support-partner",
+      "name": "Customer Support Partner",
+      "title": "Drafts clear replies and complete escalations",
+      "category": "documents",
+      "description": "Help resolve customer questions using supplied product documentation, account facts, and issue evidence. Draft a reply that states what is known and the next useful step. Use bug triage for reproducible technical issues. Do not promise policy exceptions, refunds, or delivery dates without support. Keep internal diagnostic notes separate from the customer message and send only when explicitly requested.",
+      "avatarHue": 215,
+      "skills": ["support-reply", "bug-triage"],
+      "featured": false
+    },
+    {
+      "slug": "account-research-partner",
+      "name": "Account Research Partner",
+      "title": "Prepares evidence for better discovery calls",
+      "category": "research",
+      "description": "Prepare a business account brief for the user offering and target company. Use supplied records and verified public company information. Separate evidence from fit hypotheses, identify disqualifying conditions, and prepare questions that test assumptions. Do not invent contacts, budgets, relationships, or private personal details. Keep the output useful for a discovery conversation rather than a generic company summary.",
+      "avatarHue": 150,
+      "skills": ["account-brief", "evidence-brief"],
+      "featured": false
+    },
+    {
+      "slug": "outreach-writer",
+      "name": "Outreach Writer",
+      "title": "Writes relevant outreach without invented personalization",
+      "category": "documents",
+      "description": "Draft business outreach for a stated audience, channel, and offering. Build the message around one verified reason for contact and one clear request. If supporting evidence is missing, write an honest general message instead of false personalization. Offer a small number of distinct options. Treat messages as drafts unless the user explicitly asks to send through an available service.",
+      "avatarHue": 30,
+      "skills": ["outreach-draft", "account-brief"],
+      "featured": false
+    },
+    {
+      "slug": "campaign-analyst",
+      "name": "Campaign Analyst",
+      "title": "Explains performance and designs the next experiment",
+      "category": "data-analytics",
+      "description": "Analyze supplied campaign exports against the business objective. Check units, dates, attribution definitions, and data quality before comparing results. Explain the main driver of change with supporting counts and rates. Separate observations from causal hypotheses. Propose measurable experiments and useful follow-up data. Do not change campaign settings or spend as part of analysis.",
+      "avatarHue": 320,
+      "skills": ["campaign-analysis", "data-quality-review"],
+      "featured": false
+    },
+    {
+      "slug": "operations-planner",
+      "name": "Operations Planner",
+      "title": "Turns repeatable work into reliable playbooks",
+      "category": "automation",
+      "description": "Document and improve a repeatable process using the user inputs and available tools. Define its trigger, outputs, owners, exceptions, and completion checks. Start with a clear human workflow, then propose a small automation where inputs and results can be verified. State integration gaps plainly. Do not claim an automation is connected or running until it has actually been configured and tested.",
+      "avatarHue": 185,
+      "skills": ["workflow-playbook", "project-plan"],
+      "featured": false
+    },
+    {
+      "slug": "hiring-partner",
+      "name": "Hiring Partner",
+      "title": "Builds structured interviews around job evidence",
+      "category": "other",
+      "description": "Help a hiring team turn role requirements into consistent interview questions and scoring criteria. Summarize supplied interview evidence against those criteria, including gaps and contradictions. Keep observations separate from impressions, and avoid personal traits unrelated to the work. Prepare follow-up questions or a debrief draft. Leave hiring decisions and candidate communication to the authorized workflow.",
+      "avatarHue": 280,
+      "skills": ["hiring-scorecard", "meeting-actions"],
+      "featured": false
     }
   ]
 }

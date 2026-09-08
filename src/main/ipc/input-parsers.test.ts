@@ -46,6 +46,8 @@ import {
   parseProfileName,
   parseProvider,
   parseProviderId,
+  parseSubmitMarketplaceAgent,
+  parseSubmitSkill,
   parseUpdatePreference,
 } from "./app-inputs";
 import { parseBrowserNavigate, parseBrowserOpen, parseVisibility } from "./browser-inputs";
@@ -62,6 +64,23 @@ import { nullishPayload, optionalPayload, requireString } from "./validation";
 import { parseVoiceTranscription } from "./voice-inputs";
 
 describe("app IPC input parsing", () => {
+  it("validates creator photo consent and agent categories without changing legacy submissions", () => {
+    expect(parseSubmitMarketplaceAgent({ agentId: "agent-1" })).toEqual({ agentId: "agent-1" });
+    expect(parseSubmitMarketplaceAgent({ agentId: "agent-1", category: "research", showCreatorAvatar: false })).toEqual(
+      { agentId: "agent-1", category: "research", showCreatorAvatar: false },
+    );
+    expect(parseMarketplaceAgentQuery({ category: "research" })).toEqual({ category: "research" });
+    expect(
+      parseSubmitSkill({ draftId: "draft", category: "coding", icon: null, showCreatorAvatar: true }),
+    ).toMatchObject({ showCreatorAvatar: true });
+    expect(() => parseSubmitMarketplaceAgent({ agentId: "agent-1", category: "invalid" })).toThrow(
+      "Unknown agent category.",
+    );
+    expect(() =>
+      parseSubmitSkill({ draftId: "draft", category: "coding", icon: null, showCreatorAvatar: "true" }),
+    ).toThrow();
+  });
+
   it("parses setup and permission values", () => {
     expect(parseProvider({ preferredProvider: "codex" })).toBe("codex");
     expect(parseProvider({ preferredProvider: "claude" })).toBe("claude");

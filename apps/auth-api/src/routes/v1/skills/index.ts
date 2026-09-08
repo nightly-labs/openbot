@@ -46,6 +46,9 @@ export const Route = createFileRoute("/v1/skills/")({
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
           await enforceMarketplaceMutationRateLimit("upload", user.id);
           const form = await readMultipartFormData(request, SKILL_SUBMISSION_BODY_LIMIT);
+          const showCreatorAvatar = form.get("showCreatorAvatar");
+          if (showCreatorAvatar !== null && showCreatorAvatar !== "true" && showCreatorAvatar !== "false")
+            return apiError(400, "invalid_consent", "Choose whether to show your creator photo.");
           const bundle = form.get("bundle");
           const icon = form.get("icon");
           const category = form.get("category");
@@ -57,6 +60,7 @@ export const Route = createFileRoute("/v1/skills/")({
           return json(
             await requestSkillMarketplace().submit({
               user,
+              ...(showCreatorAvatar !== null ? { showCreatorAvatar: showCreatorAvatar === "true" } : {}),
               archive: new Uint8Array(await bundle.arrayBuffer()),
               category,
               icon:

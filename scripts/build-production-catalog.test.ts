@@ -25,10 +25,19 @@ describe("production marketplace catalog", () => {
     );
     const catalog = await readCatalog(join(first, "catalog.json"));
     const skills = catalog.skills;
-    expect(skills).toHaveLength(5);
+    expect(skills).toHaveLength(20);
     for (const value of skills) {
       const bytes = new Uint8Array(await readFile(join(first, value.bundle)));
-      expect(Object.keys(unzipSync(bytes)).sort()).toEqual(["LICENSE.txt", "NOTICE.txt", "SKILL.md"]);
+      const bundle = unzipSync(bytes);
+      expect(Object.keys(bundle).sort()).toEqual(["LICENSE.txt", "NOTICE.txt", "SKILL.md"]);
+      const license = new TextDecoder().decode(bundle["LICENSE.txt"]);
+      expect(license).toContain(
+        value.slug === "change-review"
+          ? "PolyForm Noncommercial"
+          : value.slug === "secure-code-guidance"
+            ? "Apache License"
+            : "License",
+      );
       await expect(readFile(join(first, value.bundle))).resolves.toEqual(await readFile(join(second, value.bundle)));
     }
   });
@@ -40,7 +49,7 @@ describe("production marketplace catalog", () => {
     const catalog = await readCatalog(join(output, "catalog.json"));
     const skillIds = new Set(catalog.skills.map((skill) => skill.id));
     const agents = await readAgents(join(output, "agents.json"));
-    expect(agents).toHaveLength(3);
+    expect(agents).toHaveLength(15);
     for (const value of agents) {
       expect(value.routines).toEqual([]);
       for (const skill of value.skills) {
@@ -90,7 +99,7 @@ function parseGeneratedSkill(value: unknown): GeneratedSkill {
   ) {
     throw new Error("Generated catalog contains an invalid skill.");
   }
-  expect(value.versionId).toMatch(/^openbot-curated-version-.+-v1-[a-f0-9]{16}$/u);
+  expect(value.versionId).toMatch(/^openbot-curated-version-.+-v2-[a-f0-9]{16}$/u);
   return { id: value.id, versionId: value.versionId, bundle: value.bundle, slug: value.slug };
 }
 

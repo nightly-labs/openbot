@@ -63,7 +63,14 @@ export class SkillMarketplaceService {
     if (query.cursor) params.set("cursor", query.cursor);
     if (query.limit) params.set("limit", String(query.limit));
     const page = await this.auth.requestAuthorized(`/v1/skills/?${params}`, { method: "GET" }, decodeSkillPage);
-    return { ...page, skills: page.skills.map((skill) => ({ ...skill, iconUrl: this.absoluteUrl(skill.iconUrl) })) };
+    return {
+      ...page,
+      skills: page.skills.map((skill) => ({
+        ...skill,
+        iconUrl: this.absoluteUrl(skill.iconUrl),
+        creatorAvatarUrl: this.absoluteUrl(skill.creatorAvatarUrl ?? null),
+      })),
+    };
   }
 
   async get(skillId: string): Promise<MarketplaceSkillDetail> {
@@ -72,7 +79,11 @@ export class SkillMarketplaceService {
       { method: "GET" },
       decodeSkillDetail,
     );
-    return { ...detail, iconUrl: this.absoluteUrl(detail.iconUrl) };
+    return {
+      ...detail,
+      iconUrl: this.absoluteUrl(detail.iconUrl),
+      creatorAvatarUrl: this.absoluteUrl(detail.creatorAvatarUrl ?? null),
+    };
   }
 
   async listMine(): Promise<SkillSubmission[]> {
@@ -98,6 +109,7 @@ export class SkillMarketplaceService {
       throw new Error("The selected skill package expired. Choose it again.");
     const form = new FormData();
     form.set("category", input.category);
+    if (input.showCreatorAvatar !== undefined) form.set("showCreatorAvatar", String(input.showCreatorAvatar));
     if (input.skillId) form.set("skillId", input.skillId);
     form.set(
       "bundle",
@@ -512,6 +524,7 @@ function isMarketplaceSkillSummary(value: unknown): value is MarketplaceSkillSum
     isString(value.description) &&
     isSkillCategory(value.category) &&
     isString(value.creatorName) &&
+    (value.creatorAvatarUrl === undefined || value.creatorAvatarUrl === null || isString(value.creatorAvatarUrl)) &&
     isNumber(value.version) &&
     isNumber(value.installs) &&
     isBoolean(value.featured) &&
@@ -536,6 +549,7 @@ function isSkillSubmission(value: unknown): value is SkillSubmission {
   return (
     isDynamicRecord(value) &&
     isString(value.id) &&
+    (value.showCreatorAvatar === undefined || isBoolean(value.showCreatorAvatar)) &&
     isString(value.skillId) &&
     isString(value.slug) &&
     isString(value.name) &&
