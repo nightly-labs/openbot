@@ -15,7 +15,7 @@ import type {
   RoutineSchedule,
   SubmitMarketplaceAgentInput,
 } from "@openbot/contracts/ipc";
-import { isAvatarHue, isAvatarSeed, isRoutineSchedule } from "@openbot/contracts/ipc";
+import { isAvatarHue, isAvatarSeed, isRoutineSchedule, isSkillCategory } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 
 interface AgentMarketplaceAuth {
@@ -84,6 +84,7 @@ export class AgentMarketplaceService {
 
   async list(query: MarketplaceAgentQuery = {}): Promise<MarketplaceAgentPage> {
     const params = new URLSearchParams();
+    if (query.category) params.set("category", query.category);
     if (query.query) params.set("query", query.query);
     if (query.featured) params.set("featured", "true");
     if (query.sort) params.set("sort", query.sort);
@@ -141,6 +142,8 @@ export class AgentMarketplaceService {
   async submit(input: SubmitMarketplaceAgentInput): Promise<AgentSubmission> {
     const snapshot = await this.preview(input.agentId);
     const form = new FormData();
+    if (input.category) form.set("category", input.category);
+    if (input.showCreatorAvatar !== undefined) form.set("showCreatorAvatar", String(input.showCreatorAvatar));
     form.set("snapshot", JSON.stringify(toMarketplaceSnapshotWire(snapshot)));
     // The multipart field names the marketplace listing being updated, and is the deployed spelling.
     if (input.listingId) form.set("agentId", input.listingId);
@@ -260,8 +263,12 @@ export class AgentMarketplaceService {
     return { agent: agent };
   }
 
-  private withAbsoluteAvatar<T extends { avatarUrl: string | null }>(value: T): T {
-    return { ...value, avatarUrl: value.avatarUrl ? this.auth.resolveApiUrl(value.avatarUrl) : null };
+  private withAbsoluteAvatar<T extends { avatarUrl: string | null; creatorAvatarUrl?: string | null }>(value: T): T {
+    return {
+      ...value,
+      ...(value.creatorAvatarUrl ? { creatorAvatarUrl: this.auth.resolveApiUrl(value.creatorAvatarUrl) } : {}),
+      avatarUrl: value.avatarUrl ? this.auth.resolveApiUrl(value.avatarUrl) : null,
+    };
   }
 }
 
@@ -374,6 +381,8 @@ function isMarketplaceAgentSummary(value: unknown): value is MarketplaceAgentSum
     isString(value.title) &&
     isString(value.description) &&
     isString(value.creatorName) &&
+    (value.creatorAvatarUrl === undefined || value.creatorAvatarUrl === null || isString(value.creatorAvatarUrl)) &&
+    (value.category === undefined || isSkillCategory(value.category)) &&
     isNumber(value.version) &&
     isNumber(value.installs) &&
     isBoolean(value.featured) &&
@@ -392,6 +401,8 @@ function isAgentSubmissionWire(value: unknown): value is AgentSubmissionWire {
     isDynamicRecord(value) &&
     isString(value.id) &&
     isString(value.agentId) &&
+    (value.category === undefined || isSkillCategory(value.category)) &&
+    (value.showCreatorAvatar === undefined || isBoolean(value.showCreatorAvatar)) &&
     isString(value.name) &&
     isString(value.title) &&
     isString(value.description) &&

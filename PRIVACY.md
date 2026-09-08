@@ -243,3 +243,5 @@ request does not include conversation history, saved memories, or workspace file
 The draft is reviewed before OpenBot saves it; generating a draft does not create
 an OpenBot conversation or change an existing agent. The provider's own data and
 CLI retention policies still apply.
+
+Marketplace submissions from the desktop app show the publisher’s current account photo publicly on the listing. Account photo updates appear on the listing; removing the account photo removes it from the listing. Private memories and integration credentials are not included.

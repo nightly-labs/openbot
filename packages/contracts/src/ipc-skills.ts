@@ -14,6 +14,7 @@ export type SkillReviewStatus = "pending" | "approved" | "rejected";
 export type InstalledSkillState = "installed" | "update-available" | "modified" | "needs-repair";
 
 export interface MarketplaceSkillSummary {
+  creatorAvatarUrl?: string | null;
   id: string;
   slug: string;
   name: string;
@@ -49,6 +50,7 @@ export interface MarketplaceSkillQuery {
 }
 
 export interface SkillSubmission {
+  showCreatorAvatar?: boolean;
   id: string;
   skillId: string;
   slug: string;
@@ -72,6 +74,7 @@ export interface SkillPackagePreview {
 }
 
 export interface SubmitSkillInput {
+  showCreatorAvatar?: boolean;
   draftId: string;
   category: SkillCategory;
   icon: { mimeType: "image/png" | "image/jpeg" | "image/webp"; bytes: Uint8Array } | null;

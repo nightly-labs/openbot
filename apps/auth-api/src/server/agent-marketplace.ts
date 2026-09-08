@@ -6,12 +6,14 @@ import {
   isAvatarHue,
   isAvatarSeed,
   isRoutineSchedule,
+  isSkillCategory,
   type MarketplaceAgentDetail,
   type MarketplaceAgentPage,
   type MarketplaceAgentQuery,
   type MarketplaceAgentRoutine,
   type MarketplaceAgentSkill,
   type MarketplaceAgentSummary,
+  type SkillCategory,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import {
@@ -30,6 +32,9 @@ const MAX_SUBMISSIONS_PER_DAY = 10;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface AgentRow {
+  category: string;
+  show_creator_avatar: number;
+  creator_avatar_url: string | null;
   id: string;
   agent_id?: string;
   version_id?: string;
@@ -63,7 +68,7 @@ export class AgentMarketplaceError extends Error {
 }
 
 export class AgentMarketplace {
-  constructor(private readonly bindings: WorkerBindings) {}
+  constructor(private readonly bindings: Pick<WorkerBindings, "DB" | "SKILLS">) {}
 
   async list(input: MarketplaceAgentQuery = {}): Promise<MarketplaceAgentPage> {
     const limit = normalizeMarketplaceLimit(input.limit);
@@ -72,10 +77,16 @@ export class AgentMarketplace {
     const queryInput = normalizeMarketplaceQuery(input.query);
     if (queryInput) {
       clauses.push(
-        "(lower(versions.name) LIKE ? ESCAPE '\\' OR lower(versions.title) LIKE ? ESCAPE '\\' OR lower(versions.description) LIKE ? ESCAPE '\\' OR lower(users.name) LIKE ? ESCAPE '\\')",
+        "(lower(versions.name) LIKE ? ESCAPE '\\' OR lower(versions.title) LIKE ? ESCAPE '\\' OR lower(versions.description) LIKE ? ESCAPE '\\' OR lower(coalesce(nullif(trim(users.name), ''), users.email)) LIKE ? ESCAPE '\\')",
       );
       const query = marketplaceLikePattern(queryInput);
       values.push(query, query, query, query);
+    }
+    if (input.category !== undefined) {
+      if (!isSkillCategory(input.category))
+        throw new AgentMarketplaceError(400, "invalid_category", "Unknown agent category.");
+      clauses.push("versions.category = ?");
+      values.push(input.category);
     }
     if (input.featured) clauses.push("agents.featured = 1");
     const sort: MarketplaceSort = input.sort === "installs" ? "installs" : "updated";
@@ -98,7 +109,7 @@ export class AgentMarketplace {
       `SELECT agents.id, agents.installs, agents.featured, agents.updated_at,
               versions.id AS version_id, versions.version, versions.name, versions.title, versions.description,
               versions.avatar_seed, versions.avatar_hue, versions.avatar_key,
-              versions.skills_json, versions.routines_json, users.name AS creator_name, users.email AS creator_email
+              versions.skills_json, versions.routines_json, versions.category, agents.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name, users.email AS creator_email
        FROM marketplace_agents agents
        JOIN marketplace_agent_versions versions ON ${clauses.join(" AND ")}
        JOIN users ON users.id = agents.owner_user_id
@@ -128,12 +139,21 @@ export class AgentMarketplace {
     return publicDetail(row);
   }
 
+  async setCreatorAvatar(userId: string, listingId: string, show: boolean): Promise<void> {
+    const result = await this.bindings.DB.prepare(
+      "UPDATE marketplace_agents SET show_creator_avatar = ? WHERE id = ? AND owner_user_id = ?",
+    )
+      .bind(show ? 1 : 0, listingId, userId)
+      .run();
+    if (!result.meta.changes) throw new AgentMarketplaceError(404, "agent_not_found", "The owned agent was not found.");
+  }
+
   async listMine(userId: string): Promise<AgentSubmissionWire[]> {
     const result = await this.bindings.DB.prepare(
       `SELECT versions.id, versions.agent_id, versions.version, versions.name, versions.title, versions.description,
               versions.avatar_seed, versions.avatar_hue, versions.avatar_key, versions.skills_json,
               versions.routines_json, versions.status, versions.rejection_note, versions.created_at,
-              agents.installs, agents.featured, agents.updated_at, users.name AS creator_name, users.email AS creator_email
+              agents.installs, agents.featured, agents.updated_at, versions.category, agents.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name, users.email AS creator_email
        FROM marketplace_agent_versions versions
        JOIN marketplace_agents agents ON agents.id = versions.agent_id
        JOIN users ON users.id = agents.owner_user_id
@@ -149,8 +169,12 @@ export class AgentMarketplace {
     snapshot: unknown;
     avatar: { bytes: Uint8Array; mimeType: string } | null;
     agentId?: string;
+    category?: SkillCategory;
+    showCreatorAvatar?: boolean;
   }): Promise<AgentSubmissionWire> {
     const snapshot = validateSnapshot(input.snapshot);
+    if (input.category !== undefined && !isSkillCategory(input.category))
+      throw new AgentMarketplaceError(400, "invalid_category", "Unknown agent category.");
     const recent = await this.bindings.DB.prepare(
       `SELECT count(*) AS count FROM marketplace_agent_versions versions
        JOIN marketplace_agents agents ON agents.id = versions.agent_id
@@ -211,8 +235,8 @@ export class AgentMarketplace {
       await this.bindings.DB.prepare(
         `INSERT INTO marketplace_agent_versions(
            id, agent_id, version, name, title, description, avatar_seed, avatar_hue, avatar_key,
-           skills_json, routines_json, status, created_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+           skills_json, routines_json, status, created_at, category
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
       )
         .bind(
           versionId,
@@ -227,8 +251,11 @@ export class AgentMarketplace {
           JSON.stringify(snapshot.skills),
           JSON.stringify(snapshot.routines),
           now,
+          input.category ?? "other",
         )
         .run();
+      if (input.showCreatorAvatar !== undefined)
+        await this.setCreatorAvatar(input.user.id, agentId, input.showCreatorAvatar);
       await this.bindings.DB.prepare("UPDATE marketplace_agents SET updated_at = ? WHERE id = ?")
         .bind(now, agentId)
         .run();
@@ -272,7 +299,7 @@ export class AgentMarketplace {
       `SELECT versions.id, versions.agent_id, versions.version, versions.name, versions.title, versions.description,
               versions.avatar_seed, versions.avatar_hue, versions.avatar_key, versions.skills_json,
               versions.routines_json, versions.status, versions.rejection_note, versions.created_at,
-              agents.installs, agents.featured, agents.updated_at, users.name AS creator_name, users.email AS creator_email
+              agents.installs, agents.featured, agents.updated_at, versions.category, agents.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name, users.email AS creator_email
        FROM marketplace_agent_versions versions JOIN marketplace_agents agents ON agents.id = versions.agent_id
        JOIN users ON users.id = agents.owner_user_id WHERE versions.status = 'pending' ORDER BY versions.created_at`,
     ).all<AgentRow>();
@@ -328,7 +355,7 @@ export class AgentMarketplace {
       `SELECT agents.id, agents.installs, agents.featured, agents.updated_at,
               versions.id AS version_id, versions.version, versions.name, versions.title, versions.description,
               versions.avatar_seed, versions.avatar_hue, versions.avatar_key, versions.skills_json,
-              versions.routines_json, users.name AS creator_name, users.email AS creator_email
+              versions.routines_json, versions.category, agents.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name, users.email AS creator_email
        FROM marketplace_agents agents JOIN marketplace_agent_versions versions ON versions.id = agents.approved_version_id
        JOIN users ON users.id = agents.owner_user_id WHERE agents.id = ?`,
     )
@@ -341,7 +368,7 @@ export class AgentMarketplace {
       `SELECT versions.id, versions.agent_id, versions.version, versions.name, versions.title, versions.description,
               versions.avatar_seed, versions.avatar_hue, versions.avatar_key, versions.skills_json,
               versions.routines_json, versions.status, versions.rejection_note, versions.created_at,
-              agents.installs, agents.featured, agents.updated_at, users.name AS creator_name, users.email AS creator_email
+              agents.installs, agents.featured, agents.updated_at, versions.category, agents.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name, users.email AS creator_email
        FROM marketplace_agent_versions versions JOIN marketplace_agents agents ON agents.id = versions.agent_id
        JOIN users ON users.id = agents.owner_user_id WHERE versions.id = ?`,
     )
@@ -440,6 +467,8 @@ function publicSummary(row: AgentRow): MarketplaceAgentSummary {
     title: row.title,
     description: row.description,
     creatorName: row.creator_name?.trim() || row.creator_email,
+    category: isSkillCategory(row.category) ? row.category : "other",
+    creatorAvatarUrl: row.show_creator_avatar === 1 ? row.creator_avatar_url : null,
     version: row.version,
     installs: row.installs,
     featured: row.featured === 1,
@@ -471,6 +500,8 @@ function submission(row: AgentRow): AgentSubmissionWire {
   return {
     id: row.id,
     agentId: row.agent_id ?? row.id,
+    category: isSkillCategory(row.category) ? row.category : "other",
+    showCreatorAvatar: row.show_creator_avatar === 1,
     name: row.name,
     title: row.title,
     description: row.description,
