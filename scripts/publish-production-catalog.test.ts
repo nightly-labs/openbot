@@ -74,12 +74,15 @@ describe("production catalog publication", () => {
 
     const verification = spawnSync("/usr/bin/sqlite3", [":memory:"], {
       encoding: "utf8",
-      input: `${schema}\n${sql}\nCREATE TEMP TABLE initial AS SELECT (SELECT featured FROM marketplace_skills) AS skill_featured, (SELECT featured FROM marketplace_agents) AS agent_featured;\nUPDATE marketplace_skills SET installs = 8, featured = 0;\nUPDATE marketplace_agents SET installs = 5, featured = 0;\n${createPublicationSql(newer, 4567)}\n${createPublicationSql(publication, 5678)}\n.mode json\nSELECT (SELECT name FROM users WHERE id = 'openbot-production-catalog') AS owner, (SELECT installs FROM marketplace_skills) AS skill_installs, (SELECT featured FROM marketplace_skills) AS skill_featured, (SELECT installs FROM marketplace_agents) AS agent_installs, (SELECT featured FROM marketplace_agents) AS agent_featured, (SELECT status FROM marketplace_skill_versions) AS skill_status, (SELECT status FROM marketplace_agent_versions) AS agent_status, (SELECT category FROM marketplace_agent_versions) AS category, (SELECT skill_featured FROM initial) AS initial_skill_featured, (SELECT agent_featured FROM initial) AS initial_agent_featured, (SELECT count(*) FROM marketplace_skill_versions) AS skill_versions, (SELECT version FROM marketplace_skill_versions WHERE id = (SELECT approved_version_id FROM marketplace_skills)) AS approved_skill_version, (SELECT version FROM marketplace_agent_versions WHERE id = (SELECT approved_version_id FROM marketplace_agents)) AS approved_agent_version;\n`,
+      input: `${schema}\n${sql}\nCREATE TEMP TABLE initial AS SELECT (SELECT featured FROM marketplace_skills) AS skill_featured, (SELECT featured FROM marketplace_agents) AS agent_featured;\nUPDATE users SET avatar_url = NULL;\nUPDATE marketplace_skills SET installs = 8, featured = 0, show_creator_avatar = 0;\nUPDATE marketplace_agents SET installs = 5, featured = 0, show_creator_avatar = 0;\n${createPublicationSql(newer, 4567)}\n${createPublicationSql(publication, 5678)}\n.mode json\nSELECT (SELECT name FROM users WHERE id = 'openbot-production-catalog') AS owner, (SELECT avatar_url FROM users WHERE id = 'openbot-production-catalog') AS owner_avatar, (SELECT show_creator_avatar FROM marketplace_skills) AS skill_creator_avatar, (SELECT show_creator_avatar FROM marketplace_agents) AS agent_creator_avatar, (SELECT installs FROM marketplace_skills) AS skill_installs, (SELECT featured FROM marketplace_skills) AS skill_featured, (SELECT installs FROM marketplace_agents) AS agent_installs, (SELECT featured FROM marketplace_agents) AS agent_featured, (SELECT status FROM marketplace_skill_versions) AS skill_status, (SELECT status FROM marketplace_agent_versions) AS agent_status, (SELECT category FROM marketplace_agent_versions) AS category, (SELECT skill_featured FROM initial) AS initial_skill_featured, (SELECT agent_featured FROM initial) AS initial_agent_featured, (SELECT count(*) FROM marketplace_skill_versions) AS skill_versions, (SELECT version FROM marketplace_skill_versions WHERE id = (SELECT approved_version_id FROM marketplace_skills)) AS approved_skill_version, (SELECT version FROM marketplace_agent_versions WHERE id = (SELECT approved_version_id FROM marketplace_agents)) AS approved_agent_version;\n`,
     });
     expect(verification.status).toBe(0);
     expect(JSON.parse(verification.stdout)).toEqual([
       {
         owner: "OpenBot Team",
+        owner_avatar: "https://openbot.run/icon-192x192.png",
+        skill_creator_avatar: 1,
+        agent_creator_avatar: 1,
         skill_installs: 8,
         skill_featured: 0,
         agent_installs: 5,
@@ -104,7 +107,7 @@ CREATE TABLE users (
 );
 CREATE TABLE marketplace_skills (
   id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, owner_user_id TEXT NOT NULL REFERENCES users(id),
-  approved_version_id TEXT, installs INTEGER NOT NULL DEFAULT 0, featured INTEGER NOT NULL DEFAULT 0,
+  approved_version_id TEXT, installs INTEGER NOT NULL DEFAULT 0, featured INTEGER NOT NULL DEFAULT 0, show_creator_avatar INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
 );
 CREATE TABLE marketplace_skill_versions (
@@ -116,7 +119,7 @@ CREATE TABLE marketplace_skill_versions (
 );
 CREATE TABLE marketplace_agents (
   id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL REFERENCES users(id), approved_version_id TEXT,
-  installs INTEGER NOT NULL DEFAULT 0, featured INTEGER NOT NULL DEFAULT 0,
+  installs INTEGER NOT NULL DEFAULT 0, featured INTEGER NOT NULL DEFAULT 0, show_creator_avatar INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
 );
 CREATE TABLE marketplace_agent_versions (

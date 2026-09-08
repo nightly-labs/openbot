@@ -1,6 +1,6 @@
 # OpenBot team launch catalog
 
-Version v2 contains 20 Skills and 15 Agents. Four Skills and four Agents are featured on first publication. All entries use the publisher **OpenBot Team**, start with zero installs, and include no scheduled routines. They work from supplied material and available tools; they do not assume a connected inbox, CRM, ad account, or phone service.
+Version v2 contains 20 Skills and 15 Agents. Four Skills and four Agents are featured on first publication. All entries show the public OpenBot logo as their creator badge, use the publisher **OpenBot Team**, start with zero installs, and include no scheduled routines. They work from supplied material and available tools; they do not assume a connected inbox, CRM, ad account, or phone service.
 
 ## Review locally
 

@@ -159,6 +159,9 @@
   border-color: var(--openbot-border-strong);
   background: var(--openbot-bg-surface);
 }
+.skills-marketplace-search input::placeholder {
+  font-size: var(--openbot-text-sm);
+}
 .skills-marketplace-categories {
   display: flex;
   flex-wrap: wrap;
@@ -978,7 +981,7 @@
   width: var(--openbot-space-8);
   height: var(--openbot-space-8);
   overflow: hidden;
-  border-radius: var(--openbot-radius-pill);
+  border-radius: var(--openbot-radius-sm);
   background: var(--openbot-bg-control-active);
   color: var(--openbot-text-secondary);
   border: 2px solid var(--openbot-bg-sidebar);

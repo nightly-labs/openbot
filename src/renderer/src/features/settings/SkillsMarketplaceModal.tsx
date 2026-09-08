@@ -417,8 +417,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                     <DropdownMenu.Item
                       onSelect={() => {
                         selectTab("mine");
-                        if (market.browse.kind === "skills") void choosePackage();
-                        else setAgentAddVersion((version) => version + 1);
+                        if (market.browse.kind === "agents") setAgentAddVersion((version) => version + 1);
                       }}
                     >
                       <Plus /> Add {market.browse.kind === "skills" ? "skill" : "agent"}

@@ -553,6 +553,11 @@ describe("SkillsMarketplaceModal", () => {
       await screen.findByRole("menuitem", { name: kind === "skills" ? "Add skill" : "Add agent" }),
       { button: 0 },
     );
+    if (kind === "skills") {
+      const choosePackage = await screen.findByRole("button", { name: "Choose folder or ZIP" });
+      expect(window.openbot.skills.choosePackage).not.toHaveBeenCalled();
+      fireEvent.click(choosePackage);
+    }
     fireEvent.click(await screen.findByRole("button", { name: "Submit for review" }));
     const submit = kind === "skills" ? window.openbot.skills.submit : window.openbot.marketplaceAgents.submit;
     await waitFor(() => expect(submit).toHaveBeenCalledWith(expect.objectContaining({ showCreatorAvatar: true })));

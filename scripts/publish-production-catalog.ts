@@ -20,6 +20,7 @@ const owner = {
   identityKey: "openbot-production-catalog",
   email: "catalog@openbot.run",
   name: "OpenBot Team",
+  avatarUrl: "https://openbot.run/icon-192x192.png",
 } as const;
 
 interface PublishedSkill {
@@ -60,13 +61,13 @@ export interface Publication {
 export function createPublicationSql(publication: Publication, publishedAt: number): string {
   const statements = [
     "PRAGMA foreign_keys = ON;",
-    `INSERT INTO users(id, identity_key, email, name, avatar_url, created_at, updated_at) VALUES (${sql(owner.id)}, ${sql(owner.identityKey)}, ${sql(owner.email)}, ${sql(owner.name)}, NULL, ${publishedAt}, ${publishedAt}) ON CONFLICT(id) DO UPDATE SET identity_key = excluded.identity_key, email = excluded.email, name = excluded.name, updated_at = excluded.updated_at;`,
+    `INSERT INTO users(id, identity_key, email, name, avatar_url, created_at, updated_at) VALUES (${sql(owner.id)}, ${sql(owner.identityKey)}, ${sql(owner.email)}, ${sql(owner.name)}, ${sql(owner.avatarUrl)}, ${publishedAt}, ${publishedAt}) ON CONFLICT(id) DO UPDATE SET identity_key = excluded.identity_key, email = excluded.email, name = excluded.name, avatar_url = excluded.avatar_url, updated_at = excluded.updated_at;`,
   ];
 
   for (const skill of publication.skills) {
     const bundleKey = remoteBundleKey(skill);
     statements.push(
-      `INSERT INTO marketplace_skills(id, slug, owner_user_id, approved_version_id, installs, featured, created_at, updated_at) VALUES (${sql(skill.id)}, ${sql(skill.slug)}, ${sql(owner.id)}, NULL, 0, ${skill.featured ? 1 : 0}, ${publishedAt}, ${publishedAt}) ON CONFLICT(id) DO UPDATE SET slug = excluded.slug, owner_user_id = excluded.owner_user_id, updated_at = excluded.updated_at;`,
+      `INSERT INTO marketplace_skills(id, slug, owner_user_id, approved_version_id, installs, featured, show_creator_avatar, created_at, updated_at) VALUES (${sql(skill.id)}, ${sql(skill.slug)}, ${sql(owner.id)}, NULL, 0, ${skill.featured ? 1 : 0}, 1, ${publishedAt}, ${publishedAt}) ON CONFLICT(id) DO UPDATE SET slug = excluded.slug, owner_user_id = excluded.owner_user_id, show_creator_avatar = excluded.show_creator_avatar, updated_at = excluded.updated_at;`,
       `INSERT INTO marketplace_skill_versions(id, skill_id, version, name, description, category, status, rejection_note, bundle_key, bundle_sha256, files_json, icon_key, created_at, reviewed_at) VALUES (${sql(skill.versionId)}, ${sql(skill.id)}, ${skill.version}, ${sql(skill.name)}, ${sql(skill.description)}, ${sql(skill.category)}, 'approved', NULL, ${sql(bundleKey)}, ${sql(skill.bundleSha256)}, ${sql(JSON.stringify(skill.files))}, NULL, ${publishedAt}, ${publishedAt}) ON CONFLICT(id) DO NOTHING;`,
       `UPDATE marketplace_skills SET approved_version_id = ${sql(skill.versionId)}, updated_at = ${publishedAt} WHERE id = ${sql(skill.id)} AND NOT EXISTS (SELECT 1 FROM marketplace_skill_versions current WHERE current.id = marketplace_skills.approved_version_id AND current.version > ${skill.version});`,
     );
@@ -74,7 +75,7 @@ export function createPublicationSql(publication: Publication, publishedAt: numb
 
   for (const agent of publication.agents) {
     statements.push(
-      `INSERT INTO marketplace_agents(id, owner_user_id, approved_version_id, installs, featured, created_at, updated_at) VALUES (${sql(agent.id)}, ${sql(owner.id)}, NULL, 0, ${agent.featured ? 1 : 0}, ${publishedAt}, ${publishedAt}) ON CONFLICT(id) DO UPDATE SET owner_user_id = excluded.owner_user_id, updated_at = excluded.updated_at;`,
+      `INSERT INTO marketplace_agents(id, owner_user_id, approved_version_id, installs, featured, show_creator_avatar, created_at, updated_at) VALUES (${sql(agent.id)}, ${sql(owner.id)}, NULL, 0, ${agent.featured ? 1 : 0}, 1, ${publishedAt}, ${publishedAt}) ON CONFLICT(id) DO UPDATE SET owner_user_id = excluded.owner_user_id, show_creator_avatar = excluded.show_creator_avatar, updated_at = excluded.updated_at;`,
       `INSERT INTO marketplace_agent_versions(id, agent_id, version, name, title, description, avatar_seed, avatar_hue, avatar_key, skills_json, routines_json, category, status, rejection_note, created_at, reviewed_at) VALUES (${sql(agent.versionId)}, ${sql(agent.id)}, ${agent.version}, ${sql(agent.name)}, ${sql(agent.title)}, ${sql(agent.description)}, ${sql(agent.avatarSeed)}, ${agent.avatarHue}, NULL, ${sql(JSON.stringify(agent.skills))}, ${sql(JSON.stringify(agent.routines))}, ${sql(agent.category)}, 'approved', NULL, ${publishedAt}, ${publishedAt}) ON CONFLICT(id) DO NOTHING;`,
       `UPDATE marketplace_agents SET approved_version_id = ${sql(agent.versionId)}, updated_at = ${publishedAt} WHERE id = ${sql(agent.id)} AND NOT EXISTS (SELECT 1 FROM marketplace_agent_versions current WHERE current.id = marketplace_agents.approved_version_id AND current.version > ${agent.version});`,
     );
