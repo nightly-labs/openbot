@@ -106,7 +106,7 @@ function QuestionPromptChatPreview(props: QuestionPromptBubbleProps) {
             class="provider-model-trigger question-prompt-chat-model"
             aria-label="Change model"
           >
-            <span class="provider-model-trigger-name">Luna</span>
+            <span class="provider-model-trigger-name">GPT-5.6 Luna</span>
             <ChevronDown aria-hidden="true" />
           </Button>
         </div>

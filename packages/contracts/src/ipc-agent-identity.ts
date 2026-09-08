@@ -26,6 +26,18 @@ export function isAgentModel(value: unknown): value is AgentModelId {
   return isString(value) && value.length > 0 && value.length <= 160 && /^[A-Za-z0-9][A-Za-z0-9._:/[\]-]*$/.test(value);
 }
 
+/**
+ * The model each provider starts on, and the one the model picker marks as the default.
+ *
+ * A provider lists its own models, so an id here can be missing from a given CLI: every caller
+ * falls back to the first model that provider does list, and the picker simply marks nothing.
+ */
+export const DEFAULT_PROVIDER_MODELS: Record<AgentProviderId, AgentModelId> = {
+  codex: "gpt-5.6-luna",
+  claude: "claude-sonnet-5",
+  grok: "grok-4.6",
+};
+
 export function isClaudeModel(model: AgentModelId): boolean {
   return model.startsWith("claude-");
 }

@@ -36,7 +36,7 @@ export const Disabled: Story = {
 export const Opens: Story = {
   args: { reasoningEffort: "medium", onReasoningEffortChange: fn() },
   play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /Agent model: Luna/ }));
+    await userEvent.click(canvas.getByRole("button", { name: /Agent model: GPT-5.6 Luna/ }));
     await canvas.findByRole("dialog", { name: "Choose agent model" });
   },
 };

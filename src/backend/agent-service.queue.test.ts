@@ -73,7 +73,7 @@ describe.sequential("AgentService: queue", () => {
         avatarSeed: "setup:claude-planning",
       }),
     ).resolves.toMatchObject({
-      model: "claude-opus-5",
+      model: "claude-sonnet-5",
       reasoningEffort: "high",
     });
     await service.setPreferredProvider("codex");

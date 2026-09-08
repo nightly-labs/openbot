@@ -438,10 +438,64 @@ installation is display metadata until the pinned runtime passes the existing do
 checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
 preload decoder. Cancellation and failure preserve the previous installation and its update offer.
 
-Settings starts the shared renderer runtime store. An explicit update opens one notification;
-revisioned snapshots move it through progress, failure, retry, and completion. Closing the
-notification does not cancel the download, and later reports do not reopen it. Fresh provider
-downloads retain their existing flow. These actions apply only to the local desktop host.
+Settings starts the shared renderer runtime store. The store announces each provider that gains an
+offer as one notification, from an effect over both the runtime snapshot and the agent status,
+because the two arrive separately and either one can complete an offer. An explicit update opens
+the same notification; revisioned snapshots move it through progress, failure, retry, and
+completion. Only the crossing into "update available" is announced, so a dismissed notification
+stays dismissed until the offer changes. Closing the notification does not cancel the download,
+and later reports do not reopen it. Fresh provider downloads retain their existing flow. These
+actions apply only to the local desktop host.
+
+A CLI the user installed themselves is not managed, but it is still compared against the lock.
+Each provider status row reports `cliSource`, and main passes the version of a `system` row to
+`ProviderRuntimeManager.setSystemVersion`, which compares it against the pinned version exactly as
+it compares a managed installation. The row and the notification therefore use the one update offer, the
+one Update button, and one entry point in the runtime store, `startProviderUpdate`. Only the work
+behind it differs: a `system` install goes to `updateProviderCli`, which runs that CLI's own updater
+(`codex update`) and then restarts the provider on the binary now on disk. That updater reports no
+progress, so the notification holds its indeterminate step until the provider comes back, and a
+failure keeps the reason the CLI gave, redacted, in one error that goes to the provider row and to
+the caller - and on, through the Team API, to the team's connected clients.
+The owner comes from the last resolution of the binary, not from the client that runs it, so a
+provider that is signed out still reports its own install rather than reading as the managed copy.
+OpenBot downloads nothing on this path, so the pinned artifact checksums are untouched. The managed
+copy refuses this command, because the runtime manager replaces that installation whole.
+
+Every runtime the store reaches is on this computer: `window.openbot.providerRuntimes` addresses no
+other one, while the agent status beside it describes whichever server is open. The store therefore
+takes `isLocalServer`, and a workspace on another computer announces no offer and starts no update -
+the same rule the provider row and the picker already follow. A server switch rebuilds that store,
+so the version a user closed the notification on is kept by the notification module, which outlives
+the switch: the offer is raised again on the way back only if the user never closed it.
+
+Replacing the CLI is not a start, on either path: `#activateProviderClient` swaps the client of a
+provider that has one, `#connect` connects one whose client is gone, and both skip
+`onProvidersReady` for the replacement, because
+that hook is restart recovery: it settles every unresolved delivery, and the other providers keep
+running through the replacement, so a live turn would be recorded as `interrupted` - which
+`MailboxStore.markTerminal` then refuses to correct. `onProviderResumed` schedules the deliveries
+the replacement held back. The refusal record is written through one queue, because two providers
+can finish an update at once and the older snapshot must not be renamed over the newer one.
+
+The update replaces the binary under a running client. A provider that has an agent in a turn -
+a delivery on its way to one, which holds no turn id yet, or a context compaction, whose
+`turn/started` `ContextCompaction.claimTurn` takes away from the agent - therefore refuses the
+command and tells the user to wait. No turn may start on that provider until the new client is ready: the drain
+scheduler skips an agent whose provider reports `isReplacingCli`, before it can reschedule the
+delivery, and `onProviderResumed` schedules the held deliveries when the replacement ends, after a
+failure as well as after a success.
+
+That updater decides for itself what the newest version is, and its release channel can name an
+older one than the lock: `grok update` can report success and leave the CLI where it was. The IPC
+handler therefore reports the version before and after the run to
+`ProviderRuntimeManager.noteSystemCliUpdate`. An update that finishes on the version it started on
+is the updater's answer: the manager records that pair of versions in `cli-update-refusals.json`
+beside the managed runtimes, and drops the offer from `availableVersion`, so the row and the
+notification stop offering an update that cannot happen. The record is kept against both the
+installed and the pinned version, so a new pinned version is a new offer, and so is a CLI the user
+moves by other means. The runtime store keeps the same answer in memory for the run that produced
+it, only to settle the notification before the next snapshot arrives.
 
 ## Agent usage analytics
 

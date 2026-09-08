@@ -52,7 +52,7 @@ import type {
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_RUNTIME_TEXT_LIMIT, isMessageReaction } from "@openbot/contracts/ipc";
+import { AGENT_RUNTIME_TEXT_LIMIT, DEFAULT_PROVIDER_MODELS, isMessageReaction } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
@@ -234,6 +234,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#browser.clearControls();
         },
         isStopping: () => this.#stopping,
+        isProviderBusy: (provider) =>
+          this.#drain.hasStartingDeliveries(provider) ||
+          this.#store.list().some(
+            (agent) =>
+              providerForAgent(agent) === provider &&
+              // A compaction is a provider turn as well, and it holds no active turn id: its
+              // `turn/started` belongs to the compaction, not to the agent, so `claimTurn` takes
+              // it away. Only its own guard reports the turn the CLI is running.
+              (this.#conversation.snapshot(agent.id)?.activeTurnId != null || !this.#compaction.mayDrain(agent.id)),
+          ),
+        onProviderResumed: (provider) => {
+          for (const agent of this.#store.list()) {
+            if (providerForAgent(agent) === provider) this.#drain.scheduleDrain(agent.id);
+          }
+        },
       },
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
@@ -516,7 +531,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const provider = agent?.provider ?? this.#providers.preferredProvider();
     await this.ensureProvider(provider);
     const models = this.#providers.listModels();
-    const defaultModel = provider === "codex" ? "gpt-5.6-luna" : provider === "claude" ? "claude-opus-5" : null;
+    const defaultModel = DEFAULT_PROVIDER_MODELS[provider];
     const model = agent
       ? models.find((candidate) => candidate.id === agent.model && candidate.provider === provider)
       : (models.find((candidate) => candidate.provider === provider && candidate.id === defaultModel) ??
@@ -554,8 +569,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const preferredProvider = this.#providers.preferredProvider();
       if (preferredProvider !== agent.provider) {
         const models = this.#providers.listModels();
-        const preferredDefault =
-          preferredProvider === "codex" ? "gpt-5.6-luna" : preferredProvider === "claude" ? "claude-opus-5" : null;
+        const preferredDefault = DEFAULT_PROVIDER_MODELS[preferredProvider];
         const preferredModel =
           models.find((model) => model.provider === preferredProvider && model.id === preferredDefault) ??
           models.find((model) => model.provider === preferredProvider);
@@ -818,6 +832,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   connectProvider(provider: AgentProvider, openExternal: (url: string) => Promise<void>): Promise<AgentStatus> {
     return this.#providers.connectProvider(provider, openExternal);
+  }
+
+  updateProviderCli(provider: AgentProvider): Promise<AgentStatus> {
+    return this.#providers.updateProviderCli(provider);
   }
 
   async stop(): Promise<void> {

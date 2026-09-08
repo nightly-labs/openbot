@@ -41,10 +41,10 @@ describe("AgentSettingsPanel", () => {
       />
     ));
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Agent model: Sol" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Agent model: GPT-5.6 Sol" }));
     const dialog = screen.getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(dialog).getByRole("tab", { name: /^Claude:/ }));
-    await fireEvent.click(within(dialog).getByRole("option", { name: "Claude Sonnet 5" }));
+    await fireEvent.click(within(dialog).getByRole("option", { name: "Claude Sonnet 5, default" }));
 
     await waitFor(() =>
       expect(onUpdateRuntimeSettings).toHaveBeenCalledWith(
@@ -56,10 +56,10 @@ describe("AgentSettingsPanel", () => {
     await fireEvent.keyDown(dialog, { key: "Escape" });
 
     expect(await screen.findByText("Could not save agent settings.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Agent model: Sol" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Sol" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Agent reasoning level/ })).toHaveTextContent("Extra high");
     await fireEvent.click(screen.getByRole("button", { name: "Usage" }));
     expect(onOpenUsage).toHaveBeenCalledWith(screen.getByRole("button", { name: "Usage" }));
-    expect(screen.getByRole("button", { name: "Agent model: Sol" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Sol" })).toBeInTheDocument();
   });
 });

@@ -8,6 +8,7 @@ import type {
   AgentStatus,
   ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
+import { DEFAULT_PROVIDER_MODELS } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import {
   Button,
@@ -42,11 +43,6 @@ interface ProviderModelPickerProps {
 }
 
 const PROVIDERS: AgentProviderId[] = ["claude", "codex", "grok"];
-const DEFAULT_MODELS: Partial<Record<AgentProviderId, AgentModelId>> = {
-  claude: "claude-opus-5",
-  codex: "gpt-5.6-luna",
-};
-
 export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const [open, setOpen] = createSignal(false);
   const [railProvider, setRailProvider] = createSignal<AgentProviderId>(untrack(() => props.provider));
@@ -295,14 +291,14 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               type="button"
                               class={["provider-model-option", { "provider-model-option-selected": selected() }]}
                               aria-label={`${displayModelName(model.name, model.id)}${
-                                model.id === DEFAULT_MODELS[provider] ? ", default" : ""
+                                model.id === DEFAULT_PROVIDER_MODELS[provider] ? ", default" : ""
                               }`}
                               disabled={!available()}
                               onClick={() => selectModel(model.id, provider)}
                             >
                               <span class="provider-model-option-name">
                                 <span>{displayModelName(model.name, model.id)}</span>
-                                <Show when={model.id === DEFAULT_MODELS[provider]}>
+                                <Show when={model.id === DEFAULT_PROVIDER_MODELS[provider]}>
                                   <small>default</small>
                                 </Show>
                               </span>

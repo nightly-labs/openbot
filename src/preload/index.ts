@@ -738,6 +738,10 @@ const openbotApi: OpenBotDesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.computerUseCloseMacPermissionSetup).then(decodeVoid),
   openExternal: (destination) => ipcRenderer.invoke(IPC_CHANNELS.openExternal, destination),
   connectProvider: (provider) => ipcRenderer.invoke(IPC_CHANNELS.connectProvider, provider),
+  // Decoded, unlike its two neighbours: this reply is read straight after the user's own CLI was
+  // replaced under the app, so the version and state in it are the point of the call.
+  updateProviderCli: (provider) =>
+    ipcRenderer.invoke(IPC_CHANNELS.updateProviderCli, provider).then(decodeAgentStatusFromMain),
   refreshAgentProviders: () => ipcRenderer.invoke(IPC_CHANNELS.refreshAgentProviders),
   providerRuntimes: {
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.providerRuntimesGetStatus).then(decodeProviderRuntimeSnapshot),

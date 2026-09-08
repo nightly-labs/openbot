@@ -519,6 +519,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     closeComputerUsePermissionSetup: async () => undefined,
     openExternal: async () => undefined,
     connectProvider: async () => clone(agentStatus),
+    updateProviderCli: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
     providerRuntimes: {
       getStatus: async () => clone(runtimeSnapshot),

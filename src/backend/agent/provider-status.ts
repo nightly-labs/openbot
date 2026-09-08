@@ -1,5 +1,6 @@
 import type { ChildProcess } from "node:child_process";
 import type { AgentProviderStatus } from "@openbot/contracts/ipc";
+import { redactText } from "@openbot/logging";
 import type { AgentProvider } from "../agent-client";
 import { CodexCliError } from "../cli";
 
@@ -49,11 +50,42 @@ export function providerFailureStatus(
   return { state: "error", version: version ?? null, message };
 }
 
-export function waitForSuccessfulProcess(child: ChildProcess, timeoutMs: number): Promise<void> {
+/**
+ * Collects a failing process's own explanation from its error stream: the last line it wrote,
+ * bounded, for a message the user reads. Returns null when the process said nothing usable, so the
+ * caller keeps its own wording rather than showing an empty sentence.
+ *
+ * The line is redacted first. It goes into the provider row, which the Team API broadcasts to the
+ * team's connected clients, and a CLI that fails on authentication prints the header or key it sent.
+ */
+export function readProcessReason(child: ChildProcess): () => string | null {
+  let text = "";
+  child.stderr?.setEncoding("utf8");
+  child.stderr?.on("data", (chunk: string) => {
+    if (text.length < 4_000) text += chunk;
+  });
+  child.stderr?.on("error", () => undefined);
+  return () => {
+    const line = text
+      .split(/\r?\n/u)
+      .map((candidate) => candidate.trim())
+      .filter(Boolean)
+      .at(-1);
+    if (!line) return null;
+    const safe = redactText(line);
+    return safe.length > 200 ? `${safe.slice(0, 199)}…` : safe;
+  };
+}
+
+export function waitForSuccessfulProcess(
+  child: ChildProcess,
+  timeoutMs: number,
+  description = "Provider login",
+): Promise<void> {
   return new Promise((resolveProcess, reject) => {
     const timer = setTimeout(() => {
       child.kill("SIGTERM");
-      reject(new Error("Provider login timed out."));
+      reject(new Error(`${description} timed out.`));
     }, timeoutMs);
     timer.unref?.();
     child.once("error", (error) => {
@@ -63,7 +95,7 @@ export function waitForSuccessfulProcess(child: ChildProcess, timeoutMs: number)
     child.once("exit", (code, signal) => {
       clearTimeout(timer);
       if (code === 0 && signal === null) resolveProcess();
-      else reject(new Error(`Provider login stopped with ${signal ?? `code ${String(code)}`}.`));
+      else reject(new Error(`${description} stopped with ${signal ?? `code ${String(code)}`}.`));
     });
   });
 }

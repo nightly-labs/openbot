@@ -1,5 +1,14 @@
+/*
+ * The workspace keeps its place in the app frame grid while Usage is open, so the wrapper draws no
+ * box of its own. Its children are still grid items of the frame, but they are no longer its DOM
+ * children, so `.app-frame > *` no longer reaches them: without this, a conversation panel grows to
+ * its content height and pushes the composer under the window edge.
+ */
 .usage-workspace-content {
   display: contents;
+}
+.usage-workspace-content > * {
+  min-height: 0;
 }
 .app-frame-usage-open .usage-workspace-content {
   visibility: hidden;

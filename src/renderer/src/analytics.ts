@@ -136,7 +136,9 @@ export interface DesktopAnalyticsEvents {
       | "refresh"
       | "download_started"
       | "download_completed"
-      | "download_cancelled";
+      | "download_cancelled"
+      | "cli_update_started"
+      | "cli_update_completed";
     result: AnalyticsResult;
     failure_code?: string;
   };
@@ -322,6 +324,8 @@ const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
     "download_started",
     "download_completed",
     "download_cancelled",
+    "cli_update_started",
+    "cli_update_completed",
   ],
   reaction_action: ["add", "remove"],
   maintenance_action: ["export_data", "export_diagnostics"],

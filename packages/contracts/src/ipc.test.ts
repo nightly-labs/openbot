@@ -665,6 +665,10 @@ describe("renderer-to-main boundary guards", () => {
     // Open about values, not about shape: the renderer reads `id` and `state` off every entry.
     expect(isAgentStatus({ ...status, providers: [null] })).toBe(false);
     expect(isAgentStatus({ ...status, providers: [{ id: "codex" }] })).toBe(false);
+    // `cliSource` decides whether the picker offers the CLI's own updater. It stays open like the
+    // fields above - an owner we do not know simply matches nothing - but it has to be a string.
+    expect(isAgentStatus({ ...status, providers: [{ ...providers[0], cliSource: "system" }] })).toBe(true);
+    expect(isAgentStatus({ ...status, providers: [{ ...providers[0], cliSource: 1 }] })).toBe(false);
   });
 
   it("requires an agent provider and a well-formed avatar on every agent summary", () => {
