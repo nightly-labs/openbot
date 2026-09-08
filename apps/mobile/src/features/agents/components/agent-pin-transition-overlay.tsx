@@ -39,6 +39,7 @@ export function AgentPinTransitionOverlay({ progress, transition }: AgentPinTran
         hue={transition.avatarHue}
         seed={transition.avatarSeed}
         size={transition.from.width}
+        animateIdle={false}
       />
     </Animated.View>
   );
