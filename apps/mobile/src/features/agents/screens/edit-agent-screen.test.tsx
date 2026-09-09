@@ -557,6 +557,28 @@ it("shows host memories, routine status, and usage on separate pages", async () 
       original.serverId,
     ),
   );
+  await click("1 year");
+  await waitFor(() =>
+    expect(workspace.loadAgentAnalytics).toHaveBeenLastCalledWith(analyticsRange(original.id, 365), original.serverId),
+  );
+  await click("Custom range");
+  await edit("Start date", "2024-01-01");
+  await edit("End date", "2024-01-31");
+  await click("Apply range");
+  await waitFor(() =>
+    expect(workspace.loadAgentAnalytics).toHaveBeenLastCalledWith(
+      { ...analyticsRange(original.id), startDate: "2024-01-01", endDate: "2024-01-31" },
+      original.serverId,
+    ),
+  );
+  const requests = workspace.loadAgentAnalytics.mock.calls.length;
+  await edit("End date", "2023-12-31");
+  await click("Apply range");
+  expect(screen.getByText(/Enter valid dates in YYYY-MM-DD/)).toBeTruthy();
+  expect(workspace.loadAgentAnalytics).toHaveBeenCalledTimes(requests);
+  await edit("End date", "2025-12-31");
+  await click("Apply range");
+  expect(workspace.loadAgentAnalytics).toHaveBeenCalledTimes(requests);
 });
 
 it("edits appearance separately from the main form", async () => {

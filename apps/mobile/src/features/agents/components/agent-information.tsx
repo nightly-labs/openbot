@@ -1,4 +1,4 @@
-import { analyticsRange } from "@openbot/contracts/ipc";
+import { analyticsRange, parseAnalyticsRange } from "@openbot/contracts/ipc";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
@@ -7,6 +7,7 @@ import { View } from "react-native";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { MemoryEditor, RoutineEditor } from "./agent-record-editor";
 import { AgentUsageReport } from "./agent-usage-report";
 
@@ -24,6 +25,22 @@ export function AgentInformation({
   const { session, sessionScope } = useMobileSession();
   const [days, setDays] = useState(30);
   const [range, setRange] = useState(() => analyticsRange(agent.id));
+  const [custom, setCustom] = useState(false);
+  const [customStart, setCustomStart] = useState(range.startDate);
+  const [customEnd, setCustomEnd] = useState(range.endDate);
+  const [rangeError, setRangeError] = useState<string | null>(null);
+  function applyCustomRange() {
+    try {
+      const selected = parseAnalyticsRange({ startDate: customStart, endDate: customEnd, timeZone: range.timeZone });
+      setRange({ ...selected, agentId: agent.id });
+      setDays(0);
+      setRangeError(null);
+    } catch {
+      setRangeError(
+        "Enter valid dates in YYYY-MM-DD format, with the start on or before the end. Select at most 367 days.",
+      );
+    }
+  }
   const key = ["agent-info", session?.apiUrl, session?.user.id, sessionScope, agent.serverId, agent.id];
   const options = { enabled: available, retry: false, staleTime: 0, gcTime: 0 };
   const memories = useQuery({
@@ -49,21 +66,68 @@ export function AgentInformation({
       {section === "usage" ? (
         <View className="gap-4">
           <View className="flex-row gap-2">
-            {[7, 30, 90].map((value) => (
+            {[7, 30, 90, 365].map((value) => (
               <Button
                 key={value}
                 className="flex-1"
+                size="sm"
                 variant={days === value ? "secondary" : "ghost"}
                 accessibilityState={{ selected: days === value }}
                 onPress={() => {
+                  setCustom(false);
+                  setRangeError(null);
                   setDays(value);
                   setRange(analyticsRange(agent.id, value));
                 }}
               >
-                <Button.Label>{value} days</Button.Label>
+                <Button.Label>{value === 365 ? "1 year" : `${value} days`}</Button.Label>
               </Button>
             ))}
           </View>
+          <Button
+            variant="ghost"
+            accessibilityState={{ expanded: custom }}
+            onPress={() => {
+              if (!custom) {
+                setCustomStart(range.startDate);
+                setCustomEnd(range.endDate);
+              }
+              setRangeError(null);
+              setCustom(!custom);
+            }}
+          >
+            <Button.Label>Custom range</Button.Label>
+          </Button>
+          {custom ? (
+            <View className="gap-3">
+              <SheetFormField
+                label="Start date"
+                hint="YYYY-MM-DD"
+                appearance="soft"
+                value={customStart}
+                onChangeText={setCustomStart}
+                autoCorrect={false}
+                maxLength={10}
+              />
+              <SheetFormField
+                label="End date"
+                hint="YYYY-MM-DD"
+                appearance="soft"
+                value={customEnd}
+                onChangeText={setCustomEnd}
+                autoCorrect={false}
+                maxLength={10}
+              />
+              {rangeError ? (
+                <Typography.Paragraph accessibilityRole="alert" className="text-danger">
+                  {rangeError}
+                </Typography.Paragraph>
+              ) : null}
+              <Button variant="secondary" onPress={applyCustomRange}>
+                <Button.Label>Apply range</Button.Label>
+              </Button>
+            </View>
+          ) : null}
           <InformationSection
             title="Usage"
             list

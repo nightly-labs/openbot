@@ -6,8 +6,13 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 
 const number = (value: number | null) => (value === null ? "Unavailable" : value.toLocaleString());
 const money = (value: number | null) => (value === null ? "Unavailable" : `$${value.toFixed(4)}`);
-const date = (value: string) =>
-  new Date(`${value}T12:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+const date = (value: string, includeYear = false) =>
+  new Date(`${value}T12:00:00Z`).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: includeYear ? "numeric" : undefined,
+    timeZone: "UTC",
+  });
 
 export function AgentUsageReport({ result }: { result: AgentAnalytics }) {
   const [metric, setMetric] = useState<"processedTokens" | "estimatedCostUsd">("processedTokens");
@@ -19,7 +24,7 @@ export function AgentUsageReport({ result }: { result: AgentAnalytics }) {
   return (
     <View className="gap-5">
       <Typography type="body-xs" className="text-center text-grouped-secondary">
-        {date(result.startDate)} – {date(result.endDate)} · {result.timeZone}
+        {date(result.startDate, true)} – {date(result.endDate, true)} · {result.timeZone}
       </Typography>
       <View className="flex-row gap-3">
         <View className="flex-1 gap-1 rounded-grouped bg-grouped p-4">
@@ -55,7 +60,7 @@ export function AgentUsageReport({ result }: { result: AgentAnalytics }) {
               <Typography type="body-xs" className="text-grouped-secondary">
                 Peak {metric === "processedTokens" ? number(max) : money(max)}
               </Typography>
-              <View className="h-32 flex-row items-end gap-px">
+              <View className={result.daily.length > 90 ? "h-32 flex-row items-end" : "h-32 flex-row items-end gap-px"}>
                 {result.daily.map((day) => (
                   <Pressable
                     key={day.date}
