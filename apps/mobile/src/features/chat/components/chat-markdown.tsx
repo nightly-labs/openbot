@@ -4,9 +4,13 @@ import { useThemeColor } from "heroui-native/hooks";
 import { marked, type Token, type Tokens } from "marked";
 import { Fragment, memo, type ReactNode, useMemo } from "react";
 import { Alert, type ColorValue, ScrollView, type TextStyle, View } from "react-native";
+import { useReducedMotion } from "react-native-reanimated";
 import { ChatLinkIcon } from "@/features/chat/components/chat-link-icon";
-import { StreamingTailText } from "@/features/chat/components/streaming-tail-text";
-import { useStreamingText } from "@/features/chat/components/use-streaming-text";
+import {
+  StreamingBlock,
+  StreamingTailText,
+  StreamRevealProvider,
+} from "@/features/chat/components/streaming-tail-text";
 
 interface MarkdownTokenByType {
   paragraph: Tokens.Paragraph;
@@ -74,16 +78,19 @@ function CodeSpan({ text, presentation }: { text: string; presentation: TextPres
 }
 
 function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNode {
-  const lastToken = tokens.findLast((token) => token.type !== "br");
   return sourceEntries(tokens, (token) => token.raw).map(({ value: token, offset }) => {
-    const presentation = { ...parentPresentation, animateTail: parentPresentation.animateTail && token === lastToken };
+    const presentation = { ...parentPresentation, animateTail: parentPresentation.animateTail };
     if (token.type === "br") return "\n";
     if (tokenIs(token, "text")) {
       if (token.tokens) return inline(token.tokens, presentation);
-      return presentation.animateTail ? (
-        <StreamingTailText key={offset} body={token.text} type={presentation.type} style={presentation.style} />
-      ) : (
-        token.text
+      return (
+        <StreamingTailText
+          key={offset}
+          body={token.text}
+          enabled={presentation.animateTail}
+          type={presentation.type}
+          style={presentation.style}
+        />
       );
     }
     if (tokenIs(token, "escape")) return token.text;
@@ -171,7 +178,7 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
               >
                 {inline(run, {
                   ...presentation,
-                  animateTail: presentation.animateTail && run.at(-1) === tokens.at(-1),
+                  animateTail: presentation.animateTail,
                 })}
               </Typography>
             );
@@ -191,13 +198,12 @@ function MarkdownBlocks({
   presentation: TextPresentation;
   inList?: boolean;
 }) {
-  const lastToken = tokens.findLast((token) => token.type !== "space" && token.type !== "def");
   return (
     <View className="min-w-0 gap-3">
       {sourceEntries(tokens, (token) => token.raw).map(({ value: token, offset }) => {
         const presentation = {
           ...parentPresentation,
-          animateTail: parentPresentation.animateTail && token === lastToken,
+          animateTail: parentPresentation.animateTail,
         };
         if (token.type === "space" || token.type === "def") return null;
         if (tokenIs(token, "paragraph") || tokenIs(token, "text")) {
@@ -225,21 +231,22 @@ function MarkdownBlocks({
         }
         if (tokenIs(token, "code")) {
           return (
-            <ScrollView
-              key={offset}
-              horizontal
-              alwaysBounceHorizontal={false}
-              className="rounded-xl bg-control"
-              contentContainerStyle={{ padding: 10 }}
-            >
-              <Typography.Code
-                selectable
-                className="bg-transparent p-0"
-                style={{ ...presentation.style, color: presentation.codeColor }}
+            <StreamingBlock key={offset} enabled={presentation.animateTail}>
+              <ScrollView
+                horizontal
+                alwaysBounceHorizontal={false}
+                className="rounded-xl bg-control"
+                contentContainerStyle={{ padding: 10 }}
               >
-                {token.text}
-              </Typography.Code>
-            </ScrollView>
+                <Typography.Code
+                  selectable
+                  className="bg-transparent p-0"
+                  style={{ ...presentation.style, color: presentation.codeColor }}
+                >
+                  {token.text}
+                </Typography.Code>
+              </ScrollView>
+            </StreamingBlock>
           );
         }
         if (tokenIs(token, "blockquote")) {
@@ -269,7 +276,7 @@ function MarkdownBlocks({
                       inList
                       presentation={{
                         ...presentation,
-                        animateTail: presentation.animateTail && item === token.items.at(-1),
+                        animateTail: presentation.animateTail,
                       }}
                     />
                   </View>
@@ -298,7 +305,7 @@ function MarkdownBlocks({
                           >
                             {inline(cell.tokens, {
                               ...presentation,
-                              animateTail: presentation.animateTail && row === token.rows.at(-1) && cell === row.at(-1),
+                              animateTail: presentation.animateTail,
                             })}
                           </Typography>
                         </View>
@@ -334,18 +341,20 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   streaming?: boolean;
   animationEnabled?: boolean;
 }) {
-  const display = useStreamingText(body, streaming, animationEnabled);
-  const tokens = useMemo(() => marked.lexer(display.body, { gfm: true, breaks: true }), [display.body]);
+  const reducedMotion = useReducedMotion();
+  const tokens = useMemo(() => marked.lexer(body, { gfm: true, breaks: true }), [body]);
   const codeColor = useThemeColor("foreground");
   return (
-    <MarkdownBlocks
-      tokens={tokens}
-      presentation={{
-        type: compact ? "body-sm" : "body",
-        style: { color: color ?? codeColor },
-        codeColor,
-        animateTail: display.animateTail,
-      }}
-    />
+    <StreamRevealProvider>
+      <MarkdownBlocks
+        tokens={tokens}
+        presentation={{
+          type: compact ? "body-sm" : "body",
+          style: { color: color ?? codeColor },
+          codeColor,
+          animateTail: streaming && animationEnabled && !reducedMotion,
+        }}
+      />
+    </StreamRevealProvider>
   );
 });

@@ -3,7 +3,9 @@ import {
   type AgentSummary,
   type ConversationSnapshot,
   type CreateAgentInput,
+  isAttachmentSummary,
   isAvatarHue,
+  isQueuedMessageReceipt,
   type TeamRealtimeEvent,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -26,6 +28,7 @@ import {
   resyncRemoteConversations,
   watchRemoteDirectory,
 } from "@openbot/team-client";
+import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { useQueryClient } from "@tanstack/react-query";
 import { fetch } from "expo/fetch";
 import * as Crypto from "expo-crypto";
@@ -50,7 +53,7 @@ import {
   type ServerLoadContext,
 } from "@/features/workspace/components/server-connection";
 import { type MobileAgentActivities, reduceAgentActivity } from "@/features/workspace/model/agent-activity";
-import { decodeConversation } from "@/features/workspace/model/conversation";
+import { conversationMessageId, decodeConversation } from "@/features/workspace/model/conversation";
 import { applyServerRecovery, serverKind } from "@/features/workspace/model/server-status";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
 import type {
@@ -241,10 +244,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       decode: (value: unknown) => T,
       body?: TeamProtocolV2Json,
       serverId = activeServerIdRef.current,
+      upload?: RemoteFileUpload,
     ): Promise<T> => {
       const client = serverId ? connections.current.get(serverId)?.client : null;
       if (!client) throw new Error("The mobile transport is not ready.");
-      return client.request(method, path, decode, body);
+      return client.request(method, path, decode, body, upload);
     },
     [],
   );
@@ -652,12 +656,45 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         });
       },
       loadConversation,
-      sendMessage: async (agentId, text) => {
-        await request("POST", TEAM_API_ROUTES.agent.messages(agentId), ignoreResponse, {
-          text,
-          attachmentDraftIds: [],
-          replyToMessageId: null,
-        });
+      uploadAttachment: async (agentId, input) => {
+        const serverId = agents.find((candidate) => candidate.id === agentId)?.serverId;
+        if (!serverId) throw new Error("The agent is unavailable.");
+        const query = new URLSearchParams({ name: input.name, mime: input.mimeType });
+        return request(
+          "POST",
+          `${TEAM_API_ROUTES.attachments}?${query}`,
+          (value) => {
+            if (!isAttachmentSummary(value)) throw new Error("The host returned an invalid attachment.");
+            return value;
+          },
+          undefined,
+          serverId,
+          input,
+        );
+      },
+      discardAttachment: async (agentId, attachmentId) => {
+        const serverId = agents.find((candidate) => candidate.id === agentId)?.serverId;
+        if (!serverId) throw new Error("The agent is unavailable.");
+        await request("DELETE", TEAM_API_ROUTES.attachment(attachmentId), ignoreResponse, undefined, serverId);
+      },
+      sendMessage: async (agentId, text, attachmentDraftIds = []) => {
+        const serverId = agents.find((candidate) => candidate.id === agentId)?.serverId;
+        if (!serverId) throw new Error("The agent is unavailable.");
+        const receipt = await request(
+          "POST",
+          TEAM_API_ROUTES.agent.messages(agentId),
+          (value) => {
+            if (!isQueuedMessageReceipt(value)) throw new Error("The host returned an invalid message receipt.");
+            return value;
+          },
+          {
+            text,
+            attachmentDraftIds,
+            replyToMessageId: null,
+          },
+          serverId,
+        );
+        return conversationMessageId(receipt, agentId);
       },
       respondToPrompt: async (agentId, input) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
