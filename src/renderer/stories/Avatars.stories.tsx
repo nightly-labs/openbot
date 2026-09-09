@@ -1,6 +1,8 @@
 import { BloubBot, POSES, type StateId } from "@norbert_bodziony/bloub";
+import { createStore, For, Show } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { bloubAvatarProfile } from "../src/bloub-avatar";
+import { Button } from "../src/components/ui";
 import { AgentAvatar } from "../src/features/agents/AgentAvatar";
 import { TeamPersonAvatar } from "../src/features/team/TeamPersonAvatar";
 import { STORY_AGENTS, STORY_PRESENCE } from "./fixtures";
@@ -20,6 +22,69 @@ export const Generated: AgentStory = {
 
 export const Thinking: AgentStory = {
   args: { agent: STORY_AGENTS[1], motion: "always", class: "size-12" },
+};
+
+export const IndependentMotion: AgentStory = {
+  render: () => {
+    const [state, setState] = createStore({
+      seeds: ["agent-alpha", "agent-beta", "agent-gamma", "agent-delta"],
+      updates: 0,
+      visible: true,
+    });
+    return (
+      <div class="grid gap-6 p-8">
+        <div class="flex gap-3">
+          <Button
+            onClick={() =>
+              setState((draft) => {
+                draft.seeds.reverse();
+              })
+            }
+          >
+            Reverse agents
+          </Button>
+          <Button
+            onClick={() =>
+              setState((draft) => {
+                draft.updates += 1;
+              })
+            }
+          >
+            Update conversation
+          </Button>
+          <Button
+            onClick={() =>
+              setState((draft) => {
+                draft.visible = !draft.visible;
+              })
+            }
+          >
+            {state.visible ? "Hide avatars" : "Show avatars"}
+          </Button>
+        </div>
+        <p>Conversation updates: {state.updates}</p>
+        <Show when={state.visible}>
+          <For each={["idle", "working", "connecting", "always", "hover"] as const}>
+            {(motion) => (
+              <section class="grid gap-3" aria-label={`${motion} avatars`}>
+                <strong>{motion}</strong>
+                <div class="flex gap-5">
+                  <For each={state.seeds}>
+                    {(seed) => (
+                      <Button variant="ghost" aria-label={`${motion} ${seed}`}>
+                        <AgentAvatar seed={seed} motion={motion} class="size-12" hue={215} />
+                        {seed}
+                      </Button>
+                    )}
+                  </For>
+                </div>
+              </section>
+            )}
+          </For>
+        </Show>
+      </div>
+    );
+  },
 };
 
 export const CustomImageFallback: AgentStory = {

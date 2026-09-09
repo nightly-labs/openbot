@@ -606,6 +606,23 @@ describe.sequential("AgentService: providers", () => {
       expect(params.developerInstructions).toContain("sadness, disappointment, frustration, loneliness");
       expect(params.developerInstructions).toContain("An emoji written inside your answer does not count");
       expect(params.developerInstructions).toContain("Omit agentId to target yourself");
+      expect.soft(params.developerInstructions).toContain("call openbot.list_agents and openbot.list_sections");
+      expect.soft(params.developerInstructions).toContain("Prefer suitable agents in your own section first");
+      expect
+        .soft(params.developerInstructions)
+        .toContain(
+          "Choose agents outside it when no suitable section member is available or additional expertise is needed; you do not need to contact a section member first.",
+        );
+      expect
+        .soft(params.developerInstructions)
+        .toContain(
+          "If you have no section, choose by name, title, and description without giving other ungrouped agents priority.",
+        );
+      expect
+        .soft(params.developerInstructions)
+        .toContain(
+          "Recipients explicitly named by the user and replies to existing messages take priority over section preference.",
+        );
       expect(params.dynamicTools).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ type: "namespace", name: "openbot_browser" }),

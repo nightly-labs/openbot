@@ -438,6 +438,11 @@ describe("email one-time codes", () => {
         expect.objectContaining({ kind: "desktop", current: false }),
       ]),
     );
+    const desktopSession = accountSessions.find((item) => item.kind === "desktop");
+    await expect(
+      service.revokeAccountSession(mobileToken, desktopSession?.sessionId ?? "missing"),
+    ).rejects.toMatchObject({ status: 403, code: "desktop_session_protected" });
+    expect(await service.authenticateDesktopSession(session.sessionToken)).toMatchObject({ id: session.user.id });
     const tabletTicket = await service.issueMobileAuthTicket(session.sessionToken, "203.0.113.4");
     const tablet = await service.redeemMobileAuthTicket(
       tabletTicket.ticket,
@@ -485,6 +490,8 @@ describe("email one-time codes", () => {
         sourceIp: "203.0.113.4",
       }),
     ).rejects.toMatchObject({ code: "invalid_sign_in_code" });
+    await service.revokeAccountSession(session.sessionToken, desktopSession?.sessionId ?? "missing");
+    expect(await service.authenticateDesktopSession(session.sessionToken)).toBeNull();
   });
 
   it("exposes a code only in explicit development mode", async () => {

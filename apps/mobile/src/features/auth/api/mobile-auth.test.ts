@@ -386,6 +386,11 @@ it("lists account sessions and only disconnects other devices", async () => {
   const [item] = await listMobileAccountSessions(session);
   expect(item).toEqual(current);
   await expect(revokeMobileAccountSession(session, item)).rejects.toThrow("Use Sign out");
+  native.fetch.mockClear();
+  await expect(revokeMobileAccountSession(session, { ...item, current: false, kind: "desktop" })).rejects.toThrow(
+    "Desktop sessions cannot be disconnected from mobile.",
+  );
+  expect(native.fetch).not.toHaveBeenCalled();
   native.fetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
   await revokeMobileAccountSession(session, { ...item, current: false });
   expect(native.fetch).toHaveBeenLastCalledWith(
@@ -463,8 +468,8 @@ describe("settings request lifecycle", () => {
     async (operation) => {
       const target = {
         sessionId: "11111111-1111-4111-8111-111111111111",
-        name: "Desktop",
-        kind: "desktop" as const,
+        name: "Tablet",
+        kind: "mobile" as const,
         current: false,
         connectedAt: 1,
         lastActiveAt: 2,

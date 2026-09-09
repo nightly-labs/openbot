@@ -1,12 +1,22 @@
+import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import * as Linking from "expo-linking";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { marked, type Token, type Tokens } from "marked";
+import type { Token, Tokens } from "marked";
 import { Fragment, memo, type ReactNode, useMemo } from "react";
-import { Alert, type ColorValue, ScrollView, type TextStyle, View } from "react-native";
+import { Alert, type ColorValue, ScrollView, type TextStyle, useWindowDimensions, View } from "react-native";
+import { useReducedMotion } from "react-native-reanimated";
+import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkIcon } from "@/features/chat/components/chat-link-icon";
-import { StreamingTailText } from "@/features/chat/components/streaming-tail-text";
-import { useStreamingText } from "@/features/chat/components/use-streaming-text";
+import {
+  StreamingBlock,
+  StreamingTailText,
+  StreamRevealProvider,
+} from "@/features/chat/components/streaming-tail-text";
+import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { parseChatMarkdown } from "../model/chat-markdown-parser";
+import { plainMentionParts } from "../model/chat-mentions";
+import { ChatCodeBlock } from "./chat-code-block";
 
 interface MarkdownTokenByType {
   paragraph: Tokens.Paragraph;
@@ -35,6 +45,19 @@ interface TextPresentation {
   style: TextStyle;
   codeColor: ColorValue;
   animateTail: boolean;
+  agents: readonly MobileAgent[];
+  mentionOffset: number;
+}
+
+// The inline badge is shifted to align its label with native text. Reserve the
+// same space in the owning text view so its last line does not clip the capsule.
+function textContainerStyle(source: string, presentation: TextPresentation): TextStyle {
+  const hasMention =
+    chatTagReferences(source).some((reference) => reference.kind === "agent") ||
+    plainMentionParts(source, presentation.agents).some((part) => part.agent);
+  return hasMention
+    ? { ...presentation.style, paddingBottom: presentation.mentionOffset, overflow: "visible" }
+    : presentation.style;
 }
 
 function webLink(href: string): string | null {
@@ -73,17 +96,64 @@ function CodeSpan({ text, presentation }: { text: string; presentation: TextPres
   );
 }
 
+function AgentMention({ agent, presentation }: { agent: MobileAgent; presentation: TextPresentation }) {
+  const { fontScale } = useWindowDimensions();
+  return (
+    <View
+      collapsable={false}
+      className="max-w-full flex-row items-center gap-1 rounded-full bg-control/30 px-1.5"
+      // Native inline views sit on the text baseline. Offset the text descender
+      // so the name aligns with the surrounding text instead of sitting above it.
+      style={{ transform: [{ translateY: presentation.mentionOffset }], borderCurve: "circular" }}
+    >
+      <BloubAvatarThumbnail
+        hue={agent.avatarHue}
+        seed={agent.avatarSeed}
+        size={(presentation.type === "body-sm" ? 16 : 18) * fontScale}
+      />
+      <Typography type={presentation.type} style={presentation.style} className="shrink">
+        {agent.name}
+      </Typography>
+    </View>
+  );
+}
+
 function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNode {
-  const lastToken = tokens.findLast((token) => token.type !== "br");
   return sourceEntries(tokens, (token) => token.raw).map(({ value: token, offset }) => {
-    const presentation = { ...parentPresentation, animateTail: parentPresentation.animateTail && token === lastToken };
+    const presentation = { ...parentPresentation, animateTail: parentPresentation.animateTail };
+    if (token.type === "agentMention") {
+      const reference = chatTagReferences(token.raw)[0];
+      const agent = presentation.agents.find((candidate) => candidate.id === reference?.id);
+      if (!agent)
+        return (
+          <Typography
+            key={offset}
+            type={presentation.type}
+            style={presentation.style}
+          >{`@${reference?.name ?? "Agent"}`}</Typography>
+        );
+      return <AgentMention key={offset} agent={agent} presentation={presentation} />;
+    }
     if (token.type === "br") return "\n";
     if (tokenIs(token, "text")) {
       if (token.tokens) return inline(token.tokens, presentation);
-      return presentation.animateTail ? (
-        <StreamingTailText key={offset} body={token.text} type={presentation.type} style={presentation.style} />
-      ) : (
-        token.text
+      return (
+        <Fragment key={offset}>
+          {sourceEntries(plainMentionParts(token.text, presentation.agents), (part) => part.text).map(
+            ({ value: part, offset: partOffset }) =>
+              part.agent ? (
+                <AgentMention key={partOffset} agent={part.agent} presentation={presentation} />
+              ) : (
+                <StreamingTailText
+                  key={partOffset}
+                  body={part.text}
+                  enabled={presentation.animateTail}
+                  type={presentation.type}
+                  style={presentation.style}
+                />
+              ),
+          )}
+        </Fragment>
       );
     }
     if (tokenIs(token, "escape")) return token.text;
@@ -107,7 +177,9 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
     }
     if (tokenIs(token, "link") || tokenIs(token, "image")) {
       const url = webLink(token.href);
-      const label = tokenIs(token, "image") ? token.text || "Image" : inline(token.tokens, presentation);
+      const label = tokenIs(token, "image")
+        ? token.text || "Image"
+        : inline(token.tokens, { ...presentation, agents: [] });
       if (!url) return <Fragment key={offset}>{label}</Fragment>;
       return (
         <Typography
@@ -167,11 +239,11 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
                 selectable
                 className="max-w-full"
                 type={presentation.type}
-                style={presentation.style}
+                style={textContainerStyle(source(run), presentation)}
               >
                 {inline(run, {
                   ...presentation,
-                  animateTail: presentation.animateTail && run.at(-1) === tokens.at(-1),
+                  animateTail: presentation.animateTail,
                 })}
               </Typography>
             );
@@ -191,13 +263,12 @@ function MarkdownBlocks({
   presentation: TextPresentation;
   inList?: boolean;
 }) {
-  const lastToken = tokens.findLast((token) => token.type !== "space" && token.type !== "def");
   return (
     <View className="min-w-0 gap-3">
       {sourceEntries(tokens, (token) => token.raw).map(({ value: token, offset }) => {
         const presentation = {
           ...parentPresentation,
-          animateTail: parentPresentation.animateTail && token === lastToken,
+          animateTail: parentPresentation.animateTail,
         };
         if (token.type === "space" || token.type === "def") return null;
         if (tokenIs(token, "paragraph") || tokenIs(token, "text")) {
@@ -205,7 +276,12 @@ function MarkdownBlocks({
             return <ListParagraph key={offset} tokens={token.tokens} presentation={presentation} />;
           }
           return (
-            <Typography key={offset} selectable type={presentation.type} style={presentation.style}>
+            <Typography
+              key={offset}
+              selectable
+              type={presentation.type}
+              style={textContainerStyle(token.raw, presentation)}
+            >
               {token.tokens ? inline(token.tokens, presentation) : token.text}
             </Typography>
           );
@@ -217,7 +293,7 @@ function MarkdownBlocks({
               key={offset}
               selectable
               type={heading.type === "h4" ? "h4" : "h5"}
-              style={presentation.style}
+              style={textContainerStyle(token.raw, presentation)}
             >
               {inline(token.tokens, heading)}
             </Typography.Heading>
@@ -225,21 +301,9 @@ function MarkdownBlocks({
         }
         if (tokenIs(token, "code")) {
           return (
-            <ScrollView
-              key={offset}
-              horizontal
-              alwaysBounceHorizontal={false}
-              className="rounded-xl bg-control"
-              contentContainerStyle={{ padding: 10 }}
-            >
-              <Typography.Code
-                selectable
-                className="bg-transparent p-0"
-                style={{ ...presentation.style, color: presentation.codeColor }}
-              >
-                {token.text}
-              </Typography.Code>
-            </ScrollView>
+            <StreamingBlock key={offset} enabled={presentation.animateTail}>
+              <ChatCodeBlock text={token.text} language={token.lang} />
+            </StreamingBlock>
           );
         }
         if (tokenIs(token, "blockquote")) {
@@ -269,7 +333,7 @@ function MarkdownBlocks({
                       inList
                       presentation={{
                         ...presentation,
-                        animateTail: presentation.animateTail && item === token.items.at(-1),
+                        animateTail: presentation.animateTail,
                       }}
                     />
                   </View>
@@ -280,7 +344,7 @@ function MarkdownBlocks({
         }
         if (tokenIs(token, "table")) {
           return (
-            <ScrollView key={offset} horizontal alwaysBounceHorizontal={false}>
+            <ScrollView key={offset} horizontal alwaysBounceHorizontal={false} style={{ flexGrow: 0, flexShrink: 0 }}>
               <View>
                 {sourceEntries([token.header, ...token.rows], (row) => row.map((cell) => cell.text).join("|")).map(
                   ({ value: row, offset: rowOffset }) => (
@@ -291,14 +355,14 @@ function MarkdownBlocks({
                             selectable
                             type={presentation.type}
                             style={{
-                              ...presentation.style,
+                              ...textContainerStyle(cell.text, presentation),
                               textAlign: cell.align ?? "left",
                               fontWeight: cell.header ? "600" : "400",
                             }}
                           >
                             {inline(cell.tokens, {
                               ...presentation,
-                              animateTail: presentation.animateTail && row === token.rows.at(-1) && cell === row.at(-1),
+                              animateTail: presentation.animateTail,
                             })}
                           </Typography>
                         </View>
@@ -327,25 +391,32 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   compact = false,
   streaming = false,
   animationEnabled = true,
+  agents = [],
 }: {
   body: string;
   color: ColorValue | undefined;
   compact?: boolean;
   streaming?: boolean;
   animationEnabled?: boolean;
+  agents?: readonly MobileAgent[];
 }) {
-  const display = useStreamingText(body, streaming, animationEnabled);
-  const tokens = useMemo(() => marked.lexer(display.body, { gfm: true, breaks: true }), [display.body]);
+  const reducedMotion = useReducedMotion();
+  const { fontScale } = useWindowDimensions();
+  const tokens = useMemo(() => parseChatMarkdown(body), [body]);
   const codeColor = useThemeColor("foreground");
   return (
-    <MarkdownBlocks
-      tokens={tokens}
-      presentation={{
-        type: compact ? "body-sm" : "body",
-        style: { color: color ?? codeColor },
-        codeColor,
-        animateTail: display.animateTail,
-      }}
-    />
+    <StreamRevealProvider>
+      <MarkdownBlocks
+        tokens={tokens}
+        presentation={{
+          type: compact ? "body-sm" : "body",
+          style: { color: color ?? codeColor },
+          codeColor,
+          agents,
+          mentionOffset: 4 * fontScale,
+          animateTail: streaming && animationEnabled && !reducedMotion,
+        }}
+      />
+    </StreamRevealProvider>
   );
 });

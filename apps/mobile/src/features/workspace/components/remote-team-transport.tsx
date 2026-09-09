@@ -3,6 +3,7 @@ import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteTeamDirectoryClient } from "@openbot/team-client";
 import {
   createRemoteCommandMailbox,
+  type RemoteFileUpload,
   type RemoteTeamCommand,
   type RemoteTeamCommandResult,
   type RemoteTeamConnectionUpdate,
@@ -16,7 +17,13 @@ import RemoteTeamBridge from "./remote-team-bridge.dom";
 export interface RemoteTeamTransportRef {
   connect(hostId: string, hostPublicKey: string): Promise<void>;
   disconnect(): Promise<void>;
-  request<T>(method: string, path: string, decode: (value: unknown) => T, body?: TeamProtocolV2Json): Promise<T>;
+  request<T>(
+    method: string,
+    path: string,
+    decode: (value: unknown) => T,
+    body?: TeamProtocolV2Json,
+    upload?: RemoteFileUpload,
+  ): Promise<T>;
 }
 
 interface RemoteTeamTransportProps {
@@ -29,7 +36,7 @@ interface RemoteTeamTransportProps {
 type RemoteTeamCommandInput =
   | { type: "connect"; hostId: string; hostPublicKey: string }
   | { type: "disconnect" }
-  | { type: "request"; method: string; path: string; body: TeamProtocolV2Json };
+  | { type: "request"; method: string; path: string; body: TeamProtocolV2Json; upload?: RemoteFileUpload };
 
 export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeamTransportProps>(
   function RemoteTeamTransport({ active: foreground, directory, onConnectionUpdate, onTeamEvent }, ref) {
@@ -47,7 +54,7 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
           next.type === "connect"
             ? { id, type: "connect", hostId: next.hostId, hostPublicKey: next.hostPublicKey }
             : next.type === "request"
-              ? { id, type: "request", method: next.method, path: next.path, body: next.body }
+              ? { id, type: "request", method: next.method, path: next.path, body: next.body, upload: next.upload }
               : { id, type: "disconnect" };
         return mailbox.send(command);
       },
@@ -70,8 +77,9 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
           path: string,
           decode: (value: unknown) => T,
           body: TeamProtocolV2Json = {},
+          upload?: RemoteFileUpload,
         ): Promise<T> => {
-          const result = await enqueue({ type: "request", method, path, body });
+          const result = await enqueue({ type: "request", method, path, body, upload });
           if (!result.ok) throw new Error(result.error ?? "The server request failed.");
           if (result.status !== undefined && result.status >= 400) throw new Error("The server request failed.");
           return decode(result.body);

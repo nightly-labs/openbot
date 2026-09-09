@@ -56,7 +56,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
           }}
         >
           <span class="agent-row-avatar">
-            <AgentAvatar agent={rowProps.agent} motion={working() ? "working" : "hover"} />
+            <AgentAvatar agent={rowProps.agent} motion={working() ? "working" : "idle"} />
             <Show when={props.agentStates[rowProps.agent.id]}>
               {(state) => <SidebarAgentIndicator state={state()} />}
             </Show>

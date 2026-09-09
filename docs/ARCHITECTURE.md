@@ -270,6 +270,12 @@ Conversation read cursors belong to a team member and are shared across that mem
 Advancing a cursor emits a conversation invalidation without the reader's identity or cursor;
 clients reload their own read state even when the conversation content revision is unchanged.
 Mobile acknowledges rendered replies only in the foreground, focused chat at the latest messages.
+Mobile chat keeps viewport, tail-group, and composer measurements in its motion controller. The
+last user message anchors a native blank-space inset; streamed replies consume that inset without
+autoscrolling. Initial history positioning and the first-send/first-response animation are separate
+states. Pending message bubbles reconcile through the host receipt ID, not message text. Selected
+mobile attachments use the existing WebRTC file frames followed by the attachment upload endpoint;
+the native/DOM bridge limits each file to 10 MB and cancels transfers when its connection is replaced.
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
 host's SQLite and emit the same invalidation. Older hosts disable only this optional action.
@@ -456,23 +462,26 @@ because the two arrive separately and either one can complete an offer. An expli
 the same notification; revisioned snapshots move it through progress, failure, retry, and
 completion. Only the crossing into "update available" is announced, so a dismissed notification
 stays dismissed until the offer changes. Closing the notification does not cancel the download,
-and later reports do not reopen it. Fresh provider downloads retain their existing flow. These
-actions apply only to the local desktop host.
+and later reports do not reopen it. A refusal that reaches neither the download nor the report it
+makes - an update started while a workspace on another computer is open - is put on that same
+notification with a Retry, because the user pressed a button and the outcome belongs on screen.
+Fresh provider downloads retain their existing flow. These actions apply only to the local desktop
+host.
 
 A CLI the user installed themselves is not managed, but it is still compared against the lock.
 Each provider status row reports `cliSource`, and main passes the version of a `system` row to
 `ProviderRuntimeManager.setSystemVersion`, which compares it against the pinned version exactly as
-it compares a managed installation. The row and the notification therefore use the one update offer, the
-one Update button, and one entry point in the runtime store, `startProviderUpdate`. Only the work
-behind it differs: a `system` install goes to `updateProviderCli`, which runs that CLI's own updater
-(`codex update`) and then restarts the provider on the binary now on disk. That updater reports no
-progress, so the notification holds its indeterminate step until the provider comes back, and a
-failure keeps the reason the CLI gave, redacted, in one error that goes to the provider row and to
-the caller - and on, through the Team API, to the team's connected clients.
-The owner comes from the last resolution of the binary, not from the client that runs it, so a
-provider that is signed out still reports its own install rather than reading as the managed copy.
-OpenBot downloads nothing on this path, so the pinned artifact checksums are untouched. The managed
-copy refuses this command, because the runtime manager replaces that installation whole.
+it compares a managed installation. The row and the notification therefore use the one update offer,
+the one Update button, and one entry point in the runtime store, `startProviderUpdate`. One path
+runs behind it, whoever owns the CLI: the download installs the pinned managed copy and
+`updateProviderCli` activates it, and CLI resolution then prefers that copy to the system install,
+which is left where it is. OpenBot never runs the CLI's own updater, so no version it offers depends
+on another release channel. An explicit `OPENBOT_*_PATH` suppresses the offer, because that path
+names the binary to run and the managed copy is not it. The owner comes from the last resolution of
+the binary, not from the client that runs it, so a provider that is signed out still reports its own
+install rather than reading as the managed copy. A failure keeps the reason the CLI gave, redacted,
+in one error that goes to the provider row and to the caller - and on, through the Team API, to the
+team's connected clients.
 
 Every runtime the store reaches is on this computer: `window.openbot.providerRuntimes` addresses no
 other one, while the agent status beside it describes whichever server is open. The store therefore

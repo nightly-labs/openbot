@@ -43,6 +43,7 @@
       "@solidjs/testing-library": "1.0.0-beta.2",
       "@solidjs/vite-plugin": "3.0.0-next.28",
       "@solidjs/web": "2.0.0-rc.0",
+      "@speed-highlight/core": "1.2.24",
       "@tailwindcss/vite": "4.3.3",
       "@testing-library/jest-dom": "7.0.1",
       "@types/node": "24.13.3",
@@ -198,7 +199,7 @@
     "@openpanel/web": "catalog:",
     "@solidjs/signals": "catalog:",
     "@solidjs/web": "catalog:",
-    "@speed-highlight/core": "1.2.24",
+    "@speed-highlight/core": "catalog:",
     "@tanstack/virtual-core": "3.17.8",
     "class-variance-authority": "catalog:",
     "electron-updater": "6.8.9",
@@ -246,6 +247,7 @@
     "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch",
     "expo-router@57.0.17": "patches/expo-router@57.0.17.patch",
     "react-native-keyboard-controller@1.21.9": "patches/react-native-keyboard-controller@1.21.9.patch",
-    "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch"
+    "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
+    "@norbert_bodziony/bloub@0.3.0": "patches/@norbert_bodziony%2Fbloub@0.3.0.patch"
   }
 }
