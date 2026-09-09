@@ -11,13 +11,15 @@ import { Pencil } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Keyboard, Pressable, View } from "react-native";
 import { useResolveClassNames, useUniwind } from "uniwind";
+import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
 
 export function ProfileSettingsScreen() {
   const { session, updateProfile, signOut } = useMobileSession();
-  const [name, setName] = useState(session?.user.name ?? "");
+  const savedName = session ? mobileUserName(session.user) : "";
+  const [name, setName] = useState(savedName);
   const [editingName, setEditingName] = useState(false);
   const nativeName = useNativeState(name);
   const nameInput = useRef<TextInputRef>(null);
@@ -29,18 +31,17 @@ export function ProfileSettingsScreen() {
   const nameTextStyle = useResolveClassNames("text-title font-semibold");
   useEffect(() => {
     if (!editingName) {
-      const savedName = session?.user.name ?? "";
       nativeName.value = savedName;
       setName(savedName);
     }
-  }, [editingName, nativeName, session?.user.name]);
+  }, [editingName, nativeName, savedName]);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   if (!session) return null;
   const validatedName = validateProfileName(name);
-  const nameChanged = validatedName.name !== (session.user.name ?? "");
+  const nameChanged = name !== savedName;
   const profileError =
     error ||
     (editingName && nameChanged && validatedName.error
@@ -98,7 +99,7 @@ export function ProfileSettingsScreen() {
     <SettingsContent>
       <View>
         <View className="items-center gap-3 py-3">
-          <ProfileAvatar neutral name={session.user.name || session.user.email} imageUrl={avatarUrl} size={72} />
+          <ProfileAvatar neutral name={savedName} imageUrl={avatarUrl} size={72} />
           <View className="w-full items-center gap-0">
             <View
               className="w-full flex-row items-center justify-center"
@@ -192,8 +193,8 @@ export function ProfileSettingsScreen() {
               accessibilityLabel="Cancel name edit"
               disabled={busy}
               onPress={() => {
-                setName(session.user.name ?? "");
-                nativeName.value = session.user.name ?? "";
+                setName(savedName);
+                nativeName.value = savedName;
                 setEditingName(false);
                 setError(null);
                 Keyboard.dismiss();
