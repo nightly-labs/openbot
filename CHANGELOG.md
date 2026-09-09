@@ -5,11 +5,52 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-09
+
+### Added
+
+- Add OpenCode as a fourth provider. OpenBot drives your own installed OpenCode CLI over ACP, so it
+  is not downloaded or pinned like the other runtimes: install OpenCode and run
+  `opencode auth login`, then pick it when you create or edit an agent.
+- Add Team API v4, which carries the new provider and agent duplication. Version 1 to 3 stay
+  registered and unchanged, so a phone or a joined server on an older build keeps working on the
+  protocol it already speaks.
+- Search models, grouped by provider and reasoning variant, in the model picker.
+- Mention an agent in a mobile chat, see the other participants of an exchange, copy a highlighted
+  code block, and retry a send that failed.
+- Scan a pairing QR code from an inline sheet on the mobile sign-in screen.
+
+### Changed
+
+- Give every provider one name across the app. Initial setup and the thread status said "Codex"
+  where the picker said "ChatGPT". All of them now say "ChatGPT".
+- Ask the user to wait, with a countdown, when the mail provider refuses a sign-in code or a team
+  invitation because the sending mailbox is over its quota. A refusal the sender cannot wait out,
+  such as a full recipient mailbox, stays a delivery failure.
+- **A paired phone can no longer disconnect a desktop session.** Sign out or revoke a desktop
+  session from Settings on the computer that runs it. Phones and other sessions are unaffected, and
+  no session is ended by this update.
+- Install and activate OpenBot's pinned provider CLI update instead of asking the CLI to update
+  itself. A CLI update waits while a provider sign-in is pending.
+- Start the mobile app on the connected route, and block interaction while it loads.
+
 ### Fixed
 
 - Report a provider CLI update that OpenBot refuses to start, instead of leaving the offer on screen.
 - Keep an agent whose stored profile holds a value this release cannot read, instead of refusing to
   start. The startup error now names the field it cannot read.
+- Keep an empty sidebar section visible when it holds no agents.
+- Keep a chat-created agent in the section of the agent that asked for it.
+- Prefer an agent in the same sidebar section when one agent messages another.
+- Remember the selected agent for each server.
+- Focus **Delete** in sidebar confirmation dialogs.
+- Report an OpenCode turn that produced nothing as a failure, instead of a blank reply.
+- Desynchronize desktop avatar animations, animate idle sidebar agents, and keep an avatar pose
+  across a change of agent activity.
+- Keep the Dynamic Island unfocusable while the mouse is over it.
+- Explain what to do when a file preview or another surface fails, on desktop, mobile and the web.
+- Keep a mobile profile name when the name field is left blank.
+- Remove the scroll edge effect from the mobile add-server sheet.
 
 ## [0.6.1] - 2026-09-08
 
