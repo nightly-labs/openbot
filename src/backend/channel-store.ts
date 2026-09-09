@@ -103,15 +103,14 @@ export class ChannelStore {
       this.database.connection.prepare("SELECT channel_json FROM projection_channels ORDER BY rowid").all(),
     ).map((row) => {
       const channel = decodeChannel(JSON.parse(requiredStringColumn(row, "channel_json")));
-      const through = this.readSequence(channel.id, memberId);
-      // `messages` returns ascending order, so the newest entry is last. Read it from the array the
-      // unread count already needs rather than running a second query per channel.
-      const messages = this.messages(channel.id);
-      const latest = messages.at(-1);
+      // The sidebar is rebuilt on every `channels-changed`, and a streaming reply emits those while
+      // it arrives. So each summary reads one message and counts the rest in SQL: reading the whole
+      // history of every channel would parse the entire archive on each frame of a stream.
+      const latest = this.messages(channel.id, Number.MAX_SAFE_INTEGER, 1).at(-1);
       return {
         ...channel,
-        unreadCount: messages.filter((message) => message.sequence > through && message.author.id !== memberId).length,
-        activeTasks: this.tasks(channel.id).filter((task) => task.state === "running").length,
+        unreadCount: this.#unreadCount(channel.id, memberId),
+        activeTasks: this.#countTasksInState(channel.id, "running"),
         lastMessage: latest
           ? { authorName: latest.author.name, text: previewText(latest), at: latest.message.createdAt }
           : null,
@@ -566,6 +565,30 @@ export class ChannelStore {
       if (db.isTransaction) db.exec("ROLLBACK");
       throw error;
     }
+  }
+
+  /** The unread messages of one member, over the sequence index. A member's own message is read. */
+  #unreadCount(channelId: string, memberId: string): number {
+    const row = databaseRow(
+      this.database.connection
+        .prepare(
+          `SELECT COUNT(*) AS count FROM projection_channel_messages
+           WHERE channel_id = ? AND sequence > ? AND json_extract(message_json, '$.author.id') IS NOT ?`,
+        )
+        .get(channelId, this.readSequence(channelId, memberId), memberId),
+    );
+    return row ? requiredNumberColumn(row, "count") : 0;
+  }
+
+  #countTasksInState(channelId: string, state: ChannelTask["state"]): number {
+    const row = databaseRow(
+      this.database.connection
+        .prepare(
+          "SELECT COUNT(*) AS count FROM projection_channel_tasks WHERE channel_id = ? AND json_extract(task_json, '$.state') = ?",
+        )
+        .get(channelId, state),
+    );
+    return row ? requiredNumberColumn(row, "count") : 0;
   }
 
   private readSequence(channelId: string, memberId: string): number {

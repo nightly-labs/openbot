@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
-import type { ChannelDraft, ChannelMessage } from "@openbot/contracts/ipc";
+import type { ChannelDraft, ChannelMessage, ChannelTask } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stores } from "./agent-service-test-harness";
 import { ChannelHistory, type ChannelTextModel } from "./channel-history";
@@ -190,6 +190,48 @@ describe("shared channel coordination", () => {
       authorName: actor.name,
       text: "Request 104",
     });
+  });
+  it("summarizes a channel from the read cursor without reading its history", () => {
+    const message = (id: string, author: ChannelMessage["author"]): ChannelMessage => ({
+      id,
+      channelId: "channel-1",
+      sequence: 0,
+      author,
+      taskId: null,
+      superseded: false,
+      message: { id, author: "user", text: id, createdAt: new Date().toISOString(), status: "completed" },
+    });
+    const runningTask: ChannelTask = {
+      id: "task-running",
+      channelId: "channel-1",
+      parentTaskId: null,
+      rootTaskId: "task-running",
+      requestMessageId: "mine",
+      sourceMessageIds: [],
+      instruction: "Write the brief.",
+      expectedResult: "The brief is written.",
+      ownerAgentId: "agent-a",
+      state: "running",
+      error: null,
+      dependencies: [],
+      resources: [],
+      attachmentDraftIds: [],
+      assignmentCount: 1,
+      revision: 1,
+    };
+    service.store.update(service.store.get("channel-1"), {
+      messages: [
+        message("mine", { kind: "member", ...actor }),
+        message("theirs", { kind: "agent", id: "agent-a", name: "A" }),
+        message("theirs-again", { kind: "agent", id: "agent-a", name: "A" }),
+      ],
+      tasks: [runningTask, { ...runningTask, id: "task-queued", rootTaskId: "task-queued", state: "queued" }],
+    });
+    // The reader's own message is read where it is written, so only the two replies are unread.
+    expect(service.store.list(actor.id)[0]).toMatchObject({ unreadCount: 2, activeTasks: 1 });
+    service.store.markRead("channel-1", actor.id, 2, operationId());
+    expect(service.store.list(actor.id)[0]).toMatchObject({ unreadCount: 1 });
+    expect(service.store.list(actor.id)[0]?.lastMessage).toMatchObject({ text: "theirs-again" });
   });
   it("keeps an uncertain accepted turn paused after restart", async () => {
     await send("Write a file");

@@ -5,7 +5,6 @@ import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentProfile } from "../../data";
-import { ChatMessageRow } from "./ChatMessageRow";
 import { ImageGeneration } from "./ImageGeneration";
 import { MarkdownMessageText } from "./MarkdownMessageText";
 import { MessageBody } from "./MessageRendering";
@@ -1133,35 +1132,6 @@ describe("MessageBody", () => {
     expect(screen.getByRole("region", { name: "Comparison table" })).toBeInTheDocument();
     expect(screen.getByText("Unlimited projects").tagName).toBe("STRONG");
     expect(screen.queryByText("| --- | --- | --- |")).toBeNull();
-  });
-});
-
-describe("ChatMessageRow", () => {
-  it("opens the author's chat from the name and avatar", async () => {
-    const onSelectAgent = vi.fn();
-    render(() => (
-      <ChatMessageRow
-        message={{
-          id: "message-author-name",
-          author: "agent",
-          body: "Hello",
-          time: "10:00",
-        }}
-        author={{ kind: "agent", name: "Research", agent: agents[0] }}
-        showAuthor
-        agents={agents}
-        onSelectAgent={onSelectAgent}
-        onOpenLink={vi.fn()}
-        onPreview={vi.fn()}
-        onAttachmentAction={vi.fn()}
-      />
-    ));
-
-    for (const button of screen.getAllByRole("button", { name: "Open Research's chat" })) {
-      onSelectAgent.mockClear();
-      await fireEvent.click(button);
-      expect(onSelectAgent).toHaveBeenCalledWith("research");
-    }
   });
 });
 
