@@ -1509,14 +1509,17 @@ describe("OpenBotDatabase", () => {
       .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projection_provider_sessions'")
       .get();
     expect(table).toMatchObject({ sql: expect.stringContaining("'opencode'") });
+    // Written through SQL, not `bindProviderSession`: the widened CHECK constraint is what this
+    // case is about, and the typed API only accepts the provider ids the application ships today.
     expect(() =>
-      migrated.bindProviderSession({
-        threadId,
-        provider: "opencode",
-        externalSessionId: "opencode-session",
-        model: "opencode/big-pickle",
-        effort: "medium",
-      }),
+      migrated.connection
+        .prepare(
+          `INSERT INTO projection_provider_sessions
+             (id, thread_id, provider, external_session_id, model, effort, state,
+              created_at, updated_at, resume_cursor, last_event_sequence)
+           VALUES (?, ?, 'opencode', 'opencode-session', 'opencode/big-pickle', 'medium', 'active', ?, ?, NULL, 0)`,
+        )
+        .run("session-opencode", threadId, "2026-08-20T10:00:10.000Z", "2026-08-20T10:00:10.000Z"),
     ).not.toThrow();
     migrated.close();
   });

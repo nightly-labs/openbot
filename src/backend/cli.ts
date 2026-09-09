@@ -4,6 +4,7 @@ import { access } from "node:fs/promises";
 import { homedir } from "node:os";
 import { extname, posix, resolve, win32 } from "node:path";
 import { promisify } from "node:util";
+import type { AgentProviderId } from "@openbot/contracts/ipc";
 
 const execFileAsync = promisify(execFile);
 const MINIMUM_CODEX_VERSION = [0, 144, 1] as const;
@@ -39,6 +40,13 @@ export class CodexCliError extends Error {
     this.name = "CodexCliError";
   }
 }
+
+/**
+ * The managed CLI OpenBot downloaded for each provider, keyed by provider id. `null` means OpenBot
+ * has no managed copy and only the user's own installation is used. A missing key means the same as
+ * an unset option: the resolver looks for the copy shipped inside the application itself.
+ */
+export type BundledProviderExecutables = Partial<Record<AgentProviderId, string | null>>;
 
 export async function resolveCodexCli(
   input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},

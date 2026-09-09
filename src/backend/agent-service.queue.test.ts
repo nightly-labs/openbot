@@ -1124,8 +1124,6 @@ describe.sequential("AgentService: queue", () => {
         return client;
       },
       undefined,
-      null,
-      null,
       undefined,
       null,
       context === "unavailable" ? null : sidebar,
@@ -1210,8 +1208,6 @@ describe.sequential("AgentService: queue", () => {
         return client;
       },
       undefined,
-      null,
-      null,
       undefined,
       null,
       sidebar,

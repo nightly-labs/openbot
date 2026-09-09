@@ -586,8 +586,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         if (provider === "claude") clients.push(client);
         return client;
       },
-      undefined,
-      managed,
+      { claude: managed },
     );
     await service.initialize();
     await expect(service.updateProviderCli("claude", async () => managed)).rejects.toThrow();
@@ -816,8 +815,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       30_000,
       "claude",
       (provider) => new FakeAgentClient(provider),
-      undefined,
-      managed,
+      { claude: managed },
     );
     await service.initialize();
     await expect(

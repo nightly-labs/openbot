@@ -89,6 +89,7 @@ import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import type { AgentClient, AgentProvider } from "./agent-client";
 import type { AgentStore } from "./agent-store";
 import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
+import type { BundledProviderExecutables } from "./cli";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "./conversation-read-store";
 import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
@@ -97,6 +98,13 @@ import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePathFromInput } from "./workspace-paths";
 
 const logger = createOpenBotLogger("agent-service");
+
+/**
+ * Only the application knows which managed CLIs it downloaded, so a caller that says nothing gets
+ * none of them. Codex is left out on purpose: it is the one provider that can also ship inside the
+ * application, and an unset entry keeps that copy in the search.
+ */
+const DEFAULT_BUNDLED_EXECUTABLES: BundledProviderExecutables = { claude: null, grok: null };
 
 // Both types were declared in this module before the split and are part of the frozen public
 // surface, so they keep being reachable from here rather than only from the controller that owns
@@ -151,9 +159,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     requestTimeoutMs = 30_000,
     preferredProvider: AgentProvider = "codex",
     clientFactory: AgentClientFactory | null = null,
-    bundledCodexExecutable: string | null | undefined = undefined,
-    bundledClaudeExecutable: string | null | undefined = null,
-    bundledGrokExecutable: string | null | undefined = null,
+    bundledExecutables: BundledProviderExecutables = DEFAULT_BUNDLED_EXECUTABLES,
     prepareAgentWorkspace: (agent: AgentSummary) => Promise<void> = async () => undefined,
     hostedSites: AgentHostedSites | null = null,
     sidebarLayout: AgentSidebar | null = null,
@@ -255,9 +261,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       requestTimeoutMs,
       preferredProvider,
       clientFactory,
-      bundledCodexExecutable,
-      bundledClaudeExecutable,
-      bundledGrokExecutable,
+      bundledExecutables,
     });
     this.#compaction = new ContextCompaction({
       store,
