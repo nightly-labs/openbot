@@ -32,3 +32,20 @@ it("does not send a cancelled request when the native commit arrives", () => {
   gate.cancel();
   expect(gate.commit()).toBe(false);
 });
+
+it("retries a failed send without focus or editing and blocks duplicate retry events", () => {
+  const gate = createComposerSendGate();
+  gate.focus();
+  gate.request();
+  expect(gate.commit()).toBe(true);
+  expect(gate.request()).toBe("none");
+
+  gate.allowRetry();
+  expect(gate.request()).toBe("send");
+  expect(gate.request()).toBe("none");
+  expect(gate.commit()).toBe(false);
+  expect(gate.submit()).toBe(false);
+
+  gate.allowRetry();
+  expect(gate.request()).toBe("send");
+});

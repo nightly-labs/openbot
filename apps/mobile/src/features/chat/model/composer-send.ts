@@ -14,6 +14,10 @@ export function createComposerSendGate() {
     cancel() {
       pending = false;
     },
+    allowRetry() {
+      pending = false;
+      submitted = false;
+    },
     request(): "blur" | "send" | "none" {
       if (pending || submitted) return "none";
       if (editing) {

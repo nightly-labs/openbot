@@ -43,6 +43,7 @@ interface ChatComposerProps {
   onSend: (text: string) => void;
   attachments: ChatAttachments;
   sending: boolean;
+  sendRetryVersion: number;
 }
 
 export function ChatComposer({
@@ -63,6 +64,7 @@ export function ChatComposer({
   onSend,
   attachments,
   sending,
+  sendRetryVersion,
 }: ChatComposerProps) {
   const display = mentionDraft(answerQuestion ? "" : draft);
   const displayText = answerQuestion ? draft : display.text;
@@ -95,6 +97,10 @@ export function ChatComposer({
   const [focused, setFocused] = useState(false);
   const latestTextRef = useRef(draft);
   const [sendGate] = useState(createComposerSendGate);
+
+  useLayoutEffect(() => {
+    if (sendRetryVersion > 0) sendGate.allowRetry();
+  }, [sendGate, sendRetryVersion]);
 
   useEffect(() => {
     latestTextRef.current = draft;

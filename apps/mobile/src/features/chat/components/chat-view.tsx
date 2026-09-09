@@ -60,6 +60,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   ]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendRetryVersion, setSendRetryVersion] = useState(0);
   const [composerGestureHeight, setComposerGestureHeight] = useState(0);
   const sendingRef = useRef(false);
   const attachments = useChatAttachments();
@@ -238,6 +239,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
         setDraft((current) => (current ? `${body}\n${current}` : body));
         // Only discard drafts created by this attempt. Keep the local files and text for retry.
         await Promise.allSettled(uploaded.map((id) => discardAttachment(agent.id, id)));
+        setSendRetryVersion((version) => version + 1);
         Alert.alert(
           "Message not sent",
           "Your text and attachments are still here. Check the connection and try again.",
@@ -328,6 +330,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
             ) : null}
             <ConnectionStatus server={server} />
             <ChatComposer
+              sendRetryVersion={sendRetryVersion}
               mentionAgents={agents.filter(
                 (candidate) => candidate.serverId === agent.serverId && candidate.id !== agent.id,
               )}
