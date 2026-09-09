@@ -2,6 +2,7 @@ import type { AgentProviderId, ProviderRuntimeSnapshot, ProviderRuntimesDesktopA
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_PROVIDER_RUNTIMES } from "../../app-defaults";
+import { errorMessage } from "../../error-message";
 import { type ProviderUpdate, providerUpdatesToAnnounce } from "./provider-update";
 import {
   dismissProviderUpdateToast,
@@ -59,8 +60,35 @@ export function createProviderRuntimeStore(
    * Retry the notification offers after a failure. OpenBot installs its pinned runtime.
    */
   function startProviderUpdate(provider: AgentProviderId): Promise<void> {
+    return runProviderUpdate(provider).catch((error: unknown) => {
+      // A user pressed a button, so the outcome belongs on screen. `downloadProviderRuntime`
+      // reports its own failures and settles; what reaches here failed before it owned the
+      // notification, and was discarded by the caller that started it.
+      failProviderUpdate(provider, error);
+      throw error;
+    });
+  }
+
+  function runProviderUpdate(provider: AgentProviderId): Promise<void> {
     if (!isLocalServer()) return Promise.reject(new Error("Provider CLI updates run on the computer that hosts them."));
     return downloadProviderRuntime(provider);
+  }
+
+  /** Puts a failure the update never got far enough to report on the notification, with a Retry. */
+  function failProviderUpdate(provider: AgentProviderId, error: unknown): void {
+    if (disposed) return;
+    const update = providerUpdate(provider);
+    showProviderUpdateToast(
+      {
+        ...update,
+        runtime: {
+          ...update.runtime,
+          phase: "download-error",
+          message: errorMessage(error, "The update could not start. Try again."),
+        },
+      },
+      () => void startProviderUpdate(provider),
+    );
   }
 
   /** Revisioned, because the pushed event and the awaited call can land out of order. */

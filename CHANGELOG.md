@@ -5,6 +5,12 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Report a provider CLI update that OpenBot refuses to start, instead of leaving the offer on screen.
+- Keep an agent whose stored profile holds a value this release cannot read, instead of refusing to
+  start. The startup error now names the field it cannot read.
+
 ## [0.6.1] - 2026-09-08
 
 ### Fixed
