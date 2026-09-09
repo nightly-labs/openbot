@@ -288,6 +288,27 @@ it("offers no CLI update while a workspace on another computer is open", async (
   expect(await screen.findByText("ChatGPT update available")).toBeInTheDocument();
 });
 
+it("reports an update that was refused before the download could report it", async () => {
+  const { store, api, setLocal } = systemCliHarness();
+  expect(await screen.findByText("ChatGPT update available")).toBeInTheDocument();
+  setLocal(false);
+  flush();
+
+  // The workspace on screen is on another computer, and the user pressed the button before the offer
+  // went away. `downloadProviderRuntime` reports its own failures, but this one is refused before
+  // it: the refusal used to be dropped, leaving the offer on screen and nothing else said.
+  await expect(store.startProviderUpdate("codex")).rejects.toThrow(/computer that hosts them/u);
+
+  expect(await screen.findByText("ChatGPT update failed")).toBeInTheDocument();
+  expect(screen.getByText("Provider CLI updates run on the computer that hosts them.")).toBeInTheDocument();
+  expect(api.download).not.toHaveBeenCalled();
+
+  setLocal(true);
+  flush();
+  fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+  await waitFor(() => expect(api.download).toHaveBeenCalledWith("codex"));
+});
+
 it("keeps an offer the user closed closed when the workspace is opened again", async () => {
   systemCliHarness();
   fireEvent.click(await screen.findByRole("button", { name: "Close notification" }));
