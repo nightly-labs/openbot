@@ -124,7 +124,7 @@ export class TeamApiServer {
   readonly #eventClients = new Map<Ws.WebSocket, EventClientState>();
   readonly #responseRoutes = new WeakMap<
     ServerResponse,
-    { method: string; path: string; protocol: number; capabilities: Set<string> }
+    { method: string; path: string; protocol: number; capabilities: Set<string>; hiddenAgentIds?: ReadonlySet<string> }
   >();
   readonly #duplicateRequests = new Map<string, { sourceAgentId: string; result: Promise<DuplicateAgentResult> }>();
   readonly #webSockets = new webSockets.WebSocketServer({
@@ -494,6 +494,8 @@ export class TeamApiServer {
       const context = this.#requestContext(request, response, url, token, authenticated);
       if (context.protocol < 4) {
         const hidden = hiddenProviderAgentIds(this.#options.agents.listAgents());
+        const responseRoute = this.#responseRoutes.get(response);
+        if (responseRoute) responseRoute.hiddenAgentIds = hidden;
         const agentId = url.pathname.match(/^\/v1\/agents\/([^/]+)/u)?.[1];
         if (
           (agentId && hidden.has(pathIdentifier(agentId, "agentId"))) ||
@@ -1020,10 +1022,7 @@ export class TeamApiServer {
     // the headers already sent that throw could neither answer the caller nor end the request: it
     // surfaced as a hung socket and an `ERR_HTTP_HEADERS_SENT` rejection out of `#handle`'s own
     // error path. Encoding first lets that failure become the 500 the caller can read.
-    const visibleValue =
-      route.protocol >= 4
-        ? value
-        : legacyProviderView(value, hiddenProviderAgentIds(this.#options.agents.listAgents()));
+    const visibleValue = status < 400 && route.hiddenAgentIds ? legacyProviderView(value, route.hiddenAgentIds) : value;
     const body =
       route.protocol === TEAM_PROTOCOL_V4
         ? encodeTeamProtocolV4CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
