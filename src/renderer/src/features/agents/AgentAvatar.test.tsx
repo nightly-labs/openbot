@@ -3,6 +3,7 @@ import type { AvatarHue } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { createStore, For, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { AvatarMotion } from "../../bloub-avatar";
 import { AgentAvatar } from "./AgentAvatar";
 
 function playback() {
@@ -102,6 +103,31 @@ describe("AgentAvatar playback", () => {
     render(() => <AgentAvatar seed="agent-alpha" motion="working" animationOffset={phase} />);
     flush();
     expect([...clock.samples.values()].map((times) => times[0])).toEqual([phase]);
+  });
+
+  it.each([
+    ["idle", "working", "orbit"],
+    ["working", "idle", "idle"],
+  ] as const)("changes from %s to %s without restarting playback", (from, to, expectedState) => {
+    motionPreference(false);
+    const clock = playback();
+    const [state, setState] = createStore<{ motion: AvatarMotion }>({ motion: from });
+    render(() => <AgentAvatar seed="agent-alpha" motion={state.motion} animationOffset={1.2} />);
+    flush();
+    const engines = [...clock.samples.keys()];
+    clock.frame(1000);
+    clock.frame(1040);
+    setState((draft) => {
+      draft.motion = to;
+    });
+    flush();
+    expect([...clock.samples.keys()]).toEqual(engines);
+    expect(engines).toHaveLength(1);
+    expect(engines[0]?.state).toBe(expectedState);
+    clock.frame(1080);
+    for (const times of clock.samples.values()) {
+      expect(times.at(-1)).toBeCloseTo(1.28);
+    }
   });
 
   it("keeps reduced-motion avatars static and stops playback when the preference changes", () => {
