@@ -1254,18 +1254,25 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (params.tool === "create_agent") {
       const args = createAgentToolSchema.parse(params.arguments);
       const hue = args.avatarHue ?? null;
-      const created = await this.createAgent(
-        {
-          name: args.name,
-          description: args.description,
-          initialMessage: args.initialMessage,
-          avatarSeed: args.avatarSeed ?? randomUUID(),
-          avatarHue: hue,
-        },
-        args.title === undefined
-          ? undefined
-          : (agent) => this.#store.updateAgent({ agentId: agent.id, title: args.title }),
-      );
+      const sectionId = this.#sidebarLayout?.getSnapshot().agentAssignments[senderAgentId] ?? null;
+      const create = (assign?: (agentId: string) => Promise<SidebarLayoutSnapshot>) =>
+        this.createAgent(
+          {
+            name: args.name,
+            description: args.description,
+            initialMessage: args.initialMessage,
+            avatarSeed: args.avatarSeed ?? randomUUID(),
+            avatarHue: hue,
+          },
+          async (agent) => {
+            if (assign) await assign(agent.id);
+            return args.title === undefined ? agent : this.#store.updateAgent({ agentId: agent.id, title: args.title });
+          },
+        );
+      const created =
+        this.#sidebarLayout && sectionId !== null
+          ? await this.#sidebarLayout.withProfileAssignment(sectionId, create)
+          : await create();
       return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(created) }] };
     }
 

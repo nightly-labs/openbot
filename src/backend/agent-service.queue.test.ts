@@ -1097,6 +1097,99 @@ describe.sequential("AgentService: queue", () => {
     );
   });
 
+  it.each<{ provider: AgentProvider; context: "assigned" | "unassigned" | "unavailable" | "rollback" }>([
+    { provider: "codex", context: "assigned" },
+    { provider: "claude", context: "assigned" },
+    { provider: "grok", context: "assigned" },
+    { provider: "codex", context: "unassigned" },
+    { provider: "codex", context: "unavailable" },
+    { provider: "codex", context: "rollback" },
+  ])("preserves the caller's space for $provider with $context context", async ({ provider, context }) => {
+    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    const { store, mailbox } = stores(root);
+    const sidebarPath = join(root, "sidebar-layout.json");
+    const sidebar = new SidebarLayoutStore(sidebarPath);
+    await sidebar.initialize();
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      provider,
+      (selectedProvider) => {
+        const client = new FakeAgentClient(selectedProvider);
+        clients.set(selectedProvider, client);
+        return client;
+      },
+      undefined,
+      null,
+      null,
+      undefined,
+      null,
+      context === "unavailable" ? null : sidebar,
+    );
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({
+      agentId: "chief",
+      provider,
+      model: provider === "codex" ? "gpt-5.6-luna" : provider === "claude" ? "claude-sonnet-5" : "grok-4.5",
+    });
+    const layout = await sidebar.mutate({ type: "create", name: "space1" }, new Set(["chief"]));
+    const sectionId = layout.sections[0]?.id;
+    if (!sectionId) throw new Error("The section was not created.");
+    const inherits = context === "assigned" || context === "rollback";
+    if (inherits) await sidebar.mutate({ type: "assign", agentId: "chief", sectionId }, new Set(["chief"]));
+    const originalAssignments = sidebar.getSnapshot().agentAssignments;
+    let publishedAssignments = originalAssignments;
+    sidebar.on("changed", (next) => {
+      publishedAssignments = next.agentAssignments;
+    });
+    await service.sendMessage({ agentId: "chief", text: "Create a research agent." });
+    await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
+    const client = clients.get(provider);
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!client || !threadId) throw new Error("The agent session did not start.");
+    let createdAgentId = "";
+    let assignmentAtEnqueue: string | null = null;
+    const enqueue = mailbox.enqueue.bind(mailbox);
+    vi.spyOn(mailbox, "enqueue").mockImplementationOnce(async (...args) => {
+      createdAgentId = args[0].recipientAgentIds[0] ?? "";
+      assignmentAtEnqueue = sidebar.getSnapshot().agentAssignments[createdAgentId] ?? null;
+      if (context === "rollback") throw new Error("Queue write failed.");
+      return enqueue(...args);
+    });
+
+    const result = await callOpenBotTool(client, threadId, "create_agent", {
+      name: "Research Partner",
+      description: "Find primary sources.",
+      initialMessage: "Research train routes to Berlin.",
+    });
+    const restored = new SidebarLayoutStore(sidebarPath);
+    await restored.initialize();
+    const expectedAssignments =
+      context === "assigned" ? { ...originalAssignments, [createdAgentId]: sectionId } : originalAssignments;
+    expect({
+      error: result.error?.message,
+      assignmentAtEnqueue,
+      assignments: sidebar.getSnapshot().agentAssignments,
+      persistedAssignments: restored.getSnapshot().agentAssignments,
+      publishedAssignments,
+      created: service.listAgents().some((agent) => agent.id === createdAgentId),
+      deliveries: service.listQueue(createdAgentId).deliveries.length,
+    }).toEqual({
+      error: context === "rollback" ? "Error: Queue write failed." : undefined,
+      assignmentAtEnqueue: inherits ? sectionId : null,
+      assignments: expectedAssignments,
+      persistedAssignments: expectedAssignments,
+      publishedAssignments: expectedAssignments,
+      created: context !== "rollback",
+      deliveries: context === "rollback" ? 0 : 1,
+    });
+  });
+
   it("creates and groups a persistent teammate from conversation and rejects invalid changes", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);

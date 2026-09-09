@@ -168,6 +168,7 @@ They describe the enforced syntax, fixture behavior, and reasons for removed rul
 
 - Open a PR only when asked.
 - For UI changes, show before and after. State the model and harness in the PR body.
+  Do not commit screenshots or other PR review image assets to the repository.
 - Get approval for a specific wider check and run it before opening the PR.
 - A PR needs a named reason and is not auto-approvable if it adds `biome-ignore`, `@ts-expect-error`,
   or `@ts-ignore`; disables rules through `biome.json` overrides or removes a GritQL plugin; widens
