@@ -470,7 +470,12 @@ The owner comes from the last resolution of the binary, not from the client that
 provider that is signed out still reports its own install rather than reading as the managed copy.
 Until that answer exists the owner is unknown, not managed: the agent status starts on
 `FALLBACK_STATUS`, whose rows name no owner, so the store announces no offer for a provider while
-`systemCliVersion` returns `undefined`. An offer nobody has acted on is also withdrawn when the
+`systemCliVersion` returns `undefined`. `providerSystemCliVersion` decides that from the row's state
+as well as its `cliSource`, because an absent owner is a wait only before the first resolution
+reports: `not-started` and a `checking` with no owner yet. In every other state an absent owner is
+the managed copy, including a provider whose CLI resolved to nothing - an app upgrade that pins a
+newer runtime leaves the previous managed binary on disk and the new one to download, and the offer
+that downloads it is the way out. An offer nobody has acted on is also withdrawn when the
 answer ends it, because an older managed copy can sit beside a newer install of the user's. A
 started update keeps its notification until it settles: the outcome is what the user pressed the
 button for.
