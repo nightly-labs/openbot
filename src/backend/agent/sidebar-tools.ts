@@ -16,7 +16,7 @@ export const assignAgentSectionToolSchema = z
   })
   .strict();
 
-export type AgentSidebar = Pick<SidebarLayoutStore, "getSnapshot" | "mutate">;
+export type AgentSidebar = Pick<SidebarLayoutStore, "getSnapshot" | "mutate" | "withProfileAssignment">;
 
 export async function handleSidebarTool(
   tool: string,
