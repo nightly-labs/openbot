@@ -1,3 +1,4 @@
+import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Stack } from "expo-router";
 import { useIsFocused } from "expo-router/react-navigation";
@@ -96,7 +97,7 @@ export function QrScanner({ onScan }: { onScan: (data: string) => Promise<void> 
     } catch (error) {
       setScanState({
         status: "error",
-        message: error instanceof Error ? error.message : "OpenBot could not connect this phone.",
+        message: errorMessage(error, "OpenBot could not connect this phone."),
       });
     }
   }

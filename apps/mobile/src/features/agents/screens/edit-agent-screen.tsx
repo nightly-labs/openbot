@@ -1,4 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useState } from "react";
@@ -26,7 +27,7 @@ export function EditAgentScreen() {
       await updateAgent({ agentId: agent.id, name: name.trim(), description: description.trim() });
       router.back();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "OpenBot could not update this agent.");
+      setError(errorMessage(cause, "OpenBot could not update this agent."));
       setSaving(false);
     }
   }

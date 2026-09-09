@@ -133,7 +133,10 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
           <AlertContent>
             <AlertTitle>Computer Use isn’t available yet</AlertTitle>
             <AlertDescription>
-              {state()?.message ?? error() ?? "OpenBot could not find the Computer Use helper."}
+              {errorMessage(
+                state()?.message ?? error(),
+                "OpenBot could not find the Computer Use helper. Open Computer Use settings to check the setup.",
+              )}
             </AlertDescription>
           </AlertContent>
           <AlertActions>

@@ -1121,7 +1121,7 @@ describe("OpenBot connected desktop shell", () => {
     });
 
     it("shows a safe message for other preview failures", async () => {
-      previewMock().mockRejectedValueOnce(new Error(`EACCES: permission denied, open '${path}'`));
+      previewMock().mockRejectedValueOnce(new TypeError("Cannot read properties of undefined"));
       render(() => <App />);
       await fireEvent.click(await screen.findByRole("button", { name: linkName }));
       expect(await screen.findByRole("alert")).toHaveTextContent(`Could not preview “${filename}”. Try again.`);

@@ -1,6 +1,8 @@
+import { userErrorMessage } from "@openbot/user-errors";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import * as Haptics from "expo-haptics";
 import { router, useIsFocused } from "expo-router";
+import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, View } from "react-native";
@@ -53,6 +55,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     "background",
   ]);
   const [draft, setDraft] = useState("");
+  const [sendError, setSendError] = useState<{ agentId: string; message: string } | null>(null);
   const [showStarter, setShowStarter] = useState(true);
   const [historyLoadFailed, setHistoryLoadFailed] = useState(false);
   const historyRequestRef = useRef(0);
@@ -161,6 +164,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     if (!serverOnline) return;
     const body = value.trim();
     if (!body) return;
+    setSendError(null);
 
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (questionForm.question) {
@@ -170,7 +174,16 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     }
     setDraft("");
     setShowStarter(false);
-    void sendTeamMessage(agent.id, body).catch(() => setDraft((current) => current || body));
+    void sendTeamMessage(agent.id, body).catch((error) => {
+      setDraft((current) => current || body);
+      setSendError({
+        agentId: agent.id,
+        message: userErrorMessage(
+          error,
+          "Could not send the message. Check the conversation before you send it again.",
+        ),
+      });
+    });
     requestAnimationFrame(() => scrollViewRef.current?.scrollToEnd({ animated: true }));
   }
 
@@ -226,6 +239,11 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
             onLayout={({ nativeEvent: { layout } }) => setComposerHeight(layout.height)}
           >
             <ConnectionStatus server={server} />
+            {sendError?.agentId === agent.id ? (
+              <Typography.Paragraph accessibilityRole="alert" className="bg-background px-4 py-2 text-danger">
+                {sendError.message}
+              </Typography.Paragraph>
+            ) : null}
             <ChatComposer
               key={JSON.stringify([
                 agent.id,

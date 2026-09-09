@@ -353,51 +353,67 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.update.install).toHaveBeenCalledOnce());
   });
 
-  it("reports every update failure as a retryable action", async () => {
-    vi.mocked(window.openbot.update.getStatus).mockResolvedValueOnce({
-      phase: "available",
-      currentVersion: "0.1.0",
-      availableVersion: "0.2.0",
-      progress: null,
-      checkedAt: null,
-      message: null,
-      errorCode: null,
-    });
-    vi.mocked(window.openbot.update.download)
-      .mockResolvedValueOnce({
-        phase: "error",
+  it.each([
+    [
+      "Could not check for updates. Try again.",
+      "Could not check for updates. Try again.",
+      "Could not download update. Try again.",
+      "Could not download update. Try again.",
+    ],
+    [
+      "ENOSPC: write '/private/update.zip'",
+      "There is not enough storage space. Free some space on the computer running OpenBot, then try again.",
+      "Error invoking remote method 'update:download': Error: ECONNREFUSED 127.0.0.1:1234",
+      "Could not connect. Check your connection and try again.",
+    ],
+  ])(
+    "reports update failures with recovery guidance: %s",
+    async (statusError, statusMessage, rejectedError, rejectedMessage) => {
+      vi.mocked(window.openbot.update.getStatus).mockResolvedValueOnce({
+        phase: "available",
         currentVersion: "0.1.0",
         availableVersion: "0.2.0",
         progress: null,
-        checkedAt: "2026-08-12T22:00:00.000Z",
-        message: "Could not check for updates. Try again.",
-        errorCode: "download_failed",
-      })
-      .mockRejectedValueOnce(new Error("Could not download update. Try again."));
-    render(() => <App />);
+        checkedAt: null,
+        message: null,
+        errorCode: null,
+      });
+      vi.mocked(window.openbot.update.download)
+        .mockResolvedValueOnce({
+          phase: "error",
+          currentVersion: "0.1.0",
+          availableVersion: "0.2.0",
+          progress: null,
+          checkedAt: "2026-08-12T22:00:00.000Z",
+          message: statusError,
+          errorCode: "download_failed",
+        })
+        .mockRejectedValueOnce(new Error(rejectedError));
+      render(() => <App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Open account actions" }));
-    fireEvent.click(await screen.findByRole("button", { name: /Download update/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "Open account actions" }));
+      fireEvent.click(await screen.findByRole("button", { name: /Download update/ }));
 
-    await waitFor(() =>
-      expect(trackAnalytics).toHaveBeenCalledWith("update_action", {
-        action: "download",
-        result: "failed",
-        phase: "error",
-        failure_code: "download_failed",
-      }),
-    );
-    const retryAfterReturnedError = await screen.findByRole("button", {
-      name: /Retry update.*Could not check for updates/,
-    });
-    expect(retryAfterReturnedError).toBeEnabled();
+      await waitFor(() =>
+        expect(trackAnalytics).toHaveBeenCalledWith("update_action", {
+          action: "download",
+          result: "failed",
+          phase: "error",
+          failure_code: "download_failed",
+        }),
+      );
+      const retryAfterReturnedError = await screen.findByRole("button", {
+        name: `Retry update. ${statusMessage}`,
+      });
+      expect(retryAfterReturnedError).toBeEnabled();
 
-    fireEvent.click(retryAfterReturnedError);
+      fireEvent.click(retryAfterReturnedError);
 
-    expect(await screen.findByRole("button", { name: /Retry update.*Could not download update/ })).toBeEnabled();
-    await waitFor(() => expect(window.openbot.update.download).toHaveBeenCalledTimes(2));
-    expect(window.openbot.update.check).not.toHaveBeenCalled();
-  });
+      expect(await screen.findByRole("button", { name: `Retry update. ${rejectedMessage}` })).toBeEnabled();
+      await waitFor(() => expect(window.openbot.update.download).toHaveBeenCalledTimes(2));
+      expect(window.openbot.update.check).not.toHaveBeenCalled();
+    },
+  );
 
   it("keeps a toggle made before the stored preference finishes loading", async () => {
     let resolvePreference: ((value: { autoDownload: boolean }) => void) | undefined;

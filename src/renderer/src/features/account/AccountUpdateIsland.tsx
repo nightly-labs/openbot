@@ -2,6 +2,7 @@ import type { UpdateStatus } from "@openbot/contracts/ipc";
 import { isUpdateActivePhase, isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { Button, Download, RefreshCw, Spinner } from "../../components/ui";
+import { errorMessage as formatErrorMessage } from "../../error-message";
 import { rendererDuration } from "../conversation/activity-timing";
 
 // `--panel-close-dur` is a calc() on the island itself, so it cannot be read off
@@ -66,7 +67,7 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
   const phase = () => props.updateStatus.phase;
   const errorMessage = createMemo(() => {
     const message = props.errorMessage?.trim() || props.updateStatus.message?.trim();
-    return message || "Update failed. Try again.";
+    return formatErrorMessage(message, "Update failed. Try again.");
   });
   const failed = createMemo(() => Boolean(props.errorMessage) || phase() === "error");
   const open = createMemo(() => failed() || isUpdateActivePhase(phase()));

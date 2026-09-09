@@ -9,6 +9,7 @@ import {
   MessageContent,
 } from "../../components/ui";
 import type { AgentMessage, ChatActionMarkerModel } from "../../data";
+import { errorMessage } from "../../error-message";
 import { AgentActivityIndicator } from "./AgentActivity";
 import { AttachmentCards } from "./AttachmentCards";
 import { ChatActionMarker } from "./ChatActionMarker";
@@ -173,8 +174,10 @@ export function ConversationTimeline() {
                     : "Agent CLI setup required"}
                 </strong>
                 <p>
-                  {props.agentStatus.message ??
-                    "Install and sign in to Codex CLI, Claude CLI, or Grok CLI, then restart OpenBot."}
+                  {errorMessage(
+                    props.agentStatus.message,
+                    "Install and sign in to Codex CLI, Claude CLI, or Grok CLI, then restart OpenBot.",
+                  )}
                 </p>
               </div>
               <Show when={props.agentStatus.phase !== "starting" && props.agentStatus.phase !== "restarting"}>
@@ -184,7 +187,9 @@ export function ConversationTimeline() {
                   onClick={() =>
                     void props
                       .onOpenAgentSetup()
-                      .catch((error) => setComposerError(error instanceof Error ? error.message : String(error)))
+                      .catch((error) =>
+                        setComposerError(errorMessage(error, "Could not open the setup guide. Try again.")),
+                      )
                   }
                 >
                   Setup guide

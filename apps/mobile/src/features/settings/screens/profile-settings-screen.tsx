@@ -2,6 +2,7 @@ import { Host, Text as NativeText, TextInput, type TextInputRef, useNativeState 
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import { AVATAR_IMAGE_LIMITS } from "@openbot/contracts/input-limits";
 import { validateProfileName } from "@openbot/contracts/validation";
+import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { File } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -61,7 +62,7 @@ export function ProfileSettingsScreen() {
       await operation();
       setMessage(success);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not save changes. Try again.");
+      setError(errorMessage(cause, "Could not save changes. Try again."));
     } finally {
       locked.current = false;
       setBusy(false);

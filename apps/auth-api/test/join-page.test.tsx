@@ -22,7 +22,9 @@ describe("invitation landing page", () => {
     window.history.replaceState({}, "", "/join?invite=bad");
     render(() => <JoinPage />);
 
-    expect(await screen.findByText("This invitation link is invalid or incomplete.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("This invitation link is invalid or incomplete. Ask the host for a new invitation."),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Open OpenBot" })).not.toBeInTheDocument();
   });
 });

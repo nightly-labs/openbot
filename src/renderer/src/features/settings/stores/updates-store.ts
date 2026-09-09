@@ -1,6 +1,7 @@
 import type { AppInfo, UpdateStatus } from "@openbot/contracts/ipc";
 import { isUpdateActivePhase } from "@openbot/contracts/ipc";
 import { createMemo, createSignal } from "solid-js";
+import { errorMessage } from "../../../error-message";
 import { presentUpdateStatus } from "../../updates/update-status";
 
 interface UpdatesStoreProps {
@@ -42,7 +43,7 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
       case "up-to-date":
         return "OpenBot is up to date on the Stable track.";
       case "error":
-        return props.updateStatus.message ?? "OpenBot could not check for updates.";
+        return errorMessage(props.updateStatus.message, "OpenBot could not check for updates. Try again.");
       case "unsupported":
         return props.updateStatus.message ?? "Updates are unavailable in this build.";
     }
@@ -61,7 +62,7 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
     try {
       await props.onUpdateAction();
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Could not update OpenBot.");
+      setError(errorMessage(failure, "Could not update OpenBot."));
     }
   }
 

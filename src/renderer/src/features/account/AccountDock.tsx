@@ -28,6 +28,7 @@ import {
   Tooltip,
   UserAvatar,
 } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 import { presentUpdateStatus } from "../updates/update-status";
 import { AccountUpdateIsland } from "./AccountUpdateIsland";
 
@@ -152,7 +153,12 @@ export function AccountDock(props: AccountDockProps) {
   });
   const updatePresentation = createMemo(() => presentUpdateStatus(props.updateStatus));
   const accountMenuError = createMemo(
-    () => menuError() ?? updateError() ?? (props.updateStatus.phase === "error" ? props.updateStatus.message : null),
+    () =>
+      menuError() ??
+      updateError() ??
+      (props.updateStatus.phase === "error"
+        ? errorMessage(props.updateStatus.message, "Could not update OpenBot. Try again.")
+        : null),
   );
 
   onCleanup(() => {
@@ -219,7 +225,7 @@ export function AccountDock(props: AccountDockProps) {
       await props.onRefreshUsage();
     } catch (cause) {
       if (generation === usageRequestGeneration && props.usageTargetKey === targetKey) {
-        setUsageError(cause instanceof Error ? cause.message : "Usage is unavailable.");
+        setUsageError(errorMessage(cause, "Usage is unavailable."));
       }
     } finally {
       if (generation === usageRequestGeneration && props.usageTargetKey === targetKey) {
@@ -244,7 +250,7 @@ export function AccountDock(props: AccountDockProps) {
     void props
       .onOpenExternal(destination)
       .then(() => setMenuOpen(false))
-      .catch((cause) => setMenuError(cause instanceof Error ? cause.message : "Could not open the link."));
+      .catch((cause) => setMenuError(errorMessage(cause, "Could not open the link.")));
   }
 
   async function runUpdateAction(): Promise<void> {
@@ -253,7 +259,7 @@ export function AccountDock(props: AccountDockProps) {
     try {
       await props.onUpdateAction();
     } catch (cause) {
-      setUpdateError(cause instanceof Error ? cause.message : "Could not update OpenBot.");
+      setUpdateError(errorMessage(cause, "Could not update OpenBot."));
     }
   }
 
@@ -265,7 +271,7 @@ export function AccountDock(props: AccountDockProps) {
     try {
       await onLogout();
     } catch (cause) {
-      setMenuError(cause instanceof Error ? cause.message : "Could not sign out.");
+      setMenuError(errorMessage(cause, "Could not sign out."));
       setLoggingOut(false);
     }
   }

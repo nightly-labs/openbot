@@ -1,5 +1,6 @@
 import type { AttachmentSummary, BrowserBounds } from "@openbot/contracts/ipc";
 import { createMemo, createSignal } from "solid-js";
+import { errorMessage } from "../../../error-message";
 import type { ConversationProps, MediaPreview, RightPanelMode, SidebarFilePreview } from "../conversation-types";
 
 export interface RoutineSettingsRequest {
@@ -114,7 +115,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           ? {
               ...current,
               loading: false,
-              error: error instanceof Error ? error.message : String(error),
+              error: errorMessage(error, "Could not preview this attachment. Try again."),
             }
           : current,
       );
@@ -124,7 +125,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   function attachmentAction(attachment: AttachmentSummary, action: "open" | "reveal" | "download") {
     void window.openbot.agent
       .openAttachment({ attachmentId: attachment.id, action })
-      .catch((error) => deps.setComposerError(error instanceof Error ? error.message : String(error)));
+      .catch((error) =>
+        deps.setComposerError(errorMessage(error, "Could not open or save this attachment. Try again.")),
+      );
   }
 
   function openSharedFile(path: string) {
@@ -170,7 +173,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       file.source === "shared"
         ? window.openbot.agent.openSharedFile({ path: file.path })
         : window.openbot.agent.openWorkspaceFile({ agentId: file.ownerAgentId, path: file.path });
-    void request.catch((error) => deps.setComposerError(error instanceof Error ? error.message : String(error)));
+    void request.catch((error) => deps.setComposerError(errorMessage(error, "Could not open this file. Try again.")));
   }
 
   function closeSidebarFilePreview() {
@@ -214,5 +217,5 @@ function filePreviewError(error: unknown, path: string): string {
   if (error instanceof Error && /\bENOENT\b/u.test(error.message)) {
     return `“${name}” was not found. Ask the agent to create or restore the file, then click the link again.`;
   }
-  return `Could not preview “${name}”. Try again.`;
+  return errorMessage(error, `Could not preview “${name}”. Try again.`);
 }

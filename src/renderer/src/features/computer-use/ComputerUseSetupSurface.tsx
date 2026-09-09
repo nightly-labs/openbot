@@ -79,7 +79,13 @@ export function ComputerUseSetupSurface() {
         fallback={
           <div class="computer-use-setup-unavailable" role={error() ? "alert" : "status"}>
             <TriangleAlert aria-hidden="true" />
-            <span>{error() ?? state()?.message ?? "Loading Computer Use…"}</span>
+            <span>
+              {error()
+                ? errorMessage(error(), "Could not load Computer Use. Try again.")
+                : state()?.message
+                  ? errorMessage(state()?.message, "Could not load Computer Use. Try again.")
+                  : "Loading Computer Use…"}
+            </span>
           </div>
         }
       >
