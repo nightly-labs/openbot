@@ -15,8 +15,11 @@ import {
   PICKER_PROVIDERS,
 } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
+import { createScrollFades } from "./createScrollFades";
+import { groupPickerModels, type PickerModel, type PickerModelGroup, pickerModels } from "./provider-model-options";
 import {
   Button,
+  Input,
   Listbox,
   Popover,
   Progress,
@@ -51,6 +54,7 @@ const PROVIDERS = PICKER_PROVIDERS;
 export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const [open, setOpen] = createSignal(false);
   const [railProvider, setRailProvider] = createSignal<AgentProviderId>(untrack(() => props.provider));
+  const [search, setSearch] = createSignal("");
   const providerButtons = new Map<AgentProviderId, HTMLButtonElement>();
   let root: HTMLDivElement | undefined;
 
@@ -91,18 +95,28 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
 
   function setPickerOpen(next: boolean): void {
     if (props.disabled) return;
-    if (next) setRailProvider(activeProvider());
+    if (next) {
+      setRailProvider(activeProvider());
+      setSearch("");
+    }
     setOpen(next);
   }
 
   function selectModel(model: AgentModelId, provider: AgentProviderId): void {
     if (providerAvailability(props.agentStatus, props.modelOptions, provider).state !== "available") return;
-    if (!showsReasoningEffort()) setOpen(false);
+    if (
+      !showsReasoningEffort() &&
+      !pickerModels(props.modelOptions.filter((option) => option.provider === provider)).find(
+        (option) => option.id === model,
+      )?.variants.length
+    )
+      setOpen(false);
     props.onChange(model, provider);
   }
 
   function selectRailProvider(provider: AgentProviderId): void {
     setRailProvider(provider);
+    setSearch("");
   }
 
   const triggerModelName = () => displayModelName(selectedModel()?.name, props.value);
@@ -202,7 +216,32 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
             <For each={PROVIDERS}>
               {(provider) => {
                 const status = () => providerAvailability(props.agentStatus, props.modelOptions, provider);
-                const models = () => props.modelOptions.filter((option) => option.provider === provider);
+                const models = createMemo(() =>
+                  pickerModels(props.modelOptions.filter((option) => option.provider === provider)),
+                );
+                const groups = createMemo(() => groupPickerModels(models(), search()));
+                const selected = createMemo(() =>
+                  models().find(
+                    (model) => model.id === props.value || model.variants.some((variant) => variant.id === props.value),
+                  ),
+                );
+                const effortOptions = createMemo(() => {
+                  if (provider !== props.provider) return [];
+                  if (selected()?.variants.length) return selected()?.variants ?? [];
+                  return showsReasoningEffort()
+                    ? (selectedModel()?.supportedReasoningEfforts ?? []).map((effort) => ({
+                        id: effort,
+                        name: reasoningLabel(effort),
+                      }))
+                    : [];
+                });
+                const effortValue = () => (selected()?.variants.length ? props.value : props.reasoningEffort);
+                const fades = createScrollFades();
+                onSettled(() => fades.stop);
+                createEffect(
+                  () => ({ groups: groups(), active: railProvider(), open: open() }),
+                  () => fades.remeasure(),
+                );
                 const available = () => status().state === "available";
                 const runtime = () => {
                   const value = props.runtimeStatuses?.[provider];
@@ -267,85 +306,107 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         </Show>
                       </div>
                     </Show>
-                    <Show
-                      when={models().length > 0}
-                      fallback={
-                        <Show when={available()}>
-                          <div class="provider-model-empty" role="status">
-                            No models are available from {agentProviderName(provider)}.
-                          </div>
-                        </Show>
-                      }
-                    >
-                      <Listbox.Root
-                        class="provider-model-list"
-                        aria-label={`${agentProviderName(provider)} models`}
-                        options={models()}
-                        optionValue="id"
-                        optionTextValue={(model) => displayModelName(model.name, model.id)}
-                        optionDisabled={() => !available()}
-                        value={[props.value]}
-                        selectionMode="single"
-                        disallowEmptySelection
-                        shouldFocusWrap
-                        renderItem={(item) => {
-                          const model = item.rawValue;
-                          const selected = () => props.value === model.id;
-                          return (
-                            <Listbox.Item
-                              as="button"
-                              item={item}
-                              type="button"
-                              class={["provider-model-option", { "provider-model-option-selected": selected() }]}
-                              aria-label={`${displayModelName(model.name, model.id)}${
-                                model.id === defaultProviderModel(provider) ? ", default" : ""
-                              }`}
-                              disabled={!available()}
-                              onClick={() => selectModel(model.id, provider)}
-                            >
-                              <span class="provider-model-option-name">
-                                <span>{displayModelName(model.name, model.id)}</span>
-                                <Show when={model.id === defaultProviderModel(provider)}>
-                                  <small>default</small>
-                                </Show>
-                              </span>
-                              <Show when={selected()}>
-                                <CheckIcon />
-                              </Show>
-                            </Listbox.Item>
-                          );
-                        }}
-                      />
-                    </Show>
-                    <Show when={showsReasoningEffort() && provider === props.provider ? selectedModel() : undefined}>
-                      {(model) => (
-                        <div class="provider-model-effort">
-                          <span>Effort</span>
-                          <Select<AgentReasoningEffort>
-                            class="provider-model-effort-select"
-                            options={model().supportedReasoningEfforts}
-                            value={props.reasoningEffort}
-                            onChange={(effort) => {
-                              if (effort && effort !== props.reasoningEffort) {
-                                props.onReasoningEffortChange?.(effort);
-                              }
-                            }}
-                            itemComponent={(item) => (
-                              <SelectItem item={item.item}>{reasoningLabel(item.item.rawValue)}</SelectItem>
-                            )}
-                          >
-                            <SelectTrigger size="sm" aria-label="Agent reasoning effort">
-                              <SelectValue<AgentReasoningEffort>>
-                                {(state) => {
-                                  const effort = state.selectedOption();
-                                  return effort ? reasoningLabel(effort) : "Select effort";
+                    <Input
+                      class="provider-model-search"
+                      aria-label="Search models"
+                      placeholder="Search models"
+                      value={search()}
+                      onValueChange={setSearch}
+                    />
+                    <div class={["provider-model-scroll", fades.classes()]} ref={fades.bind} onScroll={fades.measure}>
+                      <Show
+                        when={groups().length > 0}
+                        fallback={
+                          <Show when={available()}>
+                            <div class="provider-model-empty" role="status">
+                              {search().trim()
+                                ? "No models match your search."
+                                : `No models are available from ${agentProviderName(provider)}.`}
+                            </div>
+                          </Show>
+                        }
+                      >
+                        <Listbox.Root<PickerModel, PickerModelGroup>
+                          class="provider-model-list"
+                          aria-label={`${agentProviderName(provider)} models`}
+                          options={groups()}
+                          optionGroupChildren="models"
+                          renderSection={(section) => (
+                            <Show when={section.rawValue.name}>
+                              <Listbox.Section class="provider-model-group">{section.rawValue.name}</Listbox.Section>
+                            </Show>
+                          )}
+                          optionValue="id"
+                          optionTextValue={(model) => displayModelName(model.name, model.id)}
+                          optionDisabled={() => !available()}
+                          value={[selected()?.id ?? props.value]}
+                          selectionMode="single"
+                          disallowEmptySelection
+                          shouldFocusWrap
+                          renderItem={(item) => {
+                            const model = item.rawValue;
+                            const isSelected = () => selected()?.id === model.id;
+                            return (
+                              <Listbox.Item
+                                as="button"
+                                item={item}
+                                type="button"
+                                class={["provider-model-option", { "provider-model-option-selected": isSelected() }]}
+                                aria-label={`${displayModelName(model.name, model.id)}${
+                                  model.id === defaultProviderModel(provider) ? ", default" : ""
+                                }`}
+                                disabled={!available()}
+                                onClick={() => {
+                                  if (!isSelected() || props.provider !== provider) selectModel(model.id, provider);
                                 }}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent class="provider-model-effort-content" />
-                          </Select>
-                        </div>
-                      )}
+                              >
+                                <span class="provider-model-option-name">
+                                  <span>{displayModelName(model.name, model.id)}</span>
+                                  <Show when={model.free}>
+                                    <small>Free</small>
+                                  </Show>
+                                  <Show when={model.id === defaultProviderModel(provider)}>
+                                    <small>default</small>
+                                  </Show>
+                                </span>
+                                <Show when={isSelected()}>
+                                  <CheckIcon />
+                                </Show>
+                              </Listbox.Item>
+                            );
+                          }}
+                        />
+                      </Show>
+                    </div>
+                    <Show when={effortOptions().length > 0}>
+                      <div class="provider-model-effort">
+                        <span>Effort</span>
+                        <Select<{ id: string; name: string }>
+                          class="provider-model-effort-select"
+                          options={effortOptions()}
+                          optionValue="id"
+                          optionTextValue="name"
+                          value={effortOptions().find((option) => option.id === effortValue())}
+                          onChange={(option) => {
+                            if (!available() || !option || option.id === effortValue()) return;
+                            if (selected()?.variants.length) props.onChange(option.id, provider);
+                            else {
+                              const effort = selectedModel()?.supportedReasoningEfforts.find(
+                                (effort) => effort === option.id,
+                              );
+                              if (effort) props.onReasoningEffortChange?.(effort);
+                            }
+                          }}
+                          itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.name}</SelectItem>}
+                        >
+                          <SelectTrigger size="sm" aria-label="Agent reasoning effort" disabled={!available()}>
+                            <SelectValue<{ id: string; name: string }>>
+                              {(state) => state.selectedOption()?.name ?? "Select effort"}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent class="provider-model-effort-content" />
+                        </Select>
+                      </div>
                     </Show>
                   </Tabs.Content>
                 );
