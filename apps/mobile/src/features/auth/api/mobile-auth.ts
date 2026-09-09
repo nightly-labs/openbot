@@ -189,6 +189,7 @@ export async function listMobileAccountSessions(
 
 export async function revokeMobileAccountSession(session: MobileSession, target: MobileAccountSession): Promise<void> {
   if (target.current) throw new Error("Use Sign out to disconnect this device.");
+  if (target.kind === "desktop") throw new Error("Desktop sessions cannot be disconnected from mobile.");
   await withMobileAuthRequestTimeout(async (signal) => {
     const response = await fetch(
       new URL(
