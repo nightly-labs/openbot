@@ -235,6 +235,76 @@ it("keeps both removals when the second starts before the first save lands", asy
   expect(within(chat).queryByRole("button", { name: "Remove Chief" })).toBeNull();
 });
 
+/**
+ * A channel with one task that the service stopped and wrote a reason on. The stub does not run
+ * the automatic assignment limit, so the stopped task arrives through the read.
+ */
+const STOPPED_TASK_REASON = "The automatic assignment limit was reached. Continue or reassign this task.";
+async function openChannelWithStoppedTask() {
+  await window.openbot.agent.channelCommand({
+    type: "save",
+    operationId: "create",
+    channelId: "channel-test",
+    draft: {
+      name: "Project room",
+      title: "",
+      instructions: "",
+      members: [{ agentId: "chief" }, { agentId: "sales-outbound" }],
+      leadAgentId: "chief",
+    },
+  });
+  await window.openbot.agent.channelCommand({
+    type: "send",
+    operationId: "request",
+    channelId: "channel-test",
+    text: "Prepare the report",
+    recipientAgentId: "chief",
+    replyToMessageId: null,
+    attachmentDraftIds: [],
+  });
+  const originalRead = window.openbot.agent.readChannel;
+  const state = { taskId: "" };
+  vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => {
+    const page = await originalRead(input);
+    state.taskId = page.tasks[0]?.id ?? "";
+    return {
+      ...page,
+      tasks: page.tasks.map((task) => ({ ...task, state: "paused" as const, error: STOPPED_TASK_REASON })),
+    };
+  });
+  const command = vi.spyOn(window.openbot.agent, "channelCommand");
+  render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+  await fireEvent.click(await screen.findByRole("button", { name: /Project room/ }));
+  const chat = await screen.findByRole("main", { name: "Channel conversation" });
+  const notice = await within(chat).findByRole("region", { name: "Stopped task for Chief" });
+  return { notice, command, state };
+}
+
+it("continues a task the channel stopped with a reason", async () => {
+  const { notice, command, state } = await openChannelWithStoppedTask();
+  expect(notice).toHaveTextContent(STOPPED_TASK_REASON);
+  await fireEvent.click(within(notice).getByRole("button", { name: "Continue" }));
+  await waitFor(() =>
+    expect(command).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "resume", taskId: state.taskId, recipientAgentId: null }),
+    ),
+  );
+});
+
+it("reassigns a task the channel stopped with a reason", async () => {
+  const { notice, command, state } = await openChannelWithStoppedTask();
+  await fireEvent.pointerDown(within(notice).getByRole("button", { name: "Reassign the stopped task of Chief" }), {
+    button: 0,
+  });
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Sales Outbound" }), { button: 0 });
+  await waitFor(() =>
+    expect(command).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "reassign", taskId: state.taskId, recipientAgentId: "sales-outbound" }),
+    ),
+  );
+});
+
 it("retries a lost response once and keeps a focused draft through incoming messages", async () => {
   const chat = await openSavedChannel();
   const originalCommand = window.openbot.agent.channelCommand;

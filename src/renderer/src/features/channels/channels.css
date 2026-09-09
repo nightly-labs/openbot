@@ -446,3 +446,26 @@
 .channel-activity-faces .agent-activity-avatar + .agent-activity-avatar {
   margin-left: calc(-1 * var(--openbot-space-2));
 }
+
+/* The notice of a task that stopped and waits for the reader: the reason, then the two ways out. */
+.channel-paused-task {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-2);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--openbot-space-3);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+}
+.channel-paused-task-reason {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+.channel-paused-task-actions {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+}
