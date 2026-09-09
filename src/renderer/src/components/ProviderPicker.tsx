@@ -1,4 +1,5 @@
 import { ProviderLogo } from "@openbot/brand";
+import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import type {
   AgentProviderId,
   AgentProviderState,
@@ -220,9 +221,9 @@ export function ProviderPicker(props: ProviderPickerProps) {
                   <Show
                     when={
                       !runtimeStatus() &&
-                      option().id === "claude" &&
+                      agentProviderDescriptor(option().id).installGuideLink !== null &&
                       state() === "not-installed" &&
-                      !props.onConnectProvider &&
+                      (option().id === "opencode" || !props.onConnectProvider) &&
                       props.onInstallProvider
                     }
                   >

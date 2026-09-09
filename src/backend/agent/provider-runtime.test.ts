@@ -10,6 +10,7 @@ import {
   createFakeClaude,
   createFakeCodex,
   createFakeGrok,
+  createFakeOpencode,
   createPendingFakeClaude,
   createUpdatableFakeClaude,
   FakeAgentClient,
@@ -36,11 +37,36 @@ afterEach(async () => {
 });
 
 describe.sequential("ProviderRuntime: account checks and login", () => {
+  it("reconnects OpenCode without a browser and refuses to replace an active client", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    const clients: FakeAgentClient[] = [];
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider, "DONE", false);
+      if (provider === "opencode") clients.push(client);
+      return client;
+    });
+    await service.initialize();
+    const openExternal = vi.fn(async () => undefined);
+    await service.connectProvider("opencode", openExternal);
+    expect(openExternal).not.toHaveBeenCalled();
+    expect(clients).toHaveLength(2);
+    expect(clients[0]?.running).toBe(false);
+    expect(clients[1]?.running).toBe(true);
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "opencode/example-model" });
+    await service.sendMessage({ agentId: "chief", text: "Start a task." });
+    await waitFor(() => clients[1]?.requests.some((request) => request.method === "turn/start") === true);
+    await expect(service.connectProvider("opencode", openExternal)).rejects.toThrow("Wait for it to finish");
+    expect(clients).toHaveLength(2);
+    expect(clients[1]?.running).toBe(true);
+  });
+
   it("checks providers concurrently and publishes each completed row", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
     const { store, mailbox } = stores(root);
-    const delays: Record<AgentProvider, number> = { codex: 60, claude: 5, grok: 30 };
+    const delays: Record<AgentProvider, number> = { codex: 60, claude: 5, grok: 30, opencode: 0 };
     const availableOrder: AgentProvider[] = [];
     const seen = new Set<AgentProvider>();
     const accountReads = new Set<AgentProvider>();

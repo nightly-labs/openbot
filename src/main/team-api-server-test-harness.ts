@@ -58,6 +58,7 @@ export function createAgents(overrides: Partial<TeamApiAgents> = {}, events = ne
     off: (event, listener) => {
       events.off(event, listener);
     },
+    preferredProvider: () => "codex",
     getStatus: unimplemented,
     getAnalytics: unimplemented,
     getHostAnalytics: unimplemented,
@@ -74,7 +75,7 @@ export function createAgents(overrides: Partial<TeamApiAgents> = {}, events = ne
     }),
     getUsage: unimplemented,
     listModels: unimplemented,
-    listAgents: unimplemented,
+    listAgents: () => [],
     listMemories: unimplemented,
     createMemory: unimplemented,
     updateMemory: unimplemented,

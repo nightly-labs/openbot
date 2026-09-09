@@ -1,3 +1,4 @@
+import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import type { AgentProviderId, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 import { createEffect, createSignal, createUniqueId, onCleanup, Show } from "solid-js";
 import { expect, waitFor, within } from "storybook/test";
@@ -12,18 +13,18 @@ import {
 } from "../src/features/provider-updates/provider-update-toast";
 
 const PROVIDERS = ["codex", "claude", "grok"] as const;
-const NAMES: Record<AgentProviderId, string> = { codex: "ChatGPT", claude: "Claude", grok: "Grok" };
-const INSTALLED: Record<AgentProviderId, string> = { codex: "0.149.1", claude: "2.1.246", grok: "1.0.5" };
+const NAMES: Record<ManagedProviderId, string> = { codex: "ChatGPT", claude: "Claude", grok: "Grok" };
+const INSTALLED: Record<ManagedProviderId, string> = { codex: "0.149.1", claude: "2.1.246", grok: "1.0.5" };
 
 /** Only Claude has a newer runtime: the quiet rows are half of what the flow has to show. */
-const AVAILABLE: Record<AgentProviderId, string | null> = { codex: "0.149.1", claude: "2.1.250", grok: null };
+const AVAILABLE: Record<ManagedProviderId, string | null> = { codex: "0.149.1", claude: "2.1.250", grok: null };
 
 /** Fast enough that a play function settles in a couple of seconds, slow enough to read. */
 const PROGRESS_STEP = 8;
 const PROGRESS_INTERVAL = 120;
 const FINISHING_DELAY = 500;
 
-function readyRuntimes(): Record<AgentProviderId, ProviderRuntimeStatus> {
+function readyRuntimes(): Record<ManagedProviderId, ProviderRuntimeStatus> {
   return {
     codex: { phase: "ready", progress: 100, message: null, version: INSTALLED.codex },
     claude: { phase: "ready", progress: 100, message: null, version: INSTALLED.claude },
@@ -57,6 +58,7 @@ function ProviderUpdateFlow(props: { failOnce?: boolean; controls?: boolean }) {
     }));
 
   function setRuntime(id: AgentProviderId, patch: Partial<ProviderRuntimeStatus>): void {
+    if (!isManagedRuntimeProvider(id)) return;
     setRuntimes((current) => ({ ...current, [id]: { ...current[id], ...patch } }));
   }
 
@@ -69,6 +71,7 @@ function ProviderUpdateFlow(props: { failOnce?: boolean; controls?: boolean }) {
   }
 
   function startUpdate(id: AgentProviderId): void {
+    if (!isManagedRuntimeProvider(id)) return;
     clearTimers();
     const update = updates().find((update) => update.provider === id);
     if (update) showProviderUpdateToast(update, () => startUpdate(id));
@@ -98,6 +101,7 @@ function ProviderUpdateFlow(props: { failOnce?: boolean; controls?: boolean }) {
 
   /** The reverse state: the runtime the user already had is still installed and still usable. */
   function cancelUpdate(id: AgentProviderId): void {
+    if (!isManagedRuntimeProvider(id)) return;
     clearTimers();
     running.delete(id);
     setRuntime(id, { phase: "ready", progress: 100, message: null, version: INSTALLED[id] });

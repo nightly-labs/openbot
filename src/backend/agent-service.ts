@@ -559,6 +559,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#profileSave.save(input, sidebar);
   }
 
+  preferredProvider(): AgentProvider {
+    return this.#providers.preferredProvider();
+  }
+
   async createAgent(
     input: CreateAgentInput,
     configure?: (agent: AgentSummary) => Promise<AgentSummary>,

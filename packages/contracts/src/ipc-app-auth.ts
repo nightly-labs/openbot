@@ -169,4 +169,10 @@ export interface ComputerUseMacSetupState {
   message: string | null;
 }
 
-export type ExternalDestination = "agent-setup" | "claude-install" | "claude-sign-in" | "feedback" | "message";
+export type ExternalDestination =
+  | "opencode-install"
+  | "agent-setup"
+  | "claude-install"
+  | "claude-sign-in"
+  | "feedback"
+  | "message";

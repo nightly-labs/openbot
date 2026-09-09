@@ -99,6 +99,7 @@ const INITIAL_STATUS: AgentStatus = {
     { id: "codex", state: "not-started", version: null, message: null },
     { id: "claude", state: "not-started", version: null, message: null },
     { id: "grok", state: "not-started", version: null, message: null },
+    { id: "opencode", state: "not-started", version: null, message: null },
   ],
   capabilities: {
     chat: "unavailable",
@@ -845,6 +846,11 @@ export class ProviderRuntime implements ProviderPort {
    * which account it now has. A provider with a free tier answers with an account either way.
    */
   async #reprobeProvider(provider: AgentProvider): Promise<AgentStatus> {
+    if (this.#hooks.isProviderBusy(provider)) {
+      throw new Error(
+        `The ${providerLabel(provider)} CLI is working on a turn. Wait for it to finish, then reconnect.`,
+      );
+    }
     let cli: AgentCliInfo | null = null;
     this.#setProviderConnectionState(provider, "connecting");
     try {

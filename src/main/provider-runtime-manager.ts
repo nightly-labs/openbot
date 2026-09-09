@@ -7,8 +7,8 @@ import { dirname, join } from "node:path";
 import { finished } from "node:stream/promises";
 import { promisify } from "node:util";
 import {
-  type AgentProviderId,
   MANAGED_RUNTIME_PROVIDERS,
+  type ManagedProviderId,
   type ProviderRuntimeSnapshot,
   type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
@@ -29,7 +29,7 @@ type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Resp
 type PartialMetadata = { url: string; etag: string | null; expectedBytes: number };
 interface ProviderRuntimeManagerEvents {
   status: [snapshot: ProviderRuntimeSnapshot];
-  ready: [provider: AgentProviderId];
+  ready: [provider: ManagedProviderId];
 }
 
 export interface ProviderRuntimeManagerOptions {
@@ -39,7 +39,7 @@ export interface ProviderRuntimeManagerOptions {
   fetchImpl?: Fetch;
   lock?: AgentRuntimeLock;
   availableDiskBytes?: () => Promise<number>;
-  updateRuntime?: (provider: AgentProviderId, install: () => Promise<string>) => Promise<void>;
+  updateRuntime?: (provider: ManagedProviderId, install: () => Promise<string>) => Promise<void>;
 }
 
 export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerEvents> {
@@ -48,13 +48,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #fetch: Fetch;
   readonly #lock: AgentRuntimeLock;
   readonly #availableDiskBytes: () => Promise<number>;
-  readonly #statuses: Record<AgentProviderId, ProviderRuntimeStatus>;
-  readonly #controllers = new Map<AgentProviderId, AbortController>();
-  readonly #tasks = new Map<AgentProviderId, Promise<void>>();
-  readonly #cancelled = new Set<AgentProviderId>();
+  readonly #statuses: Record<ManagedProviderId, ProviderRuntimeStatus>;
+  readonly #controllers = new Map<ManagedProviderId, AbortController>();
+  readonly #tasks = new Map<ManagedProviderId, Promise<void>>();
+  readonly #cancelled = new Set<ManagedProviderId>();
   /** Versions of provider CLIs the user installed, kept only to compare against the lock. */
-  readonly #systemVersions = new Map<AgentProviderId, string>();
-  readonly #updateRuntime: (provider: AgentProviderId, install: () => Promise<string>) => Promise<void>;
+  readonly #systemVersions = new Map<ManagedProviderId, string>();
+  readonly #updateRuntime: (provider: ManagedProviderId, install: () => Promise<string>) => Promise<void>;
   #revision = 0;
   #stopping = false;
 
@@ -118,7 +118,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * one rather than in the renderer, which must not compare versions at all. Pass `null` when the
    * provider went back to the managed copy or resolved nothing.
    */
-  setSystemVersion(provider: AgentProviderId, version: string | null): void {
+  setSystemVersion(provider: ManagedProviderId, version: string | null): void {
     if ((this.#systemVersions.get(provider) ?? null) === version) return;
     if (version) this.#systemVersions.set(provider, version);
     else this.#systemVersions.delete(provider);
@@ -133,7 +133,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     return executables;
   }
 
-  executablePath(provider: AgentProviderId): string | null {
+  executablePath(provider: ManagedProviderId): string | null {
     if (!this.#target) return null;
     const spec = runtimeSpec(provider, this.#target, this.#lock);
     return join(
@@ -145,7 +145,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     );
   }
 
-  async download(provider: AgentProviderId): Promise<ProviderRuntimeSnapshot> {
+  async download(provider: ManagedProviderId): Promise<ProviderRuntimeSnapshot> {
     if (!this.#target) throw new Error("Provider runtimes are not available on this platform.");
     if (this.#stopping) throw new Error("OpenBot is closing.");
     if (configuredCliPath(provider))
@@ -177,14 +177,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     return this.getStatus();
   }
 
-  async downloadAndWait(provider: AgentProviderId): Promise<void> {
+  async downloadAndWait(provider: ManagedProviderId): Promise<void> {
     await this.download(provider);
     await this.#tasks.get(provider);
     const status = this.#statuses[provider];
     if (status.phase !== "ready") throw new Error(status.message ?? "The provider update did not complete.");
   }
 
-  async cancel(provider: AgentProviderId): Promise<ProviderRuntimeSnapshot> {
+  async cancel(provider: ManagedProviderId): Promise<ProviderRuntimeSnapshot> {
     if (this.#statuses[provider].phase !== "downloading") return this.getStatus();
     const task = this.#tasks.get(provider);
     this.#cancelled.add(provider);
@@ -202,7 +202,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     await Promise.allSettled(this.#tasks.values());
   }
 
-  async #inspect(provider: AgentProviderId): Promise<void> {
+  async #inspect(provider: ManagedProviderId): Promise<void> {
     if (!this.#target) return;
     const spec = runtimeSpec(provider, this.#target, this.#lock);
     try {
@@ -358,7 +358,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     if (available < required) throw new Error("There is not enough free disk space for this provider.");
   }
 
-  async #handleDownloadFailure(provider: AgentProviderId, error: unknown): Promise<void> {
+  async #handleDownloadFailure(provider: ManagedProviderId, error: unknown): Promise<void> {
     if (this.#cancelled.has(provider)) return;
     if (this.#stopping && isAbortError(error)) return;
     const message = isAbortError(error)
@@ -374,13 +374,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     });
   }
 
-  #setStatus(provider: AgentProviderId, status: ProviderRuntimeStatus): void {
+  #setStatus(provider: ManagedProviderId, status: ProviderRuntimeStatus): void {
     this.#statuses[provider] = status;
     this.#revision += 1;
     this.emit("status", this.getStatus());
   }
 
-  #providerRoot(provider: AgentProviderId): string {
+  #providerRoot(provider: ManagedProviderId): string {
     return join(this.#root, provider);
   }
 
@@ -448,7 +448,7 @@ function runtimeTarget(platform: NodeJS.Platform, architecture: string): Runtime
   return null;
 }
 
-function runtimeSpec(provider: AgentProviderId, target: RuntimeTarget, lock: AgentRuntimeLock): RuntimeSpec {
+function runtimeSpec(provider: ManagedProviderId, target: RuntimeTarget, lock: AgentRuntimeLock): RuntimeSpec {
   return providerRuntimeDescriptor(provider).spec(target, lock);
 }
 

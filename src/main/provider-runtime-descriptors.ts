@@ -1,6 +1,6 @@
 import { access, chmod, copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { AgentProviderId } from "@openbot/contracts/ipc";
+import type { ManagedProviderId } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import type { AgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import { parseClaudeVersion, parseCodexVersion, parseGrokVersion } from "../backend/cli";
@@ -9,7 +9,7 @@ import { assertSafeArchive, extractArchive, rejectNonRegularFiles, sha256File } 
 export type RuntimeTarget = "darwin-arm64" | "win32-x64";
 
 export interface RuntimeSpec {
-  provider: AgentProviderId;
+  provider: ManagedProviderId;
   version: string;
   target: RuntimeTarget;
   url: string;
@@ -36,11 +36,11 @@ export interface ProviderStageContext {
  *
  * The manager used to answer these four questions with `if codex … else if claude … else grok`, so
  * a provider it had never heard of silently downloaded Grok's binary from x.ai into that provider's
- * directory. `Record<AgentProviderId, …>` is the fix: a provider with no descriptor is a `TS2741`
+ * directory. `Record<ManagedProviderId, …>` is the fix: a provider with no descriptor is a `TS2741`
  * naming the id.
  */
 export interface ProviderRuntimeDescriptor {
-  readonly provider: AgentProviderId;
+  readonly provider: ManagedProviderId;
   /** Where the artifact for this target lives, and what it should weigh and hash. */
   spec(target: RuntimeTarget, lock: AgentRuntimeLock): RuntimeSpec;
   /** Fill `staging` with the installed layout: `bin/<executable>`, licences and the manifest. */
@@ -52,7 +52,7 @@ export interface ProviderRuntimeDescriptor {
 
 const CODEX_ARCHIVE_ROOTS = ["bin", "codex-package.json", "codex-path", "codex-resources"];
 
-export const PROVIDER_RUNTIME_DESCRIPTORS: Record<AgentProviderId, ProviderRuntimeDescriptor> = {
+export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedProviderId, ProviderRuntimeDescriptor> = {
   codex: {
     provider: "codex",
     spec: (target, lock) => {
@@ -208,6 +208,6 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<AgentProviderId, ProviderRunti
   },
 };
 
-export function providerRuntimeDescriptor(provider: AgentProviderId): ProviderRuntimeDescriptor {
+export function providerRuntimeDescriptor(provider: ManagedProviderId): ProviderRuntimeDescriptor {
   return PROVIDER_RUNTIME_DESCRIPTORS[provider];
 }

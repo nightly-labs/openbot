@@ -558,3 +558,18 @@ is stored by the account service or Signal service.
 The desktop chart adapts Zaidan's chart and interactive area composition. The pinned
 `solid-recharts` dependency has a Solid 2 compatibility patch and uses the application's single
 Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact accessible values.
+
+### OpenCode and ACP
+
+`src/backend/acp-client.ts` owns ACP process transport, model discovery, session start/load,
+streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts` supplies xAI
+login and billing hooks. The OpenCode driver starts the installed `opencode acp` command and
+uses external sign-in. OpenCode is not a managed runtime. Profile clients deny tool permissions.
+Provider session IDs remain in `projection_provider_sessions`; migration 17 adds OpenCode while
+preserving turn links. Provider switches keep the same agent, workspace, and local thread.
+
+Team API v4 has its own frozen provider-aware schema and adapters. Versions 1–3 remain registered
+with their released provider vocabulary. The host filters OpenCode agents, models, status,
+sidebar references, and runtime events before encoding an older client's response. Requests for
+an OpenCode agent from those clients return 404. WebRTC keeps its v2 frame transport and selects
+the v4 application codec when the peer advertises the `opencode` capability.

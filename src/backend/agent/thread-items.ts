@@ -13,7 +13,7 @@ export function isArchivedThreadError(error: unknown): boolean {
 }
 
 export function isMissingProviderSessionError(error: unknown, provider: AgentProvider): boolean {
-  if (provider !== "grok" || !(error instanceof Error)) return false;
+  if ((provider !== "grok" && provider !== "opencode") || !(error instanceof Error)) return false;
   return (
     /\bunknown grok session\b/i.test(error.message) ||
     /\bsession\b.*\b(?:not found|does not exist|unknown)\b/i.test(error.message) ||

@@ -179,6 +179,30 @@ export async function resolveGrokCli(
   throw new CodexCliError("Grok is not downloaded. Download it in OpenBot to continue.", "missing");
 }
 
+export async function resolveOpencodeCli(
+  input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
+): Promise<AgentCliInfo> {
+  const candidates = await cliCandidates("opencode", input.systemCandidates, null);
+  let found = false;
+  for (const candidate of candidates) {
+    if (!(await isExecutable(candidate.executable))) continue;
+    found = true;
+    try {
+      const output = await readCliVersion(candidate.executable);
+      const version = output.trim().match(/^(?:opencode\s+)?(\d+\.\d+\.\d+)(?:[-+][\w.-]+)?$/i)?.[1];
+      if (version) return { executable: candidate.executable, version, source: "system" };
+    } catch {
+      /* Try the remaining installed candidates. */
+    }
+  }
+  throw new CodexCliError(
+    found
+      ? "OpenCode could not start. Run `opencode --version` in a terminal."
+      : "Install OpenCode on this computer to continue.",
+    found ? "invalid" : "missing",
+  );
+}
+
 export function bundledGrokExecutable(
   platform = process.platform,
   architecture = process.arch,
@@ -188,7 +212,7 @@ export function bundledGrokExecutable(
 }
 
 function bundledProviderExecutable(
-  provider: "codex" | "claude" | "grok",
+  provider: AgentProviderId,
   platform: NodeJS.Platform,
   architecture: string,
   resourcesPath: string | null | undefined,
@@ -238,12 +262,12 @@ function isMinimumVersion(version: string, minimum: readonly number[]): boolean 
 }
 
 /** An explicit path remains under the user's control, including during managed updates. */
-export function configuredCliPath(provider: "codex" | "claude" | "grok"): string | null {
+export function configuredCliPath(provider: AgentProviderId): string | null {
   return process.env[`OPENBOT_${provider.toUpperCase()}_PATH`]?.trim() || null;
 }
 
 async function cliCandidates(
-  provider: "codex" | "claude" | "grok",
+  provider: AgentProviderId,
   systemCandidates: string[] | undefined,
   bundledExecutable: string | null,
 ): Promise<Array<{ executable: string; source: "system" | "managed" }>> {
@@ -258,10 +282,7 @@ async function cliCandidates(
   );
 }
 
-async function collectCandidates(
-  command: "codex" | "claude" | "grok",
-  configuredPath: string | undefined,
-): Promise<string[]> {
+async function collectCandidates(command: AgentProviderId, configuredPath: string | undefined): Promise<string[]> {
   const candidates: string[] = [];
   const override = configuredPath?.trim();
   if (override) return [override];
@@ -299,7 +320,7 @@ async function collectCandidates(
 }
 
 export function windowsFallbackPaths(
-  command: "codex" | "claude" | "grok",
+  command: AgentProviderId,
   userHome = homedir(),
   environment: NodeJS.ProcessEnv = process.env,
 ): string[] {
@@ -330,9 +351,10 @@ export function windowsFallbackPaths(
   return paths;
 }
 
-export function posixFallbackPaths(command: "codex" | "claude" | "grok", userHome = homedir()): string[] {
+export function posixFallbackPaths(command: AgentProviderId, userHome = homedir()): string[] {
   const paths = [posix.join(userHome, ".local", "bin", command)];
   if (command === "claude") paths.push(posix.join(userHome, ".claude", "local", "claude"));
+  if (command === "opencode") paths.push(posix.join(userHome, ".opencode", "bin", "opencode"));
   if (command === "grok") paths.push(posix.join(userHome, ".grok", "bin", "grok"));
   paths.push(`/opt/homebrew/bin/${command}`, `/usr/local/bin/${command}`);
   return paths;

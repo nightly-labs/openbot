@@ -59,7 +59,7 @@ export async function routeAgentConversation(
     // `context.protocol` is the same `requestProtocol(request)` this branch used to recompute for
     // itself. It has to be: the negotiated protocol also picks the adapter `json` encodes with, so a
     // route deciding on a different number than the encoder would answer in a shape it just refused.
-    if (protocol !== TEAM_PROTOCOL_V3 || !capabilities.has("conversation-unread")) {
+    if (protocol < TEAM_PROTOCOL_V3 || !capabilities.has("conversation-unread")) {
       throw new HttpError(400, "This client does not support marking conversations unread.");
     }
     await readJson(request);

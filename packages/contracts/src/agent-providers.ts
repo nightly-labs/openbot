@@ -19,7 +19,7 @@ import { isOneOf } from "./runtime-values";
  * the per-provider argv, palette tokens and runtime-lock schemas, which belong to the driver, the
  * stylesheet and the lock file.
  */
-export const AGENT_PROVIDERS = ["codex", "claude", "grok"] as const;
+export const AGENT_PROVIDERS = ["codex", "claude", "grok", "opencode"] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
 
 export function isAgentProvider(value: unknown): value is AgentProviderId {
@@ -91,6 +91,18 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     legacyModelPrefix: "grok-",
     authKind: "grok",
     pickerOrder: 2,
+  },
+  opencode: {
+    id: "opencode",
+    displayName: "OpenCode",
+    cliName: "OpenCode CLI",
+    onboardingDescription: "Use your installed OpenCode CLI",
+    signInMessage: "Install OpenCode and run `opencode auth login`, then connect again.",
+    installGuideLink: "opencode-install",
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "opencode",
+    pickerOrder: 3,
   },
 } as const satisfies Record<AgentProviderId, AgentProviderDescriptor>;
 

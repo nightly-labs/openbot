@@ -11,6 +11,7 @@ import {
   callOpenBotTool,
   createFakeClaude,
   createFakeGrok,
+  createFakeOpencode,
   FakeAgentClient,
   fakeBrowser,
   firstInputText,
@@ -64,6 +65,7 @@ describe.sequential("AgentService: queue", () => {
           email: "claude@example.com",
         },
         { id: "grok", state: "not-installed", version: null },
+        { id: "opencode", state: "not-installed", version: null },
       ],
     });
     await expect(
@@ -108,6 +110,7 @@ describe.sequential("AgentService: queue", () => {
           { id: "codex", state: "error", message: expect.stringContaining("included ChatGPT runtime") },
           { id: "claude", state: "error", message: expect.stringContaining("included Claude runtime") },
           { id: "grok", state: "not-installed" },
+          { id: "opencode", state: "not-installed" },
         ],
       });
 
@@ -118,6 +121,7 @@ describe.sequential("AgentService: queue", () => {
           { id: "codex", state: "available" },
           { id: "claude", state: "error", message: expect.stringContaining("included Claude runtime") },
           { id: "grok", state: "not-installed" },
+          { id: "opencode", state: "not-installed" },
         ],
       });
       const codexClient = clients.get("codex");
@@ -441,53 +445,61 @@ describe.sequential("AgentService: queue", () => {
     warning.mockRestore();
   });
 
-  it("replaces a Grok session that the provider can no longer resume", async () => {
-    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
-    let rejectResume = false;
-    let grokClient: FakeAgentClient | undefined;
-    const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, undefined, true, true, {}, async (method) => {
-        if (provider === "grok" && method === "thread/resume" && rejectResume) {
-          throw new Error("Grok session not found");
-        }
+  it.each(["grok", "opencode"] as const)(
+    "replaces a %s session that the provider can no longer resume",
+    async (target) => {
+      process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+      process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+      let rejectResume = false;
+      let providerClient: FakeAgentClient | undefined;
+      const { store, mailbox } = stores(root);
+      service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+        const client = new FakeAgentClient(provider, "PROVIDER_DONE", true, true, {}, async (method) => {
+          if (provider === target && method === "thread/resume" && rejectResume) {
+            throw new Error(`${target} session not found`);
+          }
+        });
+        if (provider === target) providerClient = client;
+        return client;
       });
-      if (provider === "grok") grokClient = client;
-      return client;
-    });
-    const warning = vi.spyOn(process.stderr, "write");
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
-    await service.sendMessage({ agentId: "chief", text: "First Grok request" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
-    const publicThreadId = service.listAgents().find((agent) => agent.id === "chief")?.threadId;
-    const originalSessionId = store.activeProviderSession("chief")?.externalSessionId;
-    if (!publicThreadId || !originalSessionId) throw new Error("The first Grok session was not created.");
+      const warning = vi.spyOn(process.stderr, "write");
+      await service.initialize();
+      await store.getOrCreate("chief");
+      await service.updateAgent({
+        agentId: "chief",
+        provider: target,
+        model: target === "grok" ? "grok-4.5" : "opencode/example-model",
+      });
+      await service.sendMessage({ agentId: "chief", text: "First provider request" });
+      await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
+      const publicThreadId = service.listAgents().find((agent) => agent.id === "chief")?.threadId;
+      const originalSessionId = store.activeProviderSession("chief")?.externalSessionId;
+      if (!publicThreadId || !originalSessionId) throw new Error("The first provider session was not created.");
 
-    rejectResume = true;
-    await service.updateAgent({ agentId: "chief", description: "Force the provider session to reload." });
-    await service.sendMessage({ agentId: "chief", text: "Continue after recovery" });
-    await waitFor(() => service?.listQueue("chief").deliveries[1]?.status === "completed");
+      rejectResume = true;
+      await service.updateAgent({ agentId: "chief", description: "Force the provider session to reload." });
+      await service.sendMessage({ agentId: "chief", text: "Continue after recovery" });
+      await waitFor(() => service?.listQueue("chief").deliveries[1]?.status === "completed");
 
-    const sessions = store.database.listProviderSessions(publicThreadId);
-    expect(sessions).toMatchObject([
-      { externalSessionId: originalSessionId, provider: "grok", state: "inactive" },
-      { provider: "grok", state: "active" },
-    ]);
-    expect(sessions[1]?.externalSessionId).not.toBe(originalSessionId);
-    const turns = grokClient?.requests.filter((request) => request.method === "turn/start") ?? [];
-    expect(firstInputText(turns[1]?.params)).toContain("GROK_DONE");
-    expect(firstInputText(turns[1]?.params)).toContain("Continue after recovery");
-    expect(
-      warning.mock.calls.some(
-        ([chunk]) =>
-          String(chunk).includes("Recovered an unavailable provider session.") &&
-          String(chunk).includes('"outcome":"replaced"'),
-      ),
-    ).toBe(true);
-    warning.mockRestore();
-  });
+      const sessions = store.database.listProviderSessions(publicThreadId);
+      expect(sessions).toMatchObject([
+        { externalSessionId: originalSessionId, provider: target, state: "inactive" },
+        { provider: target, state: "active" },
+      ]);
+      expect(sessions[1]?.externalSessionId).not.toBe(originalSessionId);
+      const turns = providerClient?.requests.filter((request) => request.method === "turn/start") ?? [];
+      expect(firstInputText(turns[1]?.params)).toContain("PROVIDER_DONE");
+      expect(firstInputText(turns[1]?.params)).toContain("Continue after recovery");
+      expect(
+        warning.mock.calls.some(
+          ([chunk]) =>
+            String(chunk).includes("Recovered an unavailable provider session.") &&
+            String(chunk).includes('"outcome":"replaced"'),
+        ),
+      ).toBe(true);
+      warning.mockRestore();
+    },
+  );
 
   it("stores a visible summary when a provider handoff exceeds its budget", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);

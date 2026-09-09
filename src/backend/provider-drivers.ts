@@ -1,8 +1,9 @@
 import type { AgentAuthState, AgentProviderId } from "@openbot/contracts/ipc";
+import { AcpAgentClient } from "./acp-client";
 import type { AgentClient } from "./agent-client";
 import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
-import { type AgentCliInfo, resolveClaudeCli, resolveCodexCli, resolveGrokCli } from "./cli";
+import { type AgentCliInfo, resolveClaudeCli, resolveCodexCli, resolveGrokCli, resolveOpencodeCli } from "./cli";
 import { GrokAgentClient } from "./grok-client";
 import type { AccountReadResult } from "./protocol";
 
@@ -91,6 +92,28 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     createClient: (cli, requestTimeoutMs) => new GrokAgentClient(cli, requestTimeoutMs),
     createProfileClient: (cli, requestTimeoutMs) => new GrokAgentClient(cli, requestTimeoutMs, true),
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "opencode",
+    signIn: { kind: "external" },
+    resolveCli: resolveOpencodeCli,
+    createClient: (cli, timeout) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "opencode",
+        argv: ["acp"],
+        env: {},
+        signInMessage: "Run `opencode auth login`, then connect again.",
+      }),
+    createProfileClient: (cli, timeout) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "opencode",
+        argv: ["acp"],
+        profileGeneration: true,
+        env: { OPENCODE_CONFIG_CONTENT: JSON.stringify({ permission: { "*": "deny" } }) },
+        signInMessage: "Run `opencode auth login`, then connect again.",
+      }),
+    authState: (account) => ({ kind: "opencode", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
 ] as const;

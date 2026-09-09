@@ -1,3 +1,5 @@
+import { isAgentSummary } from "@openbot/contracts/ipc";
+import opencodeFixture from "../../packages/contracts/src/team-protocol/fixtures/v4/host-http-response.json";
 // @vitest-environment node
 
 // The WebSocket side: who receives which realtime event, and what a client on an older protocol
@@ -28,6 +30,48 @@ import {
 afterEach(stopTeamApiFixtures);
 
 describe("TeamApiServer events", () => {
+  it("filters OpenCode snapshots and events for old peers without changing the host", async () => {
+    const source = opencodeFixture[0];
+    if (!isAgentSummary(source)) throw new Error("Invalid OpenCode fixture.");
+    const events = new EventEmitter();
+    const snapshot = { ...createAgents().getRuntimeSnapshot(), agents: [source] };
+    const { store, start } = await createTeamApiFixture("provider-events", { configure: true });
+    const { port } = await start({
+      agents: createAgents({ listAgents: () => [source], getRuntimeSnapshot: () => snapshot }, events),
+    });
+    const login = await store.login("owner", "correct horse battery");
+    for (const supportsOpencode of [false, true]) {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
+        "openbot-team-v1",
+        `openbot-token.${login.sessionToken}`,
+      ]);
+      const presence = nextJsonEvent(socket);
+      await new Promise<void>((resolve) => socket.addEventListener("open", () => resolve(), { once: true }));
+      await presence;
+      const initial = nextJsonEvent(socket);
+      socket.send(
+        JSON.stringify({
+          type: "agent-event-scope",
+          includeConversations: true,
+          capabilities: ["agent-runtime-snapshots", ...(supportsOpencode ? ["opencode"] : [])],
+        }),
+      );
+      await expect(initial).resolves.toMatchObject({
+        type: "runtime-snapshot",
+        snapshot: { bots: supportsOpencode ? [expect.objectContaining({ id: source.id, name: source.name })] : [] },
+      });
+      const changed = new Promise<unknown>((resolve) =>
+        socket.addEventListener("message", (event) => resolve(JSON.parse(String(event.data))), { once: true }),
+      );
+      events.emit("event", { type: "agents-changed", agents: [source] });
+      await expect(changed).resolves.toMatchObject({ type: "bots-changed", bots: supportsOpencode ? [source] : [] });
+      const closed = new Promise<void>((resolve) => socket.addEventListener("close", () => resolve(), { once: true }));
+      socket.close();
+      await closed;
+    }
+    expect(snapshot.agents).toEqual([source]);
+  });
+
   it("shares sidebar layout mutations with owner, admin, and member clients", async () => {
     const { root, store, start } = await createTeamApiFixture("sidebar-layout", { configure: true });
     const adminInvite = await store.createInvite("admin");
