@@ -81,6 +81,7 @@ describe("TeamApiServer events", () => {
           avatarUrl: null,
         } satisfies AgentSummary,
       ],
+      sidebarChatIds: () => new Set(["chief"]),
     });
     let now = 0;
     const { base, port } = await start({

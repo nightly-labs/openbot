@@ -269,7 +269,7 @@ describe("ChannelRoutineStore", () => {
     expect(routines.pendingRuns().map((pending) => pending.id)).toEqual([run.id]);
     routines.attachRequest(run.id, "request-1");
     expect(routines.runForRequest("request-1")?.id).toBe(run.id);
-    expect(routines.pendingRuns()).toEqual([]);
+    expect(routines.pendingRuns().map((pending) => pending.id)).toEqual([run.id]);
     expect(routines.channelsWithOpenRuns()).toEqual(["channel-1"]);
     database.close();
   });

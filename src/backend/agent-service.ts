@@ -409,6 +409,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         }
       },
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
+      awaitDrain: (agentId) => this.#drain.taskFor(agentId),
       contextCharacters: (agentId, threadId) => {
         const agent = this.#store.list().find((item) => item.id === agentId);
         const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;

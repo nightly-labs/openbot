@@ -615,9 +615,10 @@ export class TeamApiServer {
         continue;
       }
       let outgoing: string;
-      if (event.type === "channels-changed") {
+      const channel = channelEvent(event);
+      if (channel) {
         if (!connection.capabilities.has("channel-chats-v1")) continue;
-        outgoing = JSON.stringify(channelEvent(event));
+        outgoing = JSON.stringify(channel);
       } else if (event.type === "conversation" && supportsRuntimeSnapshots) {
         conversationInvalidation ??=
           encodeTeamProtocolV1CurrentEvent({
@@ -1123,6 +1124,12 @@ function unavailableSidebarLayout(): TeamApiSidebarLayout {
 }
 
 function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
+  if (
+    event.type === "channels-changed" ||
+    event.type === "channel-memories-changed" ||
+    event.type === "channel-routines-changed"
+  )
+    return "channel-chats-v1";
   if (event.type === "turn-progress") return TEAM_AGENT_ACTIVITY_CAPABILITY;
   if (event.type === "runtime-snapshot") return "agent-runtime-snapshots";
   if (event.type === "sidebar-layout-changed") return "sidebar-layout";

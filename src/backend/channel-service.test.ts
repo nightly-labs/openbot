@@ -795,6 +795,43 @@ describe("shared channel coordination", () => {
     expect(data.store.list().map((agent) => agent.id)).toEqual(["agent-a", "agent-b"]);
   });
 
+  it("waits for a pending delivery start before deleting channel records", async () => {
+    await send("Remove while the assignment is starting");
+    const assignment = required(service.store.assignments("channel-1")[0]);
+    const deliveryId = required(assignment.deliveryId);
+    const threadId = service.store.context("channel-1", "agent-a").threadId;
+    await data.mailbox.markStarting(deliveryId);
+
+    let release!: () => void;
+    const pendingInterrupt = new Promise<undefined>(() => undefined);
+    interrupt.mockImplementationOnce(() => pendingInterrupt);
+    const pendingDrain = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    service.hooks.awaitDrain = vi.fn(() => pendingDrain);
+
+    const deletion = service.deleteChannel("channel-1");
+    await vi.waitFor(() => expect(service.hooks.awaitDrain).toHaveBeenCalledWith("agent-a"));
+    expect(service.store.exists("channel-1")).toBe(true);
+
+    await data.mailbox.markRunning(deliveryId, "late-start-turn");
+    service.accepted(deliveryId, "late-start-session", "late-start-turn");
+    release();
+    await vi.waitFor(() => expect(interrupt).toHaveBeenCalledWith("agent-a", "late-start-turn", threadId));
+    service.event({
+      type: "turn-completed",
+      agentId: "agent-a",
+      threadId,
+      turnId: "late-start-turn",
+      status: "interrupted",
+    });
+    await deletion;
+
+    expect(interrupt).toHaveBeenCalledWith("agent-a", "late-start-turn", threadId);
+    expect(service.store.exists("channel-1")).toBe(false);
+    expect(service.store.tasks("channel-1")).toEqual([]);
+  });
+
   it("rejects dependency cycles and pauses the root at the automatic assignment limit", async () => {
     const task = await send("Coordinate the report");
     const first = required(service.store.assignments("channel-1")[0]);

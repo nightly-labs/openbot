@@ -103,6 +103,14 @@ describe("channel-chats-v1 payloads", () => {
       channelId: "channel-1",
       revision: 2,
     });
+    expect(channelEvent({ type: "channel-memories-changed", channelId: "channel-1" })).toEqual({
+      type: "channel-memories-changed",
+      channelId: "channel-1",
+    });
+    expect(channelEvent({ type: "channel-routines-changed", channelId: "channel-1" })).toEqual({
+      type: "channel-routines-changed",
+      channelId: "channel-1",
+    });
   });
   it("reads the older purpose key as instructions", () => {
     const save = {
@@ -183,6 +191,8 @@ describe("channel-chats-v1 payloads", () => {
       }),
     ).toThrow();
     expect(() => channelEvent({ type: "channels-changed", channelId: "g", revision: -1 })).toThrow();
+    expect(() => channelEvent({ type: "channel-memories-changed", channelId: "" })).toThrow();
+    expect(() => channelEvent({ type: "channel-routines-changed", channelId: "x".repeat(129) })).toThrow();
     expect(channelEvent({ type: "future-optional-event" })).toBeNull();
   });
 });

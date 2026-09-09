@@ -7,6 +7,7 @@ import type { ChannelRoutine, ChannelRoutineRun, ChannelTask } from "@openbot/co
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stores } from "./agent-service-test-harness";
 import { ChannelRoutineScheduler, channelRunStatusForTasks } from "./channel-routine-scheduler";
+import { ChannelRoutineStore } from "./channel-routine-store";
 import { ChannelService } from "./channel-service";
 import { OpenBotDatabase } from "./openbot-database";
 
@@ -248,6 +249,39 @@ describe("ChannelRoutineScheduler", () => {
     scheduler.reconcile("channel-1");
     const run = await pending;
     await vi.waitFor(() => expect(currentRun(run.id).status).toBe("running"));
+  });
+
+  it("resumes a queued run whose request id was saved before the command", async () => {
+    const persisted = new ChannelRoutineStore(data.store.database);
+    const run = persisted.createRun(routine, null, "manual", "2026-08-25T12:00:00.000Z");
+    persisted.attachRequest(run.id, "request-after-restart");
+
+    expect(persisted.pendingRuns()).toEqual([
+      expect.objectContaining({ id: run.id, requestMessageId: "request-after-restart", status: "queued" }),
+    ]);
+    expect(
+      data.store.database.connection
+        .prepare("SELECT command_id FROM orchestration_command_receipts WHERE command_id = ?")
+        .get(`channels:routine:${routine.id}:channel-routine-run:${run.id}`),
+    ).toBeUndefined();
+
+    await scheduler.resumePendingRuns();
+
+    await vi.waitFor(() =>
+      expect(service.store.tasks("channel-1").some((task) => task.requestMessageId === "request-after-restart")).toBe(
+        true,
+      ),
+    );
+    expect(
+      data.store.database.connection
+        .prepare("SELECT command_id FROM orchestration_command_receipts WHERE command_id = ?")
+        .get(`channels:routine:${routine.id}:channel-routine-run:${run.id}`),
+    ).toMatchObject({ command_id: `channels:routine:${routine.id}:channel-routine-run:${run.id}` });
+
+    await scheduler.resumePendingRuns();
+    expect(
+      service.store.tasks("channel-1").filter((task) => task.requestMessageId === "request-after-restart"),
+    ).toHaveLength(1);
   });
 
   it("keeps tracking a request the lead merged into another task", async () => {

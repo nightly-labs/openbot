@@ -232,12 +232,21 @@ export class RoutineStore {
 
   /** Runs that were created but never got a handle - the crash window between the two writes. */
   protected pendingRunRows(): OwnedRoutineRun[] {
+    return this.#queuedRunRows(`AND ${this.tables.handleColumn} IS NULL`);
+  }
+
+  /** Queued runs, including ones whose handle was saved before the command was issued. */
+  protected queuedRunRows(): OwnedRoutineRun[] {
+    return this.#queuedRunRows("");
+  }
+
+  #queuedRunRows(condition: string): OwnedRoutineRun[] {
     return rows(
       this.database.connection
         .prepare(
           `SELECT ${this.runColumns}
            FROM ${this.tables.runTable}
-           WHERE status = 'queued' AND ${this.tables.handleColumn} IS NULL
+           WHERE status = 'queued' ${condition}
            ORDER BY created_at, run_id`,
         )
         .all(),

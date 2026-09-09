@@ -1661,8 +1661,9 @@ describe("OpenBot connected desktop shell", () => {
     emitAgentEvent?.({ type: "conversation-page", page: unreadPage });
     window.dispatchEvent(new Event("focus"));
 
-    const sales = screen.getByRole("button", { name: /Sales Outbound/ });
-    await waitFor(() => expect(sales).toHaveTextContent("1 new reply"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Sales Outbound/ })).toHaveTextContent("1 new reply"),
+    );
     expect(window.openbot.agent.markConversationRead).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
@@ -1672,6 +1673,7 @@ describe("OpenBot connected desktop shell", () => {
     );
 
     vi.mocked(window.openbot.agent.readConversationPage).mockResolvedValue(unreadPage);
+    const sales = screen.getByRole("button", { name: /Sales Outbound/ });
     await fireEvent.click(sales);
 
     await waitFor(() =>
@@ -1878,9 +1880,13 @@ describe("OpenBot connected desktop shell", () => {
 
     expect(await screen.findByRole("main", { name: "Direct conversation with Alice" })).toBeInTheDocument();
 
+    const openCreateAgent = async () => {
+      await fireEvent.pointerDown(screen.getByRole("button", { name: "New agent or channel" }), { button: 0 });
+      await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New agent" }), { button: 0 });
+    };
     fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
     flush();
-    await fireEvent.click(screen.getByRole("button", { name: "Create new agent" }));
+    await openCreateAgent();
 
     expect(await screen.findByRole("main", { name: "Create a new agent" })).toBeInTheDocument();
 
@@ -1888,7 +1894,7 @@ describe("OpenBot connected desktop shell", () => {
     // to: the press does nothing else the user can see.
     fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
     flush();
-    await fireEvent.click(screen.getByRole("button", { name: "Create new agent" }));
+    await openCreateAgent();
 
     expect(await screen.findByRole("main", { name: "Create a new agent" })).toBeInTheDocument();
   });

@@ -438,6 +438,27 @@ describe("TeamWebRtcHostGateway", () => {
       type: "event",
       payload: { type: "channels-changed", channelId: "channel-1", revision: 2 },
     });
+    for (const event of [
+      { type: "channel-memories-changed", channelId: "channel-1" },
+      { type: "channel-routines-changed", channelId: "channel-1" },
+    ] as const) {
+      for (const client of eventsServer.clients) client.send(JSON.stringify(event));
+      await vi.waitFor(() =>
+        expect(
+          bridge.sent.filter(
+            (message) => message.channel === "events" && isString(message.data) && message.data.includes(event.type),
+          ),
+        ).toHaveLength(2),
+      );
+      const forwarded = bridge.sent.find(
+        (message) => message.channel === "events" && isString(message.data) && message.data.includes(event.type),
+      );
+      expect(JSON.parse(isString(forwarded?.data) ? forwarded.data : "{}")).toMatchObject({
+        version: 2,
+        type: "event",
+        payload: event,
+      });
+    }
     await gateway.revokeSession("session-2");
     expect(closeLocalSession).toHaveBeenCalledExactlyOnceWith("session-2");
     expect(bridge.disconnectedPeers).toEqual(["peer-2"]);

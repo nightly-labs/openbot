@@ -70,10 +70,11 @@ it.each([0, 1])("opens the agent chat from author control %i", async (control) =
   expect(within(conversation).getByRole("heading", { name: "Chief", level: 1 })).toBeVisible();
 });
 
-it("hides channel deletion for a remote member", async () => {
+it.each(["owner", "admin", "member"] as const)("limits remote channel deletion for %s", async (role) => {
   vi.mocked(window.openbot.servers.list).mockResolvedValue([
     {
       ...testServer("remote-1", true),
+      role,
       compatibility: {
         localAppVersion: "0.4.0",
         hostAppVersion: "0.4.0",
@@ -87,7 +88,11 @@ it("hides channel deletion for a remote member", async () => {
   await openSavedChannel();
   await fireEvent.contextMenu(channelRow("Project room"));
   await screen.findByRole("menuitem", { name: "Edit channel" });
-  expect(screen.queryByRole("menuitem", { name: "Delete channel" })).not.toBeInTheDocument();
+  if (role === "member") {
+    expect(screen.queryByRole("menuitem", { name: "Delete channel" })).not.toBeInTheDocument();
+  } else {
+    expect(screen.getByRole("menuitem", { name: "Delete channel" })).toBeVisible();
+  }
 });
 
 it("creates a channel from a searchable member dialog and keeps the chat open beside settings", async () => {

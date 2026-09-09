@@ -28,6 +28,7 @@ export interface ChannelHooks {
   agents(): AgentSummary[];
   generate: ChannelTextModel;
   schedule(agentId: string): void;
+  awaitDrain?(agentId: string): Promise<void> | undefined;
   interrupt(agentId: string, turnId: string, threadId: string): Promise<void>;
   busy(agentId: string): boolean;
   normalBusy?(): boolean;
@@ -59,6 +60,7 @@ export class ChannelService {
   #stopped = false;
   readonly #wakeAgain = new Set<string>();
   readonly #deletedChannels = new Set<string>();
+  readonly #assignmentTerminalWaiters = new Map<string, Set<() => void>>();
 
   constructor(
     database: OpenBotDatabase,
@@ -99,7 +101,6 @@ export class ChannelService {
       .then(async () => {
         if (this.#deletedChannels.has(channelId)) return;
         const channel = this.store.get(channelId);
-        const threadIds = this.store.contextThreads(channelId);
         const pump = this.#pumps.get(channelId);
         this.#deletedChannels.add(channelId);
         try {
@@ -108,6 +109,25 @@ export class ChannelService {
             this.store.tasks(channelId).filter((task) => !terminal(task)),
           );
           await pump?.catch(() => undefined);
+          const agentIds = new Set(
+            this.store
+              .assignments(channelId)
+              .filter(activeAssignment)
+              .map((assignment) => assignment.agentId),
+          );
+          // The pump schedules the queue drain in a microtask. Wait for that drain as well as
+          // the pump: it may already have moved the delivery to starting or received a turn id,
+          // which must be interrupted before the channel's provider session is forgotten.
+          await Promise.all(
+            [...agentIds].map(async (agentId) => {
+              await this.hooks.awaitDrain?.(agentId)?.catch(() => undefined);
+            }),
+          );
+          await this.interruptTasks(
+            channelId,
+            this.store.tasks(channelId).filter((task) => !terminal(task)),
+          );
+          const threadIds = this.store.contextThreads(channelId);
           await this.mailbox.deleteChannelData(channelId, threadIds);
           for (const threadId of threadIds) await this.hooks.forgetThread?.(threadId);
           this.store.delete(channelId);
@@ -771,6 +791,7 @@ export class ChannelService {
     const assignment = this.store.assignmentForDelivery(delivery.delivery.id);
     if (!assignment) return null;
     const channel = this.store.get(assignment.channelId);
+    if (this.#deletedChannels.has(channel.id)) return null;
     const task = this.store.tasks(channel.id).find((item) => item.id === assignment.taskId);
     if (!task || channel.archived || task.revision !== assignment.taskRevision || task.state !== "queued")
       throw new Error("This channel assignment has been stopped or replaced.");
@@ -957,6 +978,7 @@ export class ChannelService {
         updated.push({ ...parent, state: "queued", revision: parent.revision + 1 });
     }
     this.store.update(this.store.get(channelId), { assignments: [{ ...assignment, state }], tasks: updated });
+    this.resolveAssignmentTerminal(assignment.id);
     this.publish(channelId);
     this.#releaseHeldAgents();
   }
@@ -1239,13 +1261,28 @@ export class ChannelService {
           continue;
         }
       }
-      if (assignment.turnId)
-        await this.hooks.interrupt(
+      if (assignment.turnId) {
+        const terminal = this.#deletedChannels.has(channelId)
+          ? this.waitForAssignmentTerminal(channelId, assignment.id)
+          : null;
+        const interruption = this.hooks.interrupt(
           assignment.agentId,
           assignment.turnId,
           this.store.context(channelId, assignment.agentId).threadId,
         );
-      else if (assignment.deliveryId) {
+        if (terminal) {
+          // Some providers emit turn completion before they acknowledge turn/interrupt. The
+          // lifecycle event is enough evidence that the provider stopped, so channel deletion
+          // must not stay blocked on an acknowledgement that may never arrive.
+          try {
+            await Promise.race([interruption, terminal]);
+          } finally {
+            this.resolveAssignmentTerminal(assignment.id);
+          }
+        } else {
+          await interruption;
+        }
+      } else if (assignment.deliveryId) {
         const delivery = this.mailbox.getDelivery(assignment.deliveryId);
         if (delivery?.delivery.status === "queued") {
           await this.mailbox.cancel(assignment.agentId, assignment.deliveryId);
@@ -1261,6 +1298,23 @@ export class ChannelService {
       !this.hooks.agents().some((agent) => agent.id === agentId)
     )
       throw new Error("Select an available member of this channel.");
+  }
+
+  private waitForAssignmentTerminal(channelId: string, assignmentId: string): Promise<void> {
+    const assignment = this.store.assignments(channelId).find((item) => item.id === assignmentId);
+    if (!assignment || !activeAssignment(assignment)) return Promise.resolve();
+    return new Promise((resolve) => {
+      const waiters = this.#assignmentTerminalWaiters.get(assignmentId) ?? new Set<() => void>();
+      waiters.add(resolve);
+      this.#assignmentTerminalWaiters.set(assignmentId, waiters);
+    });
+  }
+
+  private resolveAssignmentTerminal(assignmentId: string): void {
+    const waiters = this.#assignmentTerminalWaiters.get(assignmentId);
+    if (!waiters) return;
+    this.#assignmentTerminalWaiters.delete(assignmentId);
+    for (const resolve of waiters) resolve();
   }
 
   private message(

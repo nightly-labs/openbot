@@ -107,14 +107,19 @@ export class DrainScheduler {
       return;
     }
     this.#scheduledDrains.add(agentId);
-    queueMicrotask(() => {
-      this.#scheduledDrains.delete(agentId);
-      if (this.#hooks.isStopping()) return;
-      const task = this.drainAgent(agentId).finally(() => {
+    const task = Promise.resolve()
+      .then(() => {
+        this.#scheduledDrains.delete(agentId);
+        if (this.#hooks.isStopping()) return;
+        return this.drainAgent(agentId);
+      })
+      .finally(() => {
         if (this.#drainTasks.get(agentId) === task) this.#drainTasks.delete(agentId);
       });
-      this.#drainTasks.set(agentId, task);
-    });
+    // Track the microtask as soon as it is scheduled. A channel can be deleted in the same
+    // turn that queues its delivery, before the microtask has entered drainAgent. Deletion must
+    // still wait for that start attempt so a provider turn cannot outlive the channel records.
+    this.#drainTasks.set(agentId, task);
   }
 
   pendingTasks(): Promise<void>[] {
@@ -172,6 +177,7 @@ export class DrainScheduler {
 
   async startDelivery(context: DeliveryContext): Promise<void> {
     const { delivery, managedAttachments } = context;
+    const channelDelivery = this.#channels ? this.#channels.store.assignmentForDelivery(delivery.id) !== null : false;
     let confirmedTurnId: string | null = null;
     const claimed = this.#deliveryProviders(delivery.recipientAgentId);
     for (const provider of claimed) this.#startingDeliveries.set(provider, this.#starting(provider) + 1);
@@ -183,7 +189,8 @@ export class DrainScheduler {
       this.#threads.applyPendingRuntimeRefresh(agent);
       await this.#providers.ensureProvider(providerForAgent(agent));
       const client = this.#providers.requireReadyClient(providerForAgent(agent));
-      const execution = await this.#channels?.prepare(context);
+      const execution = this.#channels ? await this.#channels.prepare(context) : null;
+      if (channelDelivery && !execution) return;
       let threadId = await this.#threads.ensureThread(agent, client, execution?.threadId);
       const snapshot = this.#conversation.ensureSnapshot(agent.id, threadId);
       if (snapshot.activeTurnId) {

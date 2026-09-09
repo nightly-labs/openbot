@@ -561,6 +561,18 @@ describe("TeamWebRtcClientTransport", () => {
       }),
     );
     expect(event).toHaveBeenCalledWith("host-1", { type: "channels-changed", channelId: "channel-1", revision: 2 });
+    for (const [sequence, payload] of [
+      { type: "channel-memories-changed", channelId: "channel-1" },
+      { type: "channel-routines-changed", channelId: "channel-1" },
+    ].entries()) {
+      bridge.emit(
+        "data",
+        "host-1",
+        "events",
+        JSON.stringify({ version: 2, type: "event", sequence: sequence + 2, payload }),
+      );
+      expect(event).toHaveBeenCalledWith("host-1", payload);
+    }
     await transport.stop();
   });
 

@@ -233,7 +233,7 @@ const Channels = createSimpleContext({
       supported,
       deletionSupported: () =>
         activeServerSupportsCapability(CHANNEL_DELETE_CAPABILITY) &&
-        (activeServer()?.kind !== "remote" || activeServer()?.role === "owner"),
+        (activeServer()?.kind !== "remote" || activeServer()?.role === "owner" || activeServer()?.role === "admin"),
       refresh,
       retry: async () => {
         const previous = failedCommand;

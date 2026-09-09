@@ -70,7 +70,7 @@ export class ChannelRoutineStore extends RoutineStore {
   }
 
   pendingRuns(): ChannelRoutineRun[] {
-    return this.pendingRunRows().map(toChannelRun);
+    return this.queuedRunRows().map(toChannelRun);
   }
 
   activeRuns(channelId: string, routineId: string): ChannelRoutineRun[] {

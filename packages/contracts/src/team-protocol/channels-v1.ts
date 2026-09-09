@@ -383,8 +383,20 @@ export function channelResponse(path: string, status: number, value: unknown): T
   throw new Error("Unknown channel route.");
 }
 
-export function channelEvent(value: unknown): { type: "channels-changed"; channelId: string; revision: number } | null {
-  if (!isDynamicRecord(value) || value.type !== "channels-changed") return null;
+export type ChannelEvent =
+  | { type: "channels-changed"; channelId: string; revision: number }
+  | { type: "channel-memories-changed"; channelId: string }
+  | { type: "channel-routines-changed"; channelId: string };
+
+export function channelEvent(value: unknown): ChannelEvent | null {
+  if (!isDynamicRecord(value) || !isString(value.type)) return null;
+  if (value.type === "channel-memories-changed" || value.type === "channel-routines-changed") {
+    if (!isString(value.channelId) || !value.channelId.length || value.channelId.length > 128) {
+      throw new Error("Invalid channel event.");
+    }
+    return { type: value.type, channelId: value.channelId };
+  }
+  if (value.type !== "channels-changed") return null;
   if (
     !isString(value.channelId) ||
     !value.channelId.length ||
