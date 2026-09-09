@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./agent-providers": "./src/agent-providers.ts",
     "./attachment-files": "./src/attachment-files.ts",
     "./attachment-references": "./src/attachment-references.ts",
     "./avatar-images": "./src/avatar-images.ts",
@@ -28,6 +29,10 @@
     "./team-protocol/v3": "./src/team-protocol/v3.ts",
     "./team-protocol/v3-adapter": "./src/team-protocol/v3-adapter.ts",
     "./team-protocol/v3-webrtc-adapter": "./src/team-protocol/v3-webrtc-adapter.ts",
+    "./team-protocol/v4": "./src/team-protocol/v4.ts",
+    "./team-protocol/v4-adapter": "./src/team-protocol/v4-adapter.ts",
+    "./team-protocol/v4-base-adapter": "./src/team-protocol/v4-base-adapter.ts",
+    "./team-protocol/v4-webrtc-adapter": "./src/team-protocol/v4-webrtc-adapter.ts",
     "./validation": "./src/validation.ts"
   },
   "scripts": {

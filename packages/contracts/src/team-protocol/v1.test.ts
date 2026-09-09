@@ -383,4 +383,73 @@ describe("Team protocol v1", () => {
       }),
     ).toThrow("Invalid Team protocol v1 HTTP error response");
   });
+
+  // The v1 provider vocabulary shipped with three ids. A build that learns a fourth must not widen
+  // this codec: a released peer decodes what it receives with exactly these validators, so an id it
+  // has never heard of has to fail closed here rather than reach a client that cannot render it.
+  it("freezes the v1 provider vocabulary", () => {
+    const bot = {
+      id: "agent-1",
+      provider: "codex",
+      name: "Chief",
+      title: "Chief of staff",
+      description: "",
+      notifications: true,
+      model: "gpt-5.6-luna",
+      reasoningEffort: "medium",
+      threadId: null,
+      workspacePath: "/Users/dev/OpenBot/Agents/agent-1",
+      preview: "",
+      updatedAt: null,
+      avatarSeed: "first-bot",
+      avatarHue: null,
+      avatarUrl: null,
+    };
+    const modelOption = {
+      provider: "codex",
+      id: "gpt-5.6-luna",
+      name: "GPT-5.6 Luna",
+      description: "",
+      defaultReasoningEffort: "medium",
+      supportedReasoningEfforts: ["low", "medium", "high"],
+    };
+    const status = {
+      phase: "ready",
+      cliVersion: "1.0.0",
+      auth: { kind: "chatgpt", email: "dev@example.com" },
+      providers: [{ id: "codex", state: "available", version: "1.0.0", message: null }],
+      capabilities: { chat: "ready", browser: "ready", computerUse: "unavailable" },
+      message: null,
+      fullAccess: true,
+    };
+
+    expect(decodeTeamProtocolV1HttpResponse("GET", "/v1/agents", 200, [bot])).toEqual([bot]);
+    expect(decodeTeamProtocolV1HttpResponse("GET", "/v1/agents/models", 200, [modelOption])).toEqual([modelOption]);
+    expect(decodeTeamProtocolV1HttpResponse("GET", "/v1/agents/status", 200, status)).toEqual(status);
+    for (const provider of ["claude", "grok"]) {
+      expect(decodeTeamProtocolV1HttpRequest("PATCH", "/v1/agents/agent-1", { provider })).toEqual({ provider });
+    }
+
+    expect(() =>
+      decodeTeamProtocolV1HttpResponse("GET", "/v1/agents", 200, [{ ...bot, provider: "opencode" }]),
+    ).toThrow("Invalid Team protocol v1 HTTP response");
+    expect(() =>
+      decodeTeamProtocolV1HttpResponse("GET", "/v1/agents/models", 200, [{ ...modelOption, provider: "opencode" }]),
+    ).toThrow("Invalid Team protocol v1 HTTP response");
+    expect(() =>
+      decodeTeamProtocolV1HttpResponse("GET", "/v1/agents/status", 200, {
+        ...status,
+        providers: [{ id: "opencode", state: "available", version: "1.0.0", message: null }],
+      }),
+    ).toThrow("Invalid Team protocol v1 HTTP response");
+    expect(() =>
+      decodeTeamProtocolV1HttpResponse("GET", "/v1/agents/status", 200, {
+        ...status,
+        auth: { kind: "opencode", email: null },
+      }),
+    ).toThrow("Invalid Team protocol v1 HTTP response");
+    expect(() => decodeTeamProtocolV1HttpRequest("PATCH", "/v1/agents/agent-1", { provider: "opencode" })).toThrow(
+      "Invalid Team protocol v1 HTTP request",
+    );
+  });
 });

@@ -4,6 +4,7 @@ import {
   parseHostAnalyticsInput,
   parseSaveAgentProfile,
 } from "@openbot/contracts/ipc";
+import { hiddenProviderAgentIds } from "./provider-visibility";
 // Agents: the collection, the sidebar that arranges them, and everything under one agent's id.
 //
 // The order in this file is the one thing about it that is not free. The static collection paths -
@@ -58,6 +59,15 @@ export async function routeAgents(
   { agents, skills, sidebarLayout, duplicateAgent }: AgentRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, response, member, capabilities, json, empty } = context;
+  const hidden = context.protocol < 4 ? hiddenProviderAgentIds(agents.listAgents()) : new Set<string>();
+  function requireCompatibleDefault(): void {
+    if (context.protocol < 4 && agents.preferredProvider() === "opencode") {
+      throw new HttpError(400, "The host's default provider requires Team API v4.");
+    }
+  }
+  function requireVisible(id: string | undefined | null): void {
+    if (id && hidden.has(id)) throw new HttpError(404, "Agent not found.");
+  }
 
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.analytics) {
     if (!capabilities.has("host-analytics"))
@@ -79,6 +89,8 @@ export async function routeAgents(
     if (!capabilities.has("agent-profile-generation"))
       throw new HttpError(400, "Profile generation is not supported by this client.");
     const body = await readJson(request);
+    if (typeof body.agentId === "string") requireVisible(body.agentId);
+    else requireCompatibleDefault();
     if (url.pathname === TEAM_API_ROUTES.agents.generateProfile) {
       return json(
         200,
@@ -112,6 +124,8 @@ export async function routeAgents(
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.sidebarLayout.actions) {
     const action = parseSidebarLayoutAction(await readJson(request));
+    if ("agentId" in action) requireVisible(action.agentId);
+    if ("beforeAgentId" in action) requireVisible(action.beforeAgentId);
     const layout = await sidebarLayout.mutate(action, new Set(agents.listAgents().map((agent) => agent.id)));
     return json(200, layout);
   }
@@ -128,6 +142,7 @@ export async function routeAgents(
     return json(200, agents.listConversationReads(member.id, markerExclusionsForCapabilities(capabilities)));
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.agents.all) {
+    requireCompatibleDefault();
     const body = await readJson(request);
     return json(201, await agents.createAgent(agentCreate(body)));
   }

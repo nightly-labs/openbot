@@ -5,18 +5,7 @@
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
   overflow: visible;
-}
-
-.provider-update-toast-logo[data-provider="codex"] {
-  fill: var(--openbot-provider-codex);
-}
-
-.provider-update-toast-logo[data-provider="claude"] {
-  fill: var(--openbot-provider-claude);
-}
-
-.provider-update-toast-logo[data-provider="grok"] {
-  fill: var(--openbot-provider-grok);
+  fill: var(--openbot-provider-current);
 }
 
 /* One card, one size, for the whole update. The notification is held open from the offer through to
@@ -88,16 +77,8 @@
 
 /* The bar carries the provider's colour, the same one the mark above it carries, so the running
    update is legible as this provider's at a glance rather than as generic progress. */
-.provider-update-toast-bar[data-provider="codex"] .ui-progress-fill {
-  background: var(--openbot-provider-codex);
-}
-
-.provider-update-toast-bar[data-provider="claude"] .ui-progress-fill {
-  background: var(--openbot-provider-claude);
-}
-
-.provider-update-toast-bar[data-provider="grok"] .ui-progress-fill {
-  background: var(--openbot-provider-grok);
+.provider-update-toast-bar[data-provider] .ui-progress-fill {
+  background: var(--openbot-provider-current);
 }
 
 /* A short movement leaves most of each 400 ms display interval still and readable.

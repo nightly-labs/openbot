@@ -1,11 +1,13 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type {
-  AgentProviderId,
-  AgentStatus,
-  AppSetupState,
-  DesktopPlatform,
-  InvitePreview,
-  JoinServerInput,
+import {
+  AGENT_PROVIDERS,
+  type AgentProviderId,
+  type AgentStatus,
+  type AppSetupState,
+  agentProviderName,
+  type DesktopPlatform,
+  type InvitePreview,
+  type JoinServerInput,
 } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from "solid-js";
 import { ProviderPicker, type ProviderPickerOption } from "../../components/ProviderPicker";
@@ -31,11 +33,10 @@ interface InitialSetupProps {
 
 type SetupRoute = "local" | "remote";
 
-const PROVIDERS: Array<{ id: AgentProviderId; name: string }> = [
-  { id: "codex", name: "Codex" },
-  { id: "claude", name: "Claude" },
-  { id: "grok", name: "Grok" },
-];
+const PROVIDERS: Array<{ id: AgentProviderId; name: string }> = AGENT_PROVIDERS.map((id) => ({
+  id,
+  name: agentProviderName(id),
+}));
 
 export function InitialSetup(props: InitialSetupProps) {
   const initialInviteUrl = untrack(() => props.inviteUrl?.trim() ?? "");
@@ -223,7 +224,7 @@ export function InitialSetup(props: InitialSetupProps) {
                   </span>
                   <span class="setup-route-copy">
                     <strong>Use this computer</strong>
-                    <small>Run Codex, Claude, or Grok locally. Keep all OpenBot data here.</small>
+                    <small>Run {providerSentence()} locally. Keep all OpenBot data here.</small>
                   </span>
                   <RouteArrow />
                 </Button>
@@ -378,8 +379,13 @@ function RouteArrow() {
   );
 }
 
-function providerName(provider: AgentProviderId | null): "Claude" | "Codex" | "Grok" {
-  if (provider === "claude") return "Claude";
-  if (provider === "grok") return "Grok";
-  return "Codex";
+function providerName(provider: AgentProviderId | null): string {
+  return provider === null ? agentProviderName("codex") : agentProviderName(provider);
+}
+
+/** "ChatGPT, Claude, or Grok", built from the registry so a new provider joins the sentence. */
+function providerSentence(): string {
+  const names = PROVIDERS.map((provider) => provider.name);
+  const last = names[names.length - 1];
+  return names.length < 2 ? (last ?? "") : `${names.slice(0, -1).join(", ")}, or ${last}`;
 }

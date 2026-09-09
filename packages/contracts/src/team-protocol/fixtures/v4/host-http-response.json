@@ -1,0 +1,19 @@
+[
+  {
+    "id": "agent-opencode",
+    "provider": "opencode",
+    "name": "Research copy",
+    "title": "Research lead",
+    "description": "Finds primary sources.",
+    "notifications": true,
+    "model": "opencode/example-model",
+    "reasoningEffort": "medium",
+    "threadId": null,
+    "workspacePath": "/OpenBot/Agents/agent-opencode",
+    "preview": "No messages yet",
+    "updatedAt": null,
+    "avatarSeed": "research",
+    "avatarHue": 215,
+    "avatarUrl": null
+  }
+]

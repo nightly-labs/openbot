@@ -9,12 +9,12 @@ import {
 } from "@openbot/contracts/signal-protocol/messages";
 import {
   decodeTeamProtocolV2AuthFrame,
-  decodeTeamProtocolV2CurrentEvent,
   decodeTeamProtocolV2EventFrame,
   decodeTeamProtocolV2RpcFrame,
-  decodeTeamProtocolV3WebRtcHttpResponse,
+  decodeTeamProtocolV4CurrentEvent,
+  decodeTeamProtocolV4WebRtcHttpResponse,
   encodeTeamProtocolV2Frame,
-  encodeTeamProtocolV3WebRtcHttpRequest,
+  encodeTeamProtocolV4WebRtcHttpRequest,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_PROTOCOL_V2_CHANNELS,
   type TeamProtocolV2AuthFrame,
@@ -607,7 +607,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       } else {
         pending.resolve({
           status: frame.result.status,
-          body: decodeTeamProtocolV3WebRtcHttpResponse(
+          body: decodeTeamProtocolV4WebRtcHttpResponse(
             pending.method,
             pending.path,
             frame.result.status,
@@ -640,7 +640,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       return;
     }
     if (frame.sequence !== state.lastEventSequence + 1) throw new Error("The host event stream has a gap.");
-    const decoded = decodeTeamProtocolV2CurrentEvent(frame);
+    const decoded = decodeTeamProtocolV4CurrentEvent(frame);
     if (decoded.status === "invalid") throw new Error("The host returned a malformed event.");
     state.lastEventSequence = frame.sequence;
     if (decoded.status === "known") await actions.current.onTeamEvent(state.hostId, decoded.event);
@@ -727,7 +727,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
           path,
           body: upload
             ? null
-            : encodeTeamProtocolV3WebRtcHttpRequest(method, path, body, { preserveSemanticTags: true }),
+            : encodeTeamProtocolV4WebRtcHttpRequest(method, path, body, { preserveSemanticTags: true }),
           ...(bodyTransferId ? { bodyTransferId, contentType: upload?.mimeType } : {}),
           capabilities: [...TEAM_CURRENT_CAPABILITIES],
         },

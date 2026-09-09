@@ -349,3 +349,45 @@ it("keeps profile save responses frozen across HTTP and WebRTC adapters", () => 
     currentResponseFixture,
   );
 });
+// v3 delegates every non-duplicate route to v1, and the duplicate route wraps a v1 bot summary.
+// Both halves keep the three-id vocabulary: a fourth provider is v4's, and this is what stops a
+// later change from widening v3 in passing.
+it("freezes the v3 provider vocabulary", () => {
+  const agent = {
+    id: "agent-1",
+    provider: "codex",
+    name: "Chief",
+    title: "Chief of staff",
+    description: "",
+    notifications: true,
+    model: "gpt-5.6-luna",
+    reasoningEffort: "medium",
+    threadId: null,
+    workspacePath: "/Users/dev/OpenBot/Agents/agent-1",
+    preview: "",
+    updatedAt: null,
+    avatarSeed: "first-bot",
+    avatarHue: null,
+    avatarUrl: null,
+  };
+  const layout = { revision: 1, sections: [], order: [], agentAssignments: {}, agentOrder: [] };
+
+  expect(decodeTeamProtocolV3CurrentHttpResponse("GET", "/v1/agents", 200, [agent])).toEqual([agent]);
+  expect(decodeTeamProtocolV3CurrentHttpResponse("POST", duplicatePath, 201, { bot: agent, layout })).toEqual({
+    agent,
+    layout,
+  });
+
+  expect(() =>
+    decodeTeamProtocolV3CurrentHttpResponse("GET", "/v1/agents", 200, [{ ...agent, provider: "opencode" }]),
+  ).toThrow("Invalid Team protocol v1 HTTP response");
+  expect(() =>
+    decodeTeamProtocolV3CurrentHttpResponse("POST", duplicatePath, 201, {
+      bot: { ...agent, provider: "opencode" },
+      layout,
+    }),
+  ).toThrow("Invalid Team protocol v1 HTTP response");
+  expect(() => decodeTeamProtocolV3CurrentHttpRequest("PATCH", "/v1/agents/agent-1", { provider: "opencode" })).toThrow(
+    "Invalid Team protocol v1 HTTP request",
+  );
+});

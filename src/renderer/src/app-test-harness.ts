@@ -33,6 +33,17 @@ function installAnalyticsSpies(): void {
   vi.spyOn(desktopAnalytics, "anonymousScope").mockImplementation(() => ({ track: trackScopedAnalytics }));
 }
 const CONNECTING_STATUS: Record<AgentProviderId, AgentStatus> = {
+  opencode: {
+    phase: "blocked",
+    cliVersion: "1.0.0",
+    auth: { kind: "unknown" },
+    providers: [
+      { id: "opencode", state: "sign-in-required", connectionState: "connecting", version: "1.0.0", message: null },
+    ],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  },
   codex: {
     phase: "blocked",
     cliVersion: "0.149.1",

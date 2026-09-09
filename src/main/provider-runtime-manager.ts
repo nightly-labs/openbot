@@ -1,53 +1,35 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { createReadStream, createWriteStream } from "node:fs";
-import {
-  access,
-  chmod,
-  copyFile,
-  mkdir,
-  readdir,
-  readFile,
-  rename,
-  rm,
-  stat,
-  statfs,
-  writeFile,
-} from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { access, mkdir, readdir, readFile, rename, rm, stat, statfs, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { finished } from "node:stream/promises";
 import { promisify } from "node:util";
-import type { AgentProviderId, ProviderRuntimeSnapshot, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import {
+  MANAGED_RUNTIME_PROVIDERS,
+  type ManagedProviderId,
+  type ProviderRuntimeSnapshot,
+  type ProviderRuntimeStatus,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { redactText } from "@openbot/logging";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
-import { configuredCliPath, parseClaudeVersion, parseCodexVersion, parseGrokVersion } from "../backend/cli";
+import { type BundledProviderExecutables, configuredCliPath } from "../backend/cli";
+import { sha256File } from "./provider-runtime-archive";
+import { providerRuntimeDescriptor, type RuntimeSpec, type RuntimeTarget } from "./provider-runtime-descriptors";
 
 const execFileAsync = promisify(execFile);
-const PROVIDERS = ["codex", "claude", "grok"] as const satisfies readonly AgentProviderId[];
+const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
 const FREE_SPACE_HEADROOM = 100_000_000;
-const MAX_ARCHIVE_LIST_BYTES = 16 * 1024 * 1024;
 const MAX_METADATA_BYTES = 4 * 1024 * 1024;
 
-type RuntimeTarget = "darwin-arm64" | "win32-x64";
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type PartialMetadata = { url: string; etag: string | null; expectedBytes: number };
-type RuntimeSpec = {
-  provider: AgentProviderId;
-  version: string;
-  target: RuntimeTarget;
-  url: string;
-  archiveSha256: string;
-  downloadBytes: number;
-  installedBytes: number;
-  executableName: string;
-};
-
 interface ProviderRuntimeManagerEvents {
   status: [snapshot: ProviderRuntimeSnapshot];
-  ready: [provider: AgentProviderId];
+  ready: [provider: ManagedProviderId];
 }
 
 export interface ProviderRuntimeManagerOptions {
@@ -57,7 +39,7 @@ export interface ProviderRuntimeManagerOptions {
   fetchImpl?: Fetch;
   lock?: AgentRuntimeLock;
   availableDiskBytes?: () => Promise<number>;
-  updateRuntime?: (provider: AgentProviderId, install: () => Promise<string>) => Promise<void>;
+  updateRuntime?: (provider: ManagedProviderId, install: () => Promise<string>) => Promise<void>;
 }
 
 export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerEvents> {
@@ -66,13 +48,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #fetch: Fetch;
   readonly #lock: AgentRuntimeLock;
   readonly #availableDiskBytes: () => Promise<number>;
-  readonly #statuses: Record<AgentProviderId, ProviderRuntimeStatus>;
-  readonly #controllers = new Map<AgentProviderId, AbortController>();
-  readonly #tasks = new Map<AgentProviderId, Promise<void>>();
-  readonly #cancelled = new Set<AgentProviderId>();
+  readonly #statuses: Record<ManagedProviderId, ProviderRuntimeStatus>;
+  readonly #controllers = new Map<ManagedProviderId, AbortController>();
+  readonly #tasks = new Map<ManagedProviderId, Promise<void>>();
+  readonly #cancelled = new Set<ManagedProviderId>();
   /** Versions of provider CLIs the user installed, kept only to compare against the lock. */
-  readonly #systemVersions = new Map<AgentProviderId, string>();
-  readonly #updateRuntime: (provider: AgentProviderId, install: () => Promise<string>) => Promise<void>;
+  readonly #systemVersions = new Map<ManagedProviderId, string>();
+  readonly #updateRuntime: (provider: ManagedProviderId, install: () => Promise<string>) => Promise<void>;
   #revision = 0;
   #stopping = false;
 
@@ -136,7 +118,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * one rather than in the renderer, which must not compare versions at all. Pass `null` when the
    * provider went back to the managed copy or resolved nothing.
    */
-  setSystemVersion(provider: AgentProviderId, version: string | null): void {
+  setSystemVersion(provider: ManagedProviderId, version: string | null): void {
     if ((this.#systemVersions.get(provider) ?? null) === version) return;
     if (version) this.#systemVersions.set(provider, version);
     else this.#systemVersions.delete(provider);
@@ -144,7 +126,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     this.emit("status", this.getStatus());
   }
 
-  executablePath(provider: AgentProviderId): string | null {
+  /** The managed copy of every provider CLI, in the shape the agent service takes. */
+  bundledExecutables(): BundledProviderExecutables {
+    const executables: BundledProviderExecutables = {};
+    for (const provider of PROVIDERS) executables[provider] = this.executablePath(provider);
+    return executables;
+  }
+
+  executablePath(provider: ManagedProviderId): string | null {
     if (!this.#target) return null;
     const spec = runtimeSpec(provider, this.#target, this.#lock);
     return join(
@@ -156,7 +145,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     );
   }
 
-  async download(provider: AgentProviderId): Promise<ProviderRuntimeSnapshot> {
+  async download(provider: ManagedProviderId): Promise<ProviderRuntimeSnapshot> {
     if (!this.#target) throw new Error("Provider runtimes are not available on this platform.");
     if (this.#stopping) throw new Error("OpenBot is closing.");
     if (configuredCliPath(provider))
@@ -188,14 +177,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     return this.getStatus();
   }
 
-  async downloadAndWait(provider: AgentProviderId): Promise<void> {
+  async downloadAndWait(provider: ManagedProviderId): Promise<void> {
     await this.download(provider);
     await this.#tasks.get(provider);
     const status = this.#statuses[provider];
     if (status.phase !== "ready") throw new Error(status.message ?? "The provider update did not complete.");
   }
 
-  async cancel(provider: AgentProviderId): Promise<ProviderRuntimeSnapshot> {
+  async cancel(provider: ManagedProviderId): Promise<ProviderRuntimeSnapshot> {
     if (this.#statuses[provider].phase !== "downloading") return this.getStatus();
     const task = this.#tasks.get(provider);
     this.#cancelled.add(provider);
@@ -213,7 +202,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     await Promise.allSettled(this.#tasks.values());
   }
 
-  async #inspect(provider: AgentProviderId): Promise<void> {
+  async #inspect(provider: ManagedProviderId): Promise<void> {
     if (!this.#target) return;
     const spec = runtimeSpec(provider, this.#target, this.#lock);
     try {
@@ -319,9 +308,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     await mkdir(staging, { recursive: true });
     let committed = false;
     try {
-      if (spec.provider === "codex") await this.#stageCodex(spec, downloadedPath, staging);
-      else if (spec.provider === "claude") await this.#stageClaude(spec, downloadedPath, staging);
-      else await this.#stageGrok(spec, downloadedPath, staging);
+      await providerRuntimeDescriptor(spec.provider).stage({
+        spec,
+        downloadedPath,
+        staging,
+        lock: this.#lock,
+        downloadSmallFile: (url, expectedSha256) => this.#downloadSmallFile(url, expectedSha256),
+      });
       await verifyInstalledRuntime(staging, spec, this.#lock);
       const destination = this.#installRoot(spec);
       await mkdir(dirname(destination), { recursive: true });
@@ -335,86 +328,6 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     } finally {
       await rm(staging, { recursive: true, force: true });
     }
-  }
-
-  async #stageCodex(_spec: RuntimeSpec, archive: string, staging: string): Promise<void> {
-    await assertSafeArchive(archive, "codex");
-    await extractArchive(archive, staging);
-    await rejectNonRegularFiles(staging);
-    const license = await this.#downloadSmallFile(
-      `${this.#lock.codex.repository}/raw/${encodeURIComponent(this.#lock.codex.tag)}/LICENSE`,
-      this.#lock.codex.licenseSha256,
-    );
-    await writeFile(join(staging, "LICENSE"), license);
-  }
-
-  async #stageClaude(spec: RuntimeSpec, archive: string, staging: string): Promise<void> {
-    const extracted = `${staging}.extracted`;
-    await rm(extracted, { recursive: true, force: true });
-    await mkdir(extracted, { recursive: true });
-    try {
-      await assertSafeArchive(archive, "claude");
-      await extractArchive(archive, extracted);
-      await rejectNonRegularFiles(extracted);
-      const packageRoot = join(extracted, "package");
-      const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
-      const artifact = this.#lock.claude.artifacts[spec.target];
-      if (
-        !isDynamicRecord(packageManifest) ||
-        packageManifest.name !== artifact.package ||
-        packageManifest.version !== this.#lock.claude.sdkVersion
-      ) {
-        throw new Error("The Claude package does not match the runtime catalog.");
-      }
-      await mkdir(join(staging, "bin"), { recursive: true });
-      await Promise.all([
-        copyFile(join(packageRoot, artifact.executable), join(staging, "bin", artifact.executable)),
-        copyFile(join(packageRoot, "LICENSE.md"), join(staging, "LICENSE.md")),
-        writeFile(
-          join(staging, "claude-package.json"),
-          `${JSON.stringify({
-            layoutVersion: 1,
-            version: this.#lock.claude.version,
-            sdkVersion: this.#lock.claude.sdkVersion,
-            target: spec.target,
-            executable: `bin/${artifact.executable}`,
-          })}\n`,
-        ),
-      ]);
-      if (spec.target === "darwin-arm64") await chmod(join(staging, "bin", artifact.executable), 0o755);
-    } finally {
-      await rm(extracted, { recursive: true, force: true });
-    }
-  }
-
-  async #stageGrok(spec: RuntimeSpec, binary: string, staging: string): Promise<void> {
-    const rawRepository = this.#lock.grok.repository.replace("github.com", "raw.githubusercontent.com");
-    const [license, notices] = await Promise.all([
-      this.#downloadSmallFile(
-        `${rawRepository}/${this.#lock.grok.sourceCommit}/LICENSE`,
-        this.#lock.grok.licenseSha256,
-      ),
-      this.#downloadSmallFile(
-        `${rawRepository}/${this.#lock.grok.sourceCommit}/THIRD-PARTY-NOTICES`,
-        this.#lock.grok.noticesSha256,
-      ),
-    ]);
-    await mkdir(join(staging, "bin"), { recursive: true });
-    await Promise.all([
-      copyFile(binary, join(staging, "bin", spec.executableName)),
-      writeFile(join(staging, "LICENSE"), license),
-      writeFile(join(staging, "THIRD-PARTY-NOTICES"), notices),
-      writeFile(
-        join(staging, "grok-package.json"),
-        `${JSON.stringify({
-          layoutVersion: 1,
-          version: spec.version,
-          target: spec.target,
-          executable: `bin/${spec.executableName}`,
-        })}\n`,
-      ),
-    ]);
-    if (spec.target === "darwin-arm64") await chmod(join(staging, "bin", spec.executableName), 0o755);
   }
 
   async #downloadSmallFile(url: string, expectedSha256: string): Promise<Uint8Array> {
@@ -445,7 +358,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     if (available < required) throw new Error("There is not enough free disk space for this provider.");
   }
 
-  async #handleDownloadFailure(provider: AgentProviderId, error: unknown): Promise<void> {
+  async #handleDownloadFailure(provider: ManagedProviderId, error: unknown): Promise<void> {
     if (this.#cancelled.has(provider)) return;
     if (this.#stopping && isAbortError(error)) return;
     const message = isAbortError(error)
@@ -461,13 +374,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     });
   }
 
-  #setStatus(provider: AgentProviderId, status: ProviderRuntimeStatus): void {
+  #setStatus(provider: ManagedProviderId, status: ProviderRuntimeStatus): void {
     this.#statuses[provider] = status;
     this.#revision += 1;
     this.emit("status", this.getStatus());
   }
 
-  #providerRoot(provider: AgentProviderId): string {
+  #providerRoot(provider: ManagedProviderId): string {
     return join(this.#root, provider);
   }
 
@@ -535,78 +448,24 @@ function runtimeTarget(platform: NodeJS.Platform, architecture: string): Runtime
   return null;
 }
 
-function runtimeSpec(provider: AgentProviderId, target: RuntimeTarget, lock: AgentRuntimeLock): RuntimeSpec {
-  if (provider === "codex") {
-    const artifact = lock.codex.artifacts[target];
-    return {
-      provider,
-      target,
-      version: lock.codex.version,
-      url: `${lock.codex.repository}/releases/download/${encodeURIComponent(lock.codex.tag)}/${artifact.asset}`,
-      archiveSha256: artifact.assetSha256,
-      downloadBytes: artifact.downloadBytes,
-      installedBytes: artifact.installedBytes,
-      executableName: target === "win32-x64" ? "codex.exe" : "codex",
-    };
-  }
-  if (provider === "claude") {
-    const artifact = lock.claude.artifacts[target];
-    return {
-      provider,
-      target,
-      version: lock.claude.version,
-      url: `${lock.claude.registry}/${artifact.package}/-/${artifact.asset}`,
-      archiveSha256: artifact.assetSha256,
-      downloadBytes: artifact.downloadBytes,
-      installedBytes: artifact.installedBytes,
-      executableName: artifact.executable,
-    };
-  }
-  const artifact = lock.grok.artifacts[target];
-  return {
-    provider,
-    target,
-    version: lock.grok.version,
-    url: `${lock.grok.distribution}/${artifact.asset}`,
-    archiveSha256: artifact.assetSha256,
-    downloadBytes: artifact.downloadBytes,
-    installedBytes: artifact.installedBytes,
-    executableName: artifact.executable,
-  };
+function runtimeSpec(provider: ManagedProviderId, target: RuntimeTarget, lock: AgentRuntimeLock): RuntimeSpec {
+  return providerRuntimeDescriptor(provider).spec(target, lock);
 }
 
+/**
+ * The checks every provider runtime gets: the executable exists, the descriptor's own checksums and
+ * manifest pass, and the installed binary reports the version the lock pinned. The last one is what
+ * catches a CLI that replaced itself after installation.
+ */
 async function verifyInstalledRuntime(root: string, spec: RuntimeSpec, lock: AgentRuntimeLock): Promise<void> {
+  const descriptor = providerRuntimeDescriptor(spec.provider);
   const executable = join(root, "bin", spec.executableName);
   await access(executable);
-  if (spec.provider === "codex") {
-    const manifest = JSON.parse(await readFile(join(root, "codex-package.json"), "utf8"));
-    if (!isDynamicRecord(manifest) || manifest.version !== lock.codex.version) {
-      throw new Error("Unexpected Codex runtime version.");
-    }
-    await Promise.all([
-      access(join(root, "bin", spec.target === "win32-x64" ? "codex-code-mode-host.exe" : "codex-code-mode-host")),
-      access(join(root, "codex-path", spec.target === "win32-x64" ? "rg.exe" : "rg")),
-    ]);
-  } else if (spec.provider === "claude") {
-    const artifact = lock.claude.artifacts[spec.target];
-    if ((await sha256File(executable)) !== artifact.binarySha256) throw new Error("Claude runtime checksum mismatch.");
-    if ((await sha256File(join(root, "LICENSE.md"))) !== lock.claude.licenseSha256) {
-      throw new Error("Claude license checksum mismatch.");
-    }
-  } else {
-    if ((await sha256File(executable)) !== lock.grok.artifacts[spec.target].assetSha256) {
-      throw new Error("Grok runtime checksum mismatch.");
-    }
-    if ((await sha256File(join(root, "LICENSE"))) !== lock.grok.licenseSha256) {
-      throw new Error("Grok license checksum mismatch.");
-    }
-    if ((await sha256File(join(root, "THIRD-PARTY-NOTICES"))) !== lock.grok.noticesSha256) {
-      throw new Error("Grok notices checksum mismatch.");
-    }
-  }
+  await descriptor.verify(root, spec, lock);
   const { stdout } = await execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true });
-  const parseVersion = { codex: parseCodexVersion, claude: parseClaudeVersion, grok: parseGrokVersion }[spec.provider];
-  if (parseVersion(stdout) !== spec.version) throw new Error("Provider runtime returned an unexpected version.");
+  if (descriptor.parseVersion(stdout) !== spec.version) {
+    throw new Error("Provider runtime returned an unexpected version.");
+  }
 }
 
 async function streamResponse(
@@ -715,64 +574,6 @@ async function readSmallResponse(response: Response): Promise<Uint8Array> {
     offset += chunk.byteLength;
   }
   return value;
-}
-
-async function assertSafeArchive(path: string, provider: "codex" | "claude"): Promise<void> {
-  const [{ stdout: namesValue }, { stdout: detailsValue }] = await Promise.all([
-    execFileAsync("tar", ["-tzf", path], { encoding: "utf8", maxBuffer: MAX_ARCHIVE_LIST_BYTES }),
-    execFileAsync("tar", ["-tvzf", path], { encoding: "utf8", maxBuffer: MAX_ARCHIVE_LIST_BYTES }),
-  ]);
-  const names = namesValue.split(/\r?\n/u).filter(Boolean);
-  const details = detailsValue.split(/\r?\n/u).filter(Boolean);
-  if (details.some((line) => !["-", "d"].includes(line.trimStart().charAt(0)))) {
-    throw new Error("The runtime archive contains a link or special file.");
-  }
-  for (const name of names) {
-    if (name.includes("\0") || name.includes("\\")) throw new Error("The runtime archive contains an unsafe path.");
-    const normalized = name.replace(/\/+$/u, "");
-    const parts = normalized.split("/");
-    if (
-      !normalized ||
-      normalized.startsWith("/") ||
-      /^[A-Za-z]:/u.test(normalized) ||
-      parts.some((part) => !part || part === "." || part === "..")
-    ) {
-      throw new Error("The runtime archive contains an unsafe path.");
-    }
-    if (provider === "claude" && parts[0] !== "package") throw new Error("The Claude archive has an unexpected path.");
-    if (
-      provider === "codex" &&
-      !["bin", "codex-package.json", "codex-path", "codex-resources"].includes(parts[0] ?? "")
-    ) {
-      throw new Error("The Codex archive has an unexpected path.");
-    }
-  }
-}
-
-async function extractArchive(archive: string, destination: string): Promise<void> {
-  await execFileAsync("tar", ["-xzf", archive, "-C", destination, "--no-same-owner"], {
-    encoding: "utf8",
-    maxBuffer: MAX_ARCHIVE_LIST_BYTES,
-  });
-}
-
-async function rejectNonRegularFiles(root: string): Promise<void> {
-  const entries = await readdir(root, { withFileTypes: true });
-  await Promise.all(
-    entries.map(async (entry) => {
-      const path = join(root, entry.name);
-      if (entry.isSymbolicLink() || (!entry.isFile() && !entry.isDirectory())) {
-        throw new Error("The runtime contains a link or special file.");
-      }
-      if (entry.isDirectory()) await rejectNonRegularFiles(path);
-    }),
-  );
-}
-
-async function sha256File(path: string): Promise<string> {
-  const hash = createHash("sha256");
-  for await (const chunk of createReadStream(path)) hash.update(chunk);
-  return hash.digest("hex");
 }
 
 async function fileSize(path: string): Promise<number> {

@@ -1,3 +1,4 @@
+import { decodeTeamProtocolV4CurrentHttpRequest } from "@openbot/contracts/team-protocol/v4-adapter";
 // Reading a Team API request: the parsers, the validators and the capability filters that every
 // route module needs and none of them owns.
 //
@@ -16,6 +17,7 @@ import {
   type CreateAgentInput,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   isAgentModel,
+  isAgentProvider,
   isAvatarHue,
   isAvatarSeed,
   isReasoningEffort,
@@ -175,6 +177,10 @@ export async function readJson(request: IncomingMessage): Promise<DynamicRecord>
   }
   try {
     const value = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    if (requestProtocol(request) === 4)
+      return decodeTeamProtocolV4CurrentHttpRequest(request.method ?? "GET", request.url ?? "/", value, {
+        preserveSemanticTags: supportsTeamSemanticTags(requestCapabilities(request)),
+      });
     return requestProtocol(request) === TEAM_PROTOCOL_V3
       ? decodeTeamProtocolV3CurrentHttpRequest(request.method ?? "GET", request.url ?? "/", value, {
           preserveSemanticTags: supportsTeamSemanticTags(requestCapabilities(request)),
@@ -319,7 +325,7 @@ export function agentUpdate(value: DynamicRecord, agentId: string): UpdateAgentI
     result.notifications = value.notifications;
   }
   if (value.provider !== undefined) {
-    if (value.provider !== "codex" && value.provider !== "claude" && value.provider !== "grok") {
+    if (!isAgentProvider(value.provider)) {
       throw new HttpError(400, "provider is invalid.");
     }
     result.provider = value.provider;

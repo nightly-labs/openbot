@@ -28,6 +28,7 @@ import type { TeamStore } from "../team-store";
 
 type TeamApiAgentMethods = Pick<
   AgentService,
+  | "preferredProvider"
   | "getStatus"
   | "getRuntimeSnapshot"
   | "getUsage"

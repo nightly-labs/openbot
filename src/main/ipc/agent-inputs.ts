@@ -12,6 +12,7 @@ import {
   type ImportAttachmentsInput,
   type InterruptTurnInput,
   isAgentModel,
+  isAgentProvider,
   isAvatarHue,
   isAvatarSeed,
   isMessageReaction,
@@ -338,7 +339,7 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
     result.notifications = value.notifications;
   }
   if (value.provider !== undefined) {
-    if (value.provider !== "codex" && value.provider !== "claude" && value.provider !== "grok") {
+    if (!isAgentProvider(value.provider)) {
       throw new Error("Invalid agent provider.");
     }
     result.provider = value.provider;
