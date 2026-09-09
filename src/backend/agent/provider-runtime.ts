@@ -853,15 +853,19 @@ export class ProviderRuntime implements ProviderPort {
     }
     let cli: AgentCliInfo | null = null;
     this.#setProviderConnectionState(provider, "connecting");
+    this.#replacingCli.add(provider);
     try {
       cli = await this.#resolveProviderCli(provider);
       const candidate = await this.#createAuthenticatedProviderClient(provider, cli);
-      await this.#activateProviderClient(provider, candidate.client, cli, candidate.account);
+      await this.#activateProviderClient(provider, candidate.client, cli, candidate.account, { notifyReady: false });
       this.#clearProviderConnectionState(provider);
       return this.status();
     } catch (error) {
       this.#setProviderConnectionFailure(provider, error, cli?.version);
       throw error;
+    } finally {
+      this.#replacingCli.delete(provider);
+      this.#hooks.onProviderResumed(provider);
     }
   }
 

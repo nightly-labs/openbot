@@ -15,7 +15,7 @@ export function encodeTeamProtocolV4WebRtcHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ) {
-  if (method === "GET" || method === "DELETE")
+  if (method === "GET" || method === "DELETE" || isRoutineTestRequest(method, path))
     return encodeTeamProtocolV3WebRtcHttpRequest(method, path, value, options);
   return decodeTeamProtocolV2Json(
     JSON.parse(encodeTeamProtocolV4CurrentHttpRequest(method, path, value ?? {}, options)),
@@ -27,7 +27,7 @@ export function decodeTeamProtocolV4WebRtcHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ) {
-  if (method === "GET" || method === "DELETE")
+  if (method === "GET" || method === "DELETE" || isRoutineTestRequest(method, path))
     return decodeTeamProtocolV3WebRtcHttpRequest(method, path, value, options);
   return decodeTeamProtocolV2Json(decodeTeamProtocolV4CurrentHttpRequest(method, path, value ?? {}, options));
 }
@@ -38,11 +38,13 @@ export function encodeTeamProtocolV4WebRtcHttpResponse(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ) {
+  if (status === 204) return {};
   return decodeTeamProtocolV2Json(
     JSON.parse(encodeTeamProtocolV4CurrentHttpResponse(method, path, status, value ?? null, options)),
   );
 }
 export function decodeTeamProtocolV4WebRtcHttpResponse(method: string, path: string, status: number, value: unknown) {
+  if (status === 204) return {};
   return decodeTeamProtocolV2Json(decodeTeamProtocolV4CurrentHttpResponse(method, path, status, value ?? null));
 }
 export function createTeamProtocolV4Event(
@@ -62,4 +64,11 @@ export function decodeTeamProtocolV4CurrentEvent(frame: TeamProtocolV2EventFrame
   if (decoded.kind === "invalid" && !(isDynamicRecord(frame.payload) && isString(frame.payload.type)))
     return { status: "unknown" as const };
   return decoded.kind === "known" ? { status: "known" as const, event: decoded.event } : { status: decoded.kind };
+}
+
+function isRoutineTestRequest(method: string, path: string): boolean {
+  return (
+    method === "POST" &&
+    /^\/v1\/agents\/[^/]+\/routines\/[^/]+\/test$/u.test(new URL(path, "http://openbot.invalid").pathname)
+  );
 }

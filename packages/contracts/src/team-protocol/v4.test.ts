@@ -12,7 +12,10 @@ import { decodeTeamProtocolV4BaseCurrentEvent, encodeTeamProtocolV4BaseCurrentEv
 import {
   createTeamProtocolV4Event,
   decodeTeamProtocolV4CurrentEvent,
+  decodeTeamProtocolV4WebRtcHttpRequest,
+  decodeTeamProtocolV4WebRtcHttpResponse,
   encodeTeamProtocolV4WebRtcHttpRequest,
+  encodeTeamProtocolV4WebRtcHttpResponse,
 } from "./v4-webrtc-adapter";
 
 describe("Team protocol v4", () => {
@@ -39,3 +42,25 @@ describe("Team protocol v4", () => {
     });
   });
 });
+
+it.each([encodeTeamProtocolV4WebRtcHttpResponse, decodeTeamProtocolV4WebRtcHttpResponse])(
+  "%s accepts successful bodyless deletion responses",
+  (adapt) => {
+    for (const path of [
+      "/v1/agents/agent-1",
+      "/v1/agents/agent-1/memories/memory-1",
+      "/v1/agents/agent-1/routines/routine-1",
+    ]) {
+      expect(adapt("DELETE", path, 204, undefined)).toEqual({});
+    }
+  },
+);
+
+it.each([encodeTeamProtocolV4WebRtcHttpRequest, decodeTeamProtocolV4WebRtcHttpRequest])(
+  "%s preserves bodyless manual routine runs",
+  (adapt) => {
+    for (const body of [undefined, null, {}]) {
+      expect(adapt("POST", "/v1/agents/agent-1/routines/routine-1/test", body)).toEqual({});
+    }
+  },
+);
