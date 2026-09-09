@@ -58,7 +58,8 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "list_sections",
-    description: "List sidebar sections (folders), their stable ids, and agent assignments before grouping agents.",
+    description:
+      "List sidebar sections (folders), their stable ids, and agent assignments before choosing message recipients or grouping agents.",
     shape: {},
   },
   {
