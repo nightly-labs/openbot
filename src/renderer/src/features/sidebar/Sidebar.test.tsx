@@ -714,6 +714,32 @@ describe("Sidebar sections", () => {
     expect(props.onMutateLayout).toHaveBeenCalledWith({ type: "rename", sectionId: demoId, name: "Core" });
   });
 
+  it.each(["agent", "section"] as const)("focuses Delete and cancels %s deletion", async (kind) => {
+    const props = sidebarProps();
+    render(() => <Sidebar {...props} layout={sectionLayout()} />);
+    const name = kind === "agent" ? /Chief/ : "Demo";
+    const menuName = kind === "agent" ? "Agent actions" : "Section actions";
+    const actionName = kind === "agent" ? "Delete agent" : "Delete";
+
+    for (const cancelWithEscape of [true, false]) {
+      await fireEvent.contextMenu(screen.getByRole("button", { name }));
+      const menu = await screen.findByRole("menu", { name: menuName });
+      const action = within(menu).getByRole("menuitem", { name: actionName });
+      action.focus();
+      await fireEvent.keyDown(action, { key: "Enter" });
+      const dialog = await screen.findByRole("alertdialog");
+      await waitFor(() => expect(within(dialog).getByRole("button", { name: "Delete" })).toHaveFocus());
+      expect(props.onDeleteAgent).not.toHaveBeenCalled();
+      expect(props.onMutateLayout).not.toHaveBeenCalled();
+
+      if (cancelWithEscape) await fireEvent.keyDown(dialog, { key: "Escape" });
+      else await fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+      expect(props.onDeleteAgent).not.toHaveBeenCalled();
+      expect(props.onMutateLayout).not.toHaveBeenCalled();
+    }
+  });
+
   it("confirms section deletion and moves system sections through shared actions", async () => {
     const props = sidebarProps();
     render(() => <Sidebar {...props} layout={sectionLayout()} />);
