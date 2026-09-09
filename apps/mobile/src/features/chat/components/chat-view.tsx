@@ -1,10 +1,12 @@
+import { userErrorMessage } from "@openbot/user-errors";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import * as Haptics from "expo-haptics";
 import { router, useIsFocused } from "expo-router";
+import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ArrowDown } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AccessibilityInfo, Alert, AppState, Keyboard, View } from "react-native";
+import { AccessibilityInfo, AppState, Keyboard, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { KeyboardGestureArea, KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -59,6 +61,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     "background",
   ]);
   const [draft, setDraft] = useState("");
+  const [sendError, setSendError] = useState<{ agentId: string; message: string } | null>(null);
   const [sending, setSending] = useState(false);
   const [sendRetryVersion, setSendRetryVersion] = useState(0);
   const [composerGestureHeight, setComposerGestureHeight] = useState(0);
@@ -189,6 +192,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     const body = value.trim();
     if (!body && attachments.items.length === 0) return;
 
+    setSendError(null);
     motion.beginSend();
     Keyboard.dismiss();
 
@@ -233,17 +237,20 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
         setMessageAliases((current) => new Map(current).set(serverId, localId));
         setPendingMessage((current) => (current?.message.id === localId ? { ...current, serverId } : current));
         attachments.clear();
-      } catch {
+      } catch (error) {
         motion.cancelSend();
         setPendingMessage((current) => (current?.message.id === localId ? null : current));
         setDraft((current) => (current ? `${body}\n${current}` : body));
         // Only discard drafts created by this attempt. Keep the local files and text for retry.
         await Promise.allSettled(uploaded.map((id) => discardAttachment(agent.id, id)));
         setSendRetryVersion((version) => version + 1);
-        Alert.alert(
-          "Message not sent",
-          "Your text and attachments are still here. Check the connection and try again.",
-        );
+        setSendError({
+          agentId: agent.id,
+          message: userErrorMessage(
+            error,
+            "Could not send the message. Check the conversation before you send it again.",
+          ),
+        });
       } finally {
         sendingRef.current = false;
         setSending(false);
@@ -329,6 +336,11 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
               </View>
             ) : null}
             <ConnectionStatus server={server} />
+            {sendError?.agentId === agent.id ? (
+              <Typography.Paragraph accessibilityRole="alert" className="bg-background px-4 py-2 text-danger">
+                {sendError.message}
+              </Typography.Paragraph>
+            ) : null}
             <ChatComposer
               sendRetryVersion={sendRetryVersion}
               mentionAgents={agents.filter(

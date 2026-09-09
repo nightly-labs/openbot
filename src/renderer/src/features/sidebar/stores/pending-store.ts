@@ -1,3 +1,4 @@
+import { errorMessage } from "../../../error-message";
 /**
  * The two changes the sidebar can have half-made: a delete confirmation waiting on the user, and an
  * open section-name editor. Both live in one store because only one of each can exist, and because
@@ -94,7 +95,7 @@ export function createSidebarPendingStore(deps: {
     setPending((state) => {
       if (!state.deletion) return;
       state.deletion.deleting = false;
-      state.deletion.error = cause instanceof Error ? cause.message : String(cause);
+      state.deletion.error = errorMessage(cause, "Could not delete this item. Try again.");
     });
   }
 
@@ -214,7 +215,7 @@ export function createSidebarPendingStore(deps: {
     } catch (error) {
       setPending((state) => {
         if (!state.sectionEditor) return;
-        state.sectionEditor.error = error instanceof Error ? error.message : String(error);
+        state.sectionEditor.error = errorMessage(error, "Could not save this section. Try again.");
         state.sectionEditor.saving = false;
       });
       focusSectionName();

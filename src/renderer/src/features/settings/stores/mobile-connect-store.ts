@@ -1,5 +1,6 @@
 import type { MobileConnectedDevice, MobileConnectTicket } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, createStore, onCleanup } from "solid-js";
+import { errorMessage } from "../../../error-message";
 
 const MOBILE_CONNECT_SUCCESS_FEEDBACK_MS = 900;
 const MOBILE_CONNECT_COLLAPSE_MS = 240;
@@ -150,7 +151,7 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
     } catch (error) {
       setPanels((state) => {
         state.connect.session = null;
-        state.connect.error = error instanceof Error ? error.message : "Could not generate a Mobile Connect code.";
+        state.connect.error = errorMessage(error, "Could not generate a Mobile Connect code.");
       });
     } finally {
       setPanels((state) => {
@@ -182,7 +183,7 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
     } catch (error) {
       if (revision !== devicesRequestRevision) return null;
       setPanels((state) => {
-        state.devices.error = error instanceof Error ? error.message : "Could not load connected devices.";
+        state.devices.error = errorMessage(error, "Could not load connected devices.");
       });
       return null;
     } finally {
@@ -255,7 +256,7 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
       });
     } catch (error) {
       setPanels((state) => {
-        state.devices.error = error instanceof Error ? error.message : "Could not disconnect this device.";
+        state.devices.error = errorMessage(error, "Could not disconnect this device.");
       });
     } finally {
       setPanels((state) => {

@@ -29,6 +29,7 @@ import {
   watchRemoteDirectory,
 } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { useQueryClient } from "@tanstack/react-query";
 import { fetch } from "expo/fetch";
 import * as Crypto from "expo-crypto";
@@ -216,7 +217,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         } catch (error) {
           if (generation !== directoryGeneration.current) return;
           setServerDirectoryState("error");
-          setServerDirectoryError(error instanceof Error ? error.message : "The server directory is unavailable.");
+          setServerDirectoryError(errorMessage(error, "The server directory is unavailable."));
           throw error;
         }
       }),

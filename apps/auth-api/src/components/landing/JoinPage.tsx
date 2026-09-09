@@ -50,7 +50,11 @@ export function JoinPage() {
 
         <Show
           when={!invalid()}
-          fallback={<p class="join-card-error">This invitation link is invalid or incomplete.</p>}
+          fallback={
+            <p class="join-card-error">
+              This invitation link is invalid or incomplete. Ask the host for a new invitation.
+            </p>
+          }
         >
           <div class="join-card-actions">
             <Show

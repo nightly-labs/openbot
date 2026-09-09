@@ -2,6 +2,7 @@ import { desktopAnalytics } from "../../analytics";
 import { toAgentProfile, withoutAgent } from "../../app-message-projection";
 import { createStoredProfile } from "../../app-stored-values";
 import { toast } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 import { useNavigation } from "../../navigation";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
@@ -83,7 +84,7 @@ const AgentActions = createSimpleContext({
         analytics.track("agent_action", { action: "create", result: "succeeded", ...(properties ?? {}) });
       } catch (error) {
         analytics.track("agent_action", { action: "create", result: "failed", failure_code: "create_failed" });
-        setAgentSetupError(error instanceof Error ? error.message : "The agent could not be created.");
+        setAgentSetupError(errorMessage(error, "The agent could not be created."));
       } finally {
         setCreatingAgent(false);
       }
@@ -117,7 +118,7 @@ const AgentActions = createSimpleContext({
           ...(properties ?? {}),
         });
         toast.error("Could not duplicate agent", {
-          description: error instanceof Error ? error.message : String(error),
+          description: errorMessage(error, "Could not duplicate this agent. Try again."),
         });
         throw error;
       } finally {

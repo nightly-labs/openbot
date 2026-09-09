@@ -20,6 +20,7 @@
     "@openbot/brand": "workspace:*",
     "@openbot/contracts": "workspace:*",
     "@openbot/team-client": "workspace:*",
+    "@openbot/user-errors": "workspace:*",
     "@react-native-masked-view/masked-view": "0.3.2",
     "@speed-highlight/core": "catalog:",
     "@tanstack/react-query": "^5.102.8",

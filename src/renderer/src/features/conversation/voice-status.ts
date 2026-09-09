@@ -1,3 +1,4 @@
+import { errorMessage } from "../../error-message";
 export type VoicePhase = "idle" | "preparing" | "requesting" | "recording" | "transcribing";
 
 export function voiceButtonLabel(phase: VoicePhase) {
@@ -23,5 +24,5 @@ export function voiceCaptureError(error: unknown) {
 }
 
 export function voiceTranscriptionError(error: unknown): string {
-  return error instanceof Error ? error.message : "OpenBot could not transcribe this recording.";
+  return errorMessage(error, "OpenBot could not transcribe this recording.");
 }

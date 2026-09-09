@@ -1,6 +1,7 @@
 import { VOICE_AUDIO_LIMITS } from "@openbot/contracts/ipc";
 import { onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
+import { errorMessage } from "../../../error-message";
 import { appendVoiceTranscript, recordingToWav } from "../../../voice-recording";
 import { EMPTY_DRAFT } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
@@ -78,7 +79,10 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       if (modelStatus.phase !== "ready") {
         deps.setVoicePhase("idle");
         deps.setVoiceModelProgress(null);
-        deps.setConversationError(target, modelStatus.message ?? "Could not prepare the voice model.");
+        deps.setConversationError(
+          target,
+          errorMessage(modelStatus.message, "Could not prepare the voice model. Try again."),
+        );
         return;
       }
       if (!deps.viewIsMounted()) {

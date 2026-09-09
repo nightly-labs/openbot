@@ -1,3 +1,4 @@
+import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { Link, router } from "expo-router";
@@ -28,7 +29,7 @@ export function useAgentContextMenu(agent: MobileAgent) {
     } catch (error) {
       Alert.alert(
         action === "delete" ? "Could not delete agent" : "Could not duplicate agent",
-        error instanceof Error ? error.message : "The server could not complete this action. Please try again.",
+        errorMessage(error, "The server could not complete this action. Please try again."),
       );
     } finally {
       actionPending.current = false;

@@ -35,6 +35,7 @@ import {
   Upload,
   X,
 } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { routineScheduleSummary } from "../conversation/routine-schedule-ui";
 import { CATEGORY_LABELS, MarketplaceCatalog } from "./MarketplaceCatalog";
@@ -1313,8 +1314,7 @@ function avatarImageDataUrl(image: AvatarImageInput): string {
 }
 
 function marketplaceErrorMessage(cause: unknown): string {
-  const rawMessage = cause instanceof Error ? cause.message : String(cause);
-  const message = rawMessage.replace(/^Error invoking remote method '[^']+': (?:Error: )?/u, "");
+  const message = errorMessage(cause, "Could not complete the marketplace action. Try again.");
   if (message === "A skill with this name already exists.") {
     return "That skill name is already taken. Choose a different name in SKILL.md, then try again.";
   }

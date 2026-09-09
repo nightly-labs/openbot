@@ -16,6 +16,7 @@
         "@openbot/contracts": "workspace:*",
         "@openbot/logging": "workspace:*",
         "@openbot/team-client": "workspace:*",
+        "@openbot/user-errors": "workspace:*",
         "@openpanel/web": "catalog:",
         "@solidjs/signals": "catalog:",
         "@solidjs/web": "catalog:",
@@ -106,6 +107,7 @@
         "@openbot/brand": "workspace:*",
         "@openbot/contracts": "workspace:*",
         "@openbot/team-client": "workspace:*",
+        "@openbot/user-errors": "workspace:*",
         "@react-native-masked-view/masked-view": "0.3.2",
         "@speed-highlight/core": "catalog:",
         "@tanstack/react-query": "^5.102.8",
@@ -231,6 +233,18 @@
       },
       "devDependencies": {
         "typescript": "catalog:",
+      },
+    },
+    "packages/user-errors": {
+      "name": "@openbot/user-errors",
+      "version": "0.0.0",
+      "dependencies": {
+        "@openbot/logging": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
       },
     },
     "remote/api": {
@@ -817,6 +831,8 @@
     "@openbot/site-router": ["@openbot/site-router@workspace:apps/site-router"],
 
     "@openbot/team-client": ["@openbot/team-client@workspace:packages/team-client"],
+
+    "@openbot/user-errors": ["@openbot/user-errors@workspace:packages/user-errors"],
 
     "@openpanel/sdk": ["@openpanel/sdk@1.3.1", "", {}, "sha512-mQ5xaBUGXnyRg3qYxwnbVaUYyW7w8u+munrWk/ClnqxEeR2j+FYPiA6noHbHMCFC2aZutYD5OoRzEvw3FBNFxw=="],
 

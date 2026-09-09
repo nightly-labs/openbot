@@ -2,6 +2,7 @@ import type { DynamicIslandAction } from "@openbot/contracts/ipc";
 import { createEffect, onSettled } from "solid-js";
 import { withoutAgent } from "../../app-message-projection";
 import { toast } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useTurns } from "../../turns";
@@ -121,7 +122,7 @@ export function DynamicIslandBridge() {
     return window.openbot.dynamicIsland.onAction((action) => {
       void handleDynamicIslandAction(action).catch((error) => {
         toast.error("Could not open this remote item", {
-          description: error instanceof Error ? error.message : String(error),
+          description: errorMessage(error, "Could not open this item. Try again."),
         });
       });
     });
