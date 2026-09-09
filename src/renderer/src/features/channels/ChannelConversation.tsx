@@ -737,7 +737,6 @@ export function ChannelConversation() {
                         title={channels.state.editing === "settings" ? "Channel settings" : "Tasks"}
                         onClose={closePanel}
                         closeLabel="Close channel panel"
-                        closeIcon={<X />}
                       />
                       <SettingsPanelContent>
                         <Show

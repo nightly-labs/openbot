@@ -22,7 +22,6 @@ import {
   ItemTitle,
   Plus,
   Textarea,
-  X,
 } from "../src/components/ui";
 import { ChannelMemberRow } from "../src/features/channels/ChannelMemberRow";
 import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel";
@@ -131,7 +130,7 @@ function ChannelPanelStory(props: { title: string; body: () => ReturnType<typeof
   return (
     <main class="conversation-panel agent-memories-story-stage" style="--settings-panel-width: 296px">
       <SettingsPanel id="channel-side-panel" label="Channel panel" width={296} maxWidth={640} onResize={fn()}>
-        <SettingsPanelHeader title={props.title} onClose={fn()} closeLabel="Close channel panel" closeIcon={<X />} />
+        <SettingsPanelHeader title={props.title} onClose={fn()} closeLabel="Close channel panel" />
         {props.body()}
       </SettingsPanel>
     </main>

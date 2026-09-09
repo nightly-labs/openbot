@@ -1082,10 +1082,6 @@
   font-size: var(--openbot-text-sm);
 }
 
-.settings-back-icon {
-  transform: translateX(-0.5px);
-}
-
 .agent-settings-avatar-picker {
   position: relative;
   z-index: 30;

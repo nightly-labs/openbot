@@ -40,7 +40,6 @@ import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
-import { BackIcon, SettingsForwardIcon } from "./ConversationIcons";
 import { agentMemoriesPort } from "./memories-port";
 import { agentRoutinesPort } from "./routines-port";
 
@@ -445,10 +444,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           title="Settings"
           onBack={props.onClose}
           backLabel="Back to details"
-          backIcon={<BackIcon />}
           onClose={props.onClose}
           closeLabel="Close details"
-          closeIcon={<SettingsForwardIcon />}
         />
       </Show>
       <Show when={!draft.routines.open}>

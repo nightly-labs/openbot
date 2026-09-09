@@ -3,9 +3,9 @@ import type { RoutineFields, RoutineRunFields, RoutineSchedule } from "@openbot/
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
 import { createScrollFades } from "../../components/createScrollFades";
+import { SettingsBackIcon, SettingsForwardIcon } from "../../components/SettingsPanel";
 import { Button, CirclePause, Clock3, Dialog, Input, Plus, Switch, Textarea } from "../../components/ui";
 import { errorMessage } from "../../error-message";
-import { BackIcon, SettingsForwardIcon } from "./ConversationIcons";
 import { RoutineRunHistory } from "./RoutineRunHistory";
 import { RoutineScheduleEditor } from "./RoutineScheduleEditor";
 import { defaultRoutineSchedule, routineScheduleSummary } from "./routine-schedule-ui";
@@ -324,7 +324,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
           disabled={Boolean(draft() && saving())}
           onClick={() => (draft() ? requestExit("list") : props.onBack?.())}
         >
-          <BackIcon />
+          <SettingsBackIcon />
         </Button>
         <div class="agent-routines-heading">
           <h2>{draft() ? "Routine" : "Routines"}</h2>

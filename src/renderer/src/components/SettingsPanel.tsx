@@ -61,14 +61,33 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
   );
 }
 
+/**
+ * The two glyphs the panel header uses. They live here, and not with the caller, because a header
+ * button that reads one way in the agent panel and another way in the channel panel is the drift
+ * this module exists to stop: the panel closes the same way whichever chat opened it.
+ */
+export function SettingsBackIcon(): JSX.Element {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 settings-back-icon fill-none stroke-current">
+      <path d="m12.5 4-6 6 6 6" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  );
+}
+
+export function SettingsForwardIcon(): JSX.Element {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 settings-forward-icon fill-none stroke-current">
+      <path d="m5.5 4 6 6-6 6m5-12 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  );
+}
+
 export interface SettingsPanelHeaderProps {
   title: JSX.Element;
   onBack?: () => void;
   backLabel?: string;
-  backIcon?: JSX.Element;
   onClose: () => void;
   closeLabel: string;
-  closeIcon: JSX.Element;
 }
 
 /**
@@ -87,7 +106,7 @@ export function SettingsPanelHeader(props: SettingsPanelHeaderProps): JSX.Elemen
           aria-label={props.backLabel ?? "Back"}
           onClick={() => props.onBack?.()}
         >
-          {props.backIcon}
+          <SettingsBackIcon />
         </Button>
       </Show>
       <h2>{props.title}</h2>
@@ -98,7 +117,7 @@ export function SettingsPanelHeader(props: SettingsPanelHeaderProps): JSX.Elemen
         aria-label={props.closeLabel}
         onClick={() => props.onClose()}
       >
-        {props.closeIcon}
+        <SettingsForwardIcon />
       </Button>
     </header>
   );

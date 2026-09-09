@@ -87,6 +87,11 @@
   color: var(--openbot-text-primary);
 }
 
+/* The chevron reads a hair right of centre in its box, so it is nudged back onto the axis. */
+.settings-back-icon {
+  transform: translateX(-0.5px);
+}
+
 .settings-panel-content {
   min-height: 0;
   overflow-y: auto;
