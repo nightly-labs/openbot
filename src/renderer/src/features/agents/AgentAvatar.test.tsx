@@ -8,12 +8,15 @@ import { AgentAvatar } from "./AgentAvatar";
 
 function playback() {
   const samples = new Map<BotEngine, number[]>();
+  const frames = new Map<BotEngine, ReturnType<BotEngine["sample"]>>();
   const sample = BotEngine.prototype.sample;
   vi.spyOn(BotEngine.prototype, "sample").mockImplementation(function (this: BotEngine, time) {
     const times = samples.get(this) ?? [];
     times.push(time);
     samples.set(this, times);
-    return sample.call(this, time);
+    const frame = sample.call(this, time);
+    frames.set(this, frame);
+    return frame;
   });
   let nextId = 0;
   const callbacks = new Map<number, FrameRequestCallback>();
@@ -24,6 +27,7 @@ function playback() {
   vi.stubGlobal("cancelAnimationFrame", (id: number) => callbacks.delete(id));
   return {
     samples,
+    frames,
     callbacks,
     frame(time: number) {
       const pending = [...callbacks.values()];
@@ -128,6 +132,58 @@ describe("AgentAvatar playback", () => {
     for (const times of clock.samples.values()) {
       expect(times.at(-1)).toBeCloseTo(1.28);
     }
+  });
+
+  it("keeps distinct working poses and cycle positions after simultaneous activity changes", () => {
+    const clock = playback();
+    const [state, setState] = createStore({ working: false });
+    const idle = [makeBlock("idle")];
+    const working = [makeBlock("orbit")];
+    const elapsedByPhase = new Map<number, number>();
+    render(() => (
+      <For each={[0.2, 0.9]}>
+        {(phase) => (
+          <BloubBot
+            cycle={state.working ? working : idle}
+            playing
+            initialPhase={phase}
+            onElapsedChange={(elapsed) => elapsedByPhase.set(phase, elapsed)}
+          />
+        )}
+      </For>
+    ));
+    flush();
+    clock.frame(1000);
+    clock.frame(1040);
+    const before = [...clock.frames.values()].map((frame) => frame.bodyPath);
+    setState((draft) => {
+      draft.working = true;
+    });
+    flush();
+    clock.frame(1040);
+    expect([...clock.frames.values()].map((frame) => frame.bodyPath)).toEqual(before);
+    const positions = [...elapsedByPhase.values()];
+    for (let frame = 1; frame <= 20; frame += 1) clock.frame(1040 + frame * 40);
+    const arcs = [...clock.frames.values()].flatMap((frame) => frame.arcs.slice(0, 1).map((arc) => arc.front));
+    expect(arcs).toHaveLength(2);
+    expect(new Set(arcs).size).toBe(2);
+    expect(positions[0]).toBeCloseTo(0.2);
+    expect(positions[1]).toBeCloseTo(0.9);
+    const workingPoses = [...clock.frames.values()].map((frame) => frame.bodyPath);
+    setState((draft) => {
+      draft.working = false;
+    });
+    flush();
+    clock.frame(1840);
+    expect([...clock.frames.values()].map((frame) => frame.bodyPath)).toEqual(workingPoses);
+    clock.frame(1880);
+    const midTransition = [...clock.frames.values()].map((frame) => frame.bodyPath);
+    setState((draft) => {
+      draft.working = true;
+    });
+    flush();
+    clock.frame(1880);
+    expect([...clock.frames.values()].map((frame) => frame.bodyPath)).toEqual(midTransition);
   });
 
   it("keeps reduced-motion avatars static and stops playback when the preference changes", () => {
