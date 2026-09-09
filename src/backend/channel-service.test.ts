@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
@@ -17,6 +17,7 @@ const actor = { id: "human-1", name: "Alex" };
 const changed = vi.fn();
 const schedule = vi.fn();
 const interrupt = vi.fn(async () => undefined);
+const busy = vi.fn((_agentId: string) => false);
 const generate = vi.fn(async () => JSON.stringify({ agentId: "agent-a" }));
 let count = 0;
 const operationId = () => `command-${++count}`;
@@ -37,13 +38,15 @@ beforeEach(async () => {
   generate.mockClear();
   schedule.mockClear();
   interrupt.mockClear();
+  busy.mockReset();
+  busy.mockReturnValue(false);
   changed.mockClear();
   service = new ChannelService(data.store.database, data.mailbox, {
     agents: () => data.store.list(),
     generate,
     schedule,
     interrupt,
-    busy: () => false,
+    busy,
     changed,
     error: (error) => {
       throw error;
@@ -1424,8 +1427,8 @@ describe("shared channel coordination", () => {
       required(service.store.messages("channel-1").find((item) => item.id === parent.requestMessageId)).message;
     const committed = required(request().attachments?.[0]);
     const text = request().text;
-    // The first dispatch turns the draft into an attachment, so the reference in the request now
-    // names the committed file.
+    // The send turns the draft into an attachment, so the reference in the request now names the
+    // committed file.
     expect(text).toContain(committed.id);
     const deliveryId = required(service.store.assignments("channel-1")[0]?.deliveryId);
     await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
@@ -1494,6 +1497,42 @@ describe("shared channel coordination", () => {
       required(service.store.messages("channel-1").find((item) => item.id === task.requestMessageId)).message
         .attachments,
     ).toHaveLength(1);
+  });
+
+  it("sends the files of a request that was still queued at a restart", async () => {
+    const file = join(root, "brief.txt");
+    await writeFile(file, "the brief");
+    const attachment = required((await data.mailbox.prepareAttachments([file]))[0]);
+    // No member is free, so the request waits. This is the normal state of a busy channel.
+    busy.mockReturnValue(true);
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: `Prepare the report ${serializeAttachmentReference(attachment.name, attachment.id)}`,
+        recipientAgentId: "agent-a",
+        replyToMessageId: null,
+        attachmentDraftIds: [attachment.id],
+      },
+      actor,
+    );
+    expect(service.store.assignments("channel-1")).toHaveLength(0);
+    // The restart. It clears every draft and deletes the uploaded files, so only a copy the send
+    // committed can still reach the member.
+    await data.mailbox.initialize();
+    busy.mockReturnValue(false);
+    service.wake("channel-1");
+    await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
+    const deliveryId = required(service.store.assignments("channel-1")[0]?.deliveryId);
+    const delivery = required(data.mailbox.getDelivery(deliveryId)).delivery;
+    expect(delivery.attachments.map((item) => item.name)).toEqual([attachment.name]);
+    const request = required(service.store.messages("channel-1").find((item) => item.author.kind === "member")).message;
+    const stored = required(await data.mailbox.resolveAttachment(required(request.attachments?.[0]).id));
+    expect(await readFile(stored.path, "utf8")).toBe("the brief");
+    // The reference in the text follows the file, or the member reads the name of a file it has no
+    // way to open.
+    expect(request.text).toContain(required(request.attachments?.[0]).id);
   });
 
   it("holds a transferred task and its resource until the previous owner stops", async () => {

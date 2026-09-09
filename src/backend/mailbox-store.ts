@@ -300,6 +300,65 @@ export class MailboxStore {
     return this.#receipt(messageId);
   }
 
+  /**
+   * Commits the uploads of one channel request before any member holds it. A channel dispatches
+   * when a member is free, which can be after a restart, and a restart clears every draft and its
+   * files. The files therefore become a channel-owned message here, with no delivery: the request
+   * keeps durable references, every later dispatch re-sends the stored copies, and the files leave
+   * with the channel through `deleteChannelData`.
+   */
+  async commitChannelAttachments(input: {
+    channelId: string;
+    messageId: string;
+    text: string;
+    draftIds: string[];
+  }): Promise<{ text: string; attachments: AttachmentSummary[] }> {
+    const ids = new Set(input.draftIds);
+    if (ids.size !== input.draftIds.length) throw new Error("Duplicate attachment drafts.");
+    const drafts = input.draftIds.map((id) => {
+      const draft = this.#state.drafts.find((candidate) => candidate.id === id);
+      if (!draft) throw new Error(`Attachment draft no longer exists: ${id}`);
+      return draft;
+    });
+    if (drafts.length > MAX_ATTACHMENTS) throw new Error(`Attach at most ${MAX_ATTACHMENTS} files.`);
+    const sender: StoredMessage["sender"] = { kind: "user" };
+    const createdAt = new Date().toISOString();
+    const attachments = await this.#files.commitMessageTransfer(
+      input.messageId,
+      sender,
+      [],
+      input.messageId,
+      createdAt,
+      drafts.map((draft) => draft.path),
+    );
+    const committedByDraftId = new Map(drafts.map((draft, index) => [draft.id, attachments[index]] as const));
+    const message: StoredMessage = {
+      channelId: input.channelId,
+      id: input.messageId,
+      sender,
+      text: rewriteAttachmentReferences(input.text, (reference) => {
+        const attachment = committedByDraftId.get(reference.attachmentId);
+        return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
+      }),
+      attachments,
+      replyToMessageId: null,
+      createdAt,
+    };
+    this.#state.messages.push(message);
+    this.#state.drafts = this.#state.drafts.filter((draft) => !ids.has(draft.id));
+    try {
+      await this.#persist("channel.attachments-committed", `mailbox:channel-attachments:${input.messageId}`);
+    } catch (error) {
+      this.#state.messages = this.#state.messages.filter((candidate) => candidate !== message);
+      for (const draft of drafts)
+        if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) this.#state.drafts.push(draft);
+      await this.#files.remove(this.#files.transferRoot(input.messageId));
+      throw error;
+    }
+    await this.#files.removeAttachmentDirectories(drafts.map((draft) => draft.path));
+    return { text: message.text, attachments: attachments.map(toAttachmentSummary) };
+  }
+
   listQueue(agentId: string): QueueSnapshot {
     const channelMessageIds = new Set(
       this.#state.messages.filter((message) => message.channelId).map((message) => message.id),

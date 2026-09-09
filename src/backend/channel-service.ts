@@ -265,9 +265,23 @@ export class ChannelService {
             ownerAgentId: command.recipientAgentId ?? previous.ownerAgentId,
           }
         : this.newTask(channel.id, id, command.text, command.recipientAgentId);
-      task.attachmentDraftIds = command.attachmentDraftIds;
       const message = this.message(channel.id, task.id, { kind: "member", ...actor }, command.text, id);
       message.message.replyToMessageId = command.replyToMessageId;
+      // The files are committed here, not at the dispatch: a channel dispatches when a member is
+      // free, which can be after a restart, and a restart clears every draft with its files. The
+      // request would then hold ids that resolve to nothing, and no retry could bring the upload
+      // back. Committed, the request carries durable references that every dispatch re-sends.
+      if (command.attachmentDraftIds.length) {
+        const committed = await this.mailbox.commitChannelAttachments({
+          channelId: channel.id,
+          messageId: id,
+          text: command.text,
+          draftIds: command.attachmentDraftIds,
+        });
+        message.message.text = committed.text;
+        message.message.attachments = committed.attachments;
+        task.instruction = committed.text;
+      }
       const affected = previous ? descendants(allTasks, previous.id) : [];
       const stopped = affected
         .filter((item) => item.id !== task.id)
@@ -298,7 +312,7 @@ export class ChannelService {
           channel.id,
           affected.filter((item) => item.id !== previous.id),
         );
-        if (!(await this.steer(channel.id, task))) await this.interruptTasks(channel.id, [previous]);
+        if (!(await this.steer(channel.id, task, message))) await this.interruptTasks(channel.id, [previous]);
       }
       this.wake(channel.id);
       return result;
@@ -631,9 +645,9 @@ export class ChannelService {
       };
       this.store.update(channel, { assignments: [assignment] });
       // The request message belongs to the task that the request created, not to a child task that
-      // only inherits the id. `committing` is the single dispatch that turns the drafts of that
-      // request into attachments, and the only one allowed to rewrite the stored request: enqueue
-      // rewrites its draft references to attachment ids. Any later dispatch of the same request -
+      // only inherits the id. A send commits its uploads before it is accepted, so `committing`
+      // now only serves a task an earlier version queued with its drafts still open: it turns
+      // those drafts into attachments and rewrites the stored request. Every other dispatch -
       // a resume, or a hand-off to another task - re-sends the committed copies instead.
       const request = this.store.messages(channelId).find((message) => message.id === task.requestMessageId);
       const ownsRequest = request?.taskId === task.id;
@@ -917,7 +931,11 @@ export class ChannelService {
     if (!channelId) return false;
     const assignments = this.store.assignments(channelId);
     const name = this.hooks.agents().find((agent) => agent.id === snapshot.agentId)?.name ?? "Former member";
-    const existing = this.store.messages(channelId);
+    // Indexed once, not per message: a streaming turn calls this for every delta, and the thread
+    // holds every message of the whole conversation. A read of the task table and two scans of the
+    // channel history for each of them made one capture cost the square of the transcript.
+    const tasks = new Map(this.store.tasks(channelId).map((task) => [task.id, task] as const));
+    const existing = new Map(this.store.messages(channelId).map((message) => [message.id, message] as const));
     const messages: ChannelMessage[] = [];
     for (const message of snapshot.messages) {
       if (
@@ -930,16 +948,10 @@ export class ChannelService {
         assignments.find((item) => item.turnId === message.turnId) ??
         assignments.find((item) => item.agentId === snapshot.agentId && activeAssignment(item));
       if (!assignment) continue;
-      const task = this.store.tasks(channelId).find((item) => item.id === assignment.taskId);
-      if (
-        existing.some(
-          (item) =>
-            item.id === `channel-result-${assignment.id}-revision-${assignment.taskRevision}` &&
-            item.message.text === message.text,
-        )
-      )
-        continue;
-      const original = existing.find((item) => item.id === message.id);
+      const task = tasks.get(assignment.taskId);
+      const result = existing.get(`channel-result-${assignment.id}-revision-${assignment.taskRevision}`);
+      if (result?.message.text === message.text) continue;
+      const original = existing.get(message.id);
       const messageId =
         original?.superseded && task?.revision === assignment.taskRevision
           ? `${message.id}-revision-${task.revision}`
@@ -955,7 +967,7 @@ export class ChannelService {
           task?.revision !== assignment.taskRevision || (messageId === message.id && original?.superseded === true),
         message,
       };
-      const previous = existing.find((item) => item.id === value.id);
+      const previous = existing.get(value.id);
       if (
         !previous ||
         JSON.stringify(previous.message) !== JSON.stringify(value.message) ||
@@ -1205,8 +1217,10 @@ export class ChannelService {
     };
   }
 
-  private async steer(channelId: string, task: ChannelTask): Promise<boolean> {
-    if (!this.hooks.steer || task.attachmentDraftIds.length) return false;
+  private async steer(channelId: string, task: ChannelTask, request: ChannelMessage): Promise<boolean> {
+    // A steer carries text into a turn that is already running, and nothing else. A request with
+    // files therefore has to stay a delivery, or the member would never receive the upload.
+    if (!this.hooks.steer || request.message.attachments?.length) return false;
     const assignment = this.store
       .assignments(channelId)
       .find(
