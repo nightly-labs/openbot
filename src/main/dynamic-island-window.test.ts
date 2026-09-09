@@ -181,7 +181,8 @@ describe("dynamic island window geometry", () => {
 
     controller.setInteractive(43, true);
     expect(windows[0]?.setFocusable).not.toHaveBeenCalledWith(true);
-    expect(windows[1]?.setFocusable).toHaveBeenCalledWith(true);
+    expect(windows[1]?.setFocusable).not.toHaveBeenCalledWith(true);
+    expect(windows[1]?.setIgnoreMouseEvents).toHaveBeenLastCalledWith(false, { forward: true });
     expect(windows[1]?.setBounds).toHaveBeenCalledWith({ x: 2165, y: -120, width: 614, height: 380 }, false);
 
     displays = [
@@ -200,9 +201,13 @@ describe("dynamic island window geometry", () => {
     // renderer's collapse animation has landed - otherwise the lower half is cut off at once.
     vi.useFakeTimers();
     controller.setInteractive(43, false);
+    expect(windows[1]?.setIgnoreMouseEvents).toHaveBeenLastCalledWith(true, { forward: true });
     expect(windows[1]?.setBounds).not.toHaveBeenCalledWith({ x: 1793, y: 20, width: 614, height: 50 }, false);
     await vi.advanceTimersByTimeAsync(DYNAMIC_ISLAND_COLLAPSE_SETTLE_MS);
     expect(windows[1]?.setBounds).toHaveBeenCalledWith({ x: 1793, y: 20, width: 614, height: 50 }, false);
+    controller.setInteractive(43, true);
+    expect(windows[1]?.setFocusable).not.toHaveBeenCalledWith(true);
+    expect(windows[1]?.setIgnoreMouseEvents).toHaveBeenLastCalledWith(false, { forward: true });
   });
 
   it("publishes updated geometry without reloading an existing overlay", async () => {
