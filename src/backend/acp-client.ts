@@ -57,6 +57,7 @@ interface AcpTurn {
   text: string;
   thought: string;
   thoughtStarted: boolean;
+  receivedOutput: boolean;
   messages: ThreadItem[];
   task: Promise<void>;
 }
@@ -454,6 +455,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       text: "",
       thought: "",
       thoughtStarted: false,
+      receivedOutput: false,
       messages: [],
       task: Promise.resolve(),
     };
@@ -474,6 +476,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           method: "openbot/usage",
           params: { threadId: thread.id, turnId: turn.id, usage: response.usage },
         });
+      // OpenCode can swallow provider errors and report a successful, empty ACP turn.
+      // Do not invent the upstream cause or report that turn as a successful reply.
+      if (this.provider === "opencode" && response.stopReason === "end_turn" && !turn.receivedOutput) {
+        this.#completeTurn(
+          thread,
+          turn,
+          "failed",
+          "OpenCode returned no response. Check the selected model's sign-in and billing in OpenCode, then retry or choose another model.",
+        );
+        return;
+      }
       const status =
         response.stopReason === "cancelled"
           ? "interrupted"
@@ -494,6 +507,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (!turn) return;
     if (update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {
       if (update.content.text) this.#completeThought(thread, turn);
+      if (update.content.text.trim()) turn.receivedOutput = true;
       turn.text += update.content.text;
       return;
     }
@@ -520,6 +534,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
+      turn.receivedOutput = true;
       if (update.sessionUpdate === "tool_call") this.#completeMessage(thread, turn, "commentary");
       this.emit("notification", {
         method: update.status === "completed" || update.status === "failed" ? "item/completed" : "item/started",

@@ -74,6 +74,58 @@ describe.sequential("GrokAgentClient", () => {
     );
   });
 
+  it.each([
+    ["empty", "failed"],
+    ["whitespace", "failed"],
+    ["thought", "failed"],
+    ["tools", "completed"],
+    ["answer", "completed"],
+    ["cancel", "interrupted"],
+  ])("handles OpenCode %s turns and allows a retry in the same session", async (mode, status) => {
+    process.env.OPENBOT_FAKE_GROK_MODE = `opencode-${mode}`;
+    client = new AcpAgentClient({ executable, version: "1.3.13" }, 5_000, {
+      provider: "opencode",
+      argv: ["acp"],
+      env: {},
+      signInMessage: "Connect OpenCode.",
+    });
+    const notifications: AppServerNotification[] = [];
+    client.on("notification", (event) => notifications.push(event));
+    client.start();
+    const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
+    await client.request(
+      "turn/start",
+      { threadId: thread.id, input: [{ type: "text", text: "Answer" }] },
+      decodeTurnResponse,
+    );
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+    expect(notifications.find((event) => event.method === "turn/completed")?.params).toMatchObject({
+      turn: { status },
+    });
+    const errors = notifications.filter((event) => event.method === "error");
+    if (status === "failed")
+      expect(errors).toEqual([
+        expect.objectContaining({
+          params: expect.objectContaining({
+            threadId: thread.id,
+            message:
+              "OpenCode returned no response. Check the selected model's sign-in and billing in OpenCode, then retry or choose another model.",
+          }),
+        }),
+      ]);
+    else expect(errors).toEqual([]);
+    notifications.length = 0;
+    await client.request(
+      "turn/start",
+      { threadId: thread.id, input: [{ type: "text", text: "Retry" }] },
+      decodeTurnResponse,
+    );
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+    const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
+    expect(history.thread.turns?.map((turn) => turn.status)).toEqual([status, "completed"]);
+    expect(history.thread.turns?.[1]?.items).toContainEqual(expect.objectContaining({ text: "Reply after retry." }));
+  });
+
   it("uses external sign-in for OpenCode and creates its ACP process", async () => {
     const driver = requireProviderDriver("opencode");
     expect(driver.signIn).toEqual({ kind: "external" });
@@ -773,6 +825,21 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     return;
   }
   if (message.method === "session/prompt") {
+    if (mode.startsWith("opencode-")) {
+      promptCounter += 1;
+      const update = promptCounter > 1
+        ? { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Reply after retry." } }
+        : mode === "opencode-tools"
+          ? { sessionUpdate: "tool_call", toolCallId: "read-1", title: "Read files", status: "completed" }
+          : mode === "opencode-thought"
+            ? { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "Thinking." } }
+            : mode === "opencode-whitespace" || mode === "opencode-answer"
+              ? { sessionUpdate: "agent_message_chunk", content: { type: "text", text: mode === "opencode-answer" ? "Answer." : "   " } }
+              : null;
+      if (update) write({ method: "session/update", params: { sessionId: message.params.sessionId, update } });
+      write({ id: message.id, result: { stopReason: promptCounter === 1 && mode === "opencode-cancel" ? "cancelled" : "end_turn" } });
+      return;
+    }
     if (["end_turn", "cancelled", "max_tokens"].includes(mode)) {
       const updates = [
         { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "Planning inspection." } },
