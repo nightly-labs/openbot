@@ -5,6 +5,12 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Stop offering a pinned provider CLI version to an install the user made themselves, whose own
+  updater decides what version it can reach. Such a provider keeps an Update CLI action in its row,
+  and every update the user starts now reports its outcome.
+
 ## [0.6.1] - 2026-09-08
 
 ### Fixed
