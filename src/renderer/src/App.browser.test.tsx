@@ -1066,6 +1066,86 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith({ visible: false });
   });
 
+  describe.each(["workspace", "shared"] as const)("%s file preview errors", (source) => {
+    const filename = "email1_body.txt";
+    const path = source === "workspace" ? `/tmp/OpenBot/Agents/chief/${filename}` : `/tmp/OpenBot/Shared/${filename}`;
+    const linkName = `Open ${source} file ${filename}`;
+    const missingError = new Error(
+      `Error invoking remote method 'agent:preview-${source}-file': Error: ENOENT: no such file or directory, realpath '${path}'`,
+    );
+    const missingMessage = `“${filename}” was not found. Ask the agent to create or restore the file, then click the link again.`;
+    const preview = {
+      name: filename,
+      size: 13,
+      mimeType: "text/plain",
+      previewKind: "text" as const,
+      bytes: new TextEncoder().encode("Approved body"),
+    };
+    const previewMock = () =>
+      source === "workspace"
+        ? vi.mocked(window.openbot.agent.previewWorkspaceFile)
+        : vi.mocked(window.openbot.agent.previewSharedFile);
+
+    beforeEach(() => {
+      vi.mocked(window.openbot.agent.readConversation).mockImplementation(async (agentId) => ({
+        agentId,
+        threadId: agentId === "chief" ? "thread-chief" : null,
+        activeTurnId: null,
+        revision: 1,
+        messages:
+          agentId === "chief"
+            ? [
+                {
+                  id: "missing-template",
+                  author: "assistant",
+                  text: `Please provide [${filename}](${path}).`,
+                  createdAt: "2026-08-24T12:16:00.000Z",
+                  status: "completed",
+                },
+              ]
+            : [],
+        readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },
+      }));
+    });
+
+    it("explains a missing file and clears the error when preview is retried", async () => {
+      const retry = Promise.withResolvers<typeof preview>();
+      previewMock().mockRejectedValueOnce(missingError).mockReturnValueOnce(retry.promise);
+      render(() => <App />);
+      await fireEvent.click(await screen.findByRole("button", { name: linkName }));
+      expect(await screen.findByRole("alert")).toHaveTextContent(missingMessage);
+      await fireEvent.click(screen.getByRole("button", { name: linkName }));
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      retry.resolve(preview);
+      expect(await screen.findByText("Approved body")).toBeInTheDocument();
+    });
+
+    it("shows a safe message for other preview failures", async () => {
+      previewMock().mockRejectedValueOnce(new Error(`EACCES: permission denied, open '${path}'`));
+      render(() => <App />);
+      await fireEvent.click(await screen.findByRole("button", { name: linkName }));
+      expect(await screen.findByRole("alert")).toHaveTextContent(`Could not preview “${filename}”. Try again.`);
+    });
+
+    it.each(["another preview", "another agent"])("ignores a late failure after opening %s", async (next) => {
+      const pending = Promise.withResolvers<typeof preview>();
+      previewMock().mockReturnValueOnce(pending.promise).mockResolvedValueOnce(preview);
+      render(() => <App />);
+      await fireEvent.click(await screen.findByRole("button", { name: linkName }));
+      if (next === "another preview") {
+        await fireEvent.click(screen.getByRole("button", { name: linkName }));
+        await screen.findByText("Approved body");
+      } else {
+        await fireEvent.click(screen.getByRole("button", { name: /^Sales Outbound/ }));
+        await screen.findByRole("heading", { name: "Sales Outbound" });
+      }
+      pending.reject(missingError);
+      await pending.promise.catch(() => {});
+      flush();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+  });
+
   it("opens workspace Markdown in the right sidebar and keeps external opening explicit", async () => {
     const workspacePath = "/tmp/OpenBot/Agents/chief/recipe-tomato-basil-pasta.md";
     const sharedPath = "/tmp/OpenBot/Shared/menu.txt";
