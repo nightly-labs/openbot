@@ -17,6 +17,7 @@ function authFailureCode(value: string | undefined): string {
     case "code_recently_sent":
     case "email_delivery_failed":
     case "email_delivery_not_configured":
+    case "email_delivery_rate_limited":
     case "email_sign_in_failed":
     case "email_sign_in_start_failed":
     case "invalid_email":

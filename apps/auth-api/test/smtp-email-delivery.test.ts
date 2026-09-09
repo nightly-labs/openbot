@@ -486,6 +486,149 @@ describe("Private Email SMTP delivery", () => {
     expect(attempts).toBe(1);
   });
 
+  it("reports a spent sender quota as a rate-limited delivery", async () => {
+    let attempts = 0;
+    const warnings: unknown[][] = [];
+    const warn = vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+      warnings.push(args);
+    });
+    const responses = [
+      ...SUCCESS_RESPONSES.split("\r\n").slice(0, 8),
+      "554 5.7.1 <person@example.com>: Data command rejected: Reject: too many messages from sender in last 60 minutes",
+    ].join("\r\n");
+    const connector: SmtpConnector = () => {
+      attempts += 1;
+      return {
+        opened: Promise.resolve(),
+        readable: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(`${responses}\r\n`));
+            controller.close();
+          },
+        }),
+        writable: new WritableStream(),
+        close() {},
+      };
+    };
+
+    try {
+      await expect(
+        sendPrivateEmailCode(
+          {
+            host: "mail.privateemail.com",
+            port: 465,
+            username: "hello@openbot.run",
+            password: "app-password-value",
+            from: "hello@openbot.run",
+          },
+          {
+            email: "person@example.com",
+            code: "ABCD-EFGH",
+            expiresAt: Date.now() + 10 * 60_000,
+          },
+          connector,
+        ),
+      ).rejects.toThrow("email_delivery_rate_limited");
+    } finally {
+      warn.mockRestore();
+    }
+
+    expect(attempts).toBe(1);
+    expect(JSON.stringify(warnings)).not.toContain("person@example.com");
+  });
+
+  it("reports any temporary refusal as a rate-limited delivery", async () => {
+    let attempts = 0;
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const connector: SmtpConnector = () => {
+      attempts += 1;
+      return {
+        opened: Promise.resolve(),
+        readable: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("421 4.7.0 Service unavailable\r\n"));
+            controller.close();
+          },
+        }),
+        writable: new WritableStream(),
+        close() {},
+      };
+    };
+
+    try {
+      await expect(
+        sendPrivateEmailCode(
+          {
+            host: "mail.privateemail.com",
+            port: 465,
+            username: "hello@openbot.run",
+            password: "app-password-value",
+            from: "hello@openbot.run",
+          },
+          {
+            email: "person@example.com",
+            code: "ABCD-EFGH",
+            expiresAt: Date.now() + 10 * 60_000,
+          },
+          connector,
+        ),
+      ).rejects.toThrow("email_delivery_rate_limited");
+    } finally {
+      warn.mockRestore();
+    }
+
+    expect(attempts).toBe(1);
+  });
+
+  it("keeps a recipient mailbox refusal a delivery failure", async () => {
+    const responses = [...SUCCESS_RESPONSES.split("\r\n").slice(0, 7), "552 5.2.2 Mailbox quota exceeded"].join("\r\n");
+    const connector: SmtpConnector = () => ({
+      opened: Promise.resolve(),
+      readable: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(`${responses}\r\n`));
+          controller.close();
+        },
+      }),
+      writable: new WritableStream(),
+      close() {},
+    });
+
+    await expect(
+      sendPrivateEmailCode(
+        {
+          host: "mail.privateemail.com",
+          port: 465,
+          username: "hello@openbot.run",
+          password: "app-password-value",
+          from: "hello@openbot.run",
+        },
+        {
+          email: "person@example.com",
+          code: "ABCD-EFGH",
+          expiresAt: Date.now() + 10 * 60_000,
+        },
+        connector,
+      ),
+    ).rejects.toThrow("smtp_recipient_failed");
+  });
+
+  it("reports a rate-limited delivery webhook apart from other webhook failures", async () => {
+    const fetchCall = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 429 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }));
+    const delivery = createEmailCodeDelivery({ EMAIL_DELIVERY_WEBHOOK_URL: "https://mail.example.test/send" });
+    const message = { email: "person@example.com", code: "ABCD-EFGH", expiresAt: Date.now() + 10 * 60_000 };
+
+    try {
+      await expect(delivery?.send(message)).rejects.toThrow("email_delivery_rate_limited");
+      await expect(delivery?.send(message)).rejects.toThrow("email_delivery_webhook_failed");
+    } finally {
+      fetchCall.mockRestore();
+    }
+  });
+
   it("rejects partial SMTP configuration", () => {
     expect(() =>
       createEmailCodeDelivery({
