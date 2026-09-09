@@ -165,6 +165,25 @@ export class ChannelStore {
     ).map((row) => decodeAssignment(JSON.parse(requiredStringColumn(row, "assignment_json"))));
   }
 
+  /**
+   * Does any channel hold an assignment in one of these states?
+   *
+   * `mayDrain` asks this on every normal queue check, and it only needs a yes or a no. Walking the
+   * channel list to reach it parses every stored message of every channel to build summaries that
+   * nothing there reads, so the question is answered by one query over the assignment rows.
+   */
+  hasAssignmentInState(states: readonly ChannelAssignment["state"][]): boolean {
+    if (!states.length) return false;
+    const placeholders = states.map(() => "?").join(", ");
+    return (
+      this.database.connection
+        .prepare(
+          `SELECT 1 FROM projection_channel_assignments WHERE json_extract(assignment_json, '$.state') IN (${placeholders}) LIMIT 1`,
+        )
+        .get(...states) !== undefined
+    );
+  }
+
   assignmentForDelivery(deliveryId: string): ChannelAssignment | null {
     const row = databaseRow(
       this.database.connection

@@ -704,7 +704,7 @@ export class ChannelService {
   mayDrain(agentId: string): boolean {
     const next = this.mailbox.nextQueued(agentId);
     if (next && this.store.assignmentForDelivery(next.delivery.id)) return true;
-    return !this.store.list("local").some((channel) => this.store.assignments(channel.id).some(activeAssignment));
+    return !this.store.hasAssignmentInState(ACTIVE_ASSIGNMENT_STATES);
   }
 
   deliveryFailed(deliveryId: string, reason: string): void {
@@ -1404,8 +1404,10 @@ export class ChannelService {
 function terminal(task: ChannelTask): boolean {
   return task.state === "completed" || task.state === "cancelled";
 }
+/** The states in which an assignment still holds the host. */
+const ACTIVE_ASSIGNMENT_STATES: readonly ChannelAssignment["state"][] = ["starting", "running", "queued"];
 function activeAssignment(assignment: ChannelAssignment): boolean {
-  return assignment.state === "starting" || assignment.state === "running" || assignment.state === "queued";
+  return ACTIVE_ASSIGNMENT_STATES.includes(assignment.state);
 }
 function descendants(tasks: ChannelTask[], id: string): ChannelTask[] {
   const selected = new Set([id]);
