@@ -1,5 +1,5 @@
-import { createContext, type PropsWithChildren, useCallback, useContext, useMemo, useState } from "react";
-import { View } from "react-native";
+import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { BackHandler, View } from "react-native";
 import { BloubLoader } from "@/shared/components/bloub-loader";
 
 interface AppLoadingOverlayContextValue {
@@ -29,15 +29,28 @@ export function AppLoadingOverlayProvider({ children }: PropsWithChildren) {
   }, []);
   const value = useMemo(() => ({ setLoadingLabel, isLoaderPresent: present }), [present, setLoadingLabel]);
 
+  useEffect(() => {
+    if (!present) return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => true);
+    return () => subscription.remove();
+  }, [present]);
+
   return (
     <AppLoadingOverlayContext.Provider value={value}>
       <View className="flex-1">
-        {children}
+        <View
+          className="flex-1"
+          pointerEvents={present ? "none" : "auto"}
+          accessibilityElementsHidden={present}
+          importantForAccessibility={present ? "no-hide-descendants" : "auto"}
+        >
+          {children}
+        </View>
         <View
           className="absolute inset-0 items-center justify-center"
-          pointerEvents="none"
-          accessibilityElementsHidden={!visible}
-          importantForAccessibility={visible ? "auto" : "no-hide-descendants"}
+          pointerEvents={present ? "auto" : "none"}
+          accessibilityElementsHidden={!present}
+          importantForAccessibility={present ? "auto" : "no-hide-descendants"}
         >
           {/* Keep the native SVG mounted across account loading and workspace navigation. */}
           <BloubLoader

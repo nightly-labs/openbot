@@ -345,6 +345,53 @@ describe("Sidebar sections", () => {
     };
   }
 
+  it.each([0, 1, 3])("keeps a newly created empty section visible with %i agents", async (count) => {
+    const props = sidebarProps();
+    const [agents, setAgents] = createSignal(STORY_AGENTS.slice(0, count));
+    const [layout, setLayout] = createSignal(defaultSidebarLayout());
+    render(() => (
+      <Sidebar
+        {...props}
+        agents={agents()}
+        people={[]}
+        layout={layout()}
+        onMutateLayout={async () => {
+          setLayout({
+            ...defaultSidebarLayout(),
+            sections: [{ id: emptyId, name: "Product" }],
+            order: ["people", "unassigned", emptyId],
+          });
+        }}
+        emptyAction={{
+          label: "Create your first agent",
+          avatarSeed: "first-bot",
+          avatarHue: null,
+          onSelect: props.onCreateAgent,
+        }}
+      />
+    ));
+
+    await fireEvent.contextMenu(screen.getByLabelText("Sidebar free area"));
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New section" }), { button: 0 });
+    const input = await screen.findByRole("textbox", { name: "New section name" });
+    await fireEvent.input(input, { target: { value: "Product" } });
+    await fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: "New section name" })).not.toBeInTheDocument());
+    expect(screen.getByRole("region", { name: "Product" })).toBeInTheDocument();
+
+    setAgents([]);
+    await fireEvent.click(await screen.findByRole("button", { name: "Create your first agent" }));
+    expect(props.onCreateAgent).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Product" })).toBeInTheDocument();
+
+    const search = screen.getByRole("searchbox", { name: "Search chats" });
+    await fireEvent.input(search, { target: { value: "missing" } });
+    expect(screen.queryByRole("region", { name: "Product" })).not.toBeInTheDocument();
+    expect(screen.getByText("No matches")).toBeInTheDocument();
+    await fireEvent.input(search, { target: { value: "" } });
+    expect(screen.getByRole("button", { name: "Product" })).toBeInTheDocument();
+  });
+
   function multiSectionLayout() {
     return {
       revision: 1,
@@ -672,9 +719,9 @@ describe("Sidebar sections", () => {
     expect(screen.getByRole("button", { name: "Demo" })).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("creates and renames sections inline, with duplicate-name validation", async () => {
+  it.each([0, 3])("creates and renames sections inline with %i agents and duplicate-name validation", async (count) => {
     const props = sidebarProps();
-    render(() => <Sidebar {...props} layout={sectionLayout()} />);
+    render(() => <Sidebar {...props} agents={STORY_AGENTS.slice(0, count)} people={[]} layout={sectionLayout()} />);
 
     await fireEvent.contextMenu(screen.getByLabelText("Sidebar free area"));
     const sidebarMenu = await screen.findByRole("menu", { name: "Sidebar actions" });
@@ -714,9 +761,35 @@ describe("Sidebar sections", () => {
     expect(props.onMutateLayout).toHaveBeenCalledWith({ type: "rename", sectionId: demoId, name: "Core" });
   });
 
-  it("confirms section deletion and moves system sections through shared actions", async () => {
+  it.each(["agent", "section"] as const)("focuses Delete and cancels %s deletion", async (kind) => {
     const props = sidebarProps();
     render(() => <Sidebar {...props} layout={sectionLayout()} />);
+    const name = kind === "agent" ? /Chief/ : "Demo";
+    const menuName = kind === "agent" ? "Agent actions" : "Section actions";
+    const actionName = kind === "agent" ? "Delete agent" : "Delete";
+
+    for (const cancelWithEscape of [true, false]) {
+      await fireEvent.contextMenu(screen.getByRole("button", { name }));
+      const menu = await screen.findByRole("menu", { name: menuName });
+      const action = within(menu).getByRole("menuitem", { name: actionName });
+      action.focus();
+      await fireEvent.keyDown(action, { key: "Enter" });
+      const dialog = await screen.findByRole("alertdialog");
+      await waitFor(() => expect(within(dialog).getByRole("button", { name: "Delete" })).toHaveFocus());
+      expect(props.onDeleteAgent).not.toHaveBeenCalled();
+      expect(props.onMutateLayout).not.toHaveBeenCalled();
+
+      if (cancelWithEscape) await fireEvent.keyDown(dialog, { key: "Escape" });
+      else await fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+      expect(props.onDeleteAgent).not.toHaveBeenCalled();
+      expect(props.onMutateLayout).not.toHaveBeenCalled();
+    }
+  });
+
+  it.each([0, 3])("deletes sections with %i agents and moves system sections", async (count) => {
+    const props = sidebarProps();
+    render(() => <Sidebar {...props} agents={STORY_AGENTS.slice(0, count)} layout={sectionLayout()} />);
 
     // A failed delete keeps the confirmation open to say why, and that message must not still be
     // waiting there the next time the user opens it.
