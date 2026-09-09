@@ -82,7 +82,19 @@ export interface ChannelPage {
 }
 
 export type ChannelCommand =
-  | { type: "save"; operationId: string; channelId: string; draft: ChannelDraft }
+  | {
+      type: "save";
+      operationId: string;
+      channelId: string;
+      draft: ChannelDraft;
+      /**
+       * The save edits a channel that the sender has open. A save without it creates the channel
+       * when its id is unknown, which is how a channel is made, and how every released client
+       * still saves. Settings save on every field and a save can arrive after a deletion, so the
+       * settings panel sets this and the service refuses to bring the channel back.
+       */
+      update?: boolean;
+    }
   | { type: "restore"; operationId: string; channelId: string }
   | { type: "archive"; operationId: string; channelId: string }
   | {
@@ -292,7 +304,8 @@ export function parseChannelCommand(value: unknown): ChannelCommand {
     throw new Error("Provide a valid channel command.");
   const common = { operationId: value.operationId, channelId: value.channelId };
   const draft = normalizeChannelDraft(value.draft);
-  if (value.type === "save" && isChannelDraft(draft)) return { ...common, type: value.type, draft };
+  if (value.type === "save" && isChannelDraft(draft))
+    return { ...common, type: value.type, draft, ...(value.update === true ? { update: true } : {}) };
   if (value.type === "archive" || value.type === "restore") return { ...common, type: value.type };
   if (value.type === "read" && sequence(value.throughSequence))
     return { ...common, type: value.type, throughSequence: value.throughSequence };

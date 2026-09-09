@@ -284,6 +284,26 @@ export class RoutineStore {
     ).map((row) => this.#run(row));
   }
 
+  /**
+   * The failed runs of one owner that name one of these handles. A retry restarts the work under
+   * the request the run already holds, so a run a failure settled has to be reconciled again with
+   * it, or the history keeps a failure the reader has answered.
+   */
+  protected failedRunRowsForHandles(ownerId: string, handles: readonly string[]): OwnedRoutineRun[] {
+    if (!handles.length) return [];
+    return rows(
+      this.database.connection
+        .prepare(
+          `SELECT ${this.runColumns}
+           FROM ${this.tables.runTable}
+           WHERE ${this.tables.ownerColumn} = ? AND status = 'failed'
+             AND ${this.tables.handleColumn} IN (${handles.map(() => "?").join(", ")})
+           ORDER BY created_at, run_id`,
+        )
+        .all(ownerId, ...handles),
+    ).map((row) => this.#run(row));
+  }
+
   /** The owners that still have an unfinished run, so a boot reconcile can visit only those. */
   protected ownersWithOpenRuns(): string[] {
     return rows(

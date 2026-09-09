@@ -151,7 +151,13 @@ export function ChannelEditor(props: ChannelEditorProps) {
               };
         patch?.(draft);
         sent = { channelId: targetId, draft };
-        return channels.command({ type: "save", operationId: crypto.randomUUID(), channelId: targetId, draft });
+        return channels.command({
+          type: "save",
+          operationId: crypto.randomUUID(),
+          channelId: targetId,
+          draft,
+          update: true,
+        });
       });
     saving = next;
     return next;

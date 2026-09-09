@@ -191,8 +191,21 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
       const exists = this.#channels.store.exists(channelId);
       const tasks = exists ? this.#channels.store.tasks(channelId) : [];
       const assignments = exists ? this.#channels.store.assignments(channelId) : [];
+      // Continue and Reassign restart a failed task under the request it already has, so the run
+      // a failure settled has to follow it out of the failed state. Only the runs whose request
+      // still has live work are read: a finished failure stays where the history put it.
+      const live = [
+        ...new Set(
+          tasks
+            .filter((task) => task.state !== "completed" && task.state !== "cancelled")
+            .map((task) => task.requestMessageId),
+        ),
+      ];
       let changed = false;
-      for (const run of this.#routines.openRuns(channelId)) {
+      for (const run of [
+        ...this.#routines.openRuns(channelId),
+        ...this.#routines.failedRunsForRequests(channelId, live),
+      ]) {
         // A run with no request id has not reached the channel yet; `resumePendingRuns` owns it.
         if (!run.requestMessageId) continue;
         // Nor has a run whose command is still in flight: the run row is written first, so a

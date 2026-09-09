@@ -182,6 +182,10 @@ export class ChannelService {
       // Only a member the draft adds has to be available: rejecting the ones already stored would
       // hold every later save of the channel, so the reader could not remove the first of two
       // deleted members, or edit any other field.
+      // A save that edits an open channel must never bring a deleted one back. Settings save on
+      // every field, so a save can still be queued behind the deletion of its own channel, and it
+      // carries the whole draft: it would restore the name, the instructions and the members.
+      if (!existing && command.update) throw new Error("Channel not found.");
       const members = new Set(existing?.members.map((member) => member.agentId));
       for (const member of command.draft.members)
         if (!members.has(member.agentId) && !known.some((agent) => agent.id === member.agentId))
@@ -236,26 +240,45 @@ export class ChannelService {
     if (channel.archived) throw new Error("Restore this channel before sending messages or changing tasks.");
     if (command.type === "send") {
       if (command.recipientAgentId) this.requireMember(channel, command.recipientAgentId);
-      const messages = this.store.messages(channel.id);
+      const id = randomUUID();
+      // The files are committed here, not at the dispatch: a channel dispatches when a member is
+      // free, which can be after a restart, and a restart clears every draft with its files. The
+      // request would then hold ids that resolve to nothing, and no retry could bring the upload
+      // back. Committed, the request carries durable references that every dispatch re-sends.
+      //
+      // It happens before anything is read, because `archive` and `stop` do not queue behind the
+      // other commands of a channel: a state read before this copy could be stale by the time it
+      // is written back, and would restore an archived channel and start the work it stopped.
+      const committed = command.attachmentDraftIds.length
+        ? await this.mailbox.commitChannelAttachments({
+            channelId: channel.id,
+            messageId: id,
+            text: command.text,
+            draftIds: command.attachmentDraftIds,
+          })
+        : null;
+      const current = committed ? this.store.get(channel.id) : channel;
+      if (current.archived) throw new Error("Restore this channel before sending messages or changing tasks.");
+      const text = committed?.text ?? command.text;
+      const messages = this.store.messages(current.id);
       const referenced = command.replyToMessageId
         ? messages.find((message) => message.id === command.replyToMessageId)
         : undefined;
       if (command.replyToMessageId && !referenced) throw new Error("The referenced channel message is unavailable.");
-      const allTasks = this.store.tasks(channel.id);
+      const allTasks = this.store.tasks(current.id);
       const open = allTasks.filter((task) => !terminal(task));
       const previous = referenced?.taskId
         ? allTasks.find((task) => task.id === referenced.taskId)
         : open.length === 1 &&
             /^(?:also|instead|actually|please change|change that|correction|continue|yes|no|use that|make it)\b/iu.test(
-              command.text.trim(),
+              text.trim(),
             )
           ? open[0]
           : undefined;
-      const id = randomUUID();
       const task = previous
         ? {
             ...previous,
-            instruction: command.text,
+            instruction: text,
             dependencies: [],
             requestMessageId: id,
             sourceMessageIds: [...previous.sourceMessageIds.slice(-30), id],
@@ -264,24 +287,10 @@ export class ChannelService {
             error: null,
             ownerAgentId: command.recipientAgentId ?? previous.ownerAgentId,
           }
-        : this.newTask(channel.id, id, command.text, command.recipientAgentId);
-      const message = this.message(channel.id, task.id, { kind: "member", ...actor }, command.text, id);
+        : this.newTask(current.id, id, text, command.recipientAgentId);
+      const message = this.message(current.id, task.id, { kind: "member", ...actor }, text, id);
       message.message.replyToMessageId = command.replyToMessageId;
-      // The files are committed here, not at the dispatch: a channel dispatches when a member is
-      // free, which can be after a restart, and a restart clears every draft with its files. The
-      // request would then hold ids that resolve to nothing, and no retry could bring the upload
-      // back. Committed, the request carries durable references that every dispatch re-sends.
-      if (command.attachmentDraftIds.length) {
-        const committed = await this.mailbox.commitChannelAttachments({
-          channelId: channel.id,
-          messageId: id,
-          text: command.text,
-          draftIds: command.attachmentDraftIds,
-        });
-        message.message.text = committed.text;
-        message.message.attachments = committed.attachments;
-        task.instruction = committed.text;
-      }
+      if (committed) message.message.attachments = committed.attachments;
       const affected = previous ? descendants(allTasks, previous.id) : [];
       const stopped = affected
         .filter((item) => item.id !== task.id)
@@ -294,7 +303,7 @@ export class ChannelService {
           }),
         );
       const result = this.store.update(
-        channel,
+        current,
         {
           messages: [
             ...messages
@@ -306,15 +315,15 @@ export class ChannelService {
         },
         operationId,
       );
-      this.publish(channel.id);
+      this.publish(current.id);
       if (previous) {
         await this.interruptTasks(
-          channel.id,
+          current.id,
           affected.filter((item) => item.id !== previous.id),
         );
-        if (!(await this.steer(channel.id, task, message))) await this.interruptTasks(channel.id, [previous]);
+        if (!(await this.steer(current.id, task, message))) await this.interruptTasks(current.id, [previous]);
       }
-      this.wake(channel.id);
+      this.wake(current.id);
       return result;
     }
     if (command.type === "request") {

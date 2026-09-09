@@ -108,6 +108,10 @@ export class ChannelRoutineStore extends RoutineStore {
     return this.openRunRows(channelId).map(toChannelRun);
   }
 
+  failedRunsForRequests(channelId: string, requestMessageIds: readonly string[]): ChannelRoutineRun[] {
+    return this.failedRunRowsForHandles(channelId, requestMessageIds).map(toChannelRun);
+  }
+
   channelsWithOpenRuns(): string[] {
     return this.ownersWithOpenRuns();
   }

@@ -233,6 +233,28 @@ describe("ChannelRoutineScheduler", () => {
     });
   });
 
+  it("follows a failed run into the retry of its task", async () => {
+    const run = await fire();
+    const rootTask = required(service.store.tasks("channel-1")[0]);
+    await begin(rootTask.id, "turn-1");
+    await finish("turn-1", "failed");
+    expect(currentRun(run.id).status).toBe("failed");
+    await service.command(
+      {
+        type: "resume",
+        channelId: "channel-1",
+        operationId: operationId(),
+        taskId: rootTask.id,
+        recipientAgentId: null,
+      },
+      actor,
+    );
+    // Continue restarts the task under the request the run already holds. A history that stopped
+    // at the failure would report Failed for work the reader has since seen finish.
+    await vi.waitFor(() => expect(currentRun(run.id).status).toBe("running"));
+    expect(currentRun(run.id).error).toBeNull();
+  });
+
   it("waits for a human when the lead cannot route, then follows the resumed task", async () => {
     generate.mockImplementation(async () => JSON.stringify({ question: "Which report do you mean?" }));
     const run = await scheduler.test({ channelId: "channel-1", routineId: routine.id });

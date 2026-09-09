@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { App } from "./App";
-import { installOpenbotStub, testServer } from "./app-test-harness";
+import { emitAgentEvent, installOpenbotStub, testServer } from "./app-test-harness";
 import { CHANNEL_SELECTION_STORAGE_KEY } from "./features/channels/channel-selection";
 import { AccountDock } from "./lazy-views";
 
@@ -329,6 +329,9 @@ it("keeps a queued settings save on the channel it was made in", async () => {
   const saves = save.mock.calls.map(([input]) => input).filter((input) => input.type === "save");
   expect(saves.map((input) => input.channelId)).toEqual(["channel-test", "channel-test"]);
   expect(saves.at(-1)).toMatchObject({ draft: { name: "Project room", members: [] } });
+  // A settings save edits the channel that is open. It must never create one, or a save queued
+  // behind the deletion of its own channel would bring the channel back.
+  expect(saves.map((input) => input.type === "save" && input.update === true)).toEqual([true, true]);
 });
 
 it("keeps the text a queued settings save carries when the reader opens another channel", async () => {
@@ -389,6 +392,38 @@ it("keeps the text a queued settings save carries when the reader opens another 
  * the automatic assignment limit, so the stopped task arrives through the read.
  */
 const STOPPED_TASK_REASON = "The automatic assignment limit was reached. Continue or reassign this task.";
+it("shows a channel read that lands while more changes are still arriving", async () => {
+  const chat = await openSavedChannel();
+  // Every streamed chunk of a member publishes a change, and each read of a channel is two calls.
+  // Hold every read open, so the events overtake them the way streaming does.
+  const gates: Array<() => void> = [];
+  const originalRead = window.openbot.agent.readChannel;
+  vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => {
+    await new Promise<void>((resolve) => gates.push(resolve));
+    return originalRead(input);
+  });
+  await window.openbot.agent.channelCommand({
+    type: "send",
+    operationId: "request",
+    channelId: "channel-test",
+    text: "Prepare the report",
+    recipientAgentId: "chief",
+    replyToMessageId: null,
+    attachmentDraftIds: [],
+  });
+  emitAgentEvent?.({ type: "channels-changed", channelId: "channel-test", revision: 1 });
+  await waitFor(() => expect(gates).toHaveLength(1));
+  for (const revision of [2, 3, 4]) emitAgentEvent?.({ type: "channels-changed", channelId: "channel-test", revision });
+
+  // The read that is already running answers for the changes behind it, so the reader sees the
+  // message. Starting a read for each event and keeping only the newest showed nothing until the
+  // writing stopped.
+  gates[0]?.();
+  await within(chat).findByRole("article", { name: "Message from You" });
+  expect(within(chat).getByRole("article", { name: "Message from You" })).toHaveTextContent("Prepare the report");
+  for (const release of gates) release();
+});
+
 async function openChannelWithStoppedTask(options: { withChild?: boolean; state?: "paused" | "failed" } = {}) {
   await window.openbot.agent.channelCommand({
     type: "save",

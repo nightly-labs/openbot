@@ -1535,6 +1535,54 @@ describe("shared channel coordination", () => {
     expect(request.text).toContain(required(request.attachments?.[0]).id);
   });
 
+  it("refuses a send that an archive overtakes while its files are copied", async () => {
+    const file = join(root, "brief.txt");
+    await writeFile(file, "the brief");
+    const attachment = required((await data.mailbox.prepareAttachments([file]))[0]);
+    let release!: () => void;
+    const copying = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const commit = data.mailbox.commitChannelAttachments.bind(data.mailbox);
+    const copy = vi.spyOn(data.mailbox, "commitChannelAttachments").mockImplementation(async (input) => {
+      await copying;
+      return commit(input);
+    });
+    const sent = service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: "Prepare the report",
+        recipientAgentId: "agent-a",
+        replyToMessageId: null,
+        attachmentDraftIds: [attachment.id],
+      },
+      actor,
+    );
+    await vi.waitFor(() => expect(copy).toHaveBeenCalled());
+    // Archive does not queue behind the other commands, so it lands inside the copy.
+    await service.command({ type: "archive", channelId: "channel-1", operationId: operationId() }, actor);
+    release();
+    await expect(sent).rejects.toThrow("Restore this channel before sending messages or changing tasks.");
+    // The send read the channel before the archive. Writing that read back would restore the
+    // channel and start the work the reader stopped.
+    expect(service.store.get("channel-1").archived).toBe(true);
+    expect(service.store.messages("channel-1")).toHaveLength(0);
+    expect(service.store.tasks("channel-1")).toHaveLength(0);
+  });
+
+  it("refuses a settings save that arrives after its channel is deleted", async () => {
+    await service.deleteChannel("channel-1");
+    await expect(
+      service.command({ type: "save", channelId: "channel-1", operationId: operationId(), draft, update: true }, actor),
+    ).rejects.toThrow("Channel not found.");
+    expect(service.store.exists("channel-1")).toBe(false);
+    // A save with no channel behind it is still how a channel is made.
+    await service.command({ type: "save", channelId: "channel-2", operationId: operationId(), draft }, actor);
+    expect(service.store.exists("channel-2")).toBe(true);
+  });
+
   it("holds a transferred task and its resource until the previous owner stops", async () => {
     await data.store.getOrCreate("agent-c");
     await service.command(

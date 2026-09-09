@@ -71,7 +71,37 @@ const Channels = createSimpleContext({
     }
 
     const supported = () => activeServerSupportsCapability(CHANNEL_CHATS_CAPABILITY);
-    async function refresh(selectedOverride?: string | null) {
+    /**
+     * One read at a time, and at most one more behind it.
+     *
+     * A channel publishes on every streamed chunk, and a read is two calls: a read for each event,
+     * of which only the newest may write, threw away every answer while a member was writing. The
+     * transcript then stood still until the turn ended, and an opening channel stayed on Loading.
+     * Waiting for the newest answer instead of the newest request keeps the reads bounded and each
+     * one lands.
+     */
+    let reading: Promise<void> | null = null;
+    let readAgain = false;
+    let readToken = 0;
+    function refresh(selectedOverride?: string | null): Promise<void> {
+      // Navigation carries the selection it wants, so it never waits behind the read it replaces.
+      if (reading && selectedOverride === undefined) {
+        readAgain = true;
+        return reading;
+      }
+      const token = ++readToken;
+      const run = read(selectedOverride).finally(() => {
+        if (token !== readToken) return;
+        reading = null;
+        if (readAgain && !disposed) {
+          readAgain = false;
+          void refresh();
+        }
+      });
+      reading = run;
+      return run;
+    }
+    async function read(selectedOverride?: string | null) {
       if (!supported()) return;
       const id = ++refreshId;
       const account = accountKey();
