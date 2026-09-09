@@ -49,3 +49,14 @@ export function createStreamRevealPool(limit = 4) {
     },
   };
 }
+
+/** Completed text is a single prefix; only a bounded suffix needs React reveal nodes. */
+export function streamRevealWindow(body: string, baseline: string, enabled: boolean, limit = 14) {
+  if (!enabled || !body.startsWith(baseline)) return { prefix: body, words: [] };
+  const words = Array.from(body.slice(baseline.length).matchAll(/\s*\S+\s*|\s+/gu), (match) => ({
+    start: baseline.length + match.index,
+    end: baseline.length + match.index + match[0].length,
+    text: match[0],
+  })).slice(-limit);
+  return { prefix: body.slice(0, words[0]?.start ?? body.length), words };
+}

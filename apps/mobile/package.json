@@ -21,7 +21,7 @@
     "@openbot/contracts": "workspace:*",
     "@openbot/team-client": "workspace:*",
     "@react-native-masked-view/masked-view": "0.3.2",
-    "@speed-highlight/core": "1.2.24",
+    "@speed-highlight/core": "catalog:",
     "@tanstack/react-query": "^5.102.8",
     "expo": "~57.0.18",
     "expo-blur": "~57.0.2",

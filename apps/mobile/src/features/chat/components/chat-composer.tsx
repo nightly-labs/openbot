@@ -21,6 +21,7 @@ import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { largePastedText } from "../model/composer-paste";
+import { createComposerSendGate } from "../model/composer-send";
 import { ChatGlassIconButton } from "./chat-glass-icon-button";
 import { CHAT_ATTACHMENTS_ENABLED, type ChatAttachments } from "./use-chat-attachments";
 
@@ -93,6 +94,7 @@ export function ChatComposer({
       : Math.min(maxInputHeight, Math.max(minInputHeight, inputLines * 22 * fontScale + 26));
   const [focused, setFocused] = useState(false);
   const latestTextRef = useRef(draft);
+  const [sendGate] = useState(createComposerSendGate);
 
   useEffect(() => {
     latestTextRef.current = draft;
@@ -100,12 +102,16 @@ export function ChatComposer({
 
   useEffect(() => {
     if (disabled) {
+      sendGate.cancel();
       inputRef.current?.blur();
     }
-  }, [disabled]);
+  }, [disabled, sendGate]);
 
   function requestSend(): void {
-    if (!disabled && !sending) onSend(latestTextRef.current);
+    if (disabled || sending) return;
+    const action = sendGate.request();
+    if (action === "blur") inputRef.current?.blur();
+    else if (action === "send") onSend(latestTextRef.current);
   }
 
   const focusInput = useCallback(() => {
@@ -329,10 +335,12 @@ export function ChatComposer({
                   setCursor(nativeEvent.selection.start === nativeEvent.selection.end ? nativeEvent.selection.end : -1)
                 }
                 onFocus={() => {
+                  sendGate.focus();
                   setFocused(true);
                 }}
                 onBlur={() => setFocused(false)}
                 onChangeText={(text) => {
+                  sendGate.edit();
                   const pasted =
                     CHAT_ATTACHMENTS_ENABLED && !answerQuestion && !sending
                       ? largePastedText(latestTextRef.current, text)
@@ -355,7 +363,7 @@ export function ChatComposer({
                   onChangeDraft(next);
                 }}
                 onSubmitEditing={({ nativeEvent }) => {
-                  if (!disabled && !sending)
+                  if (!disabled && !sending && sendGate.submit())
                     onSend(
                       answerQuestion ? nativeEvent.text : editMentionDraft(latestTextRef.current, nativeEvent.text),
                     );
@@ -364,6 +372,7 @@ export function ChatComposer({
                   // Native editing can end before the send button's release event,
                   // while TextInput.isFocused() is still waiting for onBlur.
                   latestTextRef.current = answerQuestion ? text : editMentionDraft(latestTextRef.current, text);
+                  if (sendGate.commit() && !disabled && !sending) onSend(latestTextRef.current);
                 }}
               >
                 {/* TextInput requires native text children for editable attributed text. */}

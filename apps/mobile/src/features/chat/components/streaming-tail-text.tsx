@@ -1,5 +1,5 @@
 import { Typography } from "heroui-native";
-import { createContext, type PropsWithChildren, useContext, useEffect, useRef, useState } from "react";
+import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { TextStyle } from "react-native";
 import Animated, {
   interpolateColor,
@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import { createStreamRevealPool } from "../model/stream-reveal-pool";
+import { createStreamRevealPool, streamRevealWindow } from "../model/stream-reveal-pool";
 
 const AnimatedTypography = Animated.createAnimatedComponent(Typography);
 const RevealContext = createContext<ReturnType<typeof createStreamRevealPool> | null>(null);
@@ -71,8 +71,16 @@ function useRevealSlot(enabled: boolean) {
   return { phase: enabled ? phase : "done", onDone };
 }
 
-function RevealedWord({ enabled, ...props }: TextProps & { enabled: boolean }) {
+function RevealedWord({
+  enabled,
+  end,
+  onSettled,
+  ...props
+}: TextProps & { enabled: boolean; end: number; onSettled: (end: number) => void }) {
   const { phase, onDone } = useRevealSlot(enabled);
+  useEffect(() => {
+    if (phase === "done") onSettled(end);
+  }, [phase, end, onSettled]);
   if (phase === "done") return props.text;
   if (phase === "waiting")
     return (
@@ -110,12 +118,26 @@ export function StreamingTailText({
 }: Omit<TextProps, "text"> & { body: string; enabled: boolean }) {
   const [baseline, setBaseline] = useState(enabled ? "" : body);
   if ((!enabled && baseline !== body) || !body.startsWith(baseline)) setBaseline(body);
-  const prefix = body.startsWith(baseline) ? baseline : body;
+  const { prefix, words } = streamRevealWindow(body, baseline, enabled);
+  const settle = useCallback(
+    (end: number) => {
+      setBaseline((previous) => (body.startsWith(previous) && end > previous.length ? body.slice(0, end) : previous));
+    },
+    [body],
+  );
   return (
     <>
       {prefix}
-      {Array.from(body.slice(prefix.length).matchAll(/\s*\S+\s*|\s+/gu), (match) => (
-        <RevealedWord key={prefix.length + match.index} text={match[0]} type={type} style={style} enabled={enabled} />
+      {words.map((word) => (
+        <RevealedWord
+          key={word.start}
+          text={word.text}
+          end={word.end}
+          onSettled={settle}
+          type={type}
+          style={style}
+          enabled={enabled}
+        />
       ))}
     </>
   );

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type ChatLayout, chatBlankSpace, chatContentIsVisible, chatEndOffset, chatSendOffset } from "./chat-layout";
 import { largePastedText } from "./composer-paste";
-import { createStreamRevealPool } from "./stream-reveal-pool";
+import { createStreamRevealPool, streamRevealWindow } from "./stream-reveal-pool";
 
 const short: ChatLayout = { viewport: 800, header: 100, content: 1300, tailY: 1100, tailHeight: 200 };
 afterEach(() => vi.useRealTimers());
@@ -70,4 +70,23 @@ describe("streaming reveal work", () => {
     vi.runOnlyPendingTimers();
     expect(start).not.toHaveBeenCalled();
   });
+});
+
+it("bounds the reveal tail and retains all text when words finish or the stream changes", () => {
+  const body = "word ".repeat(1000);
+  const window = streamRevealWindow(body, "", true);
+  expect({ size: window.words.length, text: window.prefix + window.words.map((word) => word.text).join("") }).toEqual({
+    size: 14,
+    text: body,
+  });
+  const completed = body.slice(0, window.words[window.words.length - 1].end);
+  expect([
+    streamRevealWindow(body, completed, true),
+    streamRevealWindow("replacement", body, true),
+    streamRevealWindow(body, "", false),
+  ]).toEqual([
+    { prefix: body, words: [] },
+    { prefix: "replacement", words: [] },
+    { prefix: body, words: [] },
+  ]);
 });
