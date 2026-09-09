@@ -42,12 +42,33 @@ interface SmtpSocket {
   close(): void | Promise<void>;
 }
 
+// Carries the reply that refused a stage. `message` keeps the same `smtp_<stage>_failed` shape the
+// service logs and tests read, so only the added fields are new.
+class SmtpReplyError extends Error {
+  constructor(
+    readonly stage: string,
+    readonly replyCode: number,
+    readonly replyText: string,
+  ) {
+    super(`smtp_${stage}_failed`);
+  }
+}
+
 export type SmtpConnector = (
   address: { hostname: string; port: number },
   options: { secureTransport: "on"; allowHalfOpen: false },
 ) => SmtpSocket;
 
 export const EMAIL_CODE_DELIVERY_BUDGET_MS = 25_000;
+// `auth-service` answers 429 for this message instead of a permanent 502. Every delivery method
+// raises it, so the service stays free of provider detail.
+export const RATE_LIMITED_DELIVERY_ERROR = "email_delivery_rate_limited";
+// A sender-limit refusal that arrives with a permanent 5xx reply. Namecheap Private Email answers
+// `554 5.7.1 <DATA>: Data command rejected: Reject: too many messages from sender in last 60
+// minutes` when the hourly quota of the sending mailbox is spent, which is a temporary condition
+// reported with a permanent code. Recipient-side limits such as `552 Mailbox quota exceeded` must
+// not match: the sender can do nothing about those, and a countdown would be a lie.
+const SENDER_LIMIT_REPLY = /too many (?:messages|emails|recipients)|(?:sending|send|message|rate) limit|rate limited/iu;
 const SMTP_TIMEOUT_MS = 7_500;
 const SMTP_CLOSE_TIMEOUT_MS = 250;
 const SMTP_MAX_ATTEMPTS = 3;
@@ -133,6 +154,15 @@ async function sendPrivateEmail(
       return;
     } catch (error) {
       const smtpError = normalizeSmtpError(error);
+      if (smtpError instanceof SmtpReplyError && isSenderRateLimited(smtpError)) {
+        // The stage and reply code only. A reply can quote the recipient address, which belongs in
+        // the database and not in a log line.
+        console.warn("Email delivery refused by a sender limit:", {
+          stage: smtpError.stage,
+          replyCode: smtpError.replyCode,
+        });
+        throw new Error(RATE_LIMITED_DELIVERY_ERROR);
+      }
       if (!isRetryableSmtpError(smtpError) || attempt === SMTP_MAX_ATTEMPTS) throw smtpError;
       await new Promise((resolveDelay) => setTimeout(resolveDelay, attempt * 250));
     }
@@ -195,6 +225,13 @@ function wrapTransportError(): Error {
   return new Error("smtp_transport_failed");
 }
 
+// A 4xx reply is temporary by definition, so waiting is the right answer whichever stage refused.
+// A 5xx reply counts only when it names a sender-side message limit.
+function isSenderRateLimited(error: SmtpReplyError): boolean {
+  if (error.replyCode >= 400 && error.replyCode < 500) return true;
+  return SENDER_LIMIT_REPLY.test(error.replyText);
+}
+
 function isRetryableSmtpError(error: Error): boolean {
   return ["smtp_transport_failed", "smtp_timeout", "smtp_connection_closed"].includes(error.message);
 }
@@ -240,6 +277,7 @@ class SmtpResponseReader {
 
   async expect(expectedCodes: number[], stage: string): Promise<void> {
     let responseCode: number | null = null;
+    const lines: string[] = [];
     while (true) {
       const line = await this.#readLine();
       const match = /^(\d{3})([ -])/u.exec(line);
@@ -247,9 +285,12 @@ class SmtpResponseReader {
       const lineCode = Number(match[1]);
       responseCode ??= lineCode;
       if (lineCode !== responseCode) throw new Error(`smtp_${stage}_invalid_response`);
+      lines.push(line);
       if (match[2] === " ") break;
     }
-    if (!expectedCodes.includes(responseCode)) throw new Error(`smtp_${stage}_failed`);
+    if (!expectedCodes.includes(responseCode)) {
+      throw new SmtpReplyError(stage, responseCode, lines.join(" "));
+    }
   }
 
   async #readLine(): Promise<string> {
