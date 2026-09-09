@@ -24,7 +24,8 @@ function project(value: TeamProtocolV1JsonValue, hiddenIds: ReadonlySet<string>,
     value.provider === "opencode" ||
     value.id === "opencode" ||
     (typeof value.id === "string" && hiddenIds.has(value.id)) ||
-    (typeof value.agentId === "string" && hiddenIds.has(value.agentId))
+    // Sender and reaction identities contain no provider-specific fields and remain valid for old peers.
+    (value.kind !== "agent" && typeof value.agentId === "string" && hiddenIds.has(value.agentId))
   )
     return null;
   if (key === "auth" && value.kind === "opencode") return { kind: "unknown" };

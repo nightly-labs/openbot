@@ -1,5 +1,14 @@
 import { isAgentSummary } from "@openbot/contracts/ipc";
+import {
+  decodeTeamProtocolV1CurrentHttpResponse,
+  encodeTeamProtocolV1CurrentHttpResponse,
+} from "@openbot/contracts/team-protocol/v1-adapter";
+import {
+  decodeTeamProtocolV3CurrentHttpResponse,
+  encodeTeamProtocolV3CurrentHttpResponse,
+} from "@openbot/contracts/team-protocol/v3-adapter";
 import opencodeFixture from "../../packages/contracts/src/team-protocol/fixtures/v4/host-http-response.json";
+import { legacyProviderView } from "./team-api/provider-visibility";
 // @vitest-environment node
 
 // The WebSocket side: who receives which realtime event, and what a client on an older protocol
@@ -391,4 +400,56 @@ describe("TeamApiServer events", () => {
       socket.close();
     }
   });
+});
+
+it.each([
+  { version: "v1", encode: encodeTeamProtocolV1CurrentHttpResponse, decode: decodeTeamProtocolV1CurrentHttpResponse },
+  { version: "v3", encode: encodeTeamProtocolV3CurrentHttpResponse, decode: decodeTeamProtocolV3CurrentHttpResponse },
+])("preserves OpenCode sender and reaction references in $version provider views", ({ encode, decode }) => {
+  const actor = { kind: "agent", agentId: "opencode-agent" };
+  const queue = {
+    agentId: "chief",
+    deliveries: [
+      {
+        id: "delivery-1",
+        messageId: "message-1",
+        recipientAgentId: "chief",
+        sender: actor,
+        text: "Please review.",
+        attachments: [],
+        replyToMessageId: null,
+        status: "queued",
+        position: 1,
+        turnId: null,
+        error: null,
+        createdAt: "2026-09-09T10:00:00.000Z",
+      },
+    ],
+  };
+  const conversation = {
+    agentId: "chief",
+    threadId: "thread-chief",
+    activeTurnId: null,
+    revision: 1,
+    readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: "message-1" },
+    messages: [
+      {
+        id: "message-1",
+        author: "assistant",
+        text: "Review complete.",
+        status: "completed",
+        createdAt: "2026-09-09T10:00:00.000Z",
+        reactions: [{ emoji: "👍", actor }],
+      },
+    ],
+  };
+  for (const [route, payload] of [
+    ["queue", queue],
+    ["conversation", conversation],
+  ] as const) {
+    const path = `/v1/agents/chief/${route}`;
+    const filtered = legacyProviderView(payload, new Set([actor.agentId]));
+    const wire = JSON.parse(encode("GET", path, 200, filtered));
+    expect(decode("GET", path, 200, wire)).toEqual(payload);
+  }
 });
