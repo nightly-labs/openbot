@@ -63,14 +63,14 @@ describe("bundled Codex resolution", () => {
     );
   });
 
-  it.runIf(process.platform !== "win32")("prefers a compatible system CLI", async () => {
+  it.runIf(process.platform !== "win32")("prefers the managed CLI over a compatible system CLI", async () => {
     const system = await createExecutable("system-codex", "codex-cli 0.148.0");
     const bundled = await createExecutable("bundled-codex", "codex-cli 0.149.1");
 
     await expect(resolveCodexCli({ systemCandidates: [system], bundledExecutable: bundled })).resolves.toEqual({
-      executable: system,
-      version: "0.148.0",
-      source: "system",
+      executable: bundled,
+      version: "0.149.1",
+      source: "managed",
     });
   });
 
@@ -110,14 +110,14 @@ describe("bundled Claude resolution", () => {
     expect(bundledClaudeExecutable("linux", "x64", "/resources")).toBeNull();
   });
 
-  it.runIf(process.platform !== "win32")("prefers a compatible system CLI", async () => {
+  it.runIf(process.platform !== "win32")("prefers the managed CLI over a compatible system CLI", async () => {
     const system = await createExecutable("system-claude", "2.1.240 (Claude Code)");
     const bundled = await createExecutable("bundled-claude", "2.1.246 (Claude Code)");
 
     await expect(resolveClaudeCli({ systemCandidates: [system], bundledExecutable: bundled })).resolves.toEqual({
-      executable: system,
-      version: "2.1.240",
-      source: "system",
+      executable: bundled,
+      version: "2.1.246",
+      source: "managed",
     });
   });
 
@@ -194,6 +194,25 @@ describe("bundled Grok CLI resolution", () => {
       version: "1.0.5",
       source: "managed",
     });
+  });
+});
+
+describe("managed CLI selection", () => {
+  it.runIf(process.platform !== "win32")("keeps explicit overrides ahead of a managed CLI", async () => {
+    const system = await createExecutable("system-grok", "grok 1.0.5");
+    const managed = await createExecutable("managed-grok", "grok 1.0.22");
+    process.env.OPENBOT_GROK_PATH = system;
+    await expect(resolveGrokCli({ bundledExecutable: managed })).resolves.toMatchObject({
+      executable: system,
+      source: "system",
+    });
+  });
+
+  it.runIf(process.platform !== "win32")("uses the system CLI when the managed copy is missing", async () => {
+    const system = await createExecutable("system-grok", "grok 1.0.5");
+    await expect(
+      resolveGrokCli({ systemCandidates: [system], bundledExecutable: `${system}-missing` }),
+    ).resolves.toMatchObject({ executable: system, source: "system" });
   });
 });
 

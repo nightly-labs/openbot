@@ -54,7 +54,9 @@ OpenBot supports macOS 13 or newer on Apple Silicon and Windows 10 or newer on x
 ### Agent setup
 
 OpenBot can download a supported provider runtime when you select `Download` in onboarding,
-Settings, agent setup, or the model picker. A compatible system CLI remains the first choice.
+Settings, agent setup, or the model picker. OpenBot prefers its managed CLI. Explicit `OPENBOT_*_PATH` overrides take precedence; a compatible
+system CLI is used when no managed copy is available. Updates install OpenBot’s pinned runtime
+without changing the user’s system CLI.
 
 You can also install a CLI yourself.
 
