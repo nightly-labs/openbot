@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { type ConversationMessage, isConversationMessage } from "./ipc-conversation-messages";
-import { isDynamicRecord, isOneOf } from "./runtime-values";
+import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
 export const CHANNEL_CHATS_CAPABILITY = "channel-chats-v1";
 export const CHANNEL_PARALLEL_LIMIT = 2;
@@ -9,15 +9,14 @@ export const CHANNEL_ASSIGNMENT_LIMIT = 8;
 
 export interface ChannelMember {
   agentId: string;
-  responsibility: string;
 }
 
 export interface ChannelDraft {
   name: string;
-  purpose: string;
+  title: string;
+  instructions: string;
   members: ChannelMember[];
   leadAgentId: string | null;
-  linkedThreadIds: string[];
 }
 
 export interface Channel extends ChannelDraft {
@@ -95,6 +94,21 @@ export type ChannelCommand =
       attachmentDraftIds: string[];
     }
   | {
+      /**
+       * A routine firing into the channel. It is a `send` without the continuation heuristic: a
+       * schedule must start its own task rather than fold itself into whatever a member is doing.
+       * The `requestMessageId` is minted by the caller and persisted on its run row before the
+       * command is issued, so a replay after a crash lands on the same message.
+       */
+      type: "request";
+      operationId: string;
+      channelId: string;
+      text: string;
+      recipientAgentId: string | null;
+      requestMessageId: string;
+      origin: { kind: "routine"; routineId: string; routineName: string; runId: string };
+    }
+  | {
       type: "stop" | "resume" | "reassign";
       operationId: string;
       channelId: string;
@@ -108,28 +122,38 @@ export interface ChannelReadInput {
   beforeSequence?: number;
 }
 
+/**
+ * A channel used to hold one `purpose`. It now holds a `title` and `instructions`, the way an agent
+ * does, and the guards below are strict about both - so every row written before the rename has to
+ * pass through here on the way in. This is the only place that knows the old key: the store reads
+ * `channel_json` through `decodeChannel` (`channel-store.ts`), and a strict guard at the call sites
+ * would make every one of those rows unreadable instead.
+ */
+export function normalizeChannelDraft(value: unknown): DynamicRecord | undefined {
+  if (!isDynamicRecord(value)) return undefined;
+  if (!("purpose" in value)) return value;
+  const { purpose, ...rest } = value;
+  return { title: "", instructions: isString(purpose) ? purpose : "", ...rest };
+}
+
 export function isChannelDraft(value: unknown): value is ChannelDraft {
   return (
     isDynamicRecord(value) &&
     isBoundedString(value.name, INPUT_LIMITS.agentName) &&
     value.name.trim().length > 0 &&
-    isBoundedString(value.purpose, INPUT_LIMITS.agentDescription) &&
+    isBoundedString(value.title, INPUT_LIMITS.agentTitle) &&
+    isBoundedString(value.instructions, INPUT_LIMITS.agentDescription) &&
     Array.isArray(value.members) &&
     value.members.length <= INPUT_LIMITS.agents &&
     value.members.every(isChannelMember) &&
     new Set(value.members.map((member) => member.agentId)).size === value.members.length &&
     (value.leadAgentId === null ||
-      (isIdentifier(value.leadAgentId) && value.members.some((member) => member.agentId === value.leadAgentId))) &&
-    identifiers(value.linkedThreadIds)
+      (isIdentifier(value.leadAgentId) && value.members.some((member) => member.agentId === value.leadAgentId)))
   );
 }
 
 function isChannelMember(value: unknown): value is ChannelMember {
-  return (
-    isDynamicRecord(value) &&
-    isIdentifier(value.agentId) &&
-    isBoundedString(value.responsibility, INPUT_LIMITS.agentDescription)
-  );
+  return isDynamicRecord(value) && isIdentifier(value.agentId);
 }
 
 function identifiers(value: unknown): value is string[] {
@@ -197,14 +221,16 @@ export function isChannelMessage(value: unknown): value is ChannelMessage {
 }
 
 export function decodeChannel(value: unknown): Channel {
-  if (!isChannel(value)) throw new Error("Invalid channel response.");
-  return value;
+  const channel = normalizeChannelDraft(value);
+  if (!isChannel(channel)) throw new Error("Invalid channel response.");
+  return channel;
 }
 
 export function decodeChannelPage(value: unknown): ChannelPage {
+  const channel = isDynamicRecord(value) ? normalizeChannelDraft(value.channel) : undefined;
   if (
     !isDynamicRecord(value) ||
-    !isChannel(value.channel) ||
+    !isChannel(channel) ||
     !Array.isArray(value.messages) ||
     !value.messages.every(isChannelMessage) ||
     !Array.isArray(value.tasks) ||
@@ -215,7 +241,7 @@ export function decodeChannelPage(value: unknown): ChannelPage {
     throw new Error("Invalid channel conversation response.");
   }
   return {
-    channel: value.channel,
+    channel,
     messages: value.messages,
     tasks: value.tasks,
     olderCursor: value.olderCursor,
@@ -224,8 +250,10 @@ export function decodeChannelPage(value: unknown): ChannelPage {
 }
 
 export function decodeChannelSummaries(value: unknown): ChannelSummary[] {
-  if (!Array.isArray(value) || !value.every(isChannelSummary)) throw new Error("Invalid channel list response.");
-  return value;
+  if (!Array.isArray(value)) throw new Error("Invalid channel list response.");
+  const summaries: unknown[] = value.map(normalizeChannelDraft);
+  if (!summaries.every(isChannelSummary)) throw new Error("Invalid channel list response.");
+  return summaries;
 }
 
 function isChannelSummary(value: unknown): value is ChannelSummary {
@@ -262,7 +290,8 @@ export function parseChannelCommand(value: unknown): ChannelCommand {
   if (!isDynamicRecord(value) || !isIdentifier(value.operationId) || !isIdentifier(value.channelId))
     throw new Error("Provide a valid channel command.");
   const common = { operationId: value.operationId, channelId: value.channelId };
-  if (value.type === "save" && isChannelDraft(value.draft)) return { ...common, type: value.type, draft: value.draft };
+  const draft = normalizeChannelDraft(value.draft);
+  if (value.type === "save" && isChannelDraft(draft)) return { ...common, type: value.type, draft };
   if (value.type === "archive" || value.type === "restore") return { ...common, type: value.type };
   if (value.type === "read" && sequence(value.throughSequence))
     return { ...common, type: value.type, throughSequence: value.throughSequence };
@@ -288,6 +317,32 @@ export function parseChannelCommand(value: unknown): ChannelCommand {
       recipientAgentId: value.recipientAgentId,
       replyToMessageId: value.replyToMessageId,
       attachmentDraftIds: value.attachmentDraftIds,
+    };
+  }
+  if (
+    value.type === "request" &&
+    isBoundedString(value.text, INPUT_LIMITS.messageText) &&
+    value.text.trim().length > 0 &&
+    (value.recipientAgentId === null || isIdentifier(value.recipientAgentId)) &&
+    isIdentifier(value.requestMessageId) &&
+    isDynamicRecord(value.origin) &&
+    value.origin.kind === "routine" &&
+    isIdentifier(value.origin.routineId) &&
+    isBoundedString(value.origin.routineName, INPUT_LIMITS.routineName) &&
+    isIdentifier(value.origin.runId)
+  ) {
+    return {
+      ...common,
+      type: value.type,
+      text: value.text,
+      recipientAgentId: value.recipientAgentId,
+      requestMessageId: value.requestMessageId,
+      origin: {
+        kind: "routine",
+        routineId: value.origin.routineId,
+        routineName: value.origin.routineName,
+        runId: value.origin.runId,
+      },
     };
   }
   throw new Error("Provide a valid channel command.");

@@ -158,7 +158,7 @@ export function agentIpcHandlers({
       mutateSidebarLayout: payloadHandler(parseAgentRequest, (scoped): Promise<SidebarLayoutSnapshot> => {
         const action = parseSidebarLayoutAction(scoped.payload);
         return routeToServer(scoped.serverId, {
-          local: () => sidebarLayout.mutate(action, new Set(service.listAgents().map((agent) => agent.id))),
+          local: () => sidebarLayout.mutate(action, service.sidebarChatIds()),
           remote: (serverId) =>
             remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.actions, decodeSidebarLayoutSnapshot, {
               method: "POST",

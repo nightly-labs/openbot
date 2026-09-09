@@ -56,6 +56,21 @@ import type {
   BrowserTab,
   BrowserVisibilityInput,
 } from "./ipc-browser";
+import type {
+  ChannelMemory,
+  CreateChannelMemoryInput,
+  DeleteChannelMemoryInput,
+  UpdateChannelMemoryInput,
+} from "./ipc-channel-memories";
+import type {
+  ChannelRoutine,
+  ChannelRoutineRun,
+  CreateChannelRoutineInput,
+  DeleteChannelRoutineInput,
+  ListChannelRoutineRunsInput,
+  TestChannelRoutineInput,
+  UpdateChannelRoutineInput,
+} from "./ipc-channel-routines";
 import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
 import type {
   ConversationPage,
@@ -187,6 +202,17 @@ export interface AgentDesktopApi {
   deleteRoutine: (input: DeleteRoutineInput) => Promise<void>;
   testRoutine: (input: TestRoutineInput) => Promise<RoutineRun>;
   listRoutineRuns: (input: ListRoutineRunsInput) => Promise<RoutineRun[]>;
+  listChannelMemories: (channelId: string) => Promise<ChannelMemory[]>;
+  createChannelMemory: (input: CreateChannelMemoryInput) => Promise<ChannelMemory>;
+  updateChannelMemory: (input: UpdateChannelMemoryInput) => Promise<ChannelMemory>;
+  deleteChannelMemory: (input: DeleteChannelMemoryInput) => Promise<void>;
+  clearChannelMemories: (channelId: string) => Promise<void>;
+  listChannelRoutines: (channelId: string) => Promise<ChannelRoutine[]>;
+  createChannelRoutine: (input: CreateChannelRoutineInput) => Promise<ChannelRoutine>;
+  updateChannelRoutine: (input: UpdateChannelRoutineInput) => Promise<ChannelRoutine>;
+  deleteChannelRoutine: (input: DeleteChannelRoutineInput) => Promise<void>;
+  testChannelRoutine: (input: TestChannelRoutineInput) => Promise<ChannelRoutineRun>;
+  listChannelRoutineRuns: (input: ListChannelRoutineRunsInput) => Promise<ChannelRoutineRun[]>;
   readConversation: (agentId: string) => Promise<ConversationWithReadState>;
   readConversationPage: (input: ReadConversationPageInput, serverId?: string) => Promise<ConversationPage>;
   searchConversationMessages: (input: SearchConversationMessagesInput) => Promise<ConversationSearchPage>;

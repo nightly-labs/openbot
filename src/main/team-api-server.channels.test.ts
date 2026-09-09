@@ -50,7 +50,7 @@ describe("Team API channel access", () => {
         type: "save",
         operationId: "create",
         channelId: "channel-1",
-        draft: { name: "Project", purpose: "Work together", members: [], leadAgentId: null, linkedThreadIds: [] },
+        draft: { name: "Project", title: "", instructions: "Work together", members: [], leadAgentId: null },
       }),
     });
     expect(create.status).toBe(200);

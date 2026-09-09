@@ -515,15 +515,13 @@ export const DragStress: Story = {
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelectorAll("[data-pinned-key]")).toHaveLength(6);
     await expect(canvasElement.querySelectorAll("[data-section-id]").length).toBeGreaterThanOrEqual(7);
-    await expect(canvasElement.querySelectorAll("[data-agent-id]").length).toBeGreaterThanOrEqual(24);
-    const source = canvasElement.querySelector<HTMLElement>("[data-agent-id]");
+    await expect(canvasElement.querySelectorAll("[data-chat-id]").length).toBeGreaterThanOrEqual(24);
+    const source = canvasElement.querySelector<HTMLElement>("[data-chat-id]");
     const list = within(canvasElement).getByRole("navigation", { name: "Chat list" });
     const DataTransferConstructor = canvasElement.ownerDocument.defaultView?.DataTransfer;
     if (!source || !list || !DataTransferConstructor) throw new Error("Agent drag stress fixture is unavailable.");
     const section = source.closest<HTMLElement>("[data-section-id]");
-    const target = section?.querySelector<HTMLElement>(
-      `[data-agent-id]:not([data-agent-id="${source.dataset.agentId}"])`,
-    );
+    const target = section?.querySelector<HTMLElement>(`[data-chat-id]:not([data-chat-id="${source.dataset.chatId}"])`);
     if (!target) throw new Error("Agent drag stress target is unavailable.");
     const bounds = source.getBoundingClientRect();
     const targetBounds = target.getBoundingClientRect();
@@ -540,8 +538,8 @@ export const DragStress: Story = {
       dataTransfer,
     });
 
-    await expect(list).toHaveAttribute("data-sidebar-dragging", "agent");
-    for (const row of canvasElement.querySelectorAll<HTMLElement>("[data-agent-id]")) {
+    await expect(list).toHaveAttribute("data-sidebar-dragging", "chat");
+    for (const row of canvasElement.querySelectorAll<HTMLElement>("[data-chat-id]")) {
       await expect(getComputedStyle(row).transitionDuration).toBe("0s");
     }
 
@@ -611,7 +609,7 @@ export const EmptyPinDropTarget: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
   play: async ({ canvas, canvasElement }) => {
     const chief = canvas.getByRole("button", { name: /Chief/ });
-    const source = chief.closest<HTMLElement>("[data-agent-id]");
+    const source = chief.closest<HTMLElement>("[data-chat-id]");
     const DataTransferConstructor = canvasElement.ownerDocument.defaultView?.DataTransfer;
     if (!source || !DataTransferConstructor) throw new Error("Agent drag source is unavailable.");
     const bounds = source.getBoundingClientRect();
@@ -734,9 +732,9 @@ export const DragOffsets: Story = {
 
     // An agent only shifts for a source in its own section, so both rows come from one section.
     const sections = dragRows(canvasElement, "[data-section-id]", "section");
-    const populated = sections.find((section) => section.querySelectorAll("[data-agent-id]").length >= 2);
+    const populated = sections.find((section) => section.querySelectorAll("[data-chat-id]").length >= 2);
     if (!populated) throw new Error("No section holds two agents.");
-    const agents = dragRows(populated, "[data-agent-id]", "agent");
+    const agents = dragRows(populated, "[data-chat-id]", "chat");
     await expectDragShift(canvasElement, agents[0], agents[1], agents[1]);
 
     const handle = sections[0].querySelector<HTMLElement>(".sidebar-section-drag-handle");

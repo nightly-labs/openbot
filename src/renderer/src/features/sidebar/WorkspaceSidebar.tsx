@@ -5,7 +5,6 @@ import { useNavigation } from "../../navigation";
 import { useTurns } from "../../turns";
 import { useAgentActions } from "../agents/agent-actions";
 import { useAgents } from "../agents/agents-context";
-import { ChannelsSection } from "../channels/ChannelsSection";
 import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
@@ -53,6 +52,14 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     reorderSidebarPeople,
   } = useSidebar();
 
+  /* Channels reach the sidebar as data, not as a list of their own: they sit in the layout's
+   * sections beside the agents, so the sidebar has to be able to order and group them. */
+  const visibleChannels = createMemo(() =>
+    channels.supported()
+      ? channels.state.channels.filter((channel) => channel.archived === channels.state.archived)
+      : [],
+  );
+
   const sidebarAgentStates = createMemo(() =>
     computeSidebarAgentStates({
       agentIds: agentList().map((agent) => agent.id),
@@ -65,10 +72,9 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
 
   return (
     <Sidebar
-      channels={<ChannelsSection />}
-      hasChannels={
-        channels.supported() && channels.state.channels.some((channel) => channel.archived === channels.state.archived)
-      }
+      channels={visibleChannels()}
+      activeChannelId={channels.state.selectedId}
+      onSelectChannel={(id) => void channels.open(id)}
       showingArchivedChannels={channels.state.archived}
       onToggleArchivedChannels={channels.supported() ? channels.toggleArchived : undefined}
       onCreateChannel={channels.supported() ? channels.create : undefined}

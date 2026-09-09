@@ -103,6 +103,15 @@ export const CommandSearch: Story = {
 
 type PlayContext = Parameters<NonNullable<Story["play"]>>[0];
 
+/*
+ * The expanded sidebar is a precondition, not a detail: the compact rail hides the new-chat button
+ * from the accessibility tree, so a channel story must pin the sidebar open rather than inherit
+ * whatever width the last visitor left in local storage.
+ */
+function ChannelPlayground() {
+  return <SidebarStatePlayground compact={false} />;
+}
+
 async function openNewChannelDialog(context: PlayContext): Promise<HTMLElement> {
   const body = within(context.canvasElement.ownerDocument.body);
   await context.canvas.findByRole("heading", { name: "Chief" });
@@ -112,7 +121,7 @@ async function openNewChannelDialog(context: PlayContext): Promise<HTMLElement> 
 }
 
 export const NewChannel: Story = {
-  render: () => <OpenBotPlayground />,
+  render: () => <ChannelPlayground />,
   play: async (context) => {
     const dialog = await openNewChannelDialog(context);
     await expect(within(dialog).getByRole("searchbox", { name: "Search agents" })).toBeVisible();
@@ -121,7 +130,7 @@ export const NewChannel: Story = {
 };
 
 export const NewChannelWithMembers: Story = {
-  render: () => <OpenBotPlayground />,
+  render: () => <ChannelPlayground />,
   play: async (context) => {
     const dialog = await openNewChannelDialog(context);
     const field = within(dialog);
@@ -129,9 +138,40 @@ export const NewChannelWithMembers: Story = {
     await userEvent.type(field.getByRole("textbox", { name: "Channel name" }), "Project Falcon");
     await userEvent.click(field.getByRole("checkbox", { name: /Chief/ }));
     await userEvent.click(field.getByRole("checkbox", { name: /Research/ }));
-    await expect(field.getByRole("button", { name: "Remove Chief" })).toBeVisible();
-    await expect(field.getByRole("button", { name: "Remove Research" })).toBeVisible();
+    await expect(field.getByRole("checkbox", { name: /Chief/ })).toBeChecked();
+    await expect(field.getByRole("checkbox", { name: /Research/ })).toBeChecked();
     await expect(field.getByRole("button", { name: "Create" })).toBeEnabled();
+  },
+};
+
+/**
+ * The channel after it exists: a sidebar row with a preview line, and the chat itself, which reuses
+ * the agent chat's header, message column and composer. Creation runs through the dialog because the
+ * preview mock seeds no channel of its own.
+ */
+export const Channel: Story = {
+  render: () => <ChannelPlayground />,
+  play: async (context) => {
+    const dialog = await openNewChannelDialog(context);
+    const field = within(dialog);
+    const userEvent = context.userEvent;
+    await userEvent.type(field.getByRole("textbox", { name: "Channel name" }), "Project Falcon");
+    await userEvent.click(field.getByRole("checkbox", { name: /Chief/ }));
+    await userEvent.click(field.getByRole("checkbox", { name: /Research/ }));
+    await userEvent.click(field.getByRole("button", { name: "Create" }));
+
+    const chat = await context.canvas.findByRole("main", { name: "Channel conversation" });
+    const composer = within(chat).getByRole("textbox", { name: "Message to channel" });
+    composer.textContent = "Let's align on the launch milestones before Friday.";
+    await fireEvent.input(composer);
+    await userEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+
+    await expect(within(chat).findByRole("article", { name: "Message from You" })).resolves.toBeInTheDocument();
+    await waitFor(() =>
+      expect(context.canvas.getByRole("button", { name: /^Project Falcon\./ })).toHaveAccessibleName(
+        "Project Falcon. Let's align on the launch milestones before Friday.",
+      ),
+    );
   },
 };
 

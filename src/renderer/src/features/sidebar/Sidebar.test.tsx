@@ -1,3 +1,4 @@
+import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
@@ -54,6 +55,23 @@ function sidebarPropsWithExtraAgents(pinnedItems: SidebarPinnedItem[], count: nu
     })),
   ];
   return props;
+}
+
+function storyChannel(): ChannelSummary {
+  return {
+    id: "channel-1",
+    name: "Project room",
+    title: "",
+    instructions: "Ship the launch",
+    members: [{ agentId: "chief" }],
+    leadAgentId: "chief",
+    archived: false,
+    revision: 1,
+    createdAt: "2026-01-01T09:00:00.000Z",
+    unreadCount: 0,
+    activeTasks: 0,
+    lastMessage: null,
+  };
 }
 
 function nextAnimationFrame(): Promise<void> {
@@ -184,6 +202,32 @@ describe("Sidebar pinned chats", () => {
 
     await fireEvent.pointerUp(pinItem, { button: 0 });
     expect(props.onPin).toHaveBeenCalledWith({ kind: "agent", id: "extra-4" });
+  });
+
+  it("pins a channel from its menu and shows it in the strip, out of the list", async () => {
+    const props = sidebarProps();
+    const onSelectChannel = vi.fn();
+    const { unmount } = render(() => (
+      <Sidebar {...props} channels={[storyChannel()]} onSelectChannel={onSelectChannel} />
+    ));
+
+    await fireEvent.contextMenu(screen.getByRole("button", { name: "Project room. No messages yet" }));
+    const channelMenu = await screen.findByRole("menu", { name: "Channel actions" });
+    await fireEvent.pointerUp(within(channelMenu).getByRole("menuitem", { name: "Pin" }), { button: 0 });
+    expect(props.onPin).toHaveBeenCalledWith({ kind: "channel", id: "channel-1" });
+    unmount();
+
+    const pinned = sidebarProps([{ kind: "channel", id: "channel-1" }]);
+    render(() => <Sidebar {...pinned} channels={[storyChannel()]} onSelectChannel={onSelectChannel} />);
+    const tile = screen.getByRole("button", { name: "Project room, pinned channel" });
+    expect(screen.queryByRole("button", { name: "Project room. No messages yet" })).not.toBeInTheDocument();
+    await fireEvent.click(tile);
+    expect(onSelectChannel).toHaveBeenCalledWith("channel-1");
+
+    await fireEvent.contextMenu(tile);
+    const pinnedMenu = await screen.findByRole("menu", { name: "Channel actions" });
+    await fireEvent.pointerUp(within(pinnedMenu).getByRole("menuitem", { name: "Unpin" }), { button: 0 });
+    expect(pinned.onUnpin).toHaveBeenCalledWith({ kind: "channel", id: "channel-1" });
   });
 
   it("reorders pinned chats by keyboard and constrained horizontal drag", async () => {
@@ -364,7 +408,7 @@ describe("Sidebar sections", () => {
 
     const section = screen.getByRole("button", { name: "Demo" });
     expect(section).toHaveAttribute("draggable", "false");
-    expect(view.container.querySelector("[data-agent-id='chief']")).toHaveAttribute("draggable", "false");
+    expect(view.container.querySelector("[data-chat-id='chief']")).toHaveAttribute("draggable", "false");
     expect(screen.queryByLabelText("Sidebar free area")).not.toBeInTheDocument();
 
     await fireEvent.contextMenu(section);
@@ -403,6 +447,58 @@ describe("Sidebar sections", () => {
     expect(screen.getByRole("button", { name: /Research/ })).toBeInTheDocument();
   });
 
+  // "Unassigned" names the section against the sections it is not. With no other section it names the
+  // whole list, so the heading is a label for everything and tells the user nothing.
+  it("names the Unassigned section only once another section exists", async () => {
+    const props = sidebarProps();
+    const [layout, setLayout] = createSignal(defaultSidebarLayout());
+    render(() => <Sidebar {...props} layout={layout()} />);
+
+    expect(screen.getByRole("button", { name: /Chief/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Unassigned" })).not.toBeInTheDocument();
+
+    setLayout(sectionLayout());
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Unassigned" })).toBeInTheDocument());
+  });
+
+  it("files a channel into a section by drag, beside the agents", async () => {
+    const props = sidebarProps();
+    const onSelectChannel = vi.fn();
+    render(() => (
+      <Sidebar {...props} layout={sectionLayout()} channels={[storyChannel()]} onSelectChannel={onSelectChannel} />
+    ));
+    const row = screen.getByRole("button", { name: "Project room. No messages yet" });
+    const channelItem = row.closest<HTMLElement>("[data-chat-id]");
+    const demo = screen.getByRole("button", { name: "Demo" }).closest<HTMLElement>("section");
+    const list = screen.getByRole("navigation", { name: "Chat list" });
+    if (!channelItem || !demo) throw new Error("Channel drag targets are missing.");
+    vi.spyOn(channelItem, "getBoundingClientRect").mockReturnValue(rect(12, 80, 256, 54));
+    vi.spyOn(list, "getBoundingClientRect").mockReturnValue(rect(0, 0, 280, 600));
+    vi.spyOn(demo, "getBoundingClientRect").mockReturnValue(rect(12, 300, 256, 100));
+    const dataTransfer = {
+      setData: vi.fn(),
+      setDragImage: vi.fn(),
+      effectAllowed: "move",
+      dropEffect: "move",
+    };
+
+    dragStartAt(channelItem, dataTransfer, { clientX: 30, clientY: 100 });
+    await dragOverFrame(demo, dataTransfer, { clientX: 250, clientY: 330 });
+    // A channel pins like an agent, so the drag opens the empty pinned group as a target for it.
+    expect(screen.getByText("Drag here to pin")).toBeInTheDocument();
+    dropAt(demo, dataTransfer, { clientX: 250, clientY: 330 });
+
+    expect(props.onMutateLayout).toHaveBeenCalledWith({
+      type: "move-agent",
+      agentId: "channel-1",
+      sectionId: demoId,
+      beforeAgentId: null,
+    });
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Moved Project room to Demo."));
+    expect(onSelectChannel).not.toHaveBeenCalled();
+  });
+
   it("moves through empty custom sections and disables movement at the visible edge", async () => {
     const props = sidebarProps();
     const layout = sectionLayout();
@@ -428,7 +524,7 @@ describe("Sidebar sections", () => {
     const props = sidebarProps();
     render(() => <Sidebar {...props} layout={sectionLayout()} />);
     const research = screen.getByRole("button", { name: /Research/ });
-    const researchItem = research.closest<HTMLElement>("[data-agent-id]");
+    const researchItem = research.closest<HTMLElement>("[data-chat-id]");
     const unassigned = screen.getByRole("button", { name: "Unassigned" }).closest<HTMLElement>("section");
     const list = screen.getByRole("navigation", { name: "Chat list" });
     if (!researchItem || !unassigned) throw new Error("Sidebar drag targets are missing.");
@@ -492,7 +588,7 @@ describe("Sidebar sections", () => {
     const people = screen.getByRole("button", { name: "People" }).closest<HTMLElement>("section");
     const demo = screen.getByRole("button", { name: "Demo" }).closest<HTMLElement>("section");
     const product = screen.getByRole("button", { name: "Product" }).closest<HTMLElement>("section");
-    const sales = screen.getByRole("button", { name: /Sales/ }).closest<HTMLElement>("[data-agent-id]");
+    const sales = screen.getByRole("button", { name: /Sales/ }).closest<HTMLElement>("[data-chat-id]");
     const pinned = screen.getByRole("region", { name: "Pinned chats" });
     if (!pinnedItem || !list || !people || !demo || !product || !sales) {
       throw new Error("Multi-section drag targets are missing.");
@@ -607,8 +703,8 @@ describe("Sidebar sections", () => {
     render(() => <Sidebar {...props} layout={sectionLayout()} />);
     const chief = screen.getByRole("button", { name: /Chief/ });
     const research = screen.getByRole("button", { name: /Research/ });
-    const chiefItem = chief.closest<HTMLElement>("[data-agent-id]");
-    const researchItem = research.closest<HTMLElement>("[data-agent-id]");
+    const chiefItem = chief.closest<HTMLElement>("[data-chat-id]");
+    const researchItem = research.closest<HTMLElement>("[data-chat-id]");
     const demoSection = screen.getByRole("button", { name: "Demo" }).closest<HTMLElement>("section");
     const list = screen.getByRole("navigation", { name: "Chat list" });
     if (!chiefItem || !researchItem || !demoSection) throw new Error("Sidebar list is missing.");

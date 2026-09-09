@@ -1,12 +1,25 @@
 // Frozen optional channel-chats-v1 wire contract. Keep IPC types and limits out of this file.
 import { isDynamicRecord, isString } from "../runtime-values";
-import { decodeTeamProtocolV1HttpResponse } from "./v1";
+import { decodeTeamProtocolV1HttpRequest, decodeTeamProtocolV1HttpResponse } from "./v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./v2";
 
 export const CHANNEL_ROUTES = {
   list: "/v1/channels",
   read: "/v1/channels/read",
   command: "/v1/channels/commands",
+  // Every settings route is a POST with the channel in the body. A channel id in the path would
+  // need a matcher here, and this file compares `url.pathname` for equality by design.
+  memories: "/v1/channels/memories",
+  memoryCreate: "/v1/channels/memories/create",
+  memoryUpdate: "/v1/channels/memories/update",
+  memoryDelete: "/v1/channels/memories/delete",
+  memoryClear: "/v1/channels/memories/clear",
+  routines: "/v1/channels/routines",
+  routineCreate: "/v1/channels/routines/create",
+  routineUpdate: "/v1/channels/routines/update",
+  routineDelete: "/v1/channels/routines/delete",
+  routineTest: "/v1/channels/routines/test",
+  routineRuns: "/v1/channels/routines/runs",
 } as const;
 type Decoder = (value: unknown) => TeamProtocolV2Json;
 type Fields = Record<string, Decoder>;
@@ -56,16 +69,25 @@ function record(value: unknown, fields: Fields): Record<string, TeamProtocolV2Js
   if (!isDynamicRecord(value)) throw new Error("Invalid channel record.");
   return Object.fromEntries(Object.entries(fields).map(([key, decode]) => [key, decode(value[key])]));
 }
-const member: Decoder = (value) => record(value, { agentId: identifier, responsibility: string(2000) });
+const member: Decoder = (value) => record(value, { agentId: identifier });
 const draftFields = {
   name: string(80),
-  purpose: string(2000),
+  title: string(120),
+  instructions: string(2000),
   members: list(member, 100),
   leadAgentId: nullable(identifier),
-  linkedThreadIds: identifiers,
 };
+
 const draft: Decoder = (value) => {
-  const result = record(value, draftFields);
+  // `record` is strict by omission: a key absent from `draftFields` is dropped without an error. A
+  // peer that still sends the older `purpose` would therefore lose the text silently, so map it
+  // here, before the allow-list runs, which also drops `purpose` itself. The IPC guard holds the
+  // same fallback; this file keeps its own copy because it must not import IPC types.
+  const source =
+    isDynamicRecord(value) && "purpose" in value
+      ? { title: "", instructions: isString(value.purpose) ? value.purpose : "", ...value }
+      : value;
+  const result = record(source, draftFields);
   if (!isString(result.name) || !result.name.trim() || !Array.isArray(result.members))
     throw new Error("Invalid channel draft.");
   const ids = result.members.map((item) => (isDynamicRecord(item) ? item.agentId : null));
@@ -146,14 +168,89 @@ const message: Decoder = (value) =>
     message: conversationMessage,
   });
 
+const memory: Decoder = (value) =>
+  record(value, {
+    id: identifier,
+    channelId: identifier,
+    text: string(500),
+    origin: oneOf("automatic", "manual"),
+    sourceTurnId: nullable(identifier),
+    createdAt: string(80),
+    updatedAt: string(80),
+  });
+
+// A routine schedule is a union of eight shapes, and the frozen v1 codec already decodes it for
+// agent routines. Lending that codec a placeholder routine is what keeps one description of the
+// union in the repository: a channel schedule that v1 rejects is rejected here too.
+const schedule: Decoder = (value) => {
+  const projected = decodeTeamProtocolV1HttpRequest("POST", "/v1/agents/channel/routines", {
+    botId: "channel",
+    name: "routine",
+    instruction: "routine",
+    active: true,
+    timezone: "UTC",
+    schedule: value,
+  });
+  return decodeTeamProtocolV2Json(projected.schedule);
+};
+const trigger: Decoder = (value) =>
+  record(value, {
+    id: identifier,
+    routineId: identifier,
+    schedule,
+    nextRunAt: string(80),
+    createdAt: string(80),
+    updatedAt: string(80),
+  });
+const routine: Decoder = (value) =>
+  record(value, {
+    id: identifier,
+    channelId: identifier,
+    name: string(80),
+    instruction: string(100000),
+    active: boolean,
+    timezone: string(128),
+    trigger,
+    createdAt: string(80),
+    updatedAt: string(80),
+  });
+const routineRun: Decoder = (value) =>
+  record(value, {
+    id: identifier,
+    channelId: identifier,
+    routineId: identifier,
+    triggerId: nullable(identifier),
+    kind: oneOf("scheduled", "manual"),
+    scheduledFor: string(80),
+    routineName: string(80),
+    instruction: string(100000),
+    requestMessageId: nullable(identifier),
+    status: oneOf("queued", "running", "needs-attention", "succeeded", "failed", "cancelled"),
+    error: nullable(string(100000)),
+    createdAt: string(80),
+    updatedAt: string(80),
+  });
+
+const CHANNEL_ROUTE_PATHS: ReadonlySet<string> = new Set(Object.values(CHANNEL_ROUTES));
+const CHANNEL_CHAT_PATHS: ReadonlySet<string> = new Set([
+  CHANNEL_ROUTES.list,
+  CHANNEL_ROUTES.read,
+  CHANNEL_ROUTES.command,
+]);
+
+/** The memory and routine routes: every channel route that is not one of the three chat routes. */
+export function isChannelSettingsRoute(pathname: string): boolean {
+  return CHANNEL_ROUTE_PATHS.has(pathname) && !CHANNEL_CHAT_PATHS.has(pathname);
+}
+
 export function isChannelRoute(path: string): boolean {
-  const pathname = new URL(path, "http://openbot.invalid").pathname;
-  return pathname === CHANNEL_ROUTES.list || pathname === CHANNEL_ROUTES.read || pathname === CHANNEL_ROUTES.command;
+  return CHANNEL_ROUTE_PATHS.has(new URL(path, "http://openbot.invalid").pathname);
 }
 
 export function channelRequest(path: string, value: unknown): TeamProtocolV2Json {
   const pathname = new URL(path, "http://openbot.invalid").pathname;
   if (pathname === CHANNEL_ROUTES.list) return {};
+  if (isChannelSettingsRoute(pathname)) return channelSettingsRequest(pathname, value);
   if (pathname === CHANNEL_ROUTES.read) {
     if (!isDynamicRecord(value)) throw new Error("Invalid channel read request.");
     return {
@@ -187,9 +284,79 @@ export function channelRequest(path: string, value: unknown): TeamProtocolV2Json
   return { ...common, ...record(value, { taskId: identifier, recipientAgentId: nullable(identifier) }) };
 }
 
+/** The memory and routine routes, all of which carry a channel id in the body. */
+function channelSettingsRequest(pathname: string, value: unknown): TeamProtocolV2Json {
+  const owner = () => record(value, { channelId: identifier });
+  const named = () => record(value, { channelId: identifier, routineId: identifier });
+  switch (pathname) {
+    case CHANNEL_ROUTES.memories:
+    case CHANNEL_ROUTES.memoryClear:
+    case CHANNEL_ROUTES.routines:
+      return owner();
+    case CHANNEL_ROUTES.memoryCreate:
+      return record(value, { channelId: identifier, text: string(500) });
+    case CHANNEL_ROUTES.memoryUpdate:
+      return record(value, { channelId: identifier, memoryId: identifier, text: string(500) });
+    case CHANNEL_ROUTES.memoryDelete:
+      return record(value, { channelId: identifier, memoryId: identifier });
+    case CHANNEL_ROUTES.routineCreate:
+      return record(value, {
+        channelId: identifier,
+        name: string(80),
+        instruction: string(100000),
+        active: boolean,
+        timezone: string(128),
+        schedule,
+      });
+    case CHANNEL_ROUTES.routineUpdate: {
+      if (!isDynamicRecord(value)) throw new Error("Invalid channel routine update.");
+      const optional: Record<string, TeamProtocolV2Json> = {};
+      if (value.name !== undefined) optional.name = string(80)(value.name);
+      if (value.instruction !== undefined) optional.instruction = string(100000)(value.instruction);
+      if (value.active !== undefined) optional.active = boolean(value.active);
+      if (value.schedule !== undefined) optional.schedule = schedule(value.schedule);
+      if (!Object.keys(optional).length) throw new Error("Invalid channel routine update.");
+      return { ...named(), ...optional };
+    }
+    case CHANNEL_ROUTES.routineDelete:
+    case CHANNEL_ROUTES.routineTest:
+      return named();
+    case CHANNEL_ROUTES.routineRuns:
+      return { ...named(), limit: sequence(isDynamicRecord(value) ? value.limit : undefined) };
+    default:
+      throw new Error("Unknown channel route.");
+  }
+}
+
+function channelSettingsResponse(pathname: string, value: unknown): TeamProtocolV2Json {
+  switch (pathname) {
+    case CHANNEL_ROUTES.memories:
+      return list(memory, 64)(value);
+    case CHANNEL_ROUTES.memoryCreate:
+    case CHANNEL_ROUTES.memoryUpdate:
+      return memory(value);
+    case CHANNEL_ROUTES.memoryDelete:
+    case CHANNEL_ROUTES.memoryClear:
+    case CHANNEL_ROUTES.routineDelete:
+      return null;
+    case CHANNEL_ROUTES.routines:
+      return list(routine, 64)(value);
+    case CHANNEL_ROUTES.routineCreate:
+    case CHANNEL_ROUTES.routineUpdate:
+      return routine(value);
+    case CHANNEL_ROUTES.routineTest:
+      return routineRun(value);
+    case CHANNEL_ROUTES.routineRuns:
+      return list(routineRun, 100)(value);
+    default:
+      throw new Error("Unknown channel route.");
+  }
+}
+
 export function channelResponse(path: string, status: number, value: unknown): TeamProtocolV2Json {
   if (status >= 400) return record(value, { error: string(100000) });
   const pathname = new URL(path, "http://openbot.invalid").pathname;
+  if (isChannelSettingsRoute(pathname)) return channelSettingsResponse(pathname, value);
   if (pathname === CHANNEL_ROUTES.list)
     return list((item) => ({
       ...record(item, { unreadCount: sequence, activeTasks: sequence, lastMessage: preview }),

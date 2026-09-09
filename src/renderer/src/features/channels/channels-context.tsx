@@ -122,7 +122,10 @@ const Channels = createSimpleContext({
     }
     async function command(input: ChannelCommand): Promise<boolean> {
       const account = accountKey();
-      if (state.pending && input.type !== "stop" && input.type !== "archive") return false;
+      // A `save` is never dropped: settings commit each field as it is left, and a silently
+      // discarded autosave is lost work. The service serializes saves per channel and every
+      // command is idempotent on its `operationId`, so letting them queue is safe.
+      if (state.pending && input.type !== "stop" && input.type !== "archive" && input.type !== "save") return false;
       pendingCommands += 1;
       const attempt =
         failedCommand &&
@@ -139,10 +142,13 @@ const Channels = createSimpleContext({
         if (disposed || account !== accountKey()) return false;
         failedCommand = null;
         if (input.type === "save") setAgentSetupOpen(false);
+        // Only creation closes the editor. Settings save on every field, so closing on a save
+        // would shut the panel under the user between two edits.
         if (input.type === "save")
           flush(() =>
             setState((state) => {
-              Object.assign(state, { selectedId: input.channelId, editing: null });
+              state.selectedId = input.channelId;
+              if (state.editing === "create") state.editing = null;
             }),
           );
         await refresh();

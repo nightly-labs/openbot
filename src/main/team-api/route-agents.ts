@@ -94,7 +94,7 @@ export async function routeAgents(
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.sidebarLayout.actions) {
     const action = parseSidebarLayoutAction(await readJson(request));
-    const layout = await sidebarLayout.mutate(action, new Set(agents.listAgents().map((agent) => agent.id)));
+    const layout = await sidebarLayout.mutate(action, agents.sidebarChatIds());
     return json(200, layout);
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.usage) {

@@ -4,6 +4,7 @@ import {
   AGENT_RUNTIME_ATTENTION_LIMIT,
   AGENT_RUNTIME_TEXT_LIMIT,
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
+  decodeChannel,
   hostedSiteConversationEvent,
   hostedSiteConversationEventItemType,
   hostedSiteConversationEventText,
@@ -586,6 +587,36 @@ describe("memory event validation", () => {
     expect(isAgentMemory(memory)).toBe(true);
     expect(isAgentMemory({ ...memory, text: "" })).toBe(false);
     expect(isAgentMemory({ ...memory, origin: "imported" })).toBe(false);
+  });
+});
+
+describe("channel decoding", () => {
+  const channel = {
+    id: "channel-1",
+    name: "Project Falcon",
+    title: "Ship the beta",
+    instructions: "Keep the release notes current.",
+    members: [{ agentId: "agent-1" }],
+    leadAgentId: "agent-1",
+    archived: false,
+    revision: 4,
+    createdAt: "2026-08-29T10:00:00.000Z",
+  };
+
+  it("reads a stored row that still carries the older purpose key", () => {
+    const { title: _title, instructions: _instructions, ...stored } = channel;
+    expect(decodeChannel({ ...stored, purpose: "Ship the beta" })).toMatchObject({
+      title: "",
+      instructions: "Ship the beta",
+    });
+    expect(decodeChannel(channel)).toMatchObject({
+      title: "Ship the beta",
+      instructions: "Keep the release notes current.",
+    });
+  });
+
+  it("refuses a row with no name", () => {
+    expect(() => decodeChannel({ ...channel, name: " " })).toThrow("Invalid channel response.");
   });
 });
 

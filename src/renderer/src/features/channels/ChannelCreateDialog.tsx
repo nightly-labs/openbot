@@ -1,5 +1,6 @@
 import type { ChannelDraft } from "@openbot/contracts/ipc";
-import { createEffect, createSignal, createStore, For, Show, snapshot } from "solid-js";
+import { createEffect, createSignal, createStore, For, onSettled, Show, snapshot } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
 import {
   Alert,
   AlertDescription,
@@ -19,9 +20,10 @@ import { useChannels } from "./channels-context";
 import { emptyChannelDraft, toggleChannelMember } from "./channels-draft";
 
 /**
- * Creation asks for the two things that cannot be guessed - a name and the agents - and leaves
- * purpose, responsibilities and the lead to Channel settings. The lead is the first selected
- * member until settings changes it.
+ * Creation asks for the two things that cannot be guessed - a name and the agents - and leaves the
+ * purpose and the lead to Channel settings. The lead is the first selected member until settings
+ * changes it. Create is the one button here: unlike settings, there is nothing to save into until
+ * the channel exists.
  */
 export function ChannelCreateDialog() {
   const channels = useChannels();
@@ -33,40 +35,25 @@ export function ChannelCreateDialog() {
     agentList().filter((agent) =>
       `${agent.name} ${agent.description}`.toLowerCase().includes(view.search.toLowerCase()),
     );
-  const selected = () => agentList().filter((agent) => draft.members.some((member) => member.agentId === agent.id));
-  // The chips have to stay mounted while the row collapses, or removing the last one would empty
-  // the row before it has any height to animate. The delay is read back from the transition token
-  // so the two never drift apart.
-  const [chipAgents, setChipAgents] = createSignal(selected());
-  createEffect(
-    () => selected(),
-    (agents) => {
-      if (agents.length) {
-        setChipAgents(agents);
-        return;
-      }
-      const timer = setTimeout(() => setChipAgents([]), motionDuration("--acc-collapse"));
-      return () => clearTimeout(timer);
-    },
-  );
   // `.t-resize` tweens between two explicit heights, so the list gets its measured content height
   // after every filter change. The stylesheet's `max-height` still caps how tall it can grow.
   let listBody: HTMLDivElement | undefined;
   const [listHeight, setListHeight] = createSignal<string>();
+  const listFades = createScrollFades();
+  onSettled(() => listFades.stop);
   createEffect(
     () => filtered(),
     () => {
       const height = listBody?.getBoundingClientRect().height;
       if (height) setListHeight(`${height}px`);
+      // A filter changes what overflows without always changing the element's own height, which
+      // is the one case the bound resize observer cannot see.
+      listFades.remeasure();
     },
   );
   const toggle = (agentId: string, checked: boolean) =>
     setDraft((state) => {
-      toggleChannelMember(
-        state,
-        agentId,
-        checked ? (agentList().find((agent) => agent.id === agentId)?.description ?? "") : null,
-      );
+      toggleChannelMember(state, agentId, checked);
     });
   return (
     <Dialog.Root
@@ -118,29 +105,6 @@ export function ChannelCreateDialog() {
               </Field>
               <fieldset class="channel-picker">
                 <legend>Add agents</legend>
-                <div class="t-acc" data-open={selected().length ? "true" : "false"}>
-                  <div class="t-acc-panel">
-                    <div class="t-acc-panel-inner">
-                      <div class="channel-selected-members">
-                        <For each={chipAgents()}>
-                          {(agent) => (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="xs"
-                              aria-label={`Remove ${agent.name}`}
-                              onClick={() => toggle(agent.id, false)}
-                            >
-                              <AgentAvatar agent={agent} />
-                              {agent.name}
-                              <X />
-                            </Button>
-                          )}
-                        </For>
-                      </div>
-                    </div>
-                  </div>
-                </div>
                 <label class="search-field channel-member-search">
                   <span class="sr-only">Search agents</span>
                   <Search class="channel-search-icon" aria-hidden="true" />
@@ -156,7 +120,12 @@ export function ChannelCreateDialog() {
                     }
                   />
                 </label>
-                <div class="channel-picker-list t-resize" style={{ height: listHeight() }}>
+                <div
+                  ref={listFades.bind}
+                  class={["channel-picker-list t-resize", listFades.classes()]}
+                  style={{ height: listHeight() }}
+                  onScroll={listFades.measure}
+                >
                   <div ref={listBody} class="channel-picker-body">
                     <For each={filtered()}>
                       {(agent) => (
@@ -189,9 +158,6 @@ export function ChannelCreateDialog() {
                 </div>
               </fieldset>
               <footer class="channel-editor-footer">
-                <Button type="button" variant="ghost" onClick={channels.closeEditor}>
-                  Cancel
-                </Button>
                 <Button type="submit" disabled={channels.state.pending || !draft.name.trim() || !draft.members.length}>
                   Create
                 </Button>
@@ -202,9 +168,4 @@ export function ChannelCreateDialog() {
       </Dialog.Portal>
     </Dialog.Root>
   );
-}
-
-/** Reads a transition duration token so JS timing follows the stylesheet instead of a copy of it. */
-function motionDuration(token: string): number {
-  return Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(token)) || 250;
 }

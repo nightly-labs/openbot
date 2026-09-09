@@ -182,6 +182,21 @@ export const IPC_ENDPOINTS = {
     testRoutine: request(IPC_CHANNELS.agentTestRoutine),
     listRoutineRuns: request(IPC_CHANNELS.agentListRoutineRuns),
   },
+  channelMemories: {
+    listChannelMemories: request(IPC_CHANNELS.agentListChannelMemories),
+    createChannelMemory: request(IPC_CHANNELS.agentCreateChannelMemory),
+    updateChannelMemory: request(IPC_CHANNELS.agentUpdateChannelMemory),
+    deleteChannelMemory: request(IPC_CHANNELS.agentDeleteChannelMemory),
+    clearChannelMemories: request(IPC_CHANNELS.agentClearChannelMemories),
+  },
+  channelRoutines: {
+    listChannelRoutines: request(IPC_CHANNELS.agentListChannelRoutines),
+    createChannelRoutine: request(IPC_CHANNELS.agentCreateChannelRoutine),
+    updateChannelRoutine: request(IPC_CHANNELS.agentUpdateChannelRoutine),
+    deleteChannelRoutine: request(IPC_CHANNELS.agentDeleteChannelRoutine),
+    testChannelRoutine: request(IPC_CHANNELS.agentTestChannelRoutine),
+    listChannelRoutineRuns: request(IPC_CHANNELS.agentListChannelRoutineRuns),
+  },
   agentAttachments: {
     chooseAttachments: request(IPC_CHANNELS.agentChooseAttachments),
     importAttachments: request(IPC_CHANNELS.agentImportAttachments),

@@ -13,10 +13,10 @@ const command = {
 const channel = {
   id: "channel-1",
   name: "Project",
-  purpose: "Ship the project",
-  members: [{ agentId: "agent-1", responsibility: "Research" }],
+  title: "Release coordination",
+  instructions: "Ship the project",
+  members: [{ agentId: "agent-1" }],
   leadAgentId: "agent-1",
-  linkedThreadIds: [],
   archived: false,
   revision: 1,
   createdAt: "2026-09-07T12:00:00.000Z",
@@ -103,6 +103,56 @@ describe("channel-chats-v1 payloads", () => {
       channelId: "channel-1",
       revision: 2,
     });
+  });
+  it("reads the older purpose key as instructions", () => {
+    const save = {
+      type: "save",
+      operationId: "operation-3",
+      channelId: channel.id,
+      draft: {
+        name: channel.name,
+        purpose: "Ship the project",
+        members: [{ agentId: "agent-1" }],
+        leadAgentId: "agent-1",
+      },
+    };
+    expect(channelRequest(CHANNEL_ROUTES.command, save)).toEqual({
+      type: "save",
+      operationId: "operation-3",
+      channelId: channel.id,
+      draft: {
+        name: channel.name,
+        title: "",
+        instructions: "Ship the project",
+        members: [{ agentId: "agent-1" }],
+        leadAgentId: "agent-1",
+      },
+    });
+  });
+  it("drops the member and draft keys an older peer still sends", () => {
+    const save = {
+      type: "save",
+      operationId: "operation-2",
+      channelId: channel.id,
+      draft: {
+        name: channel.name,
+        title: channel.title,
+        instructions: channel.instructions,
+        members: [{ agentId: "agent-1" }],
+        leadAgentId: "agent-1",
+      },
+    };
+    expect(channelRequest(CHANNEL_ROUTES.command, save)).toEqual(save);
+    expect(
+      channelRequest(CHANNEL_ROUTES.command, {
+        ...save,
+        draft: {
+          ...save.draft,
+          members: [{ agentId: "agent-1", responsibility: "Research" }],
+          linkedThreadIds: ["thread-1"],
+        },
+      }),
+    ).toEqual(save);
   });
   it("does not accept an asserted human author from a client", () => {
     expect(

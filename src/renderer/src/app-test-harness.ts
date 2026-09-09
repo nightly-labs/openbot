@@ -491,9 +491,7 @@ export function installOpenbotStub(): void {
         onEvent: vi.fn(authBridge.subscribe),
       },
       agent: {
-        ...createMockChannels((channelId, revision) =>
-          emitAgentEvent?.({ type: "channels-changed", channelId, revision }),
-        ),
+        ...createMockChannels((event) => emitAgentEvent?.(event)),
         getStatus: vi.fn().mockResolvedValue({
           phase: "ready",
           cliVersion: "0.144.1",

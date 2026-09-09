@@ -916,7 +916,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listModels: async () => clone(models),
       listAgents: async () => clone(agents),
       listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
-      ...createMockChannels((channelId, revision) => emitAgentEvent({ type: "channels-changed", channelId, revision })),
+      ...createMockChannels(emitAgentEvent),
       getSidebarLayout: async () => clone(sidebarLayout),
       mutateSidebarLayout: async (action) => {
         sidebarLayout = applySidebarLayoutAction(sidebarLayout, action);

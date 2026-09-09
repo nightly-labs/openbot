@@ -299,7 +299,6 @@ export async function createApplicationServices({
   const hostedSites = new HostedSiteDesktopService(centralAuth);
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await sidebarLayout.initialize();
-  await sidebarLayout.reconcileAgents(new Set(store.list().map((agent) => agent.id)));
   const mailbox = new MailboxStore(app.getPath("userData"), store.sharedRoot, store.database);
   await mailbox.initialize();
   configureApplicationProtocol();
@@ -357,6 +356,9 @@ export async function createApplicationServices({
     sidebarLayout,
   );
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
+  // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
+  // reconciling against the agents alone would read every channel as gone and drop where it sits.
+  await sidebarLayout.reconcileAgents(service.sidebarChatIds());
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
   providerRuntimes.on("ready", (provider) => {
     void service.refreshProvider(provider).catch((error) => {

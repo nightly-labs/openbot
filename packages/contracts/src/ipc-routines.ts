@@ -106,9 +106,13 @@ function isRoutineTrigger(value: unknown): value is RoutineTrigger {
   );
 }
 
-export interface Routine {
+/**
+ * The part of a routine that does not name its owner. One store and one settings panel serve both
+ * an agent and a channel; `Routine` and `ChannelRoutine` only add the owner id and keep their own
+ * shapes exactly.
+ */
+export interface RoutineFields {
   id: string;
-  agentId: string;
   name: string;
   instruction: string;
   active: boolean;
@@ -118,11 +122,14 @@ export interface Routine {
   updatedAt: string;
 }
 
-export function isRoutine(value: unknown): value is Routine {
+export interface Routine extends RoutineFields {
+  agentId: string;
+}
+
+export function isRoutineFields(value: unknown): value is RoutineFields {
   return (
     isDynamicRecord(value) &&
     isString(value.id) &&
-    isString(value.agentId) &&
     isString(value.name) &&
     isString(value.instruction) &&
     isBoolean(value.active) &&
@@ -131,6 +138,10 @@ export function isRoutine(value: unknown): value is Routine {
     isString(value.createdAt) &&
     isString(value.updatedAt)
   );
+}
+
+export function isRoutine(value: unknown): value is Routine {
+  return isDynamicRecord(value) && isRoutineFields(value) && isString(value.agentId);
 }
 
 export type RoutineRunStatus =
@@ -142,34 +153,36 @@ export type RoutineRunStatus =
   | "interrupted"
   | "cancelled";
 
-export interface RoutineRun {
+/** A run without its owner and without the handle that names the work it started. */
+export interface RoutineRunFields {
   id: string;
   routineId: string;
-  agentId: string;
   triggerId: string | null;
   kind: "scheduled" | "manual";
   scheduledFor: string;
   routineName: string;
   instruction: string;
-  deliveryId: string | null;
   status: RoutineRunStatus;
   error: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export function isRoutineRun(value: unknown): value is RoutineRun {
+export interface RoutineRun extends RoutineRunFields {
+  agentId: string;
+  deliveryId: string | null;
+}
+
+export function isRoutineRunFields(value: unknown): value is RoutineRunFields {
   return (
     isDynamicRecord(value) &&
     isString(value.id) &&
     isString(value.routineId) &&
-    isString(value.agentId) &&
     (value.triggerId === null || isString(value.triggerId)) &&
     isOneOf(["scheduled", "manual"] as const, value.kind) &&
     isString(value.scheduledFor) &&
     isString(value.routineName) &&
     isString(value.instruction) &&
-    (value.deliveryId === null || isString(value.deliveryId)) &&
     isOneOf(
       ["queued", "running", "needs-attention", "succeeded", "failed", "interrupted", "cancelled"] as const,
       value.status,
@@ -177,6 +190,15 @@ export function isRoutineRun(value: unknown): value is RoutineRun {
     (value.error === null || isString(value.error)) &&
     isString(value.createdAt) &&
     isString(value.updatedAt)
+  );
+}
+
+export function isRoutineRun(value: unknown): value is RoutineRun {
+  return (
+    isDynamicRecord(value) &&
+    isRoutineRunFields(value) &&
+    isString(value.agentId) &&
+    (value.deliveryId === null || isString(value.deliveryId))
   );
 }
 

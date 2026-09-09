@@ -67,6 +67,31 @@ export class ChannelStore {
     return decodeChannel(JSON.parse(requiredStringColumn(row, "channel_json")));
   }
 
+  /**
+   * Only the ids, in one query. Placing channels in the sidebar layout needs the set of ids that
+   * exist - archived ones included, so an archived channel keeps its section - and `list` would
+   * read every message of every channel to answer that.
+   */
+  ids(): string[] {
+    return databaseRows(this.database.connection.prepare("SELECT channel_id FROM projection_channels").all()).map(
+      (row) => requiredStringColumn(row, "channel_id"),
+    );
+  }
+
+  /**
+   * The archived ids, in one query. An archived channel must not fire a routine and must not wake
+   * the shared timer, and `list` would read every message of every channel to answer that.
+   */
+  archivedIds(): ReadonlySet<string> {
+    return new Set(
+      databaseRows(
+        this.database.connection
+          .prepare("SELECT channel_id FROM projection_channels WHERE json_extract(channel_json, '$.archived') = 1")
+          .all(),
+      ).map((row) => requiredStringColumn(row, "channel_id")),
+    );
+  }
+
   list(memberId: string): ChannelSummary[] {
     return databaseRows(
       this.database.connection.prepare("SELECT channel_json FROM projection_channels ORDER BY rowid").all(),
@@ -366,7 +391,7 @@ export class ChannelStore {
           )
           .all(channelId),
       );
-      for (const table of ["assignments", "tasks", "messages", "summaries", "reads", "contexts"])
+      for (const table of ["assignments", "tasks", "messages", "summaries", "reads", "contexts", "memories"])
         db.prepare(`DELETE FROM projection_channel_${table} WHERE channel_id = ?`).run(channelId);
       db.prepare("DELETE FROM projection_channels WHERE channel_id = ?").run(channelId);
       for (const event of events) {

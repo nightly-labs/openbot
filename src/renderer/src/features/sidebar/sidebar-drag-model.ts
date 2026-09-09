@@ -36,8 +36,8 @@ export interface SectionDropTarget {
   placement: "before" | "after";
 }
 
-export interface AgentDropTarget {
-  agentId: string;
+export interface ChatDropTarget {
+  chatId: string;
   placement: "before" | "after";
   sectionId: string;
 }
@@ -47,8 +47,8 @@ export interface PersonDropTarget {
   placement: "before" | "after";
 }
 
-export interface AgentDragSlot {
-  agentId: string;
+export interface ChatDragSlot {
+  chatId: string;
   bottom: number;
   centerY: number;
   element: HTMLElement;
@@ -73,14 +73,18 @@ export interface PersonDragSlot {
 }
 
 export type SidebarDragSource =
-  | { kind: "agent"; id: string; origin: "section" }
-  | { kind: "agent"; id: string; key: string; origin: "pinned" }
+  /* A row in a section: an agent or a channel. Both are placed by the same layout, so the drag
+   * pipeline knows them as one kind and only pinning asks which of the two a chat is. */
+  | { kind: "chat"; id: string; origin: "section" }
+  /* A tile in the pinned strip. It carries its pin key because two chats of different kinds can
+   * share an id, and the strip is ordered by key. */
+  | { kind: "pinned"; id: string; key: string; origin: "pinned" }
   | { kind: "person"; id: string; origin: "people" }
   | { kind: "section"; id: string };
 
 export type SidebarDropTarget =
   | { kind: "pinned"; key: string | null }
-  | { kind: "agent"; target: AgentDropTarget }
+  | { kind: "chat"; target: ChatDropTarget }
   | { kind: "section"; sectionId: string }
   | { kind: "person"; target: PersonDropTarget }
   | { kind: "section-order"; target: SectionDropTarget };
@@ -135,19 +139,19 @@ export interface SidebarDrag {
  * resolver is pure against it, so where a drag would land is answered from slot rectangles and a
  * source alone - nothing it can reach mutates under it, and a caller can hand it geometry directly.
  *
- * The three scroll deltas are separate fields rather than one because `agentDragStartScrollTop`,
+ * The three scroll deltas are separate fields rather than one because `chatDragStartScrollTop`,
  * `sectionDragStartScrollTop` and `dragSession.startScrollTop` are assigned in different places and
  * only happen to agree.
  */
 export interface SidebarDragWorld {
-  agentScrollDelta: number;
-  agentSlots: Map<string, AgentDragSlot>;
+  chatScrollDelta: number;
+  chatSlots: Map<string, ChatDragSlot>;
   /** Read untracked, at resolve time - in the component this is a memo, not a value. */
   canPinDraggedItem: () => boolean;
   geometry: SidebarDragGeometry;
   personSlots: Map<string, PersonDragSlot>;
   pinnedSlots: DragSlot[];
-  sectionAcceptsAgent: (sectionId: string) => boolean;
+  sectionAcceptsChat: (sectionId: string) => boolean;
   sectionScrollDelta: number;
   sectionSlots: Map<string, SectionDragSlot>;
   session: SidebarDragSession;
@@ -160,9 +164,9 @@ export function sidebarDropTargetsEqual(left: SidebarDropTarget | null, right: S
   if (!left || !right || left.kind !== right.kind) return false;
   if (left.kind === "pinned" && right.kind === "pinned") return left.key === right.key;
   if (left.kind === "section" && right.kind === "section") return left.sectionId === right.sectionId;
-  if (left.kind === "agent" && right.kind === "agent") {
+  if (left.kind === "chat" && right.kind === "chat") {
     return (
-      left.target.agentId === right.target.agentId &&
+      left.target.chatId === right.target.chatId &&
       left.target.placement === right.target.placement &&
       left.target.sectionId === right.target.sectionId
     );
@@ -211,17 +215,17 @@ export function closestVerticalSlot<T extends { bottom: number; centerY: number;
   return clientY >= extentTop && clientY <= extentBottom ? closest : null;
 }
 
-function targetAgentAt(
+function targetChatAt(
   world: SidebarDragWorld,
-  sourceAgentId: string,
-  agentId: string,
+  sourceChatId: string,
+  chatId: string,
   clientY: number,
-): AgentDropTarget | null {
-  if (sourceAgentId === agentId) return null;
-  const sourceSlot = world.agentSlots.get(sourceAgentId);
-  const slot = world.agentSlots.get(agentId);
+): ChatDropTarget | null {
+  if (sourceChatId === chatId) return null;
+  const sourceSlot = world.chatSlots.get(sourceChatId);
+  const slot = world.chatSlots.get(chatId);
   if (!slot) return null;
-  const scrollDelta = world.agentScrollDelta;
+  const scrollDelta = world.chatScrollDelta;
   const placement =
     sourceSlot?.sectionId === slot.sectionId
       ? sourceSlot.top < slot.top
@@ -230,8 +234,8 @@ function targetAgentAt(
       : clientY < slot.centerY - scrollDelta
         ? "before"
         : "after";
-  const nextTarget: AgentDropTarget = {
-    agentId,
+  const nextTarget: ChatDropTarget = {
+    chatId,
     placement,
     sectionId: slot.sectionId,
   };
@@ -242,11 +246,11 @@ function sectionAtPoint(world: SidebarDragWorld, point: SidebarDragPoint): Secti
   return closestVerticalSlot(world.sectionSlots.values(), point.clientY, world.sectionScrollDelta);
 }
 
-function agentAtPoint(world: SidebarDragWorld, point: SidebarDragPoint, sectionId: string): AgentDragSlot | null {
+function chatAtPoint(world: SidebarDragWorld, point: SidebarDragPoint, sectionId: string): ChatDragSlot | null {
   return closestVerticalSlot(
-    world.agentSlots.values(),
+    world.chatSlots.values(),
     point.clientY,
-    world.agentScrollDelta,
+    world.chatScrollDelta,
     (slot) => slot.sectionId === sectionId,
   );
 }
@@ -313,11 +317,11 @@ export function sidebarDropTargetAt(world: SidebarDragWorld, point: SidebarDragP
     };
   }
 
-  if (!world.sectionAcceptsAgent(section.sectionId)) return null;
-  const agent = agentAtPoint(world, point, section.sectionId);
-  if (agent && agent.agentId !== session.source.id) {
-    const target = targetAgentAt(world, session.source.id, agent.agentId, point.clientY);
-    if (target) return { kind: "agent", target };
+  if (!world.sectionAcceptsChat(section.sectionId)) return null;
+  const chat = chatAtPoint(world, point, section.sectionId);
+  if (chat && chat.chatId !== session.source.id) {
+    const target = targetChatAt(world, session.source.id, chat.chatId, point.clientY);
+    if (target) return { kind: "chat", target };
   }
   return { kind: "section", sectionId: section.sectionId };
 }

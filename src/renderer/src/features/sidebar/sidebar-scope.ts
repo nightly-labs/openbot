@@ -27,18 +27,20 @@ export function createSidebarScope(props: SidebarProps) {
     props,
   });
   const {
-    agentPinnedItems,
     assignedSectionId,
-    agentById,
+    chatKind,
+    chatName,
+    chatPinnedItems,
     customSectionById,
     directThreadByMember,
     filteredAgents,
-    filteredAgentsBySection,
+    filteredChats,
+    filteredChatsBySection,
     filteredPeople,
     orderedPeople,
     personById,
     resolvedPinnedItems,
-    sectionAcceptsAgent,
+    sectionAcceptsChat,
     sectionIsCollapsed,
     sectionLabel,
     sectionPosition,
@@ -65,17 +67,17 @@ export function createSidebarScope(props: SidebarProps) {
   } = createSidebarPendingStore({ customSectionById, props });
   let agentList: HTMLElement | undefined;
 
-  const dragState = createSidebarDragStateStore({ sectionAcceptsAgent });
-  const { assignAgentSection, commitSidebarDrop, movePersonByKeyboard, movePinnedItem, moveSection } =
+  const dragState = createSidebarDragStateStore({ chatKind, sectionAcceptsChat });
+  const { assignChatSection, commitSidebarDrop, movePersonByKeyboard, movePinnedItem, moveSection } =
     createSidebarLayoutActions({
-      agentPinnedItems,
       announce,
       announceError,
       assignedSectionId,
-      agentById,
       canPinDraggedSidebarItem: dragState.canPinDraggedSidebarItem,
+      chatName,
+      chatPinnedItems,
       draggedSidebarItem: dragState.draggedSidebarItem,
-      filteredAgentsBySection,
+      filteredChatsBySection,
       filteredPeople,
       layoutMutable,
       orderedPeople,
@@ -87,27 +89,28 @@ export function createSidebarScope(props: SidebarProps) {
     });
   const {
     dropSidebarNativeDrag,
-    endAgentDragging,
+    endChatDragging,
     handleListDragLeave,
     sidebarClickIsSuppressed,
-    startAgentDragging,
+    startChatDragging,
     startNativeItemDragging,
     startPersonDragging,
     startSectionDragging,
     stopSidebarDragging,
     updateSidebarNativeDrag,
   } = createSidebarDragEngine({
-    agentPinnedItems,
     assignedSectionId,
     canPinDraggedItem: dragState.canPinDraggedSidebarItem,
+    chatKind,
+    chatPinnedItems,
     commitSidebarDrop,
     dragState,
-    filteredAgentsBySection,
+    filteredChatsBySection,
     filteredPeople,
     getAgentList: () => agentList,
     props,
     scrollFades,
-    sectionAcceptsAgent,
+    sectionAcceptsChat,
     visiblePinnedKeys,
     visibleSectionIds,
   });
@@ -118,7 +121,7 @@ export function createSidebarScope(props: SidebarProps) {
   });
 
   createEffect(
-    () => [resolvedPinnedItems(), filteredAgents(), filteredPeople()],
+    () => [resolvedPinnedItems(), filteredChats(), filteredPeople()],
     () => {
       scrollFades.remeasure();
     },
@@ -135,8 +138,7 @@ export function createSidebarScope(props: SidebarProps) {
    * store's writers are deliberately absent: only the engine may move a drag along.
    */
   return {
-    agentPinnedItems,
-    assignAgentSection,
+    assignChatSection,
     cancelSectionEditor,
     closeDelete,
     confirmDelete,
@@ -145,18 +147,20 @@ export function createSidebarScope(props: SidebarProps) {
     deleteError,
     deleteTarget,
     deleting,
+    chatPinnedItems,
     directThreadByMember,
     dragOffset: dragState.dragOffset,
     dragOverPinnedKey: dragState.dragOverPinnedKey,
-    draggedAgentId: dragState.draggedAgentId,
+    draggedChatId: dragState.draggedChatId,
     draggedPinnedKey: dragState.draggedPinnedKey,
     draggingKind: dragState.draggingKind,
     dropSidebarNativeDrag,
     emptyPinnedDropVisible: dragState.emptyPinnedDropVisible,
-    endAgentDragging,
+    endChatDragging,
     expandToSearch,
     filteredAgents,
-    filteredAgentsBySection,
+    filteredChats,
+    filteredChatsBySection,
     filteredPeople,
     handleListDragLeave,
     layoutMutable,
@@ -183,7 +187,7 @@ export function createSidebarScope(props: SidebarProps) {
     setSearchInputElement,
     setSectionNameInput,
     sidebarClickIsSuppressed,
-    startAgentDragging,
+    startChatDragging,
     startCreateSection,
     startNativeItemDragging,
     startPersonDragging,

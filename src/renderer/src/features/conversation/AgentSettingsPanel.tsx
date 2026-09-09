@@ -33,6 +33,8 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { BackIcon, SettingsForwardIcon } from "./ConversationIcons";
+import { agentMemoriesPort } from "./memories-port";
+import { agentRoutinesPort } from "./routines-port";
 
 const SETTINGS_PANEL_STORAGE_KEY = "openbot:settings-panel-width";
 const SETTINGS_PANEL_DEFAULT = 296;
@@ -134,6 +136,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     });
   }
 
+  const memoriesPort = createMemo(() => agentMemoriesPort(props.agent.id, props.agent.name));
+  const routinesPort = createMemo(() => agentRoutinesPort(props.agent.id));
   const selectedModel = createMemo(() =>
     props.modelOptions.find(
       (option) => option.provider === draft.runtime.provider && option.id === draft.runtime.model,
@@ -796,7 +800,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       <Show when={draft.routines.open}>
         <div class="agent-routines-overlay">
           <AgentRoutinesSettings
-            agentId={props.agent.id}
+            port={routinesPort()}
             onCountChange={(count) =>
               setDraft((state) => {
                 state.routines.count = count;
@@ -815,8 +819,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         </div>
       </Show>
       <AgentMemoriesModal
-        agentId={props.agent.id}
-        agentName={props.agent.name}
+        port={memoriesPort()}
         open={draft.memories.open}
         onOpenChange={(open) =>
           setDraft((state) => {

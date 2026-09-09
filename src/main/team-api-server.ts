@@ -502,7 +502,7 @@ export class TeamApiServer {
       if ((await this.#routeDirect(context)) === "handled") return;
       if ((await this.#routeBrowser(context)) === "handled") return;
       if ((await this.#routeFiles(context)) === "handled") return;
-      if ((await routeChannels(context, this.#options.channels)) === "handled") return;
+      if ((await routeChannels(context, this.#options.channels, this.#options.agents)) === "handled") return;
       if ((await this.#routeAgents(context)) === "handled") return;
 
       // The only 404 in the Team API.

@@ -1193,7 +1193,7 @@ textarea {
   will-change: transform;
 }
 
-.agent-list[data-sidebar-dragging="agent"] .sidebar-agent-item {
+.agent-list[data-sidebar-dragging="chat"] .sidebar-agent-item {
   transition: none;
   will-change: transform;
 }

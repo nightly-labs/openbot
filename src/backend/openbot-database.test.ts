@@ -99,6 +99,10 @@ describe("OpenBotDatabase", () => {
         "projection_direct_threads",
         "projection_direct_messages",
         "projection_direct_reads",
+        "projection_channel_memories",
+        "projection_channel_routines",
+        "projection_channel_routine_triggers",
+        "projection_channel_routine_runs",
         "file_deletion_outbox",
       ]),
     );
@@ -115,6 +119,7 @@ describe("OpenBotDatabase", () => {
       { version: 13 },
       { version: 14 },
       { version: 15 },
+      { version: 16 },
     ]);
     database.close();
   });
@@ -902,6 +907,7 @@ describe("OpenBotDatabase", () => {
       { version: 13 },
       { version: 14 },
       { version: 15 },
+      { version: 16 },
     ]);
     migrated.close();
   });
@@ -975,6 +981,7 @@ describe("OpenBotDatabase", () => {
       { version: 13 },
       { version: 14 },
       { version: 15 },
+      { version: 16 },
     ]);
     retried.close();
   });
@@ -1371,7 +1378,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const newer = new DatabaseSync(database.path);
-    newer.prepare("INSERT INTO schema_migrations(version, applied_at) VALUES (16, ?)").run("2026-08-20T10:00:00.000Z");
+    newer.prepare("INSERT INTO schema_migrations(version, applied_at) VALUES (17, ?)").run("2026-08-20T10:00:00.000Z");
     newer.close();
 
     const downgradedApp = new OpenBotDatabase(root);
@@ -1737,7 +1744,10 @@ function conversationSnapshot(agent: AgentSummary, text: string): ConversationSn
 
 // These tests construct released schemas by stripping newer additions from a fresh fixture.
 function removeChannelSchemaForLegacyFixture(db: DatabaseSync): void {
+  // Version 16 stands on version 15, so a fixture below 15 must drop both.
+  for (const table of ["memories", "routines", "routine_triggers", "routine_runs"])
+    db.exec(`DROP TABLE projection_channel_${table}`);
   for (const table of ["assignments", "tasks", "messages", "summaries", "reads", "contexts"])
     db.exec(`DROP TABLE projection_channel_${table}`);
-  db.exec("DROP TABLE projection_channels; DELETE FROM schema_migrations WHERE version = 15");
+  db.exec("DROP TABLE projection_channels; DELETE FROM schema_migrations WHERE version IN (15, 16)");
 }

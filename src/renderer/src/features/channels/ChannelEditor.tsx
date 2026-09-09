@@ -1,209 +1,324 @@
-import type { ChannelDraft } from "@openbot/contracts/ipc";
-import { createStore, For, Show, snapshot, untrack } from "solid-js";
-import { Button, Checkbox, Input, Textarea, UsersRound } from "../../components/ui";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import type { Channel, ChannelDraft } from "@openbot/contracts/ipc";
+import { createEffect, createStore, For, Show } from "solid-js";
+import {
+  Button,
+  buttonVariants,
+  ChevronRight,
+  Crown,
+  DropdownMenu,
+  Input,
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+  Plus,
+  Textarea,
+  Tooltip,
+  UserRound,
+} from "../../components/ui";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "./channels-context";
-import { emptyChannelDraft, toggleChannelMember } from "./channels-draft";
+import { toggleChannelMember } from "./channels-draft";
 
-export function ChannelEditor() {
+interface ChannelEditorProps {
+  memoryCount: number;
+  routineCount: number;
+  onOpenMemories: () => void;
+  onOpenRoutines: () => void;
+}
+
+/**
+ * Channel settings save themselves, the way agent settings do: the two text fields commit when
+ * they are left and every member action commits at once, so there is nothing to confirm or
+ * discard.
+ *
+ * That is why there is no draft of the channel here. Members and the lead are read live from the
+ * open page, and only the text fields hold state, because a field must not be overwritten while
+ * someone is typing in it - the `dirty` flags below are what protect an unsaved edit from the
+ * refresh that follows every save.
+ *
+ * The two nav rows below the fields carry no state of their own: the host owns the counts and the
+ * open flags, because the routines overlay covers the whole panel, not only this editor.
+ */
+export function ChannelEditor(props: ChannelEditorProps) {
   const channels = useChannels();
   const { agentList } = useAgents();
-  const existing = untrack(() => channels.state.page?.channel);
-  const channelId = existing?.id ?? crypto.randomUUID();
-  // `snapshot` unwraps rather than clones, so the clone is what keeps unsaved edits out of the
-  // channels store and makes Cancel discard them.
-  const [draft, setDraft] = createStore<ChannelDraft>(
-    existing ? structuredClone(snapshot(existing)) : emptyChannelDraft(),
-  );
-  const [view, setView] = createStore({ search: "" });
-  const filtered = () =>
-    agentList().filter((agent) =>
-      `${agent.name} ${agent.description}`.toLowerCase().includes(view.search.toLowerCase()),
-    );
-  const toggle = (agentId: string, checked: boolean) =>
-    setDraft((state) => {
-      toggleChannelMember(
-        state,
-        agentId,
-        checked ? (agentList().find((agent) => agent.id === agentId)?.description ?? "") : null,
+  const channel = () => channels.state.page?.channel;
+  const [fields, setFields] = createStore({ name: "", title: "", instructions: "" });
+  const [dirty, setDirty] = createStore({ name: false, title: false, instructions: false });
+  let lastSignature = "";
+  let lastChannelId = "";
+
+  createEffect(
+    () => {
+      const current = channel();
+      return (
+        current && {
+          id: current.id,
+          name: current.name,
+          title: current.title,
+          instructions: current.instructions,
+          revision: current.revision,
+        }
       );
+    },
+    (next) => {
+      if (!next) return;
+      const signature = JSON.stringify([next.id, next.revision, next.name, next.title, next.instructions]);
+      if (signature === lastSignature) return;
+      // Read the flags before writing them, so a different channel clears them here and replaces
+      // every field, while the same channel keeps whatever is still uncommitted.
+      const changed = next.id !== lastChannelId;
+      const keep = {
+        name: !changed && dirty.name,
+        title: !changed && dirty.title,
+        instructions: !changed && dirty.instructions,
+      };
+      lastSignature = signature;
+      lastChannelId = next.id;
+      if (changed)
+        setDirty((state) => {
+          state.name = false;
+          state.title = false;
+          state.instructions = false;
+        });
+      setFields((state) => {
+        if (!keep.name) state.name = next.name;
+        if (!keep.title) state.title = next.title;
+        if (!keep.instructions) state.instructions = next.instructions;
+      });
+    },
+  );
+
+  const members = () =>
+    (channel()?.members ?? []).map((member) => ({
+      agentId: member.agentId,
+      agent: agentList().find((agent) => agent.id === member.agentId),
+    }));
+  const available = () =>
+    agentList().filter((agent) => !channel()?.members.some((member) => member.agentId === agent.id));
+
+  /**
+   * The command carries a whole draft, so every save sends the fields as they are on screen. That
+   * is deliberate: removing a member commits the instructions the user can see, rather than
+   * reviving the stored ones.
+   */
+  function draftFrom(current: Channel): ChannelDraft {
+    return {
+      name: fields.name.trim() || current.name,
+      title: fields.title,
+      instructions: fields.instructions,
+      members: current.members.map((member) => ({ agentId: member.agentId })),
+      leadAgentId: current.leadAgentId,
+    };
+  }
+
+  function commit(patch?: (draft: ChannelDraft) => void): Promise<boolean> {
+    const current = channel();
+    if (!current) return Promise.resolve(false);
+    const draft = draftFrom(current);
+    patch?.(draft);
+    return channels.command({ type: "save", operationId: crypto.randomUUID(), channelId: current.id, draft });
+  }
+
+  /** An empty name is not a name the service accepts, so leaving the field blank restores it. */
+  function saveName(): void {
+    const current = channel();
+    if (!current) return;
+    const value = fields.name.trim() || current.name;
+    setFields((state) => {
+      state.name = value;
     });
+    void commit().then((saved) => {
+      if (saved && channel()?.id === current.id && fields.name === value)
+        setDirty((state) => {
+          state.name = false;
+        });
+    });
+  }
+
+  /** One saver for both free-text fields: the dirty flag clears only if that field still matches. */
+  function saveText(key: "title" | "instructions"): () => void {
+    return () => {
+      const current = channel();
+      if (!current) return;
+      const value = fields[key];
+      void commit().then((saved) => {
+        if (saved && channel()?.id === current.id && fields[key] === value)
+          setDirty((state) => {
+            state[key] = false;
+          });
+      });
+    };
+  }
+
   return (
-    <form
-      class="channel-editor"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void channels.command({ type: "save", operationId: crypto.randomUUID(), channelId, draft: snapshot(draft) });
-      }}
-    >
-      <label class="channel-field">
-        Name
+    <div class="channel-editor">
+      <label class="agent-settings-field">
+        <span>Name</span>
         <Input
           aria-label="Channel name"
           placeholder="Ex: Project Falcon"
-          required
-          value={draft.name}
-          onValueChange={(name) =>
-            setDraft((state) => {
+          maxlength={INPUT_LIMITS.agentName}
+          value={fields.name}
+          onValueChange={(name) => {
+            setFields((state) => {
               state.name = name;
-            })
-          }
+            });
+            setDirty((state) => {
+              state.name = true;
+            });
+          }}
+          onBlur={saveName}
         />
       </label>
-      <label class="channel-field">
-        Purpose
+      <label class="agent-settings-field">
+        <span>Title</span>
+        <Input
+          aria-label="Channel title"
+          placeholder="Describe what this channel does"
+          maxlength={INPUT_LIMITS.agentTitle}
+          value={fields.title}
+          onValueChange={(title) => {
+            setFields((state) => {
+              state.title = title;
+            });
+            setDirty((state) => {
+              state.title = true;
+            });
+          }}
+          onBlur={saveText("title")}
+        />
+      </label>
+      <label class="agent-settings-field agent-settings-description">
+        <span>Instructions</span>
         <Textarea
-          aria-label="Channel purpose"
+          rows="4"
+          aria-label="Channel instructions"
           placeholder="What will this channel work on?"
-          value={draft.purpose}
-          onValueChange={(purpose) =>
-            setDraft((state) => {
-              state.purpose = purpose;
-            })
-          }
+          maxlength={INPUT_LIMITS.agentDescription}
+          value={fields.instructions}
+          onValueChange={(instructions) => {
+            setFields((state) => {
+              state.instructions = instructions;
+            });
+            setDirty((state) => {
+              state.instructions = true;
+            });
+          }}
+          onBlur={saveText("instructions")}
         />
       </label>
-      <fieldset class="channel-picker">
-        <legend>Members and responsibilities</legend>
-        <div class="channel-member-picker">
-          <div class="channel-member-search">
-            <Input
-              type="search"
-              aria-label="Search agents"
-              placeholder="Search agents"
-              value={view.search}
-              onValueChange={(search) =>
-                setView((state) => {
-                  state.search = search;
-                })
-              }
-            />
-          </div>
-          <div class="channel-picker-list">
-            <For each={filtered()}>
-              {(agent) => (
-                <div class="channel-picker-entry">
-                  <label class="channel-member-row" for={`channel-member-${agent.id}`}>
-                    <Checkbox
-                      id={`channel-member-${agent.id}`}
-                      checked={draft.members.some((member) => member.agentId === agent.id)}
-                      onChange={(event) => toggle(agent.id, event.currentTarget.checked)}
-                    />
-                    <AgentAvatar agent={agent} />
-                    <span class="channel-member-copy">
-                      <strong>{agent.name}</strong>
-                      <span>{agent.description}</span>
-                    </span>
-                  </label>
-                  <Show when={draft.members.some((member) => member.agentId === agent.id)}>
-                    <div class="channel-member-options">
-                      <Input
-                        aria-label={`${agent.name} responsibility`}
-                        value={draft.members.find((member) => member.agentId === agent.id)?.responsibility ?? ""}
-                        onValueChange={(responsibility) =>
-                          setDraft((state) => {
-                            state.members = state.members.map((member) =>
-                              member.agentId === agent.id ? { ...member, responsibility } : member,
-                            );
-                          })
-                        }
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        aria-pressed={draft.leadAgentId === agent.id ? "true" : "false"}
-                        onClick={() =>
-                          setDraft((state) => {
-                            state.leadAgentId = agent.id;
-                          })
-                        }
-                      >
-                        {draft.leadAgentId === agent.id ? "Channel lead" : "Use as lead"}
-                      </Button>
-                    </div>
+      <div class="agent-settings-links">
+        <Button variant="ghost" type="button" class="agent-settings-link" onClick={props.onOpenMemories}>
+          <span class="agent-settings-link-label">Memories</span>
+          <span class="agent-settings-link-value">
+            {props.memoryCount} saved
+            <ChevronRight />
+          </span>
+        </Button>
+        <Button variant="ghost" type="button" class="agent-settings-link" onClick={props.onOpenRoutines}>
+          <span class="agent-settings-link-label">Routines</span>
+          <span class="agent-settings-link-value">
+            {props.routineCount} configured
+            <ChevronRight />
+          </span>
+        </Button>
+      </div>
+      <section class="channel-members" aria-label="Members">
+        <h3 class="channel-members-title">Members</h3>
+        <ItemGroup class="channel-member-list">
+          <For each={members()}>
+            {(entry) => (
+              <Item size="compact" class="channel-member">
+                <ItemMedia>
+                  <Show when={entry.agent} fallback={<UserRound aria-hidden="true" />}>
+                    {(agent) => <AgentAvatar agent={agent()} />}
                   </Show>
-                </div>
-              )}
-            </For>
-            <Show when={!filtered().length}>
-              <div class="channel-picker-empty">
-                <Show when={!agentList().length}>
-                  <UsersRound aria-hidden="true" />
-                </Show>
-                <p>{agentList().length ? "No agents match this search." : "No agents yet"}</p>
-                <Show when={!agentList().length}>
-                  <span>Create an agent to add it to this channel.</span>
-                </Show>
-              </div>
-            </Show>
-            <For each={draft.members.filter((member) => !agentList().some((agent) => agent.id === member.agentId))}>
-              {(member) => (
-                <div class="channel-actions">
-                  <span>Unavailable member: {member.agentId}</span>
-                  <Button type="button" variant="ghost" size="xs" onClick={() => toggle(member.agentId, false)}>
-                    Remove unavailable member
+                </ItemMedia>
+                <ItemContent>
+                  <ItemTitle>{entry.agent?.name ?? `Unavailable member ${entry.agentId}`}</ItemTitle>
+                </ItemContent>
+                <ItemActions>
+                  <Show when={entry.agent}>
+                    {(agent) => (
+                      <Tooltip.Root openDelay={250} closeDelay={75} placement="top" gutter={8}>
+                        {/* The trigger is the button itself, the way `ServerRail` does it: an
+                            `IconButton` inside a trigger would carry a `title` as well, and the
+                            crown would answer twice, once styled and once by the platform. */}
+                        <Tooltip.Trigger
+                          type="button"
+                          class={buttonVariants({
+                            variant: "ghost",
+                            size: "icon-xs",
+                            class: "ui-icon-button channel-lead-toggle",
+                          })}
+                          aria-pressed={channel()?.leadAgentId === entry.agentId ? "true" : "false"}
+                          aria-label={
+                            channel()?.leadAgentId === entry.agentId
+                              ? `${agent().name} is the channel lead`
+                              : `Make ${agent().name} the channel lead`
+                          }
+                          onClick={() =>
+                            void commit((draft) => {
+                              draft.leadAgentId = entry.agentId;
+                            })
+                          }
+                        >
+                          <Crown aria-hidden="true" />
+                        </Tooltip.Trigger>
+                        <Tooltip.Portal>
+                          <Tooltip.Content class="ui-tooltip">
+                            {channel()?.leadAgentId === entry.agentId ? "Channel lead" : "Make channel lead"}
+                          </Tooltip.Content>
+                        </Tooltip.Portal>
+                      </Tooltip.Root>
+                    )}
+                  </Show>
+                  <Button
+                    size="xs"
+                    variant="destructive"
+                    class="channel-member-remove"
+                    aria-label={
+                      entry.agent ? `Remove ${entry.agent.name}` : `Remove unavailable member ${entry.agentId}`
+                    }
+                    onClick={() => void commit((draft) => toggleChannelMember(draft, entry.agentId, false))}
+                  >
+                    Remove
                   </Button>
-                </div>
-              )}
-            </For>
-          </div>
-        </div>
-      </fieldset>
-      <p class="channel-empty-copy">
-        The lead selects one owner for each request. Other members start only when assigned work.
-      </p>
-      <fieldset class="channel-links">
-        <legend>Linked conversations</legend>
-        <For each={agentList().filter((agent) => agent.threadId)}>
-          {(agent) => (
-            <label class="channel-member-row" for={`channel-link-${agent.id}`}>
-              <Checkbox
-                id={`channel-link-${agent.id}`}
-                checked={draft.linkedThreadIds.includes(agent.threadId ?? "")}
-                onChange={(event) => {
-                  const id = agent.threadId;
-                  if (id)
-                    setDraft((state) => {
-                      state.linkedThreadIds = event.currentTarget.checked
-                        ? [...state.linkedThreadIds, id]
-                        : state.linkedThreadIds.filter((value) => value !== id);
-                    });
-                }}
-              />
-              {agent.name}
-            </label>
-          )}
-        </For>
-        <For each={draft.linkedThreadIds.filter((id) => !agentList().some((agent) => agent.threadId === id))}>
-          {(id) => (
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              onClick={() =>
-                setDraft((state) => {
-                  state.linkedThreadIds = state.linkedThreadIds.filter((value) => value !== id);
-                })
-              }
-            >
-              Unlink unavailable conversation
-            </Button>
-          )}
-        </For>
-      </fieldset>
-      <footer class="channel-editor-footer">
-        <span>{draft.members.length} selected</span>
-        <div class="channel-actions">
-          <Button type="button" variant="ghost" onClick={channels.closeEditor}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={channels.state.pending || !draft.name.trim()}>
-            Save changes
-          </Button>
-        </div>
-      </footer>
-    </form>
+                </ItemActions>
+              </Item>
+            )}
+          </For>
+          <DropdownMenu.Root placement="bottom-start" modal={false}>
+            <DropdownMenu.Trigger class="channel-member-add" disabled={!available().length}>
+              <Plus aria-hidden="true" />
+              Add member
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content class="channel-member-menu">
+                <For each={available()}>
+                  {(agent) => (
+                    <DropdownMenu.Item
+                      onSelect={() => void commit((draft) => toggleChannelMember(draft, agent.id, true))}
+                    >
+                      <AgentAvatar agent={agent} />
+                      {agent.name}
+                    </DropdownMenu.Item>
+                  )}
+                </For>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+        </ItemGroup>
+        <Show when={!members().length}>
+          <p class="channel-members-note">A channel needs one member before it can route work.</p>
+        </Show>
+      </section>
+    </div>
   );
 }

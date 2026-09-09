@@ -17,10 +17,10 @@ async function openSavedChannel() {
     channelId: "channel-test",
     draft: {
       name: "Project room",
-      purpose: "Research the project",
-      members: [{ agentId: "chief", responsibility: "Research" }],
+      title: "",
+      instructions: "Research the project",
+      members: [{ agentId: "chief" }],
       leadAgentId: "chief",
-      linkedThreadIds: [],
     },
   });
   render(() => <App />);
@@ -54,12 +54,11 @@ it("creates a channel from a searchable member dialog and keeps the chat open be
   const search = within(dialog).getByRole("searchbox", { name: "Search agents" });
   await fireEvent.input(search, { target: { value: "Chief" } });
   await fireEvent.click(within(dialog).getByRole("checkbox", { name: /Chief/ }));
-  await fireEvent.click(within(dialog).getByRole("button", { name: "Remove Chief" }));
+  await fireEvent.click(within(dialog).getByRole("checkbox", { name: /Chief/ }));
   expect(within(dialog).getByRole("button", { name: "Create" })).toBeDisabled();
   await fireEvent.click(within(dialog).getByRole("checkbox", { name: /Chief/ }));
   await fireEvent.input(search, { target: { value: "Sales" } });
   expect(within(dialog).queryByRole("checkbox", { name: /Chief/ })).not.toBeInTheDocument();
-  expect(within(dialog).getByRole("button", { name: "Remove Chief" })).toBeInTheDocument();
   await fireEvent.click(within(dialog).getByRole("checkbox", { name: /Sales Outbound/ }));
   await fireEvent.click(within(dialog).getByRole("button", { name: "Create" }));
   await waitFor(() => expect(save).toHaveBeenCalled());
@@ -67,7 +66,8 @@ it("creates a channel from a searchable member dialog and keeps the chat open be
     type: "save",
     draft: {
       leadAgentId: "chief",
-      purpose: "",
+      title: "",
+      instructions: "",
       members: [{ agentId: "chief" }, { agentId: "sales-outbound" }],
     },
   });
@@ -77,25 +77,27 @@ it("creates a channel from a searchable member dialog and keeps the chat open be
   composer.textContent = "Keep this draft";
   await fireEvent.input(composer);
   await openChannelMenuItem(chat, "Channel settings");
-  const purpose = await within(chat).findByRole("textbox", { name: "Channel purpose" });
-  expect(purpose).toHaveValue("");
-  expect(within(chat).getByRole("textbox", { name: "Chief responsibility" })).toBeVisible();
-  expect(within(chat).getByRole("button", { name: "Channel lead" })).toBeVisible();
-  expect(within(chat).getByRole("button", { name: "Use as lead" })).toBeVisible();
-  expect(composer).toBeVisible();
+  const instructions = await within(chat).findByRole("textbox", { name: "Channel instructions" });
+  expect(instructions).toHaveValue("");
+  expect(within(chat).getByRole("button", { name: "Chief is the channel lead" })).toBeVisible();
+  expect(within(chat).getByRole("button", { name: "Make Sales Outbound the channel lead" })).toBeVisible();
   expect(composer).toHaveTextContent("Keep this draft");
-  await fireEvent.input(purpose, { target: { value: "Coordinate the release" } });
-  await fireEvent.click(within(chat).getByRole("button", { name: "Cancel" }));
-  expect(within(chat).queryByRole("textbox", { name: "Channel purpose" })).not.toBeInTheDocument();
-  await openChannelMenuItem(chat, "Channel settings");
-  const reopened = await within(chat).findByRole("textbox", { name: "Channel purpose" });
-  expect(reopened).toHaveValue("");
-  await fireEvent.input(reopened, { target: { value: "Coordinate the release" } });
-  await fireEvent.click(within(chat).getByRole("button", { name: "Save changes" }));
+  // Leaving a field is the only commit: the panel has to survive it, or the next edit has nowhere
+  // to happen.
+  await fireEvent.input(instructions, { target: { value: "Coordinate the release" } });
+  await fireEvent.blur(instructions);
   await waitFor(() =>
     expect(save.mock.calls.at(-1)?.[0]).toMatchObject({
       type: "save",
-      draft: { purpose: "Coordinate the release" },
+      draft: { instructions: "Coordinate the release" },
+    }),
+  );
+  expect(instructions).toBeVisible();
+  await fireEvent.click(within(chat).getByRole("button", { name: "Remove Chief" }));
+  await waitFor(() =>
+    expect(save.mock.calls.at(-1)?.[0]).toMatchObject({
+      type: "save",
+      draft: { instructions: "Coordinate the release", members: [{ agentId: "sales-outbound" }] },
     }),
   );
 });
@@ -179,4 +181,21 @@ it("stops and resumes a task and restores an archived channel without losing its
   await fireEvent.click(restore);
   await within(chat).findByRole("textbox", { name: "Message to channel" });
   expect(within(chat).getByRole("article", { name: "Task: Prepare the report" })).toBeVisible();
+});
+
+it("opens channel memories and channel routines from the settings panel", async () => {
+  const chat = await openSavedChannel();
+  await openChannelMenuItem(chat, "Channel settings");
+  await fireEvent.click(await within(chat).findByRole("button", { name: /^Memories0 saved$/ }));
+  const memories = await screen.findByRole("dialog", { name: "Memories" });
+  // The modal reads "channel", not "agent": the port names the owner, so the shared copy follows.
+  await within(memories).findByText("This channel has no saved memories yet.");
+  await fireEvent.click(within(memories).getByRole("button", { name: "Close memories" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Memories" })).not.toBeInTheDocument());
+  await fireEvent.click(within(chat).getByRole("button", { name: /^Routines0 configured$/ }));
+  // Routines replace the panel header, so "Channel settings" gives way to the routines view.
+  await within(chat).findByRole("heading", { name: "Routines", level: 2 });
+  expect(within(chat).queryByRole("heading", { name: "Channel settings" })).not.toBeInTheDocument();
+  await fireEvent.click(within(chat).getByRole("button", { name: "Back to settings" }));
+  await within(chat).findByRole("heading", { name: "Channel settings", level: 2 });
 });

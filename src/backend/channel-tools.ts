@@ -18,12 +18,9 @@ const handoff = {
 export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: string; shape: z.ZodRawShape }[] = [
   {
     name: "channel_history",
-    description:
-      "Read earlier shared channel messages or an agent conversation on this server. This never starts another agent.",
+    description: "Read earlier shared channel messages. This never starts another agent.",
     shape: {
       beforeSequence: z.number().int().min(0).optional(),
-      threadId: z.string().optional(),
-      cursor: z.string().optional(),
       attachmentId: z.string().optional(),
     },
   },
@@ -42,5 +39,17 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
     name: "channel_result",
     description: "Publish the requested task result once in the shared chat. End your turn without repeating it.",
     shape: { text: z.string().min(1).max(INPUT_LIMITS.messageText) },
+  },
+  {
+    name: "channel_remember",
+    description:
+      "Save one short, durable fact about this channel that every member should keep. Save the same text again to correct it. This writes immediately.",
+    shape: { text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText) },
+  },
+  {
+    name: "channel_forget_memory",
+    description:
+      "Delete one saved channel memory when the user asks the channel to forget it. Give its text exactly as it is listed.",
+    shape: { text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText) },
   },
 ];

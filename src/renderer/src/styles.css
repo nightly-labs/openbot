@@ -66,9 +66,6 @@
   --page-fade-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --resize-dur: 300ms;
   --resize-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --acc-expand: 250ms;
-  --acc-collapse: 250ms;
-  --acc-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --shake-distance: 6px;
   --shake-overshoot: 4px;
   --shake-dur-a: 80ms;

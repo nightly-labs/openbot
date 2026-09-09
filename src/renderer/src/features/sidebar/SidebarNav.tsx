@@ -15,7 +15,7 @@ export function SidebarNav() {
   const {
     draggingKind,
     dropSidebarNativeDrag,
-    filteredAgents,
+    filteredChats,
     filteredPeople,
     handleListDragLeave,
     layoutMutable,
@@ -42,16 +42,14 @@ export function SidebarNav() {
       <div class="agent-list-content">
         <Show
           when={
-            props.hasChannels ||
             resolvedPinnedItems().length > 0 ||
-            filteredAgents().length > 0 ||
+            filteredChats().length > 0 ||
             (props.showPeople !== false && filteredPeople().length > 0) ||
             pending.sectionEditor?.target.kind === "create"
           }
           fallback={<SidebarEmptyState />}
         >
           <SidebarPinnedGroup />
-          {props.channels}
           <SidebarSectionList />
         </Show>
         <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">

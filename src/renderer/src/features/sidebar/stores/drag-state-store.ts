@@ -29,8 +29,12 @@ export interface SidebarDragWriters {
   setEmptyPinnedDropVisible: (visible: boolean) => void;
 }
 
-export function createSidebarDragStateStore(deps: { sectionAcceptsAgent: (sectionId: string) => boolean }) {
-  const { sectionAcceptsAgent } = deps;
+export function createSidebarDragStateStore(deps: {
+  /** Which kind of chat an id names, or null when it names none: an unknown chat cannot be pinned. */
+  chatKind: (chatId: string) => "agent" | "channel" | null;
+  sectionAcceptsChat: (sectionId: string) => boolean;
+}) {
+  const { chatKind, sectionAcceptsChat } = deps;
 
   const [drag, setDrag] = createStore<SidebarDrag>({
     emptyPinnedDropVisible: false,
@@ -44,12 +48,12 @@ export function createSidebarDragStateStore(deps: { sectionAcceptsAgent: (sectio
   // does. Being derived is also why they can no longer disagree about which drag is in flight.
   const draggedPinnedKey = createMemo(() => {
     const source = drag.source;
-    return source?.kind === "agent" && source.origin === "pinned" ? source.key : null;
+    return source?.kind === "pinned" ? source.key : null;
   });
 
-  const draggedAgentId = createMemo(() => {
+  const draggedChatId = createMemo(() => {
     const source = drag.source;
-    return source?.kind === "agent" && source.origin === "section" ? source.id : null;
+    return source?.kind === "chat" ? source.id : null;
   });
 
   const draggedSectionId = createMemo(() => {
@@ -58,23 +62,18 @@ export function createSidebarDragStateStore(deps: { sectionAcceptsAgent: (sectio
   });
 
   /** Which kind of drag the list is in, for the styling that dims everything the drag cannot reach. */
-  const draggingKind = createMemo(() => {
-    const source = drag.source;
-    if (!source) return undefined;
-    if (source.kind === "agent") return source.origin === "pinned" ? "pinned" : "agent";
-    return source.kind;
-  });
+  const draggingKind = createMemo(() => drag.source?.kind);
 
   const dragOverPinnedKey = createMemo(() => {
     const target = drag.target;
     return target?.kind === "pinned" ? target.key : null;
   });
 
-  /** The section a dragged agent would land in, whether it aims at a row inside it or at the section. */
-  const agentDropSectionId = createMemo(() => {
+  /** The section a dragged chat would land in, whether it aims at a row inside it or at the section. */
+  const chatDropSectionId = createMemo(() => {
     const target = drag.target;
-    if (target?.kind === "agent") return target.target.sectionId;
-    if (target?.kind === "section" && drag.source?.kind === "agent") return target.sectionId;
+    if (target?.kind === "chat") return target.target.sectionId;
+    if (target?.kind === "section" && drag.source?.kind === "chat") return target.sectionId;
     return null;
   });
 
@@ -84,8 +83,9 @@ export function createSidebarDragStateStore(deps: { sectionAcceptsAgent: (sectio
   });
 
   function draggedSidebarItem(): SidebarPinnedItem | null {
-    const agentId = draggedAgentId();
-    return agentId ? { kind: "agent", id: agentId } : null;
+    const chatId = draggedChatId();
+    const kind = chatId ? chatKind(chatId) : null;
+    return chatId && kind ? { kind, id: chatId } : null;
   }
 
   /**
@@ -111,7 +111,7 @@ export function createSidebarDragStateStore(deps: { sectionAcceptsAgent: (sectio
   function sectionDragClasses(sectionId: string) {
     const target = sectionDropTarget();
     return {
-      "sidebar-section-agent-drop-target": agentDropSectionId() === sectionId && sectionAcceptsAgent(sectionId),
+      "sidebar-section-agent-drop-target": chatDropSectionId() === sectionId && sectionAcceptsChat(sectionId),
       "sidebar-section-dragging": draggedSectionId() === sectionId,
       "sidebar-drag-shifting": dragOffset(sectionId).y !== 0,
       "sidebar-section-drop-before":
@@ -174,7 +174,7 @@ export function createSidebarDragStateStore(deps: { sectionAcceptsAgent: (sectio
     canPinDraggedSidebarItem,
     dragOffset,
     dragOverPinnedKey,
-    draggedAgentId,
+    draggedChatId,
     draggedPinnedKey,
     draggedSidebarItem,
     draggingKind,

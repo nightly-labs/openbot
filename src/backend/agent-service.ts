@@ -14,6 +14,9 @@ import type {
   AgentSummary,
   AttachmentDataInput,
   AvatarImageInput,
+  ChannelMemory,
+  ChannelRoutine,
+  ChannelRoutineRun,
   ConversationPage,
   ConversationPageAnchor,
   ConversationReadState,
@@ -22,12 +25,17 @@ import type {
   ConversationWithReadState,
   CreateAgentInput,
   CreateAgentMemoryInput,
+  CreateChannelMemoryInput,
+  CreateChannelRoutineInput,
   CreateRoutineInput,
   DeleteAgentMemoryInput,
+  DeleteChannelMemoryInput,
+  DeleteChannelRoutineInput,
   DeleteRoutineInput,
   DraftAttachment,
   DuplicateAgentResult,
   GenerateAgentProfileInput,
+  ListChannelRoutineRunsInput,
   ListRoutineRunsInput,
   QueuedMessageReceipt,
   QueueSnapshot,
@@ -44,9 +52,12 @@ import type {
   SidebarLayoutSnapshot,
   SidebarSection,
   SteerQueuedMessageInput,
+  TestChannelRoutineInput,
   TestRoutineInput,
   UpdateAgentInput,
   UpdateAgentMemoryInput,
+  UpdateChannelMemoryInput,
+  UpdateChannelRoutineInput,
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
@@ -87,11 +98,13 @@ import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import type { AgentClient, AgentProvider } from "./agent-client";
 import type { AgentStore } from "./agent-store";
 import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
+import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
 import { ChannelService } from "./channel-service";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "./conversation-read-store";
 import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
+import { RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePathFromInput } from "./workspace-paths";
 
@@ -124,6 +137,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #conversationReads: ConversationReadStore;
   readonly #memories: AgentMemories;
   readonly #routines: RoutineScheduler;
+  readonly #routineTimer: RoutineTimer;
+  readonly #channelRoutines: ChannelRoutineScheduler;
   readonly #providers: ProviderRuntime;
   readonly #prepareAgentWorkspace: (agent: AgentSummary) => Promise<void>;
   readonly #hostedSites: HostedSiteCoordinator;
@@ -190,7 +205,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
     });
+    // One timer for both routine owners. The sources are read lazily because `channels` and its
+    // scheduler are built further down, and because an owner's earliest routine changes constantly.
+    this.#routineTimer = new RoutineTimer(
+      () => [this.#routines, this.#channelRoutines],
+      () => this.#initialized && !this.#stopping,
+      (code, error) => this.#emitError(code, error),
+    );
     this.#routines = new RoutineScheduler({
+      timer: this.#routineTimer,
       store,
       mailbox,
       conversation: this.#conversation,
@@ -224,6 +247,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         onProvidersReady: async () => {
           await this.#boot.reconcileUnresolvedDeliveries();
           await this.channels.recover();
+          // `recover` settles interrupted assignments, so a run's tasks only reach their real state
+          // after it runs. Reconcile again here, not only in `initialize`.
+          this.#channelRoutines.reconcileAll();
           void this.#boot.backfillProviderHistory();
           for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
         },
@@ -402,8 +428,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         }
       },
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId),
-      changed: (channelId, revision) => this.#emit({ type: "channels-changed", channelId, revision }),
+      // Every channel state change ends in `publish`, so this is the complete trigger surface for
+      // reconciling a channel routine run. It does not depend on `turn-completed`, which never
+      // reaches the agent event forwarder for a channel thread.
+      changed: (channelId, revision) => {
+        this.#channelRoutines.reconcile(channelId);
+        this.#emit({ type: "channels-changed", channelId, revision });
+      },
+      memoriesChanged: (channelId) => this.#emit({ type: "channel-memories-changed", channelId }),
       error: (error) => this.#emitError("channel_coordination_failed", error),
+    });
+    this.#channelRoutines = new ChannelRoutineScheduler({
+      channels: this.channels,
+      hooks: {
+        changed: (channelId) => {
+          this.#emit({ type: "channel-routines-changed", channelId });
+          this.#routineTimer.arm();
+        },
+        emitError: (code, error) => this.#emitError(code, error),
+        excludedChannels: () => new Set(),
+      },
     });
     this.#drain = new DrainScheduler({
       channels: this.channels,
@@ -460,6 +504,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   listAgents(): AgentSummary[] {
     return this.#duplication.visibleAgents(this.#store.list());
+  }
+
+  /**
+   * Every id the sidebar layout may place: agents and channels alike, because the user files and
+   * orders both in the same sections. An id missing from this set is pruned as gone the next time
+   * the layout is reconciled, which would silently drop where the user put a channel.
+   */
+  sidebarChatIds(): Set<string> {
+    const ids = new Set(this.listAgents().map((agent) => agent.id));
+    for (const channelId of this.channels.store.ids()) ids.add(channelId);
+    return ids;
   }
 
   getRuntimeSnapshot(): AgentRuntimeSnapshot {
@@ -560,6 +615,50 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   listRoutineRuns(input: ListRoutineRunsInput): RoutineRun[] {
     return this.#routines.listRuns(input);
+  }
+
+  listChannelMemories(channelId: string): ChannelMemory[] {
+    return this.channels.listMemories(channelId);
+  }
+
+  createChannelMemory(input: CreateChannelMemoryInput): ChannelMemory {
+    return this.channels.createMemory(input);
+  }
+
+  updateChannelMemory(input: UpdateChannelMemoryInput): ChannelMemory {
+    return this.channels.updateMemory(input);
+  }
+
+  deleteChannelMemory(input: DeleteChannelMemoryInput): void {
+    this.channels.deleteMemory(input);
+  }
+
+  clearChannelMemories(channelId: string): void {
+    this.channels.clearMemories(channelId);
+  }
+
+  listChannelRoutines(channelId: string): ChannelRoutine[] {
+    return this.#channelRoutines.list(channelId);
+  }
+
+  createChannelRoutine(input: CreateChannelRoutineInput): ChannelRoutine {
+    return this.#channelRoutines.create(input);
+  }
+
+  updateChannelRoutine(input: UpdateChannelRoutineInput): ChannelRoutine {
+    return this.#channelRoutines.update(input);
+  }
+
+  deleteChannelRoutine(input: DeleteChannelRoutineInput): void {
+    this.#channelRoutines.delete(input);
+  }
+
+  testChannelRoutine(input: TestChannelRoutineInput): Promise<ChannelRoutineRun> {
+    return this.#channelRoutines.test(input);
+  }
+
+  listChannelRoutineRuns(input: ListChannelRoutineRunsInput): ChannelRoutineRun[] {
+    return this.#channelRoutines.listRuns(input);
   }
 
   listModels(): AgentModelOption[] {
@@ -852,11 +951,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#boot.recoverPersistedTurns();
     this.#hostedSites.restore();
     this.#routines.skipMissed(new Date());
+    this.#channelRoutines.skipMissed(new Date());
     this.#initialized = true;
     await this.#providers.start();
     for (const agent of this.#store.list()) this.#mailboxSync.emitQueue(agent.id);
     await this.#routines.resumePendingRuns();
-    this.#routines.arm();
+    await this.#channelRoutines.resumePendingRuns();
+    this.#channelRoutines.reconcileAll();
+    this.#routineTimer.arm();
   }
 
   setPreferredProvider(provider: AgentProvider): Promise<void> {
@@ -883,7 +985,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#stopping = true;
     const channelStop = this.channels.stop();
     this.#initialized = false;
-    this.#routines.dispose();
+    this.#routineTimer.dispose();
     this.#hostedSites.dispose();
     this.#compaction.dispose();
     this.#deltas.dispose();

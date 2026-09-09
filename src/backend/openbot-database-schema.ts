@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isGeneratedAgentId } from "@openbot/contracts/validation";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { CHANNEL_SCHEMA_SQL } from "./channel-schema";
+import { CHANNEL_SCHEMA_SQL, CHANNEL_SETTINGS_SCHEMA_SQL } from "./channel-schema";
 
 const BASELINE_SCHEMA_VERSION = 8;
 
@@ -303,7 +303,9 @@ const V12_REACTIONS_TABLE_SQL = `  CREATE TABLE IF NOT EXISTS projection_reactio
   );`;
 
 const LATEST_SCHEMA_SQL =
-  substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL) + CHANNEL_SCHEMA_SQL;
+  substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL) +
+  CHANNEL_SCHEMA_SQL +
+  CHANNEL_SETTINGS_SCHEMA_SQL;
 
 // Silence here would ship new installs a table the migrations never produce, so an edit to the baseline
 // that moves this declaration out from under the substitution has to be loud.
@@ -365,6 +367,10 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
   {
     version: 15,
     up: (db) => db.exec(CHANNEL_SCHEMA_SQL),
+  },
+  {
+    version: 16,
+    up: (db) => db.exec(CHANNEL_SETTINGS_SCHEMA_SQL),
   },
 ];
 

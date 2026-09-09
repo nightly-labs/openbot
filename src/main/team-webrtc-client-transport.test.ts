@@ -523,15 +523,16 @@ describe("TeamWebRtcClientTransport", () => {
       {
         id: "channel-1",
         name: "Project",
-        purpose: "Research",
+        title: "",
+        instructions: "Research",
         members: [],
         leadAgentId: null,
-        linkedThreadIds: [],
         archived: false,
         revision: 1,
         createdAt: "2026-09-07T12:00:00.000Z",
         unreadCount: 0,
         activeTasks: 0,
+        lastMessage: null,
       },
     ];
     bridge.emit(

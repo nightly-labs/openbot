@@ -350,3 +350,23 @@ function displayTime(time: string): string {
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+/**
+ * Walks a trigger forward over every occurrence the process slept through and returns the last one
+ * plus the first still in the future. Missed occurrences are collapsed, never replayed: an app that
+ * was closed for a week must not wake into a week of firings.
+ */
+export function collapseMissedOccurrences(
+  schedule: RoutineSchedule,
+  timezone: string,
+  from: Date,
+  now: Date,
+): { scheduledFor: Date; nextRunAt: Date } {
+  let scheduledFor = from;
+  let nextRunAt = nextRoutineOccurrence(schedule, timezone, scheduledFor);
+  while (nextRunAt.getTime() <= now.getTime()) {
+    scheduledFor = nextRunAt;
+    nextRunAt = nextRoutineOccurrence(schedule, timezone, scheduledFor);
+  }
+  return { scheduledFor, nextRunAt };
+}

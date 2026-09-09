@@ -2,7 +2,7 @@ import { legacyAgentId } from "@openbot/contracts/validation";
 import { z } from "zod";
 
 export type SidebarPinnedItem = Readonly<{
-  kind: "agent" | "person";
+  kind: "agent" | "channel" | "person";
   id: string;
 }>;
 
@@ -13,7 +13,7 @@ export const SIDEBAR_PINS_STORAGE_KEY = "openbot:sidebar-pins:v1";
 type SidebarPinStorage = Pick<Storage, "getItem" | "setItem">;
 
 const sidebarPinnedItemSchema = z.object({
-  kind: z.enum(["agent", "person"]),
+  kind: z.enum(["agent", "channel", "person"]),
   id: z.string().trim().min(1),
 });
 const sidebarPinsSchema = z.record(
@@ -29,7 +29,9 @@ export function normalizeSidebarPinnedItems(value: readonly SidebarPinnedItem[])
   const seen = new Set<string>();
   const items: SidebarPinnedItem[] = [];
   for (const candidate of value) {
-    if (candidate.kind !== "agent") continue;
+    // A channel is pinned like an agent; `person` is the one kind that was written here by a
+    // released build and is no longer pinnable, so a stored person pin is dropped rather than shown.
+    if (candidate.kind === "person") continue;
     const key = sidebarPinnedItemKey(candidate);
     if (seen.has(key)) continue;
     seen.add(key);

@@ -1,6 +1,6 @@
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import { CHANNEL_ASSIGNMENT_LIMIT, type ChannelTask, type DraftAttachment } from "@openbot/contracts/ipc";
-import { createEffect, createStore, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createStore, For, onCleanup, Show } from "solid-js";
 import { QuestionPromptBubble } from "../../components/QuestionPromptBubble";
 import {
   ArrowUp,
@@ -22,10 +22,14 @@ import { useAuth } from "../account/account-context";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { useAgents } from "../agents/agents-context";
 import { useBrowserTabs } from "../browser/browser-context";
+import { AgentMemoriesModal } from "../conversation/AgentMemoriesModal";
+import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
 import { ComposerEditor, expandComposerMentions } from "../conversation/ComposerEditor";
 import { ReplyIcon } from "../conversation/ConversationIcons";
 import { ApprovalCard, BrowserTakeoverCard } from "../conversation/ConversationPrompts";
 import { conversationBubbleVariant, MessageBody } from "../conversation/MessageRendering";
+import { channelMemoriesPort } from "../conversation/memories-port";
+import { channelRoutinesPort } from "../conversation/routines-port";
 import { usePresence } from "../team/team-context";
 import { ChannelAvatar } from "./ChannelAvatar";
 import { ChannelEditor } from "./ChannelEditor";
@@ -42,25 +46,50 @@ export function ChannelConversation() {
       authorId === (auth.status === "signed_in" ? `local-user:${auth.user.id}` : "local")
     );
   };
-  const [panel, setPanel] = createStore<{ tasks: boolean }>({ tasks: false });
+  /**
+   * Memories and routines live here rather than in `ChannelEditor`, because the routines view
+   * covers the whole panel - its own header replaces the panel header, the way the agent settings
+   * panel does it.
+   */
+  const [panel, setPanel] = createStore<{
+    tasks: boolean;
+    memories: { open: boolean; count: number };
+    routines: { open: boolean; count: number };
+  }>({ tasks: false, memories: { open: false, count: 0 }, routines: { open: false, count: 0 } });
+  const resetPanel = () => {
+    setPanel((state) => {
+      state.tasks = false;
+      state.memories.open = false;
+      state.routines.open = false;
+    });
+  };
   const openTasks = () => {
     channels.closeEditor();
+    resetPanel();
     setPanel((state) => {
       state.tasks = true;
     });
   };
   const openSettings = () => {
-    setPanel((state) => {
-      state.tasks = false;
-    });
+    resetPanel();
     channels.edit();
   };
   const closePanel = () => {
     channels.closeEditor();
-    setPanel((state) => {
-      state.tasks = false;
-    });
+    resetPanel();
   };
+  const channelId = createMemo(() => channels.state.page?.channel.id ?? null);
+  const channelName = createMemo(() => channels.state.page?.channel.name ?? "");
+  // Memoised on the id and the name alone: a port rebuilt on every revision would drop and remake
+  // its event subscription each time a message arrives.
+  const memoriesPort = createMemo(() => {
+    const id = channelId();
+    return id ? channelMemoriesPort(id, channelName()) : null;
+  });
+  const routinesPort = createMemo(() => {
+    const id = channelId();
+    return id ? channelRoutinesPort(id) : null;
+  });
   const { pendingApprovals, pendingPrompts } = useTurns();
   const { browserTabs } = useBrowserTabs();
   const { agentList } = useAgents();
@@ -74,8 +103,10 @@ export function ChannelConversation() {
   createEffect(
     () => channels.state.selectedId,
     () => {
+      resetPanel();
       setPanel((state) => {
-        state.tasks = false;
+        state.memories.count = 0;
+        state.routines.count = 0;
       });
       setComposer((state) => {
         Object.assign(state, { text: "", recipient: null, reply: null, attachments: [], archiveConfirm: false });
@@ -164,14 +195,13 @@ export function ChannelConversation() {
               <div class="conversation-heading-group">
                 <Button
                   variant="ghost"
-                  class="channel-title no-drag"
+                  size="sm"
+                  class="conversation-title channel-title no-drag"
                   aria-label="Channel settings"
                   onClick={openSettings}
                 >
-                  <ChannelAvatar members={page().channel.members} />
-                  <span>
-                    <h1>{page().channel.name}</h1>
-                  </span>
+                  <ChannelAvatar members={page().channel.members} agents={agentList()} />
+                  <h1>{page().channel.name}</h1>
                 </Button>
               </div>
               <div class="conversation-header-actions no-drag">
@@ -261,10 +291,13 @@ export function ChannelConversation() {
               </Show>
               <Show when={!page().messages.length}>
                 <div class="channel-empty">
-                  <ChannelAvatar members={page().channel.members} />
+                  <ChannelAvatar members={page().channel.members} agents={agentList()} />
                   <h2>{page().channel.name}</h2>
-                  <Show when={page().channel.purpose}>
-                    <p>{page().channel.purpose}</p>
+                  <Show when={page().channel.title}>
+                    <p class="channel-empty-title">{page().channel.title}</p>
+                  </Show>
+                  <Show when={page().channel.instructions}>
+                    <p>{page().channel.instructions}</p>
                   </Show>
                 </div>
               </Show>
@@ -650,61 +683,123 @@ export function ChannelConversation() {
             </Show>
             <Show when={channels.state.editing === "settings" || panel.tasks}>
               <aside class="channel-panel" aria-label="Channel panel">
-                <header class="channel-panel-header">
-                  <h2>{channels.state.editing === "settings" ? "Channel settings" : "Tasks"}</h2>
-                  <Button variant="ghost" size="icon-sm" aria-label="Close channel panel" onClick={closePanel}>
-                    <X />
-                  </Button>
-                </header>
-                <Show when={channels.state.editing !== "settings"} fallback={<ChannelEditor />}>
-                  <section class="channel-tasks" aria-label="Channel tasks">
-                    <Show when={!page().tasks.length}>
-                      <p class="channel-empty-copy">Tasks appear when you send a request.</p>
-                    </Show>
-                    <For each={page().tasks}>
-                      {(task) => (
-                        <article class="channel-task" aria-label={`Task: ${task.instruction}`}>
-                          <strong>
-                            {name(task.ownerAgentId)} · {task.state}
-                          </strong>
-                          <p>{task.instruction}</p>
-                          <Show when={task.error}>
-                            <p role="status">{task.error}</p>
+                {/* Routines bring their own header with a back arrow, so they replace the panel
+                    header rather than sit under it - the same trade the agent panel makes. */}
+                <Show
+                  when={panel.routines.open && routinesPort()}
+                  fallback={
+                    <>
+                      <header class="channel-panel-header">
+                        <h2>{channels.state.editing === "settings" ? "Channel settings" : "Tasks"}</h2>
+                        <Button variant="ghost" size="icon-sm" aria-label="Close channel panel" onClick={closePanel}>
+                          <X />
+                        </Button>
+                      </header>
+                      <Show
+                        when={channels.state.editing !== "settings"}
+                        fallback={
+                          <ChannelEditor
+                            memoryCount={panel.memories.count}
+                            routineCount={panel.routines.count}
+                            onOpenMemories={() =>
+                              setPanel((state) => {
+                                state.memories.open = true;
+                              })
+                            }
+                            onOpenRoutines={() =>
+                              setPanel((state) => {
+                                state.routines.open = true;
+                              })
+                            }
+                          />
+                        }
+                      >
+                        <section class="channel-tasks" aria-label="Channel tasks">
+                          <Show when={!page().tasks.length}>
+                            <p class="channel-empty-copy">Tasks appear when you send a request.</p>
                           </Show>
-                          <For each={task.dependencies}>
-                            {(id) => {
-                              const dependency = () => page().tasks.find((item) => item.id === id);
-                              return (
-                                <p>
-                                  Depends on {name(dependency()?.ownerAgentId ?? null)} ·{" "}
-                                  {dependency()?.state ?? "unavailable"}
-                                </p>
-                              );
-                            }}
+                          <For each={page().tasks}>
+                            {(task) => (
+                              <article class="channel-task" aria-label={`Task: ${task.instruction}`}>
+                                <strong>
+                                  {name(task.ownerAgentId)} · {task.state}
+                                </strong>
+                                <p>{task.instruction}</p>
+                                <Show when={task.error}>
+                                  <p role="status">{task.error}</p>
+                                </Show>
+                                <For each={task.dependencies}>
+                                  {(id) => {
+                                    const dependency = () => page().tasks.find((item) => item.id === id);
+                                    return (
+                                      <p>
+                                        Depends on {name(dependency()?.ownerAgentId ?? null)} ·{" "}
+                                        {dependency()?.state ?? "unavailable"}
+                                      </p>
+                                    );
+                                  }}
+                                </For>
+                                <Show when={task.state !== "completed" && task.state !== "cancelled"}>
+                                  <div class="channel-task-actions">
+                                    <Show when={task.state !== "paused" && task.state !== "failed"}>
+                                      <Button size="sm" variant="ghost" onClick={() => void control(task, "stop")}>
+                                        Stop
+                                      </Button>
+                                    </Show>
+                                    <Show when={task.state === "paused" || task.state === "failed"}>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        disabled={channels.state.pending}
+                                        onClick={() => void control(task, "resume")}
+                                      >
+                                        {task.assignmentCount >= CHANNEL_ASSIGNMENT_LIMIT ? "Continue" : "Resume"}
+                                      </Button>
+                                    </Show>
+                                  </div>
+                                </Show>
+                              </article>
+                            )}
                           </For>
-                          <Show when={task.state !== "completed" && task.state !== "cancelled"}>
-                            <div class="channel-task-actions">
-                              <Show when={task.state !== "paused" && task.state !== "failed"}>
-                                <Button size="sm" variant="ghost" onClick={() => void control(task, "stop")}>
-                                  Stop
-                                </Button>
-                              </Show>
-                              <Show when={task.state === "paused" || task.state === "failed"}>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  disabled={channels.state.pending}
-                                  onClick={() => void control(task, "resume")}
-                                >
-                                  {task.assignmentCount >= CHANNEL_ASSIGNMENT_LIMIT ? "Continue" : "Resume"}
-                                </Button>
-                              </Show>
-                            </div>
-                          </Show>
-                        </article>
-                      )}
-                    </For>
-                  </section>
+                        </section>
+                      </Show>
+                      <Show when={memoriesPort()}>
+                        {(port) => (
+                          <AgentMemoriesModal
+                            port={port()}
+                            open={panel.memories.open}
+                            onOpenChange={(open) =>
+                              setPanel((state) => {
+                                state.memories.open = open;
+                              })
+                            }
+                            onCountChange={(count) =>
+                              setPanel((state) => {
+                                state.memories.count = count;
+                              })
+                            }
+                          />
+                        )}
+                      </Show>
+                    </>
+                  }
+                >
+                  {(port) => (
+                    <AgentRoutinesSettings
+                      port={port()}
+                      onCountChange={(count) =>
+                        setPanel((state) => {
+                          state.routines.count = count;
+                        })
+                      }
+                      onBack={() =>
+                        setPanel((state) => {
+                          state.routines.open = false;
+                        })
+                      }
+                      onClose={closePanel}
+                    />
+                  )}
                 </Show>
               </aside>
             </Show>

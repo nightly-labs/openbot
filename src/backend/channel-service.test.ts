@@ -25,10 +25,10 @@ beforeEach(async () => {
   await data.store.getOrCreate("agent-b");
   draft = {
     name: "Project",
-    purpose: "Ship the project",
-    members: data.store.list().map((agent) => ({ agentId: agent.id, responsibility: agent.description })),
+    title: "Release coordination",
+    instructions: "Ship the project",
+    members: data.store.list().map((agent) => ({ agentId: agent.id })),
     leadAgentId: "agent-a",
-    linkedThreadIds: [],
   };
   generate.mockClear();
   service = new ChannelService(data.store.database, data.mailbox, {
@@ -321,7 +321,7 @@ describe("shared channel coordination", () => {
         type: "save",
         channelId: "channel-1",
         operationId: operationId(),
-        draft: { ...draft, members: [...draft.members, { agentId: "agent-c", responsibility: "Review" }] },
+        draft: { ...draft, members: [...draft.members, { agentId: "agent-c" }] },
       },
       actor,
     );
@@ -564,7 +564,7 @@ describe("shared channel coordination", () => {
     }));
     service.store.update(service.store.get("channel-1"), { messages });
     const model = vi.fn(async () => "DECISION_A applies. Source: history-0.");
-    const history = new ChannelHistory(service.store, model);
+    const history = new ChannelHistory(service.store, model, service.memories);
     const agents = data.store.list();
     const first = await history.prepare(task, required(agents[0]), required(agents[0]));
     const summary = service.store.summary("channel-1");
@@ -740,6 +740,85 @@ describe("shared channel coordination", () => {
     expect(service.store.tasks("channel-1")).toHaveLength(9);
     expect(service.store.tasks("channel-1").every((item) => item.state === "paused")).toBe(true);
     expect(data.mailbox.nextQueued("agent-b")).toBeNull();
+  });
+
+  it("lists an archived channel among the sidebar ids so its place in the layout survives", async () => {
+    await service.command({ type: "archive", channelId: "channel-1", operationId: operationId() }, actor);
+    expect(service.store.ids()).toContain("channel-1");
+  });
+
+  it("fires a routine request as a new root task and never absorbs an open one", async () => {
+    const open = await send("Prepare the report");
+    // "Actually …" is the exact text that makes `send` reuse the one open task. A routine must not
+    // inherit that heuristic, or a schedule silently rewrites the request a human is waiting on.
+    await service.command(
+      {
+        type: "request",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: "Actually re-check the figures",
+        recipientAgentId: null,
+        requestMessageId: "routine-request-1",
+        origin: { kind: "routine", routineId: "routine-1", routineName: "Daily check", runId: "run-1" },
+      },
+      actor,
+    );
+    const tasks = service.store.tasks("channel-1");
+    expect(tasks).toHaveLength(2);
+    const untouched = required(tasks.find((task) => task.id === open.id));
+    expect(untouched.instruction).toBe("Prepare the report");
+    expect(untouched.revision).toBe(open.revision);
+    const fired = required(tasks.find((task) => task.id !== open.id));
+    expect(fired.requestMessageId).toBe("routine-request-1");
+    expect(fired.parentTaskId).toBeNull();
+    // The routine authors the message, so the transcript reads it as a request, not as agent output.
+    const message = required(service.store.messages("channel-1").find((item) => item.id === "routine-request-1"));
+    expect(message.author).toEqual({ kind: "member", id: "routine:routine-1", name: "Daily check" });
+    expect(message.message.author).toBe("user");
+  });
+
+  it("keeps one routine request when the fire is replayed and refuses an archived channel", async () => {
+    const command = {
+      type: "request" as const,
+      channelId: "channel-1",
+      operationId: "channel-routine-run:run-1",
+      text: "Post the weekly figures",
+      recipientAgentId: null,
+      requestMessageId: "routine-request-2",
+      origin: { kind: "routine" as const, routineId: "routine-1", routineName: "Weekly", runId: "run-1" },
+    };
+    await service.command(command, actor);
+    await service.command(command, actor);
+    expect(service.store.tasks("channel-1")).toHaveLength(1);
+    expect(service.store.messages("channel-1").filter((item) => item.id === "routine-request-2")).toHaveLength(1);
+    await service.command({ type: "archive", channelId: "channel-1", operationId: operationId() }, actor);
+    await expect(service.command({ ...command, operationId: "channel-routine-run:run-2" }, actor)).rejects.toThrow(
+      /Restore this channel/,
+    );
+  });
+
+  it("writes one channel memory for a tool call and ignores the retry of that call", async () => {
+    const task = await send("Prepare the report");
+    const assignment = required(service.store.assignments("channel-1")[0]);
+    const deliveryId = required(assignment.deliveryId);
+    await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
+    await data.mailbox.markStarting(deliveryId);
+    await data.mailbox.markRunning(deliveryId, "memory-turn");
+    service.accepted(deliveryId, "session-memory", "memory-turn");
+    expect(service.store.tasks("channel-1").find((item) => item.id === task.id)?.state).toBe("running");
+    await service.tool("channel-1", "agent-a", "memory-turn", "call-1", "channel_remember", {
+      text: "The client signs off on Fridays.",
+    });
+    await service.tool("channel-1", "agent-a", "memory-turn", "call-1", "channel_remember", {
+      text: "The client signs off on Fridays.",
+    });
+    const memories = service.memories.list("channel-1");
+    expect(memories).toHaveLength(1);
+    expect(memories[0]).toMatchObject({ text: "The client signs off on Fridays.", origin: "automatic" });
+    await service.tool("channel-1", "agent-a", "memory-turn", "call-2", "channel_forget_memory", {
+      text: "The client signs off on Fridays.",
+    });
+    expect(service.memories.list("channel-1")).toHaveLength(0);
   });
 
   it("serializes overlapping workspaces and permits independent declared resources", () => {

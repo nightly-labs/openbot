@@ -6,8 +6,12 @@ import {
   type ChooseAttachmentsInput,
   type CreateAgentInput,
   type CreateAgentMemoryInput,
+  type CreateChannelMemoryInput,
+  type CreateChannelRoutineInput,
   type CreateRoutineInput,
   type DeleteAgentMemoryInput,
+  type DeleteChannelMemoryInput,
+  type DeleteChannelRoutineInput,
   type DeleteRoutineInput,
   type ImportAttachmentsInput,
   type InterruptTurnInput,
@@ -17,6 +21,7 @@ import {
   isMessageReaction,
   isReasoningEffort,
   isRoutineSchedule,
+  type ListChannelRoutineRunsInput,
   type ListRoutineRunsInput,
   type MarkConversationReadInput,
   type OpenAttachmentInput,
@@ -33,9 +38,12 @@ import {
   type SetMessageReactionInput,
   type SidebarLayoutAction,
   type SteerQueuedMessageInput,
+  type TestChannelRoutineInput,
   type TestRoutineInput,
   type UpdateAgentInput,
   type UpdateAgentMemoryInput,
+  type UpdateChannelMemoryInput,
+  type UpdateChannelRoutineInput,
   type UpdateQueuedMessageInput,
   type UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
@@ -217,6 +225,90 @@ export function parseListRoutineRuns(value: unknown): ListRoutineRunsInput {
 function parseRoutineSchedule(value: unknown): CreateRoutineInput["schedule"] {
   if (!isRoutineSchedule(value)) throw new Error("Invalid routine schedule.");
   return structuredClone(value);
+}
+
+/**
+ * The channel twins of the agent parsers above. They read `channelId` where the agent ones read
+ * `agentId` and reuse every other limit, because a channel memory and a channel routine hold the
+ * same fields as an agent one.
+ */
+export function parseCreateChannelMemory(value: unknown): CreateChannelMemoryInput {
+  if (!isObject(value)) throw new Error("Invalid memory creation request.");
+  return {
+    channelId: requireString(value.channelId, "channelId", INPUT_LIMITS.identifier),
+    text: requireString(value.text, "text", INPUT_LIMITS.agentMemoryText),
+  };
+}
+
+export function parseUpdateChannelMemory(value: unknown): UpdateChannelMemoryInput {
+  if (!isObject(value)) throw new Error("Invalid memory update request.");
+  return {
+    channelId: requireString(value.channelId, "channelId", INPUT_LIMITS.identifier),
+    memoryId: requireString(value.memoryId, "memoryId", INPUT_LIMITS.identifier),
+    text: requireString(value.text, "text", INPUT_LIMITS.agentMemoryText),
+  };
+}
+
+export function parseDeleteChannelMemory(value: unknown): DeleteChannelMemoryInput {
+  if (!isObject(value)) throw new Error("Invalid memory deletion request.");
+  return {
+    channelId: requireString(value.channelId, "channelId", INPUT_LIMITS.identifier),
+    memoryId: requireString(value.memoryId, "memoryId", INPUT_LIMITS.identifier),
+  };
+}
+
+export function parseCreateChannelRoutine(value: unknown): CreateChannelRoutineInput {
+  if (!isObject(value)) throw new Error("Invalid routine creation request.");
+  if (!isBoolean(value.active)) throw new Error("active must be a boolean.");
+  return {
+    channelId: requireString(value.channelId, "channelId", INPUT_LIMITS.identifier),
+    name: requireString(value.name, "name", INPUT_LIMITS.routineName),
+    instruction: requireString(value.instruction, "instruction", INPUT_LIMITS.routineInstruction),
+    active: value.active,
+    timezone: requireString(value.timezone, "timezone", 128),
+    schedule: parseRoutineSchedule(value.schedule),
+  };
+}
+
+export function parseUpdateChannelRoutine(value: unknown): UpdateChannelRoutineInput {
+  if (!isObject(value)) throw new Error("Invalid routine update request.");
+  const parsed: UpdateChannelRoutineInput = {
+    channelId: requireString(value.channelId, "channelId", INPUT_LIMITS.identifier),
+    routineId: requireString(value.routineId, "routineId", INPUT_LIMITS.identifier),
+  };
+  if (value.name !== undefined) parsed.name = requireString(value.name, "name", INPUT_LIMITS.routineName);
+  if (value.instruction !== undefined) {
+    parsed.instruction = requireString(value.instruction, "instruction", INPUT_LIMITS.routineInstruction);
+  }
+  if (value.active !== undefined) {
+    if (!isBoolean(value.active)) throw new Error("active must be a boolean.");
+    parsed.active = value.active;
+  }
+  if (value.schedule !== undefined) parsed.schedule = parseRoutineSchedule(value.schedule);
+  if (Object.keys(parsed).length === 2) throw new Error("A routine update is required.");
+  return parsed;
+}
+
+export function parseDeleteChannelRoutine(value: unknown): DeleteChannelRoutineInput {
+  if (!isObject(value)) throw new Error("Invalid routine deletion request.");
+  return {
+    channelId: requireString(value.channelId, "channelId", INPUT_LIMITS.identifier),
+    routineId: requireString(value.routineId, "routineId", INPUT_LIMITS.identifier),
+  };
+}
+
+export function parseTestChannelRoutine(value: unknown): TestChannelRoutineInput {
+  return parseDeleteChannelRoutine(value);
+}
+
+export function parseListChannelRoutineRuns(value: unknown): ListChannelRoutineRunsInput {
+  const input = parseDeleteChannelRoutine(value);
+  if (!isObject(value)) throw new Error("Invalid routine history request.");
+  const limit = value.limit ?? 50;
+  if (!isNumber(limit) || !Number.isInteger(limit) || limit < 1 || limit > INPUT_LIMITS.routineRunsPage) {
+    throw new Error("Invalid routine history limit.");
+  }
+  return { ...input, limit };
 }
 
 export function parseReadConversationPage(value: unknown): ReadConversationPageInput {
