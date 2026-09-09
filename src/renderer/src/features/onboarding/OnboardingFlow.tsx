@@ -1,10 +1,11 @@
-import type {
-  AgentProviderId,
-  AgentStatus,
-  AppSetupState,
-  AvatarHue,
-  DesktopPlatform,
-  ProviderRuntimeStatus,
+import {
+  AGENT_PROVIDER_DESCRIPTORS,
+  type AgentProviderId,
+  type AgentStatus,
+  type AppSetupState,
+  type AvatarHue,
+  type DesktopPlatform,
+  type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { ProviderPicker, type ProviderPickerOption } from "../../components/ProviderPicker";
@@ -32,11 +33,9 @@ export interface OnboardingFlowProps {
 type OnboardingStep = "meet" | "computer" | "jobs";
 type StepDirection = "forward" | "back";
 
-const PROVIDERS: Array<{ id: AgentProviderId; name: string; description: string }> = [
-  { id: "codex", name: "ChatGPT", description: "Included with OpenBot" },
-  { id: "claude", name: "Claude", description: "Included with OpenBot" },
-  { id: "grok", name: "Grok", description: "Included with OpenBot" },
-];
+const PROVIDERS: Array<{ id: AgentProviderId; name: string; description: string }> = AGENT_PROVIDER_DESCRIPTORS.map(
+  (descriptor) => ({ id: descriptor.id, name: descriptor.displayName, description: descriptor.onboardingDescription }),
+);
 
 const ONBOARDING_AVATAR_HUES: readonly AvatarHue[] = [0, 30, 55, 100, 150, 185, 215, 245, 280, 320];
 

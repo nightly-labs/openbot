@@ -13,7 +13,7 @@ import {
   tool,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { DEFAULT_PROVIDER_MODELS } from "@openbot/contracts/ipc";
+import { defaultProviderModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import type { AgentProvider } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
@@ -1012,7 +1012,7 @@ function dynamicContent(value: unknown): CallToolResult["content"] {
 }
 
 function normalizeClaudeModel(model: string): string {
-  return model.startsWith("claude-") ? model : DEFAULT_PROVIDER_MODELS.claude;
+  return model.startsWith("claude-") ? model : defaultProviderModel("claude");
 }
 
 function normalizeClaudeEffort(effort: string): ClaudeEffort {

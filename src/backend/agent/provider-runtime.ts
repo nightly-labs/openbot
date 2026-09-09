@@ -7,7 +7,7 @@ import type {
   AgentStatus,
   AgentSummary,
 } from "@openbot/contracts/ipc";
-import { isReasoningEffort } from "@openbot/contracts/ipc";
+import { agentProviderDescriptor, isReasoningEffort } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -1059,7 +1059,7 @@ export class ProviderRuntime implements ProviderPort {
           client.notify("initialized");
           const account = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult, 5_000);
           if (!account.account) {
-            const message = provider === "codex" ? "Connect ChatGPT to continue." : driver.signInMessage;
+            const message = agentProviderDescriptor(provider).signInMessage;
             await client.stop().catch(() => undefined);
             this.#setStatus({
               providers: updateProviderStatus(this.#status.providers, provider, {

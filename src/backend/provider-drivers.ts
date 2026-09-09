@@ -18,10 +18,13 @@ export interface ProviderCliCommand {
 }
 
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
+/**
+ * What a provider *does*. What it is called, how it is described and where its sign-in help points
+ * live in the provider registry in `@openbot/contracts/agent-providers`; a driver holds only the
+ * behaviour, so a new provider is one registry row plus one driver.
+ */
 export interface BuiltInProviderDriver {
   id: AgentProviderId;
-  label: string;
-  signInMessage: string;
   cliLogin?: ProviderCliCommand;
   resolveCli(options?: { bundledExecutable?: string | null }): Promise<AgentCliInfo>;
   createClient(cli: AgentCliInfo, requestTimeoutMs: number): AgentClient;
@@ -32,8 +35,6 @@ export interface BuiltInProviderDriver {
 export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   {
     id: "codex",
-    label: "Codex",
-    signInMessage: "Run `codex login` to use Codex.",
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs) => new CodexAppServerClient(cli.executable, requestTimeoutMs),
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
@@ -45,8 +46,6 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   },
   {
     id: "claude",
-    label: "Claude",
-    signInMessage: "Connect Claude to continue.",
     cliLogin: {
       argv: ["auth", "login", "--claudeai"],
       env: (cli): Record<string, string> => (cli.source === "managed" ? { DISABLE_AUTOUPDATER: "1" } : {}),
@@ -59,8 +58,6 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   },
   {
     id: "grok",
-    label: "Grok",
-    signInMessage: "Run `grok login` or set XAI_API_KEY to use Grok.",
     cliLogin: {
       argv: ["--no-auto-update", "login"],
       env: () => ({ GROK_OAUTH2_REFERRER: "openbot" }),

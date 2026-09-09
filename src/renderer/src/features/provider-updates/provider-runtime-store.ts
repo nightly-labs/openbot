@@ -1,4 +1,10 @@
-import type { AgentProviderId, ProviderRuntimeSnapshot, ProviderRuntimesDesktopApi } from "@openbot/contracts/ipc";
+import {
+  type AgentProviderId,
+  agentProviderName,
+  MANAGED_RUNTIME_PROVIDERS,
+  type ProviderRuntimeSnapshot,
+  type ProviderRuntimesDesktopApi,
+} from "@openbot/contracts/ipc";
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_PROVIDER_RUNTIMES } from "../../app-defaults";
@@ -11,7 +17,7 @@ import {
   showProviderUpdateToast,
 } from "./provider-update-toast";
 
-const PROVIDERS = ["codex", "claude", "grok"] as const;
+const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
 
 export interface ProviderCliOwners {
   /** The version of the CLI the user installed for this provider, or `null` for a managed one. */
@@ -45,7 +51,7 @@ export function createProviderRuntimeStore(
     const availableVersion = runtime.availableVersion ?? null;
     return {
       provider,
-      name: provider === "codex" ? "ChatGPT" : provider === "claude" ? "Claude" : "Grok",
+      name: agentProviderName(provider),
       runtime:
         systemVersion && runtime.phase !== "ready"
           ? { ...runtime, version: runtime.version ?? systemVersion }
@@ -68,7 +74,7 @@ export function createProviderRuntimeStore(
     if (disposed) return;
     const current = providerRuntimeSnapshot();
     if (snapshot.revision < current.revision) return;
-    for (const provider of ["codex", "claude", "grok"] as const) {
+    for (const provider of MANAGED_RUNTIME_PROVIDERS) {
       const previousPhase = current.providers[provider].phase;
       const nextPhase = snapshot.providers[provider].phase;
       if (previousPhase !== "downloading" && previousPhase !== "finishing") continue;
@@ -190,7 +196,7 @@ export function createProviderRuntimeStore(
       unsubscribe?.();
       updating.clear();
       // Hidden, not dismissed: the offer outlives the workspace this store was built for.
-      for (const provider of ["codex", "claude", "grok"] as const) hideProviderUpdateToast(provider);
+      for (const provider of MANAGED_RUNTIME_PROVIDERS) hideProviderUpdateToast(provider);
     };
   });
   return {

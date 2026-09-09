@@ -2496,24 +2496,13 @@
   height: 15px;
   flex: 0 0 15px;
   overflow: visible;
+  fill: var(--openbot-provider-current);
 }
 
 .provider-model-mark-large {
   width: 19px;
   height: 19px;
   flex-basis: 19px;
-}
-
-.provider-model-mark-claude {
-  fill: var(--openbot-provider-claude);
-}
-
-.provider-model-mark-codex {
-  fill: var(--openbot-provider-codex);
-}
-
-.provider-model-mark-grok {
-  fill: var(--openbot-provider-grok);
 }
 
 .provider-model-chevron {

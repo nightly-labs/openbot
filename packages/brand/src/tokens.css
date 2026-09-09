@@ -290,3 +290,25 @@
   --openbot-layer-dialog: 100;
   --openbot-layer-toast: 120;
 }
+
+/* Every surface that paints a provider - the picker mark, the update toast and its progress bar,
+   the usage icon, the account picker, the landing page - used to carry one rule per provider per
+   surface, so a new provider meant ten new rules across five stylesheets before it had a colour.
+   These four rules are the only place a provider id meets its colour; a surface writes
+   `data-provider` on the element and reads `--openbot-provider-current`. A provider with no rule
+   here falls back to the current text colour rather than to another provider's brand. */
+[data-provider] {
+  --openbot-provider-current: currentcolor;
+}
+
+[data-provider="codex"] {
+  --openbot-provider-current: var(--openbot-provider-codex);
+}
+
+[data-provider="claude"] {
+  --openbot-provider-current: var(--openbot-provider-claude);
+}
+
+[data-provider="grok"] {
+  --openbot-provider-current: var(--openbot-provider-grok);
+}

@@ -52,7 +52,7 @@ import type {
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_RUNTIME_TEXT_LIMIT, DEFAULT_PROVIDER_MODELS, isMessageReaction } from "@openbot/contracts/ipc";
+import { AGENT_RUNTIME_TEXT_LIMIT, defaultProviderModel, isMessageReaction } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
@@ -531,7 +531,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const provider = agent?.provider ?? this.#providers.preferredProvider();
     await this.ensureProvider(provider);
     const models = this.#providers.listModels();
-    const defaultModel = DEFAULT_PROVIDER_MODELS[provider];
+    const defaultModel = defaultProviderModel(provider);
     const model = agent
       ? models.find((candidate) => candidate.id === agent.model && candidate.provider === provider)
       : (models.find((candidate) => candidate.provider === provider && candidate.id === defaultModel) ??
@@ -569,7 +569,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const preferredProvider = this.#providers.preferredProvider();
       if (preferredProvider !== agent.provider) {
         const models = this.#providers.listModels();
-        const preferredDefault = DEFAULT_PROVIDER_MODELS[preferredProvider];
+        const preferredDefault = defaultProviderModel(preferredProvider);
         const preferredModel =
           models.find((model) => model.provider === preferredProvider && model.id === preferredDefault) ??
           models.find((model) => model.provider === preferredProvider);

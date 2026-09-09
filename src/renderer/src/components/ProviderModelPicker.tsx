@@ -8,7 +8,12 @@ import type {
   AgentStatus,
   ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
-import { DEFAULT_PROVIDER_MODELS } from "@openbot/contracts/ipc";
+import {
+  agentProviderCliName,
+  agentProviderName,
+  defaultProviderModel,
+  PICKER_PROVIDERS,
+} from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import {
   Button,
@@ -42,7 +47,7 @@ interface ProviderModelPickerProps {
   onChange: (model: AgentModelId, provider: AgentProviderId) => void;
 }
 
-const PROVIDERS: AgentProviderId[] = ["claude", "codex", "grok"];
+const PROVIDERS = PICKER_PROVIDERS;
 export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const [open, setOpen] = createSignal(false);
   const [railProvider, setRailProvider] = createSignal<AgentProviderId>(untrack(() => props.provider));
@@ -115,7 +120,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
           class={["provider-model-trigger", { "provider-model-trigger-field": field() }]}
           aria-label={`${props.ariaLabel ?? "Agent model"}: ${triggerModelName()}`}
           disabled={props.disabled}
-          title={props.disabled ? props.disabledReason : `${providerName(activeProvider())} · ${triggerModelName()}`}
+          title={
+            props.disabled ? props.disabledReason : `${agentProviderName(activeProvider())} · ${triggerModelName()}`
+          }
           onKeyDown={(event) => {
             if (event.key !== "ArrowDown") return;
             event.preventDefault();
@@ -165,8 +172,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           "provider-model-rail-button-unavailable": status().state !== "available",
                         },
                       ]}
-                      aria-label={`${providerName(provider)}: ${providerSummary(provider, status())}`}
-                      title={`${providerName(provider)} · ${providerSummary(provider, status())}`}
+                      aria-label={`${agentProviderName(provider)}: ${providerSummary(provider, status())}`}
+                      title={`${agentProviderName(provider)} · ${providerSummary(provider, status())}`}
                       onClick={(event) => {
                         const target = event.currentTarget;
                         selectRailProvider(provider);
@@ -221,16 +228,16 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     return `Downloading ${Math.round(runtimeStatus.progress ?? 0)}%`;
                   }
                   if (runtimeStatus?.phase === "finishing") return "Setting up";
-                  return runtimeStatus?.message ?? status().message ?? `${providerName(provider)} is unavailable.`;
+                  return runtimeStatus?.message ?? status().message ?? `${agentProviderName(provider)} is unavailable.`;
                 };
                 return (
                   <Tabs.Content
                     value={provider}
                     class="provider-model-panel"
-                    aria-label={`${providerName(provider)} models`}
+                    aria-label={`${agentProviderName(provider)} models`}
                   >
                     <div class="provider-model-heading">
-                      <strong>{providerName(provider)}</strong>
+                      <strong>{agentProviderName(provider)}</strong>
                       <span>{providerHeadingSummary(provider, status())}</span>
                     </div>
                     <Show when={!available()}>
@@ -239,7 +246,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         <Show when={runtime()?.phase === "downloading"}>
                           <Progress
                             value={runtime()?.progress ?? 0}
-                            aria-label={`${providerName(provider)} download`}
+                            aria-label={`${agentProviderName(provider)} download`}
                           />
                         </Show>
                         <Show when={runtimeAction()}>
@@ -265,14 +272,14 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                       fallback={
                         <Show when={available()}>
                           <div class="provider-model-empty" role="status">
-                            No models are available from {providerName(provider)}.
+                            No models are available from {agentProviderName(provider)}.
                           </div>
                         </Show>
                       }
                     >
                       <Listbox.Root
                         class="provider-model-list"
-                        aria-label={`${providerName(provider)} models`}
+                        aria-label={`${agentProviderName(provider)} models`}
                         options={models()}
                         optionValue="id"
                         optionTextValue={(model) => displayModelName(model.name, model.id)}
@@ -291,14 +298,14 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               type="button"
                               class={["provider-model-option", { "provider-model-option-selected": selected() }]}
                               aria-label={`${displayModelName(model.name, model.id)}${
-                                model.id === DEFAULT_PROVIDER_MODELS[provider] ? ", default" : ""
+                                model.id === defaultProviderModel(provider) ? ", default" : ""
                               }`}
                               disabled={!available()}
                               onClick={() => selectModel(model.id, provider)}
                             >
                               <span class="provider-model-option-name">
                                 <span>{displayModelName(model.name, model.id)}</span>
-                                <Show when={model.id === DEFAULT_PROVIDER_MODELS[provider]}>
+                                <Show when={model.id === defaultProviderModel(provider)}>
                                   <small>default</small>
                                 </Show>
                               </span>
@@ -366,13 +373,15 @@ function providerAvailability(
     id: provider,
     state: available ? "available" : "error",
     version: null,
-    message: available ? null : `${providerName(provider)} is unavailable.`,
+    message: available ? null : `${agentProviderName(provider)} is unavailable.`,
   };
 }
 
 function providerSummary(provider: AgentProviderId, status: AgentProviderStatus): string {
   if (status.state === "available") {
-    return status.version ? `${status.version} (${providerCliName(provider)})` : `${providerCliName(provider)} ready`;
+    return status.version
+      ? `${status.version} (${agentProviderCliName(provider)})`
+      : `${agentProviderCliName(provider)} ready`;
   }
   return status.message ?? providerStatusLabel(status.state);
 }
@@ -392,18 +401,6 @@ function providerStatusLabel(
   return "Checking";
 }
 
-function providerName(provider: AgentProviderId): "Claude" | "ChatGPT" | "Grok" {
-  if (provider === "claude") return "Claude";
-  if (provider === "grok") return "Grok";
-  return "ChatGPT";
-}
-
-function providerCliName(provider: AgentProviderId): "Claude Code" | "Codex CLI" | "Grok CLI" {
-  if (provider === "claude") return "Claude Code";
-  if (provider === "grok") return "Grok CLI";
-  return "Codex CLI";
-}
-
 function displayModelName(name: string | undefined, fallback: string): string {
   return name?.replace(/^[\s:–—-]+/, "") || fallback;
 }
@@ -417,15 +414,7 @@ function ProviderMark(props: { provider: AgentProviderId; large?: boolean }) {
   return (
     <ProviderLogo
       provider={props.provider}
-      class={[
-        "provider-model-mark",
-        {
-          "provider-model-mark-codex": props.provider === "codex",
-          "provider-model-mark-claude": props.provider === "claude",
-          "provider-model-mark-grok": props.provider === "grok",
-          "provider-model-mark-large": Boolean(props.large),
-        },
-      ]}
+      class={["provider-model-mark", { "provider-model-mark-large": Boolean(props.large) }]}
     />
   );
 }

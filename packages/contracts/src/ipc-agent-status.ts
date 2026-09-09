@@ -1,3 +1,4 @@
+import type { AgentProviderId } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isFiniteNumber, isNullableBoundedString } from "./ipc-bounded-values";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
@@ -8,12 +9,10 @@ export type AgentPhase = (typeof AGENT_PHASES)[number];
 export const CAPABILITY_STATES = ["ready", "setup-required", "unavailable"] as const;
 export type CapabilityState = (typeof CAPABILITY_STATES)[number];
 
-export const AGENT_PROVIDERS = ["codex", "claude", "grok"] as const;
-export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
-
-export function isAgentProvider(value: unknown): value is AgentProviderId {
-  return isOneOf(AGENT_PROVIDERS, value);
-}
+// The provider list lives in `agent-providers.ts` with everything else that is per-provider. It is
+// re-exported here because this module was its home first and about forty files import it from
+// here; the re-export keeps those imports where they are.
+export { AGENT_PROVIDERS, type AgentProviderId, isAgentProvider } from "./agent-providers";
 export type AgentProviderState =
   | "not-started"
   | "checking"

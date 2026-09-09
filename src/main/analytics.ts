@@ -14,6 +14,11 @@ import { OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
 
 export const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 export const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
+// Provider CLI events are named `<provider>_diagnostic`, `_exited` and `_start_failed`. The list
+// comes from the registry so a new provider's events keep their own name instead of collapsing to
+// `unknown` the moment it ships.
+const PROVIDER_EVENT_PATTERN = new RegExp(`^(?:${AGENT_PROVIDERS.join("|")})_(?:diagnostic|exited|start_failed)$`, "u");
+
 const MAX_PENDING_EVENTS = 100;
 const MAX_ACTIVE_TURNS = 1_000;
 const MAX_HOSTED_SITE_OPERATIONS = 10_000;
@@ -469,7 +474,7 @@ function systemFailureCode(value: string): string {
     case "server_request_failed":
       return value;
     default:
-      if (/^(?:claude|codex|grok)_(?:diagnostic|exited|start_failed)$/u.test(value)) return value;
+      if (PROVIDER_EVENT_PATTERN.test(value)) return value;
       if (value.startsWith("agent_")) return "agent_event_failed";
       return "unknown";
   }

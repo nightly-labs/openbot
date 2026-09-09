@@ -16,6 +16,7 @@ import {
   type CreateAgentInput,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   isAgentModel,
+  isAgentProvider,
   isAvatarHue,
   isAvatarSeed,
   isReasoningEffort,
@@ -319,7 +320,7 @@ export function agentUpdate(value: DynamicRecord, agentId: string): UpdateAgentI
     result.notifications = value.notifications;
   }
   if (value.provider !== undefined) {
-    if (value.provider !== "codex" && value.provider !== "claude" && value.provider !== "grok") {
+    if (!isAgentProvider(value.provider)) {
       throw new HttpError(400, "provider is invalid.");
     }
     result.provider = value.provider;

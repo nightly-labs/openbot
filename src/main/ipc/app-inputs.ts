@@ -19,6 +19,7 @@ import type {
   UpdatePreference,
 } from "@openbot/contracts/ipc";
 import {
+  isAgentProvider,
   isDynamicIslandAction,
   isDynamicIslandInteractive,
   isDynamicIslandPreference,
@@ -33,12 +34,12 @@ import { isObject, optionalBoolean, requireString } from "./validation";
 export function parseProvider(input: unknown): AgentProviderId {
   if (!isDynamicRecord(input)) throw new Error("Setup input is required.");
   const provider = input.preferredProvider;
-  if (provider !== "codex" && provider !== "claude" && provider !== "grok") throw new Error("Unknown provider.");
+  if (!isAgentProvider(provider)) throw new Error("Unknown provider.");
   return provider;
 }
 
 export function parseProviderId(input: unknown): AgentProviderId {
-  if (input !== "codex" && input !== "claude" && input !== "grok") throw new Error("Unknown provider.");
+  if (!isAgentProvider(input)) throw new Error("Unknown provider.");
   return input;
 }
 

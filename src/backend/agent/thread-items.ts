@@ -1,3 +1,4 @@
+import { agentProviderName } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { AgentProvider } from "../agent-client";
 import { AppServerError } from "../app-server-client";
@@ -82,8 +83,6 @@ export function providerForAgent(agent: { provider: AgentProvider }): AgentProvi
   return agent.provider;
 }
 
-export function providerLabel(provider: AgentProvider): "Claude" | "Codex" | "Grok" {
-  if (provider === "claude") return "Claude";
-  if (provider === "grok") return "Grok";
-  return "Codex";
+export function providerLabel(provider: AgentProvider): string {
+  return agentProviderName(provider);
 }
