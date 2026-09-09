@@ -190,7 +190,12 @@ export class DrainScheduler {
       await this.#providers.ensureProvider(providerForAgent(agent));
       const client = this.#providers.requireReadyClient(providerForAgent(agent));
       const execution = this.#channels ? await this.#channels.prepare(context) : null;
-      if (channelDelivery && !execution) return;
+      if (channelDelivery && !execution) {
+        const current = this.#mailbox.getDelivery(delivery.id)?.delivery;
+        if (current?.status === "starting")
+          await this.#mailbox.markTerminal(delivery.id, "interrupted", "The channel was deleted before starting.");
+        return;
+      }
       let threadId = await this.#threads.ensureThread(agent, client, execution?.threadId);
       const snapshot = this.#conversation.ensureSnapshot(agent.id, threadId);
       if (snapshot.activeTurnId) {

@@ -832,6 +832,21 @@ describe("shared channel coordination", () => {
     expect(service.store.tasks("channel-1")).toEqual([]);
   });
 
+  it("keeps a channel when its provider start has no confirmed turn", async () => {
+    await send("Keep this channel while the provider outcome is unknown");
+    const assignment = required(service.store.assignments("channel-1")[0]);
+    const deliveryId = required(assignment.deliveryId);
+    await data.mailbox.markStarting(deliveryId);
+    service.deliveryUncertain(deliveryId);
+    service.hooks.awaitDrain = vi.fn(async () => undefined);
+
+    await expect(service.deleteChannel("channel-1")).rejects.toThrow("unconfirmed assignment start");
+
+    expect(service.store.exists("channel-1")).toBe(true);
+    expect(service.store.tasks("channel-1")[0]?.state).toBe("paused");
+    expect(data.mailbox.getDelivery(deliveryId)?.delivery.status).toBe("starting");
+  });
+
   it("rejects dependency cycles and pauses the root at the automatic assignment limit", async () => {
     const task = await send("Coordinate the report");
     const first = required(service.store.assignments("channel-1")[0]);

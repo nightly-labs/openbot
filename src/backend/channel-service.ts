@@ -123,6 +123,12 @@ export class ChannelService {
               await this.hooks.awaitDrain?.(agentId)?.catch(() => undefined);
             }),
           );
+          const uncertain = this.store.assignments(channelId).find((assignment) => {
+            if (assignment.state !== "starting" || assignment.turnId || !assignment.deliveryId) return false;
+            return this.mailbox.getDelivery(assignment.deliveryId)?.delivery.status === "starting";
+          });
+          if (uncertain)
+            throw new Error("The channel has an unconfirmed assignment start. Check its outcome before deleting it.");
           await this.interruptTasks(
             channelId,
             this.store.tasks(channelId).filter((task) => !terminal(task)),
