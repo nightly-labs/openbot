@@ -71,7 +71,7 @@ describe("AgentAvatar playback", () => {
     expect(new Set(initial).size).toBe(3);
     for (const phase of initial) {
       expect(phase).toBeGreaterThan(0);
-      expect(phase).toBeLessThan(2.4);
+      expect(phase).toBeLessThan(1.4);
     }
     const engines = [...clock.samples.keys()];
     clock.frame(1000);

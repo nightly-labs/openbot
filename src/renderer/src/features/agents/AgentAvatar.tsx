@@ -177,7 +177,7 @@ function avatarAnimationPhase(seed: string): number {
     hash ^= seed.charCodeAt(index);
     hash = Math.imul(hash, 0x01000193);
   }
-  return ((hash >>> 0) / 0x100000000) * 2.4;
+  return ((hash >>> 0) / 0x100000000) * 1.4;
 }
 
 function offsetCycle(blocks: Block[], offset: number): Block[] {
