@@ -1,12 +1,17 @@
 import type { AgentPromptQuestion, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
-import { latestReadableMessage, projectChatMessages } from "../apps/mobile/src/features/chat/model/chat-messages";
+import {
+  latestReadableMessage,
+  type PendingChatMessage,
+  presentChatMessages,
+  projectChatMessages,
+} from "../apps/mobile/src/features/chat/model/chat-messages";
 import {
   answeredPromptResolution,
   nextUnansweredQuestion,
   promptAnswerLabel,
 } from "../apps/mobile/src/features/chat/model/question-prompt";
-import { decodeConversation } from "../apps/mobile/src/features/workspace/model/conversation";
+import { conversationMessageId, decodeConversation } from "../apps/mobile/src/features/workspace/model/conversation";
 
 const questions: AgentPromptQuestion[] = [
   {
@@ -41,6 +46,62 @@ function conversation(): ConversationSnapshot {
 }
 
 describe("mobile question forms", () => {
+  it("keeps attachment-only messages visible and advances their read boundary", () => {
+    const snapshot = conversation();
+    const attachment = {
+      id: "attachment-test",
+      name: "note.txt",
+      size: 5,
+      kind: "file" as const,
+      mimeType: "text/plain",
+      previewKind: "text" as const,
+      previewUrl: null,
+    };
+    snapshot.messages = [
+      {
+        id: "file-message",
+        author: "user",
+        text: "",
+        status: "completed",
+        createdAt: "2026-09-09T10:00:00Z",
+        attachments: [attachment],
+      },
+    ];
+    expect({
+      projected: projectChatMessages(snapshot.messages),
+      read: latestReadableMessage(snapshot.messages)?.id,
+    }).toEqual({
+      projected: [
+        { id: "file-message", kind: "message", author: "user", body: "", streaming: false, attachments: [attachment] },
+      ],
+      read: "file-message",
+    });
+  });
+  it("reconciles the pending bubble by receipt ID, without merging another member's identical text", () => {
+    const pending: PendingChatMessage = {
+      message: { id: "local", kind: "message", author: "user", body: "Hello", streaming: false },
+      baseline: new Set(),
+      serverId: null,
+    };
+    const receipt = {
+      messageId: "mailbox-message",
+      deliveries: [
+        { id: "other-delivery", recipientAgentId: "other-agent", status: "completed" as const, position: null },
+        { id: "mine", recipientAgentId: "agent-test", status: "completed" as const, position: null },
+      ],
+    };
+    const serverId = conversationMessageId(receipt, "agent-test");
+    const messages = [
+      { ...pending.message, id: "other-member" },
+      { ...pending.message, id: "mine" },
+    ];
+    expect(presentChatMessages(messages, pending, new Map()).map((message) => message.id)).toEqual(["local"]);
+    expect(
+      presentChatMessages(messages, { ...pending, serverId }, new Map([[serverId, "local"]])).map(
+        (message) => message.id,
+      ),
+    ).toEqual(["other-member", "local"]);
+  });
   it("advances custom answers past skipped questions and submits only when every question is handled", () => {
     const answers: Record<string, string[]> = { extra: [] };
     expect(nextUnansweredQuestion(questions, answers, 2)).toBe(0);

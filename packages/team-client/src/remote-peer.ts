@@ -22,12 +22,17 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
 import { createEd25519Identity, type Ed25519Identity, signEd25519, verifyEd25519Pem } from "./ed25519";
+import { createRemoteFileSender, type RemoteFileUpload } from "./file-upload";
+
+export type { RemoteFileUpload } from "./file-upload";
+export { MOBILE_ATTACHMENT_BYTES } from "./file-upload";
+
 import { createTeamRequestId } from "./request-id";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./webrtc-framing";
 export type RemoteTeamCommand =
   | { id: string; type: "connect"; hostId: string; hostPublicKey: string }
   | { id: string; type: "disconnect" }
-  | { id: string; type: "request"; method: string; path: string; body: TeamProtocolV2Json };
+  | { id: string; type: "request"; method: string; path: string; body: TeamProtocolV2Json; upload?: RemoteFileUpload };
 
 export interface RemoteTeamBootstrapPayload {
   sessionId: string;
@@ -158,6 +163,14 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
   let peer: PeerState | null = null;
   let generation = 0;
   const pendingRequests = new Map<string, PendingRequest>();
+  const files = createRemoteFileSender(
+    async (data) => {
+      const state = peer;
+      if (!state || !isPeerOnline(state)) throw new Error("The selected server is offline.");
+      await sendPayload(state, "files", data);
+    },
+    () => crypto.randomUUID(),
+  );
   const closingSessions = new Map<string, Promise<void>>();
 
   return {
@@ -264,7 +277,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         await closePeer(actions.current.endSession);
         return { commandId: command.id, ok: true };
       }
-      const response = await request(command.method, command.path, command.body);
+      const response = await request(command.method, command.path, command.body, command.upload);
       return { commandId: command.id, ok: true, status: response.status, body: response.body };
     } catch (error) {
       const message = error instanceof Error ? error.message : "The remote operation failed.";
@@ -579,6 +592,10 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       return;
     }
     if (!state.authenticated) throw new Error("The host sent data before authentication.");
+    if (kind === "files") {
+      files.receive(data);
+      return;
+    }
     if (kind === "rpc") {
       const frame = decodeTeamProtocolV2RpcFrame(data);
       if (frame.type !== "response") throw new Error("The host returned an invalid RPC frame.");
@@ -681,12 +698,14 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     await actions.current.onConnectionUpdate({ hostId: state.hostId, state: "online", message: null });
   }
 
-  async function request(method: string, path: string, body: TeamProtocolV2Json) {
+  async function request(method: string, path: string, body: TeamProtocolV2Json, upload?: RemoteFileUpload) {
     const state = peer;
     if (!state || !isPeerOnline(state)) {
       if (state && (method === "GET" || method === "HEAD")) state.needsResync = true;
       throw new Error("The selected server is offline.");
     }
+    const bodyTransferId = upload ? await files.upload(upload) : null;
+    if (peer !== state || !isPeerOnline(state)) throw new Error("The attachment connection changed.");
     const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
     const result = new Promise<{ status: number; body: TeamProtocolV2Json }>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -706,7 +725,10 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         payload: {
           method,
           path,
-          body: encodeTeamProtocolV3WebRtcHttpRequest(method, path, body, { preserveSemanticTags: true }),
+          body: upload
+            ? null
+            : encodeTeamProtocolV3WebRtcHttpRequest(method, path, body, { preserveSemanticTags: true }),
+          ...(bodyTransferId ? { bodyTransferId, contentType: upload?.mimeType } : {}),
           capabilities: [...TEAM_CURRENT_CAPABILITIES],
         },
       }),
@@ -840,6 +862,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
   }
 
   async function closePeer(endSession: (sessionId: string) => Promise<void>): Promise<void> {
+    files.cancel();
     const state = peer;
     peer = null;
     generation += 1;
