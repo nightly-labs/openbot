@@ -242,12 +242,16 @@ describe("AgentStore", () => {
     // the roster is intact, which is what a persist made with an agent missing leaves behind. The agent
     // has no chat in the sidebar, a later `getOrCreate` rebuilds it with no thread, and both read paths
     // then report an empty history -- while the thread and every message stay on disk.
+    store.database.connection
+      .prepare("UPDATE projection_agents SET agent_json = json_set(agent_json, '$.model', ?) WHERE agent_id = ?")
+      .run("claude fable 5.1 (1m)", "sales-outbound");
     store.database.connection.prepare("DELETE FROM projection_agents WHERE agent_id = ?").run("chief");
 
     const restored = new AgentStore(userData, home);
     await restored.initialize();
 
     expect(restored.list().map((agent) => agent.id)).toEqual(["sales-outbound", "chief"]);
+    expect(restored.list().find((agent) => agent.id === "sales-outbound")?.model).toBe("gpt-5.6-luna");
     expect(restored.list().find((agent) => agent.id === "chief")?.threadId).toBe(threadId);
     expect(restored.database.readConversationPage("chief", threadId).messages).toEqual([
       expect.objectContaining({ id: "message-1", text: "Where did my chat go?" }),
@@ -504,7 +508,15 @@ describe("AgentStore", () => {
     const chief = await store.getOrCreate("chief");
 
     // `AgentService` passes ids straight out of `listModels()`, so the value here is a provider CLI's,
-    // not a user's. Stored, it made the *next* launch the failure.
+    // not a user's. Stored, it made the *next* launch the failure. The provider must also stay unchanged
+    // when validation of the later model field fails.
+    await expect(
+      store.updateAgent({ agentId: "chief", provider: "claude", model: "claude fable 5.1 (1m)" }),
+    ).rejects.toThrow("Invalid agent model.");
+    expect(store.list().find((agent) => agent.id === "chief")).toMatchObject({
+      provider: "codex",
+      model: chief.model,
+    });
     await expect(store.updateAgent({ agentId: "chief", model: "claude fable 5.1 (1m)" })).rejects.toThrow(
       "Invalid agent model.",
     );

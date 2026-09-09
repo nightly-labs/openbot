@@ -178,13 +178,16 @@ export class AgentStore {
         if (read.repaired.length > 0) repairs.push(`${read.agent.id}: ${read.repaired.join(", ")}`);
       }
       this.#state = { version: 2, examplesInitialized: true, agents };
+      // Recover missing agents before writing repairs. The latest roster event may still contain a
+      // complete roster, and writing the shortened projection first would make that incomplete list
+      // the newest event and erase the only source from which the missing agents can be restored.
+      this.#restoreRosterFromEvents();
       if (repairs.length > 0) {
         logger.warn("Stored agent profile fields could not be read and were reset.", toLogValue(repairs));
         // Written back at once, so the repair survives the next launch instead of running again on every
         // start. The persist carries the whole roster, so the profiles that needed no repair are unchanged.
         this.#persist("agents.repaired");
       }
-      this.#restoreRosterFromEvents();
     } else {
       const legacy = await this.#readState();
       await this.#database.backupLegacyFile(this.#statePath);
@@ -482,16 +485,17 @@ export class AgentStore {
 
   async updateAgent(input: UpdateAgentInput): Promise<AgentSummary> {
     const agent = this.#requireAgent(input.agentId);
+    const next = { ...agent };
     if (input.name !== undefined) {
-      agent.name = requiredText(input.name, "Agent name", INPUT_LIMITS.agentName);
+      next.name = requiredText(input.name, "Agent name", INPUT_LIMITS.agentName);
     }
     if (input.title !== undefined) {
-      agent.title = limitedText(input.title, "Agent title", INPUT_LIMITS.agentTitle);
+      next.title = limitedText(input.title, "Agent title", INPUT_LIMITS.agentTitle);
     }
     if (input.description !== undefined) {
-      agent.description = limitedText(input.description, "Agent description", INPUT_LIMITS.agentDescription);
+      next.description = limitedText(input.description, "Agent description", INPUT_LIMITS.agentDescription);
     }
-    if (input.notifications !== undefined) agent.notifications = input.notifications;
+    if (input.notifications !== undefined) next.notifications = input.notifications;
     // Checked here and not only in the IPC decoder, because the caller closest to the data is not a
     // user: `AgentService` writes the provider, model and effort straight out of `listModels()`, which
     // is a list of ids a provider CLI minted and can rename under a running install. A value the read
@@ -499,26 +503,33 @@ export class AgentStore {
     // app refuse to start on its next launch.
     if (input.provider !== undefined) {
       if (!isOneOf(AGENT_PROVIDERS, input.provider)) throw new Error("Invalid agent provider.");
-      agent.provider = input.provider;
+      next.provider = input.provider;
     }
     if (input.model !== undefined) {
       if (!isAgentModel(input.model)) throw new Error("Invalid agent model.");
-      agent.model = input.model;
+      next.model = input.model;
     }
     if (input.reasoningEffort !== undefined) {
       if (!isReasoningEffort(input.reasoningEffort)) throw new Error("Invalid reasoning effort.");
-      agent.reasoningEffort = input.reasoningEffort;
+      next.reasoningEffort = input.reasoningEffort;
     }
     if (input.avatarSeed !== undefined) {
       if (!isAvatarSeed(input.avatarSeed)) throw new Error("Invalid avatar seed.");
-      agent.avatarSeed = input.avatarSeed;
+      next.avatarSeed = input.avatarSeed;
     }
     if (input.avatarHue !== undefined) {
       if (input.avatarHue !== null && !isAvatarHue(input.avatarHue)) throw new Error("Invalid avatar hue.");
-      agent.avatarHue = input.avatarHue;
+      next.avatarHue = input.avatarHue;
     }
-    agent.updatedAt = new Date().toISOString();
-    this.#persist("agent.updated");
+    next.updatedAt = new Date().toISOString();
+    const previous = { ...agent };
+    Object.assign(agent, next);
+    try {
+      this.#persist("agent.updated");
+    } catch (error) {
+      Object.assign(agent, previous);
+      throw error;
+    }
     return { ...agent };
   }
 
