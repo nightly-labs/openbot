@@ -137,7 +137,7 @@ function GeneratedAvatar(props: {
       cycle={motionCycle()}
       playing={true}
       fps={AVATAR_FPS}
-      elapsed={props.animationOffset}
+      initialPhase={props.animationOffset ?? avatarAnimationPhase(props.seed)}
       ariaLabel=""
       class="bloub-avatar-svg"
     />
@@ -174,6 +174,15 @@ function GeneratedAvatar(props: {
       </Show>
     </span>
   );
+}
+
+function avatarAnimationPhase(seed: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return ((hash >>> 0) / 0x100000000) * 1.4;
 }
 
 function offsetCycle(blocks: Block[], offset: number): Block[] {

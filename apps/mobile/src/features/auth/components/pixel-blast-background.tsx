@@ -1,164 +1,100 @@
-import { useEffect } from "react";
-import { useWindowDimensions, View } from "react-native";
-import Animated, {
-  cancelAnimation,
-  Easing,
-  ReduceMotion,
-  type SharedValue,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from "react-native-reanimated";
+import { Canvas, Fill, Shader, Skia } from "@shopify/react-native-skia";
+import { useEffect, useState } from "react";
+import { AppState, StyleSheet, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { useDerivedValue, useFrameCallback, useReducedMotion, useSharedValue } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
 
-interface PixelSpec {
-  color: "accent" | "brand";
-  drift: number;
-  id: string;
-  opacity: number;
-  phase: number;
-  size: number;
-  x: number;
-  y: number;
-}
+import { PIXEL_BLAST_SHADER } from "./pixel-blast-shader";
 
-const PIXEL_COUNT = 88;
-const MOTION_DURATION_MS = 3_000;
-const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
+const EFFECT = Skia.RuntimeEffect.Make(PIXEL_BLAST_SHADER);
+const INITIAL_TIME = 100;
 
-function createPixelField(): PixelSpec[] {
-  let seed = 0x6f70656e;
-  const random = () => {
-    seed = (seed * 1_664_525 + 1_013_904_223) >>> 0;
-    return seed / 0x1_0000_0000;
-  };
-
-  return Array.from({ length: PIXEL_COUNT }, (_, index) => {
-    const angle = random() * Math.PI * 2;
-    const radius = 0.08 + random() ** 0.62 * 0.68;
-    const x = Math.min(0.97, Math.max(0.03, 0.5 + Math.cos(angle) * radius * 0.72));
-    const y = Math.min(0.97, Math.max(0.03, 0.42 + Math.sin(angle) * radius));
-
-    return {
-      color: index % 4 === 0 ? "accent" : "brand",
-      drift: 4 + random() * 7,
-      id: `pixel-${index}`,
-      opacity: 0.18 + random() * 0.3,
-      phase: random(),
-      size: 3 + Math.floor(random() * 4),
-      x,
-      y,
-    };
-  });
-}
-
-const PIXELS = createPixelField();
-
-function Pixel({
-  accentColor,
-  brandColor,
-  height,
-  pixel,
-  progress,
-  reduceMotion,
-  width,
-}: {
-  accentColor: string;
-  brandColor: string;
-  height: number;
-  pixel: PixelSpec;
-  progress: SharedValue<number>;
-  reduceMotion: boolean;
-  width: number;
-}) {
-  const animatedStyle = useAnimatedStyle(() => {
-    if (reduceMotion) return { opacity: pixel.opacity * 0.9 };
-
-    const angle = (progress.get() + pixel.phase) * Math.PI * 2;
-    const wave = (Math.sin(angle) + 1) / 2;
-
-    return {
-      opacity: pixel.opacity * (0.28 + wave * 0.72),
-      transform: [
-        { translateX: Math.cos(angle) * pixel.drift },
-        { translateY: Math.sin(angle) * pixel.drift },
-        { scale: 0.62 + wave * 0.76 },
-      ],
-    };
-  });
-
-  return (
-    <Animated.View
-      style={[
-        {
-          backgroundColor: pixel.color === "accent" ? accentColor : brandColor,
-          borderCurve: "continuous",
-          borderRadius: pixel.size * 0.3,
-          height: pixel.size,
-          left: pixel.x * width - pixel.size / 2,
-          position: "absolute",
-          top: pixel.y * height - pixel.size / 2,
-          width: pixel.size,
-        },
-        animatedStyle,
-      ]}
-    />
-  );
-}
-
+// This decorative GPU canvas is outside HeroUI's product-control ownership.
 export function PixelBlastBackground({ active }: { active: boolean }) {
-  const { height, width } = useWindowDimensions();
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const [foreground, setForeground] = useState(AppState.currentState === "active");
   const reduceMotion = useReducedMotion();
-  const progress = useSharedValue(0);
+  const time = useSharedValue(INITIAL_TIME);
+  const clicks = useSharedValue(Array.from({ length: 10 }, () => [0, 0, 0, 0]));
+  const clickIndex = useSharedValue(0);
+  const brush = useSharedValue([0, 0, 0, 0]);
+  const direction = useSharedValue([0, 0]);
   const brandColor = String(useCSSVariable("--openbot-logo-production") ?? "#cdadec");
-  const accentColor = String(useCSSVariable("--openbot-accent") ?? "#007cf7");
+  const color = Array.from(Skia.Color(brandColor)).slice(0, 3);
+  const running = active && foreground && !reduceMotion;
+
+  const frame = useFrameCallback(({ timeSincePreviousFrame }) => {
+    time.set((value) => value + (timeSincePreviousFrame ?? 0) * 0.0006);
+  }, false);
 
   useEffect(() => {
-    cancelAnimation(progress);
+    const subscription = AppState.addEventListener("change", (state) => setForeground(state === "active"));
+    return () => subscription.remove();
+  }, []);
 
-    if (!active || reduceMotion) {
-      progress.set(0);
-      return;
+  useEffect(() => {
+    frame.setActive(running);
+    return () => frame.setActive(false);
+  }, [frame, running]);
+
+  useEffect(() => {
+    if (!running) {
+      clicks.set(Array.from({ length: 10 }, () => [0, 0, 0, 0]));
+      brush.set([0, 0, 0, 0]);
     }
+  }, [brush, clicks, running]);
 
-    progress.set(
-      withRepeat(
-        withTiming(1, {
-          duration: MOTION_DURATION_MS,
-          easing: EASE_IN_OUT,
-          reduceMotion: ReduceMotion.System,
-        }),
-        -1,
-        false,
-        undefined,
-        ReduceMotion.System,
-      ),
-    );
+  const uniforms = useDerivedValue(() => ({
+    resolution: [size.width, size.height],
+    time: time.get(),
+    color,
+    clicks: clicks.get(),
+    brush: brush.get(),
+    direction: direction.get(),
+  }));
 
-    return () => cancelAnimation(progress);
-  }, [active, progress, reduceMotion]);
+  // Only the empty background receives this gesture. Foreground controls stay above it.
+  const touch = Gesture.Pan()
+    .enabled(running)
+    .minDistance(0)
+    .onBegin((event) => {
+      const index = clickIndex.get();
+      clicks.set((values) =>
+        values.map((value, i) => (i === index ? [event.x, size.height - event.y, time.get(), 1] : value)),
+      );
+      clickIndex.set((index + 1) % 10);
+      brush.set([event.x / size.width, 1 - event.y / size.height, time.get(), 0]);
+    })
+    .onUpdate((event) => {
+      const x = event.x / size.width;
+      const y = 1 - event.y / size.height;
+      const previous = brush.get();
+      const dx = x - previous[0];
+      const dy = y - previous[1];
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance === 0) return;
+      direction.set([dx / distance, dy / distance]);
+      brush.set([x, y, time.get(), Math.min(distance * distance * 10_000, 1)]);
+    });
 
   return (
-    <View
-      accessibilityElementsHidden
-      className="absolute inset-0 overflow-hidden"
-      importantForAccessibility="no-hide-descendants"
-      pointerEvents="none"
-    >
-      {PIXELS.map((pixel) => (
-        <Pixel
-          key={pixel.id}
-          accentColor={accentColor}
-          brandColor={brandColor}
-          height={height}
-          pixel={pixel}
-          progress={progress}
-          reduceMotion={reduceMotion}
-          width={width}
-        />
-      ))}
-    </View>
+    <GestureDetector gesture={touch}>
+      <View
+        accessibilityElementsHidden
+        className="absolute inset-0 overflow-hidden"
+        collapsable={false}
+        importantForAccessibility="no-hide-descendants"
+        onLayout={({ nativeEvent: { layout } }) => setSize({ width: layout.width, height: layout.height })}
+      >
+        {EFFECT && size.width > 0 && size.height > 0 ? (
+          <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
+            <Fill>
+              <Shader source={EFFECT} uniforms={uniforms} />
+            </Fill>
+          </Canvas>
+        ) : null}
+      </View>
+    </GestureDetector>
   );
 }
