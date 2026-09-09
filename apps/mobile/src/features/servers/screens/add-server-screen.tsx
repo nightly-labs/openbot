@@ -69,6 +69,7 @@ export function AddServerScreen({
 
   return (
     <SheetScrollView
+      scrollEdgeEffect={false}
       className="bg-sheet"
       contentContainerClassName="gap-7 px-5 pb-safe-offset-5 pt-14"
       contentInsetAdjustmentBehavior="automatic"
