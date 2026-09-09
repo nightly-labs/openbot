@@ -8,6 +8,7 @@ import type {
   AgentSummary,
 } from "@openbot/contracts/ipc";
 import { isReasoningEffort } from "@openbot/contracts/ipc";
+import { redactText } from "@openbot/logging";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import { type AgentCliInfo, CodexCliError, type CodexCliInfo, resolveCodexCli } from "./../cli";
@@ -29,7 +30,6 @@ import { normalizeAccountUsage } from "./account-usage";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
   providerFailureStatus,
-  readProcessReason,
   setProviderStatus,
   updateProviderStatus,
   waitForSuccessfulProcess,
@@ -205,7 +205,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #requestTimeoutMs: number;
   readonly #clientFactory: AgentClientFactory | null;
-  readonly #bundledExecutables: ReadonlyMap<AgentProvider, string | null | undefined>;
+  readonly #bundledExecutables: Map<AgentProvider, string | null | undefined>;
   readonly #clients = new Map<AgentProvider, AgentClient>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
   /**
@@ -414,65 +414,35 @@ export class ProviderRuntime implements ProviderPort {
     });
   }
 
-  /**
-   * Runs the provider CLI's own updater. This is for an install the user made: it answers to them,
-   * and this is how they move it to a version newer than the one OpenBot pins, without waiting for
-   * an OpenBot release. The managed copy is refused, because the runtime manager replaces that one
-   * whole and a self-updater inside it would leave two owners for one directory.
-   */
-  async updateProviderCli(provider: AgentProvider): Promise<AgentStatus> {
-    const driver = requireProviderDriver(provider);
-    const command = driver.cliUpdate;
-    if (!command) throw new Error(`OpenBot cannot update the ${providerLabel(provider)} CLI.`);
+  /** Keeps this provider idle until its managed runtime is installed and activated. */
+  async updateProviderCli(provider: AgentProvider, install: () => Promise<string>): Promise<AgentStatus> {
     return this.#runProviderConnectionCommand(provider, async () => {
-      const cli = await this.#resolveProviderCli(provider);
-      if (cli.source === "managed") {
-        throw new Error(`OpenBot manages this ${providerLabel(provider)} CLI and updates it with the app.`);
-      }
-      // The update replaces the binary under a running client, and the client is restarted after
-      // it. A turn in flight would lose its process, so the user is asked to wait instead.
+      await this.#providerStarts.get(provider);
       if (this.#hooks.isProviderBusy(provider)) {
         throw new Error(`The ${providerLabel(provider)} CLI is working on a turn. Wait for it to finish, then update.`);
       }
+      const previousVersion = this.#cli.get(provider)?.version ?? null;
+      const previousExecutable = this.#bundledExecutables.get(provider);
       this.#setProviderConnectionState(provider, "connecting");
-      // No turn may start on this provider until the new client is ready. Deliveries wait in the
-      // mailbox and #activateProviderClient schedules them again.
       this.#replacingCli.add(provider);
       try {
-        let reason: () => string | null = () => null;
-        try {
-          const child = spawn(cli.executable, [...command.argv], {
-            cwd: process.cwd(),
-            env: { ...process.env, ...command.env(cli) },
-            // Only the error stream is read. An updater that refuses - a CLI installed by a package
-            // manager that wants to own the upgrade, most often - says why there, and its own reason
-            // is worth more to the user than an exit code.
-            stdio: ["ignore", "ignore", "pipe"],
-            shell: false,
-            windowsHide: process.platform === "win32",
-          });
-          reason = readProcessReason(child);
-          await waitForSuccessfulProcess(child, command.timeoutMs, "Provider update");
-        } catch (error) {
-          // One error for both readers: the row and the caller each get the updater's own reason.
-          const failure = new Error(
-            `OpenBot could not update the ${providerLabel(provider)} CLI. ${reason() ?? "Try again."}`,
-            { cause: error },
-          );
-          this.#setProviderConnectionFailure(provider, failure, cli.version);
-          throw failure;
+        const executable = await install();
+        this.#bundledExecutables.set(provider, executable);
+        const cli = await this.#resolveProviderCli(provider);
+        if (cli.source !== "managed" || cli.executable !== executable) {
+          throw new Error("OpenBot could not select the installed managed CLI.");
         }
-        // The running client still executes the binary the updater replaced, so it is restarted
-        // here. Its version is what the row shows, and the new one is the point of the command.
-        try {
-          await this.#reloadProviderCli(provider);
-        } catch (error) {
-          this.#setProviderConnectionFailure(provider, error, cli.version);
-          throw error;
-        }
+        await this.#reloadProviderCli(provider, cli);
+      } catch (error) {
+        this.#bundledExecutables.set(provider, previousExecutable);
+        const failure = new Error(
+          `OpenBot could not update the ${providerLabel(provider)} CLI. ${error instanceof Error ? redactText(error.message) : "Try again."}`,
+          { cause: error },
+        );
+        this.#setProviderConnectionFailure(provider, failure, previousVersion);
+        throw failure;
       } finally {
         this.#replacingCli.delete(provider);
-        // Also after a failure: nothing else schedules the deliveries this update held back.
         this.#hooks.onProviderResumed(provider);
       }
       return this.status();
@@ -483,7 +453,7 @@ export class ProviderRuntime implements ProviderPort {
     return this.#clients.get(providerForAgent(agent)) ?? null;
   }
 
-  /** True while the CLI's own updater runs and the client that used the old binary is replaced. */
+  /** True while a managed runtime is installed and its previous client is replaced. */
   isReplacingCli(provider: AgentProvider): boolean {
     return this.#replacingCli.has(provider);
   }
@@ -828,17 +798,20 @@ export class ProviderRuntime implements ProviderPort {
     });
   }
 
-  /** Puts a provider back on the binary that is on disk now, after its CLI replaced itself. */
-  async #reloadProviderCli(provider: AgentProvider): Promise<void> {
+  /** Puts a provider back on the binary that is on disk now, after a managed update. */
+  async #reloadProviderCli(provider: AgentProvider, cli: AgentCliInfo): Promise<void> {
     if (!this.#clients.has(provider)) {
       this.#clearProviderConnectionState(provider);
       this.#cli.delete(provider);
       // Connecting the replaced CLI is not a start either: the other providers are running through
       // it, and `onProvidersReady` would settle their live deliveries. See below.
       await this.#connect("starting", [provider], { preserveCheckErrors: true, notifyReady: false });
+      const status = this.status().providers?.find((row) => row.id === provider);
+      if (status?.version !== cli.version || !["available", "sign-in-required"].includes(status.state)) {
+        throw new Error(status?.message ?? "OpenBot could not activate the managed CLI.");
+      }
       return;
     }
-    const cli = await this.#resolveProviderCli(provider);
     const candidate = await this.#createAuthenticatedProviderClient(provider, cli);
     // Not a start: `onProvidersReady` is restart recovery, and it settles every unresolved delivery,
     // including the live ones of the other providers - a turn still running would be recorded as

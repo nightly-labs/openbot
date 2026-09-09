@@ -43,12 +43,8 @@ export class CodexCliError extends Error {
 export async function resolveCodexCli(
   input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
 ): Promise<CodexCliInfo> {
-  const systemCandidates = input.systemCandidates ?? (await collectCandidates("codex", process.env.OPENBOT_CODEX_PATH));
   const bundledExecutable = input.bundledExecutable === undefined ? bundledCodexExecutable() : input.bundledExecutable;
-  const candidates = [
-    ...systemCandidates.map((executable) => ({ executable, source: "system" as const })),
-    ...(bundledExecutable ? [{ executable: bundledExecutable, source: "managed" as const }] : []),
-  ].filter((candidate, index, all) => all.findIndex((other) => other.executable === candidate.executable) === index);
+  const candidates = await cliCandidates("codex", input.systemCandidates, bundledExecutable);
   const failures: CodexCliError[] = [];
 
   for (const candidate of candidates) {
@@ -94,13 +90,8 @@ export function bundledCodexExecutable(
 export async function resolveClaudeCli(
   input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
 ): Promise<ClaudeCliInfo> {
-  const systemCandidates =
-    input.systemCandidates ?? (await collectCandidates("claude", process.env.OPENBOT_CLAUDE_PATH));
   const bundledExecutable = input.bundledExecutable === undefined ? bundledClaudeExecutable() : input.bundledExecutable;
-  const candidates = [
-    ...systemCandidates.map((executable) => ({ executable, source: "system" as const })),
-    ...(bundledExecutable ? [{ executable: bundledExecutable, source: "managed" as const }] : []),
-  ].filter((candidate, index, all) => all.findIndex((other) => other.executable === candidate.executable) === index);
+  const candidates = await cliCandidates("claude", input.systemCandidates, bundledExecutable);
   const failures: CodexCliError[] = [];
 
   for (const candidate of candidates) {
@@ -145,12 +136,8 @@ export function bundledClaudeExecutable(
 export async function resolveGrokCli(
   input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
 ): Promise<GrokCliInfo> {
-  const systemCandidates = input.systemCandidates ?? (await collectCandidates("grok", process.env.OPENBOT_GROK_PATH));
   const bundledExecutable = input.bundledExecutable === undefined ? bundledGrokExecutable() : input.bundledExecutable;
-  const candidates = [
-    ...systemCandidates.map((executable) => ({ executable, source: "system" as const })),
-    ...(bundledExecutable ? [{ executable: bundledExecutable, source: "managed" as const }] : []),
-  ].filter((candidate, index, all) => all.findIndex((other) => other.executable === candidate.executable) === index);
+  const candidates = await cliCandidates("grok", input.systemCandidates, bundledExecutable);
   const failures: CodexCliError[] = [];
 
   for (const candidate of candidates) {
@@ -240,6 +227,27 @@ function isMinimumVersion(version: string, minimum: readonly number[]): boolean 
     if (parts[index] < minimum[index]) return false;
   }
   return true;
+}
+
+/** An explicit path remains under the user's control, including during managed updates. */
+export function configuredCliPath(provider: "codex" | "claude" | "grok"): string | null {
+  return process.env[`OPENBOT_${provider.toUpperCase()}_PATH`]?.trim() || null;
+}
+
+async function cliCandidates(
+  provider: "codex" | "claude" | "grok",
+  systemCandidates: string[] | undefined,
+  bundledExecutable: string | null,
+): Promise<Array<{ executable: string; source: "system" | "managed" }>> {
+  const override = systemCandidates === undefined ? configuredCliPath(provider) : null;
+  const system = (systemCandidates ?? (await collectCandidates(provider, override ?? undefined))).map((executable) => ({
+    executable,
+    source: "system" as const,
+  }));
+  const managed = bundledExecutable ? [{ executable: bundledExecutable, source: "managed" as const }] : [];
+  return (override ? [...system, ...managed] : [...managed, ...system]).filter(
+    (candidate, index, all) => all.findIndex((other) => other.executable === candidate.executable) === index,
+  );
 }
 
 async function collectCandidates(

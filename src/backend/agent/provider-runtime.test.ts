@@ -1,6 +1,5 @@
 // @vitest-environment node
-import { existsSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -501,56 +500,57 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(codexClients[2]?.running).toBe(true);
   });
 
-  it("runs the user's own CLI updater and reports the version the provider now runs", async () => {
-    const claude = await createUpdatableFakeClaude(root, "2.1.250");
-    process.env.OPENBOT_CLAUDE_PATH = claude.executable;
+  it("activates the downloaded managed CLI instead of running the user's updater", async () => {
+    const system = await createUpdatableFakeClaude(root, "2.1.250");
+    process.env.OPENBOT_CLAUDE_PATH = system.executable;
     const { store, mailbox } = stores(root);
-    service = new AgentService(
-      store,
-      mailbox,
-      fakeBrowser(),
-      30_000,
-      "claude",
-      (provider) => new FakeAgentClient(provider),
-    );
+    const clients: FakeAgentClient[] = [];
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "claude", (provider) => {
+      const client = new FakeAgentClient(provider);
+      if (provider === "claude") clients.push(client);
+      return client;
+    });
     await service.initialize();
-    expect(service.getStatus().providers).toContainEqual(
-      expect.objectContaining({ id: "claude", version: "2.1.246", cliSource: "system" }),
-    );
-
-    const status = await service.updateProviderCli("claude");
-
-    expect(await readTextOrEmpty(claude.marker)).toContain("updated");
+    const managed = await createFakeClaude(root);
+    await writeFile(managed, (await readFile(managed, "utf8")).replaceAll("2.1.246", "2.1.263"));
+    // Remove the test's explicit override to model automatic system discovery at startup.
+    process.env.OPENBOT_CLAUDE_PATH = join(root, "missing-claude");
+    const status = await service.updateProviderCli("claude", async () => managed);
+    expect(await readTextOrEmpty(system.started)).toBe("");
     expect(status.providers).toContainEqual(
-      expect.objectContaining({ id: "claude", state: "available", version: "2.1.250" }),
+      expect.objectContaining({ id: "claude", state: "available", version: "2.1.263", cliSource: "managed" }),
     );
+    expect(clients[0]?.running).toBe(false);
+    expect(clients[1]?.running).toBe(true);
   });
 
-  it("refuses to run a self-updater against the CLI copy OpenBot manages", async () => {
-    const claude = await createUpdatableFakeClaude(root, "2.1.250");
+  it("keeps the previous client when the replacement cannot authenticate", async () => {
+    const managed = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
+    const clients: FakeAgentClient[] = [];
     service = new AgentService(
       store,
       mailbox,
       fakeBrowser(),
       30_000,
       "claude",
-      (provider) => new FakeAgentClient(provider),
+      (provider) => {
+        const client = new FakeAgentClient(provider, "", true, provider !== "claude" || clients.length === 0);
+        if (provider === "claude") clients.push(client);
+        return client;
+      },
       undefined,
-      claude.executable,
+      managed,
     );
     await service.initialize();
+    await expect(service.updateProviderCli("claude", async () => managed)).rejects.toThrow();
+    expect(clients[0]?.running).toBe(true);
+    expect(clients[1]?.running).toBe(false);
     expect(service.getStatus().providers).toContainEqual(
-      expect.objectContaining({ id: "claude", version: "2.1.246", cliSource: "managed" }),
-    );
-
-    await expect(service.updateProviderCli("claude")).rejects.toThrow(/manages/u);
-
-    expect(await readTextOrEmpty(claude.marker)).toBe("");
-    expect(service.getStatus().providers).toContainEqual(
-      expect.objectContaining({ id: "claude", state: "available", version: "2.1.246" }),
+      expect.objectContaining({ id: "claude", version: "2.1.246", state: "available" }),
     );
   });
+
   it("refuses to replace a CLI that is running a turn", async () => {
     const { store, mailbox } = stores(root);
     service = new AgentService(
@@ -568,7 +568,11 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     // The updater would replace the binary under the running turn, so it is not started at all.
-    await expect(service.updateProviderCli("codex")).rejects.toThrow(/working on a turn/u);
+    await expect(
+      service.updateProviderCli("codex", async () => {
+        throw new Error("Busy provider started an install.");
+      }),
+    ).rejects.toThrow(/working on a turn/u);
 
     expect(service.getStatus().providers).toContainEqual(
       expect.objectContaining({ id: "codex", state: "available", version: "0.144.1" }),
@@ -600,7 +604,11 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     // The delivery has no turn id yet, and the client it is about to prompt must not be replaced.
     await waitFor(() => turnStartReached);
 
-    await expect(service.updateProviderCli("codex")).rejects.toThrow(/working on a turn/u);
+    await expect(
+      service.updateProviderCli("codex", async () => {
+        throw new Error("Busy provider started an install.");
+      }),
+    ).rejects.toThrow(/working on a turn/u);
 
     releaseTurnStart?.();
   });
@@ -640,14 +648,21 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     void service.sendMessage({ agentId: "chief", text: "Run after compaction" });
     await waitFor(() => compactionReached);
 
-    await expect(service.updateProviderCli("codex")).rejects.toThrow(/working on a turn/u);
+    await expect(
+      service.updateProviderCli("codex", async () => {
+        throw new Error("Busy provider started an install.");
+      }),
+    ).rejects.toThrow(/working on a turn/u);
 
     releaseCompaction?.();
   });
 
   it("delivers a message queued while a failed update held the CLI", async () => {
-    const gate = join(root, "claude-update-gate");
-    const claude = await createUpdatableFakeClaude(root, "2.1.250", "Installed by Homebrew.", gate);
+    let failInstall: ((error: Error) => void) | undefined;
+    const gate = new Promise<string>((_resolve, reject) => {
+      failInstall = reject;
+    });
+    const claude = await createUpdatableFakeClaude(root, "2.1.250");
     process.env.OPENBOT_CLAUDE_PATH = claude.executable;
     const { store, mailbox } = stores(root);
     service = new AgentService(
@@ -671,15 +686,19 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     await waitFor(async () => (await running.readConversation(agent.id)).activeTurnId === null);
     const turnsBefore = started.filter((agentId) => agentId === agent.id).length;
 
-    const update = service.updateProviderCli("claude");
-    await waitFor(() => existsSync(claude.started));
+    let installing = false;
+    const update = service.updateProviderCli("claude", () => {
+      installing = true;
+      return gate;
+    });
+    await waitFor(() => installing);
     await service.sendMessage({ agentId: agent.id, text: "Take this when you are back." });
     // The CLI under the client is being replaced, so the delivery waits in the mailbox.
     expect(started.filter((agentId) => agentId === agent.id)).toHaveLength(turnsBefore);
 
-    await writeFile(gate, "go");
+    failInstall?.(new Error("Runtime download failed."));
     // A refused update replaces no client, so nothing else would deliver what it held back.
-    await expect(update).rejects.toThrow(/Installed by Homebrew\./u);
+    await expect(update).rejects.toThrow(/Runtime download failed/u);
 
     await waitFor(() => started.filter((agentId) => agentId === agent.id).length > turnsBefore);
   });
@@ -712,7 +731,8 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
       // Claude is idle, so its CLI is replaced. Restart recovery would settle every unresolved
       // delivery, and this one belongs to a turn Codex is still running.
-      await service.updateProviderCli("claude");
+      process.env.OPENBOT_CLAUDE_PATH = join(root, "missing-claude");
+      await service.updateProviderCli("claude", async () => claude.executable);
 
       expect(running.listQueue("chief").deliveries[0]?.status).toBe("running");
       expect((await running.readConversation("chief")).activeTurnId).toBe(turnId);
@@ -739,13 +759,8 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
   });
 
-  it("redacts a secret in the reason the updater printed", async () => {
-    const claude = await createUpdatableFakeClaude(
-      root,
-      "2.1.250",
-      "registry refused Authorization: Bearer abcdef123456",
-    );
-    process.env.OPENBOT_CLAUDE_PATH = claude.executable;
+  it("reports installation failure without replacing the working client", async () => {
+    const managed = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
     service = new AgentService(
       store,
@@ -754,41 +769,17 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       30_000,
       "claude",
       (provider) => new FakeAgentClient(provider),
+      undefined,
+      managed,
     );
     await service.initialize();
-
-    // The row goes to the caller and to every client the Team API broadcasts to.
-    await expect(service.updateProviderCli("claude")).rejects.toThrow(/\[redacted\]/u);
-
-    const message = service.getStatus().providers?.find((provider) => provider.id === "claude")?.message;
-    expect(message).toContain("[redacted]");
-    expect(message).not.toContain("abcdef123456");
-  });
-
-  it("keeps the CLI's own reason when its updater refuses", async () => {
-    const claude = await createUpdatableFakeClaude(root, "2.1.250", "Installed by Homebrew. Run brew upgrade.");
-    process.env.OPENBOT_CLAUDE_PATH = claude.executable;
-    const { store, mailbox } = stores(root);
-    service = new AgentService(
-      store,
-      mailbox,
-      fakeBrowser(),
-      30_000,
-      "claude",
-      (provider) => new FakeAgentClient(provider),
-    );
-    await service.initialize();
-
-    // The caller and the provider row get the same reason: the CLI's own words.
-    await expect(service.updateProviderCli("claude")).rejects.toThrow(/Installed by Homebrew\. Run brew upgrade\./u);
-
-    expect(service.getStatus().providers).toContainEqual(
-      expect.objectContaining({
-        id: "claude",
-        state: "available",
-        version: "2.1.246",
-        message: expect.stringContaining("Installed by Homebrew. Run brew upgrade."),
+    await expect(
+      service.updateProviderCli("claude", async () => {
+        throw new Error("Runtime verification failed.");
       }),
+    ).rejects.toThrow("Runtime verification failed.");
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "claude", state: "available", version: "2.1.246" }),
     );
   });
 });
