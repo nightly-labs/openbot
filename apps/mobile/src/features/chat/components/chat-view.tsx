@@ -70,6 +70,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   const [historyLoadFailed, setHistoryLoadFailed] = useState(false);
   const historyRequestRef = useRef(0);
   const {
+    agents,
     conversations,
     loadConversation,
     markAgentRead,
@@ -267,6 +268,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
             onBack={handleLeaveConversation}
           />
           <ChatMessageList
+            agents={agents.filter((candidate) => candidate.serverId === agent.serverId)}
             agent={agent}
             motion={motion}
             sending={sending}
@@ -326,6 +328,9 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
             ) : null}
             <ConnectionStatus server={server} />
             <ChatComposer
+              mentionAgents={agents.filter(
+                (candidate) => candidate.serverId === agent.serverId && candidate.id !== agent.id,
+              )}
               key={JSON.stringify([
                 agent.id,
                 questionForm.question ? questionForm.messageId : null,

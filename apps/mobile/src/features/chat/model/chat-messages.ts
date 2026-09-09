@@ -1,6 +1,12 @@
-import type { AttachmentSummary, ConversationMessage, ConversationQuestionPrompt } from "@openbot/contracts/ipc";
+import type {
+  AgentExchangeSummary,
+  AttachmentSummary,
+  ConversationMessage,
+  ConversationQuestionPrompt,
+} from "@openbot/contracts/ipc";
 
 export type ChatMessage =
+  | { id: string; kind: "exchange"; exchange: AgentExchangeSummary }
   | { id: string; kind: "question"; turnId: string | undefined; prompt: ConversationQuestionPrompt }
   | {
       id: string;
@@ -38,6 +44,9 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
   const result: ChatMessage[] = [];
   const thinkingByTurn = new Map<string, Extract<ChatMessage, { kind: "thinking" }>>();
   for (const message of messages) {
+    if (message.exchange) {
+      result.push({ id: `exchange:${message.id}`, kind: "exchange", exchange: message.exchange });
+    }
     if (message.questionPrompt) {
       result.push({ id: message.id, kind: "question", turnId: message.turnId, prompt: message.questionPrompt });
       continue;

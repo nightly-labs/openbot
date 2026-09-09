@@ -38,6 +38,7 @@ const AGENT_MESSAGE_ENTRANCE = FadeIn.duration(240).reduceMotion(ReduceMotion.Sy
 
 interface ChatMessageListProps {
   agent: MobileAgent;
+  agents: MobileAgent[];
   motion: ChatMotion;
   sending: boolean;
   keyboardOffset: number;
@@ -60,6 +61,7 @@ interface ChatMessageListProps {
 
 export function ChatMessageList({
   agent,
+  agents,
   motion,
   sending,
   keyboardOffset,
@@ -132,7 +134,29 @@ export function ChatMessageList({
     }
   }
   const renderMessage = (message: (typeof visibleMessages)[number], isTailUser: boolean, isFirstUser: boolean) =>
-    message.kind === "question" ? (
+    message.kind === "exchange" ? (
+      <View key={message.id} className="flex-row flex-wrap items-center justify-center gap-2 py-2">
+        <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+          {message.exchange.direction === "outgoing" ? "Messaged" : "Message from"}
+        </Typography.Paragraph>
+        {(message.exchange.direction === "incoming"
+          ? [message.exchange.senderAgentId]
+          : message.exchange.recipientAgentIds
+        ).map((id) => {
+          const participant = agents.find((candidate) => candidate.id === id);
+          return (
+            <View key={id} className="flex-row items-center gap-1">
+              {participant ? (
+                <BloubAvatar agentId={id} hue={participant.avatarHue} seed={participant.avatarSeed} size={22} />
+              ) : null}
+              <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+                {participant?.name ?? "Unknown agent"}
+              </Typography.Paragraph>
+            </View>
+          );
+        })}
+      </View>
+    ) : message.kind === "question" ? (
       <ChatQuestionPrompt
         key={message.id}
         prompt={message.prompt}
@@ -167,6 +191,7 @@ export function ChatMessageList({
           </Typography.Paragraph>
         ))}
         <ChatMarkdown
+          agents={agents}
           body={message.body}
           color={message.author === "user" ? "#0a0a0c" : foreground}
           streaming={message.author === "agent" && message.streaming}

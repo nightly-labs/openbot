@@ -4,7 +4,7 @@ import type { AgentPromptQuestion } from "@openbot/contracts/ipc";
 import { GlassView } from "expo-glass-effect";
 import { Button, Typography } from "heroui-native";
 import { ArrowUp, Mic, Plus } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Text as NativeText,
@@ -17,6 +17,9 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { scheduleOnRN } from "react-native-worklets";
+import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { largePastedText } from "../model/composer-paste";
 import { ChatGlassIconButton } from "./chat-glass-icon-button";
 import { CHAT_ATTACHMENTS_ENABLED, type ChatAttachments } from "./use-chat-attachments";
@@ -25,6 +28,7 @@ interface ChatComposerProps {
   action: ViewStyle["backgroundColor"];
   actionForeground: ViewStyle["backgroundColor"];
   agentName: string;
+  mentionAgents: MobileAgent[];
   bottomInset: number;
   disabled: boolean;
   draft: string;
@@ -44,6 +48,7 @@ export function ChatComposer({
   action,
   actionForeground,
   agentName,
+  mentionAgents,
   bottomInset,
   disabled,
   draft,
@@ -58,8 +63,26 @@ export function ChatComposer({
   attachments,
   sending,
 }: ChatComposerProps) {
+  const display = mentionDraft(answerQuestion ? "" : draft);
+  const displayText = answerQuestion ? draft : display.text;
+  const [cursor, setCursor] = useState(0);
+  const query = !answerQuestion ? mentionQuery(draft, cursor) : null;
+  const suggestions = query
+    ? mentionAgents
+        .filter((agent) =>
+          `${agent.name} ${agent.title} ${agent.description}`.toLocaleLowerCase().includes(query.query.trim()),
+        )
+        .slice(0, 8)
+    : [];
   const hasDraft = Boolean(draft.trim()) || attachments.items.length > 0;
   const inputRef = useRef<TextInput>(null);
+  const pendingCursor = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (pendingCursor.current === null) return;
+    const position = Math.min(pendingCursor.current, displayText.length);
+    pendingCursor.current = null;
+    inputRef.current?.setNativeProps({ selection: { start: position, end: position } });
+  }, [displayText]);
   const { fontScale } = useWindowDimensions();
   const minInputHeight = Math.max(48, 22 * fontScale + 26);
   const maxInputHeight = 22 * fontScale * 5 + 26;
@@ -103,6 +126,46 @@ export function ChatComposer({
 
   return (
     <View>
+      {focused && query && suggestions.length > 0 && !disabled ? (
+        <GlassView
+          glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
+          style={{
+            marginLeft: 72,
+            marginRight: 16,
+            flexGrow: 0,
+            maxHeight: 240,
+            borderRadius: 24,
+            borderCurve: "continuous",
+            overflow: "hidden",
+            backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
+          }}
+        >
+          <ScrollView keyboardShouldPersistTaps="always" style={{ flexGrow: 0 }}>
+            {suggestions.map((agent) => (
+              <Button
+                key={agent.id}
+                variant="ghost"
+                className="min-h-12 flex-row justify-start gap-3 rounded-none px-4"
+                accessibilityLabel={`Mention ${agent.name}`}
+                onPress={() => {
+                  const next = insertMention(latestTextRef.current, query, agent);
+                  latestTextRef.current = next;
+                  onChangeDraft(next);
+                  const position = query.start + agent.name.length + 2;
+                  setCursor(position);
+                  pendingCursor.current = position;
+                  inputRef.current?.focus();
+                }}
+              >
+                <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={28} />
+                <Typography.Paragraph numberOfLines={1} className="flex-1">
+                  {agent.name}
+                </Typography.Paragraph>
+              </Button>
+            ))}
+          </ScrollView>
+        </GlassView>
+      ) : null}
       {attachments.items.length > 0 ? (
         <ScrollView
           horizontal
@@ -223,7 +286,7 @@ export function ChatComposer({
                   }}
                   onTextLayout={(event) => setInputLines(Math.max(1, event.nativeEvent.lines.length))}
                 >
-                  {`${draft}\u200b`}
+                  {`${displayText}\u200b`}
                 </NativeText>
               ) : null}
               <TextInput
@@ -261,7 +324,10 @@ export function ChatComposer({
                   paddingTop: 13,
                   textAlignVertical: "top",
                 }}
-                value={draft}
+                value={answerQuestion ? draft : undefined}
+                onSelectionChange={({ nativeEvent }) =>
+                  setCursor(nativeEvent.selection.start === nativeEvent.selection.end ? nativeEvent.selection.end : -1)
+                }
                 onFocus={() => {
                   setFocused(true);
                 }}
@@ -284,18 +350,37 @@ export function ChatComposer({
                       );
                     }
                   }
-                  latestTextRef.current = text;
-                  onChangeDraft(text);
+                  const next = answerQuestion ? text : editMentionDraft(latestTextRef.current, text);
+                  latestTextRef.current = next;
+                  onChangeDraft(next);
                 }}
                 onSubmitEditing={({ nativeEvent }) => {
-                  if (!disabled && !sending) onSend(nativeEvent.text);
+                  if (!disabled && !sending)
+                    onSend(
+                      answerQuestion ? nativeEvent.text : editMentionDraft(latestTextRef.current, nativeEvent.text),
+                    );
                 }}
                 onEndEditing={({ nativeEvent: { text } }) => {
                   // Native editing can end before the send button's release event,
                   // while TextInput.isFocused() is still waiting for onBlur.
-                  latestTextRef.current = text;
+                  latestTextRef.current = answerQuestion ? text : editMentionDraft(latestTextRef.current, text);
                 }}
-              />
+              >
+                {/* TextInput requires native text children for editable attributed text. */}
+                {!answerQuestion ? (
+                  <NativeText>
+                    {display.mentions.map((mention, index) => (
+                      <NativeText key={mention.start}>
+                        {displayText.slice(index ? display.mentions[index - 1].end : 0, mention.start)}
+                        <NativeText style={{ color: action }}>
+                          {displayText.slice(mention.start, mention.end)}
+                        </NativeText>
+                      </NativeText>
+                    ))}
+                    {displayText.slice(display.mentions.at(-1)?.end ?? 0)}
+                  </NativeText>
+                ) : null}
+              </TextInput>
             </View>
             <Pressable
               accessibilityLabel={hasDraft ? (answerQuestion ? "Send answer" : "Send message") : "Start voice message"}
