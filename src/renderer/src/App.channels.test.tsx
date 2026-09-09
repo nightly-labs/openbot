@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-lib
 import { beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { installOpenbotStub, testServer } from "./app-test-harness";
+import { CHANNEL_SELECTION_STORAGE_KEY } from "./features/channels/channel-selection";
 import { AccountDock } from "./lazy-views";
 
 beforeAll(async () => {
@@ -10,7 +11,7 @@ beforeAll(async () => {
 
 beforeEach(installOpenbotStub);
 
-async function openSavedChannel() {
+async function openSavedChannel(onUnmount?: (unmount: () => void) => void) {
   await window.openbot.agent.channelCommand({
     type: "save",
     operationId: "create",
@@ -23,7 +24,8 @@ async function openSavedChannel() {
       leadAgentId: "chief",
     },
   });
-  render(() => <App />);
+  const view = render(() => <App />);
+  onUnmount?.(view.unmount);
   await screen.findByRole("button", { name: /Open account (actions|menu)/ });
   await fireEvent.click(await screen.findByRole("button", { name: /Project room/ }));
   const chat = await screen.findByRole("main", { name: "Channel conversation" });
@@ -40,6 +42,32 @@ async function openChannelMenuItem(item: string) {
   await fireEvent.contextMenu(channelRow("Project room"));
   await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: item }), { button: 0 });
 }
+
+it("restores the selected channel after restart and clears it when returning to an agent", async () => {
+  let unmount: (() => void) | undefined;
+  await openSavedChannel((dispose) => {
+    unmount = dispose;
+  });
+  expect(JSON.parse(window.localStorage.getItem(CHANNEL_SELECTION_STORAGE_KEY) ?? "{}")).toEqual({
+    "user-1": { local: "channel-test" },
+  });
+
+  unmount?.();
+  const restarted = render(() => <App />);
+  await within(await screen.findByRole("main", { name: "Channel conversation" })).findByRole("heading", {
+    name: "Project room",
+    level: 1,
+  });
+
+  await fireEvent.click(screen.getByRole("button", { name: /^Chief, Chief of staff/ }));
+  await screen.findByRole("main", { name: "Conversation" });
+  expect(window.localStorage.getItem(CHANNEL_SELECTION_STORAGE_KEY)).toBe("{}");
+
+  restarted.unmount();
+  const view = render(() => <App />);
+  expect(await screen.findByRole("heading", { name: "Chief", level: 1 })).toBeVisible();
+  view.unmount();
+});
 
 it.each([0, 1])("opens the agent chat from author control %i", async (control) => {
   const read = window.openbot.agent.readChannel;
@@ -208,6 +236,7 @@ it("deletes a channel from the sidebar and keeps its member agents", async () =>
   await waitFor(() => expect(screen.queryByRole("main", { name: "Channel conversation" })).not.toBeInTheDocument());
   expect(screen.queryByRole("button", { name: /^Project room\./ })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: /^Chief, Chief of staff/ })).toBeInTheDocument();
+  expect(window.localStorage.getItem(CHANNEL_SELECTION_STORAGE_KEY)).toBe("{}");
   expect((await window.openbot.agent.listChannels()).some((channel) => channel.id === "channel-test")).toBe(false);
 });
 

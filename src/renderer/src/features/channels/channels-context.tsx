@@ -5,11 +5,12 @@ import {
   type ChannelPage,
   type ChannelSummary,
 } from "@openbot/contracts/ipc";
-import { createEffect, createStore, flush, onSettled, reconcile } from "solid-js";
+import { createEffect, createStore, flush, onSettled, reconcile, untrack } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { useServers } from "../servers/servers-context";
+import { readChannelSelection, writeChannelSelection } from "./channel-selection";
 
 interface ChannelsState {
   channels: ChannelSummary[];
@@ -26,9 +27,10 @@ interface ChannelsState {
 const Channels = createSimpleContext({
   name: "Channels",
   init: () => {
-    const { activeServer, activeServerSupportsCapability } = useServers();
+    const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
     const { setAgentSetupOpen } = useAgents();
     const { centralAuth } = useAuth();
+    const selectionServerId = untrack(activeServerId);
     const accountKey = () => {
       const auth = centralAuth();
       return auth.status === "signed_in" ? auth.user.id : auth.status;
@@ -50,12 +52,25 @@ const Channels = createSimpleContext({
     let failedCommand: ChannelCommand | null = null;
     const readThrough = new Map<string, number>();
 
+    function savedChannelId(account: string): string | null {
+      return account === "loading" || account === "error"
+        ? null
+        : (readChannelSelection()[account]?.[selectionServerId] ?? null);
+    }
+
+    function persistChannelSelection(channelId: string | null): void {
+      const status = centralAuth().status;
+      if (status === "signed_in" || status === "signed_out") {
+        writeChannelSelection(accountKey(), selectionServerId, channelId);
+      }
+    }
+
     const supported = () => activeServerSupportsCapability(CHANNEL_CHATS_CAPABILITY);
-    async function refresh() {
+    async function refresh(selectedOverride?: string | null) {
       if (!supported()) return;
       const id = ++refreshId;
       const account = accountKey();
-      const selected = state.selectedId;
+      const selected = selectedOverride === undefined ? state.selectedId : selectedOverride;
       try {
         const channels = await window.openbot.agent.listChannels();
         const selectedExists = selected !== null && channels.some((channel) => channel.id === selected);
@@ -79,6 +94,7 @@ const Channels = createSimpleContext({
           state.loading = false;
           if (!failedCommand) state.error = null;
         });
+        if (selected && !selectedExists) persistChannelSelection(null);
         if (selected && page && document.hasFocus() && page.throughSequence > (readThrough.get(selected) ?? 0)) {
           readThrough.set(selected, page.throughSequence);
           try {
@@ -105,6 +121,7 @@ const Channels = createSimpleContext({
     }
     async function open(channelId: string) {
       setAgentSetupOpen(false);
+      persistChannelSelection(channelId);
       flush(() =>
         setState((state) => {
           Object.assign(state, { selectedId: channelId, page: null, editing: null, loading: true });
@@ -150,13 +167,15 @@ const Channels = createSimpleContext({
         if (input.type === "save") setAgentSetupOpen(false);
         // Only creation closes the editor. Settings save on every field, so closing on a save
         // would shut the panel under the user between two edits.
-        if (input.type === "save")
+        if (input.type === "save") {
+          persistChannelSelection(input.channelId);
           flush(() =>
             setState((state) => {
               state.selectedId = input.channelId;
               if (state.editing === "create") state.editing = null;
             }),
           );
+        }
         await refresh();
         return true;
       } catch (error) {
@@ -200,6 +219,7 @@ const Channels = createSimpleContext({
       }
     }
     createEffect(accountKey, () => {
+      const selected = supported() ? savedChannelId(accountKey()) : null;
       refreshId += 1;
       readThrough.clear();
       failedCommand = null;
@@ -208,7 +228,7 @@ const Channels = createSimpleContext({
         setState((state) => {
           Object.assign(state, {
             channels: [],
-            selectedId: null,
+            selectedId: selected,
             page: null,
             pending: false,
             error: null,
@@ -216,7 +236,7 @@ const Channels = createSimpleContext({
           });
         }),
       );
-      if (supported()) void refresh();
+      if (supported()) void refresh(selected);
     });
     onSettled(() => {
       const focus = () => {
@@ -255,10 +275,12 @@ const Channels = createSimpleContext({
         if (disposed || account !== accountKey()) return;
         readThrough.delete(channelId);
         if (failedCommand?.channelId === channelId) failedCommand = null;
+        const selected = state.selectedId === channelId;
+        if (selected) persistChannelSelection(null);
         flush(() =>
           setState((state) => {
             state.channels = state.channels.filter((channel) => channel.id !== channelId);
-            if (state.selectedId === channelId) {
+            if (selected) {
               Object.assign(state, { selectedId: null, page: null, editing: null, loading: false, error: null });
             }
           }),
@@ -271,10 +293,12 @@ const Channels = createSimpleContext({
       command,
       perform,
       loadOlder,
-      close: () =>
+      close: () => {
+        persistChannelSelection(null);
         setState((state) => {
           Object.assign(state, { selectedId: null, page: null, editing: null });
-        }),
+        });
+      },
       edit: () =>
         setState((state) => {
           Object.assign(state, { editing: "settings" });
