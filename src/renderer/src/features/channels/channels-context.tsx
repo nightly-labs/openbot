@@ -11,6 +11,7 @@ import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useServers } from "../servers/servers-context";
+import { useUsage } from "../usage/usage-context";
 import { mergeChannelPage } from "./channel-page-merge";
 import { readChannelSelection, writeChannelSelection } from "./channel-selection";
 
@@ -32,6 +33,7 @@ const Channels = createSimpleContext({
     const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
     const { setAgentSetupOpen } = useAgents();
     const { clearDirectSelection, setDirectTyping } = useDirectMessages();
+    const usage = useUsage();
     const { centralAuth } = useAuth();
     const selectionServerId = untrack(activeServerId);
     const accountKey = () => {
@@ -98,7 +100,16 @@ const Channels = createSimpleContext({
           if (!failedCommand) state.error = null;
         });
         if (selected && !selectedExists) persistChannelSelection(null);
-        if (selected && page && document.hasFocus() && page.throughSequence > (readThrough.get(selected) ?? 0)) {
+        // The Usage report covers the workspace content and marks it inert, so a message that
+        // arrives behind it was never seen, however focused the window is. The channel stays
+        // selected under the report, which is the state this read has to refuse.
+        if (
+          selected &&
+          page &&
+          document.hasFocus() &&
+          !usage.state.serverId &&
+          page.throughSequence > (readThrough.get(selected) ?? 0)
+        ) {
           readThrough.set(selected, page.throughSequence);
           try {
             await window.openbot.agent.channelCommand({
@@ -129,6 +140,7 @@ const Channels = createSimpleContext({
       // navigation; this is the same exchange the other way round.
       setDirectTyping(false);
       clearDirectSelection();
+      usage.dismissUsage();
       persistChannelSelection(channelId);
       flush(() =>
         setState((state) => {
@@ -153,6 +165,12 @@ const Channels = createSimpleContext({
     }
     async function command(input: ChannelCommand): Promise<boolean> {
       const account = accountKey();
+      // Only the save that creates a channel opens it, and only while the reader has stayed where
+      // the save started. The sidebar takes a click through a save of the settings, and settings
+      // save on every field, so a save that selected its own channel on arrival would pull the
+      // reader back out of the channel they opened and drop the draft they began there.
+      const creating = input.type === "save" && state.editing === "create";
+      const selectedBefore = state.selectedId;
       // A `save` is never dropped: settings commit each field as it is left, and a silently
       // discarded autosave is lost work. The service serializes saves per channel and every
       // command is idempotent on its `operationId`, so letting them queue is safe.
@@ -172,14 +190,13 @@ const Channels = createSimpleContext({
         await window.openbot.agent.channelCommand(attempt);
         if (disposed || account !== accountKey()) return false;
         failedCommand = null;
-        if (input.type === "save") {
+        // Only creation closes the editor. Settings save on every field, so closing on a save
+        // would shut the panel under the user between two edits.
+        if (creating && state.selectedId === selectedBefore) {
           setAgentSetupOpen(false);
           setDirectTyping(false);
           clearDirectSelection();
-        }
-        // Only creation closes the editor. Settings save on every field, so closing on a save
-        // would shut the panel under the user between two edits.
-        if (input.type === "save") {
+          usage.dismissUsage();
           persistChannelSelection(input.channelId);
           flush(() =>
             setState((state) => {

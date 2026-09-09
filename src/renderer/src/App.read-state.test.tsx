@@ -1935,6 +1935,36 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.servers.markDirectRead).not.toHaveBeenCalled();
   });
 
+  it("keeps a channel message unread while the Usage report covers the channel", async () => {
+    render(() => (
+      <AppProviders>
+        <AppAccessGate />
+        <ChannelProbe />
+        <UsageProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+    fireEvent.click(screen.getByRole("button", { name: "Open channel" }));
+    await screen.findByRole("heading", { level: 1, name: "Project" });
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+
+    const command = vi.spyOn(window.openbot.agent, "channelCommand");
+    const read = vi.spyOn(window.openbot.agent, "readChannel");
+    await window.openbot.agent.channelCommand({
+      type: "send",
+      operationId: "channel-usage-send",
+      channelId: "channel-read",
+      text: "The report is ready",
+      recipientAgentId: "chief",
+      replyToMessageId: null,
+      attachmentDraftIds: [],
+    });
+
+    // The report covers the channel, so the message behind it is still waiting for the reader.
+    await waitFor(() => expect(read).toHaveBeenCalled());
+    expect(command).not.toHaveBeenCalledWith(expect.objectContaining({ type: "read" }));
+  });
+
   it("uncovers the conversation a global search result opens", async () => {
     const result = {
       id: "sales-search-hit",

@@ -194,6 +194,54 @@ it("creates a channel from a searchable member dialog and keeps the chat open be
   );
 });
 
+it("keeps the channel the reader opened while the save that creates another one is in flight", async () => {
+  await window.openbot.agent.channelCommand({
+    type: "save",
+    operationId: "create",
+    channelId: "channel-test",
+    draft: {
+      name: "Project room",
+      title: "",
+      instructions: "",
+      members: [{ agentId: "chief" }],
+      leadAgentId: "chief",
+    },
+  });
+  render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+  await fireEvent.pointerDown(await screen.findByRole("button", { name: "New agent or channel" }), { button: 0 });
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New channel" }), { button: 0 });
+  const dialog = await screen.findByRole("dialog", { name: "New channel" });
+  await fireEvent.input(within(dialog).getByRole("textbox", { name: "Channel name" }), {
+    target: { value: "Release room" },
+  });
+  await fireEvent.click(within(dialog).getByRole("checkbox", { name: /Chief/ }));
+
+  // The save waits on a gate, so the reader leaves the new channel while it is in flight.
+  const original = window.openbot.agent.channelCommand;
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  vi.spyOn(window.openbot.agent, "channelCommand").mockImplementation(async (input) => {
+    if (input.type === "save") await gate;
+    return original(input);
+  });
+  void fireEvent.click(within(dialog).getByRole("button", { name: "Create" }));
+  await fireEvent.click(within(dialog).getByRole("button", { name: "Close new channel" }));
+  await fireEvent.click(await screen.findByRole("button", { name: /Project room/ }));
+  const chat = await screen.findByRole("main", { name: "Channel conversation" });
+  await within(chat).findByRole("heading", { name: "Project room", level: 1 });
+  release();
+
+  // The new channel arrives in the sidebar, but the reader stays where they went.
+  await screen.findByRole("button", { name: /Release room/ });
+  expect(within(chat).getByRole("heading", { level: 1 })).toHaveTextContent("Project room");
+  expect(JSON.parse(window.localStorage.getItem(CHANNEL_SELECTION_STORAGE_KEY) ?? "{}")).toEqual({
+    "user-1": { local: "channel-test" },
+  });
+});
+
 it("keeps both removals when the second starts before the first save lands", async () => {
   await window.openbot.agent.channelCommand({
     type: "save",

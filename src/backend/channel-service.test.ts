@@ -1064,6 +1064,70 @@ describe("shared channel coordination", () => {
     expect(schedule.mock.calls.map(([agentId]) => agentId)).toContain("agent-b");
   });
 
+  it("schedules the agents held behind a channel assignment stopped before it starts", async () => {
+    const task = await send("Inspect project A");
+    await data.mailbox.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["agent-b"],
+      text: "Draft the release note",
+      idempotencyKey: "test:channel-hold:stopped-before-start",
+    });
+    expect(service.mayDrain("agent-b")).toBe(false);
+    schedule.mockClear();
+    await service.command(
+      { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
+      actor,
+    );
+    // The delivery never started, so cancelling it is the only thing left that can lift the
+    // reservation it took. Without that, the held request waits for an unrelated trigger.
+    expect(service.mayDrain("agent-b")).toBe(true);
+    expect(schedule.mock.calls.map(([agentId]) => agentId)).toContain("agent-b");
+  });
+
+  it("schedules the agents held behind a channel assignment stopped while its delivery is prepared", async () => {
+    let release!: () => void;
+    const copy = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const enqueue = data.mailbox.enqueue.bind(data.mailbox);
+    vi.spyOn(data.mailbox, "enqueue").mockImplementation(async (input) => {
+      if (input.channelId === "channel-1") await copy;
+      return enqueue(input);
+    });
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: "Inspect project A",
+        recipientAgentId: "agent-a",
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    // The reservation is taken before the delivery is created, which is the state this test needs.
+    await vi.waitFor(() => expect(service.store.assignments("channel-1")).toHaveLength(1));
+    const task = required(service.store.tasks("channel-1")[0]);
+    await data.mailbox.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["agent-b"],
+      text: "Draft the release note",
+      idempotencyKey: "test:channel-hold:stopped-while-prepared",
+    });
+    expect(service.mayDrain("agent-b")).toBe(false);
+    await service.command(
+      { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
+      actor,
+    );
+    schedule.mockClear();
+    release();
+    // The task changed while the delivery was prepared, so the assignment that reserved the host
+    // is cancelled on arrival. It carries the agents that waited behind the reservation with it.
+    await vi.waitFor(() => expect(schedule.mock.calls.map(([agentId]) => agentId)).toContain("agent-b"));
+    expect(service.mayDrain("agent-b")).toBe(true);
+  });
+
   it("keeps channel deliveries ahead of normal messages queued during attachment copying", async () => {
     await service.command(
       {

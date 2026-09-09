@@ -664,6 +664,9 @@ export class ChannelService {
           await this.mailbox.cancel(assignment.agentId, delivery.id);
           this.store.update(this.store.get(channelId), { assignments: [{ ...assignment, state: "interrupted" }] });
           this.#wakeAgain.add(channelId);
+          // The cancelled assignment held the host from the moment it reserved it, so the normal
+          // messages that arrived during the copy are waiting behind a reservation that is gone.
+          this.#releaseHeldAgents();
           continue;
         }
         const context = this.mailbox.getDelivery(delivery.id);
@@ -1312,6 +1315,9 @@ export class ChannelService {
         if (delivery?.delivery.status === "queued") {
           await this.mailbox.cancel(assignment.agentId, assignment.deliveryId);
           this.store.update(this.store.get(channelId), { assignments: [{ ...assignment, state: "interrupted" }] });
+          // A delivery that never started has no turn to complete, so this is the only place that
+          // can lift the reservation it held.
+          this.#releaseHeldAgents();
         }
       }
     }

@@ -509,6 +509,62 @@ describe("OpenBotDatabase", () => {
     database.close();
   });
 
+  it("keeps the channel thread of an agent out of the conversation search", async () => {
+    const database = await createDatabase();
+    const agent = testAgent();
+    database.replaceAgents("agents-channel-search", [agent], "agents.imported");
+    const channelThreadId = "openbot-thread-channel-search";
+    const now = "2026-09-01T12:00:00.000Z";
+    database.connection
+      .prepare("INSERT INTO projection_channels(channel_id, channel_json) VALUES (?, ?)")
+      .run("channel-1", JSON.stringify({ id: "channel-1", name: "Project" }));
+    database.connection
+      .prepare(
+        `INSERT INTO projection_threads
+           (thread_id, agent_id, title, active_turn_id, created_at, updated_at, last_event_sequence)
+         VALUES (?, ?, ?, NULL, ?, ?, 0)`,
+      )
+      .run(channelThreadId, agent.id, "Project", now, now);
+    database.connection
+      .prepare("INSERT INTO projection_channel_contexts(channel_id, agent_id, thread_id) VALUES (?, ?, ?)")
+      .run("channel-1", agent.id, channelThreadId);
+    const message = (id: string, text: string) => ({
+      id,
+      author: "assistant" as const,
+      text,
+      createdAt: now,
+      status: "completed" as const,
+    });
+    database.persistConversation(
+      {
+        agentId: agent.id,
+        threadId: agent.threadId,
+        activeTurnId: null,
+        revision: 0,
+        messages: [message("normal-hit", "A unique channel needle in the chat")],
+      },
+      "conversation.channel-search-normal",
+    );
+    database.persistConversation(
+      {
+        agentId: agent.id,
+        threadId: channelThreadId,
+        activeTurnId: null,
+        revision: 0,
+        messages: [message("channel-hit", "A unique channel needle in the channel")],
+      },
+      "conversation.channel-search-channel",
+    );
+
+    // A result names an agent and a message, and opening one shows the normal conversation of that
+    // agent. A channel message is not there, so the search must not offer it.
+    const search = database.searchConversationMessages("unique channel needle");
+    expect(search.results.map((result) => result.message.id)).toEqual(["normal-hit"]);
+    expect(search.total).toBe(1);
+    expect(database.searchConversationMessages("unique channel needle", agent.id).total).toBe(1);
+    database.close();
+  });
+
   it("fills legacy pages after excluding action markers", async () => {
     const database = await createDatabase();
     const agent = testAgent();
