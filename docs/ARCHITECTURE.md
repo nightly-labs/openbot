@@ -92,6 +92,17 @@ the `media-attachments` capability; released protocol adapters keep their existi
 Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
 it checks local file access.
 
+## Provider CLI updates
+
+The runtime manager downloads and verifies the CLI version pinned by OpenBot. The provider runtime
+holds new turns while it installs and activates that managed executable. It keeps the previous client
+until the candidate is ready; activation failure removes the rejected artifact and preserves the old
+runtime. Download status stays `finishing` until activation succeeds.
+
+CLI resolution prefers an explicit `OPENBOT_*_PATH`, then the installed managed copy, then an
+automatically discovered system CLI. Updates never run the system CLI's updater. An explicit path
+suppresses managed update offers. Startup uses the same selection and reads the executable's version.
+
 ## Agent communication policy
 
 The shared developer instructions keep routine teammate exchanges internal by default. Agents
