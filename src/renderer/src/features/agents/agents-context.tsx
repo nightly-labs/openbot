@@ -11,6 +11,7 @@ import { FALLBACK_STATUS } from "../../app-defaults";
 import { agentProfilesEqual, toAgentProfile } from "../../app-message-projection";
 import { createStoredProfile, updateStored } from "../../app-stored-values";
 import type { AgentProfile } from "../../data";
+import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useUiErrors } from "../../ui-errors";
 import { useDirectMessages } from "../conversation/direct-messages-context";
@@ -67,6 +68,7 @@ const Agents = createSimpleContext({
     const [duplicatingAgentIds, setDuplicatingAgentIds] = createSignal<Set<string>>(new Set());
     const [modelOptions, setModelOptions] = createSignal<AgentModelOption[]>([]);
     const selectionServerId = untrack(activeServerId);
+    const scopeIsCurrent = createScopeGuard();
     let savedAgentId = readAgentSelection()[selectionServerId] ?? "";
     const [activeAgentId, updateActiveAgentId] = createSignal("");
     const [agentChatOpenRevision, setAgentChatOpenRevision] = createSignal(0);
@@ -87,6 +89,7 @@ const Agents = createSimpleContext({
     });
 
     function setActiveAgentId(value: string | ((current: string) => string)): void {
+      if (!scopeIsCurrent()) return;
       updateActiveAgentId((current) => {
         const next = typeof value === "function" ? value(current) : value;
         savedAgentId = "";

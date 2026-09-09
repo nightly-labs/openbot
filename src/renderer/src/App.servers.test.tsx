@@ -17,6 +17,7 @@ import {
   queuedDelivery,
   subscriberCounts,
   testServer,
+  trackAnalytics,
 } from "./app-test-harness";
 import { useServers } from "./features/servers/servers-context";
 import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins";
@@ -53,6 +54,56 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     expect(await screen.findByRole("heading", { name: "Chief" })).toBeVisible();
     await fireEvent.click(screen.getByRole("button", { name: "Local server" }));
+    expect(await screen.findByRole("heading", { name: "Sales Outbound" })).toBeVisible();
+  });
+
+  it("keeps the newer saved selection when deletion finishes in a disposed server scope", async () => {
+    vi.mocked(window.openbot.servers.list).mockResolvedValue([
+      testServer("local", true),
+      testServer("remote-1", false),
+    ]);
+    vi.mocked(window.openbot.servers.select).mockImplementation(async (id) => [
+      testServer("local", id === "local"),
+      testServer("remote-1", id === "remote-1"),
+    ]);
+    vi.mocked(window.openbot.agent.listAgents).mockResolvedValue([
+      ...AGENTS,
+      { ...AGENTS[1], id: "research", name: "Research" },
+    ]);
+    let finishDelete: (() => void) | undefined;
+    vi.mocked(window.openbot.agent.deleteAgent).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishDelete = resolve;
+      }),
+    );
+    const view = render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await fireEvent.contextMenu(screen.getByRole("button", { name: /Research, Outbound specialist/ }));
+    await fireEvent.pointerUp(screen.getByRole("menuitem", { name: "Delete agent" }), { button: 0 });
+    await fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(window.openbot.agent.deleteAgent).toHaveBeenCalledWith("research"));
+
+    // A main-process server switch can arrive while the delete dialog is waiting.
+    emitServers?.([testServer("local", false), testServer("remote-1", true)]);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Studio Mac server" })).toHaveAttribute("aria-pressed", "true"),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: "Local server" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Local server" })).toHaveAttribute("aria-pressed", "true"),
+    );
+    await fireEvent.click(await screen.findByRole("button", { name: /Sales Outbound, Outbound specialist/ }));
+    await screen.findByRole("heading", { name: "Sales Outbound" });
+    finishDelete?.();
+    await waitFor(() =>
+      expect(trackAnalytics).toHaveBeenCalledWith(
+        "agent_action",
+        expect.objectContaining({ action: "delete", result: "succeeded" }),
+      ),
+    );
+    view.unmount();
+
+    render(() => <App />);
     expect(await screen.findByRole("heading", { name: "Sales Outbound" })).toBeVisible();
   });
 
