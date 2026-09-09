@@ -64,3 +64,24 @@ it.each([encodeTeamProtocolV4WebRtcHttpRequest, decodeTeamProtocolV4WebRtcHttpRe
     }
   },
 );
+
+it.each([encodeTeamProtocolV4WebRtcHttpRequest, decodeTeamProtocolV4WebRtcHttpRequest])(
+  "%s preserves remote-viewer authorization requests",
+  (adapt) => {
+    expect(adapt("POST", "/v1/remote-screen/sessions/session-1/authorize", { code: "viewer-code" })).toEqual({
+      code: "viewer-code",
+    });
+  },
+);
+
+it.each([encodeTeamProtocolV4WebRtcHttpResponse, decodeTeamProtocolV4WebRtcHttpResponse])(
+  "%s preserves remote-viewer responses",
+  (adapt) => {
+    for (const route of ["viewer", "authorize", "viewer-state", "moonlight/api/role"]) {
+      const payload = { ready: true };
+      expect(
+        adapt(route === "authorize" ? "POST" : "GET", `/v1/remote-screen/sessions/session-1/${route}`, 200, payload),
+      ).toEqual(payload);
+    }
+  },
+);
