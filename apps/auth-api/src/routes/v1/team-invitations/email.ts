@@ -2,7 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isCanonicalInviteUrl } from "@openbot/contracts/invite-links";
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
-import { normalizeEmail } from "../../../server/auth-service";
+import { emailDeliveryFailure, isEmailDeliveryFailure, normalizeEmail } from "../../../server/auth-service";
 import { readJsonObject } from "../../../server/json-body";
 import {
   apiError,
@@ -58,8 +58,8 @@ export const Route = createFileRoute("/v1/team-invitations/email")({
           if (error instanceof SyntaxError) {
             return apiError(400, "invalid_json", "The request body is invalid.");
           }
-          if (error instanceof Error && /^smtp_[a-z_]+$/u.test(error.message)) {
-            return apiError(502, "email_delivery_failed", "OpenBot could not send the invitation.");
+          if (isEmailDeliveryFailure(error)) {
+            return authErrorResponse(emailDeliveryFailure(error.message, "OpenBot could not send the invitation."));
           }
           return authErrorResponse(error);
         }
