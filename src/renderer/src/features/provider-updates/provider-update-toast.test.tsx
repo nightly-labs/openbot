@@ -413,15 +413,27 @@ it("withdraws an offer nobody acted on when the CLI turns out to be the user's",
   expect(store.providerAvailableVersions().codex).toBeNull();
 });
 
-it("keeps the notification of an update the user started when the owner arrives", async () => {
-  const { setOwner } = ownershipHarness();
+it("reports an update the user started when the owner arrives while it runs", async () => {
+  const { store, setOwner } = ownershipHarness();
   setOwner(null);
   flush();
   fireEvent.click(await screen.findByRole("button", { name: "Update" }));
   expect(await screen.findByText("Updating ChatGPT")).toBeInTheDocument();
 
+  // The answer arrives late and ends the offer, but the offer is not what is on screen any more:
+  // the user pressed the button, and the notification owes them the outcome. Withdrawn here, it
+  // would leave the download running with nothing to report to.
   setOwner("0.155.0");
   flush();
-  // Withdrawn here, this would remove the only report of the work the user asked for, while it runs.
-  expect(await screen.findByText("Updating ChatGPT")).toBeInTheDocument();
+  store.applyProviderRuntimeSnapshot({
+    revision: 9,
+    providers: {
+      codex: { phase: "ready", progress: 100, message: null, version: "0.153.4", availableVersion: null },
+      claude: { phase: "ready", progress: 100, message: null, version: "0.140.0", availableVersion: null },
+      grok: { phase: "ready", progress: 100, message: null, version: "0.140.0", availableVersion: null },
+    },
+  });
+
+  expect(await screen.findByText("ChatGPT is up to date")).toBeInTheDocument();
+  expect(screen.getByText("v0.155.0")).toBeInTheDocument();
 });

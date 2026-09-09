@@ -467,6 +467,12 @@ such as an update started while a workspace on another computer is open, is put 
 notification with a Retry, because the user pressed a button and the outcome belongs on screen.
 The owner comes from the last resolution of the binary, not from the client that runs it, so a
 provider that is signed out still reports its own install rather than reading as the managed copy.
+Until that answer exists the owner is unknown, not managed: the agent status starts on
+`FALLBACK_STATUS`, whose rows name no owner, so the store announces no offer for a provider while
+`systemCliVersion` returns `undefined`. An offer nobody has acted on is also withdrawn when the
+answer ends it, because an older managed copy can sit beside a newer install of the user's. A
+started update keeps its notification until it settles: the outcome is what the user pressed the
+button for.
 OpenBot downloads nothing on this path, so the pinned artifact checksums are untouched. The managed
 copy refuses this command, because the runtime manager replaces that installation whole.
 
