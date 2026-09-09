@@ -11,6 +11,8 @@ import { useSidebarScope } from "./sidebar-scope";
 export function SidebarDialogs() {
   const { closeDelete, confirmDelete, confirmSectionDelete, deleteError, deleteTarget, deleting, sectionDeleteTarget } =
     useSidebarScope();
+  let agentDeleteButton: HTMLButtonElement | undefined;
+  let sectionDeleteButton: HTMLButtonElement | undefined;
   return (
     <>
       <AlertDialog.Root
@@ -23,7 +25,13 @@ export function SidebarDialogs() {
           {(agent) => (
             <AlertDialog.Portal>
               <AlertDialog.Overlay class="agent-delete-backdrop">
-                <AlertDialog.Content class="agent-delete-dialog">
+                <AlertDialog.Content
+                  class="agent-delete-dialog"
+                  onOpenAutoFocus={(event) => {
+                    event.preventDefault();
+                    agentDeleteButton?.focus({ preventScroll: true });
+                  }}
+                >
                   <AgentAvatar
                     agent={agent()}
                     style={{
@@ -43,6 +51,9 @@ export function SidebarDialogs() {
                       Cancel
                     </Button>
                     <Button
+                      ref={(element) => {
+                        agentDeleteButton = element;
+                      }}
                       variant="destructive"
                       type="button"
                       class="agent-delete-confirm"
@@ -69,7 +80,13 @@ export function SidebarDialogs() {
           {(section) => (
             <AlertDialog.Portal>
               <AlertDialog.Overlay class="agent-delete-backdrop">
-                <AlertDialog.Content class="agent-delete-dialog sidebar-section-delete-dialog">
+                <AlertDialog.Content
+                  class="agent-delete-dialog sidebar-section-delete-dialog"
+                  onOpenAutoFocus={(event) => {
+                    event.preventDefault();
+                    sectionDeleteButton?.focus({ preventScroll: true });
+                  }}
+                >
                   <span class="sidebar-section-delete-icon" aria-hidden="true">
                     <Trash2 class="size-5" />
                   </span>
@@ -83,6 +100,9 @@ export function SidebarDialogs() {
                       Cancel
                     </Button>
                     <Button
+                      ref={(element) => {
+                        sectionDeleteButton = element;
+                      }}
                       variant="destructive"
                       type="button"
                       class="agent-delete-confirm"
