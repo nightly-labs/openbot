@@ -11,6 +11,7 @@ import {
   StreamingTailText,
   StreamRevealProvider,
 } from "@/features/chat/components/streaming-tail-text";
+import { ChatCodeBlock } from "./chat-code-block";
 
 interface MarkdownTokenByType {
   paragraph: Tokens.Paragraph;
@@ -232,20 +233,7 @@ function MarkdownBlocks({
         if (tokenIs(token, "code")) {
           return (
             <StreamingBlock key={offset} enabled={presentation.animateTail}>
-              <ScrollView
-                horizontal
-                alwaysBounceHorizontal={false}
-                className="rounded-xl bg-control"
-                contentContainerStyle={{ padding: 10 }}
-              >
-                <Typography.Code
-                  selectable
-                  className="bg-transparent p-0"
-                  style={{ ...presentation.style, color: presentation.codeColor }}
-                >
-                  {token.text}
-                </Typography.Code>
-              </ScrollView>
+              <ChatCodeBlock text={token.text} language={token.lang} />
             </StreamingBlock>
           );
         }
@@ -287,7 +275,7 @@ function MarkdownBlocks({
         }
         if (tokenIs(token, "table")) {
           return (
-            <ScrollView key={offset} horizontal alwaysBounceHorizontal={false}>
+            <ScrollView key={offset} horizontal alwaysBounceHorizontal={false} style={{ flexGrow: 0, flexShrink: 0 }}>
               <View>
                 {sourceEntries([token.header, ...token.rows], (row) => row.map((cell) => cell.text).join("|")).map(
                   ({ value: row, offset: rowOffset }) => (

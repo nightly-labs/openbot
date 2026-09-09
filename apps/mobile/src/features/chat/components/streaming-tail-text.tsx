@@ -1,6 +1,6 @@
 import { Typography } from "heroui-native";
 import { createContext, type PropsWithChildren, useContext, useEffect, useRef, useState } from "react";
-import { type TextStyle, View } from "react-native";
+import type { TextStyle } from "react-native";
 import Animated, {
   interpolateColor,
   ReduceMotion,
@@ -83,24 +83,23 @@ function RevealedWord({ enabled, ...props }: TextProps & { enabled: boolean }) {
   return <FadingWord {...props} onDone={onDone} />;
 }
 
-function FadingBlock({ children, onDone }: PropsWithChildren<{ onDone: () => void }>) {
-  const opacity = useSharedValue(0);
-  useEffect(() => {
-    opacity.set(
-      withTiming(1, { duration: 500, reduceMotion: ReduceMotion.System }, (finished) => {
-        if (finished) scheduleOnRN(onDone);
-      }),
-    );
-  }, [onDone, opacity]);
-  const style = useAnimatedStyle(() => ({ opacity: opacity.get() }));
-  return <Animated.View style={style}>{children}</Animated.View>;
-}
-
 export function StreamingBlock({ children, enabled }: PropsWithChildren<{ enabled: boolean }>) {
   const { phase, onDone } = useRevealSlot(enabled);
-  if (phase === "done") return children;
-  if (phase === "waiting") return <View style={{ opacity: 0 }}>{children}</View>;
-  return <FadingBlock onDone={onDone}>{children}</FadingBlock>;
+  const opacity = useSharedValue(enabled ? 0 : 1);
+  useEffect(() => {
+    if (phase === "active") {
+      opacity.set(
+        withTiming(1, { duration: 500, reduceMotion: ReduceMotion.System }, (finished) => {
+          if (finished) scheduleOnRN(onDone);
+        }),
+      );
+    } else {
+      opacity.set(phase === "done" ? 1 : 0);
+    }
+  }, [phase, opacity, onDone]);
+  const style = useAnimatedStyle(() => ({ opacity: opacity.get() }));
+  // Keep native scroll views mounted when the reveal finishes or streaming stops.
+  return <Animated.View style={style}>{children}</Animated.View>;
 }
 
 export function StreamingTailText({

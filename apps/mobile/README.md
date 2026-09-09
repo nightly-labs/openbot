@@ -167,6 +167,9 @@ Device verification must cover: first send with the keyboard open/closed; subseq
 and long responses; initial history position; scrolling up while streaming; down-arrow; multiline
 composer growth at the end and in history; interactive keyboard dismissal and swipe-to-focus;
 background/foreground; reduced motion/transparency; text/image/file paste; upload failure and retry.
+Code blocks show the fence language and a Copy action. They use the same syntax tokenizer as
+desktop, render native text, and retain plain text for unknown languages. Highlighting does not
+change source whitespace. Copy writes only the source to the system clipboard.
 The local model and protocol tests do not establish native animation quality.
 
 ```bash
