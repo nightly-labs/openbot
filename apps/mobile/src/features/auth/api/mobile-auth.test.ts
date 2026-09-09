@@ -13,6 +13,7 @@ import {
   updateMobileProfile,
   validateMobileSession,
 } from "./mobile-auth";
+import { mobileUserName } from "./mobile-user-name";
 
 // The native Keychain and HTTP transport are the boundary; exercise the real session storage logic.
 const native = vi.hoisted(() => ({ storage: new Map<string, string>(), fetch: vi.fn<typeof fetch>() }));
@@ -177,6 +178,24 @@ describe("mobile session revocation", () => {
 });
 
 describe("stored mobile desktop binding", () => {
+  it.each([
+    [null, "user"],
+    ["", "user"],
+    ["Saved name", "Saved name"],
+  ])("keeps the profile name available through connection and restore (%j)", async (name, expected) => {
+    native.storage.clear();
+    native.storage.set("openbot.mobile.device-id.v1", "existing-device");
+    const connected = { ...session, user: { ...session.user, name } };
+    native.fetch.mockResolvedValueOnce(Response.json(connected));
+    const redeemed = await redeemMobileConnectUrl(qrCode);
+    expect(mobileUserName(redeemed.user)).toBe(expected);
+    const restored = await readMobileSession();
+    expect(restored && mobileUserName(restored.user)).toBe(expected);
+    native.fetch.mockResolvedValueOnce(Response.json({ ...connected.user, name: "Updated name" }));
+    const refreshed = await validateMobileSession(redeemed);
+    expect(refreshed && mobileUserName(refreshed.user)).toBe("Updated name");
+  });
+
   it("restores a bound session without changing its identity or contacting the service", async () => {
     expect(await readMobileSession()).toEqual(session);
     expect(native.fetch).not.toHaveBeenCalled();

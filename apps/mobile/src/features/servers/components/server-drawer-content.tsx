@@ -5,6 +5,7 @@ import { Monitor, Plus, Server, Settings } from "lucide-react-native";
 import { Pressable, ScrollView, View, type ViewStyle } from "react-native";
 
 import type { MobileSession } from "@/features/auth/api/mobile-auth";
+import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import type { MobileServer } from "@/features/workspace/context/mobile-workspace-context";
 import { serverStatusLabel } from "@/features/workspace/model/server-status";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
@@ -37,10 +38,7 @@ export function ServerDrawerContent({
   onNavigate,
   onSelectServer,
 }: ServerDrawerContentProps) {
-  const emailSeparatorIndex = session.user.email.indexOf("@");
-  const displayName =
-    session.user.name ||
-    (emailSeparatorIndex > 0 ? session.user.email.slice(0, emailSeparatorIndex) : session.user.email);
+  const displayName = mobileUserName(session.user);
   const avatarUrl = session.user.avatarUrl ? new URL(session.user.avatarUrl, session.apiUrl).toString() : null;
   const mutedColor = String(muted);
 
