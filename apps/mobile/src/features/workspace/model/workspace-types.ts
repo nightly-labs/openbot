@@ -4,10 +4,12 @@ import type {
   AvatarHue,
   ConversationSnapshot,
   CreateAgentInput,
+  DraftAttachment,
   RespondToPromptInput,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
+import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import type { MobileAgentActivities } from "./agent-activity";
 
 export type MobileServerKind = "local" | "remote";
@@ -72,7 +74,9 @@ export interface MobileWorkspaceContextValue {
   loadAgentAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
   loadConversation: (agentId: string) => Promise<ConversationSnapshot>;
   respondToPrompt: (agentId: string, input: RespondToPromptInput) => Promise<void>;
-  sendMessage: (agentId: string, text: string) => Promise<void>;
+  sendMessage: (agentId: string, text: string, attachmentDraftIds?: string[]) => Promise<string>;
+  uploadAttachment: (agentId: string, input: RemoteFileUpload) => Promise<DraftAttachment>;
+  discardAttachment: (agentId: string, attachmentId: string) => Promise<void>;
   hideAgent: (agentId: string) => void;
   unhideAgent: (agentId: string) => void;
   markAgentRead: (agentId: string, throughMessageId?: string) => void;

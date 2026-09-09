@@ -92,6 +92,17 @@ the `media-attachments` capability; released protocol adapters keep their existi
 Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
 it checks local file access.
 
+## Provider CLI updates
+
+The runtime manager downloads and verifies the CLI version pinned by OpenBot. The provider runtime
+holds new turns while it installs and activates that managed executable. It keeps the previous client
+until the candidate is ready; activation failure removes the rejected artifact and preserves the old
+runtime. Download status stays `finishing` until activation succeeds.
+
+CLI resolution prefers an explicit `OPENBOT_*_PATH`, then the installed managed copy, then an
+automatically discovered system CLI. Updates never run the system CLI's updater. An explicit path
+suppresses managed update offers. Startup uses the same selection and reads the executable's version.
+
 ## Agent communication policy
 
 The shared developer instructions keep routine teammate exchanges internal by default. Agents
@@ -259,6 +270,12 @@ Conversation read cursors belong to a team member and are shared across that mem
 Advancing a cursor emits a conversation invalidation without the reader's identity or cursor;
 clients reload their own read state even when the conversation content revision is unchanged.
 Mobile acknowledges rendered replies only in the foreground, focused chat at the latest messages.
+Mobile chat keeps viewport, tail-group, and composer measurements in its motion controller. The
+last user message anchors a native blank-space inset; streamed replies consume that inset without
+autoscrolling. Initial history positioning and the first-send/first-response animation are separate
+states. Pending message bubbles reconcile through the host receipt ID, not message text. Selected
+mobile attachments use the existing WebRTC file frames followed by the attachment upload endpoint;
+the native/DOM bridge limits each file to 10 MB and cancels transfers when its connection is replaced.
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
 host's SQLite and emit the same invalidation. Older hosts disable only this optional action.

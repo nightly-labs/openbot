@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { createReadStream, createWriteStream } from "node:fs";
 import {
@@ -20,8 +20,10 @@ import { finished } from "node:stream/promises";
 import { promisify } from "node:util";
 import type { AgentProviderId, ProviderRuntimeSnapshot, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { redactText } from "@openbot/logging";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
+import { configuredCliPath, parseClaudeVersion, parseCodexVersion, parseGrokVersion } from "../backend/cli";
 
 const execFileAsync = promisify(execFile);
 const PROVIDERS = ["codex", "claude", "grok"] as const satisfies readonly AgentProviderId[];
@@ -55,6 +57,7 @@ export interface ProviderRuntimeManagerOptions {
   fetchImpl?: Fetch;
   lock?: AgentRuntimeLock;
   availableDiskBytes?: () => Promise<number>;
+  updateRuntime?: (provider: AgentProviderId, install: () => Promise<string>) => Promise<void>;
 }
 
 export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerEvents> {
@@ -69,22 +72,18 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #cancelled = new Set<AgentProviderId>();
   /** Versions of provider CLIs the user installed, kept only to compare against the lock. */
   readonly #systemVersions = new Map<AgentProviderId, string>();
-  /**
-   * The offers the user's own CLI updater has already turned down, one per provider.
-   *
-   * A CLI decides for itself what its newest version is, and its release channel can name an older
-   * one than the lock: `grok update` reports success and leaves the CLI where it was. Kept on disk,
-   * because an offer that returns on the next start is the same dead end again.
-   */
-  readonly #refusedUpdates = new Map<AgentProviderId, { version: string; pinnedVersion: string }>();
-  /** The queue that keeps the record's writes in the order the refusals were recorded. */
-  #refusedUpdatesWrite: Promise<void> = Promise.resolve();
+  readonly #updateRuntime: (provider: AgentProviderId, install: () => Promise<string>) => Promise<void>;
   #revision = 0;
   #stopping = false;
 
   constructor(options: ProviderRuntimeManagerOptions) {
     super();
     this.#root = options.root;
+    this.#updateRuntime =
+      options.updateRuntime ??
+      (async (_provider, install) => {
+        await install();
+      });
     this.#target = runtimeTarget(options.platform ?? process.platform, options.architecture ?? process.arch);
     this.#fetch = options.fetchImpl ?? fetch;
     this.#lock = options.lock ?? parseAgentRuntimeLock(lockValue);
@@ -105,7 +104,6 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   async initialize(): Promise<ProviderRuntimeSnapshot> {
     await mkdir(this.#root, { recursive: true });
     await this.#removeAbandonedStaging();
-    await this.#readRefusedUpdates();
     await Promise.all(PROVIDERS.map((provider) => this.#inspect(provider)));
     const target = this.#target;
     if (target) {
@@ -121,13 +119,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     if (this.#target) {
       for (const provider of PROVIDERS) {
         const version = runtimeSpec(provider, this.#target, this.#lock).version;
-        // The install in use, which is the user's own copy whenever there is one: the resolver
-        // prefers it, so the managed version on disk is not what the provider runs.
+        // Agent status names a system fallback until the managed candidate is activated.
         const installed = this.#systemVersions.get(provider) ?? providers[provider].version;
-        const refused = this.#refusedUpdates.get(provider);
         const offer = installed !== null && installed !== undefined && olderVersion(installed, version);
-        providers[provider].availableVersion =
-          offer && !(refused?.version === installed && refused.pinnedVersion === version) ? version : null;
+        providers[provider].availableVersion = offer && !configuredCliPath(provider) ? version : null;
       }
     }
     return { revision: this.#revision, providers };
@@ -149,81 +144,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     this.emit("status", this.getStatus());
   }
 
-  /**
-   * The result of a run of the provider CLI's own updater: the version the CLI was on before it, and
-   * the version it reports now.
-   *
-   * A CLI that finishes on the version it started on has answered: the version the lock pins is not
-   * one its own channel will install, so OpenBot stops offering it. The record is kept against both
-   * versions, so a new pinned version is a new offer, and so is a CLI the user moves by other means.
-   */
-  async noteSystemCliUpdate(provider: AgentProviderId, before: string | null, after: string | null): Promise<void> {
-    if (!this.#target) return;
-    const pinnedVersion = runtimeSpec(provider, this.#target, this.#lock).version;
-    const refused = after !== null && after === before && olderVersion(after, pinnedVersion);
-    const current = this.#refusedUpdates.get(provider);
-    if (refused && current?.version === after && current.pinnedVersion === pinnedVersion) return;
-    if (!refused && !current) return;
-    if (refused && after) this.#refusedUpdates.set(provider, { version: after, pinnedVersion });
-    else this.#refusedUpdates.delete(provider);
-    await this.#writeRefusedUpdates();
-    this.#revision += 1;
-    this.emit("status", this.getStatus());
-  }
-
-  async #readRefusedUpdates(): Promise<void> {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(await readFile(this.#refusedUpdatesPath(), "utf8"));
-    } catch {
-      // A record that is missing or unreadable only costs the user one more refused offer.
-      return;
-    }
-    if (!isDynamicRecord(parsed)) return;
-    for (const provider of PROVIDERS) {
-      const entry = parsed[provider];
-      if (!isDynamicRecord(entry) || !isString(entry.version) || !isString(entry.pinnedVersion)) continue;
-      this.#refusedUpdates.set(provider, { version: entry.version, pinnedVersion: entry.pinnedVersion });
-    }
-  }
-
-  /**
-   * Writes the record, one write at a time.
-   *
-   * Two providers can finish an update at once. Each write serializes the record as it stands when
-   * its turn comes and renames its own temporary file into place, so without the queue the older
-   * snapshot could be renamed last and drop the newer provider's refusal - which the user would meet
-   * as an offer that provider has already turned down.
-   */
-  async #writeRefusedUpdates(): Promise<void> {
-    const write = this.#refusedUpdatesWrite.then(async () => {
-      const path = this.#refusedUpdatesPath();
-      const temporaryPath = `${path}.${randomUUID()}.tmp`;
-      try {
-        await mkdir(this.#root, { recursive: true });
-        await writeFile(temporaryPath, `${JSON.stringify(Object.fromEntries(this.#refusedUpdates))}\n`, "utf8");
-        await rename(temporaryPath, path);
-      } catch {
-        await rm(temporaryPath, { force: true }).catch(() => undefined);
-      }
-    });
-    this.#refusedUpdatesWrite = write;
-    await write;
-  }
-
-  #refusedUpdatesPath(): string {
-    return join(this.#root, "cli-update-refusals.json");
-  }
-
   executablePath(provider: AgentProviderId): string | null {
     if (!this.#target) return null;
     const spec = runtimeSpec(provider, this.#target, this.#lock);
-    return join(this.#installRoot(spec), "bin", spec.executableName);
+    return join(
+      this.#providerRoot(provider),
+      spec.target,
+      this.#statuses[provider].version ?? spec.version,
+      "bin",
+      spec.executableName,
+    );
   }
 
   async download(provider: AgentProviderId): Promise<ProviderRuntimeSnapshot> {
     if (!this.#target) throw new Error("Provider runtimes are not available on this platform.");
     if (this.#stopping) throw new Error("OpenBot is closing.");
+    if (configuredCliPath(provider))
+      throw new Error("Remove the explicit CLI path override before updating in OpenBot.");
     if (this.#statuses[provider].phase === "ready" || this.#tasks.has(provider)) return this.getStatus();
 
     const spec = runtimeSpec(provider, this.#target, this.#lock);
@@ -236,7 +173,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       message: null,
       version: this.#statuses[provider].version,
     });
-    const task = this.#runDownload(spec, controller.signal)
+    const task = this.#updateManagedRuntime(spec, controller.signal)
       .catch((error: unknown) => {
         this.#controllers.delete(provider);
         this.#tasks.delete(provider);
@@ -249,6 +186,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       });
     this.#tasks.set(provider, task);
     return this.getStatus();
+  }
+
+  async downloadAndWait(provider: AgentProviderId): Promise<void> {
+    await this.download(provider);
+    await this.#tasks.get(provider);
+    const status = this.#statuses[provider];
+    if (status.phase !== "ready") throw new Error(status.message ?? "The provider update did not complete.");
   }
 
   async cancel(provider: AgentProviderId): Promise<ProviderRuntimeSnapshot> {
@@ -280,7 +224,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     }
   }
 
-  // This is display metadata only. Only the pinned, verified runtime is executable.
+  // Keep the last installed version available while the pinned replacement is downloaded.
   async #previousVersion(spec: RuntimeSpec): Promise<string | null> {
     const targetRoot = dirname(this.#installRoot(spec));
     const entries = await readdir(targetRoot, { withFileTypes: true }).catch(() => []);
@@ -293,6 +237,24 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       if (executable?.isFile()) return version;
     }
     return null;
+  }
+
+  async #updateManagedRuntime(spec: RuntimeSpec, signal: AbortSignal): Promise<void> {
+    let installed = false;
+    try {
+      await this.#updateRuntime(spec.provider, async () => {
+        await this.#runDownload(spec, signal);
+        installed = true;
+        await this.#removePartial(spec);
+        return join(this.#installRoot(spec), "bin", spec.executableName);
+      });
+      this.#setStatus(spec.provider, readyStatus(spec.version));
+      this.emit("ready", spec.provider);
+    } catch (error) {
+      // A failed activation must not select the rejected artifact on the next app start.
+      if (installed) await rm(this.#installRoot(spec), { recursive: true, force: true });
+      throw error;
+    }
   }
 
   async #runDownload(spec: RuntimeSpec, signal: AbortSignal): Promise<void> {
@@ -349,15 +311,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     }
 
     await this.#install(spec, partialPath);
-    await this.#removePartial(spec);
-    this.#setStatus(spec.provider, readyStatus(spec.version));
-    this.emit("ready", spec.provider);
   }
 
   async #install(spec: RuntimeSpec, downloadedPath: string): Promise<void> {
     const staging = join(this.#providerRoot(spec.provider), `.installing-${spec.target}-${spec.version}`);
     await rm(staging, { recursive: true, force: true });
     await mkdir(staging, { recursive: true });
+    let committed = false;
     try {
       if (spec.provider === "codex") await this.#stageCodex(spec, downloadedPath, staging);
       else if (spec.provider === "claude") await this.#stageClaude(spec, downloadedPath, staging);
@@ -367,7 +327,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       await mkdir(dirname(destination), { recursive: true });
       await rm(destination, { recursive: true, force: true });
       await rename(staging, destination);
+      committed = true;
       await verifyInstalledRuntime(destination, spec, this.#lock);
+    } catch (error) {
+      if (committed) await rm(this.#installRoot(spec), { recursive: true, force: true });
+      throw error;
     } finally {
       await rm(staging, { recursive: true, force: true });
     }
@@ -487,7 +451,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     const message = isAbortError(error)
       ? "Download stopped. Try again."
       : error instanceof Error
-        ? error.message
+        ? redactText(error.message)
         : "Download failed. Try again.";
     this.#setStatus(provider, {
       phase: "download-error",
@@ -641,7 +605,8 @@ async function verifyInstalledRuntime(root: string, spec: RuntimeSpec, lock: Age
     }
   }
   const { stdout } = await execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true });
-  if (!stdout.includes(spec.version)) throw new Error("Provider runtime returned an unexpected version.");
+  const parseVersion = { codex: parseCodexVersion, claude: parseClaudeVersion, grok: parseGrokVersion }[spec.provider];
+  if (parseVersion(stdout) !== spec.version) throw new Error("Provider runtime returned an unexpected version.");
 }
 
 async function streamResponse(
