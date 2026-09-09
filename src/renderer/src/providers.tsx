@@ -33,12 +33,17 @@ const Providers = createSimpleContext({
     const [refreshingProviders, setRefreshingProviders] = createSignal(false);
     /**
      * A CLI the user installed themselves, and the version it reports. Only the agent status knows
-     * this, and the runtime store needs it to offer that install the same update a managed runtime
-     * gets - and to run the right updater for it.
+     * this, and the runtime store needs it to run the right updater for that install - and to keep
+     * OpenBot's pinned version away from it.
+     *
+     * `undefined` until an answer exists. The status starts on `FALLBACK_STATUS`, whose rows name
+     * no owner, and so does the agent service before it resolves a binary; read as the managed
+     * copy, those rows would put the pinned version on a user's install for that moment.
      */
-    function systemCliVersion(provider: AgentProviderId): string | null {
+    function systemCliVersion(provider: AgentProviderId): string | null | undefined {
       const row = agentStatus().providers?.find((candidate) => candidate.id === provider);
-      return row?.cliSource === "system" ? (row.version ?? null) : null;
+      if (!row?.cliSource) return undefined;
+      return row.cliSource === "system" ? (row.version ?? null) : null;
     }
     const runtimes = createProviderRuntimeStore(window.openbot.providerRuntimes, {
       systemCliVersion,

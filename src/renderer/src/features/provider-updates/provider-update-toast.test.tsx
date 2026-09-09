@@ -338,3 +338,90 @@ it("keeps an offer the user closed closed when the workspace is opened again", a
   await waitFor(() => expect(store.providerAvailableVersions().claude).toBe("2.1.250"));
   expect(screen.queryByText("Claude update available")).not.toBeInTheDocument();
 });
+
+/**
+ * An older managed copy on disk, a newer version pinned for it, and no answer yet about which CLI
+ * the provider runs. This is the state the app starts in: the runtime snapshot and the agent status
+ * that names the owner arrive separately, in either order.
+ */
+function ownershipHarness() {
+  const ready: ProviderRuntimeStatus = { phase: "ready", progress: 100, message: null, version: "0.140.0" };
+  let snapshot: ProviderRuntimeSnapshot = {
+    revision: 1,
+    providers: {
+      codex: { ...ready, availableVersion: "0.153.4" },
+      claude: { ...ready, availableVersion: null },
+      grok: { ...ready, availableVersion: null },
+    },
+  };
+  const api: ProviderRuntimesDesktopApi = {
+    getStatus: async () => snapshot,
+    download: vi.fn(async () => {
+      snapshot = {
+        revision: snapshot.revision + 1,
+        providers: {
+          ...snapshot.providers,
+          codex: { ...snapshot.providers.codex, phase: "downloading", progress: 12 },
+        },
+      };
+      return snapshot;
+    }),
+    cancel: async () => snapshot,
+    onEvent: () => () => {},
+  };
+  // `undefined` for as long as no agent status has landed: its rows name no owner until then.
+  const [owner, setOwner] = createSignal<string | null | undefined>(undefined);
+  let store: ReturnType<typeof createProviderRuntimeStore> | undefined;
+  render(() => {
+    store = createProviderRuntimeStore(api, {
+      systemCliVersion: (provider) => (provider === "codex" ? owner() : null),
+      updateSystemCli: async () => {},
+    });
+    return <Toaster />;
+  });
+  if (!store) throw new Error("The provider runtime store did not mount.");
+  return { store, api, setOwner };
+}
+
+it("announces no offer until the owner of the CLI is known", async () => {
+  const { store, setOwner } = ownershipHarness();
+
+  // The snapshot has landed and names a newer version for the managed copy. Which CLI the provider
+  // runs is still unknown, and a CLI the user installed answers to its own updater: an offer now
+  // would name a version for an install that may never take it.
+  await waitFor(() => expect(store.providerRuntimeStatuses().codex.availableVersion).toBe("0.153.4"));
+  expect(store.providerAvailableVersions().codex).toBeNull();
+  expect(screen.queryByText("ChatGPT update available")).not.toBeInTheDocument();
+
+  setOwner(null);
+  flush();
+  expect(await screen.findByText("ChatGPT update available")).toBeInTheDocument();
+  expect(store.providerAvailableVersions().codex).toBe("0.153.4");
+});
+
+it("withdraws an offer nobody acted on when the CLI turns out to be the user's", async () => {
+  const { store, setOwner } = ownershipHarness();
+  setOwner(null);
+  flush();
+  expect(await screen.findByText("ChatGPT update available")).toBeInTheDocument();
+
+  // The agent status lands and names the user's own install, on a version the managed copy never
+  // reached. The offer behind the notification is gone, so the notification goes with it.
+  setOwner("0.155.0");
+  flush();
+  await waitFor(() => expect(screen.queryByText("ChatGPT update available")).not.toBeInTheDocument());
+  expect(store.providerAvailableVersions().codex).toBeNull();
+});
+
+it("keeps the notification of an update the user started when the owner arrives", async () => {
+  const { setOwner } = ownershipHarness();
+  setOwner(null);
+  flush();
+  fireEvent.click(await screen.findByRole("button", { name: "Update" }));
+  expect(await screen.findByText("Updating ChatGPT")).toBeInTheDocument();
+
+  setOwner("0.155.0");
+  flush();
+  // Withdrawn here, this would remove the only report of the work the user asked for, while it runs.
+  expect(await screen.findByText("Updating ChatGPT")).toBeInTheDocument();
+});

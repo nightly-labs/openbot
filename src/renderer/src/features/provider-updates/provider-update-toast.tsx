@@ -143,6 +143,14 @@ interface LiveProviderUpdateToast {
 }
 
 const liveToasts = new Map<AgentProviderId, LiveProviderUpdateToast>();
+/**
+ * The providers whose notification is an offer nobody has acted on yet.
+ *
+ * Only such a notification can be withdrawn. A started update owns its notification until it
+ * settles - the outcome is what the user pressed the button for - so a report takes the provider
+ * out of this set, and `withdrawProviderUpdateOffer` then leaves it alone.
+ */
+const liveOffers = new Set<AgentProviderId>();
 const dismissTimers = new Map<AgentProviderId, number>();
 const disposers = new Map<AgentProviderId, () => void>();
 /**
@@ -165,6 +173,7 @@ function releaseProviderUpdateToast(provider: AgentProviderId): void {
   const timer = dismissTimers.get(provider);
   if (timer !== undefined) window.clearTimeout(timer);
   dismissTimers.delete(provider);
+  liveOffers.delete(provider);
   liveToasts.delete(provider);
   disposers.get(provider)?.();
   disposers.delete(provider);
@@ -255,6 +264,22 @@ export function showProviderUpdateToast(update: ProviderUpdate, onUpdate: () => 
   live.present(presentation);
   live.setAct(onUpdate);
   live.setOffer(presentation.updatable ? update.availableVersion : null);
+  if (presentation.updatable) liveOffers.add(update.provider);
+  else liveOffers.delete(update.provider);
+}
+
+/**
+ * Take an offer off the screen because the offer behind it is gone.
+ *
+ * An offer is a fact about state that keeps arriving: the runtime snapshot names a newer version,
+ * and the agent status names who owns the CLI that would install it. When the answer that arrives
+ * last ends the offer, the notification that announced it has nothing left to say, and a user who
+ * never pressed its button loses nothing by its going. A started update keeps its notification,
+ * which is why this reaches an untouched offer only.
+ */
+export function withdrawProviderUpdateOffer(provider: AgentProviderId): void {
+  if (!liveOffers.has(provider)) return;
+  hideProviderUpdateToast(provider);
 }
 
 /** The offer this provider's notification was closed on, and so must not be raised again. */
@@ -282,6 +307,8 @@ export function hideProviderUpdateToast(provider: AgentProviderId): void {
 export function reportProviderUpdateToast(update: ProviderUpdate, onRetry: () => void): void {
   const live = liveToasts.get(update.provider);
   if (!live) return;
+  // Acted on, so the notification is the update's until it settles.
+  liveOffers.delete(update.provider);
   const presentation = presentProviderUpdate(update);
   live.present(presentation);
   live.setAct(onRetry);

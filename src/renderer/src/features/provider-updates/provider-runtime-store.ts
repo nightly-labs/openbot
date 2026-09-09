@@ -2,13 +2,14 @@ import type { AgentProviderId, ProviderRuntimeSnapshot, ProviderRuntimesDesktopA
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_PROVIDER_RUNTIMES } from "../../app-defaults";
-import { type ProviderUpdate, providerUpdatesToAnnounce } from "./provider-update";
+import { type ProviderUpdate, providerUpdateAvailable, providerUpdatesToAnnounce } from "./provider-update";
 import {
   dismissProviderUpdateToast,
   hideProviderUpdateToast,
   providerUpdateOfferClosed,
   reportProviderUpdateToast,
   showProviderUpdateToast,
+  withdrawProviderUpdateOffer,
 } from "./provider-update-toast";
 
 const PROVIDERS = ["codex", "claude", "grok"] as const;
@@ -23,8 +24,15 @@ const PROVIDERS = ["codex", "claude", "grok"] as const;
  * runtimes alone.
  */
 export interface ProviderCliOwners {
-  /** The version of the CLI the user installed for this provider, or `null` for a managed one. */
-  systemCliVersion?: (provider: AgentProviderId) => string | null;
+  /**
+   * The version of the CLI the user installed for this provider, `null` for a managed one, and
+   * `undefined` while nothing has resolved which of the two the provider runs.
+   *
+   * The answer comes from the agent status, which starts on a fallback that names no owner, so
+   * "not known yet" and "managed" must not read the same: taken for managed, a user's install would
+   * be offered the pinned version for the moment before the status lands.
+   */
+  systemCliVersion?: (provider: AgentProviderId) => string | null | undefined;
   /** Runs that CLI's own updater. OpenBot downloads nothing on this path. */
   updateSystemCli?: (provider: AgentProviderId) => Promise<void>;
   /**
@@ -50,9 +58,21 @@ export function createProviderRuntimeStore(
   let announced: ProviderUpdate[] = [];
   let disposed = false;
   const isLocalServer = owners.isLocalServer ?? (() => true);
+  /**
+   * Who owns the CLI this provider runs, as far as the renderer has been told.
+   *
+   * `known` is false only before the first resolution names an owner. Left out entirely - the
+   * managed-only consumers - there is nothing to wait for, so the owner is the managed copy.
+   */
+  function cliOwner(provider: AgentProviderId): { systemVersion: string | null; known: boolean } {
+    if (!owners.systemCliVersion) return { systemVersion: null, known: true };
+    const version = owners.systemCliVersion(provider);
+    return { systemVersion: version ?? null, known: version !== undefined };
+  }
+
   function providerUpdate(provider: AgentProviderId, snapshot = providerRuntimeSnapshot()): ProviderUpdate {
     const runtime = snapshot.providers[provider];
-    const systemVersion = owners.systemCliVersion?.(provider) ?? null;
+    const { systemVersion, known } = cliOwner(provider);
     return {
       provider,
       name: provider === "codex" ? "ChatGPT" : provider === "claude" ? "Claude" : "Grok",
@@ -64,8 +84,11 @@ export function createProviderRuntimeStore(
        * unused beside it. Its own updater decides what version it can reach, so OpenBot naming one
        * would promise a version the user may not get. The Update button for it stays available in
        * the provider row instead, and this store still routes it to the right updater.
+       *
+       * No offer either while the owner is unknown: the two answers arrive separately, and an offer
+       * made before the second one lands is a version claimed for a CLI that may not take it.
        */
-      availableVersion: systemVersion ? null : (runtime.availableVersion ?? null),
+      availableVersion: known && !systemVersion ? (runtime.availableVersion ?? null) : null,
     };
   }
 
@@ -241,6 +264,19 @@ export function createProviderRuntimeStore(
       // A remote workspace announces nothing, and leaves the record of what was announced alone:
       // it says what the user was told about this computer, which the open server does not change.
       if (!next) return;
+      /*
+       * An offer that has gone away takes its notification with it, if the user never acted on it.
+       * The owner of a CLI is resolved after the runtime snapshot as often as before it, and an
+       * offer the newer answer ends - the copy on offer is not the one this provider runs - would
+       * otherwise stay on screen, naming a version for an install that would never install it.
+       */
+      for (const previous of announced) {
+        if (!providerUpdateAvailable(previous.runtime, previous.availableVersion)) continue;
+        const current = next.find((update) => update.provider === previous.provider);
+        if (current && !providerUpdateAvailable(current.runtime, current.availableVersion)) {
+          withdrawProviderUpdateOffer(previous.provider);
+        }
+      }
       for (const update of providerUpdatesToAnnounce(announced, next)) {
         // A closed notification stays closed, including across the server switch that rebuilds this
         // store: the record of it is kept by the notification module, which outlives the switch.
