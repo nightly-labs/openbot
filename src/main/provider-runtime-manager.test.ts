@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { access, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { ProviderRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import lockValue from "../../native-runtime.lock.json";
@@ -14,6 +14,7 @@ import { ProviderRuntimeManager } from "./provider-runtime-manager";
 const roots: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
@@ -106,39 +107,119 @@ describe("ProviderRuntimeManager", () => {
     expect(snapshots).toHaveLength(2);
   });
 
-  it("stops offering a version the user's own updater leaves uninstalled, across restarts", async () => {
+  it("does not hide managed updates because an earlier system updater refused them", async () => {
     const root = await temporaryRoot();
-    const pinned = parseAgentRuntimeLock(structuredClone(lockValue)).grok.version;
+    await writeFile(
+      join(root, "cli-update-refusals.json"),
+      JSON.stringify({ grok: { version: "0.0.1", pinnedVersion: "1.0.22" } }),
+    );
     const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
     await manager.initialize();
     manager.setSystemVersion("grok", "0.0.1");
-    expect(manager.getStatus().providers.grok.availableVersion).toBe(pinned);
-
-    // The CLI ran its updater and stayed where it was: its own channel has nothing newer for it.
-    await manager.noteSystemCliUpdate("grok", "0.0.1", "0.0.1");
-    expect(manager.getStatus().providers.grok.availableVersion).toBeNull();
-
-    const restarted = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
-    await restarted.initialize();
-    restarted.setSystemVersion("grok", "0.0.1");
-    expect(restarted.getStatus().providers.grok.availableVersion).toBeNull();
-
-    // A CLI that moved on its own is a different install, so the pinned version is offered again.
-    restarted.setSystemVersion("grok", "0.0.2");
-    expect(restarted.getStatus().providers.grok.availableVersion).toBe(pinned);
+    expect(manager.getStatus().providers.grok.availableVersion).toBe("1.0.22");
   });
 
-  it("offers again once the updater installs something", async () => {
+  it("does not offer or download over an explicit CLI override", async () => {
     const root = await temporaryRoot();
-    const pinned = parseAgentRuntimeLock(structuredClone(lockValue)).grok.version;
-    const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
+    vi.stubEnv("OPENBOT_GROK_PATH", "/custom/grok");
+    const fetchImpl = vi.fn(async () => new Response());
+    const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64", fetchImpl });
     await manager.initialize();
-    manager.setSystemVersion("grok", "0.0.1");
-    await manager.noteSystemCliUpdate("grok", "0.0.1", "0.0.1");
-    manager.setSystemVersion("grok", "0.0.2");
-    await manager.noteSystemCliUpdate("grok", "0.0.1", "0.0.2");
-    expect(manager.getStatus().providers.grok.availableVersion).toBe(pinned);
-    expect(JSON.parse(await readFile(join(root, "cli-update-refusals.json"), "utf8"))).toEqual({});
+    manager.setSystemVersion("grok", "1.0.5");
+    expect(manager.getStatus().providers.grok.availableVersion).toBeNull();
+    await expect(manager.downloadAndWait("grok")).rejects.toThrow("explicit CLI path override");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("waits for activation and removes a rejected artifact before restart", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    const previous = join(root, "grok", "darwin-arm64", "1.0.21", "bin", "grok");
+    await mkdir(dirname(previous), { recursive: true });
+    await writeFile(previous, "previous runtime");
+    let activate: (() => void) | undefined;
+    const activation = new Promise<void>((resolve) => {
+      activate = resolve;
+    });
+    let finishInstall: (() => void) | undefined;
+    const installed = new Promise<void>((resolve) => {
+      finishInstall = resolve;
+    });
+    let failActivation = true;
+    const manager = new ProviderRuntimeManager({
+      root,
+      platform: "darwin",
+      architecture: "arm64",
+      lock: fixture.lock,
+      fetchImpl: async (input) =>
+        chunkedResponse(
+          String(input).endsWith("/LICENSE")
+            ? fixture.license
+            : String(input).endsWith("/THIRD-PARTY-NOTICES")
+              ? fixture.notices
+              : fixture.executable,
+          1024,
+        ),
+      updateRuntime: async (_provider, install) => {
+        await install();
+        finishInstall?.();
+        await activation;
+        if (failActivation) throw new Error("Candidate failed. Authorization: Bearer abcdef123456");
+      },
+    });
+    await manager.initialize();
+    const update = manager.downloadAndWait("grok");
+    await installed;
+    expect(manager.getStatus().providers.grok.phase).toBe("finishing");
+    activate?.();
+    await expect(update).rejects.toThrow("Candidate failed.");
+    expect(manager.getStatus().providers.grok.message).toContain("[redacted]");
+    expect(manager.getStatus().providers.grok.message).not.toContain("abcdef123456");
+    const restarted = new ProviderRuntimeManager({
+      root,
+      platform: "darwin",
+      architecture: "arm64",
+      lock: fixture.lock,
+    });
+    expect((await restarted.initialize()).providers.grok).toMatchObject({ phase: "not-downloaded", version: "1.0.21" });
+    expect(restarted.executablePath("grok")).toBe(previous);
+    expect(await readFile(previous, "utf8")).toBe("previous runtime");
+    failActivation = false;
+    await manager.downloadAndWait("grok");
+    expect(manager.getStatus().providers.grok).toMatchObject({ phase: "ready", version: "1.0.22" });
+    const successfulRestart = new ProviderRuntimeManager({
+      root,
+      platform: "darwin",
+      architecture: "arm64",
+      lock: fixture.lock,
+    });
+    expect((await successfulRestart.initialize()).providers.grok).toMatchObject({ phase: "ready", version: "1.0.22" });
+  });
+
+  it("rejects a binary whose version only contains the pinned version as a prefix", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    fixture.executable = new TextEncoder().encode("#!/bin/sh\necho 1.0.220\n");
+    const artifact = fixture.lock.grok.artifacts["darwin-arm64"];
+    artifact.downloadBytes = fixture.executable.byteLength;
+    artifact.assetSha256 = digest(fixture.executable);
+    const manager = new ProviderRuntimeManager({
+      root,
+      platform: "darwin",
+      architecture: "arm64",
+      lock: fixture.lock,
+      fetchImpl: async (input) =>
+        chunkedResponse(
+          String(input).endsWith("/LICENSE")
+            ? fixture.license
+            : String(input).endsWith("/THIRD-PARTY-NOTICES")
+              ? fixture.notices
+              : fixture.executable,
+          1024,
+        ),
+    });
+    await manager.initialize();
+    await expect(manager.downloadAndWait("grok")).rejects.toThrow("unexpected version");
   });
 
   it("allows three transfers and cancels only the selected provider", async () => {
