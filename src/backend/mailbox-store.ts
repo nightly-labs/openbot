@@ -360,9 +360,7 @@ export class MailboxStore {
   }
 
   listQueue(agentId: string): QueueSnapshot {
-    const channelMessageIds = new Set(
-      this.#state.messages.filter((message) => message.channelId).map((message) => message.id),
-    );
+    const channelMessageIds = this.#channelMessageIds();
     const positions = this.#queuedPositions();
     return {
       agentId,
@@ -370,6 +368,30 @@ export class MailboxStore {
         .filter((delivery) => delivery.recipientAgentId === agentId && !channelMessageIds.has(delivery.messageId))
         .map((delivery) => this.#publicDelivery(delivery, positions)),
     };
+  }
+
+  /**
+   * The queued channel work of this agent, in queue order. `listQueue` hides it, so a caller that
+   * reorders the queue the user sees has to put these ids back before the mailbox reads the order.
+   */
+  queuedChannelDeliveryIds(agentId: string): string[] {
+    const channelMessageIds = this.#channelMessageIds();
+    return this.#state.deliveries
+      .filter(
+        (delivery) =>
+          delivery.recipientAgentId === agentId &&
+          delivery.status === "queued" &&
+          channelMessageIds.has(delivery.messageId),
+      )
+      .sort(compareQueueOrder)
+      .map((delivery) => delivery.id);
+  }
+
+  /** Indexed once for a whole read: a queue holds one delivery for each message the agent has. */
+  #channelMessageIds(): Set<string> {
+    const ids = new Set<string>();
+    for (const message of this.#state.messages) if (message.channelId) ids.add(message.id);
+    return ids;
   }
 
   listRuntimeWork(agentIds: readonly string[], failedTurns: ReadonlyMap<string, string>): AgentRuntimeWorkItem[] {

@@ -273,10 +273,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#store.list().some(
             (agent) =>
               providerForAgent(agent) === provider &&
+              // A channel turn runs on a thread of its own, so the agent's own conversation holds no
+              // turn id while the CLI works. `workingSnapshot` reads the execution threads as well.
+              //
               // A compaction is a provider turn as well, and it holds no active turn id: its
               // `turn/started` belongs to the compaction, not to the agent, so `claimTurn` takes
               // it away. Only its own guard reports the turn the CLI is running.
-              (this.#conversation.snapshot(agent.id)?.activeTurnId != null || !this.#compaction.mayDrain(agent.id)),
+              (this.#conversation.workingSnapshot(agent.id) != null || !this.#compaction.mayDrain(agent.id)),
           ),
         onProviderResumed: (provider) => {
           for (const agent of this.#store.list()) {
@@ -1188,7 +1191,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   async reorderQueue(input: ReorderQueueInput): Promise<void> {
     if (input.deliveryIds.some((id) => this.channels.store.assignmentForDelivery(id)))
       throw new Error("Use the channel task controls for channel work.");
-    await this.#mailbox.reorderQueue(input.agentId, input.deliveryIds);
+    // The queue the user reads holds no channel work, so the order it sends names the normal
+    // messages alone, and the mailbox reads the whole queued order. Channel work stays at the head:
+    // it reserved the agent before these messages arrived.
+    const channelDeliveryIds = this.#mailbox.queuedChannelDeliveryIds(input.agentId);
+    await this.#mailbox.reorderQueue(input.agentId, [...channelDeliveryIds, ...input.deliveryIds]);
     this.#mailboxSync.emitQueue(input.agentId);
   }
 
