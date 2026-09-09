@@ -10,6 +10,7 @@ import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { useServers } from "../servers/servers-context";
+import { mergeChannelPage } from "./channel-page-merge";
 import { readChannelSelection, writeChannelSelection } from "./channel-selection";
 
 interface ChannelsState {
@@ -85,11 +86,11 @@ const Channels = createSimpleContext({
             if (failedCommand?.channelId === selected) failedCommand = null;
           }
           if (page && state.page?.channel.id === page.channel.id) {
-            const older = state.page.messages.filter((item) => item.sequence < (page.messages[0]?.sequence ?? 0));
-            reconcile([...older, ...page.messages], "id")(state.page.messages);
+            const merged = mergeChannelPage(state.page.messages, page.messages);
+            reconcile(merged.messages, "id")(state.page.messages);
             reconcile(page.tasks, "id")(state.page.tasks);
             Object.assign(state.page, { channel: page.channel, throughSequence: page.throughSequence });
-            if (!older.length) state.page.olderCursor = page.olderCursor;
+            if (merged.takeFetchedCursor) state.page.olderCursor = page.olderCursor;
           } else state.page = page;
           state.loading = false;
           if (!failedCommand) state.error = null;
