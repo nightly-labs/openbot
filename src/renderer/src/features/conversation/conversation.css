@@ -1945,7 +1945,7 @@
 }
 
 .agent-settings-model {
-  margin: 25px 0 20px;
+  margin: var(--settings-panel-section-gap) 0 20px;
   overflow: visible;
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-lg);

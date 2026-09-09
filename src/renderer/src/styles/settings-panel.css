@@ -8,6 +8,14 @@
  */
 
 .settings-panel {
+  /*
+   * The step between one block of settings and the next: the fields, the link group, the agent's
+   * runtime card, the channel's member list. It is declared here, on the panel both surfaces open,
+   * because a section that stands further from the link group in one panel than in the other is
+   * exactly the drift this file exists to stop.
+   */
+  --settings-panel-section-gap: 25px;
+
   position: absolute;
   z-index: 15;
   top: 0;
