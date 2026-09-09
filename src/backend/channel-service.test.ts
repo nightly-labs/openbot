@@ -191,6 +191,31 @@ describe("shared channel coordination", () => {
       text: "Request 104",
     });
   });
+  it("removes a member the deletion of its agent left behind, and still refuses a new one", async () => {
+    // Both members are deleted agents. The draft the settings panel sends holds the other one.
+    vi.spyOn(data.store, "list").mockReturnValue([]);
+    await service.command(
+      {
+        type: "save",
+        channelId: "channel-1",
+        operationId: operationId(),
+        draft: { ...draft, members: [{ agentId: "agent-b" }], leadAgentId: "agent-b" },
+      },
+      actor,
+    );
+    expect(service.store.get("channel-1").members).toEqual([{ agentId: "agent-b" }]);
+    await expect(
+      service.command(
+        {
+          type: "save",
+          channelId: "channel-1",
+          operationId: operationId(),
+          draft: { ...draft, members: [{ agentId: "agent-b" }, { agentId: "agent-c" }], leadAgentId: "agent-b" },
+        },
+        actor,
+      ),
+    ).rejects.toThrow("A channel member is unavailable.");
+  });
   it("summarizes a channel from the read cursor without reading its history", () => {
     const message = (id: string, author: ChannelMessage["author"]): ChannelMessage => ({
       id,

@@ -177,11 +177,16 @@ export class ChannelService {
     }
     const known = this.hooks.agents();
     if (command.type === "save") {
+      const existing = this.store.exists(command.channelId) ? this.store.get(command.channelId) : null;
+      // A deleted agent stays in the membership list, and the settings panel offers to remove it.
+      // Only a member the draft adds has to be available: rejecting the ones already stored would
+      // hold every later save of the channel, so the reader could not remove the first of two
+      // deleted members, or edit any other field.
+      const members = new Set(existing?.members.map((member) => member.agentId));
       for (const member of command.draft.members)
-        if (!known.some((agent) => agent.id === member.agentId)) throw new Error("A channel member is unavailable.");
-      const channel = this.store.exists(command.channelId)
-        ? this.store.get(command.channelId)
-        : this.store.create(command.channelId, command.draft);
+        if (!members.has(member.agentId) && !known.some((agent) => agent.id === member.agentId))
+          throw new Error("A channel member is unavailable.");
+      const channel = existing ?? this.store.create(command.channelId, command.draft);
       const assigned = this.store
         .tasks(channel.id)
         .filter(

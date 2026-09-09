@@ -587,17 +587,27 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
-  async deleteAgentData(agentId: string): Promise<void> {
+  /**
+   * Removes the mailbox of one agent. What the agent shared in a channel stays: the message a
+   * channel shows carries the uploaded files of that message, and a file the agent generated
+   * inside a channel thread is part of the shared transcript as well. Both are owned by the
+   * channel and leave with it, through `deleteChannelData`. `channelThreadIds` names the threads
+   * the channels hold, because a generated file records the thread it was made in.
+   */
+  async deleteAgentData(agentId: string, channelThreadIds: readonly string[] = []): Promise<void> {
     const previous = structuredClone(this.#state);
     const removedMessageIds = new Set<string>();
+    const channelThreads = new Set(channelThreadIds);
     const removedGenerated = this.#state.generatedAttachments.filter(
-      (attachment) => attachment.ownerAgentId === agentId,
+      (attachment) =>
+        attachment.ownerAgentId === agentId &&
+        !(attachment.ownerThreadId && channelThreads.has(attachment.ownerThreadId)),
     );
     const removedTransferRoots = new Set<string>();
     this.#state.deliveries = this.#state.deliveries.filter((delivery) => delivery.recipientAgentId !== agentId);
     const remainingMessageIds = new Set(this.#state.deliveries.map((delivery) => delivery.messageId));
     this.#state.messages = this.#state.messages.filter((message) => {
-      const keep = remainingMessageIds.has(message.id);
+      const keep = remainingMessageIds.has(message.id) || message.channelId !== undefined;
       if (!keep) removedMessageIds.add(message.id);
       if (!keep) {
         for (const attachment of message.attachments) {
@@ -616,7 +626,7 @@ export class MailboxStore {
       Object.entries(this.#state.idempotency).filter(([, messageId]) => !removedMessageIds.has(messageId)),
     );
     this.#state.generatedAttachments = this.#state.generatedAttachments.filter(
-      (attachment) => attachment.ownerAgentId !== agentId,
+      (attachment) => !removedGenerated.includes(attachment),
     );
     try {
       await this.#persist(

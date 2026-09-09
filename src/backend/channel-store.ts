@@ -328,6 +328,17 @@ export class ChannelStore {
     ).map((row) => requiredStringColumn(row, "thread_id"));
   }
 
+  /**
+   * The execution threads of every channel, in one query. Deleting an agent asks for this: a file
+   * the agent generated in a channel thread belongs to the shared transcript, so it stays with the
+   * channel rather than leaving with the agent.
+   */
+  allContextThreads(): string[] {
+    return databaseRows(
+      this.database.connection.prepare("SELECT thread_id FROM projection_channel_contexts").all(),
+    ).map((row) => requiredStringColumn(row, "thread_id"));
+  }
+
   /** Permanently removes a channel and its execution threads from every local projection. */
   delete(channelId: string, operationId: string = randomUUID()): void {
     if (!this.exists(channelId)) throw new Error("Channel not found.");

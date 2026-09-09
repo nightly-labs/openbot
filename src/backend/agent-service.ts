@@ -967,7 +967,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // Keep session records available if private file removal needs a retry.
       for (const session of providerSessions) await this.#threads.deleteProviderSessionFiles(session.externalSessionId);
       stage = "mailbox";
-      await this.#mailbox.deleteAgentData(agent.id);
+      await this.#mailbox.deleteAgentData(agent.id, this.channels.store.allContextThreads());
       stage = "agent-files-and-record";
       await this.#store.deleteAgent(agent.id);
     } catch {
