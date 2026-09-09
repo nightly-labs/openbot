@@ -3,7 +3,14 @@ import { Button, Typography } from "heroui-native";
 import { X } from "lucide-react-native";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { KeyboardChatScrollView } from "react-native-keyboard-controller";
-import Animated, { Easing, FadeIn, FadeInDown, ReduceMotion, useAnimatedStyle } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  ReduceMotion,
+  useAnimatedStyle,
+  useReducedMotion,
+} from "react-native-reanimated";
 import { BloubAvatar, getBloubAvatarColor } from "@/features/agents/components/bloub-avatar";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
@@ -14,6 +21,8 @@ import type { ChatMessage } from "@/features/chat/model/chat-messages";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import { StreamingTailText, StreamRevealProvider } from "./streaming-tail-text";
+import { ThinkingTextGradient } from "./thinking-text-gradient";
 
 const STARTER_OPTIONS = [
   { id: "plan", label: "Plan the next steps", detail: "Turn a goal into a clear plan" },
@@ -71,6 +80,7 @@ export function ChatMessageList({
   onRetryHistory,
 }: ChatMessageListProps) {
   const isFocused = useIsFocused();
+  const reducedMotion = useReducedMotion();
   const animateMessages = isFocused && canSend && appActive;
   const arrivals = useMessageArrivals(agent.id, messages, animateMessages && historyState === "ready");
   const activity = useAgentActivity(agent.id);
@@ -174,9 +184,34 @@ export function ChatMessageList({
         accessibilityLabel={`${agent.name}: ${activityLabel}`}
       >
         <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={36} />
-        <Typography.Paragraph type="body-sm" className="flex-1 text-text-secondary">
-          {activityLabel}
-        </Typography.Paragraph>
+        <StreamRevealProvider>
+          <ThinkingTextGradient
+            text={activityLabel}
+            foreground={foreground ?? "#ffffff"}
+            muted={muted ?? "#888888"}
+            enabled={
+              animateMessages &&
+              motion.historyVisible &&
+              motion.responseVisible &&
+              !reducedMotion &&
+              activity?.phase !== "waiting"
+            }
+          >
+            <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+              <StreamingTailText
+                key={
+                  thinkingDetail && latestThinking?.kind === "thinking"
+                    ? latestThinking.steps.at(-1)?.id
+                    : activityLabel
+                }
+                body={activityLabel}
+                type="body-sm"
+                style={{ color: muted }}
+                enabled={animateMessages && motion.historyVisible && motion.responseVisible && !reducedMotion}
+              />
+            </Typography.Paragraph>
+          </ThinkingTextGradient>
+        </StreamRevealProvider>
       </View>
     ) : null;
 
