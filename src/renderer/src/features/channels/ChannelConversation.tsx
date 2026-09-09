@@ -1,14 +1,33 @@
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
-import { CHANNEL_ASSIGNMENT_LIMIT, type ChannelTask, type DraftAttachment } from "@openbot/contracts/ipc";
+import {
+  CHANNEL_ASSIGNMENT_LIMIT,
+  type ChannelTask,
+  type ChannelTaskState,
+  type DraftAttachment,
+} from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createStore, For, onCleanup, Show } from "solid-js";
 import { QuestionPromptBubble } from "../../components/QuestionPromptBubble";
 import {
+  createSettingsPanelWidth,
+  SettingsPanel,
+  SettingsPanelContent,
+  SettingsPanelHeader,
+  settingsPanelMaxWidth,
+} from "../../components/SettingsPanel";
+import {
   ArrowUp,
+  Badge,
   Bubble,
   BubbleContent,
   Button,
   DropdownMenu,
   Ellipsis,
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
   Message,
   MessageAvatar,
   MessageContent,
@@ -34,6 +53,15 @@ import { usePresence } from "../team/team-context";
 import { ChannelAvatar } from "./ChannelAvatar";
 import { ChannelEditor } from "./ChannelEditor";
 import { useChannels } from "./channels-context";
+
+/** The state reads as a badge, so a task says how it stands without a sentence to read. */
+function taskTone(state: ChannelTaskState) {
+  if (state === "completed") return "success" as const;
+  if (state === "failed") return "danger" as const;
+  if (state === "paused" || state === "waiting") return "warning" as const;
+  if (state === "running") return "accent" as const;
+  return "neutral" as const;
+}
 
 export function ChannelConversation() {
   const channels = useChannels();
@@ -120,6 +148,11 @@ export function ChannelConversation() {
     });
   };
   let messageList: HTMLElement | undefined;
+  /* The panel is the same slot the agent chat opens, so it reads and writes the same width. The
+     variable has to sit on this element, because the rules that give the chat back the width the
+     panel covers are written against the conversation panel, not against the panel itself. */
+  let conversationPanel: HTMLElement | undefined;
+  const [panelWidth, setPanelWidth] = createSettingsPanelWidth();
   let stickToLatest = true;
   let scrollFrame: number | undefined;
   let scrolledChannel: string | undefined;
@@ -171,7 +204,12 @@ export function ChannelConversation() {
       });
   };
   return (
-    <main class="conversation-panel" aria-label="Channel conversation">
+    <main
+      ref={(element) => (conversationPanel = element)}
+      class="conversation-panel"
+      aria-label="Channel conversation"
+      style={`--settings-panel-width: ${panelWidth()}px`}
+    >
       <Show when={channels.state.error}>
         <p role="alert">
           {channels.state.error}
@@ -682,87 +720,100 @@ export function ChannelConversation() {
               </div>
             </Show>
             <Show when={channels.state.editing === "settings" || panel.tasks}>
-              <aside class="channel-panel" aria-label="Channel panel">
+              <SettingsPanel
+                id="channel-side-panel"
+                label="Channel panel"
+                width={panelWidth()}
+                maxWidth={() => settingsPanelMaxWidth(conversationPanel)}
+                onResize={setPanelWidth}
+              >
                 {/* Routines bring their own header with a back arrow, so they replace the panel
                     header rather than sit under it - the same trade the agent panel makes. */}
                 <Show
                   when={panel.routines.open && routinesPort()}
                   fallback={
                     <>
-                      <header class="channel-panel-header">
-                        <h2>{channels.state.editing === "settings" ? "Channel settings" : "Tasks"}</h2>
-                        <Button variant="ghost" size="icon-sm" aria-label="Close channel panel" onClick={closePanel}>
-                          <X />
-                        </Button>
-                      </header>
-                      <Show
-                        when={channels.state.editing !== "settings"}
-                        fallback={
-                          <ChannelEditor
-                            memoryCount={panel.memories.count}
-                            routineCount={panel.routines.count}
-                            onOpenMemories={() =>
-                              setPanel((state) => {
-                                state.memories.open = true;
-                              })
-                            }
-                            onOpenRoutines={() =>
-                              setPanel((state) => {
-                                state.routines.open = true;
-                              })
-                            }
-                          />
-                        }
-                      >
-                        <section class="channel-tasks" aria-label="Channel tasks">
-                          <Show when={!page().tasks.length}>
-                            <p class="channel-empty-copy">Tasks appear when you send a request.</p>
-                          </Show>
-                          <For each={page().tasks}>
-                            {(task) => (
-                              <article class="channel-task" aria-label={`Task: ${task.instruction}`}>
-                                <strong>
-                                  {name(task.ownerAgentId)} · {task.state}
-                                </strong>
-                                <p>{task.instruction}</p>
-                                <Show when={task.error}>
-                                  <p role="status">{task.error}</p>
-                                </Show>
-                                <For each={task.dependencies}>
-                                  {(id) => {
-                                    const dependency = () => page().tasks.find((item) => item.id === id);
-                                    return (
-                                      <p>
-                                        Depends on {name(dependency()?.ownerAgentId ?? null)} ·{" "}
-                                        {dependency()?.state ?? "unavailable"}
-                                      </p>
-                                    );
-                                  }}
-                                </For>
-                                <Show when={task.state !== "completed" && task.state !== "cancelled"}>
-                                  <div class="channel-task-actions">
-                                    <Show when={task.state !== "paused" && task.state !== "failed"}>
-                                      <Button size="sm" variant="ghost" onClick={() => void control(task, "stop")}>
-                                        Stop
-                                      </Button>
-                                    </Show>
-                                    <Show when={task.state === "paused" || task.state === "failed"}>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        disabled={channels.state.pending}
-                                        onClick={() => void control(task, "resume")}
-                                      >
-                                        {task.assignmentCount >= CHANNEL_ASSIGNMENT_LIMIT ? "Continue" : "Resume"}
-                                      </Button>
-                                    </Show>
-                                  </div>
-                                </Show>
-                              </article>
-                            )}
-                          </For>
-                        </section>
-                      </Show>
+                      <SettingsPanelHeader
+                        title={channels.state.editing === "settings" ? "Channel settings" : "Tasks"}
+                        onClose={closePanel}
+                        closeLabel="Close channel panel"
+                        closeIcon={<X />}
+                      />
+                      <SettingsPanelContent>
+                        <Show
+                          when={channels.state.editing !== "settings"}
+                          fallback={
+                            <ChannelEditor
+                              memoryCount={panel.memories.count}
+                              routineCount={panel.routines.count}
+                              onOpenMemories={() =>
+                                setPanel((state) => {
+                                  state.memories.open = true;
+                                })
+                              }
+                              onOpenRoutines={() =>
+                                setPanel((state) => {
+                                  state.routines.open = true;
+                                })
+                              }
+                            />
+                          }
+                        >
+                          <section class="channel-tasks" aria-label="Channel tasks">
+                            <Show when={!page().tasks.length}>
+                              <p class="channel-empty-copy">Tasks appear when you send a request.</p>
+                            </Show>
+                            <ItemGroup class="channel-task-list">
+                              <For each={page().tasks}>
+                                {(task) => (
+                                  <Item class="channel-task" role="article" aria-label={`Task: ${task.instruction}`}>
+                                    <ItemContent>
+                                      <ItemTitle>{name(task.ownerAgentId)}</ItemTitle>
+                                      <ItemDescription>{task.instruction}</ItemDescription>
+                                      <Show when={task.error}>
+                                        <ItemDescription role="status">{task.error}</ItemDescription>
+                                      </Show>
+                                      <For each={task.dependencies}>
+                                        {(id) => {
+                                          const dependency = () => page().tasks.find((item) => item.id === id);
+                                          return (
+                                            <ItemDescription>
+                                              Depends on {name(dependency()?.ownerAgentId ?? null)} ·{" "}
+                                              {dependency()?.state ?? "unavailable"}
+                                            </ItemDescription>
+                                          );
+                                        }}
+                                      </For>
+                                    </ItemContent>
+                                    <ItemActions>
+                                      <Badge tone={taskTone(task.state)} size="sm">
+                                        {task.state}
+                                      </Badge>
+                                      <Show when={task.state !== "completed" && task.state !== "cancelled"}>
+                                        <Show when={task.state !== "paused" && task.state !== "failed"}>
+                                          <Button size="sm" variant="ghost" onClick={() => void control(task, "stop")}>
+                                            Stop
+                                          </Button>
+                                        </Show>
+                                        <Show when={task.state === "paused" || task.state === "failed"}>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            disabled={channels.state.pending}
+                                            onClick={() => void control(task, "resume")}
+                                          >
+                                            {task.assignmentCount >= CHANNEL_ASSIGNMENT_LIMIT ? "Continue" : "Resume"}
+                                          </Button>
+                                        </Show>
+                                      </Show>
+                                    </ItemActions>
+                                  </Item>
+                                )}
+                              </For>
+                            </ItemGroup>
+                          </section>
+                        </Show>
+                      </SettingsPanelContent>
                       <Show when={memoriesPort()}>
                         {(port) => (
                           <AgentMemoriesModal
@@ -801,7 +852,7 @@ export function ChannelConversation() {
                     />
                   )}
                 </Show>
-              </aside>
+              </SettingsPanel>
             </Show>
           </>
         )}

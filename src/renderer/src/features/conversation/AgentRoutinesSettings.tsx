@@ -315,11 +315,11 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
 
   return (
     <div class="agent-routines-settings">
-      <header class="agent-settings-header agent-routines-header">
+      <header class="settings-panel-header agent-routines-header">
         <Button
           variant="ghost"
           type="button"
-          class="agent-settings-nav-button"
+          class="settings-panel-nav-button"
           aria-label={draft() ? "Back to Routines" : "Back to settings"}
           disabled={Boolean(draft() && saving())}
           onClick={() => (draft() ? requestExit("list") : props.onBack?.())}
@@ -335,7 +335,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
             <Button
               variant="ghost"
               type="button"
-              class="agent-settings-nav-button"
+              class="settings-panel-nav-button"
               aria-label="Close details"
               disabled={saving()}
               onClick={() => requestExit("close")}
@@ -347,7 +347,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
           <Button
             variant="ghost"
             type="button"
-            class="agent-settings-nav-button"
+            class="settings-panel-nav-button"
             aria-label="Create Routine"
             onClick={createDraft}
           >
@@ -455,7 +455,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                 </div>
               </div>
 
-              <label class="agent-settings-field">
+              <label class="settings-field">
                 <span>Name</span>
                 <Input
                   value={current().name}
@@ -464,7 +464,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                   onValueChange={(name) => changeDraft((value) => ({ ...value, name }))}
                 />
               </label>
-              <label class="agent-settings-field agent-routine-instruction-field">
+              <label class="settings-field agent-routine-instruction-field">
                 <span>Instruction</span>
                 <Textarea
                   value={current().instruction}

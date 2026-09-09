@@ -10,11 +10,19 @@ import type {
   ProviderRuntimeStatus,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createStore, For, onSettled, Show } from "solid-js";
 import { normalizeAvatarFile } from "../../avatar-image";
 import { AVATAR_HUE_OPTIONS, avatarCandidateSeeds, avatarHueSwatch } from "../../bloub-avatar";
-import { PanelResizer, readPanelWidth, savePanelWidth } from "../../components/PanelResizer";
 import { ProviderModelPicker, reasoningLabel } from "../../components/ProviderModelPicker";
+import {
+  createSettingsPanelWidth,
+  SettingsField,
+  SettingsLinkGroup,
+  SettingsLinkRow,
+  SettingsPanel,
+  SettingsPanelContent,
+  SettingsPanelHeader,
+} from "../../components/SettingsPanel";
 import {
   Button,
   ChevronRight,
@@ -35,11 +43,6 @@ import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRout
 import { BackIcon, SettingsForwardIcon } from "./ConversationIcons";
 import { agentMemoriesPort } from "./memories-port";
 import { agentRoutinesPort } from "./routines-port";
-
-const SETTINGS_PANEL_STORAGE_KEY = "openbot:settings-panel-width";
-const SETTINGS_PANEL_DEFAULT = 296;
-const SETTINGS_PANEL_MIN = 180;
-const SETTINGS_PANEL_MAX = 1600;
 
 export interface AgentRuntimeSettings {
   provider: AgentProviderId;
@@ -108,9 +111,7 @@ interface AgentSettingsDraft {
 }
 
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
-  const [panelWidth, setPanelWidth] = createSignal(
-    readPanelWidth(SETTINGS_PANEL_STORAGE_KEY, SETTINGS_PANEL_DEFAULT, SETTINGS_PANEL_MIN, SETTINGS_PANEL_MAX),
-  );
+  const [panelWidth, setPanelWidth] = createSettingsPanelWidth();
   const [draft, setDraft] = createStore<AgentSettingsDraft>({
     avatar: {
       batch: 0,
@@ -432,44 +433,26 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   }
 
   return (
-    <aside id="settings-side-panel" class="agent-settings-panel" aria-label="Agent settings">
-      <PanelResizer
-        class="right-panel-resizer"
-        label="Resize right panel"
-        controls="settings-side-panel"
-        direction="right"
-        value={panelWidth()}
-        defaultValue={SETTINGS_PANEL_DEFAULT}
-        min={SETTINGS_PANEL_MIN}
-        max={props.maxWidth}
-        onResize={setPanelWidth}
-        onResizeEnd={(value) => savePanelWidth(SETTINGS_PANEL_STORAGE_KEY, value)}
-      />
+    <SettingsPanel
+      id="settings-side-panel"
+      label="Agent settings"
+      width={panelWidth()}
+      maxWidth={props.maxWidth}
+      onResize={setPanelWidth}
+    >
       <Show when={!draft.routines.open}>
-        <header class="agent-settings-header">
-          <Button
-            variant="ghost"
-            type="button"
-            class="agent-settings-nav-button"
-            aria-label="Back to details"
-            onClick={props.onClose}
-          >
-            <BackIcon />
-          </Button>
-          <h2>Settings</h2>
-          <Button
-            variant="ghost"
-            type="button"
-            class="agent-settings-nav-button"
-            aria-label="Close details"
-            onClick={props.onClose}
-          >
-            <SettingsForwardIcon />
-          </Button>
-        </header>
+        <SettingsPanelHeader
+          title="Settings"
+          onBack={props.onClose}
+          backLabel="Back to details"
+          backIcon={<BackIcon />}
+          onClose={props.onClose}
+          closeLabel="Close details"
+          closeIcon={<SettingsForwardIcon />}
+        />
       </Show>
       <Show when={!draft.routines.open}>
-        <div class="agent-settings-content">
+        <SettingsPanelContent>
           <div ref={(element) => (avatarPickerRoot = element)} class="agent-settings-avatar-picker">
             <Popover.Root
               open={draft.avatar.pickerOpen}
@@ -636,8 +619,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               </Popover.Content>
             </Popover.Root>
           </div>
-          <label class="agent-settings-field">
-            <span>Name</span>
+          <SettingsField label="Name">
             <Input
               value={draft.fields.name}
               aria-label="Agent name"
@@ -650,9 +632,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               }
               onBlur={saveName}
             />
-          </label>
-          <label class="agent-settings-field">
-            <span>Title</span>
+          </SettingsField>
+          <SettingsField label="Title">
             <Input
               value={draft.fields.title}
               aria-label="Agent title"
@@ -666,9 +647,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               }
               onBlur={saveTitle}
             />
-          </label>
-          <label class="agent-settings-field agent-settings-description">
-            <span>Instructions</span>
+          </SettingsField>
+          <SettingsField label="Instructions">
             <Textarea
               rows="4"
               value={draft.fields.description}
@@ -683,49 +663,33 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               }
               onBlur={saveDescription}
             />
-          </label>
-          <div class="agent-settings-links">
-            <Button
-              variant="ghost"
-              class="agent-settings-link"
-              onClick={(event) => props.onOpenUsage(event.currentTarget)}
-            >
+          </SettingsField>
+          <SettingsLinkGroup>
+            {/* Usage opens beside its own trigger, so this row keeps the button it is anchored
+                to. It also carries no count, which is why it is not a `SettingsLinkRow`. */}
+            <Button variant="ghost" class="settings-link" onClick={(event) => props.onOpenUsage(event.currentTarget)}>
               Usage
               <ChevronRight />
             </Button>
-            <Button
-              variant="ghost"
-              type="button"
-              class="agent-settings-link"
+            <SettingsLinkRow
+              label="Memories"
+              value={`${draft.memories.count} saved`}
               onClick={() =>
                 setDraft((state) => {
                   state.memories.open = true;
                 })
               }
-            >
-              <span class="agent-settings-link-label">Memories</span>
-              <span class="agent-settings-link-value">
-                {draft.memories.count} saved
-                <ChevronRight />
-              </span>
-            </Button>
-            <Button
-              variant="ghost"
-              type="button"
-              class="agent-settings-link"
+            />
+            <SettingsLinkRow
+              label="Routines"
+              value={`${draft.routines.count} configured`}
               onClick={() =>
                 setDraft((state) => {
                   state.routines.open = true;
                 })
               }
-            >
-              <span class="agent-settings-link-label">Routines</span>
-              <span class="agent-settings-link-value">
-                {draft.routines.count} configured
-                <ChevronRight />
-              </span>
-            </Button>
-          </div>
+            />
+          </SettingsLinkGroup>
           <section class="agent-settings-model" aria-labelledby="agent-model-heading">
             <div class="agent-settings-section-heading">
               <strong id="agent-model-heading">Runtime</strong>
@@ -804,7 +768,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               }}
             />
           </div>
-        </div>
+        </SettingsPanelContent>
       </Show>
       <Show when={draft.routines.open}>
         <div class="agent-routines-overlay">
@@ -841,7 +805,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           })
         }
       />
-    </aside>
+    </SettingsPanel>
   );
 }
 

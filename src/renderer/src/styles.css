@@ -16,6 +16,7 @@
 @import "./styles/app-shell.css";
 @import "./features/account/account-update-island.css";
 @import "./features/servers/join-server-dialog.css";
+@import "./styles/settings-panel.css";
 @import "./features/conversation/conversation.css";
 @import "./features/channels/channels.css";
 @import "./features/usage/usage.css";

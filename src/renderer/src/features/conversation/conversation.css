@@ -356,21 +356,6 @@
   color: var(--openbot-text-primary);
 }
 
-.agent-settings-panel {
-  position: absolute;
-  z-index: 15;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  width: var(--settings-panel-width, 296px);
-  flex-direction: column;
-  border-left: 1px solid var(--openbot-border);
-  background: var(--openbot-bg-canvas);
-  color: var(--openbot-text-primary);
-  animation: settings-panel-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
 .browser-panel {
   position: absolute;
   z-index: 14;
@@ -1097,71 +1082,8 @@
   font-size: var(--openbot-text-sm);
 }
 
-.agent-settings-header {
-  display: grid;
-  height: 39px;
-  flex: 0 0 auto;
-  grid-template-columns: 32px 1fr 32px;
-  align-items: center;
-  border-bottom: 1px solid var(--openbot-border);
-  padding: 0 10px;
-}
-
-.agent-settings-header h2 {
-  margin: 0;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-md);
-  font-weight: 600;
-  line-height: 18px;
-  text-align: center;
-}
-
-.agent-settings-nav-button {
-  position: relative;
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border: 0;
-  border-radius: var(--openbot-radius-sm);
-  padding: 0;
-  background: transparent;
-  color: var(--openbot-text-secondary);
-  transition:
-    background-color var(--openbot-duration-hover) ease,
-    color var(--openbot-duration-hover) ease,
-    transform var(--openbot-duration-fast) ease;
-}
-
-.agent-settings-nav-button::before {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 40px;
-  height: 40px;
-  content: "";
-  transform: translate(-50%, -50%);
-}
-
-.agent-settings-nav-button > svg {
-  width: 16px;
-  height: 16px;
-  /* The weight is left to .ui-glyph-20 on the icons themselves, as in .message-action-button. */
-}
-
-.agent-settings-nav-button:hover {
-  background: var(--openbot-hover);
-  color: var(--openbot-text-primary);
-}
-
 .settings-back-icon {
   transform: translateX(-0.5px);
-}
-
-.agent-settings-content {
-  min-height: 0;
-  overflow-y: auto;
-  padding: 24px 15px 28px;
 }
 
 .agent-settings-avatar-picker {
@@ -1197,148 +1119,6 @@
 
 .agent-settings-avatar:hover {
   filter: brightness(1.08);
-}
-
-.agent-settings-field {
-  display: block;
-  margin: 0 0 17px;
-}
-
-.agent-settings-field > span {
-  display: block;
-  margin: 0 0 6px 8px;
-  color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-md);
-  line-height: 18px;
-}
-
-.agent-settings-field input,
-.agent-settings-field textarea,
-.agent-settings-field select {
-  display: block;
-  width: 100%;
-  border: 1px solid var(--openbot-border-strong);
-  border-radius: var(--openbot-radius-md);
-  outline: 0;
-  background: var(--openbot-shadow-popover-ambient);
-  padding: 10px 11px;
-  color: var(--openbot-text-primary);
-  caret-color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-lg);
-  line-height: 19px;
-  transition:
-    border-color var(--openbot-duration-hover) ease,
-    background var(--openbot-duration-hover) ease;
-}
-
-.agent-settings-field input,
-.agent-settings-field select {
-  height: 38px;
-}
-
-.agent-settings-field select {
-  appearance: none;
-  cursor: pointer;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--openbot-text-secondary) 50%),
-    linear-gradient(135deg, var(--openbot-text-secondary) 50%, transparent 50%);
-  background-position:
-    calc(100% - 16px) 16px,
-    calc(100% - 11px) 16px;
-  background-repeat: no-repeat;
-  background-size:
-    5px 5px,
-    5px 5px;
-  padding-right: 32px;
-}
-
-.agent-settings-field select option {
-  background: var(--openbot-bg-control);
-  color: var(--openbot-text-primary);
-}
-
-.agent-settings-field textarea {
-  field-sizing: content;
-  min-height: 88px;
-  max-height: 240px;
-  overflow-y: auto;
-}
-
-.agent-settings-field input::placeholder,
-.agent-settings-field textarea::placeholder {
-  color: var(--openbot-text-muted);
-}
-
-.agent-settings-field input:focus,
-.agent-settings-field textarea:focus,
-.agent-settings-field select:focus {
-  border-color: var(--openbot-text-muted);
-  background: var(--openbot-shadow-popover-ambient);
-}
-
-.agent-settings-field input:focus-visible,
-.agent-settings-field textarea:focus-visible,
-.agent-settings-field select:focus-visible {
-  outline: none;
-}
-
-.agent-settings-links {
-  display: grid;
-  width: 100%;
-  margin: 7px 0 22px;
-  border-top: 1px solid var(--openbot-border);
-  border-bottom: 1px solid var(--openbot-border);
-}
-
-.agent-settings-link {
-  width: 100%;
-  min-height: 42px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--openbot-space-3);
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 0 var(--openbot-space-1);
-  text-align: left;
-  transition: none;
-}
-
-.agent-settings-link + .agent-settings-link {
-  border-top: 1px solid var(--openbot-border);
-}
-
-.agent-settings-link-label {
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-md);
-  font-weight: var(--openbot-weight-medium);
-}
-
-.agent-settings-link-value {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-2);
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  font-variant-numeric: tabular-nums;
-}
-
-.agent-settings-link-value svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-  stroke-width: var(--openbot-icon-stroke);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .agent-settings-links .agent-settings-link:hover {
-    background: var(--openbot-hover);
-    color: var(--openbot-text-primary);
-  }
-
-  .agent-settings-link:hover .agent-settings-link-value {
-    color: var(--openbot-text-secondary);
-  }
 }
 
 .agent-routines-overlay {
@@ -1602,7 +1382,7 @@
   gap: 14px;
 }
 
-.agent-routine-editor > .agent-settings-field {
+.agent-routine-editor > .settings-field {
   margin-bottom: 0;
 }
 
@@ -6709,13 +6489,13 @@ button.chat-action-target:active,
   }
 }
 
-.conversation-panel:has(.agent-settings-panel) .conversation-header,
-.conversation-panel:has(.agent-settings-panel) .conversation-scroll,
-.conversation-panel:has(.agent-settings-panel) .composer-wrap {
+.conversation-panel:has(.settings-panel) .conversation-header,
+.conversation-panel:has(.settings-panel) .conversation-scroll,
+.conversation-panel:has(.settings-panel) .composer-wrap {
   width: calc(100% - var(--settings-panel-width, 296px));
 }
 
-.conversation-panel:has(.agent-settings-panel) .chat-search {
+.conversation-panel:has(.settings-panel) .chat-search {
   right: calc(var(--settings-panel-width, 296px) + 16px);
   max-width: calc(100% - var(--settings-panel-width, 296px) - 32px);
 }
@@ -6818,7 +6598,7 @@ button.chat-action-target:active,
   .agent-row-thinking-dots i,
   .agent-row-agent-status-responded,
   .agent-row-agent-status-unread,
-  .agent-settings-panel {
+  .settings-panel {
     animation: none;
     transition: none;
   }
@@ -7895,7 +7675,7 @@ button.chat-action-target:active,
   }
 }
 
-.agent-settings-panel,
+.settings-panel,
 .browser-panel,
 .remote-desktop-workspace {
   background: var(--openbot-bg-canvas);

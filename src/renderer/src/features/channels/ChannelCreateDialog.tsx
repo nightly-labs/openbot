@@ -14,8 +14,8 @@ import {
   UsersRound,
   X,
 } from "../../components/ui";
-import { AgentAvatar } from "../agents/AgentAvatar";
 import { useAgents } from "../agents/agents-context";
+import { ChannelMemberRow } from "./ChannelMemberRow";
 import { useChannels } from "./channels-context";
 import { emptyChannelDraft, toggleChannelMember } from "./channels-draft";
 
@@ -129,17 +129,21 @@ export function ChannelCreateDialog() {
                   <div ref={listBody} class="channel-picker-body">
                     <For each={filtered()}>
                       {(agent) => (
-                        <label class="channel-picker-entry channel-member-row" for={`channel-member-${agent.id}`}>
-                          <Checkbox
-                            id={`channel-member-${agent.id}`}
-                            checked={draft.members.some((member) => member.agentId === agent.id)}
-                            onChange={(event) => toggle(agent.id, event.currentTarget.checked)}
+                        // The label stays the outer element, so pointing anywhere on the row
+                        // selects the agent, and the row still names the checkbox it holds.
+                        <label class="channel-picker-entry" for={`channel-member-${agent.id}`}>
+                          <ChannelMemberRow
+                            agent={agent}
+                            fallbackName={agent.name}
+                            description={agent.description}
+                            leading={
+                              <Checkbox
+                                id={`channel-member-${agent.id}`}
+                                checked={draft.members.some((member) => member.agentId === agent.id)}
+                                onChange={(event) => toggle(agent.id, event.currentTarget.checked)}
+                              />
+                            }
                           />
-                          <AgentAvatar agent={agent} />
-                          <span class="channel-member-copy">
-                            <strong>{agent.name}</strong>
-                            <span>{agent.description}</span>
-                          </span>
                         </label>
                       )}
                     </For>

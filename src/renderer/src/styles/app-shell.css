@@ -3057,7 +3057,7 @@ textarea {
 .agent-row:active,
 .composer-button:active,
 .voice-button:active,
-.agent-settings-nav-button:active {
+.settings-panel-nav-button:active {
   transform: scale(0.97);
 }
 
@@ -3074,7 +3074,7 @@ textarea {
   background: var(--openbot-bg-surface);
 }
 
-.agent-settings-content {
+.settings-panel-content {
   color: var(--openbot-text-primary);
 }
 

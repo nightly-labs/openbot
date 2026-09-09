@@ -1,26 +1,22 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { Channel, ChannelDraft } from "@openbot/contracts/ipc";
 import { createEffect, createStore, For, Show } from "solid-js";
+import { SettingsField, SettingsLinkGroup, SettingsLinkRow } from "../../components/SettingsPanel";
 import {
   Button,
   buttonVariants,
-  ChevronRight,
   Crown,
   DropdownMenu,
   Input,
-  Item,
   ItemActions,
-  ItemContent,
   ItemGroup,
-  ItemMedia,
-  ItemTitle,
   Plus,
   Textarea,
   Tooltip,
-  UserRound,
 } from "../../components/ui";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { useAgents } from "../agents/agents-context";
+import { ChannelMemberRow } from "./ChannelMemberRow";
 import { useChannels } from "./channels-context";
 import { toggleChannelMember } from "./channels-draft";
 
@@ -158,8 +154,7 @@ export function ChannelEditor(props: ChannelEditorProps) {
 
   return (
     <div class="channel-editor">
-      <label class="agent-settings-field">
-        <span>Name</span>
+      <SettingsField label="Name">
         <Input
           aria-label="Channel name"
           placeholder="Ex: Project Falcon"
@@ -175,9 +170,8 @@ export function ChannelEditor(props: ChannelEditorProps) {
           }}
           onBlur={saveName}
         />
-      </label>
-      <label class="agent-settings-field">
-        <span>Title</span>
+      </SettingsField>
+      <SettingsField label="Title">
         <Input
           aria-label="Channel title"
           placeholder="Describe what this channel does"
@@ -193,9 +187,8 @@ export function ChannelEditor(props: ChannelEditorProps) {
           }}
           onBlur={saveText("title")}
         />
-      </label>
-      <label class="agent-settings-field agent-settings-description">
-        <span>Instructions</span>
+      </SettingsField>
+      <SettingsField label="Instructions">
         <Textarea
           rows="4"
           aria-label="Channel instructions"
@@ -212,90 +205,77 @@ export function ChannelEditor(props: ChannelEditorProps) {
           }}
           onBlur={saveText("instructions")}
         />
-      </label>
-      <div class="agent-settings-links">
-        <Button variant="ghost" type="button" class="agent-settings-link" onClick={props.onOpenMemories}>
-          <span class="agent-settings-link-label">Memories</span>
-          <span class="agent-settings-link-value">
-            {props.memoryCount} saved
-            <ChevronRight />
-          </span>
-        </Button>
-        <Button variant="ghost" type="button" class="agent-settings-link" onClick={props.onOpenRoutines}>
-          <span class="agent-settings-link-label">Routines</span>
-          <span class="agent-settings-link-value">
-            {props.routineCount} configured
-            <ChevronRight />
-          </span>
-        </Button>
-      </div>
+      </SettingsField>
+      <SettingsLinkGroup>
+        <SettingsLinkRow label="Memories" value={`${props.memoryCount} saved`} onClick={props.onOpenMemories} />
+        <SettingsLinkRow label="Routines" value={`${props.routineCount} configured`} onClick={props.onOpenRoutines} />
+      </SettingsLinkGroup>
       <section class="channel-members" aria-label="Members">
         <h3 class="channel-members-title">Members</h3>
         <ItemGroup class="channel-member-list">
           <For each={members()}>
             {(entry) => (
-              <Item size="compact" class="channel-member">
-                <ItemMedia>
-                  <Show when={entry.agent} fallback={<UserRound aria-hidden="true" />}>
-                    {(agent) => <AgentAvatar agent={agent()} />}
-                  </Show>
-                </ItemMedia>
-                <ItemContent>
-                  <ItemTitle>{entry.agent?.name ?? `Unavailable member ${entry.agentId}`}</ItemTitle>
-                </ItemContent>
-                <ItemActions>
-                  <Show when={entry.agent}>
-                    {(agent) => (
-                      <Tooltip.Root openDelay={250} closeDelay={75} placement="top" gutter={8}>
-                        {/* The trigger is the button itself, the way `ServerRail` does it: an
+              <ChannelMemberRow
+                agent={entry.agent}
+                fallbackName={`Unavailable member ${entry.agentId}`}
+                actions={
+                  <ItemActions>
+                    <Show when={entry.agent}>
+                      {(agent) => (
+                        <Tooltip.Root openDelay={250} closeDelay={75} placement="top" gutter={8}>
+                          {/* The trigger is the button itself, the way `ServerRail` does it: an
                             `IconButton` inside a trigger would carry a `title` as well, and the
                             crown would answer twice, once styled and once by the platform. */}
-                        <Tooltip.Trigger
-                          type="button"
-                          class={buttonVariants({
-                            variant: "ghost",
-                            size: "icon-xs",
-                            class: "ui-icon-button channel-lead-toggle",
-                          })}
-                          aria-pressed={channel()?.leadAgentId === entry.agentId ? "true" : "false"}
-                          aria-label={
-                            channel()?.leadAgentId === entry.agentId
-                              ? `${agent().name} is the channel lead`
-                              : `Make ${agent().name} the channel lead`
-                          }
-                          onClick={() =>
-                            void commit((draft) => {
-                              draft.leadAgentId = entry.agentId;
-                            })
-                          }
-                        >
-                          <Crown aria-hidden="true" />
-                        </Tooltip.Trigger>
-                        <Tooltip.Portal>
-                          <Tooltip.Content class="ui-tooltip">
-                            {channel()?.leadAgentId === entry.agentId ? "Channel lead" : "Make channel lead"}
-                          </Tooltip.Content>
-                        </Tooltip.Portal>
-                      </Tooltip.Root>
-                    )}
-                  </Show>
-                  <Button
-                    size="xs"
-                    variant="destructive"
-                    class="channel-member-remove"
-                    aria-label={
-                      entry.agent ? `Remove ${entry.agent.name}` : `Remove unavailable member ${entry.agentId}`
-                    }
-                    onClick={() => void commit((draft) => toggleChannelMember(draft, entry.agentId, false))}
-                  >
-                    Remove
-                  </Button>
-                </ItemActions>
-              </Item>
+                          <Tooltip.Trigger
+                            type="button"
+                            class={buttonVariants({
+                              variant: "ghost",
+                              size: "icon-xs",
+                              class: "ui-icon-button channel-lead-toggle",
+                            })}
+                            aria-pressed={channel()?.leadAgentId === entry.agentId ? "true" : "false"}
+                            aria-label={
+                              channel()?.leadAgentId === entry.agentId
+                                ? `${agent().name} is the channel lead`
+                                : `Make ${agent().name} the channel lead`
+                            }
+                            onClick={() =>
+                              void commit((draft) => {
+                                draft.leadAgentId = entry.agentId;
+                              })
+                            }
+                          >
+                            <Crown aria-hidden="true" />
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content class="ui-tooltip">
+                              {channel()?.leadAgentId === entry.agentId ? "Channel lead" : "Make channel lead"}
+                            </Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                      )}
+                    </Show>
+                    <Button
+                      size="xs"
+                      variant="destructive"
+                      class="channel-member-remove"
+                      aria-label={
+                        entry.agent ? `Remove ${entry.agent.name}` : `Remove unavailable member ${entry.agentId}`
+                      }
+                      onClick={() => void commit((draft) => toggleChannelMember(draft, entry.agentId, false))}
+                    >
+                      Remove
+                    </Button>
+                  </ItemActions>
+                }
+              />
             )}
           </For>
           <DropdownMenu.Root placement="bottom-start" modal={false}>
-            <DropdownMenu.Trigger class="channel-member-add" disabled={!available().length}>
+            <DropdownMenu.Trigger
+              class={buttonVariants({ variant: "ghost", class: "channel-member-add" })}
+              disabled={!available().length}
+            >
               <Plus aria-hidden="true" />
               Add member
             </DropdownMenu.Trigger>

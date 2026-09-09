@@ -1,18 +1,10 @@
 .channel-dialog-header,
-.channel-editor-footer,
-.channel-panel-header {
+.channel-editor-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--openbot-space-2);
 }
-.channel-member-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: var(--openbot-space-1);
-}
-.channel-member-copy > span,
 .channel-empty-copy {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
@@ -96,16 +88,9 @@
   font-variant-numeric: tabular-nums;
 }
 .channel-confirm,
-.channel-task-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--openbot-space-2);
-}
 .channel-confirm {
   padding: var(--openbot-space-2) var(--openbot-space-3);
 }
-.channel-panel-header h2,
 .channel-dialog-header h2 {
   margin: 0;
   font-size: var(--openbot-text-xl);
@@ -134,57 +119,28 @@
 .channel-empty .channel-empty-title {
   color: var(--openbot-text-primary);
 }
-/* Same overlay the agent chat uses for its settings panel, entrance animation included. */
-.channel-panel {
-  animation: settings-panel-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  position: absolute;
-  z-index: 15;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  width: var(--settings-panel-width, 296px);
-  flex-direction: column;
-  padding: var(--openbot-space-4);
-  border-left: 1px solid var(--openbot-border);
-  background: var(--openbot-bg-canvas);
-  overflow: auto;
-  gap: var(--openbot-space-4);
+
+/* A task is a row of the shared list, not a card of its own: the group draws the frame and the
+   dividers. The panel is narrow, so the state and the actions take a line of their own under the
+   instruction: they cannot shrink, and on the same line they would squeeze the text to a few words
+   a line. */
+.channel-task:is(.ui-item) {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  padding-block: var(--openbot-space-3);
 }
-/* The panel sits above the chat, so give the chat back the width the panel covers. */
-/* Routines fill the panel edge to edge, the way the agent routines overlay covers its own panel. */
-.channel-panel:has(.agent-routines-settings) {
-  padding: 0;
-  gap: 0;
+.channel-task .ui-item-content {
+  flex: 1 1 100%;
 }
-.conversation-panel:has(.channel-panel) .conversation-header,
-.conversation-panel:has(.channel-panel) .conversation-scroll,
-.conversation-panel:has(.channel-panel) .composer-wrap {
-  width: calc(100% - var(--settings-panel-width, 296px));
+.channel-task .ui-item-actions {
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
-.channel-task p {
-  margin: 0;
+/* An instruction is the user's own text, so it wraps rather than reaching past the panel. */
+.channel-task .ui-item-description {
+  white-space: normal;
   overflow-wrap: anywhere;
-}
-.channel-member-row {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-3);
-  cursor: pointer;
-}
-.channel-member-copy strong {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-2);
-}
-.channel-task {
-  display: flex;
-  flex-direction: column;
-  gap: var(--openbot-space-2);
-  padding: var(--openbot-space-3);
-  margin-bottom: var(--openbot-space-2);
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-md);
 }
 .channel-tasks {
   min-width: 0;
@@ -229,8 +185,11 @@
   padding-block: var(--openbot-space-1);
   padding-inline: var(--openbot-space-2);
 }
+/* The trigger is a shared ghost button, whose own hover is written with two `:not()`s and so
+   outweighs a plain class. It is matched here, or the last row of the list lights up differently
+   from every row above it. */
 .channel-member:hover,
-.channel-member-add:hover {
+.channel-member-add:hover:not(:disabled) {
   background: var(--openbot-hover);
 }
 /* The avatar sets the floor of a one-line row, the same size the create dialog uses. A menu row
@@ -244,15 +203,13 @@
 .channel-member .ui-item-title {
   font-weight: var(--openbot-weight-regular);
 }
-/* Adding a member belongs in the list, under the last member, where the eye already is. */
+/* Adding a member belongs in the list, under the last member, where the eye already is. The ghost
+   button already gives it the transparent frame and the muted text; what it does not give is a row,
+   so the width, the leading edge and the line height are set here. */
 .channel-member-add {
-  display: flex;
   width: 100%;
-  align-items: center;
-  border: 0;
-  background: transparent;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
+  justify-content: flex-start;
+  height: auto;
   line-height: var(--openbot-leading-md);
   text-align: left;
   cursor: pointer;
@@ -315,6 +272,7 @@
 }
 .channel-picker-entry {
   padding: var(--openbot-space-2) 0;
+  cursor: pointer;
 }
 .channel-editor-footer {
   padding-top: var(--openbot-space-3);
@@ -423,14 +381,17 @@
   display: flex;
   flex-direction: column;
 }
-/* Rows run edge to edge: the selected and hover surfaces read as one list, not as cards. */
+/* Rows run edge to edge: the selected and hover surfaces read as one list, not as cards. The row
+   inside is the shared member row, so the label around it only paints the surface. */
 .channel-create-form .channel-picker-entry {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-3);
+  display: block;
   padding: var(--openbot-space-2) var(--channel-dialog-inset);
   border-radius: 0;
   transition: background-color var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+.channel-create-form .channel-picker-entry .channel-member:is(.ui-item) {
+  min-height: 0;
+  padding: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .channel-create-form .channel-picker-entry {
@@ -447,23 +408,21 @@
  * One line per agent - name, then the description beside it - so a row costs the height of a
  * single line and more of the list is on screen while several agents are being selected.
  */
-.channel-create-form .channel-member-copy {
-  flex-direction: row;
+.channel-create-form .channel-picker-entry .ui-item-content {
+  display: flex;
   align-items: baseline;
   gap: var(--openbot-space-2);
   overflow: hidden;
 }
-.channel-create-form .channel-member-copy strong {
+.channel-create-form .channel-picker-entry .ui-item-title {
   flex: 0 0 auto;
+  font-weight: var(--openbot-weight-regular);
 }
-.channel-create-form .channel-member-copy > span {
+.channel-create-form .channel-picker-entry .ui-item-description {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.channel-create-form .channel-member-copy strong {
-  font-weight: var(--openbot-weight-regular);
 }
 /* The avatar sets the floor for a one-line row, so it is the smaller identifying size here.
    The drawn bloub overflows its own box and lands 14% of the avatar below the center of the row,
