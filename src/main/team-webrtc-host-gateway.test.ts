@@ -19,6 +19,7 @@ import {
 } from "@openbot/contracts/team-protocol/v2";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebSocketServer } from "ws";
+import opencodeAgents from "../../packages/contracts/src/team-protocol/fixtures/v4/host-http-response.json";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
@@ -105,6 +106,11 @@ describe("TeamWebRtcHostGateway", () => {
         const supported = request.headers["openbot-protocol-version"] === "3";
         response.writeHead(supported ? 200 : 400, { "content-type": "application/json" });
         response.end(JSON.stringify(supported ? unreadState : { error: "Mark unread requires protocol 3." }));
+        return;
+      }
+      if (request.url === "/v1/agents") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify(opencodeAgents));
         return;
       }
       response.writeHead(200, { "content-type": "application/json" });
@@ -350,6 +356,29 @@ describe("TeamWebRtcHostGateway", () => {
       type: "response",
       result: { status: 200, body: unreadState },
     });
+    bridge.emit(
+      "data",
+      "peer-1",
+      "rpc",
+      encodeTeamProtocolV2Frame({
+        version: 2,
+        type: "request",
+        requestId: "opencode-agents",
+        operation: "http.request",
+        payload: { method: "GET", path: "/v1/agents", body: null, capabilities: ["opencode"] },
+      }),
+    );
+    const opencodeReply = () =>
+      bridge.sent.find(
+        (message) =>
+          message.peerId === "peer-1" && isString(message.data) && message.data.includes('"opencode-agents"'),
+      );
+    await vi.waitFor(() => expect(opencodeReply()).toBeDefined());
+    expect(decodeTeamProtocolV2RpcFrame(opencodeReply()?.data)).toMatchObject({
+      type: "response",
+      result: { status: 200, body: opencodeAgents },
+    });
+    expect(localRequests).toContainEqual({ path: "/v1/agents", protocol: "4" });
     bridge.emit("incoming", "peer-1", {
       hostId: "host-1",
       connectionId: "connection-2",

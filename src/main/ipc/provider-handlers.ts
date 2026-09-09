@@ -1,3 +1,4 @@
+import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
 // Signing in to Codex, Claude and Grok, and downloading the CLI runtimes they need.
 
 import { shell } from "electron";
@@ -24,7 +25,7 @@ export function providerIpcHandlers({
           await shell.openExternal(url.toString());
         }),
       ),
-      updateProviderCli: payloadHandler(parseProviderId, async (provider) => {
+      updateProviderCli: payloadHandler(parseManagedProviderId, async (provider) => {
         await providerRuntimes.downloadAndWait(provider);
         return service.getStatus();
       }),
@@ -32,8 +33,14 @@ export function providerIpcHandlers({
     },
     providerRuntimes: {
       getStatus: handler(() => providerRuntimes.getStatus()),
-      download: payloadHandler(parseProviderId, (parsed) => providerRuntimes.download(parsed)),
-      cancel: payloadHandler(parseProviderId, (parsed) => providerRuntimes.cancel(parsed)),
+      download: payloadHandler(parseManagedProviderId, (parsed) => providerRuntimes.download(parsed)),
+      cancel: payloadHandler(parseManagedProviderId, (parsed) => providerRuntimes.cancel(parsed)),
     },
   };
+}
+
+function parseManagedProviderId(value: unknown) {
+  const provider = parseProviderId(value);
+  if (!isManagedRuntimeProvider(provider)) throw new Error("OpenCode updates are managed outside OpenBot.");
+  return provider;
 }

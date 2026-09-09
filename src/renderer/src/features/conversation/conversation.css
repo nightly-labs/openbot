@@ -2496,24 +2496,13 @@
   height: 15px;
   flex: 0 0 15px;
   overflow: visible;
+  fill: var(--openbot-provider-current);
 }
 
 .provider-model-mark-large {
   width: 19px;
   height: 19px;
   flex-basis: 19px;
-}
-
-.provider-model-mark-claude {
-  fill: var(--openbot-provider-claude);
-}
-
-.provider-model-mark-codex {
-  fill: var(--openbot-provider-codex);
-}
-
-.provider-model-mark-grok {
-  fill: var(--openbot-provider-grok);
 }
 
 .provider-model-chevron {
@@ -2552,6 +2541,7 @@
 }
 
 .provider-model-layout {
+  max-height: min(520px, calc(100dvh - 100px), var(--kb-popper-content-available-height, 520px));
   display: flex;
   width: 100%;
   min-height: inherit;
@@ -2600,6 +2590,9 @@
 }
 
 .provider-model-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   min-width: 0;
   flex: 1;
   padding: 10px 10px 11px;
@@ -2610,6 +2603,7 @@
 }
 
 .provider-model-heading {
+  flex-shrink: 0;
   min-height: 54px;
   padding: 3px 4px 8px;
 }
@@ -2652,6 +2646,7 @@
 }
 
 .provider-model-effort {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -7947,4 +7942,22 @@ button.chat-action-target:active,
 .voice-button:active,
 .voice-button-active:active {
   transform: scale(0.97);
+}
+
+.provider-model-search {
+  flex-shrink: 0;
+  margin-bottom: var(--openbot-space-2);
+}
+
+.provider-model-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.provider-model-group {
+  padding: var(--openbot-space-3) var(--openbot-space-2) var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: 500;
 }

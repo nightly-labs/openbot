@@ -1,4 +1,4 @@
-import type { AgentStatus } from "@openbot/contracts/ipc";
+import type { AgentModelOption, AgentStatus } from "@openbot/contracts/ipc";
 import { fireEvent, render, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
@@ -133,4 +133,73 @@ describe("ProviderModelPicker", () => {
     await fireEvent.pointerDown(document.body);
     expect(view.queryByRole("dialog", { name: "Choose agent model" })).not.toBeInTheDocument();
   });
+});
+
+const openCodeModels: AgentModelOption[] = [
+  ["openai/gpt", "OpenAI/GPT"],
+  ["opencode/free", "OpenCode Zen/Example Free"],
+  ["opencode/free/low", "OpenCode Zen/Example Free (low)"],
+  ["opencode/free/high", "OpenCode Zen/Example Free (high)"],
+  ["opencode/unknown", "OpenCode Zen/Unknown price"],
+].map(([id, name]) => ({
+  provider: "opencode",
+  id,
+  name,
+  description: "",
+  defaultReasoningEffort: "medium",
+  supportedReasoningEfforts: ["medium"],
+}));
+
+async function openOpenCodePicker() {
+  const onChange = vi.fn();
+  const [model, setModel] = createSignal("opencode/free/low");
+  const view = render(() => (
+    <ProviderModelPicker
+      provider="opencode"
+      value={model()}
+      modelOptions={openCodeModels}
+      agentStatus={agentStatus}
+      onChange={(id, provider) => {
+        setModel(id);
+        onChange(id, provider);
+      }}
+    />
+  ));
+  await fireEvent.click(view.getByRole("button", { name: /Agent model:/ }));
+  return { view, onChange, dialog: within(view.getByRole("dialog", { name: "Choose agent model" })) };
+}
+
+it("puts provider-labelled free models first and keeps one selected row per model", async () => {
+  const { dialog } = await openOpenCodePicker();
+  expect(dialog.getAllByRole("option").map((option) => option.getAttribute("aria-label"))).toEqual([
+    "Example Free",
+    "GPT",
+    "Unknown price",
+  ]);
+  expect(dialog.getByRole("option", { name: "Example Free" })).toHaveAttribute("aria-selected", "true");
+});
+
+it("searches by service or model and restores the list when search is cleared", async () => {
+  const { dialog } = await openOpenCodePicker();
+  const search = dialog.getByRole("textbox", { name: "Search models" });
+  await fireEvent.input(search, { target: { value: "openai" } });
+  expect(dialog.getAllByRole("option").map((option) => option.textContent)).toEqual(["GPT"]);
+  await fireEvent.input(search, { target: { value: "unknown price" } });
+  expect(dialog.getAllByRole("option").map((option) => option.textContent)).toEqual(["Unknown price"]);
+  await fireEvent.input(search, { target: { value: "missing" } });
+  expect(dialog.getByRole("status")).toHaveTextContent("No models match your search.");
+  await fireEvent.input(search, { target: { value: "" } });
+  expect(dialog.getAllByRole("option")).toHaveLength(3);
+});
+
+it("selects OpenCode reasoning model IDs and can return to the default model", async () => {
+  const { dialog, onChange } = await openOpenCodePicker();
+  const effort = dialog.getByRole("button", { name: /Agent reasoning effort/ });
+  expect(effort).toHaveTextContent("Low");
+  await fireEvent.pointerDown(effort, { pointerType: "mouse", button: 0 });
+  await fireEvent.click(await within(document.body).findByRole("option", { name: "High" }));
+  expect(onChange).toHaveBeenLastCalledWith("opencode/free/high", "opencode");
+  await fireEvent.pointerDown(effort, { pointerType: "mouse", button: 0 });
+  await fireEvent.click(await within(document.body).findByRole("option", { name: "Default" }));
+  expect(onChange).toHaveBeenLastCalledWith("opencode/free", "opencode");
 });

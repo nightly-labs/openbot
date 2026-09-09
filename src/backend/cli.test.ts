@@ -16,12 +16,14 @@ import {
   resolveClaudeCli,
   resolveCodexCli,
   resolveGrokCli,
+  resolveOpencodeCli,
   windowsFallbackPaths,
 } from "./cli";
 
 const originalAppData = process.env.APPDATA;
 const originalLocalAppData = process.env.LOCALAPPDATA;
 const originalPath = process.env.PATH;
+const originalOpencodePath = process.env.OPENBOT_OPENCODE_PATH;
 const originalGrokPath = process.env.OPENBOT_GROK_PATH;
 const temporaryPaths: string[] = [];
 
@@ -30,6 +32,7 @@ afterEach(async () => {
   restoreEnvironment("LOCALAPPDATA", originalLocalAppData);
   restoreEnvironment("PATH", originalPath);
   restoreEnvironment("OPENBOT_GROK_PATH", originalGrokPath);
+  restoreEnvironment("OPENBOT_OPENCODE_PATH", originalOpencodePath);
   await Promise.all(temporaryPaths.splice(0).map((path) => rm(path, { recursive: true })));
 });
 
@@ -288,3 +291,13 @@ function restoreEnvironment(name: string, value: string | undefined): void {
   if (value === undefined) delete process.env[name];
   else process.env[name] = value;
 }
+
+describe("OpenCode system CLI", () => {
+  it.runIf(process.platform !== "win32")("uses the installed CLI and reports a missing override", async () => {
+    const executable = await createExecutable("opencode", "1.3.13");
+    process.env.OPENBOT_OPENCODE_PATH = executable;
+    await expect(resolveOpencodeCli()).resolves.toEqual({ executable, version: "1.3.13", source: "system" });
+    process.env.OPENBOT_OPENCODE_PATH = join(executable, "missing");
+    await expect(resolveOpencodeCli()).rejects.toThrow("Install OpenCode on this computer to continue.");
+  });
+});

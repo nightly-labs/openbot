@@ -156,7 +156,7 @@
   margin-top: var(--openbot-space-2);
 }
 .agent-usage-provider-icon {
-  fill: var(--openbot-provider-codex);
+  fill: var(--openbot-provider-current);
   width: var(--openbot-space-4);
   height: var(--openbot-space-4);
   flex-shrink: 0;
@@ -322,10 +322,6 @@
   .agent-usage-section-header {
     flex-wrap: wrap;
   }
-}
-
-.agent-usage-provider-icon[data-provider="claude"] {
-  fill: var(--openbot-provider-claude);
 }
 
 /* The header holds one row of filters, so every dropdown and the refresh button share

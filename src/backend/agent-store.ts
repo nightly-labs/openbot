@@ -27,10 +27,10 @@ import {
   type AgentSummary,
   type AvatarImageInput,
   type CreateAgentInput,
-  DEFAULT_PROVIDER_MODELS,
   type DuplicateAgentResult,
   decodeAgentProfileDraft,
   decodeSaveAgentProfileResult,
+  defaultProviderModel,
   isAgentModel,
   isAvatarHue,
   isAvatarSeed,
@@ -1364,7 +1364,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
       : reset("provider", undefined);
   const model = isAgentModel(value.model)
     ? value.model
-    : reset("model", provider === undefined ? DEFAULT_AGENT_MODEL : DEFAULT_PROVIDER_MODELS[provider]);
+    : reset("model", provider === undefined ? DEFAULT_AGENT_MODEL : defaultProviderModel(provider));
   let marketplaceSource: StoredAgent["marketplaceSource"];
   if (value.marketplaceSource !== undefined) {
     if (isMarketplaceSource(value.marketplaceSource)) {

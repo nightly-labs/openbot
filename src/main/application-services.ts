@@ -1,3 +1,4 @@
+import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
 /**
  * The composition root. Every long-lived service the desktop app owns is built here, in one
  * function, in dependency order, and handed back as a single record.
@@ -350,9 +351,7 @@ export async function createApplicationServices({
     30_000,
     setupState.preferredProvider ?? "codex",
     null,
-    providerRuntimes.executablePath("codex"),
-    providerRuntimes.executablePath("claude"),
-    providerRuntimes.executablePath("grok"),
+    providerRuntimes.bundledExecutables(),
     (agent) => managedSkills.syncAgent(agent),
     hostedSites,
     sidebarLayout,
@@ -367,7 +366,7 @@ export async function createApplicationServices({
   const trackSystemCliVersions = (status: AgentStatus): void => {
     for (const provider of status.providers ?? []) {
       const version = provider.cliSource === "system" ? (provider.version ?? null) : null;
-      providerRuntimes.setSystemVersion(provider.id, version);
+      if (isManagedRuntimeProvider(provider.id)) providerRuntimes.setSystemVersion(provider.id, version);
     }
   };
   trackSystemCliVersions(service.getStatus());

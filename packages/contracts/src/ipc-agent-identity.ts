@@ -1,3 +1,4 @@
+import { AGENT_PROVIDER_DESCRIPTORS, agentProviderDescriptor } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AgentProviderId, isAgentProvider } from "./ipc-agent-status";
 import { isBoundedString } from "./ipc-bounded-values";
@@ -32,19 +33,22 @@ export function isAgentModel(value: unknown): value is AgentModelId {
  * A provider lists its own models, so an id here can be missing from a given CLI: every caller
  * falls back to the first model that provider does list, and the picker simply marks nothing.
  */
-export const DEFAULT_PROVIDER_MODELS: Record<AgentProviderId, AgentModelId> = {
-  codex: "gpt-5.6-luna",
-  claude: "claude-sonnet-5",
-  grok: "grok-4.6",
-};
+export function defaultProviderModel(provider: AgentProviderId): AgentModelId {
+  return agentProviderDescriptor(provider).defaultModel;
+}
 
 export function isClaudeModel(model: AgentModelId): boolean {
   return model.startsWith("claude-");
 }
 
+/**
+ * `codex` is the historical answer for a model no prefix claims, and it has to stay that way: an
+ * import that never named a provider already landed there, and moving it would move those agents.
+ */
 export function providerForLegacyModel(model: AgentModelId): AgentProviderId {
-  if (isClaudeModel(model)) return "claude";
-  if (model.startsWith("grok-")) return "grok";
+  for (const descriptor of AGENT_PROVIDER_DESCRIPTORS) {
+    if (descriptor.legacyModelPrefix !== null && model.startsWith(descriptor.legacyModelPrefix)) return descriptor.id;
+  }
   return "codex";
 }
 

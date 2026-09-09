@@ -89,7 +89,7 @@ export function AppAccessGate() {
                         providerRuntimeDownloadsAvailable() ? cancelProviderRuntimeDownload : undefined
                       }
                       onConnectProvider={connectProvider}
-                      onInstallProvider={providerRuntimeDownloadsAvailable() ? undefined : openProviderInstallGuide}
+                      onInstallProvider={openProviderInstallGuide}
                       onSignInProvider={providerRuntimeDownloadsAvailable() ? undefined : openProviderSignInGuide}
                       onRefreshProviders={providerRuntimeDownloadsAvailable() ? undefined : refreshAgentProviders}
                       onSave={setup.saveSetup}

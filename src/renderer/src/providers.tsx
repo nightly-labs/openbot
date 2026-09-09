@@ -1,4 +1,4 @@
-import type { AgentProviderId, AgentStatus } from "@openbot/contracts/ipc";
+import { type AgentProviderId, type AgentStatus, agentProviderDescriptor } from "@openbot/contracts/ipc";
 import { createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { useAgents } from "./features/agents/agents-context";
@@ -77,9 +77,11 @@ const Providers = createSimpleContext({
     }
 
     function openProviderInstallGuide(provider: AgentProviderId): Promise<void> {
-      if (provider !== "claude")
-        return Promise.reject(new Error(`${provider === "codex" ? "ChatGPT" : "Grok"} is included with OpenBot.`));
-      return window.openbot.openExternal("claude-install");
+      const descriptor = agentProviderDescriptor(provider);
+      if (descriptor.installGuideLink === null) {
+        return Promise.reject(new Error(`${descriptor.displayName} is included with OpenBot.`));
+      }
+      return window.openbot.openExternal(descriptor.installGuideLink);
     }
 
     function openProviderSignInGuide(provider: AgentProviderId): Promise<void> {

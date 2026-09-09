@@ -1,3 +1,5 @@
+import { isAgentSummary } from "@openbot/contracts/ipc";
+import opencodeFixture from "../../packages/contracts/src/team-protocol/fixtures/v4/host-http-response.json";
 // @vitest-environment node
 
 // The agent collection and the per-agent routes: `src/main/team-api/route-agents.ts` and the
@@ -26,6 +28,41 @@ import {
 afterEach(stopTeamApiFixtures);
 
 describe("TeamApiServer agents", () => {
+  it("hides OpenCode from old clients and allows protocol 4 to read and change it", async () => {
+    const source = opencodeFixture[0];
+    if (!isAgentSummary(source)) throw new Error("Invalid OpenCode fixture.");
+    const updateAgent = vi.fn(async () => source);
+    const { start, signIn } = await createTeamApiFixture("opencode-visibility", { configure: true });
+    const { base } = await start({
+      appVersion: "1.0.0",
+      agents: createAgents({ listAgents: () => [source], updateAgent, preferredProvider: () => "opencode" }),
+    });
+    const token = await signIn({ protocol: 4, appVersion: "1.0.0" });
+    for (const protocol of [1, 2, 3, 4]) {
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        [TEAM_PROTOCOL_VERSION_HEADER]: String(protocol),
+        [TEAM_APP_VERSION_HEADER]: "1.0.0",
+        "Content-Type": "application/json",
+      };
+      const list = await fetch(`${base}/v1/agents`, { headers });
+      expect(list.status).toBe(200);
+      expect(await list.json()).toEqual(protocol === 4 ? [source] : []);
+      const update = await fetch(`${base}/v1/agents/${source.id}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ model: source.model }),
+      });
+      expect(update.status).toBe(protocol === 4 ? 200 : 404);
+      if (protocol < 4) {
+        const create = await fetch(`${base}/v1/agents`, { method: "POST", headers, body: "{}" });
+        expect(create.status).toBe(400);
+        expect(await create.text()).toContain("The host's default provider requires Team API v4.");
+      }
+    }
+    expect(updateAgent).toHaveBeenCalledTimes(1);
+  });
+
   it("duplicates an agent through protocol v3 and places it after the source", async () => {
     const { root, start, signIn } = await createTeamApiFixture("duplicate", { configure: true });
     const sidebarLayout = new SidebarLayoutStore(join(root, "sidebar-layout.json"));

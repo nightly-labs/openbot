@@ -10,6 +10,7 @@ import {
   createFakeClaude,
   createFakeCodex,
   createFakeGrok,
+  createFakeOpencode,
   createPendingFakeClaude,
   createUpdatableFakeClaude,
   FakeAgentClient,
@@ -22,6 +23,7 @@ import {
 } from "../agent-service-test-harness";
 
 import { getString } from "../protocol";
+import { DrainScheduler } from "./drain-scheduler";
 
 let root: string;
 let service: AgentService | null = null;
@@ -36,11 +38,101 @@ afterEach(async () => {
 });
 
 describe.sequential("ProviderRuntime: account checks and login", () => {
+  it("reconnects OpenCode without a browser and refuses to replace an active client", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    const clients: FakeAgentClient[] = [];
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider, "DONE", false);
+      if (provider === "opencode") clients.push(client);
+      return client;
+    });
+    await service.initialize();
+    const openExternal = vi.fn(async () => undefined);
+    await service.connectProvider("opencode", openExternal);
+    expect(openExternal).not.toHaveBeenCalled();
+    expect(clients).toHaveLength(2);
+    expect(clients[0]?.running).toBe(false);
+    expect(clients[1]?.running).toBe(true);
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "opencode/example-model" });
+    await service.sendMessage({ agentId: "chief", text: "Start a task." });
+    await waitFor(() => clients[1]?.requests.some((request) => request.method === "turn/start") === true);
+    await expect(service.connectProvider("opencode", openExternal)).rejects.toThrow("Wait for it to finish");
+    expect(clients).toHaveLength(2);
+    expect(clients[1]?.running).toBe(true);
+  });
+
+  it("keeps another provider's live delivery running when OpenCode reconnects", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => new FakeAgentClient(provider, "", false),
+    );
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Keep working." });
+    const running = service;
+    await waitFor(async () => Boolean((await running.readConversation("chief")).activeTurnId));
+    const turnId = (await service.readConversation("chief")).activeTurnId;
+    await service.connectProvider("opencode", vi.fn());
+    expect(service.listQueue("chief").deliveries[0]?.status).toBe("running");
+    expect((await service.readConversation("chief")).activeTurnId).toBe(turnId);
+  });
+
+  it.each([false, true])("holds queued OpenCode turns during reconnect and resumes them (failure=%s)", async (fail) => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let reconnecting = false;
+    let checkingAccount = false;
+    const clients: FakeAgentClient[] = [];
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider, "DONE", true, true, {}, async (method) => {
+        if (provider !== "opencode" || !reconnecting || method !== "account/read") return;
+        checkingAccount = true;
+        await gate;
+        if (fail) throw new Error("Reconnect failed.");
+      });
+      if (provider === "opencode") clients.push(client);
+      return client;
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "opencode/example-model" });
+    reconnecting = true;
+    const connection = service.connectProvider("opencode", vi.fn());
+    await waitFor(() => checkingAccount);
+    const drain = vi.spyOn(DrainScheduler.prototype, "drainAgent");
+    try {
+      await service.sendMessage({ agentId: "chief", text: "Run after reconnect." });
+      await waitFor(() => drain.mock.calls.length > 0);
+      await drain.mock.results[0]?.value;
+      expect(clients[0]?.requests.filter((request) => request.method === "turn/start")).toEqual([]);
+    } finally {
+      drain.mockRestore();
+      release?.();
+    }
+    if (fail) await expect(connection).rejects.toThrow("Reconnect failed.");
+    else await connection;
+    const activeClient = clients[fail ? 0 : 1];
+    await waitFor(() => activeClient?.requests.some((request) => request.method === "turn/start") === true);
+    const running = service;
+    await waitFor(() => running.listQueue("chief").deliveries[0]?.status === "completed");
+  });
+
   it("checks providers concurrently and publishes each completed row", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
     const { store, mailbox } = stores(root);
-    const delays: Record<AgentProvider, number> = { codex: 60, claude: 5, grok: 30 };
+    const delays: Record<AgentProvider, number> = { codex: 60, claude: 5, grok: 30, opencode: 0 };
     const availableOrder: AgentProvider[] = [];
     const seen = new Set<AgentProvider>();
     const accountReads = new Set<AgentProvider>();
@@ -586,8 +678,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         if (provider === "claude") clients.push(client);
         return client;
       },
-      undefined,
-      managed,
+      { claude: managed },
     );
     await service.initialize();
     await expect(service.updateProviderCli("claude", async () => managed)).rejects.toThrow();
@@ -816,8 +907,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       30_000,
       "claude",
       (provider) => new FakeAgentClient(provider),
-      undefined,
-      managed,
+      { claude: managed },
     );
     await service.initialize();
     await expect(

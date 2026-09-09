@@ -105,3 +105,35 @@ export const DiscoveredModels: Story = {
   },
   play: Opens.play,
 };
+
+export const OpenCodeCatalog: Story = {
+  args: {
+    provider: "opencode",
+    value: "opencode/example-free/low",
+    agentStatus: {
+      ...STORY_AGENT_STATUS,
+      providers: [{ id: "opencode", state: "available", version: "1.3.13", message: null }],
+    },
+    modelOptions: [
+      ["cerebras/qwen", "Cerebras/Qwen"],
+      ["openai/gpt", "OpenAI/GPT"],
+      ["opencode/example-free", "OpenCode Zen/Example Free"],
+      ["opencode/another-free", "OpenCode Zen/Another Free"],
+      ["opencode/example", "OpenCode Zen/Example"],
+      ["zai/glm", "Z.AI/GLM"],
+    ].flatMap(([id, name]) =>
+      ["", "low", "medium", "high", "xhigh"].map((effort) => ({
+        provider: "opencode" as const,
+        id: effort ? `${id}/${effort}` : id,
+        name: effort ? `${name} (${effort})` : name,
+        description: "Example model catalog",
+        defaultReasoningEffort: "medium" as const,
+        supportedReasoningEfforts: ["medium" as const],
+      })),
+    ),
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /Agent model:/ }));
+    await canvas.findByRole("textbox", { name: "Search models" });
+  },
+};

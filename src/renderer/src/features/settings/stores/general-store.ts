@@ -1,4 +1,10 @@
-import type { AgentProviderId, AgentStatus, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import {
+  AGENT_PROVIDERS,
+  type AgentProviderId,
+  type AgentStatus,
+  agentProviderName,
+  type ProviderRuntimeStatus,
+} from "@openbot/contracts/ipc";
 import { createMemo, createSignal } from "solid-js";
 import type { ProviderPickerOption } from "../../../components/ProviderPicker";
 
@@ -17,12 +23,12 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
   const [selectedProvider, setSelectedProvider] = createSignal<AgentProviderId | null>(null);
 
   const providerOptions = createMemo<ProviderPickerOption[]>(() =>
-    (["codex", "claude", "grok"] as const).map((provider) => {
+    AGENT_PROVIDERS.map((provider) => {
       const agent = props.agentStatus?.providers?.find((candidate) => candidate.id === provider);
       const runtime = props.providerRuntimeStatuses?.[provider];
       return {
         id: provider,
-        name: provider === "codex" ? "ChatGPT" : provider === "claude" ? "Claude" : "Grok",
+        name: agentProviderName(provider),
         description: "Available on this computer",
         state: agent?.state ?? "not-installed",
         message: agent?.message,

@@ -64,8 +64,6 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         return client;
       },
       undefined,
-      null,
-      null,
       async () => undefined,
       hostedSites,
     );
@@ -253,8 +251,6 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         return client;
       },
       undefined,
-      null,
-      null,
       async () => undefined,
       hostedSites,
     );
@@ -356,8 +352,6 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         return client;
       },
       undefined,
-      null,
-      null,
       async () => undefined,
       hostedSites,
     );
@@ -466,8 +460,6 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         return client;
       },
       undefined,
-      null,
-      null,
       async () => undefined,
       hostedSites,
     );
@@ -586,8 +578,6 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         return client;
       },
       undefined,
-      null,
-      null,
       async () => undefined,
       hostedSites,
     );

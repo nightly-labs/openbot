@@ -206,6 +206,7 @@ function AppSettings(props: AccountProps) {
     startProviderUpdate,
     cancelProviderRuntimeDownload,
     connectProvider,
+    openProviderInstallGuide,
   } = useProviders();
   /** Provider downloads are the local machine's business, never a remote host's. */
   const localProviderDownloads = createMemo(
@@ -237,6 +238,7 @@ function AppSettings(props: AccountProps) {
         onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
         onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
         onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
+        onInstallProvider={localProviderDownloads() ? openProviderInstallGuide : undefined}
         hostedSitesApi={window.openbot.hostedSites}
         restoreFocusTarget={appSettingsRestoreTarget()}
       />

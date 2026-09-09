@@ -1,4 +1,5 @@
 import type { AnalyticsDay, AnalyticsModel, AnalyticsProviderDay } from "@openbot/contracts/ipc";
+import { agentProviderCliName, isAgentProvider } from "@openbot/contracts/ipc";
 
 // The header filters render these lists directly, so the visible label and the
 // stored value are one string.
@@ -43,14 +44,13 @@ export function usageCost(value: number | null): string {
 export function usageExactCost(value: number | null): string {
   return value === null ? "Unavailable" : `${value.toLocaleString(undefined, { maximumFractionDigits: 12 })} USD`;
 }
+/**
+ * Usage rows name the tool rather than the account: a cost line is about what ran, not about who
+ * paid. A provider this build does not know is shown as the raw id, because usage history outlives
+ * the provider list.
+ */
 export function usageProviderName(provider: string): string {
-  return provider === "codex"
-    ? "Codex"
-    : provider === "claude"
-      ? "Claude Code"
-      : provider === "grok"
-        ? "Grok"
-        : provider;
+  return isAgentProvider(provider) ? agentProviderCliName(provider) : provider;
 }
 export function usageProviders(models: AnalyticsModel[]) {
   const providers = new Map<string, { provider: string; tokens: number; cost: number | null }>();
