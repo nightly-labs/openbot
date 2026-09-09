@@ -321,4 +321,55 @@ describe("Team protocol v2", () => {
   it("rejects an oversized JSON frame before parsing its payload", () => {
     expect(() => decodeTeamProtocolV2RpcFrame(" ".repeat(TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES + 1))).toThrow("size");
   });
+
+  // v2 carries the v1 HTTP payloads inside its own framing, so the frozen provider vocabulary has to
+  // hold on this path too. A fourth provider id belongs to v4 and must never reach a v2 peer.
+  it("freezes the v2 provider vocabulary", () => {
+    const modelOption = {
+      provider: "codex",
+      id: "gpt-5.6-luna",
+      name: "GPT-5.6 Luna",
+      description: "",
+      defaultReasoningEffort: "medium",
+      supportedReasoningEfforts: ["low", "medium", "high"],
+    };
+    const status = {
+      phase: "ready",
+      cliVersion: "1.0.0",
+      auth: { kind: "chatgpt", email: "dev@example.com" },
+      providers: [{ id: "codex", state: "available", version: "1.0.0", message: null }],
+      capabilities: { chat: "ready", browser: "ready", computerUse: "unavailable" },
+      message: null,
+      fullAccess: true,
+    };
+
+    expect(decodeTeamProtocolV2CurrentHttpResponse("GET", "/v1/agents/models", 200, [modelOption])).toEqual([
+      modelOption,
+    ]);
+    expect(decodeTeamProtocolV2CurrentHttpResponse("GET", "/v1/agents/status", 200, status)).toEqual(status);
+
+    expect(() =>
+      decodeTeamProtocolV2CurrentHttpResponse("GET", "/v1/agents/models", 200, [
+        { ...modelOption, provider: "opencode" },
+      ]),
+    ).toThrow("Invalid Team protocol v1 HTTP response");
+    expect(() =>
+      decodeTeamProtocolV2CurrentHttpResponse("GET", "/v1/agents/status", 200, {
+        ...status,
+        providers: [{ id: "opencode", state: "available", version: "1.0.0", message: null }],
+      }),
+    ).toThrow("Invalid Team protocol v1 HTTP response");
+    expect(() =>
+      decodeTeamProtocolV2CurrentHttpResponse("GET", "/v1/agents/status", 200, {
+        ...status,
+        auth: { kind: "opencode", email: null },
+      }),
+    ).toThrow("Invalid Team protocol v1 HTTP response");
+    expect(() =>
+      decodeTeamProtocolV2CurrentHttpRequest("PATCH", "/v1/agents/agent-1", { provider: "opencode" }),
+    ).toThrow("Invalid Team protocol v1 HTTP request");
+    expect(decodeTeamProtocolV2CurrentHttpRequest("PATCH", "/v1/agents/agent-1", { provider: "grok" })).toEqual({
+      provider: "grok",
+    });
+  });
 });

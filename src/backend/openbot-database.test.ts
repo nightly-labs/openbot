@@ -74,6 +74,7 @@ describe("OpenBotDatabase", () => {
       { version: 14 },
       { version: 15 },
       { version: 16 },
+      { version: 17 },
     ]);
     database.close();
   });
@@ -751,7 +752,7 @@ describe("OpenBotDatabase", () => {
     const legacy = new DatabaseSync(database.path);
     removeAnalyticsSchema(legacy);
     legacy.exec("PRAGMA journal_mode = WAL");
-    legacy.prepare("DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16)").run();
+    legacy.prepare("DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17)").run();
     legacy
       .prepare("INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (3, ?)")
       .run("2026-08-20T10:00:00.000Z");
@@ -828,7 +829,7 @@ describe("OpenBotDatabase", () => {
       DROP TABLE projection_routine_triggers;
       DROP TABLE projection_agent_routines;
       DROP TABLE projection_agent_memories;
-      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16);
+      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17);
       INSERT OR IGNORE INTO schema_migrations(version, applied_at)
         VALUES (4, '2026-08-20T10:00:00.000Z');
     `);
@@ -862,6 +863,7 @@ describe("OpenBotDatabase", () => {
       { version: 14 },
       { version: 15 },
       { version: 16 },
+      { version: 17 },
     ]);
     migrated.close();
   });
@@ -936,6 +938,7 @@ describe("OpenBotDatabase", () => {
       { version: 14 },
       { version: 15 },
       { version: 16 },
+      { version: 17 },
     ]);
     retried.close();
   });
@@ -1405,7 +1408,7 @@ describe("OpenBotDatabase", () => {
       ALTER TABLE projection_provider_sessions_v6 RENAME TO projection_provider_sessions;
       CREATE INDEX provider_sessions_thread
         ON projection_provider_sessions(thread_id, provider, state);
-      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16);
+      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17);
       INSERT OR IGNORE INTO schema_migrations(version, applied_at)
         VALUES (6, '2026-08-20T10:00:00.000Z');
       PRAGMA foreign_keys = ON;
@@ -1426,6 +1429,93 @@ describe("OpenBotDatabase", () => {
         externalSessionId: "grok-session",
         model: "grok-4.5",
         effort: "xhigh",
+      }),
+    ).not.toThrow();
+    migrated.close();
+  });
+
+  it("widens the provider-session constraint for opencode without losing sessions or turn links", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-db-provider-v16-"));
+    roots.push(root);
+    const database = new OpenBotDatabase(root);
+    await database.initialize();
+    const agent = testAgent();
+    if (!agent.threadId) throw new Error("The test agent has no thread.");
+    const threadId = agent.threadId;
+    database.replaceAgents("agents-import", [agent], "agents.imported");
+    database.bindProviderSession({
+      threadId,
+      provider: "codex",
+      externalSessionId: "codex-session",
+      model: "gpt-5.4",
+      effort: "medium",
+    });
+    database.bindProviderSession({
+      threadId,
+      provider: "claude",
+      externalSessionId: "claude-session",
+      model: "claude-opus-5",
+      effort: "high",
+    });
+    const codexSessionId = database.listProviderSessions(threadId).find((session) => session.provider === "codex")?.id;
+    if (!codexSessionId) throw new Error("The codex provider session was not stored.");
+    // A turn points at the session the rebuild drops. With foreign keys on, the DROP would fire
+    // ON DELETE SET NULL and blank this column on every turn in the database.
+    database.connection
+      .prepare(
+        `INSERT INTO projection_turns
+           (turn_id, thread_id, provider_session_id, status, started_at, completed_at, last_event_sequence)
+         VALUES ('turn-1', ?, ?, 'completed', '2026-08-20T10:00:00.000Z', '2026-08-20T10:00:05.000Z', 1)`,
+      )
+      .run(threadId, codexSessionId);
+    database.close();
+
+    // A v16 database: the shipped three-provider constraint, and the migration ledger stamped one short.
+    const legacy = new DatabaseSync(database.path);
+    legacy.exec(`
+      DELETE FROM schema_migrations WHERE version = 17;
+      PRAGMA foreign_keys = OFF;
+      CREATE TABLE projection_provider_sessions_v16 (
+        id TEXT PRIMARY KEY,
+        thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,
+        provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok')),
+        external_session_id TEXT NOT NULL,
+        model TEXT NOT NULL,
+        effort TEXT NOT NULL,
+        state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        resume_cursor TEXT,
+        last_event_sequence INTEGER NOT NULL,
+        UNIQUE(provider, external_session_id)
+      );
+      INSERT INTO projection_provider_sessions_v16 SELECT * FROM projection_provider_sessions;
+      DROP TABLE projection_provider_sessions;
+      ALTER TABLE projection_provider_sessions_v16 RENAME TO projection_provider_sessions;
+      CREATE INDEX provider_sessions_thread
+        ON projection_provider_sessions(thread_id, provider, state);
+      PRAGMA foreign_keys = ON;
+    `);
+    legacy.close();
+
+    const migrated = new OpenBotDatabase(root);
+    await migrated.initialize();
+    expect(migrated.listProviderSessions(threadId).map((session) => session.provider)).toEqual(["codex", "claude"]);
+    expect(
+      migrated.connection.prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = ?").get("turn-1"),
+    ).toEqual({ provider_session_id: codexSessionId });
+    expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    const table = migrated.connection
+      .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projection_provider_sessions'")
+      .get();
+    expect(table).toMatchObject({ sql: expect.stringContaining("'opencode'") });
+    expect(() =>
+      migrated.bindProviderSession({
+        threadId,
+        provider: "opencode",
+        externalSessionId: "opencode-session",
+        model: "opencode/big-pickle",
+        effort: "medium",
       }),
     ).not.toThrow();
     migrated.close();
@@ -1627,7 +1717,7 @@ function downgradeReactionsToV7(database: DatabaseSync): void {
     );
     DROP TABLE projection_reactions;
     ALTER TABLE projection_reactions_v7 RENAME TO projection_reactions;
-    DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16);
+    DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17);
     INSERT OR IGNORE INTO schema_migrations(version, applied_at)
       VALUES (7, '2026-08-20T10:00:00.000Z');
   `);
