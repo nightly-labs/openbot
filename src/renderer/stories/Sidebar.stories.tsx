@@ -1,4 +1,4 @@
-import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import type { ChannelSummary, SidebarLayoutAction, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
 import { createSignal, untrack } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -84,6 +84,31 @@ const stressLayout: SidebarLayoutSnapshot = {
   ),
   agentOrder: stressAgents.map((agent) => agent.id),
 };
+
+/* One channel for each shape the member cluster has to draw: a single face, a pair, the triangle,
+ * the full quad, and the count that takes the last cell when the members outnumber it. */
+const channelSizes = [
+  { name: "Solo", size: 1 },
+  { name: "Pair", size: 2 },
+  { name: "Trio", size: 3 },
+  { name: "Quad", size: 4 },
+  { name: "All hands", size: 6 },
+];
+const storyChannels: ChannelSummary[] = channelSizes.map(({ name, size }, index) => ({
+  id: `channel-${size}`,
+  name,
+  title: "",
+  instructions: "",
+  members: stressAgents.slice(index, index + size).map((agent) => ({ agentId: agent.id })),
+  leadAgentId: null,
+  archived: false,
+  revision: 1,
+  createdAt: "2026-01-01T09:00:00.000Z",
+  unreadCount: size === 2 ? 4 : 0,
+  activeTasks: size === 6 ? 1 : 0,
+  lastMessage:
+    size === 1 ? null : { at: "2026-01-01T10:00:00.000Z", text: `${size} members here`, authorName: "Agent 1" },
+}));
 
 const args: Parameters<typeof Sidebar>[0] = {
   serverName: "Local",
@@ -791,4 +816,22 @@ export const FirstAgentNarrow: Story = {
 export const FirstAgentCompact: Story = {
   args: { ...FirstAgent.args, compact: true },
   decorators: [(Story) => <div style={{ width: "80px", height: "100vh" }}>{Story()}</div>],
+};
+
+export const Channels: Story = {
+  args: {
+    agents: stressAgents,
+    channels: storyChannels,
+    activeChannelId: "channel-3",
+    onSelectChannel: fn(),
+    pinnedItems: [
+      { kind: "channel", id: "channel-4" },
+      { kind: "agent", id: "chief" },
+    ],
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+export const ChannelsCompact: Story = {
+  args: { ...Channels.args, compact: true },
 };

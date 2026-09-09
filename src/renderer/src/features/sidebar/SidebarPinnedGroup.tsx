@@ -131,7 +131,7 @@ export function SidebarPinnedGroup() {
                           {(channel) => (
                             <>
                               <span class="agent-row-avatar sidebar-pinned-avatar">
-                                <ChannelAvatar members={channel().members} agents={props.agents} />
+                                <ChannelAvatar members={channel().members} agents={props.agents} layout="cluster" />
                               </span>
                               <span class="agent-row-copy sidebar-pinned-copy">
                                 <strong class="sidebar-pinned-name" title={name()}>

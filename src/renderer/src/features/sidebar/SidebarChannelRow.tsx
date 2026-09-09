@@ -64,7 +64,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary }) {
           }}
         >
           <span class="agent-row-avatar">
-            <ChannelAvatar members={rowProps.channel.members} agents={props.agents} />
+            <ChannelAvatar members={rowProps.channel.members} agents={props.agents} layout="cluster" />
             <Show when={rowProps.channel.unreadCount > 0}>
               <Badge class="person-unread-badge" tone="accent" shape="pill" aria-hidden="true">
                 {Math.min(rowProps.channel.unreadCount, 99)}

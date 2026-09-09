@@ -33,8 +33,67 @@
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface);
 }
-.channel-avatar .agent-avatar + .agent-avatar {
+.channel-avatar:not(.channel-avatar-cluster) .agent-avatar + .agent-avatar {
   margin-left: calc(-1 * var(--openbot-space-4));
+}
+/*
+ * The cluster holds the members in the square an agent avatar occupies, so a channel row keeps the
+ * shape of the agent rows around it. Two measurements set the geometry: the cell pitch, which is
+ * how far apart the face centres sit, and the face box. A bloub is drawn about 1.16 times its own
+ * box wide, so a face box of 0.48 draws 0.56 of the square: the faces overlap by the difference
+ * from the 0.44 pitch, and the pair still ends inside the square. The overflow count takes the
+ * last cell.
+ */
+.channel-avatar-cluster {
+  --channel-avatar-size: 36px;
+  --channel-avatar-pitch: calc(var(--channel-avatar-size) * 0.44);
+  --channel-avatar-face: calc(var(--channel-avatar-size) * 0.48);
+
+  display: grid;
+  grid-template: repeat(2, var(--channel-avatar-pitch)) / repeat(2, var(--channel-avatar-pitch));
+  place-content: center;
+  place-items: center;
+  width: var(--channel-avatar-size);
+  min-width: var(--channel-avatar-size);
+  height: var(--channel-avatar-size);
+}
+.channel-avatar-cluster .agent-avatar {
+  /* The bloub is drawn low in its own box; the lift is the measured share of the box it drops by. */
+  --agent-avatar-optical-offset: calc(var(--channel-avatar-face) * -0.14);
+
+  width: var(--channel-avatar-face);
+  height: var(--channel-avatar-face);
+  background: none;
+}
+/* One member is the channel's whole face. Two sit side by side, and three read as a triangle. */
+.channel-avatar-cluster > :only-child {
+  --channel-avatar-face: var(--channel-avatar-size);
+
+  grid-area: 1 / 1 / 3 / 3;
+}
+.channel-avatar-cluster > :first-child:nth-last-child(2),
+.channel-avatar-cluster > :first-child:nth-last-child(2) ~ * {
+  grid-row: 1 / span 2;
+}
+.channel-avatar-cluster > :first-child:nth-last-child(3) ~ .agent-avatar:last-child {
+  grid-column: 1 / span 2;
+}
+/* The pinned rail draws the same cluster at the size it gives an agent avatar. */
+.agent-row.sidebar-pinned-row .channel-avatar-cluster {
+  --channel-avatar-size: 48px;
+}
+.agent-row.sidebar-pinned-row .channel-avatar-cluster .agent-avatar {
+  width: var(--channel-avatar-face);
+  height: var(--channel-avatar-face);
+}
+.channel-avatar-count {
+  color: var(--openbot-text-primary);
+  /* The count is type, so it takes a step off the type scale rather than a share of the square:
+     the smallest step that stays legible beside a face at both cluster sizes. */
+  font-size: var(--openbot-text-md);
+  line-height: 1;
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
 }
 .channel-confirm,
 .channel-task-actions {
