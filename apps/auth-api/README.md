@@ -87,8 +87,10 @@ If `EMAIL_DELIVERY_WEBHOOK_SECRET` is set, the request includes a Bearer token.
 Do not enable `AUTH_EXPOSE_DEVELOPMENT_CODE` in production.
 
 When the provider itself refuses a message with a sender limit, the Worker
-answers 429 `email_delivery_rate_limited` instead of 502. The sign-in code is
-never sent in that case, so the app can ask for a new code later.
+answers 429 `email_delivery_rate_limited` instead of 502, for a sign-in code and
+for a team invitation. The message is never sent in that case, so the app can
+ask again later. Namecheap Private Email allows 500 messages an hour for each
+mailbox, and every sign-in code and invitation spends that same quota.
 
 ## Cloudflare deployment
 

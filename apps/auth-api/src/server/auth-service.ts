@@ -31,7 +31,7 @@ const AMBIGUOUS_DELIVERY_ERRORS = new Set(["smtp_delivery_unknown", "email_deliv
 // A provider sender limit frees again as its window rolls forward, so the client waits and retries
 // rather than reporting a permanent failure. The wait is shorter than the usual hourly window: some
 // capacity returns before the window ends, and a countdown of a whole hour reads like an outage.
-const DELIVERY_RATE_LIMIT_RETRY_MS = 5 * 60_000;
+const DELIVERY_RATE_LIMIT_RETRY_SECONDS = 5 * 60;
 
 interface AuthServiceOptions {
   repository: AuthRepository;
@@ -136,15 +136,7 @@ export class AuthService {
         );
       }
       await this.#repository.completeEmailChallengeDelivery(challengeHash, "failed", this.#now());
-      if (deliveryError === RATE_LIMITED_DELIVERY_ERROR) {
-        throw new AuthServiceError(
-          429,
-          "email_delivery_rate_limited",
-          "OpenBot cannot send more sign-in codes right now. Try again when the countdown ends.",
-          Math.ceil(DELIVERY_RATE_LIMIT_RETRY_MS / 1_000),
-        );
-      }
-      throw new AuthServiceError(502, "email_delivery_failed", "OpenBot could not send the sign-in code.");
+      throw emailDeliveryFailure(deliveryError, "OpenBot could not send the sign-in code.");
     }
     await this.#repository.completeEmailChallengeDelivery(challengeHash, "sent", this.#now());
 
@@ -415,10 +407,25 @@ export class AuthService {
 }
 
 function safeDeliveryError(error: unknown): string {
-  if (!(error instanceof Error)) return "unknown_delivery_error";
-  return /^smtp_[a-z_]+$/u.test(error.message) || /^email_delivery_[a-z_]+$/u.test(error.message)
-    ? error.message
-    : "unknown_delivery_error";
+  return isEmailDeliveryFailure(error) ? error.message : "unknown_delivery_error";
+}
+
+// The sign-in code and the team invitation leave from the same mailbox, so a refusal must read the
+// same way on both paths.
+export function isEmailDeliveryFailure(error: unknown): error is Error {
+  return error instanceof Error && /^(?:smtp|email_delivery)_[a-z_]+$/u.test(error.message);
+}
+
+export function emailDeliveryFailure(deliveryError: string, permanentMessage: string): AuthServiceError {
+  if (deliveryError === RATE_LIMITED_DELIVERY_ERROR) {
+    return new AuthServiceError(
+      429,
+      "email_delivery_rate_limited",
+      "OpenBot cannot send more email right now. Try again when the countdown ends.",
+      DELIVERY_RATE_LIMIT_RETRY_SECONDS,
+    );
+  }
+  return new AuthServiceError(502, "email_delivery_failed", permanentMessage);
 }
 
 export class AuthServiceError extends Error {
