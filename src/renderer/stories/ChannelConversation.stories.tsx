@@ -154,7 +154,9 @@ export const ChannelTranscriptWithSeveralAuthors: Story = {
   play: async ({ canvas }) => {
     await expect(await canvas.findAllByRole("article", { name: `Message from ${chief.name}` })).toHaveLength(2);
     await expect(await canvas.findByRole("article", { name: "Message from You" })).toBeInTheDocument();
-    await expect(await canvas.findByText(`${chief.name} and ${sales.name} are working…`)).toBeInTheDocument();
+    await expect(
+      await canvas.findByRole("status", { name: `${chief.name} and ${sales.name} are working…` }),
+    ).toBeInTheDocument();
   },
 };
 

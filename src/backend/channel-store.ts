@@ -328,9 +328,7 @@ export class ChannelStore {
         const memoryIds = databaseRows(
           db.prepare("SELECT memory_id FROM projection_channel_memories WHERE channel_id = ?").all(channelId),
         ).map((row) => requiredStringColumn(row, "memory_id"));
-        const routineIds = databaseRows(
-          db.prepare("SELECT routine_id FROM projection_channel_routines WHERE channel_id = ?").all(channelId),
-        ).map((row) => requiredStringColumn(row, "routine_id"));
+        const routineIds = channelRoutineIds(db, channelId);
         deleteAggregateHistory(db, "channel", [channelId]);
         deleteAggregateHistory(db, "channel-memory", memoryIds);
         deleteAggregateHistory(db, "channel-routine", routineIds);
@@ -559,6 +557,37 @@ export class ChannelStore {
     );
     return row ? requiredNumberColumn(row, "through_sequence") : 0;
   }
+}
+
+/**
+ * Every routine this channel ever owned, not only the ones it owns now.
+ *
+ * `RoutineStore.delete()` drops the projection row and keeps the event log, so a routine the user
+ * deleted before the channel is invisible to `projection_channel_routines`. Its instruction text
+ * lives on in the `channel-routine.created` payload, and permanent deletion promises that no such
+ * text stays behind. The event log names its owner, and the run rows carry the channel, so the two
+ * together cover a routine whichever of them outlived it.
+ */
+function channelRoutineIds(db: DatabaseSync, channelId: string): string[] {
+  const ids = new Set<string>();
+  for (const row of databaseRows(
+    db
+      .prepare(
+        `SELECT DISTINCT aggregate_id FROM orchestration_events
+         WHERE aggregate_type = 'channel-routine' AND json_extract(payload_json, '$.ownerId') = ?`,
+      )
+      .all(channelId),
+  )) {
+    ids.add(requiredStringColumn(row, "aggregate_id"));
+  }
+  for (const table of ["projection_channel_routines", "projection_channel_routine_runs"]) {
+    for (const row of databaseRows(
+      db.prepare(`SELECT DISTINCT routine_id FROM ${table} WHERE channel_id = ?`).all(channelId),
+    )) {
+      ids.add(requiredStringColumn(row, "routine_id"));
+    }
+  }
+  return [...ids];
 }
 
 function deleteAggregateHistory(db: DatabaseSync, aggregateType: string, aggregateIds: readonly string[]): void {

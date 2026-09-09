@@ -218,6 +218,14 @@ export function MessageBody(props: {
 
   return (
     <>
+      {/*
+       * The generic delivery labels - Queued, Cancelled, Failed, Stopped - were taken off the
+       * bubble on purpose. This one stays, because an error bubble carries no other sign of what
+       * the user did: without it, "Provider is offline." reads as a sentence the agent said.
+       */}
+      <Show when={props.message.kind === "error" && props.message.status}>
+        {(status) => <p class="message-error-label">{status()}</p>}
+      </Show>
       <Show when={props.referencedMessage}>
         {(referenced) => (
           <div class="message-reply-context">

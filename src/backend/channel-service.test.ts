@@ -729,6 +729,17 @@ describe("shared channel coordination", () => {
       schedule: { kind: "hourly", minute: 0 },
     });
     const run = routines.createRun(routine, routine.trigger.id, "scheduled", "2026-09-09T12:00:00.000Z");
+    // A routine the user removed before the channel keeps its instruction in the event log, and the
+    // projection row that named its channel is already gone.
+    const removedRoutine = routines.create({
+      channelId: "channel-1",
+      name: "Old cleanup check",
+      instruction: "Read the private notes.",
+      active: true,
+      timezone: "UTC",
+      schedule: { kind: "hourly", minute: 30 },
+    });
+    routines.delete("channel-1", removedRoutine.id);
     const generated = await data.mailbox.storeGeneratedAttachment({
       bytes: new Uint8Array([1, 2, 3]),
       name: "channel.png",
@@ -786,6 +797,16 @@ describe("shared channel coordination", () => {
       data.store.database.connection
         .prepare("SELECT 1 FROM orchestration_events WHERE aggregate_type = 'channel-routine-run' AND aggregate_id = ?")
         .get(routine.id),
+    ).toBeUndefined();
+    expect(
+      data.store.database.connection
+        .prepare("SELECT 1 FROM orchestration_events WHERE aggregate_type = 'channel-routine' AND aggregate_id = ?")
+        .get(removedRoutine.id),
+    ).toBeUndefined();
+    expect(
+      data.store.database.connection
+        .prepare("SELECT 1 FROM projection_channel_routine_triggers WHERE routine_id = ?")
+        .get(removedRoutine.id),
     ).toBeUndefined();
     expect(
       data.store.database.connection

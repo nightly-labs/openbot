@@ -5260,6 +5260,14 @@ button.chat-action-target:active,
   }
 }
 
+/* The action that failed, over the text of the failure. Only an error bubble draws one. */
+.message-error-label {
+  margin: 0 0 var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
 .attachment-file-visual {
   --file-reference-color: var(--openbot-file-default);
   --file-reference-soft: var(--openbot-file-default-soft);

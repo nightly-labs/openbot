@@ -35,6 +35,7 @@ const UiErrors = createSimpleContext({
             author: "agent",
             body,
             time: formatTime(new Date().toISOString()),
+            kind: "error",
             status,
           },
         ],
