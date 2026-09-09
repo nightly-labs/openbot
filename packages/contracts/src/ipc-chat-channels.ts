@@ -4,6 +4,7 @@ import { type ConversationMessage, isConversationMessage } from "./ipc-conversat
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
 export const CHANNEL_CHATS_CAPABILITY = "channel-chats-v1";
+export const CHANNEL_DELETE_CAPABILITY = "channel-delete-v1";
 export const CHANNEL_PARALLEL_LIMIT = 2;
 export const CHANNEL_ASSIGNMENT_LIMIT = 8;
 

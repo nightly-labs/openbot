@@ -1,5 +1,6 @@
 import {
   CHANNEL_CHATS_CAPABILITY,
+  CHANNEL_DELETE_CAPABILITY,
   type ChannelCommand,
   type ChannelPage,
   type ChannelSummary,
@@ -25,7 +26,7 @@ interface ChannelsState {
 const Channels = createSimpleContext({
   name: "Channels",
   init: () => {
-    const { activeServerSupportsCapability } = useServers();
+    const { activeServer, activeServerSupportsCapability } = useServers();
     const { setAgentSetupOpen } = useAgents();
     const { centralAuth } = useAuth();
     const accountKey = () => {
@@ -56,13 +57,18 @@ const Channels = createSimpleContext({
       const account = accountKey();
       const selected = state.selectedId;
       try {
-        const [channels, page] = await Promise.all([
-          window.openbot.agent.listChannels(),
-          selected ? window.openbot.agent.readChannel({ channelId: selected }) : Promise.resolve(null),
-        ]);
+        const channels = await window.openbot.agent.listChannels();
+        const selectedExists = selected !== null && channels.some((channel) => channel.id === selected);
+        const page = selectedExists ? await window.openbot.agent.readChannel({ channelId: selected }) : null;
         if (disposed || account !== accountKey() || id !== refreshId || selected !== state.selectedId) return;
         setState((state) => {
           state.channels = channels;
+          if (selected && !selectedExists) {
+            state.selectedId = null;
+            state.editing = null;
+            readThrough.delete(selected);
+            if (failedCommand?.channelId === selected) failedCommand = null;
+          }
           if (page && state.page?.channel.id === page.channel.id) {
             const older = state.page.messages.filter((item) => item.sequence < (page.messages[0]?.sequence ?? 0));
             reconcile([...older, ...page.messages], "id")(state.page.messages);
@@ -225,6 +231,9 @@ const Channels = createSimpleContext({
     return {
       state,
       supported,
+      deletionSupported: () =>
+        activeServerSupportsCapability(CHANNEL_DELETE_CAPABILITY) &&
+        (activeServer()?.kind !== "remote" || activeServer()?.role === "owner"),
       refresh,
       retry: async () => {
         const previous = failedCommand;
@@ -233,6 +242,32 @@ const Channels = createSimpleContext({
         return null;
       },
       open,
+      editChannel: async (channelId: string) => {
+        if (state.selectedId !== channelId) await open(channelId);
+        if (state.page?.channel.id !== channelId) return;
+        setState((state) => {
+          state.editing = "settings";
+        });
+      },
+      remove: async (channelId: string) => {
+        const account = accountKey();
+        await window.openbot.agent.deleteChannel(channelId);
+        if (disposed || account !== accountKey()) return;
+        readThrough.delete(channelId);
+        if (failedCommand?.channelId === channelId) failedCommand = null;
+        flush(() =>
+          setState((state) => {
+            state.channels = state.channels.filter((channel) => channel.id !== channelId);
+            if (state.selectedId === channelId) {
+              Object.assign(state, { selectedId: null, page: null, editing: null, loading: false, error: null });
+            }
+          }),
+        );
+        await refresh();
+      },
+      restore: async (channelId: string) => {
+        await command({ type: "restore", channelId, operationId: crypto.randomUUID() });
+      },
       command,
       perform,
       loadOlder,

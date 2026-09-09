@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { App } from "./App";
-import { installOpenbotStub } from "./app-test-harness";
+import { installOpenbotStub, testServer } from "./app-test-harness";
 import { AccountDock } from "./lazy-views";
 
 beforeAll(async () => {
@@ -36,10 +36,59 @@ function channelRow(name: string) {
   return screen.getByRole("button", { name: new RegExp(`^${name}\\.`) });
 }
 
-async function openChannelMenuItem(chat: HTMLElement, item: string) {
-  await fireEvent.pointerDown(within(chat).getByRole("button", { name: "Channel options" }), { button: 0 });
+async function openChannelMenuItem(item: string) {
+  await fireEvent.contextMenu(channelRow("Project room"));
   await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: item }), { button: 0 });
 }
+
+it.each([0, 1])("opens the agent chat from author control %i", async (control) => {
+  const read = window.openbot.agent.readChannel;
+  vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => ({
+    ...(await read(input)),
+    messages: [
+      {
+        id: "reply",
+        channelId: input.channelId,
+        sequence: 1,
+        author: { kind: "agent", id: "chief", name: "Chief" },
+        taskId: null,
+        superseded: false,
+        message: {
+          id: "reply",
+          author: "assistant",
+          text: "The report is ready.",
+          createdAt: new Date().toISOString(),
+          status: "completed",
+        },
+      },
+    ],
+  }));
+  const chat = await openSavedChannel();
+  const controls = await within(chat).findAllByRole("button", { name: "Open Chief's chat" });
+  await fireEvent.click(controls[control]);
+  const conversation = await screen.findByRole("main", { name: "Conversation" });
+  expect(within(conversation).getByRole("heading", { name: "Chief", level: 1 })).toBeVisible();
+});
+
+it("hides channel deletion for a remote member", async () => {
+  vi.mocked(window.openbot.servers.list).mockResolvedValue([
+    {
+      ...testServer("remote-1", true),
+      compatibility: {
+        localAppVersion: "0.4.0",
+        hostAppVersion: "0.4.0",
+        localProtocol: { minimum: 3, maximum: 3 },
+        hostProtocol: { minimum: 3, maximum: 3 },
+        negotiatedProtocol: 3,
+        capabilities: ["channel-chats-v1", "channel-delete-v1"],
+      },
+    },
+  ]);
+  await openSavedChannel();
+  await fireEvent.contextMenu(channelRow("Project room"));
+  await screen.findByRole("menuitem", { name: "Edit channel" });
+  expect(screen.queryByRole("menuitem", { name: "Delete channel" })).not.toBeInTheDocument();
+});
 
 it("creates a channel from a searchable member dialog and keeps the chat open beside settings", async () => {
   const save = vi.spyOn(window.openbot.agent, "channelCommand");
@@ -76,7 +125,7 @@ it("creates a channel from a searchable member dialog and keeps the chat open be
   const composer = within(chat).getByRole("textbox", { name: "Message to channel" });
   composer.textContent = "Keep this draft";
   await fireEvent.input(composer);
-  await openChannelMenuItem(chat, "Channel settings");
+  await openChannelMenuItem("Edit channel");
   const instructions = await within(chat).findByRole("textbox", { name: "Channel instructions" });
   expect(instructions).toHaveValue("");
   expect(within(chat).getByRole("button", { name: "Chief is the channel lead" })).toBeVisible();
@@ -145,47 +194,28 @@ it("retries a lost response once and keeps a focused draft through incoming mess
   expect(composer).toHaveTextContent("Keep this draft");
 });
 
-it("stops and resumes a task and restores an archived channel without losing its work", async () => {
-  const chat = await openSavedChannel();
-  let release!: () => void;
-  const response = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const originalCommand = window.openbot.agent.channelCommand;
-  vi.spyOn(window.openbot.agent, "channelCommand").mockImplementation(async (input) => {
-    const result = await originalCommand(input);
-    if (input.type === "send") await response;
-    return result;
-  });
-  const composer = within(chat).getByRole("textbox", { name: "Message to channel" });
-  composer.textContent = "Prepare the report";
-  await fireEvent.input(composer);
-  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
-  await openChannelMenuItem(chat, "Channel tasks");
-  const task = await within(chat).findByRole("article", { name: "Task: Prepare the report" });
-  try {
-    await fireEvent.click(within(task).getByRole("button", { name: "Stop" }));
-    await within(task).findByRole("button", { name: "Resume" });
-  } finally {
-    release();
-  }
-  const resume = await within(task).findByRole("button", { name: "Resume" });
-  await waitFor(() => expect(resume).toBeEnabled());
-  await fireEvent.click(resume);
-  await within(task).findByRole("button", { name: "Stop" });
-  await waitFor(() => expect(within(task).getByRole("button", { name: "Stop" })).toBeEnabled());
-  await openChannelMenuItem(chat, "Archive");
-  await fireEvent.click(await within(chat).findByRole("button", { name: "Archive channel" }));
-  const restore = await within(chat).findByRole("button", { name: "Restore channel" });
-  await waitFor(() => expect(restore).toBeEnabled());
-  await fireEvent.click(restore);
-  await within(chat).findByRole("textbox", { name: "Message to channel" });
-  expect(within(chat).getByRole("article", { name: "Task: Prepare the report" })).toBeVisible();
+it("deletes a channel from the sidebar and keeps its member agents", async () => {
+  await openSavedChannel();
+  await openChannelMenuItem("Delete channel");
+  const dialog = await screen.findByRole("alertdialog", { name: "Delete Project room?" });
+  await fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.queryByRole("main", { name: "Channel conversation" })).not.toBeInTheDocument());
+  expect(screen.queryByRole("button", { name: /^Project room\./ })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /^Chief, Chief of staff/ })).toBeInTheDocument();
+  expect((await window.openbot.agent.listChannels()).some((channel) => channel.id === "channel-test")).toBe(false);
+});
+
+it("closes a channel deleted from another connection", async () => {
+  await openSavedChannel();
+  await window.openbot.agent.deleteChannel("channel-test");
+  await waitFor(() => expect(screen.queryByRole("main", { name: "Channel conversation" })).not.toBeInTheDocument());
+  expect(screen.queryByRole("button", { name: /^Project room\./ })).not.toBeInTheDocument();
 });
 
 it("opens channel memories and channel routines from the settings panel", async () => {
   const chat = await openSavedChannel();
-  await openChannelMenuItem(chat, "Channel settings");
+  await openChannelMenuItem("Edit channel");
   await fireEvent.click(await within(chat).findByRole("button", { name: /^Memories0 saved$/ }));
   const memories = await screen.findByRole("dialog", { name: "Memories" });
   // The modal reads "channel", not "agent": the port names the owner, so the shared copy follows.

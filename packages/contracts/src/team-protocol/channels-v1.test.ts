@@ -159,6 +159,10 @@ describe("channel-chats-v1 payloads", () => {
       channelRequest(CHANNEL_ROUTES.command, { ...command, author: { id: "owner", name: "Impersonation" } }),
     ).toEqual(command);
   });
+  it("encodes permanent deletion as an additive empty response", () => {
+    expect(channelRequest(CHANNEL_ROUTES.delete, { channelId: channel.id })).toEqual({ channelId: channel.id });
+    expect(channelResponse(CHANNEL_ROUTES.delete, 204, null)).toBeNull();
+  });
   it("rejects malformed commands, memberships, pages, and known events", () => {
     expect(() => channelRequest(CHANNEL_ROUTES.command, { ...command, recipientAgentId: 8 })).toThrow();
     expect(() =>

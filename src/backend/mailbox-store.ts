@@ -630,6 +630,55 @@ export class MailboxStore {
     await this.#drainFileDeletionOutbox();
   }
 
+  /** Removes messages, deliveries, reactions and attachments that belong to a channel. */
+  async deleteChannelData(channelId: string, threadIds: readonly string[] = []): Promise<void> {
+    const previous = structuredClone(this.#state);
+    const removedMessageIds = new Set(
+      this.#state.messages.filter((message) => message.channelId === channelId).map((message) => message.id),
+    );
+    const removedThreadIds = new Set(threadIds);
+    const removedTransferRoots = new Set<string>();
+    for (const message of this.#state.messages) {
+      if (!removedMessageIds.has(message.id)) continue;
+      removedTransferRoots.add(this.#files.transferRoot(message.id));
+      for (const attachment of message.attachments) {
+        const transferRoot = this.#files.transferRootForPath(attachment.path);
+        if (transferRoot) removedTransferRoots.add(transferRoot);
+      }
+    }
+    const removedGenerated = this.#state.generatedAttachments.filter(
+      (attachment) =>
+        attachment.ownerThreadId !== undefined &&
+        attachment.ownerThreadId !== null &&
+        removedThreadIds.has(attachment.ownerThreadId),
+    );
+    this.#state.messages = this.#state.messages.filter((message) => message.channelId !== channelId);
+    this.#state.deliveries = this.#state.deliveries.filter((delivery) => !removedMessageIds.has(delivery.messageId));
+    this.#state.reactions = this.#state.reactions.filter((reaction) => !removedMessageIds.has(reaction.messageId));
+    this.#state.idempotency = Object.fromEntries(
+      Object.entries(this.#state.idempotency).filter(([, messageId]) => !removedMessageIds.has(messageId)),
+    );
+    this.#state.generatedAttachments = this.#state.generatedAttachments.filter(
+      (attachment) => !removedGenerated.includes(attachment),
+    );
+    for (const attachment of removedGenerated) {
+      const generatedRoot = this.#files.generatedRootForPath(attachment.path);
+      if (generatedRoot) removedTransferRoots.add(generatedRoot);
+    }
+    try {
+      await this.#persist(
+        "mailbox.channel-data-deleted",
+        `mailbox:channel-delete:${randomUUID()}`,
+        [...removedTransferRoots],
+        true,
+      );
+    } catch (error) {
+      this.#state = previous;
+      throw error;
+    }
+    await this.#drainFileDeletionOutbox();
+  }
+
   chainOriginAgentId(messageId: string): string | null {
     const visited = new Set<string>();
     let message = this.#state.messages.find((candidate) => candidate.id === messageId);

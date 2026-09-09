@@ -133,6 +133,17 @@ export function createMockChannels(emit: (event: AgentEvent) => void) {
       changed(channel.id, channel.revision);
       return structuredClone(channel);
     },
+    deleteChannel: async (channelId: string): Promise<void> => {
+      requireChannel(channelId);
+      channels.delete(channelId);
+      messages.delete(channelId);
+      tasks.delete(channelId);
+      memories.delete(channelId);
+      const channelRoutines = routines.get(channelId) ?? [];
+      routines.delete(channelId);
+      for (const routine of channelRoutines) routineRuns.delete(routine.id);
+      emit({ type: "channels-changed", channelId, revision: 0 });
+    },
     listChannelMemories: async (channelId: string): Promise<ChannelMemory[]> => {
       requireChannel(channelId);
       return structuredClone(memories.get(channelId) ?? []);

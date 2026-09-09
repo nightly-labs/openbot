@@ -414,6 +414,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
         return session ? this.#compaction.contextInputCharacters(session.externalSessionId) : 120_000;
       },
+      forgetThread: async (threadId) => {
+        const sessions = this.#store.database.listProviderSessions(threadId);
+        for (const session of sessions) await this.#threads.deleteProviderSessionFiles(session.externalSessionId);
+        for (const session of sessions) {
+          this.#conversation.unbindThread(session.externalSessionId);
+          this.#conversation.unloadThread(session.externalSessionId);
+          this.#compaction.forgetThread(session.externalSessionId);
+        }
+        this.#conversation.forgetExecutionThread(threadId);
+      },
       normalBusy: () =>
         this.#mailbox
           .unresolvedDeliveries()
@@ -934,6 +944,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this.#routines.arm();
       if (this.#store.list().some((candidate) => candidate.id === agentId)) this.#drain.scheduleDrain(agentId);
     }
+  }
+
+  deleteChannel(channelId: string): Promise<void> {
+    return this.channels.deleteChannel(channelId);
   }
 
   async #deleteAgentData(agent: Pick<AgentSummary, "id" | "threadId">): Promise<void> {

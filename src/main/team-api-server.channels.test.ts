@@ -77,6 +77,35 @@ describe("Team API channel access", () => {
     const page = decodeChannelPage(await read.json());
     expect(page.messages[0]?.author.id).not.toBe("impostor");
     expect(page.messages[0]?.author.kind).toBe("member");
+    const deleteBody = JSON.stringify({ channelId: "channel-1" });
+    const withoutDeleteCapability = await fetch(`${base}/v1/channels/delete`, {
+      method: "POST",
+      headers,
+      body: deleteBody,
+    });
+    expect(withoutDeleteCapability.status).toBe(400);
+    const invite = await fixture.store.createInvite("member");
+    const member = await fixture.store.acceptInvite(invite.token, "member", "member password");
+    const memberDelete = await fetch(`${base}/v1/channels/delete`, {
+      method: "POST",
+      headers: {
+        ...headers,
+        Authorization: `Bearer ${member.sessionToken}`,
+        "OpenBot-Capabilities": "channel-chats-v1,channel-delete-v1",
+      },
+      body: deleteBody,
+    });
+    expect(memberDelete.status).toBe(403);
+    const deleted = await fetch(`${base}/v1/channels/delete`, {
+      method: "POST",
+      headers: {
+        ...headers,
+        "OpenBot-Capabilities": "channel-chats-v1,channel-delete-v1",
+      },
+      body: deleteBody,
+    });
+    expect(deleted.status).toBe(204);
+    expect(channels.store.exists("channel-1")).toBe(false);
     const legacy = await createTeamApiFixture("no-channels");
     const old = await legacy.start();
     const compatibility = await fetch(`${old.base}/v1/compatibility`);

@@ -37,11 +37,12 @@ export interface ChatMessageRowProps {
   message: AgentMessage;
   author: ChatMessageAuthor;
   /**
-   * Whether the face and the name stand above the bubble. The agent chat never shows them - one
+   * Whether the face stands beside the bubble and the name above it. The agent chat never shows them - one
    * chat has one agent, and its name is in the header - and a channel shows them once for a run of
    * messages by one author.
    */
   showAuthor?: boolean;
+  showTime?: boolean;
   animate?: boolean;
   agents: AgentProfile[];
   skills?: InstalledSkill[];
@@ -101,13 +102,25 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
           "message-entry-animated": props.animate === true,
           "message-entry-user": own(),
           "message-entry-agent": !own(),
+          "message-entry-with-author": props.showAuthor === true && !own(),
         },
         props.class,
       ]}
     >
       <Show when={props.showAuthor && !own()}>
-        <MessageAvatar>
-          <AgentAvatar agent={props.author.agent} seed={seed()} />
+        <MessageAvatar class="message-author-avatar">
+          <Show when={props.author.agent} fallback={<AgentAvatar seed={seed()} />}>
+            {(agent) => (
+              <Button
+                variant="ghost"
+                class="message-author-avatar-button"
+                aria-label={`Open ${props.author.name}'s chat`}
+                onClick={() => props.onSelectAgent(agent().id)}
+              >
+                <AgentAvatar agent={agent()} seed={seed()} />
+              </Button>
+            )}
+          </Show>
         </MessageAvatar>
       </Show>
       <Show when={props.showAuthor === false && !own()}>
@@ -115,7 +128,20 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       </Show>
       <MessageContent>
         <Show when={props.showAuthor && !own()}>
-          <MessageHeader class="message-author-name">{props.author.name}</MessageHeader>
+          <MessageHeader class="message-author-name">
+            <Show when={props.author.agent} fallback={<span>{props.author.name}</span>}>
+              {(agent) => (
+                <Button
+                  variant="ghost"
+                  class="message-author-name-button"
+                  aria-label={`Open ${props.author.name}'s chat`}
+                  onClick={() => props.onSelectAgent(agent().id)}
+                >
+                  {props.author.name}
+                </Button>
+              )}
+            </Show>
+          </MessageHeader>
         </Show>
         <div class="message-shell">
           <Bubble
@@ -184,6 +210,11 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
             </Show>
           </Bubble>
           {props.actions}
+          <Show when={props.showTime}>
+            <time class="message-time" datetime={props.message.createdAt}>
+              {props.message.time}
+            </time>
+          </Show>
         </div>
         <Show when={props.footer}>
           <MessageFooter>{props.footer}</MessageFooter>

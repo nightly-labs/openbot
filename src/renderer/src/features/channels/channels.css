@@ -5,11 +5,6 @@
   justify-content: space-between;
   gap: var(--openbot-space-2);
 }
-.channel-empty-copy {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-sm);
-}
 .channel-avatar {
   display: inline-flex;
   align-items: center;
@@ -87,10 +82,6 @@
   font-weight: var(--openbot-weight-semibold);
   font-variant-numeric: tabular-nums;
 }
-.channel-confirm,
-.channel-confirm {
-  padding: var(--openbot-space-2) var(--openbot-space-3);
-}
 .channel-dialog-header h2 {
   margin: 0;
   font-size: var(--openbot-text-xl);
@@ -120,31 +111,6 @@
   color: var(--openbot-text-primary);
 }
 
-/* A task is a row of the shared list, not a card of its own: the group draws the frame and the
-   dividers. The panel is narrow, so the state and the actions take a line of their own under the
-   instruction: they cannot shrink, and on the same line they would squeeze the text to a few words
-   a line. */
-.channel-task:is(.ui-item) {
-  flex-wrap: wrap;
-  align-items: flex-start;
-  padding-block: var(--openbot-space-3);
-}
-.channel-task .ui-item-content {
-  flex: 1 1 100%;
-}
-.channel-task .ui-item-actions {
-  flex: 1 1 100%;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-/* An instruction is the user's own text, so it wraps rather than reaching past the panel. */
-.channel-task .ui-item-description {
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-.channel-tasks {
-  min-width: 0;
-}
 /* The editor stacks the same fields the agent panel stacks, so it adds no spacing of its own: the
    shared field carries its own bottom margin, and a gap here would add to it and set the whole
    channel form further apart than the agent form. */
@@ -444,10 +410,6 @@
   padding: var(--channel-dialog-inset);
 }
 
-.virtual-chat-row .ui-message-avatar {
-  align-self: flex-start;
-}
-
 /* The header title is the agent chat's `.conversation-title`, so the member stack has to be the
    avatar that title draws: 18px, and lifted by the same optical offset, because the bloub is drawn
    at 128% of its box and sits low in it without one. */
@@ -465,15 +427,22 @@
   margin-left: -8px;
 }
 
-/*
- * The faces in the activity row, one for each agent the channel waits on. They overlap the way the
- * member stack in the header does, so two or three faces keep the sentence beside them in place.
- */
+/* Keep the working faces in one stack at the message avatars' left edge. */
+.agent-activity-content.channel-activity-content {
+  padding-left: var(--openbot-space-0-5);
+}
+
 .channel-activity-faces {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
 }
+.channel-activity-faces .agent-activity-avatar {
+  --agent-avatar-optical-offset: -3px;
+
+  width: var(--openbot-space-8);
+  height: var(--openbot-space-8);
+}
 .channel-activity-faces .agent-activity-avatar + .agent-activity-avatar {
-  margin-left: -10px;
+  margin-left: calc(-1 * var(--openbot-space-2));
 }

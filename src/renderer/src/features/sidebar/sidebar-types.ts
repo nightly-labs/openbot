@@ -23,6 +23,9 @@ export interface SidebarProps {
   showingArchivedChannels?: boolean;
   onToggleArchivedChannels?: () => void;
   onCreateChannel?: () => void;
+  onEditChannel?: (channelId: string) => void;
+  onRestoreChannel?: (channelId: string) => Promise<void>;
+  onDeleteChannel?: (channelId: string) => Promise<void>;
   serverName: string;
   onOpenServerSettings: (trigger: HTMLElement) => void;
   agents: AgentProfile[];

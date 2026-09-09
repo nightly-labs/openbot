@@ -25,7 +25,7 @@ export function channelActivitySentence(names: string[]): string {
 }
 
 /**
- * The activity row of a channel: the face of each working agent, then the sentence.
+ * The activity row of a channel shows the face of each working agent.
  *
  * It uses the `agent-activity-*` rules of the agent chat, so the two chats keep one look and one
  * animation. A face animates while it works, and a channel runs at most `CHANNEL_PARALLEL_LIMIT`
@@ -51,7 +51,7 @@ export function ChannelActivityIndicator(props: { workers: ChannelWorker[] }) {
   return (
     <div class="agent-activity-entry" data-state="active">
       <span class="sr-only" role="status" aria-live="polite" aria-atomic="true" aria-label={sentence()} />
-      <section class="agent-activity-content" aria-label="Current activity">
+      <section class="agent-activity-content channel-activity-content" aria-label="Current activity">
         <div class="channel-activity-faces">
           <For each={props.workers}>
             {(worker) => (
@@ -66,7 +66,6 @@ export function ChannelActivityIndicator(props: { workers: ChannelWorker[] }) {
             )}
           </For>
         </div>
-        <span class="agent-activity-label">{sentence()}</span>
       </section>
     </div>
   );

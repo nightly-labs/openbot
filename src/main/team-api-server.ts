@@ -23,6 +23,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { channelEvent, channelResponse, isChannelRoute } from "@openbot/contracts/team-protocol/channels-v1";
 import {
+  CHANNEL_DELETE_CAPABILITY,
   isTeamCurrentCapability,
   supportsTeamSemanticTags,
   TEAM_AGENT_ACTIVITY_CAPABILITY,
@@ -1009,7 +1010,9 @@ export class TeamApiServer {
       appVersion: this.#options.appVersion ?? "0.0.0",
       protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V3 },
       capabilities: TEAM_CURRENT_CAPABILITIES.filter(
-        (capability) => capability !== "channel-chats-v1" || this.#options.channels !== undefined,
+        (capability) =>
+          (capability !== "channel-chats-v1" && capability !== CHANNEL_DELETE_CAPABILITY) ||
+          this.#options.channels !== undefined,
       ),
     };
   }

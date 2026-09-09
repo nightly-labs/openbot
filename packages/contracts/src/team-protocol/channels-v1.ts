@@ -7,6 +7,7 @@ export const CHANNEL_ROUTES = {
   list: "/v1/channels",
   read: "/v1/channels/read",
   command: "/v1/channels/commands",
+  delete: "/v1/channels/delete",
   // Every settings route is a POST with the channel in the body. A channel id in the path would
   // need a matcher here, and this file compares `url.pathname` for equality by design.
   memories: "/v1/channels/memories",
@@ -250,6 +251,7 @@ export function isChannelRoute(path: string): boolean {
 export function channelRequest(path: string, value: unknown): TeamProtocolV2Json {
   const pathname = new URL(path, "http://openbot.invalid").pathname;
   if (pathname === CHANNEL_ROUTES.list) return {};
+  if (pathname === CHANNEL_ROUTES.delete) return record(value, { channelId: identifier });
   if (isChannelSettingsRoute(pathname)) return channelSettingsRequest(pathname, value);
   if (pathname === CHANNEL_ROUTES.read) {
     if (!isDynamicRecord(value)) throw new Error("Invalid channel read request.");
@@ -356,6 +358,7 @@ function channelSettingsResponse(pathname: string, value: unknown): TeamProtocol
 export function channelResponse(path: string, status: number, value: unknown): TeamProtocolV2Json {
   if (status >= 400) return record(value, { error: string(100000) });
   const pathname = new URL(path, "http://openbot.invalid").pathname;
+  if (pathname === CHANNEL_ROUTES.delete) return null;
   if (isChannelSettingsRoute(pathname)) return channelSettingsResponse(pathname, value);
   if (pathname === CHANNEL_ROUTES.list)
     return list((item) => ({

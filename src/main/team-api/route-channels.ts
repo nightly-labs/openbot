@@ -1,4 +1,9 @@
-import { CHANNEL_CHATS_CAPABILITY, parseChannelCommand, parseChannelRead } from "@openbot/contracts/ipc";
+import {
+  CHANNEL_CHATS_CAPABILITY,
+  CHANNEL_DELETE_CAPABILITY,
+  parseChannelCommand,
+  parseChannelRead,
+} from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { CHANNEL_ROUTES, channelRequest, isChannelSettingsRoute } from "@openbot/contracts/team-protocol/channels-v1";
 import type { ChannelService } from "../../backend/channel-service";
@@ -42,20 +47,29 @@ export async function routeChannels(
   channels: ChannelService | undefined,
   agents: ChannelSettingsAgents,
 ): Promise<RouteOutcome> {
-  const { method, url, capabilities, member, request, json } = context;
+  const { method, url, capabilities, member, request, json, empty } = context;
   const list = method === "GET" && url.pathname === CHANNEL_ROUTES.list;
   const read = method === "POST" && url.pathname === CHANNEL_ROUTES.read;
   const command = method === "POST" && url.pathname === CHANNEL_ROUTES.command;
+  const remove = method === "POST" && url.pathname === CHANNEL_ROUTES.delete;
   // Every settings route is a POST that names its channel in the body, so one test covers all
   // eleven of them and an unknown method on a known path stays a 404 rather than a 400.
   const settings = method === "POST" && isChannelSettingsRoute(url.pathname);
-  if (!list && !read && !command && !settings) return "unmatched";
+  if (!list && !read && !command && !remove && !settings) return "unmatched";
   if (!channels || !capabilities.has(CHANNEL_CHATS_CAPABILITY))
     throw new HttpError(400, "Channel chats are not supported by this connection.");
   if (list) return json(200, channels.store.list(member.id));
   if (read) {
     const input = parseChannelRead(channelRequest(url.pathname, await readJson(request)));
     return json(200, channels.store.page(input.channelId, input.beforeSequence));
+  }
+  if (remove) {
+    if (!capabilities.has(CHANNEL_DELETE_CAPABILITY))
+      throw new HttpError(400, "Channel deletion is not supported by this connection.");
+    if (member.role === "member") throw new HttpError(403, "Members cannot delete channels.");
+    const body = await readJson(request);
+    await channels.deleteChannel(channelId(body));
+    return empty(204);
   }
   if (settings) return routeChannelSettings(context, agents);
   const input = parseChannelCommand(channelRequest(url.pathname, await readJson(request)));

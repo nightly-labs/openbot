@@ -179,6 +179,7 @@ export interface AgentDesktopApi {
   listChannels: () => Promise<ChannelSummary[]>;
   readChannel: (input: ChannelReadInput) => Promise<ChannelPage>;
   channelCommand: (input: ChannelCommand) => Promise<Channel>;
+  deleteChannel: (channelId: string) => Promise<void>;
   getStatus: () => Promise<AgentStatus>;
   getAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
   getHostAnalytics: (input: HostAnalyticsInput, serverId: string) => Promise<HostAnalytics | null>;

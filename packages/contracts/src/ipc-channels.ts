@@ -84,6 +84,7 @@ export const IPC_CHANNELS = {
   agentListChannels: "agent:channels:list",
   agentReadChannel: "agent:channels:read",
   agentChannelCommand: "agent:channels:command",
+  agentDeleteChannel: "agent:channels:delete",
   agentListChannelMemories: "agent:channel-memories:list",
   agentCreateChannelMemory: "agent:channel-memories:create",
   agentUpdateChannelMemory: "agent:channel-memories:update",

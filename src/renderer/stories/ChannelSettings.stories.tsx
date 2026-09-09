@@ -9,20 +9,7 @@ import {
   SettingsPanelContent,
   SettingsPanelHeader,
 } from "../src/components/SettingsPanel";
-import {
-  Badge,
-  Button,
-  buttonVariants,
-  Input,
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemTitle,
-  Plus,
-  Textarea,
-} from "../src/components/ui";
+import { Button, buttonVariants, Input, ItemActions, ItemGroup, Plus, Textarea } from "../src/components/ui";
 import { ChannelMemberRow } from "../src/features/channels/ChannelMemberRow";
 import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel";
 import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS } from "./fixtures";
@@ -85,43 +72,6 @@ function ChannelPanelBody() {
           </ItemGroup>
         </section>
       </div>
-    </SettingsPanelContent>
-  );
-}
-
-function ChannelTasksBody() {
-  return (
-    <SettingsPanelContent>
-      <section class="channel-tasks" aria-label="Channel tasks">
-        <ItemGroup class="channel-task-list">
-          <Item class="channel-task" role="article" aria-label="Task: Prepare the report">
-            <ItemContent>
-              <ItemTitle>Chief</ItemTitle>
-              <ItemDescription>Prepare the report on last quarter and send it to the team.</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Badge tone="accent" size="sm">
-                running
-              </Badge>
-              <Button size="sm" variant="ghost">
-                Stop
-              </Button>
-            </ItemActions>
-          </Item>
-          <Item class="channel-task" role="article" aria-label="Task: Check the numbers">
-            <ItemContent>
-              <ItemTitle>Sales Outbound</ItemTitle>
-              <ItemDescription>Check the numbers.</ItemDescription>
-              <ItemDescription>Depends on Chief · running</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Badge tone="warning" size="sm">
-                waiting
-              </Badge>
-            </ItemActions>
-          </Item>
-        </ItemGroup>
-      </section>
     </SettingsPanelContent>
   );
 }
@@ -212,10 +162,6 @@ export const ChannelSettingsWithoutMembers: Story = {
       )}
     />
   ),
-};
-
-export const ChannelTasks: Story = {
-  render: () => <ChannelPanelStory title="Tasks" body={() => <ChannelTasksBody />} />,
 };
 
 /** The panel this one has to match. Compare the header, the divider and the field rhythm. */

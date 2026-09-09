@@ -4,15 +4,17 @@ import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/cur
 /**
  * Whether a server can be asked for a capability-gated feature. A local server
  * can do everything; a remote one that never negotiated compatibility is given
- * the benefit of the doubt, except for agent duplication, which has to be
- * advertised before we offer it.
+ * the benefit of the doubt, except for features that require explicit support.
  */
 export function serverSupportsCapability(
   server: ServerSummary | undefined,
   capability: TeamCurrentCapability,
 ): boolean {
   if (
-    (capability === "channel-chats-v1" || capability === "agent-duplication" || capability === "model-scoped-usage") &&
+    (capability === "channel-chats-v1" ||
+      capability === "channel-delete-v1" ||
+      capability === "agent-duplication" ||
+      capability === "model-scoped-usage") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;

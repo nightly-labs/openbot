@@ -6,6 +6,7 @@ import type { ChannelDraft, ChannelMessage } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stores } from "./agent-service-test-harness";
 import { ChannelHistory } from "./channel-history";
+import { ChannelRoutineStore } from "./channel-routine-store";
 import { ChannelService, resourcesConflict } from "./channel-service";
 
 let root: string;
@@ -15,6 +16,7 @@ let draft: ChannelDraft;
 const actor = { id: "human-1", name: "Alex" };
 const changed = vi.fn();
 const schedule = vi.fn();
+const interrupt = vi.fn(async () => undefined);
 const generate = vi.fn(async () => JSON.stringify({ agentId: "agent-a" }));
 let count = 0;
 const operationId = () => `command-${++count}`;
@@ -34,11 +36,13 @@ beforeEach(async () => {
   };
   generate.mockClear();
   schedule.mockClear();
+  interrupt.mockClear();
+  changed.mockClear();
   service = new ChannelService(data.store.database, data.mailbox, {
     agents: () => data.store.list(),
     generate,
     schedule,
-    interrupt: async () => undefined,
+    interrupt,
     busy: () => false,
     changed,
     error: (error) => {
@@ -707,6 +711,88 @@ describe("shared channel coordination", () => {
       actor,
     );
     await vi.waitFor(() => expect(data.mailbox.nextQueued("agent-b")).not.toBeNull());
+  });
+
+  it("permanently removes channel data while preserving its member agents", async () => {
+    await send("Remove this channel");
+    const assignment = required(service.store.assignments("channel-1")[0]);
+    const deliveryId = required(assignment.deliveryId);
+    const context = service.store.context("channel-1", "agent-a");
+    const memory = service.memories.createManual("channel-1", "Keep this channel private");
+    const routines = new ChannelRoutineStore(data.store.database);
+    const routine = routines.create({
+      channelId: "channel-1",
+      name: "Channel cleanup check",
+      instruction: "Check the channel.",
+      active: true,
+      timezone: "UTC",
+      schedule: { kind: "hourly", minute: 0 },
+    });
+    const run = routines.createRun(routine, routine.trigger.id, "scheduled", "2026-09-09T12:00:00.000Z");
+    const generated = await data.mailbox.storeGeneratedAttachment({
+      bytes: new Uint8Array([1, 2, 3]),
+      name: "channel.png",
+      mimeType: "image/png",
+      ownerAgentId: "agent-a",
+      ownerThreadId: context.threadId,
+    });
+    expect(await data.mailbox.resolveAttachment(generated.id)).toMatchObject({ path: expect.any(String) });
+    await data.mailbox.markStarting(deliveryId);
+    await data.mailbox.markRunning(deliveryId, "delete-turn");
+    service.accepted(deliveryId, "delete-session", "delete-turn");
+    const channelRevision = service.store.get("channel-1").revision;
+    changed.mockClear();
+    expect(
+      data.store.database.connection
+        .prepare("SELECT 1 FROM projection_threads WHERE thread_id = ?")
+        .get(context.threadId),
+    ).toBeDefined();
+
+    await service.deleteChannel("channel-1");
+
+    expect(service.store.exists("channel-1")).toBe(false);
+    expect(changed).toHaveBeenCalledWith("channel-1", channelRevision + 1);
+    expect(interrupt).toHaveBeenCalledWith("agent-a", "delete-turn", context.threadId);
+    expect(data.mailbox.getDelivery(deliveryId)).toBeNull();
+    expect(await data.mailbox.resolveAttachment(generated.id)).toBeNull();
+    expect(service.memories.list("channel-1")).toEqual([]);
+    expect(routines.list("channel-1")).toEqual([]);
+    expect(
+      data.store.database.connection
+        .prepare("SELECT 1 FROM projection_channel_routine_runs WHERE run_id = ?")
+        .get(run.id),
+    ).toBeUndefined();
+    expect(
+      data.store.database.connection
+        .prepare("SELECT 1 FROM orchestration_events WHERE aggregate_type = 'channel-memory' AND aggregate_id = ?")
+        .get(memory.id),
+    ).toBeUndefined();
+    expect(
+      data.store.database.connection
+        .prepare("SELECT 1 FROM orchestration_events WHERE aggregate_type = 'channel' AND aggregate_id = ?")
+        .get("channel-1"),
+    ).toBeUndefined();
+    expect(
+      data.store.database.connection
+        .prepare("SELECT 1 FROM orchestration_events WHERE aggregate_type = 'channel-routine' AND aggregate_id = ?")
+        .get(routine.id),
+    ).toBeUndefined();
+    expect(
+      data.store.database.connection
+        .prepare("SELECT COUNT(*) AS count FROM orchestration_command_receipts WHERE command_id LIKE 'channels:%'")
+        .get(),
+    ).toEqual({ count: 0 });
+    expect(
+      data.store.database.connection
+        .prepare("SELECT 1 FROM orchestration_events WHERE aggregate_type = 'channel-routine-run' AND aggregate_id = ?")
+        .get(routine.id),
+    ).toBeUndefined();
+    expect(
+      data.store.database.connection
+        .prepare("SELECT 1 FROM projection_threads WHERE thread_id = ?")
+        .get(context.threadId),
+    ).toBeUndefined();
+    expect(data.store.list().map((agent) => agent.id)).toEqual(["agent-a", "agent-b"]);
   });
 
   it("rejects dependency cycles and pauses the root at the automatic assignment limit", async () => {

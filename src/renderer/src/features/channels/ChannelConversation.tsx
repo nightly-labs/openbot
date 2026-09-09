@@ -1,11 +1,6 @@
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { chatTagReferences, expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
-import {
-  CHANNEL_ASSIGNMENT_LIMIT,
-  type ChannelTask,
-  type ChannelTaskState,
-  type DraftAttachment,
-} from "@openbot/contracts/ipc";
+import type { DraftAttachment } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { QuestionPromptBubble } from "../../components/QuestionPromptBubble";
 import {
@@ -15,22 +10,9 @@ import {
   SettingsPanelHeader,
   settingsPanelMaxWidth,
 } from "../../components/SettingsPanel";
-import {
-  ArrowUp,
-  Badge,
-  Button,
-  DropdownMenu,
-  Ellipsis,
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemTitle,
-  Plus,
-  X,
-} from "../../components/ui";
+import { ArrowUp, Button, DropdownMenu, Plus, X } from "../../components/ui";
 import type { AgentMessage } from "../../data";
+import { useNavigation } from "../../navigation";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
@@ -58,17 +40,9 @@ import { ChannelEditor } from "./ChannelEditor";
 import { channelTimelineEntries, firstUnreadChannelMessageId } from "./channel-timeline";
 import { useChannels } from "./channels-context";
 
-/** The state reads as a badge, so a task says how it stands without a sentence to read. */
-function taskTone(state: ChannelTaskState) {
-  if (state === "completed") return "success" as const;
-  if (state === "failed") return "danger" as const;
-  if (state === "paused" || state === "waiting") return "warning" as const;
-  if (state === "running") return "accent" as const;
-  return "neutral" as const;
-}
-
 export function ChannelConversation() {
   const channels = useChannels();
+  const { selectAgent } = useNavigation();
   const { centralAuth } = useAuth();
   const { currentTeamMember } = usePresence();
   const isOwnMessage = (authorId: string) => {
@@ -84,22 +58,13 @@ export function ChannelConversation() {
    * panel does it.
    */
   const [panel, setPanel] = createStore<{
-    tasks: boolean;
     memories: { open: boolean; count: number };
     routines: { open: boolean; count: number };
-  }>({ tasks: false, memories: { open: false, count: 0 }, routines: { open: false, count: 0 } });
+  }>({ memories: { open: false, count: 0 }, routines: { open: false, count: 0 } });
   const resetPanel = () => {
     setPanel((state) => {
-      state.tasks = false;
       state.memories.open = false;
       state.routines.open = false;
-    });
-  };
-  const openTasks = () => {
-    channels.closeEditor();
-    resetPanel();
-    setPanel((state) => {
-      state.tasks = true;
     });
   };
   const openSettings = () => {
@@ -130,8 +95,7 @@ export function ChannelConversation() {
     recipient: string | null;
     reply: string | null;
     attachments: DraftAttachment[];
-    archiveConfirm: boolean;
-  }>({ text: "", recipient: null, reply: null, attachments: [], archiveConfirm: false });
+  }>({ text: "", recipient: null, reply: null, attachments: [] });
   createEffect(
     () => channels.state.selectedId,
     () => {
@@ -141,7 +105,7 @@ export function ChannelConversation() {
         state.routines.count = 0;
       });
       setComposer((state) => {
-        Object.assign(state, { text: "", recipient: null, reply: null, attachments: [], archiveConfirm: false });
+        Object.assign(state, { text: "", recipient: null, reply: null, attachments: [] });
       });
     },
   );
@@ -311,14 +275,6 @@ export function ChannelConversation() {
   });
   const messageElements = new Map<string, HTMLElement>();
   const name = (id: string | null) => agentList().find((agent) => agent.id === id)?.name ?? "Unassigned";
-  const control = (task: ChannelTask, type: "stop" | "resume") =>
-    channels.command({
-      type,
-      channelId: task.channelId,
-      taskId: task.id,
-      recipientAgentId: null,
-      operationId: crypto.randomUUID(),
-    });
   const submit = () => {
     const text = composer.text;
     if (channels.state.pending || (!text.trim() && !composer.attachments.length) || !channels.state.selectedId) return;
@@ -379,76 +335,7 @@ export function ChannelConversation() {
                   <h1>{page().channel.name}</h1>
                 </Button>
               </div>
-              <div class="conversation-header-actions no-drag">
-                <DropdownMenu.Root placement="bottom-end" modal={false}>
-                  <DropdownMenu.Trigger class="sidebar-icon-button" aria-label="Channel options">
-                    <Ellipsis />
-                  </DropdownMenu.Trigger>
-                  <DropdownMenu.Portal>
-                    <DropdownMenu.Content>
-                      <DropdownMenu.Item onSelect={openSettings}>Channel settings</DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={openTasks}>Channel tasks</DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={channels.close}>Close channel</DropdownMenu.Item>
-                      <Show when={!page().channel.archived}>
-                        <DropdownMenu.Item
-                          onSelect={() =>
-                            setComposer((state) => {
-                              state.archiveConfirm = true;
-                            })
-                          }
-                        >
-                          Archive
-                        </DropdownMenu.Item>
-                      </Show>
-                    </DropdownMenu.Content>
-                  </DropdownMenu.Portal>
-                </DropdownMenu.Root>
-                <Show when={page().channel.archived}>
-                  <Button
-                    disabled={channels.state.pending}
-                    onClick={() =>
-                      void channels.command({
-                        type: "restore",
-                        channelId: page().channel.id,
-                        operationId: crypto.randomUUID(),
-                      })
-                    }
-                  >
-                    Restore channel
-                  </Button>
-                </Show>
-              </div>
             </header>
-            <Show when={composer.archiveConfirm}>
-              <div class="channel-confirm">
-                <p>Archive this channel and stop its work? Its history will remain available.</p>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    setComposer((state) => {
-                      state.archiveConfirm = false;
-                    });
-                    void channels.command({
-                      type: "archive",
-                      channelId: page().channel.id,
-                      operationId: crypto.randomUUID(),
-                    });
-                  }}
-                >
-                  Archive channel
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() =>
-                    setComposer((state) => {
-                      state.archiveConfirm = false;
-                    })
-                  }
-                >
-                  Cancel
-                </Button>
-              </div>
-            </Show>
             <section
               class="conversation-scroll"
               aria-label="Shared messages"
@@ -545,15 +432,15 @@ export function ChannelConversation() {
                           message={entry()?.message ?? initialEntry.message}
                           author={entry()?.author ?? initialEntry.author}
                           showAuthor={entry()?.showAuthor ?? initialEntry.showAuthor}
+                          showTime
                           animate={animate}
                           agents={agentList()}
                           referencedMessage={referenced()?.message}
                           referencedAuthorName={referenced()?.author.name}
-                          onSelectAgent={(id) =>
-                            setComposer((state) => {
-                              state.recipient = id;
-                            })
-                          }
+                          onSelectAgent={(id) => {
+                            channels.close();
+                            selectAgent(id);
+                          }}
                           onOpenLink={(url) => {
                             void window.openbot.openUrl(url);
                           }}
@@ -593,17 +480,22 @@ export function ChannelConversation() {
                             />
                           }
                           footer={
-                            <>
-                              <time datetime={entry()?.message.createdAt}>{entry()?.message.time}</time>
-                              <Show when={entry()?.superseded}>
-                                <span>Superseded</span>
-                              </Show>
-                              <Show
-                                when={entry()?.message.status === "failed" || entry()?.message.status === "interrupted"}
-                              >
-                                <span>Partial result · {entry()?.message.status}</span>
-                              </Show>
-                            </>
+                            (entry()?.superseded ||
+                              entry()?.message.status === "failed" ||
+                              entry()?.message.status === "interrupted") && (
+                              <>
+                                <Show when={entry()?.superseded}>
+                                  <span>Superseded</span>
+                                </Show>
+                                <Show
+                                  when={
+                                    entry()?.message.status === "failed" || entry()?.message.status === "interrupted"
+                                  }
+                                >
+                                  <span>Partial result · {entry()?.message.status}</span>
+                                </Show>
+                              </>
+                            )
                           }
                         >
                           <Show when={entry()?.message.questionPrompt}>
@@ -855,7 +747,7 @@ export function ChannelConversation() {
                 </form>
               </div>
             </Show>
-            <Show when={channels.state.editing === "settings" || panel.tasks}>
+            <Show when={channels.state.editing === "settings"}>
               <SettingsPanel
                 id="channel-side-panel"
                 label="Channel panel"
@@ -870,84 +762,25 @@ export function ChannelConversation() {
                   fallback={
                     <>
                       <SettingsPanelHeader
-                        title={channels.state.editing === "settings" ? "Channel settings" : "Tasks"}
+                        title="Channel settings"
                         onClose={closePanel}
                         closeLabel="Close channel panel"
                       />
                       <SettingsPanelContent>
-                        <Show
-                          when={channels.state.editing !== "settings"}
-                          fallback={
-                            <ChannelEditor
-                              memoryCount={panel.memories.count}
-                              routineCount={panel.routines.count}
-                              onOpenMemories={() =>
-                                setPanel((state) => {
-                                  state.memories.open = true;
-                                })
-                              }
-                              onOpenRoutines={() =>
-                                setPanel((state) => {
-                                  state.routines.open = true;
-                                })
-                              }
-                            />
+                        <ChannelEditor
+                          memoryCount={panel.memories.count}
+                          routineCount={panel.routines.count}
+                          onOpenMemories={() =>
+                            setPanel((state) => {
+                              state.memories.open = true;
+                            })
                           }
-                        >
-                          <section class="channel-tasks" aria-label="Channel tasks">
-                            <Show when={!page().tasks.length}>
-                              <p class="channel-empty-copy">Tasks appear when you send a request.</p>
-                            </Show>
-                            <ItemGroup class="channel-task-list">
-                              <For each={page().tasks}>
-                                {(task) => (
-                                  <Item class="channel-task" role="article" aria-label={`Task: ${task.instruction}`}>
-                                    <ItemContent>
-                                      <ItemTitle>{name(task.ownerAgentId)}</ItemTitle>
-                                      <ItemDescription>{task.instruction}</ItemDescription>
-                                      <Show when={task.error}>
-                                        <ItemDescription role="status">{task.error}</ItemDescription>
-                                      </Show>
-                                      <For each={task.dependencies}>
-                                        {(id) => {
-                                          const dependency = () => page().tasks.find((item) => item.id === id);
-                                          return (
-                                            <ItemDescription>
-                                              Depends on {name(dependency()?.ownerAgentId ?? null)} ·{" "}
-                                              {dependency()?.state ?? "unavailable"}
-                                            </ItemDescription>
-                                          );
-                                        }}
-                                      </For>
-                                    </ItemContent>
-                                    <ItemActions>
-                                      <Badge tone={taskTone(task.state)} size="sm">
-                                        {task.state}
-                                      </Badge>
-                                      <Show when={task.state !== "completed" && task.state !== "cancelled"}>
-                                        <Show when={task.state !== "paused" && task.state !== "failed"}>
-                                          <Button size="sm" variant="ghost" onClick={() => void control(task, "stop")}>
-                                            Stop
-                                          </Button>
-                                        </Show>
-                                        <Show when={task.state === "paused" || task.state === "failed"}>
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            disabled={channels.state.pending}
-                                            onClick={() => void control(task, "resume")}
-                                          >
-                                            {task.assignmentCount >= CHANNEL_ASSIGNMENT_LIMIT ? "Continue" : "Resume"}
-                                          </Button>
-                                        </Show>
-                                      </Show>
-                                    </ItemActions>
-                                  </Item>
-                                )}
-                              </For>
-                            </ItemGroup>
-                          </section>
-                        </Show>
+                          onOpenRoutines={() =>
+                            setPanel((state) => {
+                              state.routines.open = true;
+                            })
+                          }
+                        />
                       </SettingsPanelContent>
                       <Show when={memoriesPort()}>
                         {(port) => (

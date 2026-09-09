@@ -115,6 +115,8 @@ function ChannelPlayground() {
 async function openNewChannelDialog(context: PlayContext): Promise<HTMLElement> {
   const body = within(context.canvasElement.ownerDocument.body);
   await context.canvas.findByRole("heading", { name: "Chief" });
+  const expandSidebar = context.canvas.queryByRole("button", { name: "Expand sidebar" });
+  if (expandSidebar) await context.userEvent.click(expandSidebar);
   await context.userEvent.click(context.canvas.getByRole("button", { name: "New agent or channel" }));
   await context.userEvent.click(await body.findByRole("menuitem", { name: "New channel" }));
   return await body.findByRole("dialog", { name: "New channel" });

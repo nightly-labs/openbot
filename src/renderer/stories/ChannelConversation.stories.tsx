@@ -14,7 +14,7 @@ import { STORY_AGENTS } from "./fixtures";
  * The rows are written out here rather than mounted from `ChannelConversation`, because that
  * component reads the channels context, which needs the account, server, turns and browser contexts
  * and a channel-aware `window.openbot` behind it. What is under test here is what the reader sees:
- * the coloured author name over the face beside it, the run of messages that names its author once,
+ * the coloured author name above the bubble and the face beside its bottom edge, the run of messages that names its author once,
  * the day separator, the reader's own message on the right with neither face nor name, and one
  * activity row for every agent the channel waits on.
  *
@@ -94,6 +94,7 @@ function ChannelTranscript(props: { rows: Row[]; workers: ChannelWorker[] }) {
                   message={row.message}
                   author={row.author}
                   showAuthor={row.showAuthor}
+                  showTime
                   agents={STORY_AGENTS}
                   onSelectAgent={fn()}
                   onOpenLink={fn()}
@@ -116,7 +117,6 @@ function ChannelTranscript(props: { rows: Row[]; workers: ChannelWorker[] }) {
                       onCopy={fn()}
                     />
                   }
-                  footer={<time>{row.message.time}</time>}
                 />
               </div>
             )}
@@ -152,7 +152,7 @@ export const ChannelTranscriptWithSeveralAuthors: Story = {
     />
   ),
   play: async ({ canvas }) => {
-    await expect(await canvas.findByRole("article", { name: `Message from ${chief.name}` })).toBeInTheDocument();
+    await expect(await canvas.findAllByRole("article", { name: `Message from ${chief.name}` })).toHaveLength(2);
     await expect(await canvas.findByRole("article", { name: "Message from You" })).toBeInTheDocument();
     await expect(await canvas.findByText(`${chief.name} and ${sales.name} are working…`)).toBeInTheDocument();
   },
@@ -168,4 +168,31 @@ export const ChannelTranscriptWithOneWorker: Story = {
 /** Nothing is running: the activity row leaves, and the transcript keeps its place. */
 export const ChannelTranscriptAtRest: Story = {
   render: () => <ChannelTranscript rows={rows.slice(0, 4)} workers={[]} />,
+};
+
+/** Wrapped text, a long name, and an author whose profile is no longer available. */
+export const AuthorLayout: Story = {
+  render: () => (
+    <ChannelTranscript
+      rows={[
+        {
+          id: "wrapped",
+          author: { kind: "agent", name: "Research and project coordination", agent: research },
+          showAuthor: true,
+          message: agentMessage(
+            "wrapped",
+            "I checked the project notes and the source material.\n\nThe next step is to confirm the owners and share the final plan with the team.",
+            "1:06 PM",
+          ),
+        },
+        {
+          id: "former-member",
+          author: { kind: "agent", name: "Former member" },
+          showAuthor: true,
+          message: agentMessage("former-member", "My notes are ready for review.", "1:07 PM"),
+        },
+      ]}
+      workers={[]}
+    />
+  ),
 };

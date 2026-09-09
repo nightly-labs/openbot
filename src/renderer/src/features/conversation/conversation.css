@@ -2808,10 +2808,54 @@
   max-width: 100%;
 }
 
-/*
- * The author's name above a bubble, drawn in the head colour of the face beside it. A chat with one
- * agent draws no name at all, so the variable is unset there and the shared muted colour stands.
- */
+/* Keep the face beside the bubble, independent of the author name and footer height. */
+.message-entry-with-author {
+  display: grid;
+  grid-template-columns: calc(var(--openbot-space-6) + var(--openbot-space-1)) minmax(0, 1fr);
+  column-gap: var(--openbot-space-2);
+  row-gap: var(--openbot-space-1);
+}
+
+.message-entry-with-author > .ui-message-content {
+  display: contents;
+}
+
+.message-entry-with-author .message-shell {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.message-entry-with-author .ui-message-footer {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.message-author-avatar {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: end;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+.message-author-avatar .agent-avatar {
+  --agent-avatar-optical-offset: -3px;
+
+  width: var(--openbot-space-6);
+  height: var(--openbot-space-6);
+}
+
+.message-author-avatar-button {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+}
+
+.message-author-avatar-button:hover:not(:disabled):not([data-disabled]) {
+  background: transparent;
+}
+
 /*
  * The empty column under a face. A message that continues a run of messages by one author draws no
  * face, and without this spacer its bubble would step left, off the line the run started on. A chat
@@ -2823,8 +2867,29 @@
 }
 
 .message-author-name {
+  grid-column: 2;
+  grid-row: 1;
+  padding-inline: var(--openbot-space-3);
   color: var(--message-author-color, var(--openbot-text-muted));
-  font-weight: var(--openbot-weight-medium);
+  font-weight: var(--openbot-weight-regular);
+}
+
+.message-author-name-button {
+  height: auto;
+  min-width: 0;
+  margin-inline: calc(var(--openbot-space-1-5) * -1);
+  padding: 0 var(--openbot-space-1-5);
+  border-radius: var(--openbot-radius-md);
+  color: inherit;
+  font: inherit;
+  white-space: normal;
+  text-align: start;
+}
+
+.message-author-name-button:hover:not(:disabled):not([data-disabled]),
+.message-author-name-button:focus-visible {
+  background: var(--openbot-hover);
+  color: inherit;
 }
 
 .message-entry-animated {
@@ -2868,6 +2933,23 @@
   order: -1;
 }
 
+.message-time {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-inline-start: auto;
+  padding-inline-start: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--openbot-duration-hover) ease;
+}
+
+.message-entry-user .message-time {
+  margin-inline-start: 0;
+}
+
 .message-entry:hover .message-actions,
 .message-entry:focus-within .message-actions,
 .message-actions-open {
@@ -2875,8 +2957,15 @@
   pointer-events: auto;
 }
 
+.message-entry:hover .message-time,
+.message-entry:focus-within .message-time,
+.message-entry:has(.message-actions-open) .message-time {
+  opacity: 1;
+}
+
 @media (hover: none), (pointer: coarse) {
-  .message-actions {
+  .message-actions,
+  .message-time {
     opacity: 1;
     pointer-events: auto;
   }

@@ -302,6 +302,74 @@ export class ChannelStore {
     ).map((row) => ({ id: requiredStringColumn(row, "agent_id"), threadId: requiredStringColumn(row, "thread_id") }));
   }
 
+  contextThreads(channelId: string): string[] {
+    return databaseRows(
+      this.database.connection
+        .prepare("SELECT thread_id FROM projection_channel_contexts WHERE channel_id = ? ORDER BY agent_id")
+        .all(channelId),
+    ).map((row) => requiredStringColumn(row, "thread_id"));
+  }
+
+  /** Permanently removes a channel and its execution threads from every local projection. */
+  delete(channelId: string, operationId: string = randomUUID()): void {
+    if (!this.exists(channelId)) throw new Error("Channel not found.");
+    const threadIds = this.contextThreads(channelId);
+    this.database.dispatch(
+      `channel-delete:${operationId}`,
+      [
+        {
+          aggregateType: "channel",
+          aggregateId: channelId,
+          eventType: "channel.deleted",
+          payload: { threadIds },
+        },
+      ],
+      (db) => {
+        const memoryIds = databaseRows(
+          db.prepare("SELECT memory_id FROM projection_channel_memories WHERE channel_id = ?").all(channelId),
+        ).map((row) => requiredStringColumn(row, "memory_id"));
+        const routineIds = databaseRows(
+          db.prepare("SELECT routine_id FROM projection_channel_routines WHERE channel_id = ?").all(channelId),
+        ).map((row) => requiredStringColumn(row, "routine_id"));
+        deleteAggregateHistory(db, "channel", [channelId]);
+        deleteAggregateHistory(db, "channel-memory", memoryIds);
+        deleteAggregateHistory(db, "channel-routine", routineIds);
+        // Routine run events use the routine id as their aggregate id; one routine can own many runs.
+        deleteAggregateHistory(db, "channel-routine-run", routineIds);
+        if (routineIds.length) {
+          const placeholders = routineIds.map(() => "?").join(", ");
+          db.prepare(`DELETE FROM projection_channel_routine_triggers WHERE routine_id IN (${placeholders})`).run(
+            ...routineIds,
+          );
+        }
+
+        for (const table of [
+          "projection_channel_contexts",
+          "projection_channel_summaries",
+          "projection_channel_reads",
+          "projection_channel_assignments",
+          "projection_channel_tasks",
+          "projection_channel_messages",
+          "projection_channel_routine_runs",
+          "projection_channel_routines",
+          "projection_channel_memories",
+        ]) {
+          db.prepare(`DELETE FROM ${table} WHERE channel_id = ?`).run(channelId);
+        }
+        db.prepare("DELETE FROM projection_channels WHERE channel_id = ?").run(channelId);
+
+        for (const threadId of threadIds) {
+          deleteAggregateHistory(db, "thread", [threadId]);
+          db.prepare("DELETE FROM projection_attachments WHERE owner_kind = 'thread-message' AND owner_id LIKE ?").run(
+            `${threadId}:%`,
+          );
+          db.prepare("DELETE FROM projection_threads WHERE thread_id = ?").run(threadId);
+        }
+        return null;
+      },
+    );
+  }
+
   channelForThread(threadId: string): string | null {
     const row = databaseRow(
       this.database.connection
@@ -491,6 +559,21 @@ export class ChannelStore {
     );
     return row ? requiredNumberColumn(row, "through_sequence") : 0;
   }
+}
+
+function deleteAggregateHistory(db: DatabaseSync, aggregateType: string, aggregateIds: readonly string[]): void {
+  if (!aggregateIds.length) return;
+  const placeholders = aggregateIds.map(() => "?").join(", ");
+  db.prepare(
+    `DELETE FROM orchestration_command_receipts WHERE command_id IN (
+       SELECT DISTINCT command_id FROM orchestration_events
+       WHERE aggregate_type = ? AND aggregate_id IN (${placeholders})
+     )`,
+  ).run(aggregateType, ...aggregateIds);
+  db.prepare(`DELETE FROM orchestration_events WHERE aggregate_type = ? AND aggregate_id IN (${placeholders})`).run(
+    aggregateType,
+    ...aggregateIds,
+  );
 }
 
 /**

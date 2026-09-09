@@ -32,6 +32,8 @@ export interface ChannelHooks {
   busy(agentId: string): boolean;
   normalBusy?(): boolean;
   contextCharacters?(agentId: string, threadId: string): number;
+  /** Removes live provider state for an execution thread before its durable rows are deleted. */
+  forgetThread?(threadId: string): Promise<void> | void;
   steer?(
     agentId: string,
     threadId: string,
@@ -53,9 +55,10 @@ export class ChannelService {
   readonly memories: ChannelMemoryStore;
   readonly #history: ChannelHistory;
   readonly #pumps = new Map<string, Promise<void>>();
-  readonly #commands = new Map<string, Promise<Channel>>();
+  readonly #commands = new Map<string, Promise<unknown>>();
   #stopped = false;
   readonly #wakeAgain = new Set<string>();
+  readonly #deletedChannels = new Set<string>();
 
   constructor(
     database: OpenBotDatabase,
@@ -85,6 +88,44 @@ export class ChannelService {
       return await next;
     } finally {
       if (this.#commands.get(command.channelId) === next) this.#commands.delete(command.channelId);
+    }
+  }
+
+  async deleteChannel(channelId: string): Promise<void> {
+    if (this.#deletedChannels.has(channelId)) return;
+    const prior = this.#commands.get(channelId) ?? Promise.resolve();
+    const next = prior
+      .catch(() => undefined)
+      .then(async () => {
+        if (this.#deletedChannels.has(channelId)) return;
+        const channel = this.store.get(channelId);
+        const threadIds = this.store.contextThreads(channelId);
+        const pump = this.#pumps.get(channelId);
+        this.#deletedChannels.add(channelId);
+        try {
+          await this.interruptTasks(
+            channelId,
+            this.store.tasks(channelId).filter((task) => !terminal(task)),
+          );
+          await pump?.catch(() => undefined);
+          await this.mailbox.deleteChannelData(channelId, threadIds);
+          for (const threadId of threadIds) await this.hooks.forgetThread?.(threadId);
+          this.store.delete(channelId);
+          this.#pumps.delete(channelId);
+          this.#wakeAgain.delete(channelId);
+          this.#releaseHeldAgents();
+          this.#deletedChannels.delete(channelId);
+          this.hooks.changed(channelId, channel.revision + 1);
+        } catch (error) {
+          this.#deletedChannels.delete(channelId);
+          throw error;
+        }
+      });
+    this.#commands.set(channelId, next);
+    try {
+      await next;
+    } finally {
+      if (this.#commands.get(channelId) === next) this.#commands.delete(channelId);
     }
   }
 
@@ -311,6 +352,7 @@ export class ChannelService {
   wake(channelId?: string): void {
     if (this.#stopped) return;
     for (const channel of this.store.list("local")) {
+      if (this.#deletedChannels.has(channel.id)) continue;
       if (channel.archived || (channelId && channelId !== channel.id)) continue;
       if (this.#pumps.has(channel.id)) {
         this.#wakeAgain.add(channel.id);
@@ -352,7 +394,7 @@ export class ChannelService {
 
   private async pump(channelId: string): Promise<void> {
     for (const candidate of this.store.tasks(channelId)) {
-      if (this.#stopped) return;
+      if (this.#stopped || this.#deletedChannels.has(channelId)) return;
       let channel = this.store.get(channelId);
       if (channel.archived) return;
       let task = this.store.tasks(channelId).find((item) => item.id === candidate.id);
@@ -401,6 +443,7 @@ export class ChannelService {
               "This request exceeds the routing context limit. Select a member or send a shorter request.",
             );
           const response = await this.hooks.generate(lead, prompt);
+          if (this.#deletedChannels.has(channelId)) return;
           if (this.routingState(channelId) !== revision) {
             this.#wakeAgain.add(channelId);
             continue;
@@ -562,6 +605,7 @@ export class ChannelService {
           channelId,
           idempotencyKey: `channel-assignment:${assignment.id}`,
         });
+        if (this.#deletedChannels.has(channelId)) return;
         const delivery = receipt.deliveries[0];
         if (!delivery) throw new Error("Channel delivery was not created.");
         assignment.deliveryId = delivery.id;

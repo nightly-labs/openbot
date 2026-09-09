@@ -112,6 +112,7 @@ export class ConversationRuntime {
   readonly #loadedThreads = new Map<string, AgentClient>();
   readonly #executionSnapshots = new Map<string, ConversationSnapshot>();
   readonly #publicThreads = new Map<string, string>();
+  readonly #forgottenExecutionThreads = new Set<string>();
 
   constructor(store: AgentStore, emit: (event: AgentEvent) => void, listAgents: () => AgentSummary[]) {
     this.#store = store;
@@ -124,6 +125,7 @@ export class ConversationRuntime {
   }
 
   setSnapshot(agentId: string, snapshot: ConversationSnapshot): void {
+    if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
     if (snapshot.threadId && snapshot.threadId !== this.#store.list().find((agent) => agent.id === agentId)?.threadId)
       this.#executionSnapshots.set(snapshot.threadId, snapshot);
     else this.#snapshots.set(agentId, snapshot);
@@ -148,6 +150,7 @@ export class ConversationRuntime {
   }
 
   registerExecutionThread(agentId: string, threadId: string): void {
+    if (this.#forgottenExecutionThreads.has(threadId)) return;
     if (!this.#executionSnapshots.has(threadId)) {
       this.#executionSnapshots.set(threadId, this.#store.database.readConversation(agentId, threadId));
     }
@@ -199,6 +202,7 @@ export class ConversationRuntime {
       messageCount: snapshot.messages.length,
     },
   ): void {
+    if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
     sortConversationMessages(snapshot.messages);
     const signature = conversationContentSignature(snapshot);
     if (this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature) return;
@@ -210,11 +214,13 @@ export class ConversationRuntime {
   }
 
   publishConversation(snapshot: ConversationSnapshot): void {
+    if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
     this.#conversationSignatures.set(snapshot.threadId ?? snapshot.agentId, conversationContentSignature(snapshot));
     this.#emit({ type: "conversation", snapshot: structuredClone(snapshot) });
   }
 
   rememberConversationSignature(snapshot: ConversationSnapshot): void {
+    if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
     this.#conversationSignatures.set(snapshot.threadId ?? snapshot.agentId, conversationContentSignature(snapshot));
   }
 
@@ -242,6 +248,12 @@ export class ConversationRuntime {
 
   unloadThread(externalThreadId: string): void {
     this.#loadedThreads.delete(externalThreadId);
+  }
+
+  forgetExecutionThread(threadId: string): void {
+    this.#forgottenExecutionThreads.add(threadId);
+    this.#executionSnapshots.delete(threadId);
+    this.#conversationSignatures.delete(threadId);
   }
 
   clearLoadedThreads(): void {

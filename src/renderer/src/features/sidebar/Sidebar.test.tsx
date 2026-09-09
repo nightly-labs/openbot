@@ -230,6 +230,56 @@ describe("Sidebar pinned chats", () => {
     expect(pinned.onUnpin).toHaveBeenCalledWith({ kind: "channel", id: "channel-1" });
   });
 
+  it("offers channel edit and delete without duplication", async () => {
+    const props = sidebarProps();
+    const onEditChannel = vi.fn();
+    const onDeleteChannel = vi.fn(async () => undefined);
+    render(() => (
+      <Sidebar {...props} channels={[storyChannel()]} onEditChannel={onEditChannel} onDeleteChannel={onDeleteChannel} />
+    ));
+
+    const row = screen.getByRole("button", { name: "Project room. No messages yet" });
+    await fireEvent.contextMenu(row);
+    let channelMenu = await screen.findByRole("menu", { name: "Channel actions" });
+    expect(within(channelMenu).getByRole("menuitem", { name: "Edit channel" })).toBeInTheDocument();
+    expect(within(channelMenu).getByRole("menuitem", { name: "Delete channel" })).toBeInTheDocument();
+    expect(within(channelMenu).queryByRole("menuitem", { name: /Duplicate/ })).not.toBeInTheDocument();
+    await fireEvent.pointerUp(within(channelMenu).getByRole("menuitem", { name: "Edit channel" }), { button: 0 });
+    expect(onEditChannel).toHaveBeenCalledWith("channel-1");
+
+    await fireEvent.contextMenu(row);
+    channelMenu = await screen.findByRole("menu", { name: "Channel actions" });
+    await fireEvent.pointerUp(within(channelMenu).getByRole("menuitem", { name: "Delete channel" }), { button: 0 });
+    const dialog = await screen.findByRole("alertdialog", { name: "Delete Project room?" });
+    await fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("alertdialog", { name: "Delete Project room?" })).not.toBeInTheDocument(),
+    );
+    expect(onDeleteChannel).not.toHaveBeenCalled();
+
+    await fireEvent.contextMenu(row);
+    channelMenu = await screen.findByRole("menu", { name: "Channel actions" });
+    await fireEvent.pointerUp(within(channelMenu).getByRole("menuitem", { name: "Delete channel" }), { button: 0 });
+    const confirmation = await screen.findByRole("alertdialog", { name: "Delete Project room?" });
+    await fireEvent.click(within(confirmation).getByRole("button", { name: "Delete" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("alertdialog", { name: "Delete Project room?" })).not.toBeInTheDocument(),
+    );
+    expect(onDeleteChannel).toHaveBeenCalledWith("channel-1");
+  });
+
+  it("offers restore for archived channels", async () => {
+    const props = sidebarProps();
+    const onRestoreChannel = vi.fn(async () => undefined);
+    const archivedChannel = { ...storyChannel(), archived: true };
+    render(() => <Sidebar {...props} channels={[archivedChannel]} onRestoreChannel={onRestoreChannel} />);
+
+    await fireEvent.contextMenu(screen.getByRole("button", { name: "Project room. No messages yet" }));
+    const channelMenu = await screen.findByRole("menu", { name: "Channel actions" });
+    await fireEvent.pointerUp(within(channelMenu).getByRole("menuitem", { name: "Restore channel" }), { button: 0 });
+    expect(onRestoreChannel).toHaveBeenCalledWith("channel-1");
+  });
+
   it("reorders pinned chats by keyboard and constrained horizontal drag", async () => {
     const props = sidebarProps([
       { kind: "agent", id: "chief" },

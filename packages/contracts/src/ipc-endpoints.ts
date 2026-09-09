@@ -142,6 +142,7 @@ export const IPC_ENDPOINTS = {
     listChannels: request(IPC_CHANNELS.agentListChannels),
     readChannel: request(IPC_CHANNELS.agentReadChannel),
     channelCommand: request(IPC_CHANNELS.agentChannelCommand),
+    deleteChannel: request(IPC_CHANNELS.agentDeleteChannel),
     getSidebarLayout: request(IPC_CHANNELS.agentGetSidebarLayout),
     mutateSidebarLayout: request(IPC_CHANNELS.agentMutateSidebarLayout),
     generateProfile: request(IPC_CHANNELS.agentGenerateProfile),

@@ -2,6 +2,7 @@ import {
   analyticsQuery,
   assertAnalyticsScope,
   assertHostAnalyticsScope,
+  CHANNEL_DELETE_CAPABILITY,
   decodeAgentProfileDraft,
   decodeChannel,
   decodeChannelPage,
@@ -179,6 +180,20 @@ export function agentIpcHandlers({
           local: () => service.channels.command(input, host.channelActor()),
           remote: (serverId) =>
             remoteServers.request(serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: input }),
+        });
+      }),
+      deleteChannel: payloadHandler(parseAgentRequest, (scoped) => {
+        const channelId = requireString(scoped.payload, "channelId", INPUT_LIMITS.identifier);
+        return routeToServer<void>(scoped.serverId, {
+          local: () => service.deleteChannel(channelId),
+          remote: async (serverId) => {
+            if (!remoteServers.supportsCapability(serverId, CHANNEL_DELETE_CAPABILITY))
+              throw new Error("Channel deletion is not supported by this server.");
+            await remoteServers.request(serverId, CHANNEL_ROUTES.delete, decodeVoid, {
+              method: "POST",
+              body: { channelId },
+            });
+          },
         });
       }),
       getSidebarLayout: payloadHandler(parseAgentRequest, (parsed): Promise<SidebarLayoutSnapshot> => {

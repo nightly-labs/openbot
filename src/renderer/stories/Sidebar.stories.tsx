@@ -839,6 +839,9 @@ export const Channels: Story = {
     channels: storyChannels,
     activeChannelId: "channel-3",
     onSelectChannel: fn(),
+    onEditChannel: fn(),
+    onRestoreChannel: fn(async () => undefined),
+    onDeleteChannel: fn(async () => undefined),
     pinnedItems: [
       { kind: "channel", id: "channel-4" },
       { kind: "agent", id: "chief" },
@@ -849,6 +852,37 @@ export const Channels: Story = {
 
 export const ChannelsCompact: Story = {
   args: { ...Channels.args, compact: true },
+};
+
+export const ChannelContextMenu: Story = {
+  args: { ...Channels.args, pinnedItems: [] },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+  play: async ({ canvas, canvasElement }) => {
+    const channel = canvas.getByRole("button", { name: "Trio. 3 members here" });
+    const bounds = channel.getBoundingClientRect();
+    fireEvent.contextMenu(channel, {
+      clientX: bounds.left + bounds.width / 2,
+      clientY: bounds.top + bounds.height / 2,
+    });
+    const menu = await within(canvasElement.ownerDocument.body).findByRole("menu", { name: "Channel actions" });
+    await expect(within(menu).getByRole("menuitem", { name: "Pin" })).toBeInTheDocument();
+    await expect(within(menu).getByRole("menuitem", { name: "Move to" })).toBeInTheDocument();
+    await expect(within(menu).getByRole("menuitem", { name: "Edit channel" })).toBeInTheDocument();
+    await expect(within(menu).getByRole("menuitem", { name: "Delete channel" })).toBeInTheDocument();
+    await expect(within(menu).queryByRole("menuitem", { name: /Duplicate/ })).not.toBeInTheDocument();
+  },
+};
+
+export const ChannelDeleteConfirmation: Story = {
+  args: { ...Channels.args, pinnedItems: [] },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const channel = canvas.getByRole("button", { name: "Trio. 3 members here" });
+    fireEvent.contextMenu(channel);
+    const menu = await within(canvasElement.ownerDocument.body).findByRole("menu", { name: "Channel actions" });
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Delete channel" }));
+    await within(canvasElement.ownerDocument.body).findByRole("alertdialog", { name: "Delete Trio?" });
+  },
 };
 
 export const DeleteConfirmationKeyboard: Story = {
