@@ -27,11 +27,7 @@ export function SidebarAgentIndicator(props: { state: SidebarAgentState }) {
 export function SidebarPinnedAvatar(props: { agent: AgentProfile; agentState: () => SidebarAgentState | undefined }) {
   return (
     <span class="agent-row-avatar sidebar-pinned-avatar">
-      {/* A resting agent holds its pose. `"idle"` morphed for as long as the sidebar was on
-          screen, which is all day, and bought nothing: the shape is 24 px and nobody is
-          looking at it while they work in the pane next to it. `"hover"` brings it back the
-          moment a pointer arrives, and real work still animates on its own. */}
-      <AgentAvatar agent={props.agent} motion={props.agentState()?.kind === "working" ? "working" : "hover"} />
+      <AgentAvatar agent={props.agent} motion={props.agentState()?.kind === "working" ? "working" : "idle"} />
       <Show when={props.agentState()}>{(state) => <SidebarAgentIndicator state={state()} />}</Show>
     </span>
   );
