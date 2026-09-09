@@ -104,14 +104,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       onUnpin={unpinSidebarItem}
       onReorderPinned={reorderPinnedSidebarItems}
       onReorderPeople={reorderSidebarPeople}
-      onSelectAgent={(id) => {
-        channels.close();
-        selectAgent(id);
-      }}
-      onSelectPerson={(memberId) => {
-        channels.close();
-        void selectDirectMember(memberId);
-      }}
+      onSelectAgent={selectAgent}
+      onSelectPerson={(memberId) => void selectDirectMember(memberId)}
       onPreloadDirectConversation={props.peopleEnabled ? () => void DirectConversation.preload() : undefined}
       onCreateAgent={() => {
         channels.close();

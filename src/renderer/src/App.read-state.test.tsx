@@ -22,6 +22,7 @@ import {
   testConversationPage,
   testServer,
 } from "./app-test-harness";
+import { useChannels } from "./features/channels/channels-context";
 import { useConversation } from "./features/conversation/conversation-context";
 import { useDirectMessages } from "./features/conversation/direct-messages-context";
 import { useServerScope } from "./features/servers/server-scope";
@@ -45,6 +46,41 @@ function UsageProbe() {
         Close usage
       </button>
     </>
+  );
+}
+
+/**
+ * Opens a channel over the workspace. The agent stays selected under it, which is the state the
+ * read predicate has to refuse: the reply is on a chat the channel covers.
+ */
+function ChannelProbe() {
+  const channels = useChannels();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void (async () => {
+          await window.openbot.agent.channelCommand({
+            type: "save",
+            operationId: "channel-read-op",
+            channelId: "channel-read",
+            draft: { name: "Project", title: "", instructions: "", members: [{ agentId: "chief" }], leadAgentId: null },
+          });
+          await channels.open("channel-read");
+        })();
+      }}
+    >
+      Open channel
+    </button>
+  );
+}
+
+function CloseChannelProbe() {
+  const channels = useChannels();
+  return (
+    <button type="button" onClick={() => channels.close()}>
+      Close channel
+    </button>
   );
 }
 
@@ -1803,6 +1839,50 @@ describe("OpenBot connected desktop shell", () => {
     // which is the same reason the reply must not count as seen.
     fireEvent.click(screen.getByRole("button", { name: "Close usage" }));
     expect(await screen.findByRole("status", { name: "1 new message" })).toBeInTheDocument();
+  });
+
+  it("keeps an agent reply unread while an open channel covers the conversation", async () => {
+    const unreadPage = testConversationPage(
+      "chief",
+      [
+        {
+          id: "agent-channel-answer",
+          author: "assistant",
+          text: "Ready while the channel was open",
+          createdAt: "2026-08-19T09:06:00.000Z",
+          status: "completed",
+        },
+      ],
+      {
+        revision: 2,
+        readState: {
+          unreadCount: 1,
+          firstUnreadMessageId: "agent-channel-answer",
+          throughMessageId: null,
+        },
+      },
+    );
+
+    render(() => (
+      <AppProviders>
+        <AppAccessGate />
+        <ChannelProbe />
+        <CloseChannelProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+    vi.mocked(window.openbot.agent.markConversationRead).mockClear();
+    vi.mocked(window.openbot.agent.readConversationPage).mockResolvedValue(unreadPage);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open channel" }));
+    await screen.findByRole("heading", { level: 1, name: "Project" });
+    emitAgentEvent?.({ type: "conversation-page", page: unreadPage });
+
+    // Leaving the channel uncovers the chat, and the reply is still waiting there. The boundary is
+    // queryable only now, which is the same reason the reply could not count as seen before.
+    fireEvent.click(screen.getByRole("button", { name: "Close channel" }));
+    expect(await screen.findByRole("status", { name: "1 new message" })).toBeInTheDocument();
+    expect(window.openbot.agent.markConversationRead).not.toHaveBeenCalled();
   });
 
   it("uncovers the conversation a global search result opens", async () => {

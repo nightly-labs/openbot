@@ -27,6 +27,7 @@ import { cleanAgentMessageText } from "../agents/agent-message-text";
 import { useAgentReadTracking } from "../agents/agent-read-tracking";
 import { appendLatestRuntimeMessages } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
+import { useChannels } from "../channels/channels-context";
 import { useServers } from "../servers/servers-context";
 import { notifyTeamTyping } from "../team/team-typing";
 import { useUsage } from "../usage/usage-context";
@@ -82,6 +83,7 @@ const Conversation = createSimpleContext({
     const { agentChatsToMarkRead, agentChatsToRetryRead, autoReadAgentMessages } = useAgentReadTracking();
     const scopeIsCurrent = createScopeGuard();
     const { activeDirectMemberId } = useDirectMessages();
+    const channels = useChannels();
     const {
       activeAgent,
       activeAgentId,
@@ -285,8 +287,17 @@ const Conversation = createSimpleContext({
     // Usage covers the workspace content and marks it inert, so the chat under it is not the
     // pane the user is looking at. Both readers of this predicate use it to decide whether a
     // message may be marked read, and a message read behind the report was never seen.
+    //
+    // An open channel is the same case: `WorkspaceShell` keeps the agent selected under it, so a
+    // reply that arrives while the channel is on screen must stay unread.
     function isAgentChatOpen(agentId: string): boolean {
-      return !agentSetupOpen() && !activeDirectMemberId() && !usage.state.serverId && activeAgent()?.id === agentId;
+      return (
+        !agentSetupOpen() &&
+        !activeDirectMemberId() &&
+        !channels.state.selectedId &&
+        !usage.state.serverId &&
+        activeAgent()?.id === agentId
+      );
     }
 
     function isAgentChatReadable(agentId: string): boolean {

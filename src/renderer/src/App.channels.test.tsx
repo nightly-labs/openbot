@@ -69,6 +69,16 @@ it("restores the selected channel after restart and clears it when returning to 
   view.unmount();
 });
 
+it("opens the agent chat when Edit agent runs while a channel is open", async () => {
+  await openSavedChannel();
+
+  await fireEvent.contextMenu(screen.getByRole("button", { name: /^Chief, Chief of staff/ }));
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Edit agent" }), { button: 0 });
+
+  await screen.findByRole("main", { name: "Conversation" });
+  expect(screen.queryByRole("main", { name: "Channel conversation" })).toBeNull();
+});
+
 it.each([0, 1])("opens the agent chat from author control %i", async (control) => {
   const read = window.openbot.agent.readChannel;
   vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => ({
