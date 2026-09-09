@@ -378,6 +378,16 @@ export class AuthService {
     if (!isUuidV4(sessionId)) throw new AuthServiceError(400, "invalid_session", "The session ID is invalid.");
     const user = await this.authenticate(sessionToken);
     if (!user) throw new AuthServiceError(401, "unauthorized", "The session is invalid.");
+    if (!(await this.authenticateDesktopSession(sessionToken))) {
+      const sessions = await this.#repository.listAccountSessions(user.id, sessionToken, this.#now());
+      if (sessions.some((session) => session.sessionId === sessionId && session.kind === "desktop")) {
+        throw new AuthServiceError(
+          403,
+          "desktop_session_protected",
+          "Desktop sessions cannot be disconnected from mobile.",
+        );
+      }
+    }
     await this.#repository.revokeAccountSession(user.id, sessionId, this.#now());
     await this.#flushSessionRevocations();
   }
