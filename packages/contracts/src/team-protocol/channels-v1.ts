@@ -266,7 +266,10 @@ export function channelRequest(path: string, value: unknown): TeamProtocolV2Json
     operationId: identifier,
     channelId: identifier,
   });
-  if (value.type === "save") return { ...common, draft: draft(value.draft) };
+  // `update` marks a save of the settings of a channel the sender has open. A save without it
+  // creates the channel when it is missing, which is what the create dialog sends.
+  if (value.type === "save")
+    return { ...common, draft: draft(value.draft), ...(value.update === true ? { update: true } : {}) };
   if (value.type === "archive" || value.type === "restore") return common;
   if (value.type === "read") return { ...common, throughSequence: sequence(value.throughSequence) };
   if (value.type === "send") {

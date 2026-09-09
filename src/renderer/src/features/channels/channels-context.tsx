@@ -83,6 +83,8 @@ const Channels = createSimpleContext({
     let reading: Promise<void> | null = null;
     let readAgain = false;
     let readToken = 0;
+    let laterRead: Promise<void> | null = null;
+    let settleLaterRead: (() => void) | null = null;
     function refresh(selectedOverride?: string | null): Promise<void> {
       // Navigation carries the selection it wants, so it never waits behind the read it replaces.
       if (reading && selectedOverride === undefined) {
@@ -93,13 +95,31 @@ const Channels = createSimpleContext({
       const run = read(selectedOverride).finally(() => {
         if (token !== readToken) return;
         reading = null;
+        const settle = settleLaterRead;
+        laterRead = null;
+        settleLaterRead = null;
         if (readAgain && !disposed) {
           readAgain = false;
-          void refresh();
-        }
+          void refresh().finally(() => settle?.());
+        } else settle?.();
       });
       reading = run;
       return run;
+    }
+    /**
+     * A read that starts after this call.
+     *
+     * The read in flight started before the write, so its answer can hold the state the write
+     * replaced. A settings panel that saves each field builds the next save from the page it holds,
+     * and two removals in a row put the first member back.
+     */
+    function refreshAfter(): Promise<void> {
+      if (!reading) return refresh();
+      readAgain = true;
+      laterRead ??= new Promise<void>((resolve) => {
+        settleLaterRead = resolve;
+      });
+      return laterRead;
     }
     async function read(selectedOverride?: string | null) {
       if (!supported()) return;
@@ -177,13 +197,13 @@ const Channels = createSimpleContext({
           Object.assign(state, { selectedId: channelId, page: null, editing: null, loading: true });
         }),
       );
-      await refresh();
+      await refreshAfter();
     }
     async function perform(action: () => Promise<void>): Promise<boolean> {
       const account = accountKey();
       try {
         await action();
-        if (!disposed && account === accountKey()) await refresh();
+        if (!disposed && account === accountKey()) await refreshAfter();
         return !disposed && account === accountKey();
       } catch (error) {
         if (!disposed && account === accountKey())
@@ -235,7 +255,7 @@ const Channels = createSimpleContext({
             }),
           );
         }
-        await refresh();
+        await refreshAfter();
         return true;
       } catch (error) {
         if (!disposed && account === accountKey()) {
@@ -344,7 +364,7 @@ const Channels = createSimpleContext({
             }
           }),
         );
-        await refresh();
+        await refreshAfter();
       },
       restore: async (channelId: string) => {
         await command({ type: "restore", channelId, operationId: crypto.randomUUID() });

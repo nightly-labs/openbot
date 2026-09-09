@@ -112,6 +112,23 @@ describe("channel-chats-v1 payloads", () => {
       channelId: "channel-1",
     });
   });
+  it("carries the update flag of a settings save, and only that flag", () => {
+    const save = {
+      type: "save",
+      operationId: "operation-4",
+      channelId: channel.id,
+      draft: {
+        name: channel.name,
+        title: "",
+        instructions: "",
+        members: [{ agentId: "agent-1" }],
+        leadAgentId: "agent-1",
+      },
+    };
+    expect(channelRequest(CHANNEL_ROUTES.command, { ...save, update: true })).toMatchObject({ update: true });
+    expect(channelRequest(CHANNEL_ROUTES.command, save)).not.toHaveProperty("update");
+    expect(channelRequest(CHANNEL_ROUTES.command, { ...save, update: "yes" })).not.toHaveProperty("update");
+  });
   it("reads the older purpose key as instructions", () => {
     const save = {
       type: "save",

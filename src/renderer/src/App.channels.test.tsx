@@ -283,6 +283,71 @@ it("keeps both removals when the second starts before the first save lands", asy
   expect(within(chat).queryByRole("button", { name: "Remove Chief" })).toBeNull();
 });
 
+it("builds the second removal on a channel read that started after the first save", async () => {
+  await window.openbot.agent.channelCommand({
+    type: "save",
+    operationId: "create",
+    channelId: "channel-test",
+    draft: {
+      name: "Project room",
+      title: "",
+      instructions: "",
+      members: [{ agentId: "chief" }, { agentId: "sales-outbound" }],
+      leadAgentId: "chief",
+    },
+  });
+  render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+  await fireEvent.click(await screen.findByRole("button", { name: /Project room/ }));
+  const chat = await screen.findByRole("main", { name: "Channel conversation" });
+  await within(chat).findByRole("heading", { name: "Project room", level: 1 });
+  await openChannelMenuItem("Edit channel");
+  await within(chat).findByRole("button", { name: "Remove Chief" });
+
+  // A read of the channel is already in flight when the first removal is saved, and it answers
+  // with the members it found before that save. A draft carries the whole member list, so a save
+  // that ends on this answer builds the next draft from the list it replaced. Every later read is
+  // held as well, so this answer is the only one the second draft can be built on.
+  let releaseFirstRead: () => void = () => undefined;
+  let releaseLaterReads: () => void = () => undefined;
+  const firstRead = new Promise<void>((resolve) => {
+    releaseFirstRead = resolve;
+  });
+  const laterReads = new Promise<void>((resolve) => {
+    releaseLaterReads = resolve;
+  });
+  let reads = 0;
+  const originalRead = window.openbot.agent.readChannel;
+  vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => {
+    const first = ++reads === 1;
+    // The answer holds the members this read found, not the ones the store keeps when it lands.
+    const answer = structuredClone(await originalRead(input));
+    await (first ? firstRead : laterReads);
+    return answer;
+  });
+  emitAgentEvent?.({ type: "channels-changed", channelId: "channel-test", revision: 1 });
+  await waitFor(() => expect(reads).toBe(1));
+
+  const command = vi.spyOn(window.openbot.agent, "channelCommand");
+  const saves = () => command.mock.calls.map(([input]) => input).filter((input) => input.type === "save");
+  void fireEvent.click(within(chat).getByRole("button", { name: "Remove Chief" }));
+  void fireEvent.click(within(chat).getByRole("button", { name: "Remove Sales Outbound" }));
+  await waitFor(() => expect(saves()).toHaveLength(1));
+  await command.mock.results[0]?.value;
+  releaseFirstRead();
+  await waitFor(() => expect(reads).toBe(2));
+  releaseLaterReads();
+
+  // The second save builds on the first: it removes the last member instead of restoring Chief.
+  await waitFor(() => expect(saves()).toHaveLength(2));
+  expect(saves().map((input) => (input.type === "save" ? input.draft.members : null))).toEqual([
+    [{ agentId: "sales-outbound" }],
+    [],
+  ]);
+  await waitFor(() => expect(within(chat).queryByRole("button", { name: "Remove Sales Outbound" })).toBeNull());
+  expect(within(chat).queryByRole("button", { name: "Remove Chief" })).toBeNull();
+});
+
 it("keeps a queued settings save on the channel it was made in", async () => {
   for (const [channelId, name] of [
     ["channel-test", "Project room"],
