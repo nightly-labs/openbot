@@ -3,6 +3,7 @@ import { createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { useAgents } from "./features/agents/agents-context";
 import { createProviderRuntimeStore } from "./features/provider-updates/provider-runtime-store";
+import { providerSystemCliVersion } from "./features/provider-updates/provider-update";
 import { useServers } from "./features/servers/servers-context";
 import { createSimpleContext } from "./simple-context";
 
@@ -35,15 +36,9 @@ const Providers = createSimpleContext({
      * A CLI the user installed themselves, and the version it reports. Only the agent status knows
      * this, and the runtime store needs it to run the right updater for that install - and to keep
      * OpenBot's pinned version away from it.
-     *
-     * `undefined` until an answer exists. The status starts on `FALLBACK_STATUS`, whose rows name
-     * no owner, and so does the agent service before it resolves a binary; read as the managed
-     * copy, those rows would put the pinned version on a user's install for that moment.
      */
     function systemCliVersion(provider: AgentProviderId): string | null | undefined {
-      const row = agentStatus().providers?.find((candidate) => candidate.id === provider);
-      if (!row?.cliSource) return undefined;
-      return row.cliSource === "system" ? (row.version ?? null) : null;
+      return providerSystemCliVersion(agentStatus().providers?.find((candidate) => candidate.id === provider));
     }
     const runtimes = createProviderRuntimeStore(window.openbot.providerRuntimes, {
       systemCliVersion,

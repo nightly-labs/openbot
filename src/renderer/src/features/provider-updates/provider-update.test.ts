@@ -1,8 +1,9 @@
-import type { ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import type { AgentProviderStatus, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import {
   type ProviderUpdate,
   presentProviderUpdate,
+  providerSystemCliVersion,
   providerUpdatesToAnnounce,
   providerVersionLabel,
 } from "./provider-update";
@@ -104,5 +105,36 @@ describe("providerUpdatesToAnnounce", () => {
     const current = update({ availableVersion: "2.1.246" });
     const downloading = update({ runtime: runtime({ phase: "downloading", progress: 10 }) });
     expect(providerUpdatesToAnnounce([], [current, downloading])).toEqual([]);
+  });
+});
+
+describe("providerSystemCliVersion", () => {
+  function row(patch: Partial<AgentProviderStatus> = {}): AgentProviderStatus {
+    return { id: "claude", state: "available", version: "2.1.246", message: null, ...patch };
+  }
+
+  it("names the version of a CLI the user installed", () => {
+    expect(providerSystemCliVersion(row({ cliSource: "system" }))).toBe("2.1.246");
+    expect(providerSystemCliVersion(row({ cliSource: "system", version: null }))).toBeNull();
+  });
+
+  it("waits for the answer while no resolution has reported one", () => {
+    expect(providerSystemCliVersion(undefined)).toBeUndefined();
+    expect(providerSystemCliVersion(row({ state: "not-started", version: null }))).toBeUndefined();
+    expect(providerSystemCliVersion(row({ state: "checking", version: null }))).toBeUndefined();
+  });
+
+  it("keeps the owner a re-check of a resolved provider still names", () => {
+    expect(providerSystemCliVersion(row({ state: "checking", cliSource: "system" }))).toBe("2.1.246");
+    expect(providerSystemCliVersion(row({ state: "checking", cliSource: "managed" }))).toBeNull();
+  });
+
+  it("answers the managed copy for a provider whose CLI could not be resolved", () => {
+    // Nothing resolved, so the row names no owner - and that is an answer, not a wait: an app
+    // upgrade that pins a newer runtime leaves exactly this state, with the previous managed binary
+    // on disk and the new one still to download. The offer that downloads it is the way out.
+    expect(providerSystemCliVersion(row({ state: "not-installed", version: null }))).toBeNull();
+    expect(providerSystemCliVersion(row({ state: "error", version: null }))).toBeNull();
+    expect(providerSystemCliVersion(row({ state: "outdated" }))).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import type { AgentProviderId, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import type { AgentProviderId, AgentProviderStatus, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 import { errorMessage } from "../../error-message";
 
 /**
@@ -51,6 +51,26 @@ export interface ProviderUpdatePresentation {
    * The toast animates the digits, so it needs the number rather than the sentence.
    */
   progress: number | null;
+}
+
+/**
+ * The version of the CLI the user installed for this provider, read from its status row: `null` when
+ * OpenBot's own managed copy is the CLI for it, and `undefined` while no answer exists yet.
+ *
+ * The three answers must stay apart. A user's install takes no offer of the pinned version, because
+ * its own updater decides what it can reach; the managed copy takes one; and a provider nothing has
+ * resolved yet takes none until it is one of the two.
+ *
+ * `cliSource` alone cannot say which: it is absent before the resolution and absent again after one
+ * that found no install of the user's. The state says which of those it is. `not-started` is the
+ * status both `FALLBACK_STATUS` and the agent service open on, and `checking` is a first resolution
+ * in flight - a re-check of a resolved provider keeps its owner through it. Every other state is an
+ * answer, and no `cliSource` in one of those means the managed copy: a provider whose CLI could not
+ * be resolved at all still has the managed copy to install, and keeps the offer that installs it.
+ */
+export function providerSystemCliVersion(row: AgentProviderStatus | undefined): string | null | undefined {
+  if (!row?.cliSource && (!row || row.state === "not-started" || row.state === "checking")) return undefined;
+  return row?.cliSource === "system" ? (row.version ?? null) : null;
 }
 
 /** An installed runtime with a different version waiting is the whole trigger. */
