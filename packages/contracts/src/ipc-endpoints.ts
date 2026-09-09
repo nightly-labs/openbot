@@ -48,6 +48,7 @@ export const IPC_ENDPOINTS = {
   providers: {
     connectProvider: request(IPC_CHANNELS.connectProvider),
     refreshAgentProviders: request(IPC_CHANNELS.refreshAgentProviders),
+    updateProviderCli: request(IPC_CHANNELS.updateProviderCli),
   },
   providerRuntimes: {
     getStatus: request(IPC_CHANNELS.providerRuntimesGetStatus),
@@ -132,6 +133,8 @@ export const IPC_ENDPOINTS = {
   },
   agent: {
     getStatus: request(IPC_CHANNELS.agentGetStatus),
+    getAnalytics: request(IPC_CHANNELS.agentGetAnalytics),
+    getHostAnalytics: request(IPC_CHANNELS.hostGetAnalytics),
     getUsage: request(IPC_CHANNELS.agentGetUsage),
     listModels: request(IPC_CHANNELS.agentListModels),
     list: request(IPC_CHANNELS.agentList),

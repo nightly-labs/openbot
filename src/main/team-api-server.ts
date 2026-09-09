@@ -5,6 +5,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT,
   type AgentEvent,
+  AnalyticsInputError,
   type DirectConversationPage,
   type DirectConversationPageAnchor,
   type DirectConversationSnapshot,
@@ -511,7 +512,10 @@ export class TeamApiServer {
       // The only catch, too. A module with its own would cut an unexpected error off from the
       // logger below and answer 400 where the failure was a 500 nobody would then ever see.
       const expected =
-        error instanceof HttpError || error instanceof RemoteScreenError || error instanceof TeamStoreError;
+        error instanceof HttpError ||
+        error instanceof RemoteScreenError ||
+        error instanceof TeamStoreError ||
+        error instanceof AnalyticsInputError;
       const status =
         error instanceof HttpError || error instanceof RemoteScreenError ? error.status : expected ? 400 : 500;
       const message = expected ? error.message : "Request failed.";

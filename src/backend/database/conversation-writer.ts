@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { AgentRoster } from "./agent-roster";
+import { recordUsageMessage } from "./agent-usage";
 import { type DatabaseCore, deleteOrphanReceipts } from "./database-core";
 import {
   databaseRow,
@@ -95,6 +96,7 @@ export class ConversationWriter {
             last_event_sequence = excluded.last_event_sequence
         `);
         snapshot.messages.forEach((message, ordinal) => {
+          recordUsageMessage(db, agent.id, message, agent.provider, agent.model);
           upsert.run(
             snapshot.threadId,
             message.id,
@@ -228,6 +230,7 @@ export class ConversationWriter {
           JSON.stringify(input.message),
           sequence,
         );
+        recordUsageMessage(db, agent.id, input.message, agent.provider, agent.model);
         for (const attachment of input.message.attachments ?? []) {
           db.prepare(
             `INSERT INTO projection_attachments

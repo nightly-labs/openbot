@@ -3,6 +3,7 @@ import { createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { useAgents } from "./features/agents/agents-context";
 import { createProviderRuntimeStore } from "./features/provider-updates/provider-runtime-store";
+import { useServers } from "./features/servers/servers-context";
 import { createSimpleContext } from "./simple-context";
 
 /**
@@ -28,8 +29,22 @@ const Providers = createSimpleContext({
   name: "Providers",
   init: () => {
     const { agentStatus, setAgentStatus } = useAgents();
+    const { activeServer } = useServers();
     const [refreshingProviders, setRefreshingProviders] = createSignal(false);
-    const runtimes = createProviderRuntimeStore(window.openbot.providerRuntimes);
+    /**
+     * A CLI the user installed themselves, and the version it reports. Only the agent status knows
+     * this, and the runtime store needs it to offer that install the same update a managed runtime
+     * gets - and to run the right updater for it.
+     */
+    function systemCliVersion(provider: AgentProviderId): string | null {
+      const row = agentStatus().providers?.find((candidate) => candidate.id === provider);
+      return row?.cliSource === "system" ? (row.version ?? null) : null;
+    }
+    const runtimes = createProviderRuntimeStore(window.openbot.providerRuntimes, {
+      systemCliVersion,
+      updateSystemCli: (provider) => updateProviderCli(provider),
+      isLocalServer: () => activeServer()?.kind === "local",
+    });
     /** Connect attempts still waiting for the status that says how they ended. */
     const pendingProviderConnections = new Map<AgentProviderId, ReturnType<typeof desktopAnalytics.scope>>();
 
@@ -88,6 +103,29 @@ const Providers = createSimpleContext({
           action: "connect_completed",
           result: "failed",
           failure_code: "connect_failed",
+        });
+        throw error;
+      }
+    }
+
+    /**
+     * Runs the provider CLI's own updater, for an install the user made. Nothing is downloaded by
+     * OpenBot, so this shares nothing with the managed runtime download in `runtimes`; what comes
+     * back is the status the restarted provider reports, with the version it now runs.
+     */
+    async function updateProviderCli(provider: AgentProviderId): Promise<void> {
+      const analytics = desktopAnalytics.scope();
+      analytics.track("provider_action", { provider, action: "cli_update_started", result: "succeeded" });
+      try {
+        const status = await window.openbot.updateProviderCli(provider);
+        flush(() => applyAgentStatus(status));
+        analytics.track("provider_action", { provider, action: "cli_update_completed", result: "succeeded" });
+      } catch (error) {
+        analytics.track("provider_action", {
+          provider,
+          action: "cli_update_completed",
+          result: "failed",
+          failure_code: "cli_update_failed",
         });
         throw error;
       }

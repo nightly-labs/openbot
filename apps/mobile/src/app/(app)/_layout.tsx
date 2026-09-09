@@ -22,6 +22,7 @@ function AuthenticatedStack() {
   return (
     <ChatNavigationGateContext value={navigationGate}>
       <Stack
+        initialRouteName="connected"
         screenListeners={({ route }) =>
           route.name === "connected"
             ? {
@@ -42,6 +43,10 @@ function AuthenticatedStack() {
         }}
       >
         <Stack.Screen name="connected" options={{ animation: "fade", gestureEnabled: false, title: "" }} />
+        <Stack.Screen
+          name="agent-usage/[agentId]"
+          options={{ title: "Usage", contentStyle: { backgroundColor: background } }}
+        />
         <Stack.Screen
           name="chat/[agentId]"
           options={{

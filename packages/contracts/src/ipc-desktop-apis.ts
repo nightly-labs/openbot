@@ -1,3 +1,4 @@
+import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
 import type { AgentEvent, ScopedAgentEvent } from "./ipc-agent-events";
 import type { AgentModelOption } from "./ipc-agent-identity";
 import type {
@@ -92,6 +93,7 @@ import type {
   SetDynamicIslandInteractiveInput,
   SetDynamicIslandPreferenceInput,
 } from "./ipc-dynamic-island";
+import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type {
   DeleteHostedSiteInput,
   HostedSiteSummary,
@@ -178,9 +180,11 @@ export interface AgentDesktopApi {
   readChannel: (input: ChannelReadInput) => Promise<ChannelPage>;
   channelCommand: (input: ChannelCommand) => Promise<Channel>;
   getStatus: () => Promise<AgentStatus>;
+  getAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
+  getHostAnalytics: (input: HostAnalyticsInput, serverId: string) => Promise<HostAnalytics | null>;
   getUsage: (agentId: string) => Promise<AccountUsage>;
   listModels: () => Promise<AgentModelOption[]>;
-  listAgents: () => Promise<AgentSummary[]>;
+  listAgents: (serverId?: string) => Promise<AgentSummary[]>;
   listInstalledSkills: (agentId: string) => Promise<InstalledSkill[]>;
   getSidebarLayout: () => Promise<SidebarLayoutSnapshot>;
   mutateSidebarLayout: (action: SidebarLayoutAction) => Promise<SidebarLayoutSnapshot>;
@@ -406,6 +410,12 @@ export interface OpenBotDesktopApi {
   openExternal: (destination: ExternalDestination) => Promise<void>;
   connectProvider: (provider: AgentProviderId) => Promise<AgentStatus>;
   refreshAgentProviders: () => Promise<AgentStatus>;
+  /**
+   * Runs the provider CLI's own updater, for a CLI the user installed themselves. It is their copy,
+   * so the version they end on is whatever that updater fetches, which owes nothing to the version
+   * OpenBot pins for the runtime it manages.
+   */
+  updateProviderCli: (provider: AgentProviderId) => Promise<AgentStatus>;
   providerRuntimes: ProviderRuntimesDesktopApi;
   openUrl: (url: string) => Promise<void>;
   voice: VoiceDesktopApi;

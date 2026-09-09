@@ -13,6 +13,7 @@ import {
   tool,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { DEFAULT_PROVIDER_MODELS } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import type { AgentProvider } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
@@ -70,6 +71,8 @@ interface ActiveTurn {
 
 interface ThreadRuntime {
   id: string;
+  usageCounterId: string;
+  usageCost: number;
   config: ThreadConfig;
   appliedEffort?: string;
   input: AsyncMessageQueue;
@@ -94,6 +97,8 @@ interface ClaudeStreamMessage {
   result?: string;
   errors?: string[];
   terminal_reason?: string;
+  modelUsage?: unknown;
+  total_cost_usd?: number;
 }
 
 interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
@@ -396,6 +401,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
     const runtime: ThreadRuntime = {
       id: threadId,
+      usageCounterId: randomUUID(),
+      usageCost: 0,
       config,
       appliedEffort,
       input,
@@ -552,6 +559,24 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
 
     if (message.type !== "result") return;
+    if (
+      message.subtype === "success" &&
+      message.total_cost_usd !== undefined &&
+      message.total_cost_usd < runtime.usageCost
+    )
+      runtime.usageCounterId = randomUUID();
+    if (message.subtype === "success" || (message.total_cost_usd ?? 0) > runtime.usageCost)
+      runtime.usageCost = message.total_cost_usd ?? runtime.usageCost;
+    if (runtime.activeTurn && message.modelUsage)
+      this.emit("notification", {
+        method: "openbot/usage",
+        params: {
+          threadId: runtime.id,
+          turnId: runtime.activeTurn.id,
+          counterId: runtime.usageCounterId,
+          modelUsage: message.modelUsage,
+        },
+      });
     const fallback = message.subtype === "success" ? message.result : "";
     const errors = message.errors ?? [];
     const turn = runtime.activeTurn;
@@ -987,7 +1012,7 @@ function dynamicContent(value: unknown): CallToolResult["content"] {
 }
 
 function normalizeClaudeModel(model: string): string {
-  return model.startsWith("claude-") ? model : "claude-opus-5";
+  return model.startsWith("claude-") ? model : DEFAULT_PROVIDER_MODELS.claude;
 }
 
 function normalizeClaudeEffort(effort: string): ClaudeEffort {

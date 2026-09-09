@@ -454,3 +454,14 @@ export const AgentStarting: Story = {
     />
   ),
 };
+
+export const HostUsage: Story = {
+  render: () => <OpenBotPlayground />,
+  play: async ({ canvas, canvasElement }) => {
+    const server = await canvas.findByRole("button", { name: "Local server" });
+    await fireEvent.contextMenu(server);
+    const menu = within(canvasElement.ownerDocument.body);
+    await fireEvent.pointerUp(await menu.findByRole("menuitem", { name: "Usage" }), { button: 0 });
+    await expect(canvas.findByRole("region", { name: "Usage summary" })).resolves.toBeInTheDocument();
+  },
+};

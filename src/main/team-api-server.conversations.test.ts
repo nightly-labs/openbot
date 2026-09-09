@@ -1,3 +1,4 @@
+import { analyticsRange, emptyAnalyticsTotals } from "@openbot/contracts/ipc";
 // @vitest-environment node
 
 // What a remote client reads back from one agent service: the agent list, the conversation and
@@ -138,6 +139,18 @@ describe("TeamApiServer conversations", () => {
       ],
     };
     const getUsage = vi.fn(async () => usage);
+    const analytics = {
+      ...analyticsRange("chief"),
+      collectionStartedAt: "2026-09-01T00:00:00Z",
+      updatedAt: null,
+      totals: emptyAnalyticsTotals(),
+      daily: [],
+      models: [],
+    };
+    const getAnalytics = vi.fn(() => analytics);
+    const { agentId: _agentId, ...report } = analytics;
+    const hostAnalytics = { ...report, agents: [], providerDaily: [] };
+    const getHostAnalytics = vi.fn(() => hostAnalytics);
     const readConversationPageFor = vi.fn(async (...args: unknown[]) => {
       const options = isDynamicRecord(args[4]) ? args[4] : {};
       const messages = localConversation.messages.filter((message) => {
@@ -173,6 +186,8 @@ describe("TeamApiServer conversations", () => {
     const agents = createAgents({
       listAgents: () => localAgents,
       getUsage,
+      getAnalytics,
+      getHostAnalytics,
       createAgent,
       listConversationReads,
       markConversationUnread,
@@ -220,6 +235,64 @@ describe("TeamApiServer conversations", () => {
       }),
     ).resolves.toEqual(usage);
     expect(getUsage).toHaveBeenCalledWith("chief");
+    const analyticsPath = `/v1/agents/chief/analytics?startDate=${analytics.startDate}&endDate=${analytics.endDate}&timeZone=UTC`;
+    await expect(
+      jsonRequest(base, analyticsPath, {
+        token,
+        capabilities: [...TEAM_CURRENT_CAPABILITIES],
+        protocol: TEAM_PROTOCOL_V3,
+      }),
+    ).resolves.toEqual(analytics);
+    expect(getAnalytics).toHaveBeenCalledWith({
+      agentId: "chief",
+      startDate: analytics.startDate,
+      endDate: analytics.endDate,
+      timeZone: "UTC",
+    });
+    await expect(
+      jsonRequest(base, `/v1/analytics?startDate=${analytics.startDate}&endDate=${analytics.endDate}&timeZone=UTC`, {
+        token,
+        capabilities: [...TEAM_CURRENT_CAPABILITIES],
+        protocol: TEAM_PROTOCOL_V3,
+      }),
+    ).resolves.toEqual(hostAnalytics);
+    expect(getHostAnalytics).toHaveBeenCalledWith({
+      startDate: analytics.startDate,
+      endDate: analytics.endDate,
+      timeZone: "UTC",
+    });
+    const headers = {
+      [TEAM_PROTOCOL_VERSION_HEADER]: "3",
+      [TEAM_CAPABILITIES_HEADER]: TEAM_CURRENT_CAPABILITIES.join(","),
+    };
+    expect((await fetch(`${base}${analyticsPath}`, { headers })).status).toBe(401);
+    const memberSession = store.openRemoteSession({
+      sessionId: "analytics-member",
+      membershipId: "member-a",
+      userId: "account-a",
+      role: "member",
+    });
+    await expect(
+      jsonRequest(base, analyticsPath, {
+        token: memberSession.sessionToken,
+        capabilities: [...TEAM_CURRENT_CAPABILITIES],
+        protocol: TEAM_PROTOCOL_V3,
+      }),
+    ).resolves.toEqual(analytics);
+    expect(
+      (
+        await fetch(`${base}${analyticsPath.replace("chief", "other-agent")}`, {
+          headers: { ...headers, Authorization: `Bearer ${token}` },
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await fetch(`${base}${analyticsPath.replace("timeZone=UTC", "timeZone=invalid")}`, {
+          headers: { ...headers, Authorization: `Bearer ${token}` },
+        })
+      ).status,
+    ).toBe(400);
     await expect(jsonRequest(base, "/v1/agents/chief/conversation", { token: token })).resolves.toEqual({
       ...wireLegacyConversation,
       messages: [wireLegacyConversation.messages[0]],

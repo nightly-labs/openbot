@@ -102,6 +102,7 @@ import {
   STORY_UPDATE_STATUS,
   STORY_USAGE,
 } from "./fixtures";
+import { mockAgentAnalytics, mockHostAnalytics } from "./mock-agent-analytics";
 import { createMockChannels } from "./mock-channels";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 
@@ -519,6 +520,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     closeComputerUsePermissionSetup: async () => undefined,
     openExternal: async () => undefined,
     connectProvider: async () => clone(agentStatus),
+    updateProviderCli: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
     providerRuntimes: {
       getStatus: async () => clone(runtimeSnapshot),
@@ -909,6 +911,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     agent: {
       getStatus: async () => clone(agentStatus),
+      getHostAnalytics: async (input) => mockHostAnalytics(input, agents),
+      getAnalytics: async (input) => {
+        const agent = agents.find((entry) => entry.id === input.agentId);
+        if (!agent) throw new Error("Agent not found.");
+        return mockAgentAnalytics(input, agent);
+      },
       getUsage: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
         return clone(agent && `${agent.provider}:${agent.model}` === usageTargetKey ? usage : { limits: [] });

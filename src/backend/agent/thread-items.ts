@@ -78,11 +78,6 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   return completed ? "Reviewing the latest tool result…" : "Working through the next tool-assisted step…";
 }
 
-export function cleanModelName(value: string | undefined, fallback: string): string {
-  if (!value) return fallback;
-  return value.replace(/^GPT-5\.6[\s:–—-]*/i, "").trim() || fallback;
-}
-
 export function providerForAgent(agent: { provider: AgentProvider }): AgentProvider {
   return agent.provider;
 }

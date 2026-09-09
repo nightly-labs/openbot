@@ -98,6 +98,15 @@
   --openbot-provider-codex: var(--openbot-text-primary);
   --openbot-provider-claude: #d97757;
   --openbot-provider-grok: var(--openbot-text-primary);
+  /* A chart series needs a hue of its own: the logo colours above give codex and grok the
+     same white, which no reader can tell apart in two overlaid areas. Validated together
+     with the dataviz skill's checker -
+     node scripts/validate_palette.js "#d6adf2,#d97757,#6bc7d9" --mode dark --surface "#1a1a1a"
+     - for colour-vision separation and contrast on the canvas. */
+  --openbot-chart-series-codex: #d6adf2;
+  --openbot-chart-series-claude: var(--openbot-provider-claude);
+  --openbot-chart-series-grok: #6bc7d9;
+  --openbot-chart-series-other: var(--openbot-text-muted);
   --openbot-logo-production: #d6adf2;
   --openbot-logo-eye: #040007;
   --openbot-logo-dev: var(--openbot-warning);
@@ -196,6 +205,7 @@
    * landing page carry type above 24px; .landing-hero-logo is sized in em off
    * --openbot-text-hero, so that token is layout, not just type. */
   --openbot-text-display: 32px;
+  --openbot-text-usage-total: clamp(2rem, 5cqi, 3.5rem);
   --openbot-leading-display: 38px;
   --openbot-text-hero: clamp(3rem, 8vw, 6.5rem);
 

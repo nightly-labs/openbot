@@ -11,6 +11,7 @@ import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { usePresence } from "../team/team-context";
+import { useUsage } from "../usage/usage-context";
 import { Conversation } from "./Conversation";
 import { useConversation } from "./conversation-context";
 
@@ -76,6 +77,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     closeBrowserTab,
   } = useBrowserTabs();
   const { activeRemoteDesktopSession, remoteDesktopWorkspaceVisible, openRemoteDesktopWorkspace } = useRemoteDesktop();
+  const usage = useUsage();
   const { teamPresence } = usePresence();
   const { selectAgent, openAgentMessage, messageFocusRequest, globalSearchOpen } = useNavigation();
 
@@ -134,6 +136,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       browserTabs={browserTabs()}
       activeBrowserTabId={activeBrowserTabId()}
       browserVisibilitySuspended={browserVisibilitySuspended()}
+      workspaceCovered={usage.state.serverId !== null}
       browserControlState={browserControlState()}
       server={activeServer()}
       presence={teamPresence()}

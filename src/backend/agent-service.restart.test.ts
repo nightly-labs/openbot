@@ -156,17 +156,10 @@ describe.sequential("AgentService: restart", () => {
       { agentId: "chief", threadId, activeTurnId: null, revision: 0, messages: [local] },
       "test.saved-before-upgrade",
     );
-    // Remove later channel tables to reopen a version 13 database and run the shipped session upgrade.
-    store.database.connection.exec(`
-      DROP TABLE projection_channel_reads;
-      DROP TABLE projection_channel_summaries;
-      DROP TABLE projection_channel_contexts;
-      DROP TABLE projection_channel_assignments;
-      DROP TABLE projection_channel_tasks;
-      DROP TABLE projection_channel_messages;
-      DROP TABLE projection_channels;
-      DELETE FROM schema_migrations WHERE version >= 14;
-    `);
+    // Version 14 changes session state only. Reopen the version 13 database to run the shipped upgrade.
+    // Every later version goes too: a history that keeps 15 but drops 14 has a gap, which the
+    // schema check rejects before any upgrade runs.
+    store.database.connection.prepare("DELETE FROM schema_migrations WHERE version >= 14").run();
     store.database.close();
 
     let failRead = true;

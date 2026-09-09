@@ -18,6 +18,7 @@
 @import "./features/servers/join-server-dialog.css";
 @import "./features/conversation/conversation.css";
 @import "./features/channels/channels.css";
+@import "./features/usage/usage.css";
 @import "./features/settings/settings-modal.css";
 @import "./features/settings/settings-mobile-connect.css";
 @import "./features/settings/settings-hosted-sites.css";

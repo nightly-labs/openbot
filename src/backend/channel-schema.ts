@@ -1,32 +1,35 @@
-// Shared by migration v15 and the separate new-database schema.
+// Shared by migration v17 and the separate new-database schema. IF NOT EXISTS throughout, because
+// this text is both the migration and the tail of the latest schema: a database built from the
+// latest schema and then replayed forward - which is how a test fakes an older version - meets its
+// own tables.
 export const CHANNEL_SCHEMA_SQL = `
-  CREATE TABLE projection_channels (
+  CREATE TABLE IF NOT EXISTS projection_channels (
     channel_id TEXT PRIMARY KEY,
     channel_json TEXT NOT NULL CHECK(json_valid(channel_json))
   );
-  CREATE TABLE projection_channel_messages (
+  CREATE TABLE IF NOT EXISTS projection_channel_messages (
     channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id),
     message_id TEXT NOT NULL,
     sequence INTEGER NOT NULL,
     message_json TEXT NOT NULL CHECK(json_valid(message_json)),
     PRIMARY KEY(channel_id, message_id)
   );
-  CREATE INDEX channel_messages_sequence ON projection_channel_messages(channel_id, sequence);
-  CREATE TABLE projection_channel_tasks (
+  CREATE INDEX IF NOT EXISTS channel_messages_sequence ON projection_channel_messages(channel_id, sequence);
+  CREATE TABLE IF NOT EXISTS projection_channel_tasks (
     task_id TEXT PRIMARY KEY,
     channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id),
     task_json TEXT NOT NULL CHECK(json_valid(task_json))
   );
-  CREATE INDEX channel_tasks_channel ON projection_channel_tasks(channel_id);
-  CREATE TABLE projection_channel_assignments (
+  CREATE INDEX IF NOT EXISTS channel_tasks_channel ON projection_channel_tasks(channel_id);
+  CREATE TABLE IF NOT EXISTS projection_channel_assignments (
     assignment_id TEXT PRIMARY KEY,
     channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id),
     task_id TEXT NOT NULL REFERENCES projection_channel_tasks(task_id),
     delivery_id TEXT UNIQUE,
     assignment_json TEXT NOT NULL CHECK(json_valid(assignment_json))
   );
-  CREATE INDEX channel_assignments_channel ON projection_channel_assignments(channel_id);
-  CREATE TABLE projection_channel_contexts (
+  CREATE INDEX IF NOT EXISTS channel_assignments_channel ON projection_channel_assignments(channel_id);
+  CREATE TABLE IF NOT EXISTS projection_channel_contexts (
     channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id),
     agent_id TEXT NOT NULL,
     thread_id TEXT NOT NULL UNIQUE REFERENCES projection_threads(thread_id),
@@ -35,13 +38,13 @@ export const CHANNEL_SCHEMA_SQL = `
     summary_version INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY(channel_id, agent_id)
   );
-  CREATE TABLE projection_channel_summaries (
+  CREATE TABLE IF NOT EXISTS projection_channel_summaries (
     channel_id TEXT PRIMARY KEY REFERENCES projection_channels(channel_id),
     version INTEGER NOT NULL,
     through_sequence INTEGER NOT NULL,
     text TEXT NOT NULL
   );
-  CREATE TABLE projection_channel_reads (
+  CREATE TABLE IF NOT EXISTS projection_channel_reads (
     channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id),
     member_id TEXT NOT NULL,
     through_sequence INTEGER NOT NULL,
@@ -49,8 +52,8 @@ export const CHANNEL_SCHEMA_SQL = `
   );
 `;
 
-// Shared by migration v16 and the separate new-database schema. A separate constant, and a new
-// version rather than an edit to CHANNEL_SCHEMA_SQL: a database that already ran 15 - every
+// Shared by migration v18 and the separate new-database schema. A separate constant, and a new
+// version rather than an edit to CHANNEL_SCHEMA_SQL: a database that already ran 17 - every
 // development profile on this branch - would otherwise never meet these tables.
 //
 // Every table mirrors its agent twin in the v8 baseline column for column, because one store

@@ -229,6 +229,7 @@ export class ThreadLifecycle {
   }
 
   async resumeThread(agent: AgentSummary, client: AgentClient, externalThreadId: string): Promise<void> {
+    this.#conversation.bindThread(externalThreadId, agent.id);
     const params = {
       threadId: externalThreadId,
       model: agent.model,

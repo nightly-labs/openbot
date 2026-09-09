@@ -109,7 +109,7 @@ export const STORY_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
     id: "gpt-5.6-luna",
-    name: "Luna",
+    name: "GPT-5.6 Luna",
     description: "Fast and efficient for everyday agent work.",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["low", "medium", "high"],
@@ -117,7 +117,7 @@ export const STORY_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
     id: "gpt-5.6-terra",
-    name: "Terra",
+    name: "GPT-5.6 Terra",
     description: "Balanced speed and capability for involved tasks.",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium", "high"],
@@ -125,7 +125,7 @@ export const STORY_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
     id: "gpt-5.6-sol",
-    name: "Sol",
+    name: "GPT-5.6 Sol",
     description: "Most capable for complex, long-running work.",
     defaultReasoningEffort: "high",
     supportedReasoningEfforts: ["medium", "high", "xhigh"],
@@ -144,6 +144,14 @@ export const STORY_MODELS: AgentModelOption[] = [
     name: "Claude Sonnet 5",
     description: "Balanced Claude model for general agent work.",
     defaultReasoningEffort: "high",
+    supportedReasoningEfforts: ["low", "medium", "high"],
+  },
+  {
+    provider: "grok",
+    id: "grok-4.6",
+    name: "Grok 4.6",
+    description: "Discovered from Grok CLI over ACP.",
+    defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["low", "medium", "high"],
   },
   {

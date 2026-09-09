@@ -1,6 +1,7 @@
 import { Show } from "solid-js";
 import { toast } from "../../components/ui";
 import { usePlatform } from "../../platform";
+import { useUsage } from "../usage/usage-context";
 import { ServerRail } from "./ServerRail";
 import { useServerSelection } from "./server-selection";
 import { useServerSettings } from "./server-settings";
@@ -14,6 +15,7 @@ import { useServers } from "./servers-context";
  */
 export function WorkspaceServerRail() {
   const platform = usePlatform();
+  const { openUsage } = useUsage();
   const { servers, reorderServers, setJoinServerOpen } = useServers();
   const { selectServer } = useServerSelection();
   const { openServerSettings } = useServerSettings();
@@ -33,6 +35,7 @@ export function WorkspaceServerRail() {
         onAdd={() => {
           if (!platform.landingPreview) setJoinServerOpen(true);
         }}
+        onOpenUsage={openUsage}
         onOpenSettings={openServerSettings}
       />
     </Show>

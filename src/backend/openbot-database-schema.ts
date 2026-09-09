@@ -302,8 +302,62 @@ const V12_REACTIONS_TABLE_SQL = `  CREATE TABLE IF NOT EXISTS projection_reactio
     PRIMARY KEY(agent_id, message_id, actor_kind, actor_agent_id)
   );`;
 
+// IF NOT EXISTS throughout, because this text is both migration 15 and the tail of the latest
+// schema. A database built from the latest schema and then replayed forward - which is how a
+// test fakes an older version - meets its own tables.
+const ANALYTICS_SCHEMA_SQL = `
+  CREATE TABLE IF NOT EXISTS agent_usage_records (
+    agent_id TEXT NOT NULL,
+    record_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    turn_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    occurred_at TEXT NOT NULL,
+    tokens_json TEXT NOT NULL CHECK(json_valid(tokens_json)),
+    estimated_cost_usd REAL,
+    rate_basis TEXT,
+    recorded_at TEXT NOT NULL,
+    PRIMARY KEY(agent_id, record_id)
+  );
+  CREATE INDEX IF NOT EXISTS agent_usage_date ON agent_usage_records(agent_id, occurred_at);
+  CREATE TABLE IF NOT EXISTS agent_usage_checkpoints (
+    agent_id TEXT NOT NULL,
+    counter_id TEXT NOT NULL,
+    tokens_json TEXT NOT NULL CHECK(json_valid(tokens_json)),
+    PRIMARY KEY(agent_id, counter_id)
+  );
+  CREATE TABLE IF NOT EXISTS agent_usage_activity (
+    agent_id TEXT NOT NULL,
+    activity_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    turn_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('turn', 'user', 'assistant')),
+    occurred_at TEXT NOT NULL,
+    PRIMARY KEY(agent_id, activity_id)
+  );
+  CREATE INDEX IF NOT EXISTS agent_usage_activity_date ON agent_usage_activity(agent_id, occurred_at);
+`;
+
+// A host-wide report constrains the date and nothing else, and an index that leads with
+// `agent_id` cannot serve a range over `occurred_at` alone - so every such report used to
+// scan all retained history, and a report open across turn completions repeated that scan.
+// The date-leading pair is what a host read seeks on; `agent_usage_date` and
+// `agent_usage_activity_date` still serve a report filtered to one agent.
+//
+// A separate constant, and migration 16 rather than an edit to 15: a database that already
+// ran 15 - every development profile on this machine - would otherwise never meet the index.
+const ANALYTICS_DATE_INDEX_SQL = `
+  CREATE INDEX IF NOT EXISTS agent_usage_occurred ON agent_usage_records(occurred_at);
+  CREATE INDEX IF NOT EXISTS agent_usage_activity_occurred ON agent_usage_activity(occurred_at);
+`;
+
 const LATEST_SCHEMA_SQL =
   substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL) +
+  ANALYTICS_SCHEMA_SQL +
+  ANALYTICS_DATE_INDEX_SQL +
   CHANNEL_SCHEMA_SQL +
   CHANNEL_SETTINGS_SCHEMA_SQL;
 
@@ -364,12 +418,14 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     version: 14,
     up: refreshProviderSessionsForDynamicTools,
   },
+  { version: 15, up: (db) => db.exec(ANALYTICS_SCHEMA_SQL) },
+  { version: 16, up: (db) => db.exec(ANALYTICS_DATE_INDEX_SQL) },
   {
-    version: 15,
+    version: 17,
     up: (db) => db.exec(CHANNEL_SCHEMA_SQL),
   },
   {
-    version: 16,
+    version: 18,
     up: (db) => db.exec(CHANNEL_SETTINGS_SCHEMA_SQL),
   },
 ];

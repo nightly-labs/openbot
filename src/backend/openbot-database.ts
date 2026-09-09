@@ -11,6 +11,7 @@ import type {
   HostedSiteConversationEventStatus,
 } from "@openbot/contracts/ipc";
 import { AgentRoster } from "./database/agent-roster";
+import { AgentUsage } from "./database/agent-usage";
 import { ConversationQueries } from "./database/conversation-queries";
 import { ConversationWriter } from "./database/conversation-writer";
 import { DatabaseCore, type OrchestrationEventInput } from "./database/database-core";
@@ -43,6 +44,7 @@ export type { StoredThreadSummary } from "./database/thread-summaries";
  */
 export class OpenBotDatabase {
   readonly #core: DatabaseCore;
+  readonly usage: AgentUsage;
   readonly #conversations: ConversationQueries;
   readonly #roster: AgentRoster;
   readonly #conversationWrites: ConversationWriter;
@@ -54,6 +56,7 @@ export class OpenBotDatabase {
 
   constructor(readonly userDataPath: string) {
     this.#core = new DatabaseCore({ userDataPath });
+    this.usage = new AgentUsage(this.#core);
     this.#conversations = new ConversationQueries({ core: this.#core });
     this.#roster = new AgentRoster({ core: this.#core });
     this.#conversationWrites = new ConversationWriter({ core: this.#core, roster: this.#roster });

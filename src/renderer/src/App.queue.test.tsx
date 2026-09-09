@@ -2,8 +2,11 @@ import { serializeAttachmentReference } from "@openbot/contracts/attachment-refe
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import type { DirectConversationSnapshot } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
+import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
+import { AppAccessGate } from "./AppView";
+import { AppProviders } from "./app-providers";
 import {
   attachment,
   confirmOnboardingModel,
@@ -18,10 +21,62 @@ import {
   testServer,
   trackAnalytics,
 } from "./app-test-harness";
+import { useServers } from "./features/servers/servers-context";
+import { useUsage } from "./features/usage/usage-context";
 
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
     installOpenbotStub();
+  });
+
+  it("keeps a queued-message edit through Escape while the Usage report covers the conversation", async () => {
+    vi.mocked(window.openbot.agent.listQueue).mockResolvedValueOnce({
+      agentId: "chief",
+      deliveries: [
+        queuedDelivery("delivery-running", "Running", null, { status: "running", turnId: "turn-running" }),
+        queuedDelivery("delivery-covered-edit", "Queued draft", 1),
+      ],
+    });
+
+    // The tree `App` mounts, plus a control that opens the report over it.
+    function UsageProbe() {
+      const { activeServerId } = useServers();
+      const usage = useUsage();
+      return (
+        <>
+          <button type="button" onClick={() => usage.openUsage(activeServerId(), null)}>
+            Open usage
+          </button>
+          <button type="button" onClick={() => usage.closeUsage()}>
+            Close usage
+          </button>
+        </>
+      );
+    }
+
+    render(() => (
+      <AppProviders>
+        <AppAccessGate />
+        <UsageProbe />
+      </AppProviders>
+    ));
+    const composer = await screen.findByRole("textbox", { name: "Message Chief" });
+    await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+    composer.textContent = "Queued draft with more to say";
+    await fireEvent.input(composer);
+
+    // The report covers the conversation and marks it inert, but `inert` does not reach the
+    // document-level Escape listener the conversation registers. Escape here belongs to the
+    // pane the user is looking at, which is the report.
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+    flush();
+    await fireEvent.keyDown(document, { key: "Escape" });
+
+    // Back returns to the edit as the user left it. Cancelling it would have restored the
+    // queued text and discarded anything added to the draft since.
+    fireEvent.click(screen.getByRole("button", { name: "Close usage" }));
+    expect(await screen.findByRole("button", { name: "Save queued message" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Queued draft with more to say");
   });
 
   it("keeps a failed send in the composer and clears it only after a successful retry", async () => {

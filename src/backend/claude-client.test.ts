@@ -57,6 +57,17 @@ type TestStreamMessage =
     }
   | {
       type: "result";
+      modelUsage?: Record<
+        string,
+        {
+          inputTokens: number;
+          outputTokens: number;
+          cacheReadInputTokens: number;
+          cacheCreationInputTokens: number;
+          costUSD: number;
+        }
+      >;
+      total_cost_usd?: number;
       subtype: "success";
       result: string;
       terminal_reason: "completed";
@@ -284,6 +295,16 @@ fi
       type: "result",
       subtype: "success",
       result: "Hi",
+      modelUsage: {
+        "claude-sonnet-5": {
+          inputTokens: 100,
+          outputTokens: 50,
+          cacheReadInputTokens: 200,
+          cacheCreationInputTokens: 20,
+          costUSD: 0.001,
+        },
+      },
+      total_cost_usd: 0.001,
       terminal_reason: "completed",
       errors: [],
       session_id: thread.thread.id,
@@ -291,6 +312,18 @@ fi
     });
     await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
 
+    expect(notifications.find((event) => event.method === "openbot/usage")?.params).toMatchObject({
+      turnId: deliveryId,
+      modelUsage: {
+        "claude-sonnet-5": {
+          inputTokens: 100,
+          outputTokens: 50,
+          cacheReadInputTokens: 200,
+          cacheCreationInputTokens: 20,
+          costUSD: 0.001,
+        },
+      },
+    });
     expect(notifications).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ method: "turn/started" }),

@@ -1,11 +1,13 @@
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
+import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
 
 export function SettingsScreen() {
   const { session } = useMobileSession();
+  const displayName = session ? mobileUserName(session.user) : "Profile";
   return (
     <SettingsContent>
       <SettingsSection>
@@ -15,13 +17,13 @@ export function SettingsScreen() {
           leading={
             <ProfileAvatar
               neutral
-              name={session?.user.name || session?.user.email || "Profile"}
+              name={displayName}
               imageUrl={session?.user.avatarUrl ? new URL(session.user.avatarUrl, session.apiUrl).toString() : null}
               size={40}
             />
           }
         >
-          <Typography.Paragraph type="body-sm">{session?.user.name || "Profile"}</Typography.Paragraph>
+          <Typography.Paragraph type="body-sm">{displayName}</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
       <SettingsSection title="Preferences">

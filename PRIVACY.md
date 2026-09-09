@@ -8,6 +8,26 @@ configuration, memberships, invitations, and logical sessions.
 Production builds of OpenBot and the website use a self-hosted OpenPanel service for product
 analytics. Development builds, previews, tests, and Storybook do not send analytics.
 
+## Agent and host usage
+
+The Usage view stores numeric token counts, activity counts, provider and model identifiers,
+internal session and turn identifiers, timestamps, and cost estimates in the host's local SQLite
+database. Collection starts when this feature is installed. It does not import old provider
+transcripts or store message contents, credentials, or raw provider responses in analytics records.
+
+Authenticated members of a host team can read aggregate usage for that host's agents through the
+Team API, including from mobile. Desktop can also show the combined totals for all agents on one
+host, with an optional agent filter. A host-wide response carries the combined totals, one row per
+day, one row per model, one aggregate row per agent, identified by the agent's internal id, and one
+row per day and provider with that provider's token count and cost estimate for the day. Agent
+names are not part of the analytics payload; the client shows them from the agent list it already
+reads. These records are separate from product analytics and are not sent
+to OpenPanel or stored by the account service or Signal service. Conversation clearing retains usage;
+agent deletion removes it. A duplicate agent starts with no usage history.
+
+Costs are API-equivalent estimates in USD, not subscription charges. Missing usage, unknown prices,
+and incomplete billing inputs remain marked as unavailable or partial.
+
 ## Product analytics
 
 The production website records anonymous page views using only the fixed paths `/` and `/join`. It

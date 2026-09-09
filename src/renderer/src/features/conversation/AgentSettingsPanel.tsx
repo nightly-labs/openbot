@@ -50,6 +50,7 @@ export interface AgentRuntimeSettings {
 export type AgentRuntimeSettingsPatch = AgentRuntimeSettings | Pick<AgentRuntimeSettings, "reasoningEffort">;
 
 interface AgentSettingsPanelProps {
+  onOpenUsage: (trigger: HTMLButtonElement) => void;
   agent: AgentProfile;
   runtimeSettings: AgentRuntimeSettings;
   agentStatus: AgentStatus;
@@ -684,6 +685,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             />
           </label>
           <div class="agent-settings-links">
+            <Button
+              variant="ghost"
+              class="agent-settings-link"
+              onClick={(event) => props.onOpenUsage(event.currentTarget)}
+            >
+              Usage
+              <ChevronRight />
+            </Button>
             <Button
               variant="ghost"
               type="button"

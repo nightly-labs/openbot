@@ -2,7 +2,7 @@ import type { ServerSummary } from "@openbot/contracts/ipc";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
-import { buttonVariants, ContextMenu, ServerGradientLogo, Tooltip } from "../../components/ui";
+import { buttonVariants, ChartArea, ContextMenu, ServerGradientLogo, Tooltip } from "../../components/ui";
 
 const SERVER_RAIL_TOOLTIP_OPEN_DELAY = 150;
 
@@ -11,6 +11,7 @@ interface ServerRailProps {
   onSelect: (serverId: string) => void;
   onReorder: (serverIds: string[]) => void;
   onAdd: () => void;
+  onOpenUsage?: (serverId: string, trigger: HTMLElement | null) => void;
   onOpenSettings: (serverId: string, trigger: HTMLElement | null) => void;
 }
 
@@ -208,7 +209,12 @@ export function ServerRail(props: ServerRailProps) {
       >
         <For each={localServers()} keyed={(server) => server.id}>
           {(server) => (
-            <ServerRailButton server={server()} onSelect={props.onSelect} onOpenSettings={props.onOpenSettings} />
+            <ServerRailButton
+              server={server()}
+              onSelect={props.onSelect}
+              onOpenSettings={props.onOpenSettings}
+              onOpenUsage={props.onOpenUsage}
+            />
           )}
         </For>
         <Show when={remoteServers().length > 0}>
@@ -251,6 +257,7 @@ export function ServerRail(props: ServerRailProps) {
                     server={server()}
                     onSelect={props.onSelect}
                     onOpenSettings={props.onOpenSettings}
+                    onOpenUsage={props.onOpenUsage}
                     onMove={(direction) => moveServer(server().id, direction)}
                   />
                 </li>
@@ -288,6 +295,7 @@ export function ServerRail(props: ServerRailProps) {
 function ServerRailButton(props: {
   server: ServerSummary;
   onSelect: (serverId: string) => void;
+  onOpenUsage?: (serverId: string, trigger: HTMLElement | null) => void;
   onOpenSettings: (serverId: string, trigger: HTMLElement | null) => void;
   onMove?: (direction: -1 | 1) => void;
 }) {
@@ -311,14 +319,30 @@ function ServerRailButton(props: {
             class={buttonVariants({ variant: "ghost", class: "server-rail-button" })}
             aria-label={`${props.server.name} server${props.server.state === "online" ? "" : `, ${props.server.state}`}`}
             aria-pressed={props.server.active ? "true" : "false"}
-            aria-keyshortcuts={props.onMove ? "Alt+ArrowUp Alt+ArrowDown" : undefined}
+            aria-keyshortcuts={props.onMove ? "Shift+F10 Alt+ArrowUp Alt+ArrowDown" : "Shift+F10"}
             onClick={() => props.onSelect(props.server.id)}
             onContextMenu={(event: MouseEvent & { currentTarget: HTMLButtonElement }) => {
               trigger = event.currentTarget;
             }}
-            onFocus={() => setTooltipOpen(true)}
+            onFocus={(event) => {
+              trigger = event.currentTarget;
+              setTooltipOpen(true);
+            }}
             onBlur={() => setTooltipOpen(false)}
-            onKeyDown={(event: KeyboardEvent) => {
+            onKeyDown={(event: KeyboardEvent & { currentTarget: HTMLButtonElement }) => {
+              if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+                event.preventDefault();
+                const bounds = event.currentTarget.getBoundingClientRect();
+                event.currentTarget.dispatchEvent(
+                  new MouseEvent("contextmenu", {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: bounds.right,
+                    clientY: bounds.top,
+                  }),
+                );
+                return;
+              }
               if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
               event.preventDefault();
               props.onMove?.(event.key === "ArrowUp" ? -1 : 1);
@@ -329,6 +353,12 @@ function ServerRailButton(props: {
           </ContextMenu.Trigger>
           <ContextMenu.Portal>
             <ContextMenu.Content class="agent-context-menu" aria-label="Server actions">
+              <Show when={props.onOpenUsage}>
+                <ContextMenu.Item onSelect={() => props.onOpenUsage?.(props.server.id, trigger)}>
+                  <ChartArea class="agent-context-icon size-4" aria-hidden="true" />
+                  <span>Usage</span>
+                </ContextMenu.Item>
+              </Show>
               <ContextMenu.Item onSelect={() => props.onOpenSettings(props.server.id, trigger)}>
                 <svg
                   aria-hidden="true"

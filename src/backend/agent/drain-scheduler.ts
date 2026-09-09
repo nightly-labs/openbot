@@ -1,3 +1,5 @@
+import { AGENT_PROVIDERS } from "@openbot/contracts/ipc";
+import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
 import type { DeliveryContext, MailboxStore } from "../mailbox-store";
@@ -57,6 +59,14 @@ export class DrainScheduler {
   readonly #hooks: DrainHooks;
   readonly #channels: ChannelService | undefined;
   readonly #drainingAgents = new Set<string>();
+  /**
+   * How many deliveries are on their way to a turn, per provider.
+   *
+   * A delivery is claimed before its first await and released when it has an active turn or has
+   * failed. Between the two it holds no turn id, and only this count stops a CLI update from
+   * replacing the client it is about to prompt.
+   */
+  readonly #startingDeliveries = new Map<AgentProvider, number>();
   readonly #scheduledDrains = new Set<string>();
   readonly #drainTasks = new Map<string, Promise<void>>();
 
@@ -130,7 +140,10 @@ export class DrainScheduler {
       this.#hooks.isStopping() ||
       this.#drainingAgents.has(agentId) ||
       !this.mayDrain(agentId) ||
-      !this.#providers.isReady()
+      !this.#providers.isReady() ||
+      // Before the try, so the delivery is not rescheduled in a loop while the CLI is replaced.
+      // ProviderRuntime schedules this agent again once the new client is ready.
+      this.#deliveryProviders(agentId).some((provider) => this.#providers.isReplacingCli(provider))
     )
       return;
     this.#drainingAgents.add(agentId);
@@ -160,6 +173,8 @@ export class DrainScheduler {
   async startDelivery(context: DeliveryContext): Promise<void> {
     const { delivery, managedAttachments } = context;
     let confirmedTurnId: string | null = null;
+    const claimed = this.#deliveryProviders(delivery.recipientAgentId);
+    for (const provider of claimed) this.#startingDeliveries.set(provider, this.#starting(provider) + 1);
     try {
       await this.#mailbox.markStarting(delivery.id);
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
@@ -344,6 +359,26 @@ export class DrainScheduler {
       this.#channels?.deliveryFailed(delivery.id, "The provider could not start this assignment. Resume to try again.");
       this.#hooks.emitError("delivery_start_failed", error, delivery.recipientAgentId);
       this.scheduleDrain(delivery.recipientAgentId);
+    } finally {
+      for (const provider of claimed) this.#startingDeliveries.set(provider, this.#starting(provider) - 1);
     }
+  }
+
+  /** True while a delivery for this provider is between its first await and its turn. */
+  hasStartingDeliveries(provider: AgentProvider): boolean {
+    return this.#starting(provider) > 0;
+  }
+
+  #starting(provider: AgentProvider): number {
+    return this.#startingDeliveries.get(provider) ?? 0;
+  }
+
+  /**
+   * The providers a delivery to this agent can reach. One for an agent that exists; an agent
+   * startDelivery has still to create can land on any of them, so all of them are claimed.
+   */
+  #deliveryProviders(agentId: string): AgentProvider[] {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    return agent ? [providerForAgent(agent)] : [...AGENT_PROVIDERS];
   }
 }

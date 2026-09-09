@@ -31,6 +31,8 @@ import {
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
   decodeChannelSummaries,
+  decodeOptionalAgentAnalytics,
+  decodeOptionalHostAnalytics,
   decodeSaveAgentProfileResult,
   type FilePreview,
   type HostedSiteSummary,
@@ -745,6 +747,10 @@ const openbotApi: OpenBotDesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.computerUseCloseMacPermissionSetup).then(decodeVoid),
   openExternal: (destination) => ipcRenderer.invoke(IPC_CHANNELS.openExternal, destination),
   connectProvider: (provider) => ipcRenderer.invoke(IPC_CHANNELS.connectProvider, provider),
+  // Decoded, unlike its two neighbours: this reply is read straight after the user's own CLI was
+  // replaced under the app, so the version and state in it are the point of the call.
+  updateProviderCli: (provider) =>
+    ipcRenderer.invoke(IPC_CHANNELS.updateProviderCli, provider).then(decodeAgentStatusFromMain),
   refreshAgentProviders: () => ipcRenderer.invoke(IPC_CHANNELS.refreshAgentProviders),
   providerRuntimes: {
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.providerRuntimesGetStatus).then(decodeProviderRuntimeSnapshot),
@@ -824,9 +830,16 @@ const openbotApi: OpenBotDesktopApi = {
   },
   agent: {
     getStatus: () => invokeAgent(IPC_CHANNELS.agentGetStatus, null, decodeAgentStatusFromMain),
+    getHostAnalytics: (input, serverId) =>
+      invokeAgentForServer(serverId, IPC_CHANNELS.hostGetAnalytics, input, decodeHostAnalyticsFromMain),
+    getAnalytics: (input, serverId) =>
+      invokeAgentForServer(serverId, IPC_CHANNELS.agentGetAnalytics, input, decodeAgentAnalyticsFromMain),
     getUsage: (agentId) => invokeAgent(IPC_CHANNELS.agentGetUsage, agentId, decodeAccountUsageFromMain),
     listModels: () => invokeAgent(IPC_CHANNELS.agentListModels, null, decodeAgentModels),
-    listAgents: () => invokeAgent(IPC_CHANNELS.agentList, null, decodeAgents),
+    listAgents: (serverId) =>
+      serverId === undefined
+        ? invokeAgent(IPC_CHANNELS.agentList, null, decodeAgents)
+        : invokeAgentForServer(serverId, IPC_CHANNELS.agentList, null, decodeAgents),
     listInstalledSkills: (agentId) =>
       invokeAgent(IPC_CHANNELS.agentListInstalledSkills, agentId, decodeInstalledSkillsFromMain),
     listChannels: () => invokeAgent(IPC_CHANNELS.agentListChannels, null, decodeChannelSummaries),
@@ -1064,3 +1077,11 @@ const openbotApi: OpenBotDesktopApi = {
 };
 
 contextBridge.exposeInMainWorld("openbot", openbotApi);
+
+function decodeAgentAnalyticsFromMain(value: unknown) {
+  return decodeOptionalAgentAnalytics(value);
+}
+
+function decodeHostAnalyticsFromMain(value: unknown) {
+  return decodeOptionalHostAnalytics(value);
+}

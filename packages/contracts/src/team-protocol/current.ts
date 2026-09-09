@@ -10,6 +10,8 @@ export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
 export const TEAM_CURRENT_CAPABILITIES = [
   ...TEAM_PROTOCOL_V3_CAPABILITIES,
   "agent-profile-generation",
+  "agent-analytics",
+  "host-analytics",
   TEAM_SEMANTIC_TAGS_CAPABILITY,
   TEAM_AGENT_ACTIVITY_CAPABILITY,
   TEAM_CONVERSATION_UNREAD_CAPABILITY,
@@ -43,4 +45,12 @@ export function isAgentProfileRoute(method: string, path: string): boolean {
     method === "POST" &&
     /^\/v1\/agents\/profile\/(generate|save)$/u.test(new URL(path, "http://openbot.invalid").pathname)
   );
+}
+
+export function isAgentAnalyticsRoute(method: string, path: string): boolean {
+  return method === "GET" && /^\/v1\/agents\/[^/]+\/analytics$/u.test(new URL(path, "http://openbot.invalid").pathname);
+}
+
+export function isHostAnalyticsRoute(method: string, path: string): boolean {
+  return method === "GET" && new URL(path, "http://openbot.invalid").pathname === "/v1/analytics";
 }

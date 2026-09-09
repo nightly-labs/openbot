@@ -285,7 +285,7 @@ export function testConversationPage(
 }
 
 export async function confirmOnboardingModel(): Promise<void> {
-  await screen.findByRole("button", { name: "Agent model: Luna" });
+  await screen.findByRole("button", { name: "Agent model: GPT-5.6 Luna" });
 }
 
 export function queuedDelivery(
@@ -516,6 +516,8 @@ export function installOpenbotStub(): void {
           message: null,
           fullAccess: true,
         }),
+        getAnalytics: vi.fn().mockResolvedValue(null),
+        getHostAnalytics: vi.fn().mockResolvedValue(null),
         getUsage: vi.fn().mockResolvedValue({
           limits: [
             {
@@ -533,7 +535,7 @@ export function installOpenbotStub(): void {
           {
             provider: "codex",
             id: "gpt-5.6-luna",
-            name: "Luna",
+            name: "GPT-5.6 Luna",
             description: "Fast and efficient for everyday agent work.",
             defaultReasoningEffort: "medium",
             supportedReasoningEfforts: ["low", "medium", "high"],
@@ -541,7 +543,7 @@ export function installOpenbotStub(): void {
           {
             provider: "codex",
             id: "gpt-5.6-terra",
-            name: "Terra",
+            name: "GPT-5.6 Terra",
             description: "Balanced speed and capability for involved tasks.",
             defaultReasoningEffort: "medium",
             supportedReasoningEfforts: ["medium", "high"],
@@ -549,7 +551,7 @@ export function installOpenbotStub(): void {
           {
             provider: "codex",
             id: "gpt-5.6-sol",
-            name: "Sol",
+            name: "GPT-5.6 Sol",
             description: "Most capable for complex, long-running work.",
             defaultReasoningEffort: "high",
             supportedReasoningEfforts: ["medium", "high", "xhigh"],

@@ -1,5 +1,6 @@
 import type {
   AccountSession,
+  AgentStatus,
   AvatarImageInput,
   CentralAuthUser,
   HostedSitesDesktopApi,
@@ -140,6 +141,48 @@ describe("SettingsModal", () => {
     await fireEvent.click(await screen.findByRole("tab", { name: "Updates" }));
 
     expect(await screen.findByRole("switch", { name: "Automatically download updates" })).not.toBeChecked();
+  });
+
+  it("offers an update for a CLI the user installed, which has no managed download", async () => {
+    const onUpdateProvider = vi.fn(async () => undefined);
+    const agentStatus: AgentStatus = {
+      phase: "ready",
+      cliVersion: "0.146.0",
+      auth: { kind: "chatgpt", email: "norbert@example.com" },
+      providers: [
+        { id: "codex", state: "available", version: "0.146.0", message: null, cliSource: "system" },
+        { id: "claude", state: "available", version: "2.1.246", message: null, cliSource: "managed" },
+        { id: "grok", state: "not-installed", version: null, message: null },
+      ],
+      capabilities: { chat: "ready", browser: "ready", computerUse: "unavailable" },
+      message: null,
+      fullAccess: true,
+    };
+
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={{ name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" }}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={vi.fn(async () => undefined)}
+        account={account}
+        onUpdateAccountName={vi.fn(async () => undefined)}
+        onUpdateAccountAvatar={vi.fn(async () => undefined)}
+        agentStatus={agentStatus}
+        providerRuntimeStatuses={{
+          codex: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: "0.153.4" },
+          claude: { phase: "ready", progress: null, message: null, version: "2.1.246", availableVersion: "2.1.263" },
+        }}
+        providerAvailableVersions={{ codex: "0.153.4", claude: "2.1.263" }}
+        onUpdateProvider={onUpdateProvider}
+      />
+    ));
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Update ChatGPT to 0.153.4" }));
+    await waitFor(() => expect(onUpdateProvider).toHaveBeenCalledWith("codex"));
   });
 
   it("runs the updater and reflects its live status", async () => {

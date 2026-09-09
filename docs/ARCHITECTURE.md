@@ -438,10 +438,114 @@ installation is display metadata until the pinned runtime passes the existing do
 checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
 preload decoder. Cancellation and failure preserve the previous installation and its update offer.
 
-Settings starts the shared renderer runtime store. An explicit update opens one notification;
-revisioned snapshots move it through progress, failure, retry, and completion. Closing the
-notification does not cancel the download, and later reports do not reopen it. Fresh provider
-downloads retain their existing flow. These actions apply only to the local desktop host.
+Settings starts the shared renderer runtime store. The store announces each provider that gains an
+offer as one notification, from an effect over both the runtime snapshot and the agent status,
+because the two arrive separately and either one can complete an offer. An explicit update opens
+the same notification; revisioned snapshots move it through progress, failure, retry, and
+completion. Only the crossing into "update available" is announced, so a dismissed notification
+stays dismissed until the offer changes. Closing the notification does not cancel the download,
+and later reports do not reopen it. Fresh provider downloads retain their existing flow. These
+actions apply only to the local desktop host.
+
+A CLI the user installed themselves is not managed, but it is still compared against the lock.
+Each provider status row reports `cliSource`, and main passes the version of a `system` row to
+`ProviderRuntimeManager.setSystemVersion`, which compares it against the pinned version exactly as
+it compares a managed installation. The row and the notification therefore use the one update offer, the
+one Update button, and one entry point in the runtime store, `startProviderUpdate`. Only the work
+behind it differs: a `system` install goes to `updateProviderCli`, which runs that CLI's own updater
+(`codex update`) and then restarts the provider on the binary now on disk. That updater reports no
+progress, so the notification holds its indeterminate step until the provider comes back, and a
+failure keeps the reason the CLI gave, redacted, in one error that goes to the provider row and to
+the caller - and on, through the Team API, to the team's connected clients.
+The owner comes from the last resolution of the binary, not from the client that runs it, so a
+provider that is signed out still reports its own install rather than reading as the managed copy.
+OpenBot downloads nothing on this path, so the pinned artifact checksums are untouched. The managed
+copy refuses this command, because the runtime manager replaces that installation whole.
+
+Every runtime the store reaches is on this computer: `window.openbot.providerRuntimes` addresses no
+other one, while the agent status beside it describes whichever server is open. The store therefore
+takes `isLocalServer`, and a workspace on another computer announces no offer and starts no update -
+the same rule the provider row and the picker already follow. A server switch rebuilds that store,
+so the version a user closed the notification on is kept by the notification module, which outlives
+the switch: the offer is raised again on the way back only if the user never closed it.
+
+Replacing the CLI is not a start, on either path: `#activateProviderClient` swaps the client of a
+provider that has one, `#connect` connects one whose client is gone, and both skip
+`onProvidersReady` for the replacement, because
+that hook is restart recovery: it settles every unresolved delivery, and the other providers keep
+running through the replacement, so a live turn would be recorded as `interrupted` - which
+`MailboxStore.markTerminal` then refuses to correct. `onProviderResumed` schedules the deliveries
+the replacement held back. The refusal record is written through one queue, because two providers
+can finish an update at once and the older snapshot must not be renamed over the newer one.
+
+The update replaces the binary under a running client. A provider that has an agent in a turn -
+a delivery on its way to one, which holds no turn id yet, or a context compaction, whose
+`turn/started` `ContextCompaction.claimTurn` takes away from the agent - therefore refuses the
+command and tells the user to wait. No turn may start on that provider until the new client is ready: the drain
+scheduler skips an agent whose provider reports `isReplacingCli`, before it can reschedule the
+delivery, and `onProviderResumed` schedules the held deliveries when the replacement ends, after a
+failure as well as after a success.
+
+That updater decides for itself what the newest version is, and its release channel can name an
+older one than the lock: `grok update` can report success and leave the CLI where it was. The IPC
+handler therefore reports the version before and after the run to
+`ProviderRuntimeManager.noteSystemCliUpdate`. An update that finishes on the version it started on
+is the updater's answer: the manager records that pair of versions in `cli-update-refusals.json`
+beside the managed runtimes, and drops the offer from `availableVersion`, so the row and the
+notification stop offering an update that cannot happen. The record is kept against both the
+installed and the pinned version, so a new pinned version is a new offer, and so is a CLI the user
+moves by other means. The runtime store keeps the same answer in memory for the run that produced
+it, only to settle the notification before the next snapshot arrives.
+
+## Agent usage analytics
+
+`AgentUsage` owns local numeric usage records, cumulative counter checkpoints, and activity counts.
+Migration 15 adds these tables on both database creation paths. They do not reference conversation
+projections: clearing a conversation must retain usage. Agent deletion removes usage, checkpoints,
+activity, and related command receipts in its existing transaction.
+
+The turn lifecycle accepts usage only for a provider session belonging to the agent. Codex totals
+use durable session checkpoints; restored totals establish a baseline for pre-feature sessions.
+Claude uses per-model query totals and a separate counter identity for each query process. ACP usage
+is optional. Missing fields remain unknown. Completed assistant messages exclude commentary and tool
+output. Only post-install messages enter activity counts.
+
+`agent:get-analytics` and the capability-gated `GET /v1/agents/:agentId/analytics` return aggregates.
+They are separate from provider account limits. A request names the agent, inclusive calendar dates,
+and viewer time zone. The host groups records into calendar days in that zone. Date comparisons use
+an inclusive start and exclusive next-day boundary; custom ranges are limited to 367 days. Desktop
+names the host explicitly, and mobile binds reads to its authenticated active host. Every member of
+that host team can read totals. The public web and Signal service store no usage records.
+
+The Usage views show 7, 30, 90, or custom days, with 30 days as the default. Both expose exact daily
+values beside the SVG charts. Cost is a USD API-equivalent estimate, not a subscription charge.
+The bundled rates cite official sources and carry a verification date. Claude list-price estimates
+come from SDK model usage; unknown or managed pricing is not treated as a list-price estimate.
+Unknown models, missing cache data, and unresolvable context or cache-write pricing stay unpriced.
+Tool and media fees are outside the estimate. Stored estimates retain their price basis.
+
+
+### Host-wide Usage
+
+Desktop opens Usage from the server context menu. It keeps the previous workspace mounted and
+inert until Back, so conversation drafts and settings survive navigation. Agent settings opens
+the same report with an agent filter. Host changes clear the filter and stale responses are rejected.
+
+`host:get-analytics` and the optional `host-analytics` capability expose `GET /v1/analytics`.
+The host queries its local usage tables once for the date range and optional agent filter; it does
+not add per-agent API responses. The one pass groups by agent id beside day and model, so the
+host-wide response carries per-agent rows that the client labels from the agent list it already
+reads. The same pass also groups by day and provider, which is what lets the chart draw one area
+per provider over a shared baseline; a cell carries only the token count and the cost estimate,
+because those are the two measures the chart reads. Both arrays are on the host report only, which
+is why the agent-scoped route, its codec and the mobile screen are unchanged. Session and turn identities include agent and provider. HTTP and
+WebRTC use an explicit host analytics codec. Existing agent analytics and account limits keep their
+contracts. All authenticated team members can read these aggregates; no additional analytics data
+is stored by the account service or Signal service.
+
+The desktop chart adapts Zaidan's chart and interactive area composition. The pinned
+`solid-recharts` dependency has a Solid 2 compatibility patch and uses the application's single
+Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact accessible values.
 
 ## Shared desktop channel chats
 
@@ -453,7 +557,7 @@ coordination settings. The chat shows each author and keeps details, settings, a
 a side panel. The mobile interface is unchanged.
 
 `ChannelStore` stores the canonical transcript, channel configuration, tasks, assignments, summaries,
-execution threads, and human read positions in SQLite. Migration 15 adds these projections without
+execution threads, and human read positions in SQLite. Migration 17 adds these projections without
 changing existing agent data. Channel commands use the orchestration log and command receipts.
 Messages have stable IDs and per-channel sequences. A channel projection can be rebuilt from its events.
 Archiving stops channel work and retains its records. Restore makes the chat available again; paused
@@ -496,3 +600,4 @@ Desktop IPC and remote desktop transports expose `channel-chats-v1` as an option
 separate payload codecs. Released Team API adapters keep their existing meaning. A host advertises
 the capability only when its channel service is connected. Unsupported remote hosts show an explanation
 in place of channel controls. The account API and Signal service add no channel storage or routing.
+

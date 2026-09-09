@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 describe("AgentSettingsPanel", () => {
-  it("restores the previous model when saving runtime settings fails", async () => {
+  it("preserves settings after a failed save and a visit to Usage", async () => {
     mock = createMockOpenBot();
     window.openbot = mock.api;
     // Sol does not run under Claude, and Claude does not offer Extra high, so a rejected save has
@@ -22,9 +22,11 @@ describe("AgentSettingsPanel", () => {
       model: "gpt-5.6-sol",
       reasoningEffort: "xhigh",
     };
+    const onOpenUsage = vi.fn();
     const onUpdateRuntimeSettings = vi.fn(async () => false);
     render(() => (
       <AgentSettingsPanel
+        onOpenUsage={onOpenUsage}
         agent={{ ...STORY_AGENTS[0], provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "xhigh" }}
         runtimeSettings={runtimeSettings}
         agentStatus={STORY_AGENT_STATUS}
@@ -39,10 +41,10 @@ describe("AgentSettingsPanel", () => {
       />
     ));
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Agent model: Sol" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Agent model: GPT-5.6 Sol" }));
     const dialog = screen.getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(dialog).getByRole("tab", { name: /^Claude:/ }));
-    await fireEvent.click(within(dialog).getByRole("option", { name: "Claude Sonnet 5" }));
+    await fireEvent.click(within(dialog).getByRole("option", { name: "Claude Sonnet 5, default" }));
 
     await waitFor(() =>
       expect(onUpdateRuntimeSettings).toHaveBeenCalledWith(
@@ -54,7 +56,10 @@ describe("AgentSettingsPanel", () => {
     await fireEvent.keyDown(dialog, { key: "Escape" });
 
     expect(await screen.findByText("Could not save agent settings.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Agent model: Sol" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Sol" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Agent reasoning level/ })).toHaveTextContent("Extra high");
+    await fireEvent.click(screen.getByRole("button", { name: "Usage" }));
+    expect(onOpenUsage).toHaveBeenCalledWith(screen.getByRole("button", { name: "Usage" }));
+    expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Sol" })).toBeInTheDocument();
   });
 });

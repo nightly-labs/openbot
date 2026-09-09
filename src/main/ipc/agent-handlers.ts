@@ -1,15 +1,22 @@
 import {
+  analyticsQuery,
+  assertAnalyticsScope,
+  assertHostAnalyticsScope,
   decodeAgentProfileDraft,
   decodeChannel,
   decodeChannelPage,
   decodeChannelSummaries,
   decodeSaveAgentProfileResult,
+  hostAnalyticsQuery,
+  parseAgentAnalyticsInput,
   parseChannelCommand,
   parseChannelRead,
   parseGenerateAgentProfile,
+  parseHostAnalyticsInput,
   parseSaveAgentProfile,
 } from "@openbot/contracts/ipc";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { decodeAgentAnalyticsFromHost, decodeHostAnalyticsFromHost } from "../remote-agent-decoding";
 // An agent's core surface: status, agents, conversations, the queue and the prompts
 // a turn can raise. Memories, routines and attachments are their own registrars.
 // Every one of these routes to the local service or to a remote server by the
@@ -88,6 +95,32 @@ export function agentIpcHandlers({
           local: () => service.getStatus(),
           remote: (serverId) =>
             remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost),
+        });
+      }),
+      getHostAnalytics: payloadHandler(parseAgentRequest, (parsed) => {
+        const input = parseHostAnalyticsInput(parsed.payload);
+        return routeToServer(parsed.serverId, {
+          local: () => service.getHostAnalytics(input),
+          remote: (serverId) =>
+            remoteServers.supportsCapability(serverId, "host-analytics")
+              ? remoteServers.request(serverId, `${TEAM_API_ROUTES.analytics}?${hostAnalyticsQuery(input)}`, (value) =>
+                  assertHostAnalyticsScope(decodeHostAnalyticsFromHost(value), input),
+                )
+              : null,
+        });
+      }),
+      getAnalytics: payloadHandler(parseAgentRequest, (parsed) => {
+        const input = parseAgentAnalyticsInput(parsed.payload);
+        return routeToServer(parsed.serverId, {
+          local: () => service.getAnalytics(input),
+          remote: (serverId) =>
+            remoteServers.supportsCapability(serverId, "agent-analytics")
+              ? remoteServers.request(
+                  serverId,
+                  `${TEAM_API_ROUTES.agent.analytics(input.agentId)}?${analyticsQuery(input)}`,
+                  (value) => assertAnalyticsScope(decodeAgentAnalyticsFromHost(value), input),
+                )
+              : null,
         });
       }),
       getUsage: payloadHandler(parseAgentRequest, (parsed) => {

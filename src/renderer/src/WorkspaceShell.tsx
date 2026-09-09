@@ -14,6 +14,8 @@ import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-conte
 import { useServers } from "./features/servers/servers-context";
 import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
 import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
+import { AgentUsagePanel } from "./features/usage/AgentUsagePanel";
+import { useUsage } from "./features/usage/usage-context";
 import { useLayout } from "./layout";
 import { LEFT_PANEL_COMPACT } from "./layout-constants";
 import { usePlatform } from "./platform";
@@ -33,16 +35,17 @@ import { WorkspaceOverlays } from "./WorkspaceOverlays";
  * them is passed on rather than derived twice.
  *
  * The order of the children is the paint order the stylesheet expects, and the
- * three middle-pane `<Show>`s are mutually exclusive by construction: a blocked
- * remote server wins over everything, then the Agent form, then a person, then a
- * Agent.
+ * middle-pane `<Show>`s are mutually exclusive by construction: a blocked remote
+ * server wins over everything, then the Agent form, then a channel, then a
+ * person, then a Agent. The usage panel sits outside that group and inerts it.
  */
 export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   const platform = usePlatform();
   const channels = useChannels();
   const channelOpen = () => channels.state.selectedId !== null;
+  const usage = useUsage();
   const layout = useLayout();
-  const { activeServer, activeServerSupportsCapability, retryServerConnection } = useServers();
+  const { activeServer, activeServerSupportsCapability, retryServerConnection, servers } = useServers();
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
   const { agentSetupOpen } = useAgents();
   const { activeDirectMember } = useDirectMessages();
@@ -64,6 +67,7 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
         {
           "app-frame-sidebar-compact": layout.leftPanelCompact(),
           "app-frame-with-server-rail": platform.serverRailVisible(),
+          "app-frame-usage-open": !!usage.state.serverId,
           "app-frame-platform-darwin": platform.appInfo()?.platform === "darwin",
         },
       ]}
@@ -74,25 +78,47 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
       <WorkspaceSidebar peopleEnabled={activePeopleEnabled()} />
       <WorkspaceAccountDock account={props.account} />
       <WorkspaceLeftPanelResizer />
-      <Show when={blockedRemoteServer()} keyed>
-        {(server) => <RemoteCompatibilityScreen server={server} onRetry={() => retryServerConnection(server.id)} />}
-      </Show>
-      <Show when={!blockedRemoteServer() && agentSetupOpen()}>
-        <WorkspaceAgentSetup />
-      </Show>
-      <Show
-        when={
-          !blockedRemoteServer() && activePeopleEnabled() && !agentSetupOpen() && !channelOpen() && activeDirectMember()
-        }
-        keyed
+      <div
+        class="usage-workspace-content"
+        inert={!!usage.state.serverId}
+        aria-hidden={usage.state.serverId ? "true" : undefined}
       >
-        {(member) => <WorkspaceDirectConversation member={member} />}
-      </Show>
-      <Show when={!blockedRemoteServer() && !agentSetupOpen() && !channelOpen() && !activeDirectMember()}>
-        <WorkspaceConversation account={props.account} />
-      </Show>
-      <Show when={!blockedRemoteServer() && !agentSetupOpen() && channelOpen()}>
-        <ChannelConversation />
+        <Show when={blockedRemoteServer()} keyed>
+          {(server) => <RemoteCompatibilityScreen server={server} onRetry={() => retryServerConnection(server.id)} />}
+        </Show>
+        <Show when={!blockedRemoteServer() && agentSetupOpen()}>
+          <WorkspaceAgentSetup />
+        </Show>
+        <Show
+          when={
+            !blockedRemoteServer() &&
+            activePeopleEnabled() &&
+            !agentSetupOpen() &&
+            !channelOpen() &&
+            activeDirectMember()
+          }
+          keyed
+        >
+          {(member) => <WorkspaceDirectConversation member={member} />}
+        </Show>
+        <Show when={!blockedRemoteServer() && !agentSetupOpen() && !channelOpen() && !activeDirectMember()}>
+          <WorkspaceConversation account={props.account} />
+        </Show>
+        <Show when={!blockedRemoteServer() && !agentSetupOpen() && channelOpen()}>
+          <ChannelConversation />
+        </Show>
+      </div>
+      <Show when={usage.state.serverId}>
+        {(serverId) => (
+          <div class="conversation-panel agent-usage-workspace">
+            <AgentUsagePanel
+              serverId={serverId()}
+              hostName={servers().find((server) => server.id === serverId())?.name ?? "Host"}
+              agentId={usage.state.agentId}
+              onBack={usage.closeUsage}
+            />
+          </div>
+        )}
       </Show>
       <WorkspaceOverlays account={props.account} />
       <Show when={channels.state.editing === "create"}>

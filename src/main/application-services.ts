@@ -24,6 +24,7 @@ import { rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type {
+  AgentStatus,
   AppVariant,
   BrowserDisplayState,
   CentralAuthState,
@@ -359,6 +360,23 @@ export async function createApplicationServices({
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
   // reconciling against the agents alone would read every channel as gone and drop where it sits.
   await sidebarLayout.reconcileAgents(service.sidebarChatIds());
+
+  /*
+   * The runtime manager decides which provider has an update waiting, by comparing against the
+   * pinned lock. It knows the copies it downloaded itself; a CLI the user installed is only ever
+   * reported in the agent status, so it is passed on from here. Nothing is downloaded for such an
+   * install - the offer only leads to the CLI's own updater.
+   */
+  const trackSystemCliVersions = (status: AgentStatus): void => {
+    for (const provider of status.providers ?? []) {
+      const version = provider.cliSource === "system" ? (provider.version ?? null) : null;
+      providerRuntimes.setSystemVersion(provider.id, version);
+    }
+  };
+  trackSystemCliVersions(service.getStatus());
+  service.on("event", (event) => {
+    if (event.type === "status") trackSystemCliVersions(event.status);
+  });
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
   providerRuntimes.on("ready", (provider) => {
     void service.refreshProvider(provider).catch((error) => {

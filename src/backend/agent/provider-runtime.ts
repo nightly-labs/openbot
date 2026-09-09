@@ -24,16 +24,17 @@ import {
   isRecord,
   type ModelListResponse,
 } from "./../protocol";
-import { BUILT_IN_PROVIDER_DRIVERS, type CliLoginCommand, requireProviderDriver } from "./../provider-drivers";
+import { BUILT_IN_PROVIDER_DRIVERS, type ProviderCliCommand, requireProviderDriver } from "./../provider-drivers";
 import { normalizeAccountUsage } from "./account-usage";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
   providerFailureStatus,
+  readProcessReason,
   setProviderStatus,
   updateProviderStatus,
   waitForSuccessfulProcess,
 } from "./provider-status";
-import { cleanModelName, providerForAgent, providerLabel } from "./thread-items";
+import { providerForAgent, providerLabel } from "./thread-items";
 
 const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
 
@@ -67,6 +68,10 @@ export interface ProviderHooks {
   onProviderLost(client: AgentClient): void;
   /** True once stop() has begun, so a client exiting during shutdown does not trigger a restart. */
   isStopping(): boolean;
+  /** True while a turn on this provider runs or starts, which replacing its CLI would cut short. */
+  isProviderBusy(provider: AgentProvider): boolean;
+  /** Runs after a CLI replacement, so deliveries held back during it are delivered. */
+  onProviderResumed(provider: AgentProvider): void;
 }
 
 /**
@@ -99,11 +104,47 @@ const INITIAL_STATUS: AgentStatus = {
   fullAccess: true,
 };
 
+/**
+ * Models a provider CLI lists that an OpenBot agent is not meant to run. `codex-auto-review` and
+ * `gpt-reserve` are Codex picks for its own use -- a review pass and spare capacity -- and
+ * `gpt-5.5` and `gpt-5.4-mini` are older models this product does not offer. Everything else the
+ * CLI reports reaches the picker, the models it marks hidden included, so this list is the only
+ * thing that keeps a model out and adding to it is a product decision, not a guess about a flag.
+ */
+const SUPPRESSED_MODEL_IDS: ReadonlyMap<AgentProvider, ReadonlySet<string>> = new Map([
+  ["codex", new Set(["gpt-reserve", "gpt-5.5", "gpt-5.4-mini", "codex-auto-review"])],
+]);
+
+/**
+ * The product name of a Claude model, from its id, or `null` for an id that does not read as one.
+ *
+ * Claude Code lists a model by the part it plays in that CLI - "Default (recommended)", "Opus" -
+ * so its display name says which pick it is there, not which model an agent runs here. The picker
+ * puts all three providers side by side, and the other two name a model in full, so the same
+ * sentence has to be true of this one: the id carries it, with a release stamp the picker has no
+ * use for. `claude-haiku-4-5-20251001` is Claude Haiku 4.5, and `claude-fable-5-1[1m]` is the 1M
+ * context window of Claude Fable 5.1.
+ */
+function claudeModelName(id: string): string | null {
+  const parsed = /^([a-z0-9-]+?)(?:\[([a-z0-9]+)\])?$/u.exec(id.trim().toLowerCase());
+  if (!parsed) return null;
+  const [, base = "", variant] = parsed;
+  const parts = base.split("-");
+  if (parts.shift() !== "claude") return null;
+  const family = parts.shift();
+  if (!family || !/^[a-z]+$/u.test(family)) return null;
+  // Eight digits are the build date, which names a release of the model rather than the model.
+  const version = parts.filter((part) => !/^\d{8}$/u.test(part));
+  if (!version.length || version.some((part) => !/^\d+$/u.test(part))) return null;
+  const name = `Claude ${family[0]?.toUpperCase()}${family.slice(1)} ${version.join(".")}`;
+  return variant ? `${name} (${variant.toUpperCase()} context)` : name;
+}
+
 const FALLBACK_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
     id: "gpt-5.6-luna",
-    name: "Luna",
+    name: "GPT-5.6 Luna",
     description: "Fast and efficient for everyday agent work.",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
@@ -111,7 +152,7 @@ const FALLBACK_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
     id: "gpt-5.6-terra",
-    name: "Terra",
+    name: "GPT-5.6 Terra",
     description: "Balanced speed and capability for involved tasks.",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
@@ -119,7 +160,7 @@ const FALLBACK_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
     id: "gpt-5.6-sol",
-    name: "Sol",
+    name: "GPT-5.6 Sol",
     description: "Most capable for complex, long-running work.",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
@@ -167,9 +208,19 @@ export class ProviderRuntime implements ProviderPort {
   readonly #bundledExecutables: ReadonlyMap<AgentProvider, string | null | undefined>;
   readonly #clients = new Map<AgentProvider, AgentClient>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
+  /**
+   * Who owns each provider's binary, as the last resolution found it.
+   *
+   * `#cli` holds only the CLI a client runs on, and a provider that is signed out has no client
+   * although its binary is resolved and its version is on the row. Without this record that row
+   * names no owner, and an unowned CLI is read as the managed copy: the user's own install would be
+   * offered a download instead of its own updater.
+   */
+  readonly #cliSources = new Map<AgentProvider, AgentCliInfo["source"]>();
   readonly #accounts = new Map<AgentProvider, AccountReadResult["account"]>();
   readonly #providerStarts = new Map<AgentProvider, Promise<void>>();
   readonly #providerConnectionCommands = new Map<AgentProvider, Promise<void>>();
+  readonly #replacingCli = new Set<AgentProvider>();
   #status: AgentStatus = structuredClone(INITIAL_STATUS);
   #providerRefresh: Promise<AgentStatus> | null = null;
   #codexLogin: PendingCodexLogin | null = null;
@@ -206,8 +257,37 @@ export class ProviderRuntime implements ProviderPort {
     ]);
   }
 
+  /**
+   * Every read of the status names who owns each CLI, from the resolved binary rather than from a
+   * stored field, so a provider that switches between the user's install and the managed copy
+   * cannot leave a stale owner behind. It is added here, not in `#setStatus`, because both the
+   * getter and the events `#setStatus` emits go through it.
+   */
   status(): AgentStatus {
-    return structuredClone(this.#status);
+    const status = structuredClone(this.#status);
+    if (!status.providers) return status;
+    return {
+      ...status,
+      providers: status.providers.map((row) => {
+        const source = this.#cli.get(row.id)?.source ?? this.#cliSources.get(row.id);
+        return source ? { ...row, cliSource: source } : row;
+      }),
+    };
+  }
+
+  /** Resolve a provider's binary and keep who owns it, whether or not the provider is signed in. */
+  async #resolveProviderCli(provider: AgentProvider): Promise<AgentCliInfo> {
+    try {
+      const cli = await requireProviderDriver(provider).resolveCli({
+        bundledExecutable: this.#bundledExecutables.get(provider),
+      });
+      this.#cliSources.set(provider, cli.source);
+      return cli;
+    } catch (error) {
+      // Nothing resolved, so there is no owner to name: a kept one would outlive its binary.
+      this.#cliSources.delete(provider);
+      throw error;
+    }
   }
 
   isReady(): boolean {
@@ -334,8 +414,78 @@ export class ProviderRuntime implements ProviderPort {
     });
   }
 
+  /**
+   * Runs the provider CLI's own updater. This is for an install the user made: it answers to them,
+   * and this is how they move it to a version newer than the one OpenBot pins, without waiting for
+   * an OpenBot release. The managed copy is refused, because the runtime manager replaces that one
+   * whole and a self-updater inside it would leave two owners for one directory.
+   */
+  async updateProviderCli(provider: AgentProvider): Promise<AgentStatus> {
+    const driver = requireProviderDriver(provider);
+    const command = driver.cliUpdate;
+    if (!command) throw new Error(`OpenBot cannot update the ${providerLabel(provider)} CLI.`);
+    return this.#runProviderConnectionCommand(provider, async () => {
+      const cli = await this.#resolveProviderCli(provider);
+      if (cli.source === "managed") {
+        throw new Error(`OpenBot manages this ${providerLabel(provider)} CLI and updates it with the app.`);
+      }
+      // The update replaces the binary under a running client, and the client is restarted after
+      // it. A turn in flight would lose its process, so the user is asked to wait instead.
+      if (this.#hooks.isProviderBusy(provider)) {
+        throw new Error(`The ${providerLabel(provider)} CLI is working on a turn. Wait for it to finish, then update.`);
+      }
+      this.#setProviderConnectionState(provider, "connecting");
+      // No turn may start on this provider until the new client is ready. Deliveries wait in the
+      // mailbox and #activateProviderClient schedules them again.
+      this.#replacingCli.add(provider);
+      try {
+        let reason: () => string | null = () => null;
+        try {
+          const child = spawn(cli.executable, [...command.argv], {
+            cwd: process.cwd(),
+            env: { ...process.env, ...command.env(cli) },
+            // Only the error stream is read. An updater that refuses - a CLI installed by a package
+            // manager that wants to own the upgrade, most often - says why there, and its own reason
+            // is worth more to the user than an exit code.
+            stdio: ["ignore", "ignore", "pipe"],
+            shell: false,
+            windowsHide: process.platform === "win32",
+          });
+          reason = readProcessReason(child);
+          await waitForSuccessfulProcess(child, command.timeoutMs, "Provider update");
+        } catch (error) {
+          // One error for both readers: the row and the caller each get the updater's own reason.
+          const failure = new Error(
+            `OpenBot could not update the ${providerLabel(provider)} CLI. ${reason() ?? "Try again."}`,
+            { cause: error },
+          );
+          this.#setProviderConnectionFailure(provider, failure, cli.version);
+          throw failure;
+        }
+        // The running client still executes the binary the updater replaced, so it is restarted
+        // here. Its version is what the row shows, and the new one is the point of the command.
+        try {
+          await this.#reloadProviderCli(provider);
+        } catch (error) {
+          this.#setProviderConnectionFailure(provider, error, cli.version);
+          throw error;
+        }
+      } finally {
+        this.#replacingCli.delete(provider);
+        // Also after a failure: nothing else schedules the deliveries this update held back.
+        this.#hooks.onProviderResumed(provider);
+      }
+      return this.status();
+    });
+  }
+
   clientForAgent(agent: AgentSummary): AgentClient | null {
     return this.#clients.get(providerForAgent(agent)) ?? null;
+  }
+
+  /** True while the CLI's own updater runs and the client that used the old binary is replaced. */
+  isReplacingCli(provider: AgentProvider): boolean {
+    return this.#replacingCli.has(provider);
   }
 
   requireReadyClient(provider: AgentProvider): AgentClient {
@@ -554,8 +704,9 @@ export class ProviderRuntime implements ProviderPort {
     client: AgentClient,
     cli: AgentCliInfo,
     account: NonNullable<AccountReadResult["account"]>,
-    isCurrent?: () => boolean,
+    options: { isCurrent?: () => boolean; notifyReady?: boolean } = {},
   ): Promise<void> {
+    const { isCurrent, notifyReady = true } = options;
     const activation = this.#providerActivation
       .catch(() => undefined)
       .then(async () => {
@@ -616,7 +767,7 @@ export class ProviderRuntime implements ProviderPort {
 
         if (previousClient && previousClient !== client) await previousClient.stop().catch(() => undefined);
         if (provider === "codex") void this.#refreshUsage(client).catch(() => undefined);
-        await this.#hooks.onProvidersReady();
+        if (notifyReady) await this.#hooks.onProvidersReady();
       });
     this.#providerActivation = activation.catch(() => undefined);
     await activation;
@@ -677,14 +828,33 @@ export class ProviderRuntime implements ProviderPort {
     });
   }
 
-  async #startCliLogin(provider: AgentProvider, command: CliLoginCommand): Promise<AgentStatus> {
+  /** Puts a provider back on the binary that is on disk now, after its CLI replaced itself. */
+  async #reloadProviderCli(provider: AgentProvider): Promise<void> {
+    if (!this.#clients.has(provider)) {
+      this.#clearProviderConnectionState(provider);
+      this.#cli.delete(provider);
+      // Connecting the replaced CLI is not a start either: the other providers are running through
+      // it, and `onProvidersReady` would settle their live deliveries. See below.
+      await this.#connect("starting", [provider], { preserveCheckErrors: true, notifyReady: false });
+      return;
+    }
+    const cli = await this.#resolveProviderCli(provider);
+    const candidate = await this.#createAuthenticatedProviderClient(provider, cli);
+    // Not a start: `onProvidersReady` is restart recovery, and it settles every unresolved delivery,
+    // including the live ones of the other providers - a turn still running would be recorded as
+    // interrupted, which `markTerminal` then refuses to correct. `onProviderResumed` schedules the
+    // deliveries this replacement held back instead.
+    await this.#activateProviderClient(provider, candidate.client, cli, candidate.account, {
+      notifyReady: false,
+    });
+  }
+
+  async #startCliLogin(provider: AgentProvider, command: ProviderCliCommand): Promise<AgentStatus> {
     let cli: AgentCliInfo | null = null;
     this.#setProviderConnectionState(provider, "connecting");
 
     try {
-      cli = await requireProviderDriver(provider).resolveCli({
-        bundledExecutable: this.#bundledExecutables.get(provider),
-      });
+      cli = await this.#resolveProviderCli(provider);
       const child = spawn(cli.executable, [...command.argv], {
         cwd: process.cwd(),
         env: { ...process.env, ...command.env(cli) },
@@ -712,13 +882,9 @@ export class ProviderRuntime implements ProviderPort {
         await candidate.client.stop().catch(() => undefined);
         return;
       }
-      await this.#activateProviderClient(
-        provider,
-        candidate.client,
-        pending.cli,
-        candidate.account,
-        () => this.#cliLogins.get(provider) === pending,
-      );
+      await this.#activateProviderClient(provider, candidate.client, pending.cli, candidate.account, {
+        isCurrent: () => this.#cliLogins.get(provider) === pending,
+      });
       if (this.#cliLogins.get(provider) === pending) this.#cliLogins.delete(provider);
     } catch (error) {
       await this.#failCliLogin(provider, pending, error);
@@ -832,13 +998,9 @@ export class ProviderRuntime implements ProviderPort {
         throw new Error("ChatGPT did not return an authenticated account.");
       }
       if (this.#codexLogin !== pending) return;
-      await this.#activateProviderClient(
-        "codex",
-        pending.client,
-        pending.cli,
-        account.account,
-        () => this.#codexLogin === pending,
-      );
+      await this.#activateProviderClient("codex", pending.client, pending.cli, account.account, {
+        isCurrent: () => this.#codexLogin === pending,
+      });
       if (this.#codexLogin === pending) this.#codexLogin = null;
     } catch {
       await this.#failCodexLogin(pending, "OpenBot could not verify the ChatGPT connection. Try again.");
@@ -869,7 +1031,7 @@ export class ProviderRuntime implements ProviderPort {
   async #connect(
     phase: "starting" | "restarting",
     requestedProviders: readonly AgentProvider[],
-    options: { preserveCheckErrors?: boolean; refreshRuntimeInBackground?: boolean } = {},
+    options: { preserveCheckErrors?: boolean; refreshRuntimeInBackground?: boolean; notifyReady?: boolean } = {},
   ): Promise<void> {
     const hadClients = this.#clients.size > 0;
     const providerStatuses: AgentProviderStatus[] = structuredClone(
@@ -904,7 +1066,7 @@ export class ProviderRuntime implements ProviderPort {
         let client: AgentClient | null = null;
         let cli: AgentCliInfo | null = null;
         try {
-          cli = await driver.resolveCli({ bundledExecutable: this.#bundledExecutables.get(provider) });
+          cli = await this.#resolveProviderCli(provider);
           client = this.#clientFactory
             ? this.#clientFactory(provider, cli)
             : driver.createClient(cli, this.#requestTimeoutMs);
@@ -1008,7 +1170,7 @@ export class ProviderRuntime implements ProviderPort {
         });
       }
       if (codexClient) void this.#refreshUsage(codexClient).catch(() => undefined);
-      await this.#hooks.onProvidersReady();
+      if (options.notifyReady !== false) await this.#hooks.onProvidersReady();
     };
     if (options.refreshRuntimeInBackground) {
       void refreshRuntime().catch((error) => this.#emitError("provider_metadata_refresh_failed", error));
@@ -1090,6 +1252,7 @@ export class ProviderRuntime implements ProviderPort {
           const previous = this.#models.filter((model) => model.provider === provider);
           const client = this.#clients.get(provider);
           if (!client) return previous;
+          const suppressed = SUPPRESSED_MODEL_IDS.get(provider) ?? new Set<string>();
           try {
             const serverModels = new Map<string, ModelListResponse["data"][number]>();
             const cursors = new Set<string>();
@@ -1097,12 +1260,22 @@ export class ProviderRuntime implements ProviderPort {
             do {
               const response = await client.request(
                 "model/list",
-                { limit: 100, includeHidden: false, ...(cursor ? { cursor } : {}) },
+                { limit: 100, includeHidden: true, ...(cursor ? { cursor } : {}) },
                 decodeModelListResponse,
                 5_000,
               );
+              // Every model the CLI reports is offered apart from SUPPRESSED_MODEL_IDS, the ones it
+              // marks hidden included. A CLI hides a model it still accepts -- a new release such
+              // as `gpt-6-astra` is hidden until its own launch -- and this app has no way to tell
+              // that apart from a model the account cannot use, so a hidden flag was the only
+              // reason a working model was missing from the picker while the same CLI ran it
+              // happily from a terminal.
               for (const item of response.data) {
-                if (!item.hidden && item.model?.trim()) serverModels.set(item.model, item);
+                // The trimmed id is what is kept: `isAgentModel` allows no whitespace, so a padded
+                // id would fail the contract guard downstream and take the whole list with it.
+                const id = item.model?.trim();
+                if (!id || suppressed.has(id.toLowerCase())) continue;
+                serverModels.set(id, { ...item, model: id });
               }
               cursor = client.provider === "codex" ? response.nextCursor : undefined;
               if (cursor && cursors.has(cursor)) throw new Error("Model discovery repeated a pagination cursor.");
@@ -1120,7 +1293,14 @@ export class ProviderRuntime implements ProviderPort {
               models.push({
                 provider: client.provider,
                 id: server.model,
-                name: cleanModelName(server.displayName, fallback?.name ?? server.model),
+                // The name the provider CLI gives, whole: a model is easier to recognise as
+                // `GPT-5.6 Sol` than as `Sol`, and its own CLI names it that way.
+                // Claude Code is the exception, and `claudeModelName` says why.
+                name:
+                  (client.provider === "claude" ? claudeModelName(server.model) : null) ||
+                  server.displayName?.trim() ||
+                  fallback?.name ||
+                  server.model,
                 description:
                   fallback?.description ?? `${providerLabel(client.provider)} model discovered from the local CLI.`,
                 defaultReasoningEffort: isReasoningEffort(server?.defaultReasoningEffort)

@@ -10,6 +10,7 @@ const args: Parameters<typeof ServerRail>[0] = {
   onReorder: fn(),
   onAdd: fn(),
   onOpenSettings: fn(),
+  onOpenUsage: fn(),
 };
 
 const MANY_SERVERS = createManyServers();
@@ -58,6 +59,7 @@ function InteractiveServerRail(props: Parameters<typeof ServerRail>[0]) {
       }}
       onAdd={props.onAdd}
       onOpenSettings={props.onOpenSettings}
+      onOpenUsage={props.onOpenUsage}
     />
   );
 }

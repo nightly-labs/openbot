@@ -470,6 +470,11 @@ export class GrokAgentClient extends EventEmitter<ClientEvents> {
   async #consumePrompt(thread: GrokThread, turn: GrokTurn, prompt: ContentBlock[]): Promise<void> {
     try {
       const response = await this.#requireConnection().prompt({ sessionId: thread.id, prompt });
+      if (response.usage)
+        this.emit("notification", {
+          method: "openbot/usage",
+          params: { threadId: thread.id, turnId: turn.id, usage: response.usage },
+        });
       const status =
         response.stopReason === "cancelled"
           ? "interrupted"

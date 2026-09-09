@@ -5,6 +5,7 @@ import { basename } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AccountUsage,
+  AgentAnalyticsInput,
   AgentEvent,
   AgentMemory,
   AgentModelOption,
@@ -35,6 +36,7 @@ import type {
   DraftAttachment,
   DuplicateAgentResult,
   GenerateAgentProfileInput,
+  HostAnalyticsInput,
   ListChannelRoutineRunsInput,
   ListRoutineRunsInput,
   QueuedMessageReceipt,
@@ -61,7 +63,7 @@ import type {
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_RUNTIME_TEXT_LIMIT, isMessageReaction } from "@openbot/contracts/ipc";
+import { AGENT_RUNTIME_TEXT_LIMIT, DEFAULT_PROVIDER_MODELS, isMessageReaction } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
@@ -261,6 +263,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#browser.clearControls();
         },
         isStopping: () => this.#stopping,
+        isProviderBusy: (provider) =>
+          this.#drain.hasStartingDeliveries(provider) ||
+          this.#store.list().some(
+            (agent) =>
+              providerForAgent(agent) === provider &&
+              // A compaction is a provider turn as well, and it holds no active turn id: its
+              // `turn/started` belongs to the compaction, not to the agent, so `claimTurn` takes
+              // it away. Only its own guard reports the turn the CLI is running.
+              (this.#conversation.snapshot(agent.id)?.activeTurnId != null || !this.#compaction.mayDrain(agent.id)),
+          ),
+        onProviderResumed: (provider) => {
+          for (const agent of this.#store.list()) {
+            if (providerForAgent(agent) === provider) this.#drain.scheduleDrain(agent.id);
+          }
+        },
       },
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
@@ -495,6 +512,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.status();
   }
 
+  getAnalytics(input: AgentAnalyticsInput) {
+    if (!this.listAgents().some((agent) => agent.id === input.agentId)) throw new Error("Agent not found.");
+    return this.#store.database.usage.read(input);
+  }
+
+  getHostAnalytics(input: HostAnalyticsInput) {
+    if (input.agentId && !this.listAgents().some((agent) => agent.id === input.agentId))
+      throw new Error("Agent not found.");
+    return this.#store.database.usage.readHost(input);
+  }
+
   async getUsage(agentId?: string): Promise<AccountUsage> {
     if (!agentId) return this.#providers.usage();
     const agent = this.listAgents().find((candidate) => candidate.id === agentId);
@@ -673,7 +701,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const provider = agent?.provider ?? this.#providers.preferredProvider();
     await this.ensureProvider(provider);
     const models = this.#providers.listModels();
-    const defaultModel = provider === "codex" ? "gpt-5.6-luna" : provider === "claude" ? "claude-opus-5" : null;
+    const defaultModel = DEFAULT_PROVIDER_MODELS[provider];
     const model = agent
       ? models.find((candidate) => candidate.id === agent.model && candidate.provider === provider)
       : (models.find((candidate) => candidate.provider === provider && candidate.id === defaultModel) ??
@@ -711,8 +739,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const preferredProvider = this.#providers.preferredProvider();
       if (preferredProvider !== agent.provider) {
         const models = this.#providers.listModels();
-        const preferredDefault =
-          preferredProvider === "codex" ? "gpt-5.6-luna" : preferredProvider === "claude" ? "claude-opus-5" : null;
+        const preferredDefault = DEFAULT_PROVIDER_MODELS[preferredProvider];
         const preferredModel =
           models.find((model) => model.provider === preferredProvider && model.id === preferredDefault) ??
           models.find((model) => model.provider === preferredProvider);
@@ -979,6 +1006,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   connectProvider(provider: AgentProvider, openExternal: (url: string) => Promise<void>): Promise<AgentStatus> {
     return this.#providers.connectProvider(provider, openExternal);
+  }
+
+  updateProviderCli(provider: AgentProvider): Promise<AgentStatus> {
+    return this.#providers.updateProviderCli(provider);
   }
 
   async stop(): Promise<void> {
@@ -1427,18 +1458,25 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (params.tool === "create_agent") {
       const args = createAgentToolSchema.parse(params.arguments);
       const hue = args.avatarHue ?? null;
-      const created = await this.createAgent(
-        {
-          name: args.name,
-          description: args.description,
-          initialMessage: args.initialMessage,
-          avatarSeed: args.avatarSeed ?? randomUUID(),
-          avatarHue: hue,
-        },
-        args.title === undefined
-          ? undefined
-          : (agent) => this.#store.updateAgent({ agentId: agent.id, title: args.title }),
-      );
+      const sectionId = this.#sidebarLayout?.getSnapshot().agentAssignments[senderAgentId] ?? null;
+      const create = (assign?: (agentId: string) => Promise<SidebarLayoutSnapshot>) =>
+        this.createAgent(
+          {
+            name: args.name,
+            description: args.description,
+            initialMessage: args.initialMessage,
+            avatarSeed: args.avatarSeed ?? randomUUID(),
+            avatarHue: hue,
+          },
+          async (agent) => {
+            if (assign) await assign(agent.id);
+            return args.title === undefined ? agent : this.#store.updateAgent({ agentId: agent.id, title: args.title });
+          },
+        );
+      const created =
+        this.#sidebarLayout && sectionId !== null
+          ? await this.#sidebarLayout.withProfileAssignment(sectionId, create)
+          : await create();
       return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(created) }] };
     }
 

@@ -203,6 +203,7 @@ function AppSettings(props: AccountProps) {
     providerAvailableVersions,
     providerRuntimeDownloadsAvailable,
     downloadProviderRuntime,
+    startProviderUpdate,
     cancelProviderRuntimeDownload,
     connectProvider,
   } = useProviders();
@@ -232,7 +233,7 @@ function AppSettings(props: AccountProps) {
         agentStatus={agentStatus()}
         providerRuntimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
         providerAvailableVersions={localProviderDownloads() ? providerAvailableVersions() : undefined}
-        onUpdateProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
+        onUpdateProvider={localProviderDownloads() ? startProviderUpdate : undefined}
         onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
         onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
         onConnectProvider={localProviderDownloads() ? connectProvider : undefined}

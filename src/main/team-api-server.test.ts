@@ -128,6 +128,7 @@ describe("TeamApiServer compatibility", () => {
 // walked rather than listed, so a new entry cannot quietly skip the check - it arrives with no method
 // declared and fails on `undeclared` until it is named here.
 const ROUTE_METHODS: Record<string, string> = {
+  analytics: "GET",
   compatibility: "GET",
   identity: "GET",
   events: "GET",
@@ -186,6 +187,7 @@ const ROUTE_METHODS: Record<string, string> = {
   "agents.conversationReads": "GET",
   "agent.one": "PATCH",
   "agent.usage": "GET",
+  "agent.analytics": "GET",
   "agent.skills": "GET",
   "agent.duplicate": "POST",
   "agent.avatar": "GET",
@@ -246,6 +248,8 @@ const ROUTES_WITHOUT_A_CLASSIFIED_JSON_BODY = new Set([
   // that calls either anyway is answered 500 rather than a protocol error - see the PR body.
   "agent.duplicate",
   "agent.usage",
+  "agent.analytics",
+  "analytics",
   // Additive v3 routes: peers without the capability receive 400 before any JSON success body.
   "agents.generateProfile",
   "agents.saveProfile",
