@@ -58,6 +58,27 @@ sqlite3 "$HOME/Library/Application Support/OpenBot/openbot.db" \
 Any row means the messages are still on disk and are recoverable. Report the output with the details
 below, and keep the folder where it is until then.
 
+## OpenBot will not start and names a stored agent profile
+
+The message reads `Stored agent profile <id> has an unreadable "<field>" value`. Your data is intact:
+OpenBot stops before it writes anything, which is what keeps the profile as it is.
+
+Do not follow the reset steps below, and do not move the folder. Install the current version first:
+OpenBot now repairs a stored profile field it cannot read and keeps the agent, its chat and its
+workspace, while a release from before that repair refuses to start over the same profile.
+
+If the current version still stops, quit OpenBot and read the profile it names. On macOS:
+
+```sh
+sqlite3 "$HOME/Library/Application Support/OpenBot/openbot.db" \
+  "SELECT agent_json FROM projection_agents WHERE agent_id = '<id>';"
+```
+
+On Windows, the same file is at `%APPDATA%\OpenBot\openbot.db`.
+
+Report the field the message names, together with the details below. The output holds your own file
+paths, so review it before you publish it.
+
 ## Reset OpenBot
 
 Quit OpenBot before moving data. To reset application state and the shared browser profile while
