@@ -61,10 +61,11 @@ export function MemoryEditor({
 }) {
   const workspace = useMobileWorkspace();
   const action = useRecordAction();
-  const [text, setText] = useState(memory?.text ?? "");
+  const [editedText, setEditedText] = useState<string | undefined>();
+  const text = editedText ?? memory?.text ?? "";
   const [savedText, setSavedText] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
-  const dirty = text.trim() !== (savedText ?? memory?.text ?? "");
+  const dirty = text.trim() !== (memory ? memory.text : (savedText ?? ""));
   useRecordDraftGuard(dirty && !finished, action.pending);
   useEffect(() => {
     if (finished) router.back();
@@ -79,7 +80,7 @@ export function MemoryEditor({
         value={text}
         editable={!disabled}
         maxLength={INPUT_LIMITS.agentMemoryText}
-        onChangeText={setText}
+        onChangeText={(value) => setEditedText(value === (memory?.text ?? "") ? undefined : value)}
       />
       <SheetSaveAction
         canSave={!disabled && Boolean(text.trim()) && dirty}
@@ -91,6 +92,7 @@ export function MemoryEditor({
             () => workspace.saveAgentMemory(agent.id, text.trim(), agent.serverId, memory?.id),
             () => {
               setSavedText(text.trim());
+              if (memory) setEditedText(undefined);
             },
           )
         }

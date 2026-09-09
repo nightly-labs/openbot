@@ -99,7 +99,9 @@ Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. 
 
 - Disable bounce and overscroll (`bounces={false}`, `alwaysBounceVertical={false}` and
   `overScrollMode="never"`). Content that fits stays still; longer content keeps native scrolling.
-  Do not disable scrolling globally or add a height-measurement loop to decide whether it is needed.
+  Do not disable scrolling globally. Agent Info uses `scrollOnlyOnOverflow` to disable touch
+  scrolling on short pages. It compares native content and viewport sizes without changing layout,
+  and permits scrolling while the keyboard is visible. Keep this opt-in behavior in `SheetScrollView`.
 - With an iOS native header, it reads `HeaderHeightContext` and `HeaderShownContext` from
   `expo-router/react-navigation`, disables automatic content inset adjustment, and adds the
   measured header height inside scrollable content. This keeps the first item below the title at

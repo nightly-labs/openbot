@@ -376,6 +376,7 @@ it("opens the same host-bound sheet from the chat avatar and the row Info action
     ),
   );
   await act(() => fireEvent.click(screen.getByText("Travel")));
+  expect(screen.queryByText("Usage")).toBeNull();
   await click("Info");
   expect(mocks.push.mock.calls).toEqual([
     [{ pathname: "/agent-info/[agentId]", params: { agentId: original.id, serverId: original.serverId } }],
@@ -651,7 +652,7 @@ it("changes provider together with a compatible model and reasoning", async () =
 });
 
 it("creates, edits, and deletes a memory on its host", async () => {
-  const memory: AgentMemory = {
+  let memory: AgentMemory = {
     id: "memory",
     agentId: original.id,
     text: "Old note",
@@ -660,7 +661,7 @@ it("creates, edits, and deletes a memory on its host", async () => {
     createdAt: "",
     updatedAt: "",
   };
-  workspace.loadAgentMemories.mockResolvedValue([memory]);
+  workspace.loadAgentMemories.mockImplementation(async () => [memory]);
   await renderSheet("memories");
   await waitFor(() => expect(screen.getByRole("button", { name: "Add memory" })).toBeTruthy());
   await click("Add memory");
@@ -678,7 +679,19 @@ it("creates, edits, and deletes a memory on its host", async () => {
   mocks.recordId = memory.id;
   await renderSheet("memory");
   await waitFor(() => expect(screen.getByRole("textbox", { name: "Memory" })).toHaveProperty("value", "Old note"));
+  memory = { ...memory, text: "Desktop note" };
+  await act(async () => {
+    await client.invalidateQueries({ queryKey: ["agent-info"] });
+  });
+  await waitFor(() => expect(screen.getByRole("textbox", { name: "Memory" })).toHaveProperty("value", "Desktop note"));
+  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  expect(mocks.blocked).toBe(false);
   await edit("Memory", "Changed note");
+  memory = { ...memory, text: "New desktop note" };
+  await act(async () => {
+    await client.invalidateQueries({ queryKey: ["agent-info"] });
+  });
+  expect(screen.getByRole("textbox", { name: "Memory" })).toHaveProperty("value", "Changed note");
   workspace.servers = [{ ...host, state: "offline" }];
   await renderSheet("memory");
   expect(screen.getByRole("textbox", { name: "Memory" })).toHaveProperty("value", "Changed note");

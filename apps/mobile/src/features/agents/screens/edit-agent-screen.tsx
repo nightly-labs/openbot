@@ -116,6 +116,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
 
   return (
     <SheetScrollView
+      scrollOnlyOnOverflow
       className="bg-sheet"
       contentContainerClassName={page === "info" ? "gap-5 px-5 pb-safe-offset-5" : "gap-5 px-5 pb-safe-offset-5 pt-5"}
       keyboardDismissMode="interactive"
