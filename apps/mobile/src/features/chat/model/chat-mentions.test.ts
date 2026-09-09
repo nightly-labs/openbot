@@ -55,7 +55,7 @@ describe("mobile agent mentions", () => {
     ]);
   });
 
-  it("keeps outgoing markers and incoming message content when history is loaded", () => {
+  it("keeps exchange markers and the current agent response without exposing another agent message", () => {
     const exchange = {
       direction: "outgoing" as const,
       messageId: "m",
@@ -74,6 +74,7 @@ describe("mobile agent mentions", () => {
         status: "completed",
         exchange: { ...exchange, direction: "incoming" },
       },
+      { id: "response", author: "assistant", text: "Current agent response", createdAt: "now", status: "completed" },
     ]);
     expect(
       result.map((message) =>
@@ -83,7 +84,7 @@ describe("mobile agent mentions", () => {
             ? message.body
             : message.kind,
       ),
-    ).toEqual(["outgoing", "incoming", "reply"]);
+    ).toEqual(["outgoing", "incoming", "Current agent response"]);
   });
 });
 

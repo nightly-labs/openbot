@@ -46,6 +46,9 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
   for (const message of messages) {
     if (message.exchange) {
       result.push({ id: `exchange:${message.id}`, kind: "exchange", exchange: message.exchange });
+      // Match desktop: exchanges have markers, not another agent's text bubble.
+      // Incoming attachments remain visible below their marker.
+      if (message.exchange.direction !== "incoming" || !message.attachments?.length) continue;
     }
     if (message.questionPrompt) {
       result.push({ id: message.id, kind: "question", turnId: message.turnId, prompt: message.questionPrompt });
@@ -66,7 +69,7 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
         id: message.id,
         kind: "message",
         author: message.author === "user" ? "user" : "agent",
-        body: message.text,
+        body: message.exchange ? "" : message.text,
         streaming: message.status === "streaming",
         attachments: message.attachments,
       });
