@@ -21,6 +21,33 @@ async function createStore(): Promise<{ root: string; path: string; store: Sideb
 }
 
 describe("SidebarLayoutStore", () => {
+  it("persists empty sections through rename, reconciliation, reload, and deletion", async () => {
+    const { path, store } = await createStore();
+    const agents = new Set<string>();
+    const created = await store.mutate({ type: "create", name: "Product" }, agents);
+    const sectionId = created.sections[0]?.id ?? "";
+    const withReference = await store.mutate({ type: "create", name: "Reference" }, agents);
+    const referenceId = withReference.sections[1]?.id ?? "";
+    await store.mutate({ type: "rename", sectionId, name: "Core" }, agents);
+    await store.reconcileAgents(agents);
+    const restored = new SidebarLayoutStore(path);
+    await restored.initialize();
+    expect(restored.getSnapshot()).toMatchObject({
+      sections: [
+        { id: sectionId, name: "Core" },
+        { id: referenceId, name: "Reference" },
+      ],
+      order: [SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID, sectionId, referenceId],
+    });
+    await restored.mutate({ type: "delete", sectionId }, agents);
+    const deleted = new SidebarLayoutStore(path);
+    await deleted.initialize();
+    expect(deleted.getSnapshot()).toMatchObject({
+      sections: [{ id: referenceId, name: "Reference" }],
+      order: [SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID, referenceId],
+    });
+  });
+
   it("persists shared sections, assignments, names, and the complete order", async () => {
     const { path, store } = await createStore();
     const agents = new Set(["chief", "research"]);
