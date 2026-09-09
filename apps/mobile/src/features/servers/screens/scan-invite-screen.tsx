@@ -4,7 +4,7 @@ import { Button } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { useState } from "react";
 import { useCSSVariable } from "uniwind";
-import { QrScanner } from "@/features/auth/screens/scan-qr-code-screen";
+import { QrScanner } from "@/features/auth/components/qr-scanner";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { AddServerScreen } from "./add-server-screen";
 
