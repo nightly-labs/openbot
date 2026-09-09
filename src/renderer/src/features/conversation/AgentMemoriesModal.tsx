@@ -4,6 +4,7 @@ import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createScrollFades } from "../../components/createScrollFades";
 import { Button, Dialog, IconButton, Plus, Textarea, Trash2, X } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 import type { MemoriesPort } from "./memories-port";
 
 interface AgentMemoriesModalProps {
@@ -40,7 +41,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       setMemories(next);
       props.onCountChange(next.length);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not load memories.");
+      setError(errorMessage(caught, "Could not load memories."));
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -84,7 +85,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       if (!operationSucceeded) {
         analytics.track("memory_action", { action: "create", result: "failed", failure_code: "create_failed" });
       }
-      setError(caught instanceof Error ? caught.message : "Could not save the memory.");
+      setError(errorMessage(caught, "Could not save the memory."));
     } finally {
       setSavingId(null);
     }
@@ -135,7 +136,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       if (!operationSucceeded) {
         analytics.track("memory_action", { action: "update", result: "failed", failure_code: "update_failed" });
       }
-      setError(caught instanceof Error ? caught.message : "Could not update the memory.");
+      setError(errorMessage(caught, "Could not update the memory."));
     } finally {
       setSavingId(null);
     }
@@ -156,7 +157,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       if (!operationSucceeded) {
         analytics.track("memory_action", { action: "delete", result: "failed", failure_code: "delete_failed" });
       }
-      setError(caught instanceof Error ? caught.message : "Could not delete the memory.");
+      setError(errorMessage(caught, "Could not delete the memory."));
     } finally {
       setSavingId(null);
     }
@@ -178,7 +179,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       if (!operationSucceeded) {
         analytics.track("memory_action", { action: "clear", result: "failed", failure_code: "clear_failed" });
       }
-      setError(caught instanceof Error ? caught.message : "Could not clear the memories.");
+      setError(errorMessage(caught, "Could not clear the memories."));
     } finally {
       setSavingId(null);
     }

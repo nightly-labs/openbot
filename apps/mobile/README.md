@@ -145,6 +145,33 @@ In short, use HeroUI Native for application content and reusable product compone
 
 ## Verification
 
+Chat follows the [v0 chat interaction model](https://vercel.com/blog/how-we-built-the-v0-ios-app).
+`use-chat-motion.ts` owns measurements, native blank-space insets, initial positioning, and send
+animation sequencing. Message groups keep stable keys. Responses fill the blank space without
+autoscrolling; the down-arrow returns to the latest content. Keyboard Controller absorbs keyboard
+and composer growth into the blank space before shifting content at the end of the chat.
+
+Streaming Markdown uses a bounded reveal pool (four active nodes, batches every 32 ms). It renders
+the complete received text without a second typewriter queue. Reduced motion skips movement.
+The floating composer uses the existing Expo glass components with an opaque accessibility fallback.
+Mobile file attachments are currently disabled by `CHAT_ATTACHMENTS_ENABLED` in
+`use-chat-attachments.ts`. The plus button shows a native Coming soon dialog; large pasted text
+stays in the input. When enabled, the native menu on the plus button opens Files. The plus button and input share one row; there is
+no separate paste button. The native multiline input grows to five lines, then scrolls internally;
+its height limit follows the system font scale. Large text pasted into the input becomes a text attachment. Mobile uploads
+use the released file-transfer protocol and are limited to 10 MB per file. Sending dismisses the
+keyboard. The gesture area covers the chat and uses the measured composer height for dismissal.
+The installed Keyboard Controller content-inset hit-test workaround enables scrolling in blank space.
+
+Device verification must cover: first send with the keyboard open/closed; subsequent sends; short
+and long responses; initial history position; scrolling up while streaming; down-arrow; multiline
+composer growth at the end and in history; interactive keyboard dismissal and swipe-to-focus;
+background/foreground; reduced motion/transparency; text/image/file paste; upload failure and retry.
+Code blocks show the fence language and a Copy action. They use the same syntax tokenizer as
+desktop, render native text, and retain plain text for unknown languages. Highlighting does not
+change source whitespace. Copy writes only the source to the system clipboard.
+The local model and protocol tests do not establish native animation quality.
+
 ```bash
 bun run mobile:lint
 bun run mobile:typecheck

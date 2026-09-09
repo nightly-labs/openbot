@@ -32,7 +32,6 @@ import type {
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import { IPC_CHANNELS } from "@openbot/contracts/ipc";
-import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, safeStorage, screen, shell } from "electron";
 import electronUpdater from "electron-updater";
@@ -90,8 +89,6 @@ import { readUpdatePreference } from "./update-preference-store";
 import { supportsInstalledUpdates, UpdateService } from "./update-service";
 import { WHISPER_MODEL_NAME, WHISPER_MODEL_URL } from "./voice-model-service";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
-
-const logger = createOpenBotLogger("main");
 
 const SETUP_FILE = "openbot-setup-v2.json";
 const ANALYTICS_PREFERENCE_FILE = "openbot-analytics-preference-v1.json";
@@ -338,6 +335,9 @@ export async function createApplicationServices({
   const updatePreference = await readUpdatePreference(updatePreferenceFile);
   const providerRuntimes = new ProviderRuntimeManager({
     root: join(app.getPath("userData"), "provider-runtimes"),
+    updateRuntime: async (provider, install) => {
+      await service.updateProviderCli(provider, install);
+    },
   });
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () => providerRuntimes.stop());
   // Before `new AgentService`, which reads every `executablePath` eagerly.
@@ -364,8 +364,8 @@ export async function createApplicationServices({
   /*
    * The runtime manager decides which provider has an update waiting, by comparing against the
    * pinned lock. It knows the copies it downloaded itself; a CLI the user installed is only ever
-   * reported in the agent status, so it is passed on from here. Nothing is downloaded for such an
-   * install - the offer only leads to the CLI's own updater.
+   * reported in the agent status, so it is passed on from here. Its update offer installs the
+   * pinned managed copy and leaves the system installation untouched.
    */
   const trackSystemCliVersions = (status: AgentStatus): void => {
     for (const provider of status.providers ?? []) {
@@ -378,11 +378,6 @@ export async function createApplicationServices({
     if (event.type === "status") trackSystemCliVersions(event.status);
   });
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
-  providerRuntimes.on("ready", (provider) => {
-    void service.refreshProvider(provider).catch((error) => {
-      logger.error(`Unable to refresh ${provider} after runtime installation:`, toLogValue(error));
-    });
-  });
   const skills = new SkillMarketplaceService(
     centralAuth,
     () => service.listAgents(),

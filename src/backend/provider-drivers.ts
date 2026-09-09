@@ -18,28 +18,11 @@ export interface ProviderCliCommand {
 }
 
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
-const CLI_UPDATE_TIMEOUT_MS = 10 * 60_000;
-
-/**
- * The CLI's own updater, for an install the user made. Each of the three ships one, and each one
- * decides for itself what "latest" means, which is the point: a user is not held to the version
- * OpenBot pins for the runtime it manages. OpenBot never runs these against its managed copy --
- * that install is replaced wholesale by the runtime manager, and a self-updater loose inside it
- * would leave two owners for one directory.
- */
-const CLI_UPDATE_COMMAND: ProviderCliCommand = {
-  argv: ["update"],
-  env: () => ({}),
-  timeoutMs: CLI_UPDATE_TIMEOUT_MS,
-};
-
 export interface BuiltInProviderDriver {
   id: AgentProviderId;
   label: string;
   signInMessage: string;
   cliLogin?: ProviderCliCommand;
-  /** Absent for a provider whose CLI cannot update itself, which offers the user no update. */
-  cliUpdate?: ProviderCliCommand;
   resolveCli(options?: { bundledExecutable?: string | null }): Promise<AgentCliInfo>;
   createClient(cli: AgentCliInfo, requestTimeoutMs: number): AgentClient;
   authState(account: AccountReadResult["account"]): AgentAuthState;
@@ -51,7 +34,6 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     id: "codex",
     label: "Codex",
     signInMessage: "Run `codex login` to use Codex.",
-    cliUpdate: CLI_UPDATE_COMMAND,
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs) => new CodexAppServerClient(cli.executable, requestTimeoutMs),
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
@@ -70,7 +52,6 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       env: (cli): Record<string, string> => (cli.source === "managed" ? { DISABLE_AUTOUPDATER: "1" } : {}),
       timeoutMs: CLI_LOGIN_TIMEOUT_MS,
     },
-    cliUpdate: CLI_UPDATE_COMMAND,
     resolveCli: resolveClaudeCli,
     createClient: (cli, requestTimeoutMs) => new ClaudeAgentClient(cli, undefined, undefined, requestTimeoutMs),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
@@ -85,7 +66,6 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       env: () => ({ GROK_OAUTH2_REFERRER: "openbot" }),
       timeoutMs: CLI_LOGIN_TIMEOUT_MS,
     },
-    cliUpdate: CLI_UPDATE_COMMAND,
     resolveCli: resolveGrokCli,
     createClient: (cli, requestTimeoutMs) => new GrokAgentClient(cli, requestTimeoutMs),
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),

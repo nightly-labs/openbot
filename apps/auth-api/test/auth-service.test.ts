@@ -1,7 +1,13 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AccountSession } from "@openbot/contracts/mobile-connect";
 import { describe, expect, it, vi } from "vitest";
-import { AuthService, generateOneTimeCode, normalizeOneTimeCode } from "../src/server/auth-service";
+import {
+  AuthService,
+  emailDeliveryFailure,
+  generateOneTimeCode,
+  isEmailDeliveryFailure,
+  normalizeOneTimeCode,
+} from "../src/server/auth-service";
 import type {
   AuthRepository,
   AuthUser,
@@ -432,6 +438,11 @@ describe("email one-time codes", () => {
         expect.objectContaining({ kind: "desktop", current: false }),
       ]),
     );
+    const desktopSession = accountSessions.find((item) => item.kind === "desktop");
+    await expect(
+      service.revokeAccountSession(mobileToken, desktopSession?.sessionId ?? "missing"),
+    ).rejects.toMatchObject({ status: 403, code: "desktop_session_protected" });
+    expect(await service.authenticateDesktopSession(session.sessionToken)).toMatchObject({ id: session.user.id });
     const tabletTicket = await service.issueMobileAuthTicket(session.sessionToken, "203.0.113.4");
     const tablet = await service.redeemMobileAuthTicket(
       tabletTicket.ticket,
@@ -479,6 +490,8 @@ describe("email one-time codes", () => {
         sourceIp: "203.0.113.4",
       }),
     ).rejects.toMatchObject({ code: "invalid_sign_in_code" });
+    await service.revokeAccountSession(session.sessionToken, desktopSession?.sessionId ?? "missing");
+    expect(await service.authenticateDesktopSession(session.sessionToken)).toBeNull();
   });
 
   it("exposes a code only in explicit development mode", async () => {
@@ -651,6 +664,42 @@ describe("email one-time codes", () => {
       service.startEmailSignIn("person@example.com", "203.0.113.4", "10000000-0000-4000-8000-000000000004"),
     ).resolves.toMatchObject({ challengeId: "10000000-0000-4000-8000-000000000004" });
     expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks the caller to wait when the provider refuses more messages", async () => {
+    const repository = new MemoryAuthRepository();
+    const send = vi.fn().mockRejectedValueOnce(new Error("email_delivery_rate_limited")).mockResolvedValue(undefined);
+    const service = new AuthService({ repository, delivery: { send }, now: () => 1_000 });
+
+    await expect(
+      service.startEmailSignIn("person@example.com", "203.0.113.4", "10000000-0000-4000-8000-000000000010"),
+    ).rejects.toMatchObject({
+      status: 429,
+      code: "email_delivery_rate_limited",
+      retryAfterSeconds: 300,
+    });
+    await expect(
+      service.startEmailSignIn("person@example.com", "203.0.113.4", "10000000-0000-4000-8000-000000000011"),
+    ).resolves.toMatchObject({ challengeId: "10000000-0000-4000-8000-000000000011" });
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives every email path the same answer for a refused mailbox", () => {
+    expect(emailDeliveryFailure("email_delivery_rate_limited", "OpenBot could not send the invitation.")).toMatchObject(
+      {
+        status: 429,
+        code: "email_delivery_rate_limited",
+        retryAfterSeconds: 300,
+      },
+    );
+    expect(emailDeliveryFailure("smtp_message_failed", "OpenBot could not send the invitation.")).toMatchObject({
+      status: 502,
+      code: "email_delivery_failed",
+      message: "OpenBot could not send the invitation.",
+    });
+    expect(isEmailDeliveryFailure(new Error("email_delivery_rate_limited"))).toBe(true);
+    expect(isEmailDeliveryFailure(new Error("smtp_message_failed"))).toBe(true);
+    expect(isEmailDeliveryFailure(new SyntaxError("Unexpected end of JSON input"))).toBe(false);
   });
 
   it("rejects reuse of an idempotency key for a different email", async () => {

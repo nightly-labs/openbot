@@ -18,6 +18,7 @@ import {
 } from "../../app-message-projection";
 import { createStoredMessage, updateStored } from "../../app-stored-values";
 import type { AgentMessage } from "../../data";
+import { errorMessage } from "../../error-message";
 import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
@@ -610,7 +611,7 @@ const Conversation = createSimpleContext({
       } catch (error) {
         if (!requestIsCurrent()) return;
         updateConversation(agentId, (conversation) => {
-          conversation.olderError = error instanceof Error ? error.message : "Older messages could not load.";
+          conversation.olderError = errorMessage(error, "Older messages could not load.");
         });
       } finally {
         if (scopeIsCurrent() && conversations[agentId] === conversationAtStart) {

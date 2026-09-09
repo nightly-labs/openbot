@@ -808,6 +808,21 @@ export const FirstAgent: Story = {
   },
 };
 
+export const EmptySections: Story = {
+  args: {
+    ...FirstAgent.args,
+    layout: {
+      ...defaultSidebarLayout(),
+      sections: [
+        { id: demoSectionId, name: "Product" },
+        { id: emptySectionId, name: "Research" },
+      ],
+      order: ["people", "unassigned", demoSectionId, emptySectionId],
+    },
+  },
+  decorators: FirstAgent.decorators,
+};
+
 export const FirstAgentNarrow: Story = {
   ...FirstAgent,
   decorators: [(Story) => <div style={{ width: "220px", height: "100vh" }}>{Story()}</div>],
@@ -834,4 +849,61 @@ export const Channels: Story = {
 
 export const ChannelsCompact: Story = {
   args: { ...Channels.args, compact: true },
+};
+
+export const DeleteConfirmationKeyboard: Story = {
+  args: {
+    layout: sectionedLayout,
+    pinnedItems: [],
+    onDeleteAgent: fn(async () => undefined),
+    onMutateLayout: fn(async () => undefined),
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+  play: async ({ args: storyArgs, canvas, canvasElement, userEvent }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    for (const kind of ["agent", "section"] as const) {
+      const trigger = canvas.getByRole("button", { name: kind === "agent" ? /Chief, CEO/ : "Core team" });
+      const deletion = kind === "agent" ? storyArgs.onDeleteAgent : storyArgs.onMutateLayout;
+      const openConfirmation = async () => {
+        fireEvent.contextMenu(trigger);
+        const menu = await body.findByRole("menu", {
+          name: kind === "agent" ? "Agent actions" : "Section actions",
+        });
+        within(menu)
+          .getByRole("menuitem", { name: kind === "agent" ? "Delete agent" : "Delete" })
+          .focus();
+        await userEvent.keyboard("{Enter}");
+        const dialog = await body.findByRole("alertdialog");
+        await waitFor(() => expect(within(dialog).getByRole("button", { name: "Delete" })).toHaveFocus());
+        return dialog;
+      };
+
+      const dialog = await openConfirmation();
+      await expect(deletion).not.toHaveBeenCalled();
+      const confirm = within(dialog).getByRole("button", { name: "Delete" });
+      const cancel = within(dialog).getByRole("button", { name: "Cancel" });
+      await userEvent.tab();
+      await expect(cancel).toHaveFocus();
+      await userEvent.tab({ shift: true });
+      await expect(confirm).toHaveFocus();
+      await userEvent.tab({ shift: true });
+      await expect(cancel).toHaveFocus();
+      await userEvent.keyboard("{Enter}");
+      await waitFor(() => expect(body.queryByRole("alertdialog")).not.toBeInTheDocument());
+      await expect(deletion).not.toHaveBeenCalled();
+
+      await openConfirmation();
+      await userEvent.keyboard("{Escape}");
+      await waitFor(() => expect(body.queryByRole("alertdialog")).not.toBeInTheDocument());
+      await expect(deletion).not.toHaveBeenCalled();
+
+      await openConfirmation();
+      await userEvent.keyboard("{Enter}");
+      await waitFor(() => expect(deletion).toHaveBeenCalledOnce());
+      await expect(deletion).toHaveBeenCalledWith(
+        kind === "agent" ? "chief" : { type: "delete", sectionId: demoSectionId },
+      );
+      await waitFor(() => expect(body.queryByRole("alertdialog")).not.toBeInTheDocument());
+    }
+  },
 };

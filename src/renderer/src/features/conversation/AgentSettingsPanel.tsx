@@ -37,6 +37,7 @@ import {
   Textarea,
 } from "../../components/ui";
 import type { AgentProfile } from "../../data";
+import { errorMessage } from "../../error-message";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
@@ -266,7 +267,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       await props.onUpdateAgent(props.agent.id, updates);
       return true;
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "Could not save agent settings.");
+      setSaveError(errorMessage(error, "Could not save agent settings."));
       return false;
     }
   }
@@ -283,7 +284,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       return saved;
     } catch (error) {
       if (props.agent.id === agentId) {
-        setSaveError(error instanceof Error ? error.message : "Could not save agent settings.");
+        setSaveError(errorMessage(error, "Could not save agent settings."));
       }
       return false;
     }
@@ -341,7 +342,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       await props.onSetAgentAvatar(props.agent.id, image);
       return true;
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "Could not save the agent avatar.");
+      setSaveError(errorMessage(error, "Could not save the agent avatar."));
       return false;
     } finally {
       setDraft((state) => {
@@ -360,7 +361,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       const image = await normalizeAvatarFile(file);
       await props.onSetAgentAvatar(props.agent.id, image);
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "Could not process the agent avatar.");
+      setSaveError(errorMessage(error, "Could not process the agent avatar."));
     } finally {
       setDraft((state) => {
         state.avatar.uploadBusy = false;

@@ -83,9 +83,9 @@ export function AccountSessionsScreen() {
             disclosure={false}
             disabled={revoke.isPending}
             key={item.sessionId}
-            supportingText={`${item.kind} · Last active ${new Date(item.lastActiveAt).toLocaleString()}${item.current ? " · This device" : " · Tap to disconnect"}`}
+            supportingText={`${item.kind} · Last active ${new Date(item.lastActiveAt).toLocaleString()}${item.current ? " · This device" : item.kind === "mobile" ? " · Tap to disconnect" : ""}`}
             onPress={
-              item.current
+              item.current || item.kind === "desktop"
                 ? undefined
                 : () =>
                     Alert.alert(

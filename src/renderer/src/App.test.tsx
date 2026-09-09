@@ -337,6 +337,28 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
+  it("restores empty sections and their collapsed state without agents after remount", async () => {
+    vi.mocked(window.openbot.agent.listAgents).mockResolvedValue([]);
+    vi.mocked(window.openbot.agent.getSidebarLayout).mockResolvedValue({
+      revision: 1,
+      sections: [{ id: "11111111-1111-4111-8111-111111111111", name: "Product" }],
+      order: ["people", "unassigned", "11111111-1111-4111-8111-111111111111"],
+      agentAssignments: {},
+      agentOrder: [],
+    });
+    const view = render(() => <App />);
+    await fireEvent.click(await screen.findByRole("button", { name: "Product" }));
+    expect(screen.getByRole("button", { name: "Product" })).toHaveAttribute("aria-expanded", "false");
+    view.unmount();
+
+    render(() => <App />);
+    const toggle = await screen.findByRole("button", { name: "Product" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Create your first agent" })).toBeInTheDocument();
+  });
+
   it("creates an agent from a suggestion with one complete backend input", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });

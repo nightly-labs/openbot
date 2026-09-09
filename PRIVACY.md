@@ -140,6 +140,12 @@ Conversation read/unread changes are stored on the desktop host and shared with 
 Mobile chat uses a local symbol beside links. It does not fetch website icons or Markdown images
 when displaying a conversation. Link destinations are contacted only when you choose to open them.
 
+Mobile chat can send selected files to the conversation's desktop host through the existing encrypted
+team connection. Text pasted into the input is processed only after the user pastes it. A text paste
+longer than 4,000 characters becomes a text attachment. Selected documents can also have a temporary
+copy in the phone's system cache. Uploads are limited to 10 MB per file on mobile; successful uploads
+become managed attachments on the host. Cloudflare account storage does not receive these files.
+
 ## Email delivery and infrastructure providers
 
 OpenBot sends sign-in and team invitation messages through the configured SMTP provider. The

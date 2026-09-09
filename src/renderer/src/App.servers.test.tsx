@@ -1161,8 +1161,14 @@ describe("OpenBot connected desktop shell", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps the current selection and shows an error when duplication fails", async () => {
-    vi.mocked(window.openbot.agent.duplicateAgent).mockRejectedValueOnce(new Error("The agent is busy."));
+  it.each([
+    ["The agent is busy.", "The agent is busy."],
+    [
+      "Error invoking remote method 'agent:duplicate': Error: EACCES: open '/private/workspace'",
+      "OpenBot does not have permission to complete this action. Check the file or folder permissions, then try again.",
+    ],
+  ])("keeps the current selection and explains duplication failures: %s", async (error, message) => {
+    vi.mocked(window.openbot.agent.duplicateAgent).mockRejectedValueOnce(new Error(error));
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     await fireEvent.contextMenu(screen.getByRole("button", { name: /Sales Outbound/ }), {
@@ -1172,7 +1178,7 @@ describe("OpenBot connected desktop shell", () => {
 
     await fireEvent.pointerUp(screen.getByRole("menuitem", { name: "Duplicate agent" }), { button: 0 });
 
-    expect(await screen.findByText("Could not duplicate agent")).toBeVisible();
+    expect(await screen.findByText(message)).toBeVisible();
     expect(screen.getByRole("heading", { name: "Chief" })).toBeInTheDocument();
   });
 

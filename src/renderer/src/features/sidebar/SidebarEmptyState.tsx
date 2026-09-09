@@ -21,7 +21,7 @@ export function SidebarEmptyState() {
       }
     >
       {(action) => (
-        <div class="sidebar-first-agent-state">
+        <div class={props.layout.sections.length === 0 ? "sidebar-first-agent-state" : undefined}>
           <Button
             variant="ghost"
             type="button"

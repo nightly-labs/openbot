@@ -1,4 +1,5 @@
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
+import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -59,7 +60,7 @@ export function AddServerScreen({
       setJoinedId(serverId);
       setJoining(false);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "OpenBot could not join this server.");
+      setError(errorMessage(cause, "OpenBot could not join this server."));
       joinInFlight.current = false;
       setJoining(false);
     }

@@ -10,7 +10,7 @@ import {
 
 import { randomToken, sha256 } from "./crypto";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
-import { EMAIL_CODE_DELIVERY_BUDGET_MS } from "./smtp-email-delivery";
+import { EMAIL_CODE_DELIVERY_BUDGET_MS, RATE_LIMITED_DELIVERY_ERROR } from "./smtp-email-delivery";
 import type {
   AuthRepository,
   AuthUser,
@@ -28,6 +28,10 @@ const TEAM_TICKET_TTL_MS = 2 * 60_000;
 const MOBILE_CONNECT_SERVER_ID = "00000000-0000-4000-8000-000000000002";
 const RATE_WINDOW_MS = 15 * 60_000;
 const AMBIGUOUS_DELIVERY_ERRORS = new Set(["smtp_delivery_unknown", "email_delivery_unknown"]);
+// A provider sender limit frees again as its window rolls forward, so the client waits and retries
+// rather than reporting a permanent failure. The wait is shorter than the usual hourly window: some
+// capacity returns before the window ends, and a countdown of a whole hour reads like an outage.
+const DELIVERY_RATE_LIMIT_RETRY_SECONDS = 5 * 60;
 
 interface AuthServiceOptions {
   repository: AuthRepository;
@@ -132,7 +136,7 @@ export class AuthService {
         );
       }
       await this.#repository.completeEmailChallengeDelivery(challengeHash, "failed", this.#now());
-      throw new AuthServiceError(502, "email_delivery_failed", "OpenBot could not send the sign-in code.");
+      throw emailDeliveryFailure(deliveryError, "OpenBot could not send the sign-in code.");
     }
     await this.#repository.completeEmailChallengeDelivery(challengeHash, "sent", this.#now());
 
@@ -374,6 +378,16 @@ export class AuthService {
     if (!isUuidV4(sessionId)) throw new AuthServiceError(400, "invalid_session", "The session ID is invalid.");
     const user = await this.authenticate(sessionToken);
     if (!user) throw new AuthServiceError(401, "unauthorized", "The session is invalid.");
+    if (!(await this.authenticateDesktopSession(sessionToken))) {
+      const sessions = await this.#repository.listAccountSessions(user.id, sessionToken, this.#now());
+      if (sessions.some((session) => session.sessionId === sessionId && session.kind === "desktop")) {
+        throw new AuthServiceError(
+          403,
+          "desktop_session_protected",
+          "Desktop sessions cannot be disconnected from mobile.",
+        );
+      }
+    }
     await this.#repository.revokeAccountSession(user.id, sessionId, this.#now());
     await this.#flushSessionRevocations();
   }
@@ -403,10 +417,25 @@ export class AuthService {
 }
 
 function safeDeliveryError(error: unknown): string {
-  if (!(error instanceof Error)) return "unknown_delivery_error";
-  return /^smtp_[a-z_]+$/u.test(error.message) || /^email_delivery_[a-z_]+$/u.test(error.message)
-    ? error.message
-    : "unknown_delivery_error";
+  return isEmailDeliveryFailure(error) ? error.message : "unknown_delivery_error";
+}
+
+// The sign-in code and the team invitation leave from the same mailbox, so a refusal must read the
+// same way on both paths.
+export function isEmailDeliveryFailure(error: unknown): error is Error {
+  return error instanceof Error && /^(?:smtp|email_delivery)_[a-z_]+$/u.test(error.message);
+}
+
+export function emailDeliveryFailure(deliveryError: string, permanentMessage: string): AuthServiceError {
+  if (deliveryError === RATE_LIMITED_DELIVERY_ERROR) {
+    return new AuthServiceError(
+      429,
+      "email_delivery_rate_limited",
+      "OpenBot cannot send more email right now. Try again when the countdown ends.",
+      DELIVERY_RATE_LIMIT_RETRY_SECONDS,
+    );
+  }
+  return new AuthServiceError(502, "email_delivery_failed", permanentMessage);
 }
 
 export class AuthServiceError extends Error {

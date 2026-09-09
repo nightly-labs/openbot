@@ -42,16 +42,16 @@ export function SidebarNav() {
       <div class="agent-list-content">
         <Show
           when={
-            resolvedPinnedItems().length > 0 ||
-            filteredChats().length > 0 ||
-            (props.showPeople !== false && filteredPeople().length > 0) ||
-            pending.sectionEditor?.target.kind === "create"
+            resolvedPinnedItems().length === 0 &&
+            filteredChats().length === 0 &&
+            (props.showPeople === false || filteredPeople().length === 0) &&
+            pending.sectionEditor?.target.kind !== "create"
           }
-          fallback={<SidebarEmptyState />}
         >
-          <SidebarPinnedGroup />
-          <SidebarSectionList />
+          <SidebarEmptyState />
         </Show>
+        <SidebarPinnedGroup />
+        <SidebarSectionList />
         <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
           {reorderAnnouncement()}
         </span>

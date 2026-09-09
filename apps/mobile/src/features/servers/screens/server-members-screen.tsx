@@ -1,6 +1,7 @@
 import { Host, Picker } from "@expo/ui";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import type { RemoteTeamMember } from "@openbot/team-client";
+import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams } from "expo-router";
@@ -229,7 +230,9 @@ export function ServerMembersScreen() {
           )}
         </View>
       ) : null}
-      {action.error ? <SettingsNote>{action.error.message}</SettingsNote> : null}
+      {action.error ? (
+        <SettingsNote>{errorMessage(action.error, "Could not update this member. Try again.")}</SettingsNote>
+      ) : null}
       <SettingsSection title="Server members">
         {members.isError ? (
           <SettingsRow disclosure={false}>

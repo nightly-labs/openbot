@@ -206,8 +206,14 @@ describe("AgentMemoriesModal", () => {
     expect(await screen.findByText("This agent has no saved memories yet.")).toBeInTheDocument();
   });
 
-  it("shows loading errors and closes from the close button", async () => {
-    listMemories.mockRejectedValueOnce(new Error("Memory service is unavailable."));
+  it.each([
+    ["Memory service is unavailable.", "Memory service is unavailable."],
+    [
+      "Error invoking remote method 'agent:memories': Error: SQLITE_BUSY: database is locked",
+      "Could not load memories.",
+    ],
+  ])("shows readable loading errors and closes from the close button: %s", async (error, message) => {
+    listMemories.mockRejectedValueOnce(new Error(error));
     const onOpenChange = vi.fn();
     render(() => (
       <AgentMemoriesModal
@@ -218,7 +224,7 @@ describe("AgentMemoriesModal", () => {
       />
     ));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Memory service is unavailable.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
     await fireEvent.click(screen.getByRole("button", { name: "Close memories" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });

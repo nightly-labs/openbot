@@ -20,10 +20,13 @@ export function ChatQuestionPrompt({
     prompt.resolution ?? controller?.resolution ?? (controller ? null : { status: "expired" as const });
   if (resolution) {
     return (
-      <View className="gap-3 rounded-[26px] bg-control/60 p-4">
+      <View
+        className="max-w-[88%] self-start gap-2 rounded-[30px] bg-control/60 px-4 py-3"
+        style={{ borderCurve: "circular" }}
+      >
         <View className="flex-row items-center gap-2">
           {resolution.status === "answered" ? <Check color={String(muted)} size={18} /> : null}
-          <Typography weight="semibold">
+          <Typography type="body-sm" className="text-text-secondary">
             {resolution.status === "answered"
               ? "Answers sent"
               : resolution.status === "cancelled"
@@ -49,9 +52,13 @@ export function ChatQuestionPrompt({
   const { question, index, disabled, pending, failedAnswers, setIndex, answer, submit } = controller;
 
   return (
-    <View className="gap-2 rounded-[26px] bg-control/60 p-4" accessibilityLabel="Question form">
+    <View
+      className="w-full max-w-[88%] self-start gap-1 rounded-[30px] bg-control/60 px-4 py-3"
+      style={{ borderCurve: "circular" }}
+      accessibilityLabel="Question form"
+    >
       <View className="flex-row items-center gap-2">
-        <Typography weight="semibold" className="min-w-0 flex-1">
+        <Typography weight="medium" className="min-w-0 flex-1">
           {question.question}
         </Typography>
         <Button
@@ -99,15 +106,18 @@ export function ChatQuestionPrompt({
             variant="ghost"
             isDisabled={disabled}
             accessibilityLabel={option.label}
-            className="h-auto min-h-12 justify-start rounded-xl px-2 py-2"
+            className="h-auto min-h-12 justify-start rounded-[18px] px-2 py-2"
             onPress={() => answer([option.label])}
           >
-            <View className="size-6 items-center justify-center rounded-md bg-control">
-              <Typography type="body-xs" className="text-text-secondary">
+            <View
+              className="w-10 self-stretch items-center justify-center rounded-xl bg-control"
+              style={{ borderCurve: "continuous" }}
+            >
+              <Typography type="body-sm" weight="medium" className="text-text-secondary">
                 {String.fromCharCode(65 + optionIndex)}
               </Typography>
             </View>
-            <View className="min-w-0 flex-1">
+            <View className="min-w-0 flex-1 gap-0.5">
               <Typography type="body-sm" weight="medium">
                 {option.label}
               </Typography>
@@ -125,7 +135,9 @@ export function ChatQuestionPrompt({
           Or type your answer
         </Typography>
         <Button variant="ghost" size="sm" isDisabled={disabled} onPress={() => answer([])}>
-          <Button.Label>Skip</Button.Label>
+          <Typography type="body-xs" className="text-text-secondary">
+            Skip
+          </Typography>
         </Button>
       </View>
       {pending ? (

@@ -1,6 +1,7 @@
 import type { AttachmentSummary, ImageGenerationAspectRatio } from "@openbot/contracts/ipc";
 import { createEffect, createSignal, Show } from "solid-js";
 import { Button, X } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 import { DownloadIcon } from "./ConversationIcons";
 
 export type ImageGenerationStatus = "generating" | "completed" | "failed" | "interrupted";
@@ -38,8 +39,10 @@ export function ImageGeneration(props: ImageGenerationProps) {
       ? isAttachment()
         ? "The image preview is unavailable."
         : "The generated image preview is unavailable."
-      : (props.error ??
-        (props.status === "interrupted" ? "Image generation was interrupted." : "Image generation did not complete."));
+      : errorMessage(
+          props.error,
+          props.status === "interrupted" ? "Image generation was interrupted." : "Image generation did not complete.",
+        );
   const label = () => {
     if (props.status === "generating") return "Generating image";
     if (previewError() || previewUnavailable()) return "Image unavailable";

@@ -1004,8 +1004,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.connectProvider(provider, openExternal);
   }
 
-  updateProviderCli(provider: AgentProvider): Promise<AgentStatus> {
-    return this.#providers.updateProviderCli(provider);
+  updateProviderCli(provider: AgentProvider, install: () => Promise<string>): Promise<AgentStatus> {
+    return this.#providers.updateProviderCli(provider, install);
   }
 
   async stop(): Promise<void> {
