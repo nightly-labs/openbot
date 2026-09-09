@@ -128,7 +128,8 @@ export class DynamicIslandWindowController {
     const bounds = display ? dynamicIslandWindowBounds(display) : undefined;
     this.#cancelCollapse(displayId);
     if (interactive && bounds) window.setBounds(dynamicIslandInteractiveWindowBounds(bounds, true), false);
-    window.setFocusable(interactive);
+    // On macOS, focusability also allows the panel to become a main window in AltTab.
+    // Keep it non-focusable; mouse interaction does not require keyboard focus.
     window.setIgnoreMouseEvents(!interactive, { forward: true });
     if (interactive || !bounds) return;
     this.#collapseTimers.set(
