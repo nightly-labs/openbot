@@ -12,6 +12,7 @@ import {
   MessageGroup,
   Textarea,
 } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 import { TeamPersonAvatar, teamMemberName } from "../team/TeamPersonAvatar";
 import { calculateChatScrollMargin, createChatVirtualizer } from "./createChatVirtualizer";
 import { ScrollToLatestButton, scrollToLatestMessage } from "./MessageNavigation";
@@ -169,7 +170,7 @@ export function DirectConversation(props: DirectConversationProps) {
       setText("");
       if (result.readError) setError(result.readError);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The message was not sent.");
+      setError(errorMessage(cause, "The message was not sent."));
     } finally {
       setSending(false);
     }
@@ -182,7 +183,7 @@ export function DirectConversation(props: DirectConversationProps) {
     try {
       await props.onMarkRead();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not mark messages as read.");
+      setError(errorMessage(cause, "Could not mark messages as read."));
     } finally {
       setMarkingRead(false);
     }

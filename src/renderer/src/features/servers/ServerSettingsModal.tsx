@@ -62,6 +62,7 @@ import {
   UsersRound,
 } from "../../components/ui";
 import { truncateMiddle } from "../../components/ui/utils";
+import { errorMessage } from "../../error-message";
 import { SettingsDialogShell } from "../settings/SettingsDialogShell";
 import { teamMemberName } from "../team/TeamPersonAvatar";
 import { serverSupportsCapability } from "./server-capabilities";
@@ -326,7 +327,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       return true;
     } catch (error) {
       toast.error("Server action failed", {
-        description: error instanceof Error ? error.message : "The server action failed.",
+        description: errorMessage(error, "The server action failed."),
       });
       return false;
     } finally {
@@ -350,7 +351,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       });
     } catch (error) {
       setPanels((state) => {
-        state.identity.logoError = error instanceof Error ? error.message : "OpenBot could not read this image.";
+        state.identity.logoError = errorMessage(error, "OpenBot could not read this image.");
       });
     }
   }

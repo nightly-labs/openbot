@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { createScrollFades } from "../../../components/createScrollFades";
+import { errorMessage } from "../../../error-message";
 import type { ConversationProps } from "../conversation-types";
 import { calculateChatScrollMargin, createChatVirtualizer } from "../createChatVirtualizer";
 import { scrollToLatestMessage } from "../MessageNavigation";
@@ -105,7 +106,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     try {
       await deps.props.onMarkRead();
     } catch (error) {
-      deps.setComposerError(error instanceof Error ? error.message : "Could not mark messages as read.");
+      deps.setComposerError(errorMessage(error, "Could not mark messages as read."));
     } finally {
       deps.setMarkingRead(false);
     }

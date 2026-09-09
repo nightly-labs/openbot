@@ -3,6 +3,7 @@ import type { AccountSession, AvatarImageInput, CentralAuthUser } from "@openbot
 import { normalizeAccountName, validateProfileName } from "@openbot/contracts/validation";
 import { createEffect, createMemo, createStore } from "solid-js";
 import { normalizeAvatarFile } from "../../../avatar-image";
+import { errorMessage } from "../../../error-message";
 
 interface ProfileStoreProps {
   open: boolean;
@@ -162,7 +163,7 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
       await props.onUpdateAccountAvatar(image);
     } catch (error) {
       setPanels((state) => {
-        state.avatar.error = error instanceof Error ? error.message : "Could not update your profile photo.";
+        state.avatar.error = errorMessage(error, "Could not update your profile photo.");
       });
     } finally {
       setPanels((state) => {
@@ -219,7 +220,7 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
       });
     } catch (error) {
       setPanels((state) => {
-        state.profile.saveError = error instanceof Error ? error.message : "Could not update your display name.";
+        state.profile.saveError = errorMessage(error, "Could not update your display name.");
       });
       queueMicrotask(() => nameInput?.focus({ preventScroll: true }));
     } finally {
@@ -240,7 +241,7 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
       await props.onUpdateAccountAvatar(image);
     } catch (error) {
       setPanels((state) => {
-        state.avatar.error = error instanceof Error ? error.message : "Could not process your profile photo.";
+        state.avatar.error = errorMessage(error, "Could not process your profile photo.");
       });
     } finally {
       setPanels((state) => {

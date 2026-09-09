@@ -63,11 +63,7 @@ export function remoteConnectionFailure(stage: RemoteConnectionStage, error: unk
   const reason =
     error instanceof Error && SAFE_CONNECTION_ERRORS.has(error.message)
       ? error.message
-      : error instanceof TypeError
-        ? "TypeError."
-        : error instanceof SyntaxError
-          ? "SyntaxError."
-          : "Unexpected error.";
+      : "Could not complete this connection step.";
   return `${CONNECTION_STAGES[stage]}: ${reason}`;
 }
 

@@ -15,6 +15,7 @@ packages/
   contracts/         Process and network boundary types, limits, and pure validation
   logging/           ts-log Logger interface plus the redacting console/file implementation
   team-client/       Shared team connection, recovery, and WebRTC framing code
+  user-errors/       Shared user-facing error messages for desktop and mobile
 remote/
   api/               Bun Signal service for SDP, ICE, ticket checks, and TURN credentials
   scripts/           Bun checks and update commands for Signal and coturn

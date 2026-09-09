@@ -1,6 +1,7 @@
 import type { RemoteDesktopSession } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { errorMessage } from "../../error-message";
 import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { serverSupportsCapability } from "../servers/server-capabilities";
@@ -134,7 +135,7 @@ const RemoteDesktop = createSimpleContext({
         return session;
       } catch (error) {
         if (request === remoteDesktopConnectionRequest && remoteDesktopWorkspaceServerId() === serverId) {
-          setRemoteDesktopConnectionError(error instanceof Error ? error.message : "Could not start remote control.");
+          setRemoteDesktopConnectionError(errorMessage(error, "Could not start remote control."));
         }
         return undefined;
       } finally {

@@ -2,6 +2,7 @@ import type { JSX } from "@solidjs/web";
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/solid-router";
 import "@openbot/brand/logo.css";
 import "../styles.css";
+import { PageError } from "../components/landing/PageError";
 import { OPENBOT_SECURITY_HEADERS, openBotRootHead } from "../lib/site-metadata";
 
 export const Route = createRootRoute({
@@ -9,6 +10,8 @@ export const Route = createRootRoute({
   headers: () => OPENBOT_SECURITY_HEADERS,
   component: RootComponent,
   shellComponent: RootDocument,
+  errorComponent: () => <PageError onRetry={() => window.location.reload()} />,
+  notFoundComponent: () => <PageError notFound onRetry={() => window.location.reload()} />,
 });
 
 function RootComponent() {

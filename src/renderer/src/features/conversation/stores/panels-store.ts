@@ -1,5 +1,6 @@
 import type { AttachmentSummary, BrowserBounds } from "@openbot/contracts/ipc";
 import { createMemo, createSignal } from "solid-js";
+import { errorMessage } from "../../../error-message";
 import type { ConversationProps, MediaPreview, RightPanelMode, SidebarFilePreview } from "../conversation-types";
 
 export interface RoutineSettingsRequest {
@@ -114,7 +115,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           ? {
               ...current,
               loading: false,
-              error: error instanceof Error ? error.message : String(error),
+              error: errorMessage(error, "Could not preview this attachment. Try again."),
             }
           : current,
       );
@@ -124,20 +125,26 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   function attachmentAction(attachment: AttachmentSummary, action: "open" | "reveal" | "download") {
     void window.openbot.agent
       .openAttachment({ attachmentId: attachment.id, action })
-      .catch((error) => deps.setComposerError(error instanceof Error ? error.message : String(error)));
+      .catch((error) =>
+        deps.setComposerError(errorMessage(error, "Could not open or save this attachment. Try again.")),
+      );
   }
 
   function openSharedFile(path: string) {
     const ownerAgentId = deps.props.agent?.id;
     if (!ownerAgentId) return;
     const generation = deps.nextFilePreviewGeneration();
+    deps.setComposerError(null);
     void window.openbot.agent.previewSharedFile({ path }).then(
       (preview) => {
         if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== ownerAgentId) return;
         deps.setSidebarFilePreview({ ownerAgentId, source: "shared", path, preview });
         setActiveRightPanel("file-preview", ownerAgentId);
       },
-      (error) => deps.setComposerError(error instanceof Error ? error.message : String(error)),
+      (error) => {
+        if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== ownerAgentId) return;
+        deps.setComposerError(filePreviewError(error, path));
+      },
     );
   }
 
@@ -145,13 +152,17 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const agentId = deps.props.agent?.id;
     if (!agentId) return;
     const generation = deps.nextFilePreviewGeneration();
+    deps.setComposerError(null);
     void window.openbot.agent.previewWorkspaceFile({ agentId, path }).then(
       (preview) => {
         if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== agentId) return;
         deps.setSidebarFilePreview({ ownerAgentId: agentId, source: "workspace", path, preview });
         setActiveRightPanel("file-preview", agentId);
       },
-      (error) => deps.setComposerError(error instanceof Error ? error.message : String(error)),
+      (error) => {
+        if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== agentId) return;
+        deps.setComposerError(filePreviewError(error, path));
+      },
     );
   }
 
@@ -162,7 +173,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       file.source === "shared"
         ? window.openbot.agent.openSharedFile({ path: file.path })
         : window.openbot.agent.openWorkspaceFile({ agentId: file.ownerAgentId, path: file.path });
-    void request.catch((error) => deps.setComposerError(error instanceof Error ? error.message : String(error)));
+    void request.catch((error) => deps.setComposerError(errorMessage(error, "Could not open this file. Try again.")));
   }
 
   function closeSidebarFilePreview() {
@@ -194,3 +205,17 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
 }
 
 export type PanelsStore = ReturnType<typeof createPanelsStore>;
+
+function filePreviewError(error: unknown, path: string): string {
+  let decodedPath = path;
+  try {
+    decodedPath = decodeURIComponent(path);
+  } catch {
+    // A literal percent sign can be part of a file name.
+  }
+  const name = decodedPath.replaceAll("\\", "/").split("/").pop() || "File";
+  if (error instanceof Error && /\bENOENT\b/u.test(error.message)) {
+    return `“${name}” was not found. Ask the agent to create or restore the file, then click the link again.`;
+  }
+  return errorMessage(error, `Could not preview “${name}”. Try again.`);
+}

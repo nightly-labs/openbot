@@ -8,6 +8,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { errorMessage } from "../../error-message";
 import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
@@ -192,8 +193,7 @@ const DirectMessages = createSimpleContext({
         }
       } catch (error) {
         if (!scopeIsCurrent() || request !== directConversationRequest) return;
-        if (!hasCached)
-          setDirectConversationError(error instanceof Error ? error.message : "The messages could not load.");
+        if (!hasCached) setDirectConversationError(errorMessage(error, "The messages could not load."));
       } finally {
         if (scopeIsCurrent() && request === directConversationRequest) setDirectConversationLoading(false);
       }
@@ -233,7 +233,7 @@ const DirectMessages = createSimpleContext({
       } catch (error) {
         setDirectOlderErrors((current) => ({
           ...current,
-          [memberId]: error instanceof Error ? error.message : "Older messages could not load.",
+          [memberId]: errorMessage(error, "Older messages could not load."),
         }));
       } finally {
         setDirectOlderLoading((current) => ({ ...current, [memberId]: false }));
@@ -255,7 +255,7 @@ const DirectMessages = createSimpleContext({
         if (request !== directConversationRequest || activeDirectMemberId() !== memberId) return;
         setDirectOlderErrors((current) => ({
           ...current,
-          [memberId]: error instanceof Error ? error.message : "The unread message could not load.",
+          [memberId]: errorMessage(error, "The unread message could not load."),
         }));
       }
     }
@@ -299,7 +299,7 @@ const DirectMessages = createSimpleContext({
       try {
         await markDirectMessagesRead(memberId, message.sequence);
       } catch (error) {
-        readError = error instanceof Error ? error.message : "Could not mark messages as read.";
+        readError = errorMessage(error, "Could not mark messages as read.");
       }
       await refreshDirectThreads();
       return { message, ...(readError ? { readError } : {}) };

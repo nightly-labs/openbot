@@ -1,6 +1,7 @@
 import { createSignal } from "solid-js";
 import { formatTime } from "./app-message-projection";
 import type { AgentMessage } from "./data";
+import { errorMessage } from "./error-message";
 import { agentConversationKey } from "./features/conversation/conversation-keys";
 import { createSimpleContext } from "./simple-context";
 
@@ -23,7 +24,7 @@ const UiErrors = createSimpleContext({
     const [uiErrors, setUiErrors] = createSignal<Record<string, AgentMessage[]>>({});
 
     function appendUiError(agentId: string, error: unknown, status: string, serverId: string): void {
-      const body = error instanceof Error ? error.message : String(error);
+      const body = errorMessage(error, "The action could not be completed. Try again.");
       const errorKey = agentConversationKey(serverId, agentId);
       setUiErrors((current) => ({
         ...current,
