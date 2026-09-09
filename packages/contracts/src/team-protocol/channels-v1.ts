@@ -96,8 +96,11 @@ const draft: Decoder = (value) => {
     throw new Error("Invalid channel membership.");
   return result;
 };
+// 120 is the account-name bound: the author of a channel message can be a person, and their name
+// is longer than an agent name is allowed to be. The number is written out because this file keeps
+// the IPC limits out, so that a change there cannot move a frozen wire contract.
 const preview: Decoder = nullable((value) =>
-  record(value, { authorName: string(80), text: string(200), at: string(80) }),
+  record(value, { authorName: string(120), text: string(200), at: string(80) }),
 );
 const channel: Decoder = (value) => ({
   ...record(draft(value), draftFields),
@@ -163,7 +166,11 @@ const message: Decoder = (value) =>
     channelId: identifier,
     sequence,
     author: (author) =>
-      record(author, { kind: oneOf("member", "agent", "coordinator"), id: identifier, name: string(80) }),
+      record(author, {
+        kind: oneOf("member", "agent", "coordinator"),
+        id: identifier,
+        name: string(120),
+      }),
     taskId: nullable(identifier),
     superseded: boolean,
     message: conversationMessage,

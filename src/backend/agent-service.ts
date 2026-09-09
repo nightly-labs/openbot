@@ -188,8 +188,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       create: (input, configure) =>
         this.createAgent({ ...input.draft, initialMessage: input.initialMessage ?? "" }, configure, input.operationId),
       changed: (agent) => {
-        const session = this.#store.activeProviderSession(agent.id);
-        if (session) this.#conversation.unloadThread(session.externalSessionId);
+        this.#conversation.unloadAgentThreads(agent.id);
         this.#emit({ type: "agents-changed", agents: this.listAgents() });
         this.#drain.scheduleDrain(agent.id);
       },
@@ -874,10 +873,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         agent.reasoningEffort,
       );
     }
-    if (profileChanged && activeSession) {
-      // Re-resume before the next turn so App Server receives the updated standing instructions.
-      this.#conversation.unloadThread(activeSession.externalSessionId);
-    }
+    // Re-resume before the next turn so App Server receives the updated standing instructions. The
+    // agent chat is not the only session that holds them: a channel turn runs on a session of its
+    // own, and it is written from the same profile.
+    if (profileChanged) this.#conversation.unloadAgentThreads(agent.id);
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
     return agent;
   }

@@ -250,6 +250,18 @@ export class ConversationRuntime {
     this.#loadedThreads.delete(externalThreadId);
   }
 
+  /**
+   * Every provider session this agent holds: its own chat, and each channel thread it runs. The
+   * developer instructions are written when a session loads, so a change of the profile or of the
+   * memories has to unload all of them. One session alone would leave a channel turn on the values
+   * the agent had before.
+   */
+  unloadAgentThreads(agentId: string): void {
+    for (const [externalThreadId, owner] of this.#threadToAgent) {
+      if (owner === agentId) this.#loadedThreads.delete(externalThreadId);
+    }
+  }
+
   forgetExecutionThread(threadId: string): void {
     this.#forgottenExecutionThreads.add(threadId);
     this.#executionSnapshots.delete(threadId);

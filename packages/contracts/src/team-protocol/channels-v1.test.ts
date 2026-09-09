@@ -22,10 +22,70 @@ const channel = {
   createdAt: "2026-09-07T12:00:00.000Z",
 };
 
+const preview = { authorName: "Researcher", text: "Choose a format", at: channel.createdAt };
+const page = {
+  channel,
+  messages: [
+    {
+      id: "message-1",
+      channelId: channel.id,
+      sequence: 1,
+      author: { kind: "agent", id: "agent-1", name: "Researcher" },
+      taskId: "task-1",
+      superseded: false,
+      message: {
+        id: "message-1",
+        turnId: "turn-1",
+        author: "assistant",
+        text: "Choose a format",
+        createdAt: channel.createdAt,
+        status: "completed",
+        attachments: [
+          {
+            id: "attachment-1",
+            name: "report.txt",
+            size: 12,
+            kind: "file",
+            mimeType: "text/plain",
+            previewKind: "text",
+            previewUrl: null,
+          },
+        ],
+        questionPrompt: {
+          requestId: "question-1",
+          questions: [{ id: "format", header: "Format", question: "Which format?", isSecret: false, options: null }],
+          resolution: null,
+        },
+      },
+    },
+  ],
+  tasks: [
+    {
+      id: "task-1",
+      channelId: channel.id,
+      parentTaskId: null,
+      rootTaskId: "task-1",
+      ownerAgentId: "agent-1",
+      requestMessageId: "request-1",
+      instruction: "Prepare a report",
+      attachmentDraftIds: [],
+      expectedResult: "Report",
+      sourceMessageIds: ["request-1"],
+      dependencies: [],
+      resources: ["host"],
+      state: "running",
+      revision: 0,
+      assignmentCount: 0,
+      error: null,
+    },
+  ],
+  olderCursor: null,
+  throughSequence: 1,
+};
+
 describe("channel-chats-v1 payloads", () => {
   it("preserves the published command, list, page, and change fixtures", () => {
     expect(channelRequest(CHANNEL_ROUTES.command, command)).toEqual(command);
-    const preview = { authorName: "Researcher", text: "Choose a format", at: channel.createdAt };
     expect(
       channelResponse(CHANNEL_ROUTES.list, 200, [
         { ...channel, unreadCount: 1, activeTasks: 0, lastMessage: preview },
@@ -35,67 +95,6 @@ describe("channel-chats-v1 payloads", () => {
       { ...channel, unreadCount: 1, activeTasks: 0, lastMessage: preview },
       { ...channel, id: "channel-2", unreadCount: 0, activeTasks: 0, lastMessage: null },
     ]);
-    const page = {
-      channel,
-      messages: [
-        {
-          id: "message-1",
-          channelId: channel.id,
-          sequence: 1,
-          author: { kind: "agent", id: "agent-1", name: "Researcher" },
-          taskId: "task-1",
-          superseded: false,
-          message: {
-            id: "message-1",
-            turnId: "turn-1",
-            author: "assistant",
-            text: "Choose a format",
-            createdAt: channel.createdAt,
-            status: "completed",
-            attachments: [
-              {
-                id: "attachment-1",
-                name: "report.txt",
-                size: 12,
-                kind: "file",
-                mimeType: "text/plain",
-                previewKind: "text",
-                previewUrl: null,
-              },
-            ],
-            questionPrompt: {
-              requestId: "question-1",
-              questions: [
-                { id: "format", header: "Format", question: "Which format?", isSecret: false, options: null },
-              ],
-              resolution: null,
-            },
-          },
-        },
-      ],
-      tasks: [
-        {
-          id: "task-1",
-          channelId: channel.id,
-          parentTaskId: null,
-          rootTaskId: "task-1",
-          ownerAgentId: "agent-1",
-          requestMessageId: "request-1",
-          instruction: "Prepare a report",
-          attachmentDraftIds: [],
-          expectedResult: "Report",
-          sourceMessageIds: ["request-1"],
-          dependencies: [],
-          resources: ["host"],
-          state: "running",
-          revision: 0,
-          assignmentCount: 0,
-          error: null,
-        },
-      ],
-      olderCursor: null,
-      throughSequence: 1,
-    };
     expect(channelResponse(CHANNEL_ROUTES.read, 200, page)).toEqual(page);
     expect(channelResponse(CHANNEL_ROUTES.command, 200, { ...channel, providerSessionId: "private" })).toEqual(channel);
     expect(channelEvent({ type: "channels-changed", channelId: "channel-1", revision: 2 })).toEqual({
@@ -112,6 +111,21 @@ describe("channel-chats-v1 payloads", () => {
       channelId: "channel-1",
     });
   });
+  it("carries the name of a member author, which is an account name", () => {
+    // Eight family emoji are 88 UTF-16 units and 8 visible characters: a name an account can hold,
+    // and longer than an agent name may be. A codec that cut it here would refuse the page and the
+    // sidebar entry of every channel the person wrote in.
+    const name = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}".repeat(8);
+    const author = { kind: "member", id: "member-1", name };
+    const message = { ...page.messages[0], author };
+    expect(channelResponse(CHANNEL_ROUTES.read, 200, { ...page, messages: [message] })).toEqual({
+      ...page,
+      messages: [message],
+    });
+    const summary = { ...channel, unreadCount: 0, activeTasks: 0, lastMessage: { ...preview, authorName: name } };
+    expect(channelResponse(CHANNEL_ROUTES.list, 200, [summary])).toEqual([summary]);
+  });
+
   it("carries the update flag of a settings save, and only that flag", () => {
     const save = {
       type: "save",

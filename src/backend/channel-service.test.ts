@@ -2,7 +2,9 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { ChannelDraft, ChannelMessage, ChannelTask } from "@openbot/contracts/ipc";
+import { validateProfileName } from "@openbot/contracts/validation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stores } from "./agent-service-test-harness";
 import { ChannelHistory, type ChannelTextModel } from "./channel-history";
@@ -1666,6 +1668,30 @@ describe("shared channel coordination", () => {
     // conservative reading holds the channel until that assignment ends, because the resources the
     // running turn uses are unknown.
     expect(service.store.assignments("channel-1")[0]?.resources).toEqual(["host"]);
+  });
+
+  it("reads back a message from a member whose account name is long", async () => {
+    // An account name holds up to 20 visible characters in 120 UTF-16 units, so eight family emoji
+    // are a name a person can have. The message is stored whatever the reader accepts, so a
+    // narrower bound leaves a channel that no read can decode and a sidebar that cannot list it.
+    const name = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}".repeat(8);
+    expect(validateProfileName(name).error).toBeNull();
+    expect(name.length).toBeGreaterThan(INPUT_LIMITS.agentName);
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: "Prepare the report",
+        recipientAgentId: "agent-a",
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      { id: "human-2", name },
+    );
+
+    expect(service.store.messages("channel-1").at(-1)?.author.name).toBe(name);
+    expect(service.store.list("human-2").at(0)?.lastMessage?.authorName).toBe(name);
   });
 
   it("serializes overlapping workspaces and permits independent declared resources", () => {

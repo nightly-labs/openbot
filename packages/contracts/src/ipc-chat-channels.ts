@@ -226,7 +226,9 @@ export function isChannelMessage(value: unknown): value is ChannelMessage {
     isDynamicRecord(value.author) &&
     isOneOf(["member", "agent", "coordinator"] as const, value.author.kind) &&
     isIdentifier(value.author.id) &&
-    isBoundedString(value.author.name, INPUT_LIMITS.agentName) &&
+    // The author of a channel message can be a person, and an account name is bounded there, not
+    // by the agent name. A name this validator refuses is a stored message no read can decode.
+    isBoundedString(value.author.name, INPUT_LIMITS.accountName) &&
     (value.taskId === null || isIdentifier(value.taskId)) &&
     typeof value.superseded === "boolean" &&
     isConversationMessage(value.message)
@@ -282,7 +284,7 @@ function isChannelSummary(value: unknown): value is ChannelSummary {
 function isChannelPreview(value: unknown): value is ChannelPreview {
   return (
     isDynamicRecord(value) &&
-    isBoundedString(value.authorName, INPUT_LIMITS.agentName) &&
+    isBoundedString(value.authorName, INPUT_LIMITS.accountName) &&
     isBoundedString(value.text, CHANNEL_PREVIEW_LIMIT) &&
     isBoundedString(value.at, 80)
   );
