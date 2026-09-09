@@ -28,6 +28,34 @@ describe("OpenBot connected desktop shell", () => {
     installOpenbotStub();
   });
 
+  it("restores a separate selected agent for each server", async () => {
+    vi.mocked(window.openbot.servers.list).mockResolvedValue([
+      testServer("local", true),
+      testServer("remote-1", false),
+    ]);
+    vi.mocked(window.openbot.servers.select).mockImplementation(async (id) => [
+      testServer("local", id === "local"),
+      testServer("remote-1", id === "remote-1"),
+    ]);
+    const view = render(() => <App />);
+    await fireEvent.click(await screen.findByRole("button", { name: /Sales Outbound, Outbound specialist/ }));
+    await screen.findByRole("heading", { name: "Sales Outbound" });
+    await fireEvent.click(screen.getByRole("button", { name: "Studio Mac server" }));
+    await screen.findByRole("heading", { name: "Chief" });
+    await fireEvent.click(screen.getByRole("button", { name: "Local server" }));
+    expect(await screen.findByRole("heading", { name: "Sales Outbound" })).toBeVisible();
+    view.unmount();
+
+    vi.mocked(window.openbot.servers.list).mockResolvedValue([
+      testServer("local", false),
+      testServer("remote-1", true),
+    ]);
+    render(() => <App />);
+    expect(await screen.findByRole("heading", { name: "Chief" })).toBeVisible();
+    await fireEvent.click(screen.getByRole("button", { name: "Local server" }));
+    expect(await screen.findByRole("heading", { name: "Sales Outbound" })).toBeVisible();
+  });
+
   it("restores the active server before loading its workspace data", async () => {
     let resolveServers: ((servers: ServerSummary[]) => void) | undefined;
     vi.mocked(window.openbot.servers.list).mockReturnValueOnce(

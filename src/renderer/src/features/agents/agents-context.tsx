@@ -5,7 +5,7 @@ import type {
   AvatarImageInput,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
-import { createMemo, createSignal } from "solid-js";
+import { createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_STATUS } from "../../app-defaults";
 import { agentProfilesEqual, toAgentProfile } from "../../app-message-projection";
@@ -16,6 +16,7 @@ import { useUiErrors } from "../../ui-errors";
 import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useServers } from "../servers/servers-context";
 import { useUsage } from "../usage/usage-context";
+import { readAgentSelection, writeAgentSelection } from "./agent-selection";
 import { createFirstAgentDraft, type FirstAgentDraft } from "./FirstAgentSetup";
 
 /**
@@ -65,7 +66,9 @@ const Agents = createSimpleContext({
     const [agentList, setAgentList] = createSignal<AgentProfile[]>([]);
     const [duplicatingAgentIds, setDuplicatingAgentIds] = createSignal<Set<string>>(new Set());
     const [modelOptions, setModelOptions] = createSignal<AgentModelOption[]>([]);
-    const [activeAgentId, setActiveAgentId] = createSignal("");
+    const selectionServerId = untrack(activeServerId);
+    let savedAgentId = readAgentSelection()[selectionServerId] ?? "";
+    const [activeAgentId, updateActiveAgentId] = createSignal("");
     const [agentChatOpenRevision, setAgentChatOpenRevision] = createSignal(0);
     const [agentSetupOpen, setAgentSetupOpen] = createSignal(false);
     const [agentSetupDraft, setAgentSetupDraft] = createSignal<FirstAgentDraft>(createFirstAgentDraft());
@@ -82,6 +85,15 @@ const Agents = createSimpleContext({
       if (activeDirectMember()) return undefined;
       return agentList().find((agent) => agent.id === activeAgentId()) ?? agentList()[0];
     });
+
+    function setActiveAgentId(value: string | ((current: string) => string)): void {
+      updateActiveAgentId((current) => {
+        const next = typeof value === "function" ? value(current) : value;
+        savedAgentId = "";
+        writeAgentSelection(selectionServerId, next);
+        return next;
+      });
+    }
 
     function explicitlyOpenedAgentChatId(): string | null {
       return openedAgentChatId;
@@ -112,9 +124,11 @@ const Agents = createSimpleContext({
         return existing;
       });
       setAgentList(profiles);
-      setActiveAgentId((current) =>
-        profiles.some((agent) => agent.id === current) ? current : (profiles[0]?.id ?? ""),
-      );
+      setActiveAgentId((current) => {
+        // Validate the saved choice before it can trigger conversation requests.
+        const preferred = current || savedAgentId;
+        return profiles.some((agent) => agent.id === preferred) ? preferred : (profiles[0]?.id ?? "");
+      });
       if (profiles.length === 0 && !agentSetupOpen()) {
         setAgentSetupDraft(createFirstAgentDraft());
         setAgentSetupError(null);

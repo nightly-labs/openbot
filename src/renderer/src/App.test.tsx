@@ -19,6 +19,7 @@ import {
   testServer,
 } from "./app-test-harness";
 import { createAgentInitialMessage } from "./features/agents/agent-initial-message";
+import { AGENT_SELECTION_STORAGE_KEY } from "./features/agents/agent-selection";
 import { useAgents } from "./features/agents/agents-context";
 import { useConversation } from "./features/conversation/conversation-context";
 import { useServers } from "./features/servers/servers-context";
@@ -30,6 +31,87 @@ import { useNavigation } from "./navigation";
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
     installOpenbotStub();
+  });
+
+  it("restores the selected agent after the app remounts", async () => {
+    const view = render(() => <App />);
+    await fireEvent.click(await screen.findByRole("button", { name: /Sales Outbound, Outbound specialist/ }));
+    await screen.findByRole("heading", { name: "Sales Outbound" });
+    view.unmount();
+
+    render(() => <App />);
+    expect(await screen.findByRole("heading", { name: "Sales Outbound" })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Sales Outbound, Outbound specialist/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("replaces a deleted saved selection with the first available agent", async () => {
+    window.localStorage.setItem(AGENT_SELECTION_STORAGE_KEY, JSON.stringify({ local: "deleted-agent" }));
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    expect(JSON.parse(window.localStorage.getItem(AGENT_SELECTION_STORAGE_KEY) ?? "{}")).toEqual({ local: "chief" });
+  });
+
+  it("clears only this server's saved selection when its agent list is empty", async () => {
+    window.localStorage.setItem(AGENT_SELECTION_STORAGE_KEY, JSON.stringify({ local: "chief", team: "other" }));
+    vi.mocked(window.openbot.agent.listAgents).mockResolvedValue([]);
+    render(() => <App />);
+    await screen.findByRole("button", { name: "Create your first agent" });
+    expect(JSON.parse(window.localStorage.getItem(AGENT_SELECTION_STORAGE_KEY) ?? "{}")).toEqual({ team: "other" });
+  });
+
+  it("keeps a saved selection after a failed agent load and restores it on retry", async () => {
+    window.localStorage.setItem(AGENT_SELECTION_STORAGE_KEY, JSON.stringify({ local: "sales-outbound" }));
+    vi.mocked(window.openbot.agent.listAgents).mockRejectedValueOnce(new Error("Offline"));
+    function LoadStatus() {
+      const { agentStatus } = useAgents();
+      return <output aria-label="Agent load status">{agentStatus().message}</output>;
+    }
+    const view = render(() => (
+      <AppProviders>
+        <LoadStatus />
+      </AppProviders>
+    ));
+    await waitFor(() => expect(screen.getByLabelText("Agent load status")).toHaveTextContent("Offline"));
+    view.unmount();
+    render(() => <App />);
+    expect(await screen.findByRole("heading", { name: "Sales Outbound" })).toBeVisible();
+  });
+
+  it("keeps an explicit agent selection made while the initial list is loading", async () => {
+    window.localStorage.setItem(AGENT_SELECTION_STORAGE_KEY, JSON.stringify({ local: "sales-outbound" }));
+    let resolveAgents: ((agents: AgentSummary[]) => void) | undefined;
+    vi.mocked(window.openbot.agent.listAgents).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveAgents = resolve;
+      }),
+    );
+    function SelectWhileLoading() {
+      const { selectAgent } = useNavigation();
+      const { activeAgent } = useAgents();
+      return (
+        <>
+          <button type="button" onClick={() => selectAgent("chief")}>
+            Open Chief
+          </button>
+          <output aria-label="Selected agent">{activeAgent()?.name}</output>
+        </>
+      );
+    }
+    const view = render(() => (
+      <AppProviders>
+        <SelectWhileLoading />
+      </AppProviders>
+    ));
+    await waitFor(() => expect(window.openbot.agent.listAgents).toHaveBeenCalledOnce());
+    await fireEvent.click(screen.getByRole("button", { name: "Open Chief" }));
+    resolveAgents?.(AGENTS);
+    await waitFor(() => expect(screen.getByLabelText("Selected agent")).toHaveTextContent("Chief"));
+    view.unmount();
+    render(() => <App />);
+    expect(await screen.findByRole("heading", { name: "Chief" })).toBeVisible();
   });
 
   it("returns from full-page Usage with the conversation draft and settings intact", async () => {
