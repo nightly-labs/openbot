@@ -411,6 +411,113 @@ describe("AgentStore", () => {
     await expect(readFile(statePath, "utf8")).resolves.toBe(source);
   });
 
+  it("resets a stored profile field it cannot read and keeps the agent, its thread and its workspace", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-store-unreadable-"));
+    temporaryRoots.push(root);
+    const userData = join(root, "user-data");
+    const home = join(root, "home");
+    const store = new AgentStore(userData, home);
+    await store.initialize();
+    await store.getOrCreate("chief");
+    await store.updateAgent({
+      agentId: "chief",
+      provider: "claude",
+      model: "claude-fable-5-1",
+      reasoningEffort: "high",
+      avatarSeed: "chief:picked",
+      avatarHue: 30,
+    });
+    const threadId = await store.ensureThreadId("chief");
+    const workspacePath = store.list().find((agent) => agent.id === "chief")?.workspacePath;
+
+    // Four values a released build stored and a later one cannot read: a model id the provider CLI
+    // renamed under a running install, an effort and a hue from a release the user has since left, and
+    // a marketplace source written as SQL `null`. Every one of them used to stop the app from starting.
+    store.database.connection
+      .prepare(
+        `UPDATE projection_agents SET agent_json = json_set(agent_json,
+           '$.model', ?, '$.reasoningEffort', ?, '$.avatarSeed', ?, '$.avatarHue', ?,
+           '$.marketplaceSource', json('null'))
+         WHERE agent_id = ?`,
+      )
+      .run("claude fable 5.1 (1m)", "ultra", "Chief Seed", 7, "chief");
+
+    const repaired = new AgentStore(userData, home);
+    await repaired.initialize();
+
+    // The identity survives: same agent, same thread, same workspace, and the chat is still readable.
+    expect(repaired.list().find((agent) => agent.id === "chief")).toMatchObject({
+      id: "chief",
+      threadId,
+      workspacePath,
+      provider: "claude",
+      // The default of the provider the profile names, not the default of a new agent, which is Codex.
+      model: "claude-sonnet-5",
+      reasoningEffort: "medium",
+      avatarSeed: "chief",
+      avatarHue: null,
+    });
+    expect(repaired.list().find((agent) => agent.id === "chief")?.marketplaceSource).toBeUndefined();
+
+    // Written back at once, so the next launch reads a profile it accepts instead of repairing again.
+    expect(repaired.database.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
+      model: "claude-sonnet-5",
+      reasoningEffort: "medium",
+      avatarSeed: "chief",
+      avatarHue: null,
+    });
+  });
+
+  it("refuses to start on a stored profile field no default can stand in for", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-store-unusable-"));
+    temporaryRoots.push(root);
+    const userData = join(root, "user-data");
+    const home = join(root, "home");
+    const store = new AgentStore(userData, home);
+    await store.initialize();
+    await store.getOrCreate("chief");
+    const threadId = await store.ensureThreadId("chief");
+    store.database.connection
+      .prepare(
+        "UPDATE projection_agents SET agent_json = json_set(agent_json, '$.workspacePath', ?) WHERE agent_id = ?",
+      )
+      .run(42, "chief");
+
+    const blocked = new AgentStore(userData, home);
+    // The field is the diagnosis a support report can carry; the value is a path from the user's home
+    // directory, and this message reaches a dialog, the log and any diagnostics export.
+    await expect(blocked.initialize()).rejects.toThrow(
+      'Stored agent profile chief has an unreadable "workspacePath" value',
+    );
+
+    // Refusing is what keeps the row: nothing about the agent, its thread or its messages is rewritten.
+    expect(store.database.listAgents().map((agent) => agent.id)).toEqual(["chief"]);
+    expect(store.database.readConversation("chief", threadId).threadId).toBe(threadId);
+  });
+
+  it("refuses to store a profile value the next launch could not read", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-store-rejects-"));
+    temporaryRoots.push(root);
+    const userData = join(root, "user-data");
+    const store = new AgentStore(userData, join(root, "home"));
+    await store.initialize();
+    const chief = await store.getOrCreate("chief");
+
+    // `AgentService` passes ids straight out of `listModels()`, so the value here is a provider CLI's,
+    // not a user's. Stored, it made the *next* launch the failure.
+    await expect(store.updateAgent({ agentId: "chief", model: "claude fable 5.1 (1m)" })).rejects.toThrow(
+      "Invalid agent model.",
+    );
+    await expect(store.updateAgent({ agentId: "chief", avatarSeed: "Chief Seed" })).rejects.toThrow(
+      "Invalid avatar seed.",
+    );
+
+    expect(store.list().find((agent) => agent.id === "chief")).toMatchObject({
+      model: chief.model,
+      avatarSeed: chief.avatarSeed,
+    });
+  });
+
   it("creates unique new agents at the top of the persistent list", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
     temporaryRoots.push(root);

@@ -27,6 +27,7 @@ import {
   type AgentSummary,
   type AvatarImageInput,
   type CreateAgentInput,
+  DEFAULT_PROVIDER_MODELS,
   type DuplicateAgentResult,
   decodeAgentProfileDraft,
   decodeSaveAgentProfileResult,
@@ -85,6 +86,7 @@ const LEGACY_AVATAR_COLORS = [
   "gray",
 ] as const;
 
+export const NEW_AGENT_PREVIEW = "No messages yet";
 export const DEFAULT_AGENT_MODEL: AgentModelId = "gpt-5.6-luna";
 export const DEFAULT_AGENT_PROVIDER: AgentProviderId = "codex";
 export const DEFAULT_REASONING_EFFORT: AgentReasoningEffort = "medium";
@@ -157,14 +159,31 @@ export class AgentStore {
     await this.#database.initialize();
     const persisted = this.#database.listAgents();
     if (persisted.length > 0 || this.#database.hasAggregateEvents("agents", "agents")) {
-      if (!persisted.every(isStoredAgent)) {
-        throw new Error("Stored agent profiles use the old role field; update the data before starting OpenBot.");
+      // Repaired field by field rather than accepted or refused as a whole. One stored value this build
+      // cannot read -- a model id a provider CLI has since renamed, an effort or a hue added by a later
+      // release, a marketplace source written as `null` -- used to stop the app from starting at all,
+      // and the message named the one cause this branch never tests: a `role` field cannot reach the
+      // database, because the `bots.json` import below rejects it before anything is written. Dropping
+      // the profile instead is not an option either: `replaceAgents` truncates the roster and re-inserts
+      // this list, so a dropped agent takes its chat out of the sidebar while its thread and every
+      // message stay on disk, unreachable. What `readStoredAgent` cannot guess -- the id, the workspace
+      // path, the thread -- still refuses to start, because guessing one of those three would point an
+      // agent at another agent's files or at an empty history.
+      const agents: StoredAgent[] = [];
+      const repairs: string[] = [];
+      for (const stored of persisted) {
+        const read = readStoredAgent(stored);
+        if ("unreadable" in read) throw new Error(unreadableProfileMessage(read));
+        agents.push(normalizeStoredAgent(read.agent));
+        if (read.repaired.length > 0) repairs.push(`${read.agent.id}: ${read.repaired.join(", ")}`);
       }
-      this.#state = {
-        version: 2,
-        examplesInitialized: true,
-        agents: persisted.map(normalizeStoredAgent),
-      };
+      this.#state = { version: 2, examplesInitialized: true, agents };
+      if (repairs.length > 0) {
+        logger.warn("Stored agent profile fields could not be read and were reset.", toLogValue(repairs));
+        // Written back at once, so the repair survives the next launch instead of running again on every
+        // start. The persist carries the whole roster, so the profiles that needed no repair are unchanged.
+        this.#persist("agents.repaired");
+      }
       this.#restoreRosterFromEvents();
     } else {
       const legacy = await this.#readState();
@@ -473,13 +492,31 @@ export class AgentStore {
       agent.description = limitedText(input.description, "Agent description", INPUT_LIMITS.agentDescription);
     }
     if (input.notifications !== undefined) agent.notifications = input.notifications;
-    if (input.provider !== undefined) agent.provider = input.provider;
+    // Checked here and not only in the IPC decoder, because the caller closest to the data is not a
+    // user: `AgentService` writes the provider, model and effort straight out of `listModels()`, which
+    // is a list of ids a provider CLI minted and can rename under a running install. A value the read
+    // guards reject must not reach the roster at all -- before `readStoredAgent`, storing one made the
+    // app refuse to start on its next launch.
+    if (input.provider !== undefined) {
+      if (!isOneOf(AGENT_PROVIDERS, input.provider)) throw new Error("Invalid agent provider.");
+      agent.provider = input.provider;
+    }
     if (input.model !== undefined) {
+      if (!isAgentModel(input.model)) throw new Error("Invalid agent model.");
       agent.model = input.model;
     }
-    if (input.reasoningEffort !== undefined) agent.reasoningEffort = input.reasoningEffort;
-    if (input.avatarSeed !== undefined) agent.avatarSeed = input.avatarSeed;
-    if (input.avatarHue !== undefined) agent.avatarHue = input.avatarHue;
+    if (input.reasoningEffort !== undefined) {
+      if (!isReasoningEffort(input.reasoningEffort)) throw new Error("Invalid reasoning effort.");
+      agent.reasoningEffort = input.reasoningEffort;
+    }
+    if (input.avatarSeed !== undefined) {
+      if (!isAvatarSeed(input.avatarSeed)) throw new Error("Invalid avatar seed.");
+      agent.avatarSeed = input.avatarSeed;
+    }
+    if (input.avatarHue !== undefined) {
+      if (input.avatarHue !== null && !isAvatarHue(input.avatarHue)) throw new Error("Invalid avatar hue.");
+      agent.avatarHue = input.avatarHue;
+    }
     agent.updatedAt = new Date().toISOString();
     this.#persist("agent.updated");
     return { ...agent };
@@ -1022,7 +1059,12 @@ export class AgentStore {
   #restoreRosterFromEvents(): void {
     const replayed = this.#database.latestRosterAgents();
     if (replayed.length === 0) return;
-    const readable = replayed.filter(isStoredAgent).map(normalizeStoredAgent);
+    const readable: StoredAgent[] = [];
+    for (const value of replayed) {
+      const read = readStoredAgent(value);
+      if ("unreadable" in read) continue;
+      readable.push(normalizeStoredAgent(read.agent));
+    }
     const present = new Set(this.#state.agents.map((agent) => agent.id));
     // Appended rather than put back at its old index: the sidebar orders agents by the layout's own
     // `agentOrder`, so the position here is not what the user sees, and appending keeps the agents that
@@ -1053,7 +1095,7 @@ export class AgentStore {
       reasoningEffort: DEFAULT_REASONING_EFFORT,
       threadId: null,
       workspacePath: join(this.#agentsRoot, id),
-      preview: "No messages yet",
+      preview: NEW_AGENT_PREVIEW,
       updatedAt: null,
       avatarSeed: id,
       avatarHue: null,
@@ -1266,6 +1308,96 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
     (record.avatarHue === null || isAvatarHue(record.avatarHue)) &&
     isMarketplaceSource(record.marketplaceSource)
   );
+}
+
+interface ReadStoredAgent {
+  agent: PersistedStoredAgent;
+  /** The names of the fields this build could not read, in the order they are checked. */
+  repaired: string[];
+}
+
+interface UnreadableStoredAgent {
+  unreadable: string;
+  id: string | null;
+}
+
+/**
+ * A stored profile, with every field this build cannot read put back to a value it can.
+ *
+ * The three fields it refuses on instead are the ones no default can stand in for. `id` names the
+ * avatar directory, the workspace under `~/OpenBot/Agents` and the agent every thread and receipt
+ * points at; `workspacePath` is the directory the agent reads and writes, and a guessed one is either
+ * another agent's files or an empty new directory beside the real one; `threadId` is the whole
+ * conversation, and reading a broken one as `null` reports an empty history and mints a second thread
+ * over the first. Everything else is a preference, a label or a drawn face: resetting one costs the
+ * user a setting they can see and set again, while refusing costs them the application.
+ *
+ * `avatarUrl` is absent from the repair list on purpose -- `normalizeStoredAgent` already drops a URL
+ * that does not parse, and has since before this reader existed.
+ */
+function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgent {
+  if (!isRecord(value)) return { unreadable: "profile", id: null };
+  const id = value.id;
+  if (!isString(id) || !isValidAgentId(id)) return { unreadable: "id", id: null };
+  if (!isString(value.workspacePath)) return { unreadable: "workspacePath", id };
+  if (value.threadId !== null && !isString(value.threadId)) return { unreadable: "threadId", id };
+
+  const repaired: string[] = [];
+  const reset = <T>(field: string, fallback: T): T => {
+    repaired.push(field);
+    return fallback;
+  };
+  const provider =
+    value.provider === undefined || isOneOf(AGENT_PROVIDERS, value.provider)
+      ? value.provider
+      : reset("provider", undefined);
+  const model = isAgentModel(value.model)
+    ? value.model
+    : reset("model", provider === undefined ? DEFAULT_AGENT_MODEL : DEFAULT_PROVIDER_MODELS[provider]);
+  let marketplaceSource: StoredAgent["marketplaceSource"];
+  if (value.marketplaceSource !== undefined) {
+    if (isMarketplaceSource(value.marketplaceSource)) {
+      marketplaceSource = normalizeMarketplaceSource(value.marketplaceSource);
+    } else {
+      // Reset to "installed by hand" rather than kept: the listing and version ids are what an update
+      // check compares, and a half-read pair reports the wrong version. Installing the marketplace
+      // agent again over this one binds it back.
+      reset("marketplaceSource", undefined);
+    }
+  }
+  const agent: PersistedStoredAgent = {
+    id,
+    name: isString(value.name) ? value.name : reset("name", titleFromId(id)),
+    title: isString(value.title) ? value.title : reset("title", ""),
+    description: isString(value.description) ? value.description : reset("description", ""),
+    notifications: isBoolean(value.notifications) ? value.notifications : reset("notifications", true),
+    model,
+    reasoningEffort: isReasoningEffort(value.reasoningEffort)
+      ? value.reasoningEffort
+      : reset("reasoningEffort", DEFAULT_REASONING_EFFORT),
+    threadId: value.threadId,
+    workspacePath: value.workspacePath,
+    preview: isString(value.preview) ? value.preview : reset("preview", NEW_AGENT_PREVIEW),
+    updatedAt: isString(value.updatedAt) || value.updatedAt === null ? value.updatedAt : reset("updatedAt", null),
+    avatarSeed: isAvatarSeed(value.avatarSeed) ? value.avatarSeed : reset("avatarSeed", id),
+    avatarHue: value.avatarHue === null || isAvatarHue(value.avatarHue) ? value.avatarHue : reset("avatarHue", null),
+    avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
+    ...(provider === undefined ? {} : { provider }),
+    ...(marketplaceSource === undefined ? {} : { marketplaceSource }),
+  };
+  return { agent, repaired };
+}
+
+/**
+ * The one message the startup dialog shows for a profile that cannot be read.
+ *
+ * It names the field, because the field is the whole diagnosis and a screenshot is usually all a
+ * report carries. It never carries the *value*: `workspacePath` holds the user's home directory, and
+ * this string reaches a dialog, a log and any diagnostics export.
+ */
+function unreadableProfileMessage({ unreadable, id }: UnreadableStoredAgent): string {
+  const subject = id === null ? "A stored agent profile" : `Stored agent profile ${id}`;
+  return `${subject} has an unreadable "${unreadable}" value; update the data before starting OpenBot.`;
 }
 
 function isMarketplaceSource(value: unknown): boolean {
