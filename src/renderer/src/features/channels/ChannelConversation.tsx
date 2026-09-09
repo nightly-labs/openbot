@@ -479,24 +479,6 @@ export function ChannelConversation() {
                               onCopy={() => void copyChannelMessage(entry()?.message ?? initialEntry.message)}
                             />
                           }
-                          footer={
-                            (entry()?.superseded ||
-                              entry()?.message.status === "failed" ||
-                              entry()?.message.status === "interrupted") && (
-                              <>
-                                <Show when={entry()?.superseded}>
-                                  <span>Superseded</span>
-                                </Show>
-                                <Show
-                                  when={
-                                    entry()?.message.status === "failed" || entry()?.message.status === "interrupted"
-                                  }
-                                >
-                                  <span>Partial result · {entry()?.message.status}</span>
-                                </Show>
-                              </>
-                            )
-                          }
                         >
                           <Show when={entry()?.message.questionPrompt}>
                             {(prompt) => (

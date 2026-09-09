@@ -29,7 +29,6 @@ export interface ChannelTimelineEntry {
   showAuthor: boolean;
   /** The separator above the row, or `null` when the row stays on the day above it. */
   dayMarker: string | null;
-  superseded: boolean;
   source: ChannelMessage;
 }
 
@@ -95,7 +94,6 @@ export function channelTimelineEntries(
       message: toAgentMessage(source, own, options),
       showAuthor: !(sameAuthor && withinWindow && dayMarker === null),
       dayMarker,
-      superseded: source.superseded,
       source,
     };
     entries.push(entry);

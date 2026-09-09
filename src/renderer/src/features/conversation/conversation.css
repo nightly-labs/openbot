@@ -5260,22 +5260,6 @@ button.chat-action-target:active,
   }
 }
 
-.message-status {
-  display: block;
-  color: var(--openbot-text-muted);
-  font-family: inherit;
-  font-size: var(--openbot-text-sm);
-  line-height: 19px;
-}
-
-.message-status {
-  margin-top: var(--openbot-space-2);
-}
-
-[data-slot="bubble"][data-author="user"] .message-status {
-  color: var(--openbot-bg-overlay);
-}
-
 .attachment-file-visual {
   --file-reference-color: var(--openbot-file-default);
   --file-reference-soft: var(--openbot-file-default-soft);

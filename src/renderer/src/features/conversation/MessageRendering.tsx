@@ -348,14 +348,6 @@ export function MessageBody(props: {
           </For>
         </div>
       </Show>
-      <Show
-        when={props.message.status && !props.message.imageGeneration && props.message.itemType !== "agent_attachment"}
-      >
-        <div class="message-status">
-          <span />
-          {props.message.status}
-        </div>
-      </Show>
       <Show when={standaloneFileAttachments().length > 0}>
         <AttachmentCards
           attachments={standaloneFileAttachments()}
