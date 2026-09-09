@@ -2808,6 +2808,25 @@
   max-width: 100%;
 }
 
+/*
+ * The author's name above a bubble, drawn in the head colour of the face beside it. A chat with one
+ * agent draws no name at all, so the variable is unset there and the shared muted colour stands.
+ */
+/*
+ * The empty column under a face. A message that continues a run of messages by one author draws no
+ * face, and without this spacer its bubble would step left, off the line the run started on. A chat
+ * with one agent draws no faces at all, so it never asks for the column.
+ */
+.message-author-gutter {
+  width: 28px;
+  flex: 0 0 28px;
+}
+
+.message-author-name {
+  color: var(--message-author-color, var(--openbot-text-muted));
+  font-weight: var(--openbot-weight-medium);
+}
+
 .message-entry-animated {
   opacity: 0;
   animation: message-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) forwards;

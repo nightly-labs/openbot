@@ -1,11 +1,12 @@
-import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
+import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
+import { chatTagReferences, expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import {
   CHANNEL_ASSIGNMENT_LIMIT,
   type ChannelTask,
   type ChannelTaskState,
   type DraftAttachment,
 } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createStore, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { QuestionPromptBubble } from "../../components/QuestionPromptBubble";
 import {
   createSettingsPanelWidth,
@@ -17,8 +18,6 @@ import {
 import {
   ArrowUp,
   Badge,
-  Bubble,
-  BubbleContent,
   Button,
   DropdownMenu,
   Ellipsis,
@@ -28,30 +27,35 @@ import {
   ItemDescription,
   ItemGroup,
   ItemTitle,
-  Message,
-  MessageAvatar,
-  MessageContent,
-  MessageFooter,
-  MessageHeader,
   Plus,
   X,
 } from "../../components/ui";
+import type { AgentMessage } from "../../data";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
-import { AgentAvatar } from "../agents/AgentAvatar";
 import { useAgents } from "../agents/agents-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { AgentMemoriesModal } from "../conversation/AgentMemoriesModal";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
+import { ChatMessageRow } from "../conversation/ChatMessageRow";
 import { ComposerEditor, expandComposerMentions } from "../conversation/ComposerEditor";
-import { ReplyIcon } from "../conversation/ConversationIcons";
 import { ApprovalCard, BrowserTakeoverCard } from "../conversation/ConversationPrompts";
-import { conversationBubbleVariant, MessageBody } from "../conversation/MessageRendering";
+import { calculateChatScrollMargin, createChatVirtualizer } from "../conversation/createChatVirtualizer";
+import { ScrollToLatestButton, scrollToLatestMessage } from "../conversation/MessageNavigation";
+import { MessageActions } from "../conversation/MessageRendering";
 import { channelMemoriesPort } from "../conversation/memories-port";
 import { channelRoutinesPort } from "../conversation/routines-port";
+import {
+  scrollToUnreadBoundary,
+  UnreadMessagesBanner,
+  UnreadMessagesDivider,
+  unreadMessagesDividerIsVisible,
+} from "../conversation/UnreadMessages";
 import { usePresence } from "../team/team-context";
+import { ChannelActivityIndicator, type ChannelWorker } from "./ChannelActivityIndicator";
 import { ChannelAvatar } from "./ChannelAvatar";
 import { ChannelEditor } from "./ChannelEditor";
+import { channelTimelineEntries, firstUnreadChannelMessageId } from "./channel-timeline";
 import { useChannels } from "./channels-context";
 
 /** The state reads as a badge, so a task says how it stands without a sentence to read. */
@@ -148,14 +152,142 @@ export function ChannelConversation() {
     });
   };
   let messageList: HTMLElement | undefined;
+  let virtualRoot: HTMLElement | undefined;
+  let unreadMessagesDivider: HTMLElement | undefined;
   /* The panel is the same slot the agent chat opens, so it reads and writes the same width. The
      variable has to sit on this element, because the rules that give the chat back the width the
      panel covers are written against the conversation panel, not against the panel itself. */
   let conversationPanel: HTMLElement | undefined;
   const [panelWidth, setPanelWidth] = createSettingsPanelWidth();
+  const [showScrollToLatest, setShowScrollToLatest] = createSignal(false);
+  const [unreadDividerVisible, setUnreadDividerVisible] = createSignal(false);
+  const [virtualScrollMargin, setVirtualScrollMargin] = createSignal(0);
+  const [openMoreMessageId, setOpenMoreMessageId] = createSignal<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = createSignal<string | null>(null);
   let stickToLatest = true;
   let scrollFrame: number | undefined;
+  let unreadVisibilityFrame: number | undefined;
   let scrolledChannel: string | undefined;
+  const timeline = createMemo(() => {
+    const page = channels.state.page;
+    return page ? channelTimelineEntries(page, agentList(), isOwnMessage) : [];
+  });
+  const unreadCount = createMemo(
+    () => channels.state.channels.find((channel) => channel.id === channels.state.selectedId)?.unreadCount ?? 0,
+  );
+  const firstUnreadId = createMemo(() => firstUnreadChannelMessageId(timeline(), unreadCount()));
+  /**
+   * Everyone the channel waits on: the owner of a running task, and the author of a message that is
+   * still arriving. They read as one row under the transcript, because a channel runs several
+   * agents at once and a row for each would push the messages off the screen.
+   */
+  const workers = createMemo<ChannelWorker[]>(() => {
+    const page = channels.state.page;
+    if (!page) return [];
+    const ids = new Set<string>();
+    for (const task of page.tasks) if (task.state === "running" && task.ownerAgentId) ids.add(task.ownerAgentId);
+    for (const entry of page.messages)
+      if (entry.message.status === "streaming" && entry.author.kind !== "member") ids.add(entry.author.id);
+    return [...ids].map((id) => {
+      const agent = agentList().find((candidate) => candidate.id === id);
+      const authored = page.messages.find((entry) => entry.author.id === id);
+      return { id, name: agent?.name ?? authored?.author.name ?? "Agent", agent };
+    });
+  });
+  const messageVirtualizer = createChatVirtualizer<HTMLElement, HTMLElement>({
+    count: () => timeline().length,
+    getScrollElement: () => messageList ?? null,
+    // A channel row is taller than an agent row: most rows carry a face and a name above the bubble.
+    estimateSize: () => 84,
+    getItemKey: (index) => timeline()[index]?.id ?? index,
+    keyVersion: () => `${timeline()[0]?.id ?? ""}:${timeline().at(-1)?.id ?? ""}`,
+    scrollMargin: virtualScrollMargin,
+  });
+  const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
+  /*
+   * A message animates in once, and only after the channel has drawn its first page: everything
+   * that was already there when the reader opened the channel arrives at the same moment, and ten
+   * bubbles sliding in together reads as a fault.
+   */
+  const seenMessages = new Map<string, Set<string>>();
+  const markMessageSeen = (channelId: string, messageId: string): boolean => {
+    const known = seenMessages.get(channelId);
+    if (!known) {
+      seenMessages.set(channelId, new Set(untrack(timeline).map((entry) => entry.id)));
+      return false;
+    }
+    if (known.has(messageId)) return false;
+    known.add(messageId);
+    return true;
+  };
+  const updateScrollState = (element: HTMLElement) => {
+    setShowScrollToLatest(element.scrollHeight - element.scrollTop - element.clientHeight > 80);
+  };
+  const updateVirtualScrollMargin = () => {
+    setVirtualScrollMargin(calculateChatScrollMargin(messageList, virtualRoot));
+  };
+  const updateUnreadDividerVisibility = () => {
+    setUnreadDividerVisible(
+      Boolean(
+        unreadCount() > 0 &&
+          messageList &&
+          unreadMessagesDivider &&
+          unreadMessagesDividerIsVisible(messageList, unreadMessagesDivider),
+      ),
+    );
+  };
+  const scheduleUnreadDividerVisibilityUpdate = () => {
+    if (unreadVisibilityFrame !== undefined) cancelAnimationFrame(unreadVisibilityFrame);
+    unreadVisibilityFrame = requestAnimationFrame(() => {
+      unreadVisibilityFrame = undefined;
+      updateUnreadDividerVisibility();
+    });
+  };
+  /** The channel is read as far as its newest message: that is what the page counts through. */
+  const markChannelRead = async () => {
+    const page = channels.state.page;
+    if (!page) return;
+    await channels.command({
+      type: "read",
+      channelId: page.channel.id,
+      throughSequence: page.throughSequence,
+      operationId: crypto.randomUUID(),
+    });
+  };
+  const jumpToUnreadMessages = () => {
+    if (!messageList || !unreadMessagesDivider) return;
+    const boundary =
+      unreadMessagesDivider.nextElementSibling instanceof HTMLElement
+        ? unreadMessagesDivider.nextElementSibling
+        : unreadMessagesDivider;
+    scrollToUnreadBoundary(messageList, boundary);
+  };
+  const jumpToLatestMessage = () => {
+    if (!messageList) return;
+    stickToLatest = true;
+    scrollToLatestMessage(messageList);
+  };
+  /**
+   * The clipboard gets the message the reader sees, not its stored form: a mention is a name and an
+   * attachment is a file name. A channel has no skills of its own, so only the agent names expand.
+   */
+  const copyChannelMessage = async (message: AgentMessage) => {
+    const attachmentNames = new Map((message.attachments ?? []).map((attachment) => [attachment.id, attachment.name]));
+    const agentNames = new Map(agentList().map((agent) => [agent.id, agent.name]));
+    const text = expandAttachmentReferences(
+      expandChatTagReferences(message.body, (reference) =>
+        reference.kind === "agent" ? agentNames.get(reference.id) : undefined,
+      ),
+      (reference) => attachmentNames.get(reference.attachmentId),
+    );
+    if (!text) return;
+    setOpenMoreMessageId(null);
+    await navigator.clipboard.writeText(text);
+    setCopiedMessageId(message.id);
+    window.setTimeout(() => {
+      if (copiedMessageId() === message.id) setCopiedMessageId(null);
+    }, 1_400);
+  };
   createEffect(
     () => ({ id: channels.state.page?.channel.id, revision: channels.state.page?.channel.revision }),
     ({ id }) => {
@@ -165,12 +297,17 @@ export function ChannelConversation() {
       }
       if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame);
       scrollFrame = requestAnimationFrame(() => {
-        if (messageList && stickToLatest) messageList.scrollTop = messageList.scrollHeight;
+        if (!messageList) return;
+        updateVirtualScrollMargin();
+        if (stickToLatest) messageList.scrollTop = messageList.scrollHeight;
+        updateScrollState(messageList);
+        updateUnreadDividerVisibility();
       });
     },
   );
   onCleanup(() => {
     if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame);
+    if (unreadVisibilityFrame !== undefined) cancelAnimationFrame(unreadVisibilityFrame);
   });
   const messageElements = new Map<string, HTMLElement>();
   const name = (id: string | null) => agentList().find((agent) => agent.id === id)?.name ?? "Unassigned";
@@ -316,12 +453,28 @@ export function ChannelConversation() {
               class="conversation-scroll"
               aria-label="Shared messages"
               aria-live="polite"
-              ref={messageList}
+              ref={(element) => {
+                messageList = element;
+                updateVirtualScrollMargin();
+              }}
               onScroll={(event) => {
                 const element = event.currentTarget;
                 stickToLatest = element.scrollHeight - element.scrollTop - element.clientHeight <= 80;
+                updateScrollState(element);
+                updateUnreadDividerVisibility();
               }}
             >
+              <Show when={unreadCount() > 0 && !unreadDividerVisible()}>
+                <UnreadMessagesBanner
+                  count={unreadCount()}
+                  busy={channels.state.pending}
+                  onJumpToUnread={jumpToUnreadMessages}
+                  onMarkRead={() => void markChannelRead()}
+                />
+              </Show>
+              <Show when={showScrollToLatest()}>
+                <ScrollToLatestButton onClick={jumpToLatestMessage} />
+              </Show>
               <Show when={page().olderCursor}>
                 <Button variant="ghost" onClick={() => void channels.loadOlder()}>
                   Load earlier messages
@@ -339,163 +492,146 @@ export function ChannelConversation() {
                   </Show>
                 </div>
               </Show>
-              <div class="virtual-chat-list virtual-chat-list-static">
-                <For
-                  each={page().messages.filter(
-                    (entry) =>
-                      entry.message.text.trim() || entry.message.attachments?.length || entry.message.questionPrompt,
-                  )}
-                >
-                  {(entry) => (
-                    <article
-                      class="virtual-chat-row"
-                      ref={(element) => {
-                        messageElements.set(entry.id, element);
-                      }}
-                      aria-label={`Message from ${entry.author.name}`}
-                    >
-                      <Message
-                        class={[
-                          "message-entry",
-                          entry.author.kind === "member" && isOwnMessage(entry.author.id)
-                            ? "message-entry-user"
-                            : "message-entry-agent",
-                        ]}
-                        data-author={
-                          entry.author.kind === "member" && isOwnMessage(entry.author.id) ? "user" : "assistant"
-                        }
-                        align={entry.author.kind === "member" && isOwnMessage(entry.author.id) ? "end" : "start"}
+              <div
+                ref={(element) => {
+                  virtualRoot = element;
+                  updateVirtualScrollMargin();
+                }}
+                class={["virtual-chat-list", { "virtual-chat-list-static": !messageVirtualizer.isVirtualized() }]}
+                style={{
+                  height: messageVirtualizer.isVirtualized() ? `${messageVirtualizer.getTotalSize()}px` : "auto",
+                }}
+              >
+                <For each={virtualMessageRows()}>
+                  {(virtualRow) => {
+                    const entry = createMemo(() => timeline()[virtualRow.index]);
+                    const initialEntry = untrack(entry);
+                    if (!initialEntry) return null;
+                    const animate = markMessageSeen(page().channel.id, initialEntry.id);
+                    const referenced = createMemo(() =>
+                      timeline().find((candidate) => candidate.id === entry()?.message.replyToMessageId),
+                    );
+                    return (
+                      <div
+                        data-index={virtualRow.index}
+                        data-grouped={entry()?.showAuthor === false ? "sender" : undefined}
+                        ref={(element) => {
+                          messageElements.set(initialEntry.id, element);
+                          messageVirtualizer.measureElement(element);
+                        }}
+                        class="virtual-chat-row"
+                        style={{
+                          transform: messageVirtualizer.isVirtualized()
+                            ? `translateY(${virtualRow.start - messageVirtualizer.scrollMargin()}px)`
+                            : "none",
+                        }}
                       >
-                        <Show when={entry.author.kind === "agent"}>
-                          <MessageAvatar>
-                            <AgentAvatar agent={agentList().find((agent) => agent.id === entry.author.id)} />
-                          </MessageAvatar>
-                        </Show>
-                        <MessageContent>
-                          <Show when={!(entry.author.kind === "member" && isOwnMessage(entry.author.id))}>
-                            <MessageHeader>{entry.author.name}</MessageHeader>
-                          </Show>
-                          <div class="message-shell">
-                            <Bubble
-                              align={entry.author.kind === "member" && isOwnMessage(entry.author.id) ? "end" : "start"}
-                              variant={conversationBubbleVariant({
-                                id: entry.id,
-                                author:
-                                  entry.author.kind === "member" && isOwnMessage(entry.author.id) ? "you" : "agent",
-                                body: entry.message.text,
-                                time: entry.message.createdAt,
-                                attachments: entry.message.attachments,
-                              })}
-                            >
-                              <BubbleContent>
-                                <Show when={entry.superseded}>
-                                  <span> · Superseded</span>
-                                </Show>
-                                <Show when={entry.message.replyToMessageId}>
-                                  <Button
-                                    size="xs"
-                                    variant="ghost"
-                                    onClick={() => {
-                                      const target =
-                                        entry.message.replyToMessageId &&
-                                        messageElements.get(entry.message.replyToMessageId);
-                                      if (target) target.scrollIntoView({ block: "center" });
-                                      else void channels.loadOlder();
-                                    }}
-                                  >
-                                    Reply to{" "}
-                                    {page().messages.find((message) => message.id === entry.message.replyToMessageId)
-                                      ?.author.name ?? "earlier message"}
-                                  </Button>
-                                </Show>
-                                <MessageBody
-                                  message={{
-                                    id: entry.id,
-                                    author:
-                                      entry.author.kind === "member" && isOwnMessage(entry.author.id) ? "you" : "agent",
-                                    body: entry.message.text,
-                                    time: new Date(entry.message.createdAt).toLocaleTimeString(),
-                                    attachments: entry.message.attachments,
-                                    replyToMessageId: entry.message.replyToMessageId,
-                                    status: undefined,
-                                    streaming: entry.message.status === "streaming",
-                                  }}
-                                  agents={agentList()}
-                                  onSelectAgent={(id) =>
-                                    setComposer((state) => {
-                                      state.recipient = id;
-                                    })
-                                  }
-                                  onOpenLink={(url) => {
-                                    void window.openbot.openUrl(url);
-                                  }}
-                                  onPreview={(attachment) => {
-                                    void channels.perform(() =>
-                                      window.openbot.agent.openAttachment({
-                                        attachmentId: attachment.id,
-                                        action: "open",
-                                      }),
-                                    );
-                                  }}
-                                  onAttachmentAction={(attachment, action) => {
-                                    void channels.perform(() =>
-                                      window.openbot.agent.openAttachment({ attachmentId: attachment.id, action }),
-                                    );
-                                  }}
-                                />
-                                <Show when={entry.message.questionPrompt}>
-                                  {(prompt) => (
-                                    <QuestionPromptBubble
-                                      questions={prompt().questions}
-                                      resolution={prompt().resolution}
-                                      onSubmit={(answers) =>
-                                        channels.perform(() =>
-                                          window.openbot.agent.respondToPrompt({
-                                            requestId: prompt().requestId,
-                                            answers,
-                                          }),
-                                        )
-                                      }
-                                    />
-                                  )}
-                                </Show>
-                              </BubbleContent>
-                            </Bubble>
-                            <div class="message-actions">
-                              {" "}
-                              <Button
-                                class="message-action-button"
-                                aria-label="Reply"
-                                variant="ghost"
-                                onClick={() =>
-                                  setComposer((state) => {
-                                    state.reply = entry.id;
-                                  })
-                                }
-                              >
-                                <ReplyIcon />
-                              </Button>
+                        <Show when={entry()?.dayMarker}>
+                          {(label) => (
+                            <div class="time-marker">
+                              <span>{label()}</span>
                             </div>
-                          </div>
-                          <MessageFooter>
-                            <time datetime={entry.message.createdAt}>
-                              {new Date(entry.message.createdAt).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </time>
-                            <Show when={entry.message.status === "streaming"}>
-                              <span>Writing…</span>
-                            </Show>
-                            <Show when={entry.message.status === "failed" || entry.message.status === "interrupted"}>
-                              <span>Partial result · {entry.message.status}</span>
-                            </Show>
-                          </MessageFooter>
-                        </MessageContent>
-                      </Message>
-                    </article>
-                  )}
+                          )}
+                        </Show>
+                        <Show when={entry()?.id === firstUnreadId()}>
+                          <UnreadMessagesDivider
+                            elementRef={(element) => {
+                              unreadMessagesDivider = element;
+                              scheduleUnreadDividerVisibilityUpdate();
+                            }}
+                          />
+                        </Show>
+                        <ChatMessageRow
+                          message={entry()?.message ?? initialEntry.message}
+                          author={entry()?.author ?? initialEntry.author}
+                          showAuthor={entry()?.showAuthor ?? initialEntry.showAuthor}
+                          animate={animate}
+                          agents={agentList()}
+                          referencedMessage={referenced()?.message}
+                          referencedAuthorName={referenced()?.author.name}
+                          onSelectAgent={(id) =>
+                            setComposer((state) => {
+                              state.recipient = id;
+                            })
+                          }
+                          onOpenLink={(url) => {
+                            void window.openbot.openUrl(url);
+                          }}
+                          onPreview={(attachment) => {
+                            void channels.perform(() =>
+                              window.openbot.agent.openAttachment({ attachmentId: attachment.id, action: "open" }),
+                            );
+                          }}
+                          onAttachmentAction={(attachment, action) => {
+                            void channels.perform(() =>
+                              window.openbot.agent.openAttachment({ attachmentId: attachment.id, action }),
+                            );
+                          }}
+                          actions={
+                            <MessageActions
+                              message={entry()?.message ?? initialEntry.message}
+                              authorName={entry()?.author.name ?? initialEntry.author.name}
+                              reactions={false}
+                              pickerOpen={false}
+                              moreOpen={openMoreMessageId() === initialEntry.id}
+                              expandedEmoji={false}
+                              copied={copiedMessageId() === initialEntry.id}
+                              onTogglePicker={() => {}}
+                              onToggleMore={() =>
+                                setOpenMoreMessageId((current) =>
+                                  current === initialEntry.id ? null : initialEntry.id,
+                                )
+                              }
+                              onExpandEmoji={() => {}}
+                              onReact={() => {}}
+                              onReply={() =>
+                                setComposer((state) => {
+                                  state.reply = initialEntry.id;
+                                })
+                              }
+                              onCopy={() => void copyChannelMessage(entry()?.message ?? initialEntry.message)}
+                            />
+                          }
+                          footer={
+                            <>
+                              <time datetime={entry()?.message.createdAt}>{entry()?.message.time}</time>
+                              <Show when={entry()?.superseded}>
+                                <span>Superseded</span>
+                              </Show>
+                              <Show
+                                when={entry()?.message.status === "failed" || entry()?.message.status === "interrupted"}
+                              >
+                                <span>Partial result · {entry()?.message.status}</span>
+                              </Show>
+                            </>
+                          }
+                        >
+                          <Show when={entry()?.message.questionPrompt}>
+                            {(prompt) => (
+                              <QuestionPromptBubble
+                                questions={prompt().questions}
+                                resolution={prompt().resolution}
+                                onSubmit={(answers) =>
+                                  channels.perform(() =>
+                                    window.openbot.agent.respondToPrompt({
+                                      requestId: prompt().requestId,
+                                      answers,
+                                    }),
+                                  )
+                                }
+                              />
+                            )}
+                          </Show>
+                        </ChatMessageRow>
+                      </div>
+                    );
+                  }}
                 </For>
+              </div>
+              <div class="agent-activity-slot" data-reserved={workers().length > 0 ? "true" : "false"}>
+                <Show when={workers().length > 0}>
+                  <ChannelActivityIndicator workers={workers()} />
+                </Show>
               </div>
               <For each={page().channel.members}>
                 {(member) => (

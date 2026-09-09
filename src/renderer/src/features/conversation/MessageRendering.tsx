@@ -137,6 +137,8 @@ export function MessageBody(props: {
   animate?: boolean;
   message: AgentMessage;
   referencedMessage?: AgentMessage;
+  /** Who wrote the quoted message. A chat with several authors has to name the one it quotes. */
+  referencedAuthorName?: string;
   agents: AgentProfile[];
   skills?: InstalledSkill[];
   onSelectAgent: (agentId: string) => void;
@@ -219,7 +221,7 @@ export function MessageBody(props: {
       <Show when={props.referencedMessage}>
         {(referenced) => (
           <div class="message-reply-context">
-            <span>{referenced().author === "you" ? "You" : "Agent"}</span>
+            <span>{referenced().author === "you" ? "You" : (props.referencedAuthorName ?? "Agent")}</span>
             <p>
               <RichMessageText
                 body={referenced().body || "Attachment"}
@@ -377,6 +379,13 @@ function imageGenerationStatus(
 
 export function MessageActions(props: {
   message: AgentMessage;
+  /** Names the toolbar for a screen reader. A channel has more authors than "Agent". */
+  authorName?: string;
+  /**
+   * Whether the reaction button stands in the toolbar. A channel message has no owner to hold a
+   * reaction yet, so the chats share one toolbar and the channel leaves that button out.
+   */
+  reactions?: boolean;
   pickerOpen: boolean;
   moreOpen: boolean;
   expandedEmoji: boolean;
@@ -392,52 +401,29 @@ export function MessageActions(props: {
     <div
       class={["message-actions", { "message-actions-open": props.pickerOpen || props.moreOpen }]}
       role="toolbar"
-      aria-label={`${props.message.author === "you" ? "User" : "Agent"} message actions`}
+      aria-label={`${props.message.author === "you" ? "User" : (props.authorName ?? "Agent")} message actions`}
     >
-      <div class="message-action-popover-anchor">
-        <DropdownMenu.Root
-          open={props.pickerOpen}
-          onOpenChange={props.onTogglePicker}
-          placement={props.message.author === "you" ? "top-end" : "top-start"}
-          gutter={6}
-          modal={false}
-        >
-          <DropdownMenu.Trigger class="message-action-button" aria-label="Add reaction">
-            <ReactionIcon />
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Content
-            class="reaction-picker"
-            data-menu-layout="grid"
-            aria-label="Choose a reaction"
-            aria-hidden={props.pickerOpen ? undefined : "true"}
+      <Show when={props.reactions !== false}>
+        <div class="message-action-popover-anchor">
+          <DropdownMenu.Root
+            open={props.pickerOpen}
+            onOpenChange={props.onTogglePicker}
+            placement={props.message.author === "you" ? "top-end" : "top-start"}
+            gutter={6}
+            modal={false}
           >
-            <div class="reaction-picker-row">
-              <DropdownMenu.RadioGroup class="reaction-picker-options" value={props.message.reaction ?? ""}>
-                <For each={MESSAGE_REACTIONS}>
-                  {(emoji) => (
-                    <DropdownMenu.RadioItem
-                      value={emoji}
-                      aria-label={`React with ${emoji}`}
-                      onSelect={() => props.onReact(props.message.reaction === emoji ? null : emoji)}
-                    >
-                      {emoji}
-                    </DropdownMenu.RadioItem>
-                  )}
-                </For>
-              </DropdownMenu.RadioGroup>
-              <DropdownMenu.Item
-                class="reaction-more-button"
-                aria-label="More emoji"
-                closeOnSelect={false}
-                onSelect={props.onExpandEmoji}
-              >
-                <PlusIcon />
-              </DropdownMenu.Item>
-            </div>
-            <Show when={props.expandedEmoji}>
-              <div class="reaction-picker-row reaction-picker-more">
+            <DropdownMenu.Trigger class="message-action-button" aria-label="Add reaction">
+              <ReactionIcon />
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content
+              class="reaction-picker"
+              data-menu-layout="grid"
+              aria-label="Choose a reaction"
+              aria-hidden={props.pickerOpen ? undefined : "true"}
+            >
+              <div class="reaction-picker-row">
                 <DropdownMenu.RadioGroup class="reaction-picker-options" value={props.message.reaction ?? ""}>
-                  <For each={MORE_MESSAGE_REACTIONS}>
+                  <For each={MESSAGE_REACTIONS}>
                     {(emoji) => (
                       <DropdownMenu.RadioItem
                         value={emoji}
@@ -449,16 +435,41 @@ export function MessageActions(props: {
                     )}
                   </For>
                 </DropdownMenu.RadioGroup>
+                <DropdownMenu.Item
+                  class="reaction-more-button"
+                  aria-label="More emoji"
+                  closeOnSelect={false}
+                  onSelect={props.onExpandEmoji}
+                >
+                  <PlusIcon />
+                </DropdownMenu.Item>
               </div>
-            </Show>
-          </DropdownMenu.Content>
-        </DropdownMenu.Root>
-      </div>
+              <Show when={props.expandedEmoji}>
+                <div class="reaction-picker-row reaction-picker-more">
+                  <DropdownMenu.RadioGroup class="reaction-picker-options" value={props.message.reaction ?? ""}>
+                    <For each={MORE_MESSAGE_REACTIONS}>
+                      {(emoji) => (
+                        <DropdownMenu.RadioItem
+                          value={emoji}
+                          aria-label={`React with ${emoji}`}
+                          onSelect={() => props.onReact(props.message.reaction === emoji ? null : emoji)}
+                        >
+                          {emoji}
+                        </DropdownMenu.RadioItem>
+                      )}
+                    </For>
+                  </DropdownMenu.RadioGroup>
+                </div>
+              </Show>
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
+        </div>
+      </Show>
       <Button
         variant="ghost"
         type="button"
         class="message-action-button"
-        aria-label={`Reply to ${props.message.author === "you" ? "User" : "Agent"} message`}
+        aria-label={`Reply to ${props.message.author === "you" ? "User" : (props.authorName ?? "Agent")} message`}
         onClick={props.onReply}
       >
         <ReplyIcon />

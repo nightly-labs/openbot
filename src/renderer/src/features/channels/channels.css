@@ -464,3 +464,16 @@
 .channel-title .agent-avatar + .agent-avatar {
   margin-left: -8px;
 }
+
+/*
+ * The faces in the activity row, one for each agent the channel waits on. They overlap the way the
+ * member stack in the header does, so two or three faces keep the sentence beside them in place.
+ */
+.channel-activity-faces {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+.channel-activity-faces .agent-activity-avatar + .agent-activity-avatar {
+  margin-left: -10px;
+}
