@@ -635,6 +635,16 @@ export class ChannelService {
         const delivery = receipt.deliveries[0];
         if (!delivery) throw new Error("Channel delivery was not created.");
         assignment.deliveryId = delivery.id;
+        // The assignment reserved the host before attachment copying. Keep its delivery ahead
+        // of normal messages that arrived during that await, or the reservation would leave the
+        // queue's normal head blocked behind this channel delivery forever.
+        const queuedDeliveryIds = this.mailbox.queuedDeliveryIds(assignment.agentId);
+        if (queuedDeliveryIds[0] !== delivery.id)
+          await this.mailbox.reorderQueue(assignment.agentId, [
+            delivery.id,
+            ...queuedDeliveryIds.filter((deliveryId) => deliveryId !== delivery.id),
+          ]);
+        if (this.#deletedChannels.has(channelId)) return;
         const latest = this.store.tasks(channelId).find((item) => item.id === task.id);
         if (
           !latest ||

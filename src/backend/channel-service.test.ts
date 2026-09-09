@@ -998,6 +998,153 @@ describe("shared channel coordination", () => {
     expect(schedule.mock.calls.map(([agentId]) => agentId)).toContain("agent-b");
   });
 
+  it("keeps channel deliveries ahead of normal messages queued during attachment copying", async () => {
+    await service.command(
+      {
+        type: "save",
+        channelId: "channel-2",
+        operationId: operationId(),
+        draft: { ...draft, title: "Second channel" },
+      },
+      actor,
+    );
+    const firstFile = join(root, "first-brief.txt");
+    const secondFile = join(root, "second-brief.txt");
+    await writeFile(firstFile, "the first brief");
+    await writeFile(secondFile, "the second brief");
+    const firstAttachment = required((await data.mailbox.prepareAttachments([firstFile]))[0]);
+    const secondAttachment = required((await data.mailbox.prepareAttachments([secondFile]))[0]);
+    let releaseFirst!: () => void;
+    let releaseSecond!: () => void;
+    const firstCopy = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const secondCopy = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
+    const enqueue = data.mailbox.enqueue.bind(data.mailbox);
+    vi.spyOn(data.mailbox, "enqueue").mockImplementation(async (input) => {
+      if (input.channelId === "channel-1") await firstCopy;
+      if (input.channelId === "channel-2") await secondCopy;
+      return enqueue(input);
+    });
+
+    const wake = vi.spyOn(service, "wake").mockImplementation(() => undefined);
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: `Compare the first brief ${serializeAttachmentReference(firstAttachment.name, firstAttachment.id)}`,
+        recipientAgentId: "agent-a",
+        replyToMessageId: null,
+        attachmentDraftIds: [firstAttachment.id],
+      },
+      actor,
+    );
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-2",
+        operationId: operationId(),
+        text: `Compare the second brief ${serializeAttachmentReference(secondAttachment.name, secondAttachment.id)}`,
+        recipientAgentId: "agent-b",
+        replyToMessageId: null,
+        attachmentDraftIds: [secondAttachment.id],
+      },
+      actor,
+    );
+    const firstTask = required(service.store.tasks("channel-1")[0]);
+    const secondTask = required(service.store.tasks("channel-2")[0]);
+    // Independent resource reservations can be copied concurrently. Pause the pumps above so
+    // the test can give these queued tasks their separate workspace reservations before dispatch.
+    service.store.update(service.store.get("channel-1"), {
+      tasks: [{ ...firstTask, resources: ["workspace:/first"] }],
+    });
+    service.store.update(service.store.get("channel-2"), {
+      tasks: [{ ...secondTask, resources: ["workspace:/second"] }],
+    });
+    wake.mockRestore();
+    service.wake("channel-1");
+    service.wake("channel-2");
+    await vi.waitFor(() => expect(service.store.assignments("channel-1")).toHaveLength(1));
+    await vi.waitFor(() => expect(service.store.assignments("channel-2")).toHaveLength(1));
+    await data.mailbox.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["agent-a"],
+      text: "Answer the first normal request",
+      idempotencyKey: "test:channel-order:first-normal",
+    });
+    await data.mailbox.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["agent-a"],
+      text: "Answer the first follow-up",
+      idempotencyKey: "test:channel-order:first-follow-up",
+    });
+    await data.mailbox.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["agent-b"],
+      text: "Answer the second normal request",
+      idempotencyKey: "test:channel-order:second-normal",
+    });
+    await data.mailbox.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["agent-b"],
+      text: "Answer the second follow-up",
+      idempotencyKey: "test:channel-order:second-follow-up",
+    });
+
+    expect(service.mayDrain("agent-a")).toBe(false);
+    expect(service.mayDrain("agent-b")).toBe(false);
+
+    releaseFirst();
+    releaseSecond();
+    await vi.waitFor(() => expect(service.store.assignments("channel-1")[0]?.deliveryId).not.toBeNull());
+    await vi.waitFor(() => expect(service.store.assignments("channel-2")[0]?.deliveryId).not.toBeNull());
+    await vi.waitFor(() =>
+      expect(service.store.messages("channel-1")[0]?.message.attachments).toEqual([
+        expect.objectContaining({ name: firstAttachment.name }),
+      ]),
+    );
+    await vi.waitFor(() =>
+      expect(service.store.messages("channel-2")[0]?.message.attachments).toEqual([
+        expect.objectContaining({ name: secondAttachment.name }),
+      ]),
+    );
+    const firstDeliveryId = required(service.store.assignments("channel-1")[0]?.deliveryId);
+    const secondDeliveryId = required(service.store.assignments("channel-2")[0]?.deliveryId);
+    await vi.waitFor(() => {
+      const next = data.mailbox.nextQueued("agent-a");
+      expect(next && service.store.assignmentForDelivery(next.delivery.id)?.id).toBe(
+        service.store.assignments("channel-1")[0]?.id,
+      );
+    });
+    await vi.waitFor(() => {
+      const next = data.mailbox.nextQueued("agent-b");
+      expect(next && service.store.assignmentForDelivery(next.delivery.id)?.id).toBe(
+        service.store.assignments("channel-2")[0]?.id,
+      );
+    });
+    // Once the channel deliveries finish, the normal messages that arrived during the copy are
+    // still queued and can become the next work for each agent.
+    await data.mailbox.cancel("agent-a", firstDeliveryId);
+    service.deliveryFailed(firstDeliveryId, "The channel delivery failed.");
+    await data.mailbox.cancel("agent-b", secondDeliveryId);
+    service.deliveryFailed(secondDeliveryId, "The channel delivery failed.");
+    expect(data.mailbox.nextQueued("agent-a")?.delivery.text).toBe("Answer the first normal request");
+    expect(data.mailbox.nextQueued("agent-b")?.delivery.text).toBe("Answer the second normal request");
+    expect(data.mailbox.listQueue("agent-a").deliveries.map((item) => item.text)).toEqual([
+      "Answer the first normal request",
+      "Answer the first follow-up",
+    ]);
+    expect(data.mailbox.listQueue("agent-b").deliveries.map((item) => item.text)).toEqual([
+      "Answer the second normal request",
+      "Answer the second follow-up",
+    ]);
+    expect(service.mayDrain("agent-a")).toBe(true);
+    expect(service.mayDrain("agent-b")).toBe(true);
+  });
+
   it("keeps the stored request and its file when a child task starts", async () => {
     await data.store.getOrCreate("agent-c");
     await service.command(

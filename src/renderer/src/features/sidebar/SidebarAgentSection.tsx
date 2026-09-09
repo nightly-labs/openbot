@@ -29,6 +29,7 @@ export function SidebarAgentSection(sectionProps: { sectionId: string }) {
   const custom = () => customSectionById().get(sectionId());
   const name = () => (sectionId() === SIDEBAR_UNASSIGNED_SECTION_ID ? "Unassigned" : (custom()?.name ?? ""));
   const headed = () => Boolean(custom()) || props.layout.sections.length > 0;
+  const collapsed = () => headed() && sectionIsCollapsed(sectionId());
   return (
     <Show when={name() && (chats().length > 0 || (custom() && !normalizedQuery()))}>
       <section
@@ -42,9 +43,9 @@ export function SidebarAgentSection(sectionProps: { sectionId: string }) {
         </Show>
         <div
           class="sidebar-section-collapse"
-          data-collapsed={sectionIsCollapsed(sectionId()) ? "" : undefined}
-          aria-hidden={sectionIsCollapsed(sectionId()) ? "true" : undefined}
-          inert={sectionIsCollapsed(sectionId()) ? true : undefined}
+          data-collapsed={collapsed() ? "" : undefined}
+          aria-hidden={collapsed() ? "true" : undefined}
+          inert={collapsed() ? true : undefined}
         >
           <div id={`sidebar-section-body-${sectionId()}`} class="sidebar-section-body">
             <For each={chats()}>

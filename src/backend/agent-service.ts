@@ -461,6 +461,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // reaches the agent event forwarder for a channel thread.
       changed: (channelId, revision) => {
         this.#channelRoutines.reconcile(channelId);
+        this.#routineTimer.arm();
         this.#emit({ type: "channels-changed", channelId, revision });
       },
       memoriesChanged: (channelId) => this.#emit({ type: "channel-memories-changed", channelId }),

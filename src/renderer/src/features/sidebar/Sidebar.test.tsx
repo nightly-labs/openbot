@@ -559,6 +559,15 @@ describe("Sidebar sections", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Unassigned" })).toBeInTheDocument());
   });
 
+  it("keeps unassigned chats visible when its hidden heading is saved collapsed", async () => {
+    const props = sidebarProps();
+    render(() => <Sidebar {...props} collapsedSectionIds={["unassigned"]} />);
+
+    expect(screen.queryByRole("button", { name: "Unassigned" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Chief/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Research/ })).toBeInTheDocument();
+  });
+
   it("files a channel into a section by drag, beside the agents", async () => {
     const props = sidebarProps();
     const onSelectChannel = vi.fn();

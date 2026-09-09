@@ -551,6 +551,13 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
+  queuedDeliveryIds(agentId: string): string[] {
+    return this.#state.deliveries
+      .filter((delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued")
+      .sort(compareQueueOrder)
+      .map((delivery) => delivery.id);
+  }
+
   getDelivery(deliveryId: string): DeliveryContext | null {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     return delivery ? this.#context(delivery) : null;
