@@ -1,5 +1,5 @@
 import { userErrorMessage as errorMessage } from "@openbot/user-errors";
-import { CameraView, useCameraPermissions } from "expo-camera";
+import { CameraView, type CameraViewProps, useCameraPermissions } from "expo-camera";
 import { Stack } from "expo-router";
 import { useIsFocused } from "expo-router/react-navigation";
 import { StatusBar } from "expo-status-bar";
@@ -8,6 +8,8 @@ import { useThemeColor } from "heroui-native/hooks";
 import { Camera, ScanLine } from "lucide-react-native";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AppState, Linking, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+
+import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
@@ -60,6 +62,26 @@ function ScannerStatus({ scanState, onRetry }: { scanState: ScanState; onRetry: 
   );
 }
 
+// Mount with the session so readiness resets on close, focus loss and background.
+function ScannerCamera({ onBarcodeScanned }: Pick<CameraViewProps, "onBarcodeScanned">) {
+  const opacity = useSharedValue(0);
+  const previewStyle = useAnimatedStyle(() => ({ opacity: opacity.get() }));
+
+  return (
+    <Animated.View style={[StyleSheet.absoluteFill, previewStyle]}>
+      <CameraView
+        style={StyleSheet.absoluteFill}
+        facing="back"
+        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+        onBarcodeScanned={onBarcodeScanned}
+        onCameraReady={() => {
+          opacity.set(withTiming(1, { duration: 200, reduceMotion: ReduceMotion.System }));
+        }}
+      />
+    </Animated.View>
+  );
+}
+
 export function QrScanner({
   onScan,
   embedded = false,
@@ -109,10 +131,7 @@ export function QrScanner({
     return (
       <>
         {!embedded ? <Stack.Screen options={{ headerTintColor: foregroundColor }} /> : null}
-        <View className="flex-1 items-center justify-center bg-background">
-          <Spinner color="default" accessibilityLabel="Loading camera" />
-          {renderOverlay?.(false)}
-        </View>
+        <View className="flex-1 items-center justify-center bg-background">{renderOverlay?.(false)}</View>
       </>
     );
   }
@@ -181,12 +200,9 @@ export function QrScanner({
         />
       ) : null}
       {!embedded ? <StatusBar style="light" /> : null}
-      <View className="flex-1 bg-black">
+      <View className={embedded ? "flex-1 bg-sheet" : "flex-1 bg-black"}>
         {focused && foreground ? (
-          <CameraView
-            style={StyleSheet.absoluteFill}
-            facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+          <ScannerCamera
             onBarcodeScanned={scanEnabled && scanState.status === "idle" ? ({ data }) => void connect(data) : undefined}
           />
         ) : null}

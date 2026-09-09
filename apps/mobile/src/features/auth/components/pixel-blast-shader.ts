@@ -97,7 +97,10 @@ half4 main(float2 position) {
   float edge = min(min(norm.x, norm.y), min(1.0 - norm.x, 1.0 - norm.y));
   float alpha = clamp(mask * smoothstep(0.0, 0.07, edge), 0.0, 1.0);
   // Keep the reading area clear; the animation is a quiet accent at the edges.
-  float contentDistance = length((norm - 0.5) / float2(0.30, 0.22));
+  // A fourth-power superellipse gives the clear area soft, square corners.
+  float2 contentOffset = (norm - 0.5) / float2(0.30, 0.22);
+  float2 contentSquared = contentOffset * contentOffset;
+  float contentDistance = sqrt(sqrt(dot(contentSquared, contentSquared)));
   float contentFade = smoothstep(0.85, 1.55, contentDistance);
   alpha *= 0.42 * contentFade;
   return half4(color * alpha, alpha);

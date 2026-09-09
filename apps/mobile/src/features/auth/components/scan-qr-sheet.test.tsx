@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScanQrSheet } from "./scan-qr-sheet";
 
 const native = vi.hoisted(() => {
-  const camera: { scan?: (event: { data: string }) => void } = {};
+  const camera: { ready?: () => void; scan?: (event: { data: string }) => void } = {};
   return {
     finishMotion: () => {},
     back: new Set<() => boolean>(),
@@ -47,6 +47,7 @@ vi.mock("react-native-reanimated", () => ({
   cancelAnimation: () => {},
   useSharedValue: (initial: number) => useRef({ get: () => initial, set: () => {} }).current,
   useAnimatedStyle: () => ({}),
+  withTiming: (target: number) => target,
   withSpring: (_target: number, _config: { duration: number }, done: (finished: boolean) => void) => {
     native.finishMotion = () => done(true);
     return 0;
@@ -57,8 +58,15 @@ vi.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ t
 vi.mock("uniwind", () => ({ useCSSVariable: () => "12" }));
 vi.mock("expo-camera", () => ({
   useCameraPermissions: () => [native.permission, native.requestPermission, native.getPermission],
-  CameraView: ({ onBarcodeScanned }: { onBarcodeScanned?: (event: { data: string }) => void }) => {
+  CameraView: ({
+    onBarcodeScanned,
+    onCameraReady,
+  }: {
+    onBarcodeScanned?: (event: { data: string }) => void;
+    onCameraReady?: () => void;
+  }) => {
     native.camera.scan = onBarcodeScanned;
+    native.camera.ready = onCameraReady;
     return <div role="img" aria-label="Camera preview" />;
   },
 }));

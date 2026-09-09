@@ -109,11 +109,23 @@ export function ScanQrSheet({
       borderRadius: interpolate(p, [0, 1], [radius, radius * 2]),
     };
   });
+  // Keep the fixed-size preview centered inside the changing clip bounds.
+  // Anchoring it at top-left makes the content slide diagonally during the morph.
   const scannerStyle = useAnimatedStyle(() => ({
     opacity: Math.min(1, Math.max(0, (progress.get() - 0.55) / 0.45)),
+    transform: [
+      { translateX: ((origin.width - width) * (1 - progress.get())) / 2 },
+      { translateY: ((origin.height - height) * (1 - progress.get())) / 2 },
+    ],
   }));
   const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.get() * 0.45 }));
-  const sourceButtonStyle = useAnimatedStyle(() => ({ opacity: Math.max(0, 1 - progress.get() * 5) }));
+  const sourceButtonStyle = useAnimatedStyle(() => ({
+    opacity: Math.max(0, 1 - progress.get() * 5),
+    transform: [
+      { translateX: ((width - origin.width) * progress.get()) / 2 },
+      { translateY: ((height - origin.height) * progress.get()) / 2 },
+    ],
+  }));
   // Native button padding, type and material need to match at handoff. Fade the
   // morph surface out before returning to the same button component below it.
   const surfaceStyle = useAnimatedStyle(() => ({
