@@ -194,6 +194,47 @@ it("creates a channel from a searchable member dialog and keeps the chat open be
   );
 });
 
+it("keeps both removals when the second starts before the first save lands", async () => {
+  await window.openbot.agent.channelCommand({
+    type: "save",
+    operationId: "create",
+    channelId: "channel-test",
+    draft: {
+      name: "Project room",
+      title: "",
+      instructions: "",
+      members: [{ agentId: "chief" }, { agentId: "sales-outbound" }],
+      leadAgentId: "chief",
+    },
+  });
+  render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+  await fireEvent.click(await screen.findByRole("button", { name: /Project room/ }));
+  const chat = await screen.findByRole("main", { name: "Channel conversation" });
+  await within(chat).findByRole("heading", { name: "Project room", level: 1 });
+  await openChannelMenuItem("Edit channel");
+  await within(chat).findByRole("button", { name: "Remove Chief" });
+
+  // Both saves wait on one gate, so the second removal is started while the first is in flight.
+  // A draft carries the whole member list, so a second draft built from the state before the
+  // first save would put Chief back.
+  const original = window.openbot.agent.channelCommand;
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  vi.spyOn(window.openbot.agent, "channelCommand").mockImplementation(async (input) => {
+    if (input.type === "save") await gate;
+    return original(input);
+  });
+  void fireEvent.click(within(chat).getByRole("button", { name: "Remove Chief" }));
+  void fireEvent.click(within(chat).getByRole("button", { name: "Remove Sales Outbound" }));
+  release();
+
+  await waitFor(() => expect(within(chat).queryByRole("button", { name: "Remove Sales Outbound" })).toBeNull());
+  expect(within(chat).queryByRole("button", { name: "Remove Chief" })).toBeNull();
+});
+
 it("retries a lost response once and keeps a focused draft through incoming messages", async () => {
   const chat = await openSavedChannel();
   const originalCommand = window.openbot.agent.channelCommand;

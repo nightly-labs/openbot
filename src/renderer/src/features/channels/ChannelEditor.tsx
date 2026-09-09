@@ -113,12 +113,26 @@ export function ChannelEditor(props: ChannelEditorProps) {
     };
   }
 
+  /**
+   * One save at a time, and each draft built after the one before it has landed.
+   *
+   * The member controls stay enabled while a save is in flight, and a draft carries the whole
+   * member list. Two removals started together would both read the list as it was before either
+   * of them, so the second save would put the first member back.
+   */
+  let saving: Promise<unknown> = Promise.resolve();
   function commit(patch?: (draft: ChannelDraft) => void): Promise<boolean> {
-    const current = channel();
-    if (!current) return Promise.resolve(false);
-    const draft = draftFrom(current);
-    patch?.(draft);
-    return channels.command({ type: "save", operationId: crypto.randomUUID(), channelId: current.id, draft });
+    const next = saving
+      .catch(() => undefined)
+      .then(() => {
+        const current = channel();
+        if (!current) return false;
+        const draft = draftFrom(current);
+        patch?.(draft);
+        return channels.command({ type: "save", operationId: crypto.randomUUID(), channelId: current.id, draft });
+      });
+    saving = next;
+    return next;
   }
 
   /** An empty name is not a name the service accepts, so leaving the field blank restores it. */
