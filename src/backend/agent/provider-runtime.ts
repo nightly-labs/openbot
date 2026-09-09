@@ -418,6 +418,9 @@ export class ProviderRuntime implements ProviderPort {
   async updateProviderCli(provider: AgentProvider, install: () => Promise<string>): Promise<AgentStatus> {
     return this.#runProviderConnectionCommand(provider, async () => {
       await this.#providerStarts.get(provider);
+      if ((provider === "codex" && this.#codexLogin) || this.#cliLogins.has(provider)) {
+        throw new Error(`The ${providerLabel(provider)} CLI is signing in. Finish or cancel sign-in, then update.`);
+      }
       if (this.#hooks.isProviderBusy(provider)) {
         throw new Error(`The ${providerLabel(provider)} CLI is working on a turn. Wait for it to finish, then update.`);
       }

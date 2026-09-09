@@ -8,6 +8,7 @@ import { AgentService } from "../agent-service";
 import {
   CREATE_AGENT_INPUT,
   createFakeClaude,
+  createFakeCodex,
   createFakeGrok,
   createPendingFakeClaude,
   createUpdatableFakeClaude,
@@ -499,6 +500,52 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(activeClient?.running).toBe(false);
     expect(codexClients[2]?.running).toBe(true);
   });
+
+  it.each(["codex", "claude"] as const)(
+    "blocks %s updates during sign-in and allows retry after cancellation",
+    async (target) => {
+      const managed = target === "codex" ? await createFakeCodex(root) : await createFakeClaude(root);
+      if (target === "claude") {
+        process.env.OPENBOT_FAKE_CLAUDE_LOGIN_LOG = join(root, "pending-claude-login.log");
+        process.env.OPENBOT_CLAUDE_PATH = await createPendingFakeClaude(root);
+      }
+      const { store, mailbox } = stores(root);
+      service = new AgentService(
+        store,
+        mailbox,
+        fakeBrowser(),
+        30_000,
+        target,
+        (provider) => new FakeAgentClient(provider),
+      );
+      await service.initialize();
+      await service.connectProvider(target, async () => undefined);
+      const install = vi.fn(async () => managed);
+
+      await expect(service.updateProviderCli(target, install)).rejects.toThrow(
+        "Finish or cancel sign-in, then update.",
+      );
+      expect(install).not.toHaveBeenCalled();
+      expect(service.getStatus().providers).toContainEqual(
+        expect.objectContaining({ id: target, connectionState: "connecting" }),
+      );
+
+      const other = target === "codex" ? "claude" : "codex";
+      const otherCli = other === "codex" ? await createFakeCodex(root) : await createFakeClaude(root);
+      process.env[`OPENBOT_${other.toUpperCase()}_PATH`] = join(root, "missing-other-override");
+      const otherUpdated = await service.updateProviderCli(other, async () => otherCli);
+      expect(otherUpdated.providers).toContainEqual(
+        expect.objectContaining({ id: other, state: "available", cliSource: "managed" }),
+      );
+
+      await service.refreshProviders();
+      process.env[`OPENBOT_${target.toUpperCase()}_PATH`] = join(root, "missing-override");
+      const updated = await service.updateProviderCli(target, install);
+      expect(updated.providers).toContainEqual(
+        expect.objectContaining({ id: target, state: "available", cliSource: "managed" }),
+      );
+    },
+  );
 
   it("activates the downloaded managed CLI instead of running the user's updater", async () => {
     const system = await createUpdatableFakeClaude(root, "2.1.250");
