@@ -1,6 +1,7 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import type { ChannelDraft, ChannelMessage } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stores } from "./agent-service-test-harness";
@@ -13,6 +14,7 @@ let data: ReturnType<typeof stores>;
 let draft: ChannelDraft;
 const actor = { id: "human-1", name: "Alex" };
 const changed = vi.fn();
+const schedule = vi.fn();
 const generate = vi.fn(async () => JSON.stringify({ agentId: "agent-a" }));
 let count = 0;
 const operationId = () => `command-${++count}`;
@@ -31,10 +33,11 @@ beforeEach(async () => {
     leadAgentId: "agent-a",
   };
   generate.mockClear();
+  schedule.mockClear();
   service = new ChannelService(data.store.database, data.mailbox, {
     agents: () => data.store.list(),
     generate,
-    schedule: () => undefined,
+    schedule,
     interrupt: async () => undefined,
     busy: () => false,
     changed,
@@ -819,6 +822,231 @@ describe("shared channel coordination", () => {
       text: "The client signs off on Fridays.",
     });
     expect(service.memories.list("channel-1")).toHaveLength(0);
+  });
+
+  it("counts a normal request held behind another agent's channel work as unfinished", async () => {
+    await send("Inspect project A");
+    await data.mailbox.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["agent-b"],
+      text: "Draft the release note",
+      idempotencyKey: "test:channel-hold:normal-request",
+    });
+    // One active assignment reserves the host, so every agent whose next request is not channel
+    // work is held: this delivery stays queued for as long as agent-a's assignment runs.
+    expect(service.mayDrain("agent-b")).toBe(false);
+    expect(data.mailbox.listQueue("agent-b").deliveries.map((delivery) => delivery.status)).toEqual(["queued"]);
+    // Agent deletion and the provider switch both refuse on this. A guard that reads only the
+    // active statuses sees an idle agent and takes the request and its files away while it waits.
+    expect(data.mailbox.hasUnfinishedDelivery("agent-b")).toBe(true);
+  });
+
+  it("schedules the agents held behind a channel assignment when it fails to start", async () => {
+    await send("Inspect project A");
+    const deliveryId = required(service.store.assignments("channel-1").find((item) => item.deliveryId)?.deliveryId);
+    await data.mailbox.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["agent-b"],
+      text: "Draft the release note",
+      idempotencyKey: "test:channel-hold:startup-failure",
+    });
+    expect(service.mayDrain("agent-b")).toBe(false);
+    schedule.mockClear();
+    service.deliveryFailed(deliveryId, "The provider did not start.");
+    // The failure lifts the reservation, so agent-b may drain again - but the drain scheduler
+    // retries only the failed assignment's agent, so without this the held request waits for an
+    // unrelated trigger.
+    expect(service.mayDrain("agent-b")).toBe(true);
+    expect(schedule.mock.calls.map(([agentId]) => agentId)).toContain("agent-b");
+  });
+
+  it("keeps the stored request and its file when a child task starts", async () => {
+    await data.store.getOrCreate("agent-c");
+    await service.command(
+      {
+        type: "save",
+        channelId: "channel-1",
+        operationId: operationId(),
+        draft: { ...draft, members: [...draft.members, { agentId: "agent-c" }] },
+      },
+      actor,
+    );
+    const file = join(root, "brief.txt");
+    await writeFile(file, "the brief");
+    const attachment = required((await data.mailbox.prepareAttachments([file]))[0]);
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: `Compare the two projects ${serializeAttachmentReference(attachment.name, attachment.id)}`,
+        recipientAgentId: "agent-a",
+        replyToMessageId: null,
+        attachmentDraftIds: [attachment.id],
+      },
+      actor,
+    );
+    await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
+    const parent = required(service.store.tasks("channel-1")[0]);
+    const request = () =>
+      required(service.store.messages("channel-1").find((item) => item.id === parent.requestMessageId)).message;
+    const committed = required(request().attachments?.[0]);
+    const text = request().text;
+    // The first dispatch turns the draft into an attachment, so the reference in the request now
+    // names the committed file.
+    expect(text).toContain(committed.id);
+    const deliveryId = required(service.store.assignments("channel-1")[0]?.deliveryId);
+    await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
+    await data.mailbox.markStarting(deliveryId);
+    await data.mailbox.markRunning(deliveryId, "parent-turn");
+    service.accepted(deliveryId, "parent-session", "parent-turn");
+    await service.tool("channel-1", "agent-a", "parent-turn", "child-1", "channel_assign", {
+      recipientAgentId: "agent-b",
+      task: "Inspect project B",
+      expectedResult: "Findings B",
+      sourceMessageIds: [parent.requestMessageId],
+      resources: ["workspace:/work/b"],
+    });
+    await data.mailbox.markTerminal(deliveryId, "completed");
+    service.event({
+      type: "turn-completed",
+      agentId: "agent-a",
+      threadId: service.store.context("channel-1", "agent-a").threadId,
+      turnId: "parent-turn",
+      status: "completed",
+    });
+    await vi.waitFor(() => expect(data.mailbox.nextQueued("agent-b")).not.toBeNull());
+    // A child task inherits the id of the request message, and its instruction is the delegation,
+    // not what the human wrote. The request keeps its own words and its own file.
+    expect(data.mailbox.nextQueued("agent-b")?.delivery.text).toBe("Inspect project B");
+    expect(request().text).toBe(text);
+    expect(request().attachments).toEqual([committed]);
+  });
+
+  it("sends the request file again when a stopped assignment resumes", async () => {
+    const file = join(root, "brief.txt");
+    await writeFile(file, "the brief");
+    const attachment = required((await data.mailbox.prepareAttachments([file]))[0]);
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: "Prepare the report",
+        recipientAgentId: "agent-a",
+        replyToMessageId: null,
+        attachmentDraftIds: [attachment.id],
+      },
+      actor,
+    );
+    await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
+    const task = required(service.store.tasks("channel-1")[0]);
+    const first = required(service.store.assignments("channel-1")[0]);
+    expect(data.mailbox.getDelivery(required(first.deliveryId))?.delivery.attachments).toHaveLength(1);
+    await service.command(
+      { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
+      actor,
+    );
+    await service.command(
+      { type: "resume", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
+      actor,
+    );
+    await vi.waitFor(() => expect(service.store.assignments("channel-1")[1]?.deliveryId).not.toBeNull());
+    const second = required(service.store.assignments("channel-1")[1]);
+    // The drafts are consumed by the first dispatch, so a retry has to attach the committed
+    // copies. Without them the agent resumes a request without the file it is about.
+    expect(
+      data.mailbox.getDelivery(required(second.deliveryId))?.delivery.attachments.map((item) => item.name),
+    ).toEqual([attachment.name]);
+    expect(
+      required(service.store.messages("channel-1").find((item) => item.id === task.requestMessageId)).message
+        .attachments,
+    ).toHaveLength(1);
+  });
+
+  it("holds a transferred task and its resource until the previous owner stops", async () => {
+    await data.store.getOrCreate("agent-c");
+    await service.command(
+      {
+        type: "save",
+        channelId: "channel-1",
+        operationId: operationId(),
+        draft: { ...draft, members: [...draft.members, { agentId: "agent-c" }] },
+      },
+      actor,
+    );
+    const parent = await send("Compare the two projects");
+    const parentDeliveryId = required(service.store.assignments("channel-1")[0]?.deliveryId);
+    await service.prepare(required(data.mailbox.getDelivery(parentDeliveryId)));
+    await data.mailbox.markStarting(parentDeliveryId);
+    await data.mailbox.markRunning(parentDeliveryId, "parent-turn");
+    service.accepted(parentDeliveryId, "parent-session", "parent-turn");
+    for (const [index, recipientAgentId] of ["agent-b", "agent-c"].entries())
+      await service.tool("channel-1", "agent-a", "parent-turn", `child-${index}`, "channel_assign", {
+        recipientAgentId,
+        task: `Inspect project B as ${recipientAgentId}`,
+        expectedResult: "Findings B",
+        sourceMessageIds: [parent.requestMessageId],
+        resources: ["workspace:/work/b"],
+      });
+    await data.mailbox.markTerminal(parentDeliveryId, "completed");
+    service.event({
+      type: "turn-completed",
+      agentId: "agent-a",
+      threadId: service.store.context("channel-1", "agent-a").threadId,
+      turnId: "parent-turn",
+      status: "completed",
+    });
+    // The two children declare the same workspace, so the second one waits for the first.
+    await vi.waitFor(() => expect(data.mailbox.nextQueued("agent-b")).not.toBeNull());
+    const children = service.store.tasks("channel-1").filter((item) => item.parentTaskId === parent.id);
+    const transferred = required(children[0]);
+    const waiting = required(children[1]);
+    const childDeliveryId = required(
+      service.store.assignments("channel-1").find((item) => item.taskId === transferred.id)?.deliveryId,
+    );
+    await service.prepare(required(data.mailbox.getDelivery(childDeliveryId)));
+    await data.mailbox.markStarting(childDeliveryId);
+    await data.mailbox.markRunning(childDeliveryId, "child-turn");
+    service.accepted(childDeliveryId, "child-session", "child-turn");
+    await service.tool("channel-1", "agent-b", "child-turn", "transfer", "channel_transfer", {
+      recipientAgentId: "agent-a",
+      task: "Finish the inspection",
+      expectedResult: "Findings B",
+      sourceMessageIds: [parent.requestMessageId],
+      resources: ["none"],
+    });
+    // Agent-b still runs the turn that holds the workspace. The new owner of that task must not
+    // start a second turn on it, and the task that declares the same workspace must not read the
+    // lowered resources of the transfer as a free reservation.
+    const assignmentsFor = (taskId: string) =>
+      service.store.assignments("channel-1").filter((item) => item.taskId === taskId);
+    expect(assignmentsFor(transferred.id)).toHaveLength(1);
+    expect(assignmentsFor(waiting.id)).toHaveLength(0);
+    await data.mailbox.markTerminal(childDeliveryId, "completed");
+    service.event({
+      type: "turn-completed",
+      agentId: "agent-b",
+      threadId: service.store.context("channel-1", "agent-b").threadId,
+      turnId: "child-turn",
+      status: "completed",
+    });
+    await vi.waitFor(() => expect(assignmentsFor(transferred.id)).toHaveLength(2));
+    expect(data.mailbox.nextQueued("agent-a")?.delivery.text).toBe("Finish the inspection");
+  });
+
+  it("reads an assignment stored before resources as a host reservation", async () => {
+    await send("Prepare the report");
+    const assignment = required(service.store.assignments("channel-1")[0]);
+    const { resources, ...withoutResources } = assignment;
+    expect(resources).toEqual(["host"]);
+    data.store.database.connection
+      .prepare("UPDATE projection_channel_assignments SET assignment_json = ? WHERE assignment_id = ?")
+      .run(JSON.stringify(withoutResources), assignment.id);
+    // A profile that ran the previous build holds assignment records with no resources. The
+    // conservative reading holds the channel until that assignment ends, because the resources the
+    // running turn uses are unknown.
+    expect(service.store.assignments("channel-1")[0]?.resources).toEqual(["host"]);
   });
 
   it("serializes overlapping workspaces and permits independent declared resources", () => {

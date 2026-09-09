@@ -822,9 +822,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (!input.model || !input.provider) {
         throw new Error("Changing provider requires an atomic provider and model selection.");
       }
-      const hasPendingWork = this.#mailbox
-        .unresolvedDeliveries()
-        .some((item) => item.delivery.recipientAgentId === input.agentId);
+      const hasPendingWork = this.#mailbox.hasUnfinishedDelivery(input.agentId);
       const activeTurn =
         this.#conversation.workingSnapshot(input.agentId)?.activeTurnId ??
         (previous.threadId
@@ -916,9 +914,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   async deleteAgent(agentId: string): Promise<void> {
     if (this.#deletingAgents.has(agentId)) throw new Error("Agent deletion is already in progress.");
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-    const hasPendingWork = this.#mailbox
-      .unresolvedDeliveries()
-      .some((item) => item.delivery.recipientAgentId === agentId);
+    const hasPendingWork = this.#mailbox.hasUnfinishedDelivery(agentId);
     if (hasPendingWork || this.#conversation.workingSnapshot(agentId)?.activeTurnId) {
       throw new Error("Stop the agent and cancel its queued messages before deleting it.");
     }

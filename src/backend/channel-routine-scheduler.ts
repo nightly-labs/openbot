@@ -165,6 +165,10 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
       for (const run of this.#routines.openRuns(channelId)) {
         // A run with no request id has not reached the channel yet; `resumePendingRuns` owns it.
         if (!run.requestMessageId) continue;
+        // Nor has a run whose command is still in flight: the run row is written first, so a
+        // publish from other channel work can land between the two. Read as a state, that window
+        // looks like a request that every task has dropped, and would cancel work about to start.
+        if (exists && !this.#channels.committed(this.#actor(run).id, this.#operationId(run))) continue;
         const requestId = run.requestMessageId;
         const owned = tasks.filter((task) => task.requestMessageId === requestId);
         const hasAssignment = assignments.some(
@@ -201,7 +205,7 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
       await this.#channels.command(
         {
           type: "request",
-          operationId: `channel-routine-run:${run.id}`,
+          operationId: this.#operationId(run),
           channelId: run.channelId,
           text: run.instruction,
           // Always the lead's decision. A routine pinned to one member would fail the moment that
@@ -215,7 +219,7 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
             runId: run.id,
           },
         },
-        { id: `routine:${run.routineId}`, name: run.routineName },
+        this.#actor(run),
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -224,6 +228,14 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
       return this.#routines.runForRequest(run.requestMessageId) ?? run;
     }
     return run;
+  }
+
+  #actor(run: ChannelRoutineRun): { id: string; name: string } {
+    return { id: `routine:${run.routineId}`, name: run.routineName };
+  }
+
+  #operationId(run: ChannelRoutineRun): string {
+    return `channel-routine-run:${run.id}`;
   }
 
   /** Writes only on a change, so a channel that publishes often does not rewrite every run row. */

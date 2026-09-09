@@ -831,6 +831,21 @@ export class MailboxStore {
     });
   }
 
+  /**
+   * Both guards that ask this - agent deletion and the provider switch - have to see a channel
+   * delivery as well as a normal one, so neither can use {@link listQueue}, which hides channel
+   * messages. `queued` counts: one agent runs at most one work turn across all chats, so a normal
+   * request can wait behind another agent's channel work for as long as that work runs, and
+   * deletion would take its message and files away while it waited.
+   */
+  hasUnfinishedDelivery(agentId: string): boolean {
+    return this.#state.deliveries.some(
+      (delivery) =>
+        delivery.recipientAgentId === agentId &&
+        (delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running"),
+    );
+  }
+
   unresolvedDeliveries(): DeliveryContext[] {
     return this.#state.deliveries
       .filter((delivery) => delivery.status === "starting" || delivery.status === "running")

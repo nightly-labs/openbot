@@ -240,6 +240,16 @@ describe("ChannelRoutineScheduler", () => {
     expect(currentRun(run.id).error).toBeNull();
   });
 
+  it("keeps a run open while its request command is still in flight", async () => {
+    const pending = scheduler.test({ channelId: "channel-1", routineId: routine.id });
+    // The run row is written before its command commits, and other channel work publishes in that
+    // window. The reconcile of that publish reads a request that no task holds yet, which is not
+    // the same as a request that every task has dropped.
+    scheduler.reconcile("channel-1");
+    const run = await pending;
+    await vi.waitFor(() => expect(currentRun(run.id).status).toBe("running"));
+  });
+
   it("keeps tracking a request the lead merged into another task", async () => {
     const open = await service.command(
       {

@@ -67,6 +67,15 @@ export class ChannelService {
     this.#history = new ChannelHistory(this.store, hooks.generate, this.memories);
   }
 
+  /**
+   * Whether a command of this actor has already committed. The owner of a routine run writes its
+   * run row before it issues the command, so it needs this to tell a request that has not arrived
+   * in the channel yet from one that every task has dropped.
+   */
+  committed(actorId: string, operationId: string): boolean {
+    return this.store.database.commandResult(`channels:${actorId}:${operationId}`) !== undefined;
+  }
+
   async command(command: ChannelCommand, actor: { id: string; name: string }): Promise<Channel> {
     if (command.type === "stop" || command.type === "archive") return this.apply(command, actor);
     const prior = this.#commands.get(command.channelId) ?? Promise.resolve(null);
@@ -287,6 +296,18 @@ export class ChannelService {
     };
   }
 
+  /**
+   * One active assignment reserves the host, so `mayDrain` holds the normal requests of every
+   * agent whose next delivery is not channel work. Ending that assignment lifts the reservation,
+   * but a held agent has no trigger of its own left: `wake()` schedules channel tasks only, and
+   * the drain scheduler retries just the agent whose delivery it was. Every path that ends an
+   * assignment therefore schedules the agents that were waiting behind it.
+   */
+  #releaseHeldAgents(): void {
+    this.wake();
+    for (const agent of this.hooks.agents()) this.hooks.schedule(agent.id);
+  }
+
   wake(channelId?: string): void {
     if (this.#stopped) return;
     for (const channel of this.store.list("local")) {
@@ -489,27 +510,30 @@ export class ChannelService {
         .list("local")
         .flatMap((item) => this.store.assignments(item.id))
         .filter(activeAssignment);
+      // A task keeps one owner at a time. A transfer replaces the owner and the resources of the
+      // task record while the previous owner still runs its turn, so the identity of the owner
+      // alone does not show that the task is free: the assignment of the previous owner does.
       if (
-        allAssignments.some((assignment) => assignment.agentId === task.ownerAgentId) ||
+        allAssignments.some(
+          (assignment) => assignment.agentId === task.ownerAgentId || assignment.taskId === task.id,
+        ) ||
         allAssignments.filter((assignment) => assignment.channelId === channelId).length >= CHANNEL_PARALLEL_LIMIT
       )
         continue;
       const allTasks = this.store.list("local").flatMap((item) => this.store.tasks(item.id));
       if (task.dependencies.some((id) => !allTasks.some((item) => item.id === id && item.state === "completed")))
         continue;
-      if (
-        allAssignments.some((assignment) => {
-          const other = allTasks.find((item) => item.id === assignment.taskId);
-          return other && resourcesConflict(task.resources, other.resources);
-        })
-      )
-        continue;
+      // Read the reservation from the assignment, not from its task: a transfer can lower the
+      // resources of a task that still runs, and the record of the task would then report a
+      // reservation that the running turn has not released.
+      if (allAssignments.some((assignment) => resourcesConflict(task.resources, assignment.resources))) continue;
       const assignment: ChannelAssignment = {
         id: randomUUID(),
         channelId,
         taskId: task.id,
         agentId: task.ownerAgentId,
         taskRevision: task.revision,
+        resources: [...task.resources],
         deliveryId: null,
         turnId: null,
         state: "starting",
@@ -520,12 +544,21 @@ export class ChannelService {
         pendingOutcome: null,
       };
       this.store.update(channel, { assignments: [assignment] });
+      // The request message belongs to the task that the request created, not to a child task that
+      // only inherits the id. `committing` is the single dispatch that turns the drafts of that
+      // request into attachments, and the only one allowed to rewrite the stored request: enqueue
+      // rewrites its draft references to attachment ids. Any later dispatch of the same request -
+      // a resume, or a hand-off to another task - re-sends the committed copies instead.
+      const request = this.store.messages(channelId).find((message) => message.id === task.requestMessageId);
+      const ownsRequest = request?.taskId === task.id;
+      const committing = ownsRequest && task.attachmentDraftIds.length > 0;
       try {
         const receipt = await this.mailbox.enqueue({
           sender: { kind: "user" },
           recipientAgentIds: [assignment.agentId],
           text: task.instruction,
           draftIds: task.attachmentDraftIds,
+          sourcePaths: ownsRequest && !committing ? await this.#requestAttachmentPaths(request) : [],
           channelId,
           idempotencyKey: `channel-assignment:${assignment.id}`,
         });
@@ -545,17 +578,16 @@ export class ChannelService {
           continue;
         }
         const context = this.mailbox.getDelivery(delivery.id);
-        const source = this.store.messages(channelId).find((message) => message.id === task.requestMessageId);
         this.store.update(this.store.get(channelId), {
           assignments: [assignment],
           tasks: [{ ...latest, attachmentDraftIds: [] }],
           messages:
-            source && context
+            committing && request && context
               ? [
                   {
-                    ...source,
+                    ...request,
                     message: {
-                      ...source.message,
+                      ...request.message,
                       text: context.delivery.text,
                       attachments: context.delivery.attachments,
                     },
@@ -571,8 +603,22 @@ export class ChannelService {
           tasks: [{ ...task, state: "failed", error: "Could not queue this assignment. Resume to try again." }],
         });
         this.publish(channelId);
+        this.#releaseHeldAgents();
       }
     }
+  }
+
+  /**
+   * The files of a request outlive its first dispatch as committed attachments, not as drafts:
+   * enqueue consumes every draft and the dispatch clears the ids. A second delivery of the same
+   * request therefore attaches the stored copies again, so a resume after a failure sends the same
+   * files as the first try. A file that the user has moved or changed resolves to null and is left
+   * out, which is what `verifyDeliveryAttachments` reports for a missing delivery file.
+   */
+  async #requestAttachmentPaths(request: ChannelMessage | undefined): Promise<string[]> {
+    const attachments = request?.message.attachments ?? [];
+    const resolved = await Promise.all(attachments.map((item) => this.mailbox.resolveAttachment(item.id)));
+    return resolved.flatMap((item) => (item ? [item.path] : []));
   }
 
   mayDrain(agentId: string): boolean {
@@ -590,7 +636,7 @@ export class ChannelService {
       tasks: task?.revision === assignment.taskRevision ? [{ ...task, state: "failed", error: reason }] : [],
     });
     this.publish(assignment.channelId);
-    this.wake();
+    this.#releaseHeldAgents();
   }
 
   restoreDeliveryLinks(): void {
@@ -868,8 +914,7 @@ export class ChannelService {
     }
     this.store.update(this.store.get(channelId), { assignments: [{ ...assignment, state }], tasks: updated });
     this.publish(channelId);
-    this.wake();
-    for (const agent of this.hooks.agents()) this.hooks.schedule(agent.id);
+    this.#releaseHeldAgents();
   }
 
   async tool(

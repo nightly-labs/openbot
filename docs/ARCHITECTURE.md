@@ -579,8 +579,9 @@ runtime supplies channel and caller identity. A child keeps its parent owner; a 
 Only assignments and awaited results start turns. Completed child results are combined before the
 owner returns. The limit is eight automatic assignments per root request and two active assignments
 per channel. One agent runs at most one work turn across all chats. Declared workspace and browser
-resources are serialized; undeclared resources reserve the host. These controls do not restrict
-provider process privileges.
+resources are serialized; undeclared resources reserve the host. An assignment keeps the resources
+it started with until it ends, and a task with an active assignment starts no second owner. These
+controls do not restrict provider process privileges.
 
 Each turn receives bounded channel context: purpose, responsibilities, the current request, source
 messages and replies, shared decisions, recent messages, and attachment references. A versioned
@@ -590,11 +591,13 @@ provider replacement or compaction does not remove shared decisions. Unrelated s
 are available through paginated retrieval and are not inserted automatically. Agent memories keep
 their existing meaning.
 
-Task revisions prevent an old assignment from completing a corrected request. Stop pauses a task
-and its descendants and interrupts active work. Reassign waits for the old assignment to finish
-stopping. Restart recovery checks accepted provider work before retrying. Unknown outcomes require
-attention. Command, assignment, and result IDs prevent duplicate dispatch and visible results;
-external side effects do not have an exactly-once guarantee.
+Task revisions prevent an old assignment from completing a corrected request. The stored request
+keeps its own text and files: only its first dispatch converts the attachment drafts, and a later
+dispatch of the same request sends the stored copies again. Stop pauses a task and its descendants
+and interrupts active work. Reassign waits for the old assignment to finish stopping. Restart
+recovery checks accepted provider work before retrying. Unknown outcomes require attention.
+Command, assignment, and result IDs prevent duplicate dispatch and visible results; external side
+effects do not have an exactly-once guarantee.
 
 Desktop IPC and remote desktop transports expose `channel-chats-v1` as an optional capability with
 separate payload codecs. Released Team API adapters keep their existing meaning. A host advertises

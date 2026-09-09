@@ -23,6 +23,12 @@ export interface ChannelAssignment {
   taskId: string;
   agentId: string;
   taskRevision: number;
+  /**
+   * The resources this assignment holds, copied from the task when the assignment starts. A task
+   * record can change owner and resources while its previous owner still runs, so the task is not
+   * a safe place to read a live reservation from.
+   */
+  resources: string[];
   deliveryId: string | null;
   turnId: string | null;
   state: "queued" | "starting" | "running" | "completed" | "failed" | "interrupted";
@@ -532,6 +538,10 @@ function decodeAssignment(value: unknown): ChannelAssignment {
     taskId: value.taskId,
     agentId: value.agentId,
     taskRevision: value.taskRevision,
+    // An assignment written before resources were stored reads as a host reservation, which
+    // conflicts with every other task. That holds the channel until the assignment ends, rather
+    // than letting a second agent take a resource this one may still use.
+    resources: Array.isArray(value.resources) && value.resources.every(isString) ? value.resources : ["host"],
     awaitedTaskIds: value.awaitedTaskIds,
     pendingRevision: value.pendingRevision,
     pendingOutcome: value.pendingOutcome,
