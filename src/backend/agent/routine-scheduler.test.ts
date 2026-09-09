@@ -224,6 +224,10 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     service = createService();
     await service.initialize();
 
+    // The restarted service reconciles the cancelled delivery while it starts, so the marker is
+    // waited for. It arrives with the run transition, in one transaction. The count stays a plain
+    // assertion: the attempt that rolled back must leave no marker of its own behind.
+    await waitFor(async () => (await cancelledMarkers()).length > 0);
     expect(
       service
         .listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })
