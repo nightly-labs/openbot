@@ -1,4 +1,9 @@
-import { type SmtpEmailConfig, sendPrivateEmailCode, sendPrivateTeamInvite } from "./smtp-email-delivery";
+import {
+  RATE_LIMITED_DELIVERY_ERROR,
+  type SmtpEmailConfig,
+  sendPrivateEmailCode,
+  sendPrivateTeamInvite,
+} from "./smtp-email-delivery";
 import type { EmailCodeDelivery, TeamInviteEmailDelivery, WorkerBindings } from "./types";
 
 type EmailDeliveryBindings = Pick<
@@ -40,6 +45,7 @@ export function createEmailCodeDelivery(bindings: EmailDeliveryBindings): EmailC
       }).catch(() => {
         throw new Error("email_delivery_unknown");
       });
+      if (response.status === 429) throw new Error(RATE_LIMITED_DELIVERY_ERROR);
       if (!response.ok) throw new Error("email_delivery_webhook_failed");
     },
   };

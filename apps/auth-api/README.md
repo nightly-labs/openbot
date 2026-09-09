@@ -86,6 +86,10 @@ sends this JSON:
 If `EMAIL_DELIVERY_WEBHOOK_SECRET` is set, the request includes a Bearer token.
 Do not enable `AUTH_EXPOSE_DEVELOPMENT_CODE` in production.
 
+When the provider itself refuses a message with a sender limit, the Worker
+answers 429 `email_delivery_rate_limited` instead of 502. The sign-in code is
+never sent in that case, so the app can ask for a new code later.
+
 ## Cloudflare deployment
 
 Create the D1 database and replace the placeholder `database_id` in

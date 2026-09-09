@@ -10,7 +10,7 @@ import {
 
 import { randomToken, sha256 } from "./crypto";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
-import { EMAIL_CODE_DELIVERY_BUDGET_MS } from "./smtp-email-delivery";
+import { EMAIL_CODE_DELIVERY_BUDGET_MS, RATE_LIMITED_DELIVERY_ERROR } from "./smtp-email-delivery";
 import type {
   AuthRepository,
   AuthUser,
@@ -28,6 +28,10 @@ const TEAM_TICKET_TTL_MS = 2 * 60_000;
 const MOBILE_CONNECT_SERVER_ID = "00000000-0000-4000-8000-000000000002";
 const RATE_WINDOW_MS = 15 * 60_000;
 const AMBIGUOUS_DELIVERY_ERRORS = new Set(["smtp_delivery_unknown", "email_delivery_unknown"]);
+// A provider sender limit frees again as its window rolls forward, so the client waits and retries
+// rather than reporting a permanent failure. The wait is shorter than the usual hourly window: some
+// capacity returns before the window ends, and a countdown of a whole hour reads like an outage.
+const DELIVERY_RATE_LIMIT_RETRY_MS = 5 * 60_000;
 
 interface AuthServiceOptions {
   repository: AuthRepository;
@@ -132,6 +136,14 @@ export class AuthService {
         );
       }
       await this.#repository.completeEmailChallengeDelivery(challengeHash, "failed", this.#now());
+      if (deliveryError === RATE_LIMITED_DELIVERY_ERROR) {
+        throw new AuthServiceError(
+          429,
+          "email_delivery_rate_limited",
+          "OpenBot cannot send more sign-in codes right now. Try again when the countdown ends.",
+          Math.ceil(DELIVERY_RATE_LIMIT_RETRY_MS / 1_000),
+        );
+      }
       throw new AuthServiceError(502, "email_delivery_failed", "OpenBot could not send the sign-in code.");
     }
     await this.#repository.completeEmailChallengeDelivery(challengeHash, "sent", this.#now());

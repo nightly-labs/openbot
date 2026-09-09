@@ -256,6 +256,7 @@ const SAFE_FAILURE_CODES = new Set([
   "edit_failed",
   "email_delivery_failed",
   "email_delivery_not_configured",
+  "email_delivery_rate_limited",
   "email_sign_in_failed",
   "email_sign_in_start_failed",
   "identity_save_failed",

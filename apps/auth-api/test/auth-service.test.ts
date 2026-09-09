@@ -653,6 +653,24 @@ describe("email one-time codes", () => {
     expect(send).toHaveBeenCalledTimes(2);
   });
 
+  it("asks the caller to wait when the provider refuses more messages", async () => {
+    const repository = new MemoryAuthRepository();
+    const send = vi.fn().mockRejectedValueOnce(new Error("email_delivery_rate_limited")).mockResolvedValue(undefined);
+    const service = new AuthService({ repository, delivery: { send }, now: () => 1_000 });
+
+    await expect(
+      service.startEmailSignIn("person@example.com", "203.0.113.4", "10000000-0000-4000-8000-000000000010"),
+    ).rejects.toMatchObject({
+      status: 429,
+      code: "email_delivery_rate_limited",
+      retryAfterSeconds: 300,
+    });
+    await expect(
+      service.startEmailSignIn("person@example.com", "203.0.113.4", "10000000-0000-4000-8000-000000000011"),
+    ).resolves.toMatchObject({ challengeId: "10000000-0000-4000-8000-000000000011" });
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects reuse of an idempotency key for a different email", async () => {
     const service = new AuthService({
       repository: new MemoryAuthRepository(),
