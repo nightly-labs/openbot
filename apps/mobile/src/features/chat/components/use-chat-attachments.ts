@@ -6,6 +6,9 @@ import { File } from "expo-file-system";
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
 
+//! Enable when mobile file transfer is ready.
+export const CHAT_ATTACHMENTS_ENABLED = false;
+
 export interface ChatAttachment extends RemoteFileUpload {
   id: string;
   size: number;
@@ -40,6 +43,10 @@ export function useChatAttachments() {
     add({ name: name.replace(/[/\\]/gu, "_"), mimeType, base64: base64(await file.bytes()) });
   }
   async function chooseFiles() {
+    if (!CHAT_ATTACHMENTS_ENABLED) {
+      Alert.alert("Coming soon", "File attachments will be available in a future update.");
+      return;
+    }
     const result = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true });
     if (!result.canceled)
       for (const asset of result.assets)

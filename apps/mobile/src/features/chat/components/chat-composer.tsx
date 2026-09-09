@@ -18,7 +18,8 @@ import {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { scheduleOnRN } from "react-native-worklets";
 import { largePastedText } from "../model/composer-paste";
-import type { ChatAttachments } from "./use-chat-attachments";
+import { ChatGlassIconButton } from "./chat-glass-icon-button";
+import { CHAT_ATTACHMENTS_ENABLED, type ChatAttachments } from "./use-chat-attachments";
 
 interface ChatComposerProps {
   action: ViewStyle["backgroundColor"];
@@ -133,44 +134,57 @@ export function ChatComposer({
           paddingBottom: Math.max(bottomInset, 10),
         }}
       >
-        <View pointerEvents={disabled || sending || answerQuestion ? "none" : "auto"}>
-          <MenuView
-            style={{ width: 48, height: 48 }}
-            actions={[
-              {
-                id: "files",
-                title: "Files",
-                image: "paperclip",
-                attributes: { disabled: disabled || sending || Boolean(answerQuestion) },
-              },
-            ]}
-            onPressAction={({ nativeEvent }) => {
-              if (nativeEvent.event === "files" && !disabled && !sending && !answerQuestion) attachments.chooseFiles();
-            }}
+        {!CHAT_ATTACHMENTS_ENABLED ? (
+          <ChatGlassIconButton
+            accessibilityLabel="Add attachment"
+            disabled={disabled || sending || Boolean(answerQuestion)}
+            fallbackBackground={fallbackBackground}
+            liquidGlassAvailable={liquidGlassAvailable}
+            onPress={attachments.chooseFiles}
           >
-            <GlassView
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel="Add attachment"
-              accessibilityState={{ disabled: disabled || sending || Boolean(answerQuestion) }}
-              glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
-              isInteractive={liquidGlassAvailable && !disabled && !sending && !answerQuestion}
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-                borderCurve: "continuous",
-                overflow: "hidden",
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
-                opacity: disabled || sending || answerQuestion ? 0.45 : 1,
+            <Plus color={String(foreground)} size={25} strokeWidth={1.8} />
+          </ChatGlassIconButton>
+        ) : (
+          <View pointerEvents={disabled || sending || answerQuestion ? "none" : "auto"}>
+            <MenuView
+              style={{ width: 48, height: 48 }}
+              actions={[
+                {
+                  id: "files",
+                  title: "Files",
+                  image: "paperclip",
+                  attributes: { disabled: disabled || sending || Boolean(answerQuestion) },
+                },
+              ]}
+              onPressAction={({ nativeEvent }) => {
+                if (nativeEvent.event === "files" && !disabled && !sending && !answerQuestion)
+                  attachments.chooseFiles();
               }}
             >
-              <Plus color={String(foreground)} size={25} strokeWidth={1.8} />
-            </GlassView>
-          </MenuView>
-        </View>
+              <GlassView
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel="Add attachment"
+                accessibilityState={{ disabled: disabled || sending || Boolean(answerQuestion) }}
+                glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
+                isInteractive={liquidGlassAvailable && !disabled && !sending && !answerQuestion}
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  borderCurve: "continuous",
+                  overflow: "hidden",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
+                  opacity: disabled || sending || answerQuestion ? 0.45 : 1,
+                }}
+              >
+                <Plus color={String(foreground)} size={25} strokeWidth={1.8} />
+              </GlassView>
+            </MenuView>
+          </View>
+        )}
         <GestureDetector gesture={pan}>
           <GlassView
             glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
@@ -253,7 +267,10 @@ export function ChatComposer({
                 }}
                 onBlur={() => setFocused(false)}
                 onChangeText={(text) => {
-                  const pasted = !answerQuestion && !sending ? largePastedText(latestTextRef.current, text) : null;
+                  const pasted =
+                    CHAT_ATTACHMENTS_ENABLED && !answerQuestion && !sending
+                      ? largePastedText(latestTextRef.current, text)
+                      : null;
                   if (pasted) {
                     try {
                       attachments.paste({ type: "text", text: pasted.text }, () => {});

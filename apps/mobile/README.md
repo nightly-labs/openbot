@@ -154,7 +154,9 @@ and composer growth into the blank space before shifting content at the end of t
 Streaming Markdown uses a bounded reveal pool (four active nodes, batches every 32 ms). It renders
 the complete received text without a second typewriter queue. Reduced motion skips movement.
 The floating composer uses the existing Expo glass components with an opaque accessibility fallback.
-The native menu on the plus button opens Files. The plus button and input share one row; there is
+Mobile file attachments are currently disabled by `CHAT_ATTACHMENTS_ENABLED` in
+`use-chat-attachments.ts`. The plus button shows a native Coming soon dialog; large pasted text
+stays in the input. When enabled, the native menu on the plus button opens Files. The plus button and input share one row; there is
 no separate paste button. The native multiline input grows to five lines, then scrolls internally;
 its height limit follows the system font scale. Large text pasted into the input becomes a text attachment. Mobile uploads
 use the released file-transfer protocol and are limited to 10 MB per file. Sending dismisses the
