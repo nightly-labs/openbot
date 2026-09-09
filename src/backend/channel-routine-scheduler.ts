@@ -27,6 +27,24 @@ export interface ChannelRoutineSchedulerOptions {
 }
 
 /**
+ * The task that holds this one, if there is one: the first dependency of the branch below it that
+ * failed or that a human has to unblock. A dependency of a dependency counts, because the branch
+ * moves again only from its own root.
+ */
+function stoppedBlocker(tasks: ChannelTask[], task: ChannelTask, seen = new Set<string>()): ChannelTask | null {
+  for (const id of task.dependencies) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const dependency = tasks.find((item) => item.id === id);
+    if (!dependency) continue;
+    if (dependency.state === "failed" || dependency.state === "paused") return dependency;
+    const deeper = stoppedBlocker(tasks, dependency, seen);
+    if (deeper) return deeper;
+  }
+  return null;
+}
+
+/**
  * Reads the run's status out of the tasks its request produced. Pure, because that is what makes a
  * restart free: the status is a function of durable rows, so a fresh scheduler over the same
  * database reaches the same answer with no in-memory state.
@@ -42,8 +60,20 @@ export function channelRunStatusForTasks(
   // deleted channel takes every task. Neither is a failure of the routine.
   if (!tasks.length) return { status: "cancelled", error: null };
   if (tasks.some((task) => task.state === "running")) return { status: "running", error: null };
-  if (tasks.some((task) => task.state === "queued" || task.state === "waiting"))
-    return { status: hasAssignment ? "running" : "queued", error: null };
+  const open = tasks.filter((task) => task.state === "queued" || task.state === "waiting");
+  if (open.length) {
+    // A task starts only when every task it delegated is completed, so an open task behind one
+    // that stopped is not work in progress: nothing but a human moves it again. Reporting it as
+    // queued would hide the reason in the run history while the run cannot advance.
+    const blocked = open.map((task) => stoppedBlocker(tasks, task));
+    const free = blocked.some((blocker) => !blocker);
+    if (free) return { status: hasAssignment ? "running" : "queued", error: null };
+    const blocker = blocked.find((task) => task?.state === "failed") ?? blocked[0];
+    if (blocker)
+      return blocker.state === "failed"
+        ? { status: "failed", error: blocker.error }
+        : { status: "needs-attention", error: blocker.error };
+  }
   const failed = tasks.find((task) => task.state === "failed");
   if (failed) return { status: "failed", error: failed.error };
   // In a channel, `paused` always means a human has to act: a routing question, an unavailable

@@ -144,6 +144,20 @@ describe("channelRunStatusForTasks", () => {
     });
   });
 
+  it("reports the failure that holds a delegated run instead of reading it as queued", () => {
+    const child = task({ id: "child", state: "failed", error: "The agent gave up." });
+    const parent = task({ id: "parent", state: "waiting", dependencies: [child.id] });
+    // Nothing but a human starts the failed child again, and the parent waits for it, so the run
+    // cannot advance. The reason belongs in the run history.
+    expect(channelRunStatusForTasks([parent, child], false)).toEqual({
+      status: "failed",
+      error: "The agent gave up.",
+    });
+    // A branch that stopped does not hold a task that has no dependency on it.
+    const other = task({ id: "other", state: "queued" });
+    expect(channelRunStatusForTasks([parent, child, other], false)).toEqual({ status: "queued", error: null });
+  });
+
   it("succeeds on a cancelled-only fan-out and cancels a request whose tasks are gone", () => {
     expect(channelRunStatusForTasks([task({ state: "completed" }), task({ state: "cancelled" })], false)).toEqual({
       status: "succeeded",

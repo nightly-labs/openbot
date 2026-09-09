@@ -331,6 +331,59 @@ it("keeps a queued settings save on the channel it was made in", async () => {
   expect(saves.at(-1)).toMatchObject({ draft: { name: "Project room", members: [] } });
 });
 
+it("keeps the text a queued settings save carries when the reader opens another channel", async () => {
+  for (const [channelId, name] of [
+    ["channel-test", "Project room"],
+    ["channel-other", "Release room"],
+  ]) {
+    await window.openbot.agent.channelCommand({
+      type: "save",
+      operationId: `create-${channelId}`,
+      channelId,
+      draft: {
+        name,
+        title: "",
+        instructions: "",
+        members: [{ agentId: "chief" }, { agentId: "sales-outbound" }],
+        leadAgentId: "chief",
+      },
+    });
+  }
+  render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+  await fireEvent.click(await screen.findByRole("button", { name: /Project room/ }));
+  const chat = await screen.findByRole("main", { name: "Channel conversation" });
+  await within(chat).findByRole("heading", { name: "Project room", level: 1 });
+  await openChannelMenuItem("Edit channel");
+  await within(chat).findByRole("button", { name: "Remove Chief" });
+
+  const original = window.openbot.agent.channelCommand;
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const save = vi.spyOn(window.openbot.agent, "channelCommand").mockImplementation(async (input) => {
+    if (input.type === "save") await gate;
+    return original(input);
+  });
+  // The removal holds the gate, so the title the reader writes next waits behind it.
+  void fireEvent.click(within(chat).getByRole("button", { name: "Remove Chief" }));
+  const title = within(chat).getByRole("textbox", { name: "Channel title" });
+  await fireEvent.input(title, { target: { value: "Weekly sync" } });
+  void fireEvent.blur(title);
+  await fireEvent.click(screen.getByRole("button", { name: /Release room/ }));
+  release();
+
+  // The queued save carries the membership the save before it left, and its own title: the text
+  // was written in this channel, not read from the one the reader went to.
+  await waitFor(() => expect(save.mock.calls.filter(([input]) => input.type === "save")).toHaveLength(2));
+  const saves = save.mock.calls.map(([input]) => input).filter((input) => input.type === "save");
+  expect(saves.map((input) => input.channelId)).toEqual(["channel-test", "channel-test"]);
+  expect(saves.at(-1)).toMatchObject({
+    draft: { name: "Project room", title: "Weekly sync", members: [{ agentId: "sales-outbound" }] },
+  });
+});
+
 /**
  * A channel with one task that the service stopped and wrote a reason on. The stub does not run
  * the automatic assignment limit, so the stopped task arrives through the read.

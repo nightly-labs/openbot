@@ -137,9 +137,18 @@ export function ChannelEditor(props: ChannelEditorProps) {
       .then(() => {
         const current = channel();
         // The live page first, because the save before this one landed in it: two removals in a
-        // row build on each other. It is the same channel or nothing.
+        // row build on each other. Away from the channel, the members come from the save before
+        // this one and the text from this one, because each save carries the fields as they were
+        // when the reader left them.
+        const previous = sent?.channelId === targetId ? sent.draft : captured;
         const draft =
-          current?.id === targetId ? draftFrom(current) : sent?.channelId === targetId ? { ...sent.draft } : captured;
+          current?.id === targetId
+            ? draftFrom(current)
+            : {
+                ...captured,
+                members: previous.members.map((member) => ({ ...member })),
+                leadAgentId: previous.leadAgentId,
+              };
         patch?.(draft);
         sent = { channelId: targetId, draft };
         return channels.command({ type: "save", operationId: crypto.randomUUID(), channelId: targetId, draft });
