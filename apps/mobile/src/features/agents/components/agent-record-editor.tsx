@@ -159,21 +159,24 @@ export function RoutineEditor({
   const { theme } = useUniwind();
   const [finished, setFinished] = useState(false);
   const [savedDraft, setSavedDraft] = useState<string | null>(null);
-  const [name, setName] = useState(routine?.name ?? "");
-
-  const [instruction, setInstruction] = useState(routine?.instruction ?? "");
-  const [schedule, setSchedule] = useState<RoutineSchedule>(
-    routine?.trigger.schedule ?? { kind: "daily", time: "09:00" },
-  );
+  const [edits, setEdits] = useState<{ name?: string; instruction?: string; schedule?: RoutineSchedule }>({});
+  const name = edits.name ?? routine?.name ?? "";
+  const instruction = edits.instruction ?? routine?.instruction ?? "";
+  const schedule = edits.schedule ?? routine?.trigger.schedule ?? { kind: "daily", time: "09:00" };
+  const setName = (name: string) => setEdits((current) => ({ ...current, name }));
+  const setInstruction = (instruction: string) => setEdits((current) => ({ ...current, instruction }));
+  const setSchedule = (schedule: RoutineSchedule) => setEdits((current) => ({ ...current, schedule }));
   const [timezone, setTimezone] = useState(routine?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
   const draft = JSON.stringify({ name, instruction, schedule, timezone });
-  const initialDraft = JSON.stringify({
-    name: routine?.name ?? "",
-    instruction: routine?.instruction ?? "",
-    schedule: routine?.trigger.schedule ?? { kind: "daily", time: "09:00" },
-    timezone: routine?.timezone ?? timezone,
-  });
-  const dirty = draft !== (savedDraft ?? initialDraft);
+  const nameChanged = name.trim() !== (routine?.name ?? "");
+  const instructionChanged = instruction.trim() !== (routine?.instruction ?? "");
+  const scheduleChanged =
+    JSON.stringify(schedule) !== JSON.stringify(routine?.trigger.schedule ?? { kind: "daily", time: "09:00" });
+  const dirty = routine
+    ? nameChanged || instructionChanged || scheduleChanged
+    : draft !==
+      (savedDraft ??
+        JSON.stringify({ name: "", instruction: "", schedule: { kind: "daily", time: "09:00" }, timezone }));
   useRecordDraftGuard(dirty && !finished, action.pending);
   useEffect(() => {
     if (finished) router.back();
@@ -186,9 +189,9 @@ export function RoutineEditor({
         {
           agentId: agent.id,
           routineId: routine.id,
-          name: name.trim(),
-          instruction: instruction.trim(),
-          schedule,
+          ...(nameChanged ? { name: name.trim() } : {}),
+          ...(instructionChanged ? { instruction: instruction.trim() } : {}),
+          ...(scheduleChanged ? { schedule } : {}),
         },
         agent.serverId,
       );
@@ -354,6 +357,7 @@ export function RoutineEditor({
         onSave={() =>
           void action.run(save, () => {
             setSavedDraft(draft);
+            if (routine) setEdits({});
           })
         }
       />

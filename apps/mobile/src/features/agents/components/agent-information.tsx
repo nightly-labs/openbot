@@ -29,13 +29,13 @@ export function AgentInformation({
   const memories = useQuery({
     ...options,
     enabled: available && (section === "memories" || section === "memory"),
-    queryKey: [...key, "memories", available],
+    queryKey: [...key, "memories"],
     queryFn: () => workspace.loadAgentMemories(agent.id, agent.serverId),
   });
   const routines = useQuery({
     ...options,
     enabled: available && (section === "routines" || section === "routine"),
-    queryKey: [...key, "routines", available],
+    queryKey: [...key, "routines"],
     queryFn: () => workspace.loadAgentRoutines(agent.id, agent.serverId),
   });
   const usage = useQuery({
@@ -175,7 +175,7 @@ export function AgentInformation({
               <MemoryEditor
                 key={recordId}
                 agent={agent}
-                available={available}
+                available={available && !memories.isError}
                 memory={memories.data.find((item) => item.id === recordId)}
               />
             ) : (
@@ -202,7 +202,7 @@ export function AgentInformation({
               <RoutineEditor
                 key={recordId}
                 agent={agent}
-                available={available}
+                available={available && !routines.isError}
                 routine={routines.data.find((item) => item.id === recordId)}
               />
             ) : (
@@ -233,6 +233,27 @@ function InformationSection({
   failed: boolean;
   retry: () => void;
 }>) {
+  if (list && (title === "Memory" || title === "Routine")) {
+    return (
+      <View className="gap-4">
+        {!pending ? children : null}
+        {!available ? (
+          <Typography.Paragraph>Reconnect to save changes.</Typography.Paragraph>
+        ) : pending ? (
+          <Typography.Paragraph>Loading {title.toLowerCase()}…</Typography.Paragraph>
+        ) : failed ? (
+          <View className="gap-2">
+            <Typography.Paragraph accessibilityRole="alert">
+              Could not refresh {title.toLowerCase()}.
+            </Typography.Paragraph>
+            <Button variant="ghost" onPress={retry}>
+              <Button.Label>Retry {title.toLowerCase()}</Button.Label>
+            </Button>
+          </View>
+        ) : null}
+      </View>
+    );
+  }
   if (list && available && !pending && !failed)
     return title === "Memories" || title === "Routines" ? <SettingsSection>{children}</SettingsSection> : children;
   return (

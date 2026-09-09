@@ -679,6 +679,18 @@ it("creates, edits, and deletes a memory on its host", async () => {
   await renderSheet("memory");
   await waitFor(() => expect(screen.getByRole("textbox", { name: "Memory" })).toHaveProperty("value", "Old note"));
   await edit("Memory", "Changed note");
+  workspace.servers = [{ ...host, state: "offline" }];
+  await renderSheet("memory");
+  expect(screen.getByRole("textbox", { name: "Memory" })).toHaveProperty("value", "Changed note");
+  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  expect(mocks.blocked).toBe(true);
+  workspace.servers = [{ ...host }];
+  workspace.loadAgentMemories.mockRejectedValueOnce(new Error("Refresh failed"));
+  await renderSheet("memory");
+  await waitFor(() => expect(screen.getByText("Could not refresh memory.")).toBeTruthy());
+  expect(screen.getByRole("textbox", { name: "Memory" })).toHaveProperty("value", "Changed note");
+  await click("Retry memory");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy());
   await click("Save changes");
   expect(workspace.saveAgentMemory).toHaveBeenCalledWith(original.id, "Changed note", host.id, memory.id);
   await click("Delete memory");
@@ -738,14 +750,24 @@ it("creates, edits, pauses, resumes, and deletes a routine without changing its 
     expect(screen.getByRole("textbox", { name: "Routine name" })).toHaveProperty("value", "Daily check"),
   );
   await edit("Routine name", "Renamed");
+  routine = {
+    ...routine,
+    instruction: "Updated on desktop",
+    trigger: { ...routine.trigger, schedule: { kind: "weekly", weekday: 5, time: "16:00" } },
+  };
+  await act(async () => {
+    await client.invalidateQueries({ queryKey: ["agent-info"] });
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("textbox", { name: "Routine instructions" })).toHaveProperty("value", "Updated on desktop"),
+  );
+  expect(screen.getByLabelText("Time")).toHaveProperty("value", "16:00");
   await click("Save changes");
   expect(workspace.updateAgentRoutine).toHaveBeenCalledWith(
     {
       agentId: original.id,
       routineId: routine.id,
       name: "Renamed",
-      instruction: "Check trains",
-      schedule: routine.trigger.schedule,
     },
     host.id,
   );
