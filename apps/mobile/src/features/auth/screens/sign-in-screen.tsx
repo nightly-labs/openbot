@@ -14,37 +14,31 @@ export function SignInScreen() {
   const isFocused = useIsFocused();
 
   return (
-    <Animated.View
+    <Animated.ScrollView
       entering={SIGN_IN_ENTER}
-      className="min-h-full flex-1 grow items-center justify-center overflow-hidden bg-background px-6 pb-safe-offset-8 pt-safe-offset-8"
+      className="flex-1 bg-background"
+      contentContainerClassName="min-h-full grow items-center justify-center px-8 pb-safe-offset-8 pt-safe-offset-8"
+      contentInsetAdjustmentBehavior="never"
+      bounces={false}
+      showsVerticalScrollIndicator={false}
     >
       <PixelBlastBackground active={isFocused} />
-      <View className="z-10 w-full max-w-90">
-        <View className="mb-10.5 items-center justify-center gap-6">
-          <AppLogo
-            size={80}
-            animation={isFocused ? "blink" : "none"}
-            followDeviceOrientation={isFocused}
-            interactive={isFocused}
-          />
-          <Typography.Heading type="h1" align="center" className="tracking-openbot-tight">
-            OpenBot
-          </Typography.Heading>
+      <View className="z-10 w-full max-w-72 items-center gap-8">
+        <View className="items-center gap-5">
+          <AppLogo size={56} animation={isFocused ? "blink" : "none"} interactive={isFocused} />
+          <View className="items-center gap-3">
+            <Typography.Heading type="h2" accessibilityRole="header" align="center" className="tracking-openbot-tight">
+              OpenBot
+            </Typography.Heading>
+            <Typography.Paragraph color="muted" align="center">
+              Scan the QR code on your computer to connect.
+            </Typography.Paragraph>
+          </View>
         </View>
-
-        <View className="items-center gap-2">
-          <Typography.Heading type="h2" align="center" className="tracking-openbot-tight">
-            Sign in to OpenBot
-          </Typography.Heading>
-          <Typography.Paragraph color="muted" align="center">
-            Scan the QR code on your OpenBot device to sign in and start controlling it.
-          </Typography.Paragraph>
-        </View>
-
-        <View className="mt-6">
+        <View className="w-full max-w-60">
           <ScanQrButton onPress={() => router.push("/scan-qr-code")} />
         </View>
       </View>
-    </Animated.View>
+    </Animated.ScrollView>
   );
 }
