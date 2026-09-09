@@ -1,3 +1,4 @@
+import type { ManagedProviderId } from "./agent-providers";
 import type { AgentProviderId } from "./ipc-agent-status";
 import type { AvatarImageInput } from "./ipc-agents";
 import type { AccountSession, MobileConnectedDevice, MobileConnectTicket } from "./mobile-connect";
@@ -83,7 +84,12 @@ export interface ProviderRuntimeStatus {
 
 export interface ProviderRuntimeSnapshot {
   revision: number;
-  providers: Record<AgentProviderId, ProviderRuntimeStatus>;
+  /**
+   * Only the providers whose CLI OpenBot downloads and pins itself. A provider that ships without a
+   * managed runtime is absent from `ManagedProviderId`, so it needs no fake entry here, and every
+   * provider that is in the tuple has a real status.
+   */
+  providers: Record<ManagedProviderId, ProviderRuntimeStatus>;
 }
 
 export interface ExportResult {
@@ -163,4 +169,10 @@ export interface ComputerUseMacSetupState {
   message: string | null;
 }
 
-export type ExternalDestination = "agent-setup" | "claude-install" | "claude-sign-in" | "feedback" | "message";
+export type ExternalDestination =
+  | "opencode-install"
+  | "agent-setup"
+  | "claude-install"
+  | "claude-sign-in"
+  | "feedback"
+  | "message";

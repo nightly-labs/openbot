@@ -1,3 +1,4 @@
+import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import type {
   AccountSession,
   AccountUsage,
@@ -265,7 +266,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let failRuntimeDownload = options.providerRuntimeFailure ?? false;
   const runtimeListeners = new Set<Listener<ProviderRuntimeSnapshot>>();
   const runtimeTransfers = new Map<AgentProviderId, symbol>();
-  const setRuntimeStatus = (provider: AgentProviderId, status: ProviderRuntimeStatus) => {
+  const setRuntimeStatus = (provider: ManagedProviderId, status: ProviderRuntimeStatus) => {
     runtimeSnapshot.providers[provider] = status;
     runtimeSnapshot.revision += 1;
     for (const listener of runtimeListeners) listener(clone(runtimeSnapshot));
@@ -525,6 +526,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     providerRuntimes: {
       getStatus: async () => clone(runtimeSnapshot),
       download: async (provider) => {
+        if (!isManagedRuntimeProvider(provider)) throw new Error("OpenCode updates are managed outside OpenBot.");
         const installed = runtimeSnapshot.providers[provider];
         if (runtimeTransfers.has(provider) || (installed.phase === "ready" && !installed.availableVersion))
           return clone(runtimeSnapshot);
@@ -566,6 +568,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(runtimeSnapshot);
       },
       cancel: async (provider) => {
+        if (!isManagedRuntimeProvider(provider)) throw new Error("OpenCode updates are managed outside OpenBot.");
         const current = runtimeSnapshot.providers[provider];
         if (current.phase !== "downloading") return clone(runtimeSnapshot);
         runtimeTransfers.delete(provider);

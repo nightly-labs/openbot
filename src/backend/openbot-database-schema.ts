@@ -302,6 +302,13 @@ const V12_REACTIONS_TABLE_SQL = `  CREATE TABLE IF NOT EXISTS projection_reactio
     PRIMARY KEY(agent_id, message_id, actor_kind, actor_agent_id)
   );`;
 
+// Migration 17 widens the provider CHECK, so the fresh schema is no longer the v8 baseline here either.
+// One line rather than the whole table: the substitution then survives any later baseline edit that does
+// not touch this constraint, and `substituteOnce` still shouts if the line ever stops being unique.
+const BASELINE_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok')),`;
+
+const V17_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode')),`;
+
 // IF NOT EXISTS throughout, because this text is both migration 15 and the tail of the latest
 // schema. A database built from the latest schema and then replayed forward - which is how a
 // test fakes an older version - meets its own tables.
@@ -355,7 +362,11 @@ const ANALYTICS_DATE_INDEX_SQL = `
 `;
 
 const LATEST_SCHEMA_SQL =
-  substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL) +
+  substituteOnce(
+    substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL),
+    BASELINE_PROVIDER_SESSIONS_CHECK_SQL,
+    V17_PROVIDER_SESSIONS_CHECK_SQL,
+  ) +
   ANALYTICS_SCHEMA_SQL +
   ANALYTICS_DATE_INDEX_SQL +
   CHANNEL_SCHEMA_SQL +
@@ -422,11 +433,24 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
   { version: 16, up: (db) => db.exec(ANALYTICS_DATE_INDEX_SQL) },
   {
     version: 17,
-    up: (db) => db.exec(CHANNEL_SCHEMA_SQL),
+    // `projection_turns.provider_session_id` is a child reference with ON DELETE SET NULL. Dropping the
+    // parent with foreign keys on would fire that action and blank the column on every turn ever taken,
+    // so the rebuild runs with them off - the same reason migration 13 does.
+    disableForeignKeys: true,
+    up: migrateProviderSessionsForOpencode,
   },
   {
     version: 18,
-    up: (db) => db.exec(CHANNEL_SETTINGS_SCHEMA_SQL),
+    up: (db) => db.exec(CHANNEL_SCHEMA_SQL),
+  },
+  {
+    version: 19,
+    // The pre-merge channel branch used versions 17 and 18 for channel storage and settings. Those
+    // versions were never shipped, but a development profile can still have both markers while
+    // retaining the old provider-session constraint. Repair that table before adding the settings
+    // projections so the profile also receives the main branch's migration 17 behavior.
+    disableForeignKeys: true,
+    up: migrateChannelSettings,
   },
 ];
 
@@ -674,6 +698,50 @@ function migrateProviderSessionsForGrok(db: DatabaseSync): void {
     CREATE INDEX provider_sessions_thread
       ON projection_provider_sessions(thread_id, provider, state);
   `);
+}
+
+// The provider list is a CHECK constraint, which SQLite can only widen by rebuilding the table. Guarding
+// on the stored SQL rather than on the schema version keeps this a no-op for a database `createLatestDatabase`
+// already built with the wider list, which is how a test replays an older version forward over a fresh file.
+// The index goes with the table it indexes, so it has to be recreated by name after the rename.
+function migrateProviderSessionsForOpencode(db: DatabaseSync): void {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projection_provider_sessions'")
+    .get();
+  if (!isDynamicRecord(row) || !isString(row.sql) || row.sql.includes("'opencode'")) return;
+
+  db.exec(`
+    CREATE TABLE projection_provider_sessions_v17 (
+      id TEXT PRIMARY KEY,
+      thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,
+      ${V17_PROVIDER_SESSIONS_CHECK_SQL}
+      external_session_id TEXT NOT NULL,
+      model TEXT NOT NULL,
+      effort TEXT NOT NULL,
+      state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      resume_cursor TEXT,
+      last_event_sequence INTEGER NOT NULL,
+      UNIQUE(provider, external_session_id)
+    );
+    INSERT INTO projection_provider_sessions_v17 (
+      id, thread_id, provider, external_session_id, model, effort, state,
+      created_at, updated_at, resume_cursor, last_event_sequence
+    ) SELECT
+      id, thread_id, provider, external_session_id, model, effort, state,
+      created_at, updated_at, resume_cursor, last_event_sequence
+    FROM projection_provider_sessions;
+    DROP TABLE projection_provider_sessions;
+    ALTER TABLE projection_provider_sessions_v17 RENAME TO projection_provider_sessions;
+    CREATE INDEX provider_sessions_thread
+      ON projection_provider_sessions(thread_id, provider, state);
+  `);
+}
+
+function migrateChannelSettings(db: DatabaseSync): void {
+  migrateProviderSessionsForOpencode(db);
+  db.exec(CHANNEL_SETTINGS_SCHEMA_SQL);
 }
 
 // The actor column is part of the primary key, so the table is rebuilt rather than altered. There are no

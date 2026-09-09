@@ -1,9 +1,10 @@
-import type {
-  AgentStatus,
-  HostStatus,
-  ProviderRuntimeSnapshot,
-  TeamPresenceSnapshot,
-  UpdateStatus,
+import {
+  AGENT_PROVIDERS,
+  type AgentStatus,
+  type HostStatus,
+  type ProviderRuntimeSnapshot,
+  type TeamPresenceSnapshot,
+  type UpdateStatus,
 } from "@openbot/contracts/ipc";
 
 /**
@@ -12,15 +13,14 @@ import type {
  * never durable state.
  */
 
+/** No runtime known yet. One object, because the fallback is the same for every provider. */
+const NO_PROVIDER_RUNTIME = { phase: "not-downloaded", progress: null, message: null, version: null } as const;
+
 export const FALLBACK_STATUS: AgentStatus = {
   phase: "starting",
   cliVersion: null,
   auth: { kind: "unknown" },
-  providers: [
-    { id: "codex", state: "not-started", version: null, message: null },
-    { id: "claude", state: "not-started", version: null, message: null },
-    { id: "grok", state: "not-started", version: null, message: null },
-  ],
+  providers: AGENT_PROVIDERS.map((id) => ({ id, state: "not-started", version: null, message: null })),
   capabilities: {
     chat: "unavailable",
     browser: "unavailable",
@@ -43,9 +43,9 @@ export const FALLBACK_UPDATE_STATUS: UpdateStatus = {
 export const FALLBACK_PROVIDER_RUNTIMES: ProviderRuntimeSnapshot = {
   revision: -1,
   providers: {
-    codex: { phase: "not-downloaded", progress: null, message: null, version: null },
-    claude: { phase: "not-downloaded", progress: null, message: null, version: null },
-    grok: { phase: "not-downloaded", progress: null, message: null, version: null },
+    codex: NO_PROVIDER_RUNTIME,
+    claude: NO_PROVIDER_RUNTIME,
+    grok: NO_PROVIDER_RUNTIME,
   },
 };
 

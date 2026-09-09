@@ -54,10 +54,11 @@ describe("OpenBotDatabase", () => {
     legacy.exec("CREATE TABLE channel_tasks_channel (conflict TEXT)");
     legacy.close();
     const failed = new OpenBotDatabase(root);
-    await expect(failed.initialize()).rejects.toThrow("migration to version 17 failed");
+    await expect(failed.initialize()).rejects.toThrow("migration to version 18 failed");
     const check = new DatabaseSync(path);
     expect(check.prepare("SELECT name FROM sqlite_master WHERE name = 'projection_channels'").get()).toBeUndefined();
-    expect(check.prepare("SELECT version FROM schema_migrations WHERE version = 17").get()).toBeUndefined();
+    expect(check.prepare("SELECT version FROM schema_migrations WHERE version = 17").get()).toEqual({ version: 17 });
+    expect(check.prepare("SELECT version FROM schema_migrations WHERE version = 18").get()).toBeUndefined();
     check.exec("DROP TABLE channel_tasks_channel");
     check.close();
     const retried = new OpenBotDatabase(root);
@@ -125,6 +126,7 @@ describe("OpenBotDatabase", () => {
       { version: 16 },
       { version: 17 },
       { version: 18 },
+      { version: 19 },
     ]);
     database.close();
   });
@@ -802,7 +804,9 @@ describe("OpenBotDatabase", () => {
     const legacy = new DatabaseSync(database.path);
     removeSchemaAfterVersion14(legacy);
     legacy.exec("PRAGMA journal_mode = WAL");
-    legacy.prepare("DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16)").run();
+    legacy
+      .prepare("DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)")
+      .run();
     legacy
       .prepare("INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (3, ?)")
       .run("2026-08-20T10:00:00.000Z");
@@ -914,8 +918,104 @@ describe("OpenBotDatabase", () => {
       { version: 16 },
       { version: 17 },
       { version: 18 },
+      { version: 19 },
     ]);
     expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    migrated.close();
+  });
+
+  it("repairs the provider constraint in a pre-merge channel schema without losing channel data", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-db-channel-v18-"));
+    roots.push(root);
+    const database = new OpenBotDatabase(root);
+    await database.initialize();
+    const agent = testAgent();
+    if (!agent.threadId) throw new Error("The test agent has no thread.");
+    database.replaceAgents("agents-import", [agent], "agents.imported");
+    database.bindProviderSession({
+      threadId: agent.threadId,
+      provider: "codex",
+      externalSessionId: "channel-v18-session",
+      model: "gpt-5.6-luna",
+      effort: "medium",
+    });
+    const sessionId = database
+      .listProviderSessions(agent.threadId)
+      .find((session) => session.externalSessionId === "channel-v18-session")?.id;
+    if (!sessionId) throw new Error("The provider session was not stored.");
+    database.connection
+      .prepare(
+        `INSERT INTO projection_turns
+           (turn_id, thread_id, provider_session_id, status, started_at, completed_at, last_event_sequence)
+         VALUES ('channel-v18-turn', ?, ?, 'completed', '2026-09-07T12:00:00.000Z',
+           '2026-09-07T12:00:05.000Z', 1)`,
+      )
+      .run(agent.threadId, sessionId);
+    database.connection
+      .prepare("INSERT INTO projection_channels(channel_id, channel_json) VALUES (?, ?)")
+      .run("channel-v18", JSON.stringify({ id: "channel-v18", purpose: "Keep this channel" }));
+    database.connection
+      .prepare(
+        `INSERT INTO projection_channel_messages(channel_id, message_id, sequence, message_json)
+         VALUES (?, ?, ?, ?)`,
+      )
+      .run("channel-v18", "channel-v18-message", 1, JSON.stringify({ text: "Keep this channel message" }));
+    database.close();
+
+    // Recreate the unshipped channel branch's version 18 profile: channel migrations are marked through
+    // 18, while its provider table still has the three-provider CHECK that migration 17 widens.
+    const legacy = new DatabaseSync(database.path);
+    legacy.exec(`
+      PRAGMA foreign_keys = OFF;
+      CREATE TABLE projection_provider_sessions_v18 (
+        id TEXT PRIMARY KEY,
+        thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,
+        provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok')),
+        external_session_id TEXT NOT NULL,
+        model TEXT NOT NULL,
+        effort TEXT NOT NULL,
+        state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        resume_cursor TEXT,
+        last_event_sequence INTEGER NOT NULL,
+        UNIQUE(provider, external_session_id)
+      );
+      INSERT INTO projection_provider_sessions_v18 SELECT * FROM projection_provider_sessions;
+      DROP TABLE projection_provider_sessions;
+      ALTER TABLE projection_provider_sessions_v18 RENAME TO projection_provider_sessions;
+      CREATE INDEX provider_sessions_thread
+        ON projection_provider_sessions(thread_id, provider, state);
+      DELETE FROM schema_migrations WHERE version = 19;
+      PRAGMA foreign_keys = ON;
+    `);
+    legacy.close();
+
+    const migrated = new OpenBotDatabase(root);
+    await migrated.initialize();
+    expect(
+      migrated.connection
+        .prepare("SELECT channel_json FROM projection_channels WHERE channel_id = ?")
+        .get("channel-v18"),
+    ).toEqual({ channel_json: JSON.stringify({ id: "channel-v18", purpose: "Keep this channel" }) });
+    expect(
+      migrated.connection
+        .prepare("SELECT message_json FROM projection_channel_messages WHERE message_id = ?")
+        .get("channel-v18-message"),
+    ).toEqual({ message_json: JSON.stringify({ text: "Keep this channel message" }) });
+    expect(
+      migrated.connection
+        .prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = ?")
+        .get("channel-v18-turn"),
+    ).toEqual({ provider_session_id: sessionId });
+    expect(
+      migrated.connection
+        .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projection_provider_sessions'")
+        .get(),
+    ).toMatchObject({ sql: expect.stringContaining("'opencode'") });
+    expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
+      version: 19,
+    });
     migrated.close();
   });
 
@@ -933,7 +1033,7 @@ describe("OpenBotDatabase", () => {
       DROP TABLE projection_routine_triggers;
       DROP TABLE projection_agent_routines;
       DROP TABLE projection_agent_memories;
-      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16);
+      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19);
       INSERT OR IGNORE INTO schema_migrations(version, applied_at)
         VALUES (4, '2026-08-20T10:00:00.000Z');
     `);
@@ -969,6 +1069,7 @@ describe("OpenBotDatabase", () => {
       { version: 16 },
       { version: 17 },
       { version: 18 },
+      { version: 19 },
     ]);
     migrated.close();
   });
@@ -1045,6 +1146,7 @@ describe("OpenBotDatabase", () => {
       { version: 16 },
       { version: 17 },
       { version: 18 },
+      { version: 19 },
     ]);
     retried.close();
   });
@@ -1514,7 +1616,7 @@ describe("OpenBotDatabase", () => {
       ALTER TABLE projection_provider_sessions_v6 RENAME TO projection_provider_sessions;
       CREATE INDEX provider_sessions_thread
         ON projection_provider_sessions(thread_id, provider, state);
-      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16);
+      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19);
       INSERT OR IGNORE INTO schema_migrations(version, applied_at)
         VALUES (6, '2026-08-20T10:00:00.000Z');
       PRAGMA foreign_keys = ON;
@@ -1539,6 +1641,133 @@ describe("OpenBotDatabase", () => {
     ).not.toThrow();
     migrated.close();
   });
+
+  it.each([false, true])(
+    "widens the provider-session constraint without losing data (failed attempt=%s)",
+    async (failFirst) => {
+      const root = await mkdtemp(join(tmpdir(), "openbot-db-provider-v16-"));
+      roots.push(root);
+      const database = new OpenBotDatabase(root);
+      await database.initialize();
+      const agent = testAgent();
+      if (!agent.threadId) throw new Error("The test agent has no thread.");
+      const threadId = agent.threadId;
+      database.replaceAgents("agents-import", [agent], "agents.imported");
+      database.bindProviderSession({
+        threadId,
+        provider: "codex",
+        externalSessionId: "codex-session",
+        model: "gpt-5.4",
+        effort: "medium",
+      });
+      database.bindProviderSession({
+        threadId,
+        provider: "claude",
+        externalSessionId: "claude-session",
+        model: "claude-opus-5",
+        effort: "high",
+      });
+      const codexSessionId = database
+        .listProviderSessions(threadId)
+        .find((session) => session.provider === "codex")?.id;
+      if (!codexSessionId) throw new Error("The codex provider session was not stored.");
+      // A turn points at the session the rebuild drops. With foreign keys on, the DROP would fire
+      // ON DELETE SET NULL and blank this column on every turn in the database.
+      database.connection
+        .prepare(
+          `INSERT INTO projection_turns
+           (turn_id, thread_id, provider_session_id, status, started_at, completed_at, last_event_sequence)
+         VALUES ('turn-1', ?, ?, 'completed', '2026-08-20T10:00:00.000Z', '2026-08-20T10:00:05.000Z', 1)`,
+        )
+        .run(threadId, codexSessionId);
+      database.close();
+
+      // A v16 database: the shipped three-provider constraint, and the migration ledger stamped one short.
+      const legacy = new DatabaseSync(database.path);
+      legacy.exec(`
+      DELETE FROM schema_migrations WHERE version >= 17;
+      PRAGMA foreign_keys = OFF;
+      CREATE TABLE projection_provider_sessions_v16 (
+        id TEXT PRIMARY KEY,
+        thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,
+        provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok')),
+        external_session_id TEXT NOT NULL,
+        model TEXT NOT NULL,
+        effort TEXT NOT NULL,
+        state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        resume_cursor TEXT,
+        last_event_sequence INTEGER NOT NULL,
+        UNIQUE(provider, external_session_id)
+      );
+      INSERT INTO projection_provider_sessions_v16 SELECT * FROM projection_provider_sessions;
+      DROP TABLE projection_provider_sessions;
+      ALTER TABLE projection_provider_sessions_v16 RENAME TO projection_provider_sessions;
+      CREATE INDEX provider_sessions_thread
+        ON projection_provider_sessions(thread_id, provider, state);
+      PRAGMA foreign_keys = ON;
+    `);
+      const originalSessions = legacy.prepare("SELECT * FROM projection_provider_sessions ORDER BY id").all();
+      if (failFirst)
+        legacy.exec(`
+      CREATE TRIGGER reject_migration_17 BEFORE INSERT ON schema_migrations
+      WHEN NEW.version = 17 BEGIN SELECT RAISE(ABORT, 'reject migration 17'); END;
+    `);
+      legacy.close();
+
+      if (failFirst) {
+        const failed = new OpenBotDatabase(root);
+        await expect(failed.initialize()).rejects.toThrow("migration to version 17 failed");
+        const rolledBack = new DatabaseSync(database.path);
+        expect(rolledBack.prepare("SELECT * FROM projection_provider_sessions ORDER BY id").all()).toEqual(
+          originalSessions,
+        );
+        expect(
+          rolledBack.prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = 'turn-1'").get(),
+        ).toEqual({ provider_session_id: codexSessionId });
+        expect(rolledBack.prepare("SELECT 1 FROM schema_migrations WHERE version = 17").get()).toBeUndefined();
+        expect(
+          rolledBack.prepare("SELECT sql FROM sqlite_master WHERE name = 'projection_provider_sessions'").get(),
+        ).toMatchObject({ sql: expect.not.stringContaining("'opencode'") });
+        expect(rolledBack.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+        rolledBack.exec("DROP TRIGGER reject_migration_17");
+        rolledBack.close();
+      }
+
+      const migrated = new OpenBotDatabase(root);
+      await migrated.initialize();
+      expect(migrated.connection.prepare("SELECT * FROM projection_provider_sessions ORDER BY id").all()).toEqual(
+        originalSessions,
+      );
+      expect(migrated.connection.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
+      expect(
+        migrated.connection.prepare("SELECT 1 AS applied FROM schema_migrations WHERE version = 17").get(),
+      ).toEqual({ applied: 1 });
+      expect(migrated.listProviderSessions(threadId).map((session) => session.provider)).toEqual(["codex", "claude"]);
+      expect(
+        migrated.connection.prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = ?").get("turn-1"),
+      ).toEqual({ provider_session_id: codexSessionId });
+      expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+      const table = migrated.connection
+        .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projection_provider_sessions'")
+        .get();
+      expect(table).toMatchObject({ sql: expect.stringContaining("'opencode'") });
+      // Written through SQL, not `bindProviderSession`: the widened CHECK constraint is what this
+      // case is about, and the typed API only accepts the provider ids the application ships today.
+      expect(() =>
+        migrated.connection
+          .prepare(
+            `INSERT INTO projection_provider_sessions
+             (id, thread_id, provider, external_session_id, model, effort, state,
+              created_at, updated_at, resume_cursor, last_event_sequence)
+           VALUES (?, ?, 'opencode', 'opencode-session', 'opencode/big-pickle', 'medium', 'active', ?, ?, NULL, 0)`,
+          )
+          .run("session-opencode", threadId, "2026-08-20T10:00:10.000Z", "2026-08-20T10:00:10.000Z"),
+      ).not.toThrow();
+      migrated.close();
+    },
+  );
 
   it("erases an agent's history without leaving a receipt whose events are gone", async () => {
     const database = await createDatabase();
@@ -1736,7 +1965,7 @@ function downgradeReactionsToV7(database: DatabaseSync): void {
     );
     DROP TABLE projection_reactions;
     ALTER TABLE projection_reactions_v7 RENAME TO projection_reactions;
-    DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16);
+    DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19);
     INSERT OR IGNORE INTO schema_migrations(version, applied_at)
       VALUES (7, '2026-08-20T10:00:00.000Z');
   `);
@@ -1810,8 +2039,8 @@ function conversationSnapshot(agent: AgentSummary, text: string): ConversationSn
 
 // These tests construct released schemas by stripping newer additions from a fresh fixture.
 function removeSchemaAfterVersion14(db: DatabaseSync): void {
-  // Version 18 stands on version 17, so a fixture below 17 must drop both. Every version from 15
-  // up goes: a history that keeps a later version and drops an earlier one has a gap, which the
+  // Channel migrations 18 and 19 stand on the provider migration 17, so a fixture below 17 must
+  // drop all three. Every version from 15 up goes: a history that keeps a later version and drops an earlier one has a gap, which the
   // schema check rejects before any upgrade runs.
   for (const table of ["memories", "routines", "routine_triggers", "routine_runs"])
     db.exec(`DROP TABLE projection_channel_${table}`);

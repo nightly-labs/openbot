@@ -867,18 +867,7 @@
   width: 18px;
   height: 18px;
   overflow: visible;
-}
-
-.provider-picker-logo[data-provider="codex"] {
-  fill: var(--openbot-provider-codex);
-}
-
-.provider-picker-logo[data-provider="claude"] {
-  fill: var(--openbot-provider-claude);
-}
-
-.provider-picker-logo[data-provider="grok"] {
-  fill: var(--openbot-provider-grok);
+  fill: var(--openbot-provider-current);
 }
 
 .provider-picker-option-unavailable .provider-picker-logo {

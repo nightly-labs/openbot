@@ -1,4 +1,4 @@
-// Shared by migration v17 and the separate new-database schema. IF NOT EXISTS throughout, because
+// Shared by migration v18 and the separate new-database schema. IF NOT EXISTS throughout, because
 // this text is both the migration and the tail of the latest schema: a database built from the
 // latest schema and then replayed forward - which is how a test fakes an older version - meets its
 // own tables.
@@ -52,8 +52,8 @@ export const CHANNEL_SCHEMA_SQL = `
   );
 `;
 
-// Shared by migration v18 and the separate new-database schema. A separate constant, and a new
-// version rather than an edit to CHANNEL_SCHEMA_SQL: a database that already ran 17 - every
+// Shared by migration v19 and the separate new-database schema. A separate constant, and a new
+// version rather than an edit to CHANNEL_SCHEMA_SQL: a database that already ran 18 - every
 // development profile on this branch - would otherwise never meet these tables.
 //
 // Every table mirrors its agent twin in the v8 baseline column for column, because one store

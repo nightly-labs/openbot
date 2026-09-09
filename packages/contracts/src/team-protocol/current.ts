@@ -1,5 +1,5 @@
 import { CHANNEL_DELETE_CAPABILITY } from "../ipc-chat-channels";
-import { TEAM_PROTOCOL_V3_CAPABILITIES } from "./v3";
+import { TEAM_PROTOCOL_V4_CAPABILITIES } from "./v4";
 
 export const TEAM_SEMANTIC_TAGS_CAPABILITY = "installed-skills";
 export const TEAM_AGENT_ACTIVITY_CAPABILITY = "agent-activity";
@@ -10,7 +10,7 @@ export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
 export { CHANNEL_DELETE_CAPABILITY };
 
 export const TEAM_CURRENT_CAPABILITIES = [
-  ...TEAM_PROTOCOL_V3_CAPABILITIES,
+  ...TEAM_PROTOCOL_V4_CAPABILITIES,
   "agent-profile-generation",
   "agent-analytics",
   "host-analytics",

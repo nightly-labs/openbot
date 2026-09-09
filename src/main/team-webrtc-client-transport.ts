@@ -23,11 +23,11 @@ import {
   type TeamProtocolV2RpcFrame,
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol/v2";
-import { decodeTeamProtocolV2CurrentEvent } from "@openbot/contracts/team-protocol/v2-adapter";
 import {
-  decodeTeamProtocolV3WebRtcHttpResponse,
-  encodeTeamProtocolV3WebRtcHttpRequest,
-} from "@openbot/contracts/team-protocol/v3-webrtc-adapter";
+  decodeTeamProtocolV4CurrentEvent,
+  decodeTeamProtocolV4WebRtcHttpResponse,
+  encodeTeamProtocolV4WebRtcHttpRequest,
+} from "@openbot/contracts/team-protocol/v4-webrtc-adapter";
 import type {
   RemoteConnectionBootstrap,
   RemoteHostSummary,
@@ -254,7 +254,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           ? null
           : isChannelRoute(path)
             ? channelRequest(path, init.body)
-            : encodeTeamProtocolV3WebRtcHttpRequest(method, path, init.body, {
+            : encodeTeamProtocolV4WebRtcHttpRequest(method, path, init.body, {
                 preserveSemanticTags: init.preserveSemanticTags,
               }),
         capabilities: [...TEAM_CURRENT_CAPABILITIES],
@@ -292,12 +292,12 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     // well-formed frame whose *body* the released V3 adapter refuses, which is the same kind of
     // failure and has to carry the same code: a plain error here reads to the caller as an ordinary
     // request failure, so the host stays healthy and reconnectable while talking nonsense.
-    let body: ReturnType<typeof decodeTeamProtocolV3WebRtcHttpResponse> = null;
+    let body: ReturnType<typeof decodeTeamProtocolV4WebRtcHttpResponse> = null;
     if (!file) {
       try {
         body = isChannelRoute(path)
           ? channelResponse(path, envelope.status, envelope.body)
-          : decodeTeamProtocolV3WebRtcHttpResponse(method, path, envelope.status, envelope.body);
+          : decodeTeamProtocolV4WebRtcHttpResponse(method, path, envelope.status, envelope.body);
       } catch {
         throw new TeamWebRtcRequestError(502, "protocol_error", "The host returned an invalid response body.");
       }
@@ -725,7 +725,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         return;
       }
       const channel = frame.type === "event" ? channelEvent(frame.payload) : null;
-      const decoded = channel ? { status: "known" as const, event: channel } : decodeTeamProtocolV2CurrentEvent(frame);
+      const decoded = channel ? { status: "known" as const, event: channel } : decodeTeamProtocolV4CurrentEvent(frame);
       if (decoded.status === "invalid") {
         this.#failProtocol(hostId, "The host returned a malformed known event.");
         return;

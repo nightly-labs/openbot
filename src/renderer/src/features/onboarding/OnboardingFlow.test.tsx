@@ -1,3 +1,4 @@
+import type { ManagedProviderId } from "@openbot/contracts/agent-providers";
 import type { AgentProviderId, AgentStatus, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 import { fireEvent, render, waitFor, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
@@ -105,7 +106,7 @@ describe("OnboardingFlow", () => {
         message: null,
       })),
     };
-    const initialRuntimeStatuses: Record<AgentProviderId, ProviderRuntimeStatus> = {
+    const initialRuntimeStatuses: Record<ManagedProviderId, ProviderRuntimeStatus> = {
       codex: { phase: "not-downloaded", progress: null, message: null, version: null },
       claude: { phase: "not-downloaded", progress: null, message: null, version: null },
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },

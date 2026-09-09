@@ -1,3 +1,14 @@
+import { isAgentSummary } from "@openbot/contracts/ipc";
+import {
+  decodeTeamProtocolV1CurrentHttpResponse,
+  encodeTeamProtocolV1CurrentHttpResponse,
+} from "@openbot/contracts/team-protocol/v1-adapter";
+import {
+  decodeTeamProtocolV3CurrentHttpResponse,
+  encodeTeamProtocolV3CurrentHttpResponse,
+} from "@openbot/contracts/team-protocol/v3-adapter";
+import opencodeFixture from "../../packages/contracts/src/team-protocol/fixtures/v4/host-http-response.json";
+import { legacyProviderView } from "./team-api/provider-visibility";
 // @vitest-environment node
 
 // The WebSocket side: who receives which realtime event, and what a client on an older protocol
@@ -28,6 +39,48 @@ import {
 afterEach(stopTeamApiFixtures);
 
 describe("TeamApiServer events", () => {
+  it("filters OpenCode snapshots and events for old peers without changing the host", async () => {
+    const source = opencodeFixture[0];
+    if (!isAgentSummary(source)) throw new Error("Invalid OpenCode fixture.");
+    const events = new EventEmitter();
+    const snapshot = { ...createAgents().getRuntimeSnapshot(), agents: [source] };
+    const { store, start } = await createTeamApiFixture("provider-events", { configure: true });
+    const { port } = await start({
+      agents: createAgents({ listAgents: () => [source], getRuntimeSnapshot: () => snapshot }, events),
+    });
+    const login = await store.login("owner", "correct horse battery");
+    for (const supportsOpencode of [false, true]) {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
+        "openbot-team-v1",
+        `openbot-token.${login.sessionToken}`,
+      ]);
+      const presence = nextJsonEvent(socket);
+      await new Promise<void>((resolve) => socket.addEventListener("open", () => resolve(), { once: true }));
+      await presence;
+      const initial = nextJsonEvent(socket);
+      socket.send(
+        JSON.stringify({
+          type: "agent-event-scope",
+          includeConversations: true,
+          capabilities: ["agent-runtime-snapshots", ...(supportsOpencode ? ["opencode"] : [])],
+        }),
+      );
+      await expect(initial).resolves.toMatchObject({
+        type: "runtime-snapshot",
+        snapshot: { bots: supportsOpencode ? [expect.objectContaining({ id: source.id, name: source.name })] : [] },
+      });
+      const changed = new Promise<unknown>((resolve) =>
+        socket.addEventListener("message", (event) => resolve(JSON.parse(String(event.data))), { once: true }),
+      );
+      events.emit("event", { type: "agents-changed", agents: [source] });
+      await expect(changed).resolves.toMatchObject({ type: "bots-changed", bots: supportsOpencode ? [source] : [] });
+      const closed = new Promise<void>((resolve) => socket.addEventListener("close", () => resolve(), { once: true }));
+      socket.close();
+      await closed;
+    }
+    expect(snapshot.agents).toEqual([source]);
+  });
+
   it("shares sidebar layout mutations with owner, admin, and member clients", async () => {
     const { root, store, start } = await createTeamApiFixture("sidebar-layout", { configure: true });
     const adminInvite = await store.createInvite("admin");
@@ -348,4 +401,56 @@ describe("TeamApiServer events", () => {
       socket.close();
     }
   });
+});
+
+it.each([
+  { version: "v1", encode: encodeTeamProtocolV1CurrentHttpResponse, decode: decodeTeamProtocolV1CurrentHttpResponse },
+  { version: "v3", encode: encodeTeamProtocolV3CurrentHttpResponse, decode: decodeTeamProtocolV3CurrentHttpResponse },
+])("preserves OpenCode sender and reaction references in $version provider views", ({ encode, decode }) => {
+  const actor = { kind: "agent", agentId: "opencode-agent" };
+  const queue = {
+    agentId: "chief",
+    deliveries: [
+      {
+        id: "delivery-1",
+        messageId: "message-1",
+        recipientAgentId: "chief",
+        sender: actor,
+        text: "Please review.",
+        attachments: [],
+        replyToMessageId: null,
+        status: "queued",
+        position: 1,
+        turnId: null,
+        error: null,
+        createdAt: "2026-09-09T10:00:00.000Z",
+      },
+    ],
+  };
+  const conversation = {
+    agentId: "chief",
+    threadId: "thread-chief",
+    activeTurnId: null,
+    revision: 1,
+    readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: "message-1" },
+    messages: [
+      {
+        id: "message-1",
+        author: "assistant",
+        text: "Review complete.",
+        status: "completed",
+        createdAt: "2026-09-09T10:00:00.000Z",
+        reactions: [{ emoji: "👍", actor }],
+      },
+    ],
+  };
+  for (const [route, payload] of [
+    ["queue", queue],
+    ["conversation", conversation],
+  ] as const) {
+    const path = `/v1/agents/chief/${route}`;
+    const filtered = legacyProviderView(payload, new Set([actor.agentId]));
+    const wire = JSON.parse(encode("GET", path, 200, filtered));
+    expect(decode("GET", path, 200, wire)).toEqual(payload);
+  }
 });

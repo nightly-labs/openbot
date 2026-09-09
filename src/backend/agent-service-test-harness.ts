@@ -53,7 +53,12 @@ const FAKE_RUNTIME_ENV_VARS = [
   "OPENBOT_FAKE_CLAUDE_LOGIN_LOG",
 ] as const;
 
-const PROVIDER_PATH_ENV_VARS = ["OPENBOT_CODEX_PATH", "OPENBOT_CLAUDE_PATH", "OPENBOT_GROK_PATH"] as const;
+const PROVIDER_PATH_ENV_VARS = [
+  "OPENBOT_CODEX_PATH",
+  "OPENBOT_CLAUDE_PATH",
+  "OPENBOT_GROK_PATH",
+  "OPENBOT_OPENCODE_PATH",
+] as const;
 
 /** Provider paths as they were before any shard touched them. */
 const originalProviderPaths = new Map(PROVIDER_PATH_ENV_VARS.map((name) => [name, process.env[name]]));
@@ -70,6 +75,7 @@ export async function startAgentTestFixture(): Promise<{ root: string; logPath: 
   process.env.OPENBOT_CODEX_PATH = await createFakeCodex(root);
   process.env.OPENBOT_CLAUDE_PATH = join(root, "missing-claude");
   process.env.OPENBOT_GROK_PATH = join(root, "missing-grok");
+  process.env.OPENBOT_OPENCODE_PATH = join(root, "missing-opencode");
   return { root, logPath };
 }
 
@@ -159,9 +165,11 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
                 "gpt-5.3-codex-spark",
                 "codex-auto-review",
               ].map((model) => ({ model }))
-            : this.provider === "grok"
-              ? ["grok-4.5", "grok-fast"].map((model) => ({ model }))
-              : ["claude-fable-5", "claude-opus-5", "claude-sonnet-5"].map((model) => ({ model })),
+            : this.provider === "opencode"
+              ? [{ model: "opencode/example-model" }]
+              : this.provider === "grok"
+                ? ["grok-4.5", "grok-fast"].map((model) => ({ model }))
+                : ["claude-fable-5", "claude-opus-5", "claude-sonnet-5"].map((model) => ({ model })),
       };
     }
     if (method === "model/list" && this.modelList) result = this.modelList(params);
@@ -628,6 +636,13 @@ if [ "$1" = "--version" ]; then
 fi
 `,
   );
+  await chmod(executable, 0o755);
+  return executable;
+}
+
+export async function createFakeOpencode(directory: string): Promise<string> {
+  const executable = join(directory, "opencode");
+  await writeFile(executable, "#!/bin/sh\nprintf '1.3.13\\n'\n");
   await chmod(executable, 0o755);
   return executable;
 }

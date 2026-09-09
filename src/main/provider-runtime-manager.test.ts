@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { access, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import type { ProviderRuntimeSnapshot } from "@openbot/contracts/ipc";
+import { MANAGED_RUNTIME_PROVIDERS, type ProviderRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import lockValue from "../../native-runtime.lock.json";
 import { parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
@@ -465,6 +465,21 @@ describe("ProviderRuntimeManager", () => {
     expect(snapshot.providers.codex.message).toContain("link or special file");
     const providerEntries = await readdir(join(root, "runtimes", "codex")).catch(() => []);
     expect(providerEntries.some((entry) => entry.startsWith(".installing-"))).toBe(false);
+  });
+
+  it("installs each provider under its own name and version", async () => {
+    // The manager used to answer "which artifact does this provider get?" with `else grok`, so a
+    // provider it had never heard of got Grok's binary in its own directory. Every managed provider
+    // is asked here, so a new one joins this case by joining the registry.
+    const root = await temporaryRoot();
+    const lock = parseAgentRuntimeLock(structuredClone(lockValue));
+    const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64", lock });
+
+    for (const provider of MANAGED_RUNTIME_PROVIDERS) {
+      expect(manager.executablePath(provider)).toBe(
+        join(root, provider, "darwin-arm64", lock[provider].version, "bin", provider),
+      );
+    }
   });
 });
 

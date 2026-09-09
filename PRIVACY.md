@@ -252,6 +252,13 @@ CLI retention policies still apply.
 
 Marketplace submissions from the desktop app show the publisher’s current account photo publicly on the listing. Account photo updates appear on the listing; removing the account photo removes it from the listing. Private memories and integration credentials are not included.
 
+### OpenCode
+
+OpenBot starts the OpenCode CLI installed on the host with `opencode acp`. Prompts, attachments,
+and tool results go to that local process. OpenCode can send them to the model provider selected
+in its configuration. OpenBot does not copy OpenCode credentials or upload its session files.
+OpenCode manages its own login and resume state.
+
 ## Shared desktop channels
 
 Channel names, purposes, participating agents, linked conversation references, messages, tasks,

@@ -568,21 +568,35 @@ The desktop chart adapts Zaidan's chart and interactive area composition. The pi
 `solid-recharts` dependency has a Solid 2 compatibility patch and uses the application's single
 Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact accessible values.
 
+### OpenCode and ACP
+
+`src/backend/acp-client.ts` owns ACP process transport, model discovery, session start/load,
+streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts` supplies xAI
+login and billing hooks. The OpenCode driver starts the installed `opencode acp` command and
+uses external sign-in. OpenCode is not a managed runtime. Profile clients deny tool permissions.
+Provider session IDs remain in `projection_provider_sessions`; migration 17 adds OpenCode while
+preserving turn links. Provider switches keep the same agent, workspace, and local thread.
+
+Team API v4 has its own frozen provider-aware schema and adapters. Versions 1–3 remain registered
+with their released provider vocabulary. The host filters OpenCode agents, models, status,
+sidebar references, and runtime events before encoding an older client's response. Requests for
+an OpenCode agent from those clients return 404. WebRTC keeps its v2 frame transport and selects
+the v4 application codec when the peer advertises the `opencode` capability.
+
 ## Shared desktop channel chats
 
 Channels are separate from sidebar sections. A channel has one host, a purpose, participating agents,
 a selected lead, and linked agent conversations. Agent membership selects who can receive work.
 It does not restrict human access: each authenticated server member can read and use its channels.
 The Electron app provides the channel interface. A creation dialog provides member search and optional
-coordination settings. The chat shows each author and keeps details, settings, and task controls in
-a side panel. The mobile interface is unchanged.
+coordination settings. The chat shows each author and keeps settings in a side panel. Channels use the sidebar
+context menu for management and have no Pause or Resume controls. The mobile interface is unchanged.
 
 `ChannelStore` stores the canonical transcript, channel configuration, tasks, assignments, summaries,
-execution threads, and human read positions in SQLite. Migration 17 adds these projections without
+execution threads, and human read positions in SQLite. Migration 18 adds these projections without
 changing existing agent data. Channel commands use the orchestration log and command receipts.
 Messages have stable IDs and per-channel sequences. A channel projection can be rebuilt from its events.
-Archiving stops channel work and retains its records. Restore makes the chat available again; paused
-work requires Resume. Neither action removes agents or linked conversations.
+Archiving stops channel work and retains its records. Restore makes the chat available for new messages again. Neither action removes agents or linked conversations.
 
 Each channel-agent pair has a separate execution thread in `projection_threads`. The normal agent
 thread is never replaced. Provider sessions, turns, questions, approvals, attachments, compaction,
@@ -624,4 +638,3 @@ Desktop IPC and remote desktop transports expose `channel-chats-v1` as an option
 separate payload codecs. Released Team API adapters keep their existing meaning. A host advertises
 the capability only when its channel service is connected. Unsupported remote hosts show an explanation
 in place of channel controls. The account API and Signal service add no channel storage or routing.
-

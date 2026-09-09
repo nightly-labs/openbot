@@ -577,18 +577,7 @@ a {
   height: 0.84em;
   flex: 0 0 auto;
   overflow: visible;
-}
-
-.landing-provider-logo[data-provider="codex"] {
-  fill: var(--openbot-provider-codex);
-}
-
-.landing-provider-logo[data-provider="claude"] {
-  fill: var(--openbot-provider-claude);
-}
-
-.landing-provider-logo[data-provider="grok"] {
-  fill: var(--openbot-provider-grok);
+  fill: var(--openbot-provider-current);
 }
 
 .landing-actions {

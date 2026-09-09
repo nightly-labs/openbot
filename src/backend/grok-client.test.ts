@@ -1,3 +1,5 @@
+import { AcpAgentClient } from "./acp-client";
+import { requireProviderDriver } from "./provider-drivers";
 // @vitest-environment node
 
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -20,7 +22,7 @@ import {
 let root: string;
 let executable: string;
 let logPath: string;
-let client: GrokAgentClient | null = null;
+let client: AcpAgentClient | null = null;
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "openbot-grok-acp-"));
@@ -41,6 +43,104 @@ afterEach(async () => {
 });
 
 describe.sequential("GrokAgentClient", () => {
+  it("runs OpenCode ACP without Grok authentication or billing and preserves its resumed session", async () => {
+    client = new AcpAgentClient({ executable, version: "1.0.0" }, 5_000, {
+      provider: "opencode",
+      argv: ["acp"],
+      env: {},
+      signInMessage: "Connect OpenCode.",
+    });
+    client.start();
+    await client.request("initialize", {}, decodeRecordResponse);
+    expect((await client.request("account/read", {}, decodeAccountReadResult)).account?.type).toBe("opencode");
+    expect(await client.request("account/rateLimits/read", {}, decodeAccountRateLimitsReadResult)).toEqual({
+      rateLimits: null,
+      rateLimitsByLimitId: null,
+    });
+    const resumed = await client.request(
+      "thread/resume",
+      { threadId: "existing-opencode-session", cwd: root, dynamicTools: [] },
+      decodeThreadResponse,
+    );
+    expect(resumed.thread.id).toBe("existing-opencode-session");
+    const log = (await readFile(logPath, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(log).toContainEqual(expect.objectContaining({ event: "start", args: ["acp"] }));
+    expect(log.some((entry) => entry.method === "authenticate" || entry.method === "_x.ai/billing")).toBe(false);
+    expect(log).toContainEqual(
+      expect.objectContaining({ method: "session/load", sessionId: "existing-opencode-session" }),
+    );
+  });
+
+  it.each([
+    ["empty", "failed"],
+    ["whitespace", "failed"],
+    ["thought", "failed"],
+    ["tools", "completed"],
+    ["answer", "completed"],
+    ["cancel", "interrupted"],
+  ])("handles OpenCode %s turns and allows a retry in the same session", async (mode, status) => {
+    process.env.OPENBOT_FAKE_GROK_MODE = `opencode-${mode}`;
+    client = new AcpAgentClient({ executable, version: "1.3.13" }, 5_000, {
+      provider: "opencode",
+      argv: ["acp"],
+      env: {},
+      signInMessage: "Connect OpenCode.",
+    });
+    const notifications: AppServerNotification[] = [];
+    client.on("notification", (event) => notifications.push(event));
+    client.start();
+    const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
+    await client.request(
+      "turn/start",
+      { threadId: thread.id, input: [{ type: "text", text: "Answer" }] },
+      decodeTurnResponse,
+    );
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+    expect(notifications.find((event) => event.method === "turn/completed")?.params).toMatchObject({
+      turn: { status },
+    });
+    const errors = notifications.filter((event) => event.method === "error");
+    if (status === "failed")
+      expect(errors).toEqual([
+        expect.objectContaining({
+          params: expect.objectContaining({
+            threadId: thread.id,
+            message:
+              "OpenCode returned no response. Check the selected model's sign-in and billing in OpenCode, then retry or choose another model.",
+          }),
+        }),
+      ]);
+    else expect(errors).toEqual([]);
+    notifications.length = 0;
+    await client.request(
+      "turn/start",
+      { threadId: thread.id, input: [{ type: "text", text: "Retry" }] },
+      decodeTurnResponse,
+    );
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+    const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
+    expect(history.thread.turns?.map((turn) => turn.status)).toEqual([status, "completed"]);
+    expect(history.thread.turns?.[1]?.items).toContainEqual(expect.objectContaining({ text: "Reply after retry." }));
+  });
+
+  it("uses external sign-in for OpenCode and creates its ACP process", async () => {
+    const driver = requireProviderDriver("opencode");
+    expect(driver.signIn).toEqual({ kind: "external" });
+    const providerClient = driver.createClient({ executable, version: "1.0.0" }, 5_000);
+    providerClient.start();
+    try {
+      await providerClient.request("initialize", {}, decodeRecordResponse);
+      expect((await providerClient.request("account/read", {}, decodeAccountReadResult)).account?.type).toBe(
+        "opencode",
+      );
+    } finally {
+      await providerClient.stop();
+    }
+  });
+
   it("starts profile generation with no built-in tools and denies approval requests", async () => {
     client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000, true);
     const requests: AppServerRequest[] = [];
@@ -192,142 +292,158 @@ describe.sequential("GrokAgentClient", () => {
     ).rejects.toThrow("Grok request timed out: account/rateLimits/read");
   });
 
-  it("discovers ACP models, configures a session, streams, steers, asks, approves, cancels, and resumes", async () => {
-    client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
-    const notifications: AppServerNotification[] = [];
-    const requests: AppServerRequest[] = [];
-    client.on("notification", (notification) => notifications.push(notification));
-    client.on("request", (request) => requests.push(request));
-    client.start();
+  it.each(["grok", "opencode"] as const)(
+    "%s discovers models, streams, steers, asks, approves, cancels, and resumes",
+    async (provider) => {
+      const createClient = () =>
+        provider === "grok"
+          ? new GrokAgentClient({ executable, version: "1.0.5" }, 5_000)
+          : new AcpAgentClient({ executable, version: "1.3.13" }, 5_000, {
+              provider,
+              argv: ["acp"],
+              env: {},
+              signInMessage: "Connect OpenCode.",
+            });
+      client = createClient();
+      const notifications: AppServerNotification[] = [];
+      const requests: AppServerRequest[] = [];
+      client.on("notification", (notification) => notifications.push(notification));
+      client.on("request", (request) => requests.push(request));
+      client.start();
 
-    await client.request("initialize", {}, decodeRecordResponse);
-    await expect(client.request("account/read", {}, decodeAccountReadResult)).resolves.toMatchObject({
-      account: { type: "grok" },
-    });
-    const models = await client.request("model/list", {}, decodeModelListResponse);
-    expect(models.data).toEqual([
-      expect.objectContaining({
-        model: "grok-4.5",
-        defaultReasoningEffort: "xhigh",
-        supportedReasoningEfforts: [{ reasoningEffort: "low" }, { reasoningEffort: "xhigh" }],
-      }),
-      expect.objectContaining({ model: "grok-fast" }),
-    ]);
-
-    const started = await client.request(
-      "thread/start",
-      {
-        cwd: root,
-        runtimeWorkspaceRoots: [root],
-        developerInstructions: "Use OpenBot tools.",
-        dynamicTools: [],
-        model: "grok-fast",
-        effort: "xhigh",
-      },
-      decodeThreadResponse,
-    );
-    const threadId = started.thread.id;
-    const turn = await client.request(
-      "turn/start",
-      {
-        threadId,
-        model: "grok-fast",
-        effort: "xhigh",
-        clientUserMessageId: "turn-1",
-        input: [{ type: "text", text: "Build it" }],
-      },
-      decodeTurnResponse,
-    );
-    expect(turn.turn.status).toBe("inProgress");
-    await waitFor(() => requests.some((request) => request.method.includes("requestApproval")));
-
-    await client.request(
-      "turn/steer",
-      {
-        threadId,
-        expectedTurnId: "turn-1",
-        input: [{ type: "text", text: "Also add tests" }],
-      },
-      decodeRecordResponse,
-    );
-    const approval = requests.find((request) => request.method.includes("requestApproval"));
-    if (!approval) throw new Error("The fake ACP permission request was not surfaced.");
-    client.respond(approval.id, { decision: "accept" });
-    await waitFor(() => requests.filter((request) => request.method === "item/tool/requestUserInput").length === 1);
-    const elicitation = requests.find((request) => request.method === "item/tool/requestUserInput");
-    if (!elicitation) throw new Error("The standard ACP elicitation was not surfaced.");
-    client.respond(elicitation.id, { answers: { language: { answers: ["TypeScript"] } } });
-    await waitFor(() => requests.filter((request) => request.method === "item/tool/requestUserInput").length === 2);
-    const prompt = requests.filter((request) => request.method === "item/tool/requestUserInput")[1];
-    if (!prompt) throw new Error("The xAI user-input request was not surfaced.");
-    client.respond(prompt.id, { answers: { confirm: { answers: ["yes"] } } });
-    await waitFor(() => notifications.some((notification) => notification.method === "turn/completed"));
-    expect(notifications).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ method: "turn/started" }),
-        expect.objectContaining({ method: "item/agentMessage/delta" }),
-        expect.objectContaining({ method: "item/completed" }),
-        expect.objectContaining({ method: "turn/completed" }),
-      ]),
-    );
-    // A thought only reaches the thinking disclosure while it is phased as commentary; without the
-    // phase it arrives as an ordinary agent message and renders as a chat bubble.
-    expect(notifications).toEqual(
-      expect.arrayContaining([
+      await client.request("initialize", {}, decodeRecordResponse);
+      await expect(client.request("account/read", {}, decodeAccountReadResult)).resolves.toMatchObject({
+        account: { type: provider },
+      });
+      const models = await client.request("model/list", {}, decodeModelListResponse);
+      expect(models.data).toEqual([
         expect.objectContaining({
-          method: "item/started",
-          params: expect.objectContaining({
-            item: expect.objectContaining({ type: "agentMessage", phase: "commentary" }),
-          }),
+          model: "grok-4.5",
+          defaultReasoningEffort: "xhigh",
+          supportedReasoningEfforts: [{ reasoningEffort: "low" }, { reasoningEffort: "xhigh" }],
         }),
-        expect.objectContaining({
-          method: "item/completed",
-          params: expect.objectContaining({
-            item: expect.objectContaining({ phase: "commentary", text: "GROK_THOUGHT" }),
+        expect.objectContaining({ model: "grok-fast" }),
+      ]);
+
+      const started = await client.request(
+        "thread/start",
+        {
+          cwd: root,
+          runtimeWorkspaceRoots: [root],
+          developerInstructions: "Use OpenBot tools.",
+          dynamicTools: [],
+          model: "grok-fast",
+          effort: "xhigh",
+        },
+        decodeThreadResponse,
+      );
+      const threadId = started.thread.id;
+      const turn = await client.request(
+        "turn/start",
+        {
+          threadId,
+          model: "grok-fast",
+          effort: "xhigh",
+          clientUserMessageId: "turn-1",
+          input: [{ type: "text", text: "Build it" }],
+        },
+        decodeTurnResponse,
+      );
+      expect(turn.turn.status).toBe("inProgress");
+      await waitFor(() => requests.some((request) => request.method.includes("requestApproval")));
+
+      await client.request(
+        "turn/steer",
+        {
+          threadId,
+          expectedTurnId: "turn-1",
+          input: [{ type: "text", text: "Also add tests" }],
+        },
+        decodeRecordResponse,
+      );
+      const approval = requests.find((request) => request.method.includes("requestApproval"));
+      if (!approval) throw new Error("The fake ACP permission request was not surfaced.");
+      client.respond(approval.id, { decision: "accept" });
+      await waitFor(() => requests.filter((request) => request.method === "item/tool/requestUserInput").length === 1);
+      const elicitation = requests.find((request) => request.method === "item/tool/requestUserInput");
+      if (!elicitation) throw new Error("The standard ACP elicitation was not surfaced.");
+      client.respond(elicitation.id, { answers: { language: { answers: ["TypeScript"] } } });
+      await waitFor(() => requests.filter((request) => request.method === "item/tool/requestUserInput").length === 2);
+      const prompt = requests.filter((request) => request.method === "item/tool/requestUserInput")[1];
+      if (!prompt) throw new Error("The xAI user-input request was not surfaced.");
+      client.respond(prompt.id, { answers: { confirm: { answers: ["yes"] } } });
+      await waitFor(() => notifications.some((notification) => notification.method === "turn/completed"));
+      expect(notifications).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ method: "turn/started" }),
+          expect.objectContaining({ method: "item/agentMessage/delta" }),
+          expect.objectContaining({ method: "item/completed" }),
+          expect.objectContaining({ method: "turn/completed" }),
+        ]),
+      );
+      // A thought only reaches the thinking disclosure while it is phased as commentary; without the
+      // phase it arrives as an ordinary agent message and renders as a chat bubble.
+      expect(notifications).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            method: "item/started",
+            params: expect.objectContaining({
+              item: expect.objectContaining({ type: "agentMessage", phase: "commentary" }),
+            }),
           }),
-        }),
-      ]),
-    );
+          expect.objectContaining({
+            method: "item/completed",
+            params: expect.objectContaining({
+              item: expect.objectContaining({ phase: "commentary", text: "GROK_THOUGHT" }),
+            }),
+          }),
+        ]),
+      );
 
-    const secondTurn = await client.request(
-      "turn/start",
-      { threadId, clientUserMessageId: "turn-2", input: [{ type: "text", text: "Wait" }] },
-      decodeTurnResponse,
-    );
-    await client.request("turn/interrupt", { threadId, turnId: secondTurn.turn.id }, decodeRecordResponse);
-    await waitFor(() =>
-      notifications.some(
-        (notification) =>
-          notification.method === "turn/completed" &&
-          JSON.stringify(notification.params).includes('"status":"interrupted"'),
-      ),
-    );
+      const secondTurn = await client.request(
+        "turn/start",
+        { threadId, clientUserMessageId: "turn-2", input: [{ type: "text", text: "Wait" }] },
+        decodeTurnResponse,
+      );
+      await client.request("turn/interrupt", { threadId, turnId: secondTurn.turn.id }, decodeRecordResponse);
+      await waitFor(() =>
+        notifications.some(
+          (notification) =>
+            notification.method === "turn/completed" &&
+            JSON.stringify(notification.params).includes('"status":"interrupted"'),
+        ),
+      );
 
-    const log = await readLog();
-    expect(log).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ event: "start", args: ["--no-auto-update", "agent", "stdio"] }),
-        expect.objectContaining({ method: "authenticate", methodId: "cached_token" }),
-        expect.objectContaining({ method: "session/set_config_option", configId: "model", value: "grok-fast" }),
-        expect.objectContaining({ method: "session/set_config_option", configId: "thought", value: "extra_high" }),
-        expect.objectContaining({ event: "permission-response", optionId: "allow-once" }),
-        expect.objectContaining({ event: "elicitation-response", language: "TypeScript" }),
-        expect.objectContaining({ event: "user-input-response" }),
-        expect.objectContaining({ method: "session/cancel" }),
-      ]),
-    );
+      const log = await readLog();
+      if (provider === "grok")
+        expect(log).toContainEqual(expect.objectContaining({ method: "authenticate", methodId: "cached_token" }));
+      expect(log).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            event: "start",
+            args: provider === "grok" ? ["--no-auto-update", "agent", "stdio"] : ["acp"],
+          }),
+          expect.objectContaining({ method: "session/set_config_option", configId: "model", value: "grok-fast" }),
+          expect.objectContaining({ method: "session/set_config_option", configId: "thought", value: "extra_high" }),
+          expect.objectContaining({ event: "permission-response", optionId: "allow-once" }),
+          expect.objectContaining({ event: "elicitation-response", language: "TypeScript" }),
+          expect.objectContaining({ event: "user-input-response" }),
+          expect.objectContaining({ method: "session/cancel" }),
+        ]),
+      );
 
-    await client.stop();
-    client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
-    client.start();
-    await client.request("initialize", {}, decodeRecordResponse);
-    await expect(
-      client.request("thread/resume", { threadId, cwd: root, dynamicTools: [] }, decodeRecordResponse),
-    ).resolves.toEqual(expect.any(Object));
-    expect(await readLog()).toEqual(
-      expect.arrayContaining([expect.objectContaining({ method: "session/load", sessionId: threadId })]),
-    );
-  });
+      await client.stop();
+      client = createClient();
+      client.start();
+      await client.request("initialize", {}, decodeRecordResponse);
+      await expect(
+        client.request("thread/resume", { threadId, cwd: root, dynamicTools: [] }, decodeRecordResponse),
+      ).resolves.toEqual(expect.any(Object));
+      expect(await readLog()).toEqual(
+        expect.arrayContaining([expect.objectContaining({ method: "session/load", sessionId: threadId })]),
+      );
+    },
+  );
 
   it("rediscovers Grok models without restarting and closes discovery sessions", async () => {
     process.env.OPENBOT_FAKE_GROK_MODE = "refresh-models";
@@ -709,6 +825,21 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     return;
   }
   if (message.method === "session/prompt") {
+    if (mode.startsWith("opencode-")) {
+      promptCounter += 1;
+      const update = promptCounter > 1
+        ? { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Reply after retry." } }
+        : mode === "opencode-tools"
+          ? { sessionUpdate: "tool_call", toolCallId: "read-1", title: "Read files", status: "completed" }
+          : mode === "opencode-thought"
+            ? { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "Thinking." } }
+            : mode === "opencode-whitespace" || mode === "opencode-answer"
+              ? { sessionUpdate: "agent_message_chunk", content: { type: "text", text: mode === "opencode-answer" ? "Answer." : "   " } }
+              : null;
+      if (update) write({ method: "session/update", params: { sessionId: message.params.sessionId, update } });
+      write({ id: message.id, result: { stopReason: promptCounter === 1 && mode === "opencode-cancel" ? "cancelled" : "end_turn" } });
+      return;
+    }
     if (["end_turn", "cancelled", "max_tokens"].includes(mode)) {
       const updates = [
         { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "Planning inspection." } },

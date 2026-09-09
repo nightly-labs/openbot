@@ -1,3 +1,4 @@
+import { TEAM_PROTOCOL_V4 } from "@openbot/contracts/team-protocol/v4";
 // What a failure means to the user, and what this build claims to support. Pure functions only --
 // nothing here reads or writes connection state, so the whole table can be checked with a value in
 // and a value out.
@@ -11,11 +12,11 @@
 
 import type { ServerCompatibility, ServerConnectionIssue, ServerSummary } from "@openbot/contracts/ipc";
 import { TEAM_PROTOCOL_V1, type TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
-import { TEAM_PROTOCOL_V3, TEAM_PROTOCOL_V3_CAPABILITIES } from "@openbot/contracts/team-protocol/v3";
+import { TEAM_PROTOCOL_V3_CAPABILITIES } from "@openbot/contracts/team-protocol/v3";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 
 // The protocol range this build speaks. Every compatibility record reports it as the local half.
-export const LOCAL_TEAM_PROTOCOL = { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V3 } as const;
+export const LOCAL_TEAM_PROTOCOL = { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V4 } as const;
 
 // Everything the app tracks about one server's connection, and the whole of what `list()` reports
 // beyond the server's stored fields.

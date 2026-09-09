@@ -1,12 +1,12 @@
 import { channelRequest, channelResponse, isChannelRoute } from "@openbot/contracts/team-protocol/channels-v1";
+import {
+  decodeTeamProtocolV4CurrentHttpResponse,
+  encodeTeamProtocolV4CurrentHttpRequest,
+} from "@openbot/contracts/team-protocol/v4-adapter";
 // Putting one Team API call on the wire, and reading what came back off it.
 //
-// Two encodings live here and must not be collapsed into one. A negotiated V3 host is framed by
-// `@openbot/contracts/team-protocol/v3-adapter`; anything older by the V1 adapter. Both are released
-// wire protocols, so an existing host will keep speaking the one it shipped with forever -- see
-// `packages/contracts/AGENTS.md`. `webRtcRequestBody` is the third: it re-frames a JSON body as
-// protocol V2 for the WebRTC transport, and returns the body untouched when it cannot, because a
-// released host already accepts that shape.
+// HTTP uses the adapter for the negotiated protocol: V4 adds OpenCode, V3 adds duplication,
+// and V1 serves older hosts. The WebRTC transport retains its released V2 framing.
 //
 // Nothing here knows a server exists. It takes a URL, a token and a protocol number, and it either
 // returns a decoded value or throws one of `remote-server-errors.ts`. Deciding what a throw means for
@@ -75,13 +75,17 @@ export async function requestJson<T>(
           ? undefined
           : isChannelRoute(path)
             ? JSON.stringify(channelRequest(path, options.body))
-            : options.protocol === TEAM_PROTOCOL_V3
-              ? encodeTeamProtocolV3CurrentHttpRequest(method, path, options.body, {
+            : options.protocol === 4
+              ? encodeTeamProtocolV4CurrentHttpRequest(method, path, options.body, {
                   preserveSemanticTags: options.preserveSemanticTags,
                 })
-              : encodeTeamProtocolV1CurrentHttpRequest(method, path, options.body, {
-                  preserveSemanticTags: options.preserveSemanticTags,
-                }),
+              : options.protocol === TEAM_PROTOCOL_V3
+                ? encodeTeamProtocolV3CurrentHttpRequest(method, path, options.body, {
+                    preserveSemanticTags: options.preserveSemanticTags,
+                  })
+                : encodeTeamProtocolV1CurrentHttpRequest(method, path, options.body, {
+                    preserveSemanticTags: options.preserveSemanticTags,
+                  }),
     },
     options.timeoutMs,
   );
@@ -103,9 +107,11 @@ export async function requestJson<T>(
     try {
       value = isChannelRoute(path)
         ? channelResponse(path, response.status, value)
-        : options.protocol === TEAM_PROTOCOL_V3
-          ? decodeTeamProtocolV3CurrentHttpResponse(method, path, response.status, value)
-          : decodeTeamProtocolV1CurrentHttpResponse(method, path, response.status, value);
+        : options.protocol === 4
+          ? decodeTeamProtocolV4CurrentHttpResponse(method, path, response.status, value)
+          : options.protocol === TEAM_PROTOCOL_V3
+            ? decodeTeamProtocolV3CurrentHttpResponse(method, path, response.status, value)
+            : decodeTeamProtocolV1CurrentHttpResponse(method, path, response.status, value);
     } catch (error) {
       throw new RemoteProtocolError(
         "protocol_error",

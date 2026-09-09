@@ -7,12 +7,17 @@ import type {
   AgentStatus,
   AgentSummary,
 } from "@openbot/contracts/ipc";
-import { isReasoningEffort } from "@openbot/contracts/ipc";
+import { agentProviderDescriptor, isReasoningEffort } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
-import { type AgentCliInfo, CodexCliError, type CodexCliInfo, resolveCodexCli } from "./../cli";
-import { GrokAgentClient } from "../grok-client";
+import {
+  type AgentCliInfo,
+  type BundledProviderExecutables,
+  CodexCliError,
+  type CodexCliInfo,
+  resolveCodexCli,
+} from "./../cli";
 import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
@@ -94,6 +99,7 @@ const INITIAL_STATUS: AgentStatus = {
     { id: "codex", state: "not-started", version: null, message: null },
     { id: "claude", state: "not-started", version: null, message: null },
     { id: "grok", state: "not-started", version: null, message: null },
+    { id: "opencode", state: "not-started", version: null, message: null },
   ],
   capabilities: {
     chat: "unavailable",
@@ -205,7 +211,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #requestTimeoutMs: number;
   readonly #clientFactory: AgentClientFactory | null;
-  readonly #bundledExecutables: Map<AgentProvider, string | null | undefined>;
+  readonly #bundledExecutables: BundledProviderExecutables;
   readonly #clients = new Map<AgentProvider, AgentClient>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
   /**
@@ -239,9 +245,7 @@ export class ProviderRuntime implements ProviderPort {
     requestTimeoutMs: number;
     preferredProvider: AgentProvider;
     clientFactory: AgentClientFactory | null;
-    bundledCodexExecutable: string | null | undefined;
-    bundledClaudeExecutable: string | null | undefined;
-    bundledGrokExecutable: string | null | undefined;
+    bundledExecutables: BundledProviderExecutables;
   }) {
     this.#conversation = options.conversation;
     this.#hooks = options.hooks;
@@ -250,11 +254,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#requestTimeoutMs = options.requestTimeoutMs;
     this.#preferredProvider = options.preferredProvider;
     this.#clientFactory = options.clientFactory;
-    this.#bundledExecutables = new Map([
-      ["codex", options.bundledCodexExecutable],
-      ["claude", options.bundledClaudeExecutable],
-      ["grok", options.bundledGrokExecutable],
-    ]);
+    this.#bundledExecutables = { ...options.bundledExecutables };
   }
 
   /**
@@ -279,7 +279,7 @@ export class ProviderRuntime implements ProviderPort {
   async #resolveProviderCli(provider: AgentProvider): Promise<AgentCliInfo> {
     try {
       const cli = await requireProviderDriver(provider).resolveCli({
-        bundledExecutable: this.#bundledExecutables.get(provider),
+        bundledExecutable: this.#bundledExecutables[provider],
       });
       this.#cliSources.set(provider, cli.source);
       return cli;
@@ -307,8 +307,9 @@ export class ProviderRuntime implements ProviderPort {
     if (!cli || !this.#clients.has(provider))
       throw new Error("Connect the selected provider before generating a profile.");
     if (this.#clientFactory) return this.#clientFactory(provider, cli);
-    if (provider === "grok") return new GrokAgentClient(cli, this.#requestTimeoutMs, true);
-    return requireProviderDriver(provider).createClient(cli, this.#requestTimeoutMs);
+    const driver = requireProviderDriver(provider);
+    if (driver.createProfileClient) return driver.createProfileClient(cli, this.#requestTimeoutMs);
+    return driver.createClient(cli, this.#requestTimeoutMs);
   }
 
   preferredProvider(): AgentProvider {
@@ -393,8 +394,10 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   /**
-   * Signs the user in to one provider. `openExternal` is only reached by Codex, whose login
-   * hands back a URL; the other two open their own browser window from the CLI they spawn.
+   * Signs the user in to one provider, in the way that provider's driver declares. `openExternal`
+   * is only reached by a `browser` sign-in, whose login hands back a URL; a `cli-command` sign-in
+   * opens its own browser window from the CLI OpenBot spawns, and an `external` sign-in happens
+   * outside OpenBot, so Connect only asks the provider again.
    */
   async connectProvider(provider: AgentProvider, openExternal: (url: string) => Promise<void>): Promise<AgentStatus> {
     const start = this.#providerStarts.get(provider);
@@ -403,14 +406,20 @@ export class ProviderRuntime implements ProviderPort {
     if (this.#providerRefresh || (!start && ["starting", "restarting"].includes(this.#status.phase))) {
       return Promise.resolve(this.status());
     }
-    const cliLogin = requireProviderDriver(provider).cliLogin;
+    const signIn = requireProviderDriver(provider).signIn;
     return this.#runProviderConnectionCommand(provider, async () => {
-      if (!cliLogin) {
-        await this.#cancelCodexLogin(null);
-        return this.#startCodexLogin(openExternal);
+      switch (signIn.kind) {
+        case "browser":
+          await this.#cancelCodexLogin(null);
+          return this.#startCodexLogin(openExternal);
+        case "cli-command":
+          await this.#cancelCliLogin(provider, null);
+          return this.#startCliLogin(provider, signIn.command);
+        case "external":
+          // Nothing to spawn: the user signs in with the provider's own CLI in a terminal, and
+          // Connect only asks the provider again whether that has happened.
+          return this.#reprobeProvider(provider);
       }
-      await this.#cancelCliLogin(provider, null);
-      return this.#startCliLogin(provider, cliLogin);
     });
   }
 
@@ -425,19 +434,19 @@ export class ProviderRuntime implements ProviderPort {
         throw new Error(`The ${providerLabel(provider)} CLI is working on a turn. Wait for it to finish, then update.`);
       }
       const previousVersion = this.#cli.get(provider)?.version ?? null;
-      const previousExecutable = this.#bundledExecutables.get(provider);
+      const previousExecutable = this.#bundledExecutables[provider];
       this.#setProviderConnectionState(provider, "connecting");
       this.#replacingCli.add(provider);
       try {
         const executable = await install();
-        this.#bundledExecutables.set(provider, executable);
+        this.#bundledExecutables[provider] = executable;
         const cli = await this.#resolveProviderCli(provider);
         if (cli.source !== "managed" || cli.executable !== executable) {
           throw new Error("OpenBot could not select the installed managed CLI.");
         }
         await this.#reloadProviderCli(provider, cli);
       } catch (error) {
-        this.#bundledExecutables.set(provider, previousExecutable);
+        this.#bundledExecutables[provider] = previousExecutable;
         const failure = new Error(
           `OpenBot could not update the ${providerLabel(provider)} CLI. ${error instanceof Error ? redactText(error.message) : "Try again."}`,
           { cause: error },
@@ -549,9 +558,15 @@ export class ProviderRuntime implements ProviderPort {
     await Promise.all(
       BUILT_IN_PROVIDER_DRIVERS.map((driver) =>
         this.#runProviderConnectionCommand(driver.id, async () => {
-          if (!driver.cliLogin) return this.#settleCodexLoginForRefresh();
-          await this.#cancelCliLogin(driver.id, null);
-          return this.status();
+          switch (driver.signIn.kind) {
+            case "browser":
+              return this.#settleCodexLoginForRefresh();
+            case "cli-command":
+            case "external":
+              // `external` has nothing to cancel, and the call is a no-op without a pending login.
+              await this.#cancelCliLogin(driver.id, null);
+              return this.status();
+          }
         }),
       ),
     );
@@ -825,6 +840,35 @@ export class ProviderRuntime implements ProviderPort {
     });
   }
 
+  /**
+   * Connects a provider that OpenBot never spawns a login for. The user signed in with the
+   * provider's own CLI in a terminal, so this only starts a fresh client and asks the provider
+   * which account it now has. A provider with a free tier answers with an account either way.
+   */
+  async #reprobeProvider(provider: AgentProvider): Promise<AgentStatus> {
+    if (this.#hooks.isProviderBusy(provider)) {
+      throw new Error(
+        `The ${providerLabel(provider)} CLI is working on a turn. Wait for it to finish, then reconnect.`,
+      );
+    }
+    let cli: AgentCliInfo | null = null;
+    this.#setProviderConnectionState(provider, "connecting");
+    this.#replacingCli.add(provider);
+    try {
+      cli = await this.#resolveProviderCli(provider);
+      const candidate = await this.#createAuthenticatedProviderClient(provider, cli);
+      await this.#activateProviderClient(provider, candidate.client, cli, candidate.account, { notifyReady: false });
+      this.#clearProviderConnectionState(provider);
+      return this.status();
+    } catch (error) {
+      this.#setProviderConnectionFailure(provider, error, cli?.version);
+      throw error;
+    } finally {
+      this.#replacingCli.delete(provider);
+      this.#hooks.onProviderResumed(provider);
+    }
+  }
+
   async #startCliLogin(provider: AgentProvider, command: ProviderCliCommand): Promise<AgentStatus> {
     let cli: AgentCliInfo | null = null;
     this.#setProviderConnectionState(provider, "connecting");
@@ -890,7 +934,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#setProviderConnectionState("codex", "connecting");
 
     try {
-      cli = await resolveCodexCli({ bundledExecutable: this.#bundledExecutables.get("codex") });
+      cli = await resolveCodexCli({ bundledExecutable: this.#bundledExecutables.codex });
       client = this.#clientFactory
         ? this.#clientFactory("codex", cli)
         : new CodexAppServerClient(cli.executable, this.#requestTimeoutMs);
@@ -1059,7 +1103,7 @@ export class ProviderRuntime implements ProviderPort {
           client.notify("initialized");
           const account = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult, 5_000);
           if (!account.account) {
-            const message = provider === "codex" ? "Connect ChatGPT to continue." : driver.signInMessage;
+            const message = agentProviderDescriptor(provider).signInMessage;
             await client.stop().catch(() => undefined);
             this.#setStatus({
               providers: updateProviderStatus(this.#status.providers, provider, {

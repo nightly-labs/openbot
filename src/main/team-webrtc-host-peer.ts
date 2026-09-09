@@ -27,6 +27,11 @@ import {
   encodeTeamProtocolV3WebRtcHttpResponse,
   isTeamProtocolV3OnlyRoute,
 } from "@openbot/contracts/team-protocol/v3-webrtc-adapter";
+import {
+  createTeamProtocolV4Event,
+  decodeTeamProtocolV4WebRtcHttpRequest,
+  encodeTeamProtocolV4WebRtcHttpResponse,
+} from "@openbot/contracts/team-protocol/v4-webrtc-adapter";
 import type * as Ws from "ws";
 import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
 import {
@@ -421,7 +426,11 @@ export class TeamWebRtcHostPeer {
       headers: {
         Authorization: `Bearer ${this.#localSessionToken}`,
         "Content-Type": uploaded?.mimeType ?? input.contentType ?? "application/json",
-        "OpenBot-Protocol-Version": isTeamProtocolV3OnlyRoute(input.method, input.path) ? "3" : "1",
+        "OpenBot-Protocol-Version": peerCapabilities.has("opencode")
+          ? "4"
+          : isTeamProtocolV3OnlyRoute(input.method, input.path)
+            ? "3"
+            : "1",
         "OpenBot-App-Version": this.#appVersion,
         "OpenBot-Capabilities": [...this.#peerCapabilities].join(","),
         ...(this.#localSessionId ? { "X-OpenBot-WebRTC-Session": this.#localSessionId } : {}),
@@ -434,14 +443,13 @@ export class TeamWebRtcHostPeer {
             : input.body === null
               ? undefined
               : JSON.stringify(
-                  (isChannelRoute(input.path) ? channelRequestForMethod : decodeTeamProtocolV3WebRtcHttpRequest)(
-                    input.method,
-                    input.path,
-                    input.body,
-                    {
-                      preserveSemanticTags,
-                    },
-                  ),
+                  (isChannelRoute(input.path)
+                    ? channelRequestForMethod
+                    : peerCapabilities.has("opencode")
+                      ? decodeTeamProtocolV4WebRtcHttpRequest
+                      : decodeTeamProtocolV3WebRtcHttpRequest)(input.method, input.path, input.body, {
+                    preserveSemanticTags,
+                  }),
                 ),
     });
     const contentType = response.headers.get("content-type") ?? "";
@@ -472,15 +480,13 @@ export class TeamWebRtcHostPeer {
     }
     return {
       status: response.status,
-      body: (isChannelRoute(input.path) ? channelResponseForMethod : encodeTeamProtocolV3WebRtcHttpResponse)(
-        input.method,
-        input.path,
-        response.status,
-        body,
-        {
-          preserveSemanticTags,
-        },
-      ),
+      body: (isChannelRoute(input.path)
+        ? channelResponseForMethod
+        : peerCapabilities.has("opencode")
+          ? encodeTeamProtocolV4WebRtcHttpResponse
+          : encodeTeamProtocolV3WebRtcHttpResponse)(input.method, input.path, response.status, body, {
+        preserveSemanticTags,
+      }),
     };
   }
 
@@ -514,9 +520,13 @@ export class TeamWebRtcHostPeer {
                 sequence: this.#nextEventSequence,
                 payload: channel,
               })
-            : createTeamProtocolV2Event(this.#nextEventSequence, event, {
-                preserveSemanticTags: supportsTeamSemanticTags(this.#peerCapabilities),
-              }),
+            : (this.#peerCapabilities.has("opencode") ? createTeamProtocolV4Event : createTeamProtocolV2Event)(
+                this.#nextEventSequence,
+                event,
+                {
+                  preserveSemanticTags: supportsTeamSemanticTags(this.#peerCapabilities),
+                },
+              ),
         );
       } catch {
         return;

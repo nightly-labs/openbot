@@ -1,3 +1,4 @@
+import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import type { AgentProviderId, AgentStatus, AppSetupState, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 import { createSignal, onCleanup } from "solid-js";
 import { expect, fn, waitFor, within } from "storybook/test";
@@ -15,6 +16,7 @@ const noProvidersConnectedAgentStatus: AgentStatus = {
   cliVersion: null,
   auth: { kind: "unknown" },
   providers: [
+    { id: "opencode", state: "not-installed", version: null, message: "Install OpenCode on this computer." },
     {
       id: "codex",
       state: "sign-in-required",
@@ -68,7 +70,7 @@ const lazyProviderAgentStatus: AgentStatus = {
   })),
 };
 
-const initialRuntimeStatuses = (): Record<AgentProviderId, ProviderRuntimeStatus> => ({
+const initialRuntimeStatuses = (): Record<ManagedProviderId, ProviderRuntimeStatus> => ({
   codex: { phase: "not-downloaded", progress: null, message: null, version: null },
   claude: { phase: "not-downloaded", progress: null, message: null, version: null },
   grok: { phase: "not-downloaded", progress: null, message: null, version: null },
@@ -142,6 +144,7 @@ function LazyProviderDownloadsFlow(props: { args: Parameters<typeof OnboardingFl
   }
 
   function updateRuntime(provider: AgentProviderId, status: Partial<ProviderRuntimeStatus>): void {
+    if (!isManagedRuntimeProvider(provider)) return;
     setRuntimeStatuses((current) => ({ ...current, [provider]: { ...current[provider], ...status } }));
   }
 
@@ -214,7 +217,7 @@ function LazyProviderDownloadsFlow(props: { args: Parameters<typeof OnboardingFl
   }
 
   onCleanup(() => {
-    for (const provider of ["codex", "claude", "grok"] as const) clearProviderTimers(provider);
+    for (const provider of providerTimers.keys()) clearProviderTimers(provider);
   });
 
   return (
@@ -226,6 +229,7 @@ function LazyProviderDownloadsFlow(props: { args: Parameters<typeof OnboardingFl
         onDownloadProvider: downloadProvider,
         onCancelProviderDownload: cancelProviderDownload,
         onConnectProvider: connectProvider,
+        onInstallProvider: fn(),
         onRefreshProviders: undefined,
       }}
     />

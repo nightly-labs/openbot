@@ -13,6 +13,7 @@ import {
   CREATE_AGENT_INPUT,
   createFakeClaude,
   createFakeGrok,
+  createFakeOpencode,
   FakeAgentClient,
   fakeBrowser,
   firstInputText,
@@ -274,11 +275,12 @@ describe.sequential("AgentService: providers", () => {
     }
   });
 
-  it.each<AgentProvider>(["codex", "claude", "grok"])(
+  it.each<AgentProvider>(["codex", "claude", "grok", "opencode"])(
     "delivers the quiet collaboration policy to %s on startup and after restart",
     async (provider) => {
       process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
       process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+      process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
       const { store, mailbox } = stores(root);
       for (const method of ["thread/start", "thread/resume"]) {
         const clients = new Map<AgentProvider, FakeAgentClient>();
@@ -293,7 +295,14 @@ describe.sequential("AgentService: providers", () => {
           await service.updateAgent({
             agentId: "chief",
             provider,
-            model: provider === "codex" ? "gpt-5.6-luna" : provider === "claude" ? "claude-sonnet-5" : "grok-4.5",
+            model:
+              provider === "codex"
+                ? "gpt-5.6-luna"
+                : provider === "claude"
+                  ? "claude-sonnet-5"
+                  : provider === "grok"
+                    ? "grok-4.5"
+                    : "opencode/example-model",
           });
         }
         await service.sendMessage({ agentId: "chief", text: "Continue coordinating the research task." });
@@ -646,6 +655,7 @@ describe.sequential("AgentService: providers", () => {
         },
         { id: "claude", state: "error", version: null },
         { id: "grok", state: "not-installed", version: null },
+        { id: "opencode", state: "not-installed", version: null },
       ],
       capabilities: { chat: "ready", browser: "ready", computerUse: "ready" },
     });
