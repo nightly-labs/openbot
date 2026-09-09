@@ -271,6 +271,7 @@
     "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
     "dmg-builder@26.15.7": "patches/dmg-builder@26.15.7.patch",
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
+    "@norbert_bodziony/bloub@0.3.0": "patches/@norbert_bodziony%2Fbloub@0.3.0.patch",
     "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch",
   },
   "catalog": {

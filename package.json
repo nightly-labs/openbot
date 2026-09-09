@@ -247,6 +247,7 @@
     "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch",
     "expo-router@57.0.17": "patches/expo-router@57.0.17.patch",
     "react-native-keyboard-controller@1.21.9": "patches/react-native-keyboard-controller@1.21.9.patch",
-    "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch"
+    "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
+    "@norbert_bodziony/bloub@0.3.0": "patches/@norbert_bodziony%2Fbloub@0.3.0.patch"
   }
 }
