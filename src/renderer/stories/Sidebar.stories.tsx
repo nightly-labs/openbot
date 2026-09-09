@@ -785,6 +785,21 @@ export const FirstAgent: Story = {
   },
 };
 
+export const EmptySections: Story = {
+  args: {
+    ...FirstAgent.args,
+    layout: {
+      ...defaultSidebarLayout(),
+      sections: [
+        { id: demoSectionId, name: "Product" },
+        { id: emptySectionId, name: "Research" },
+      ],
+      order: ["people", "unassigned", demoSectionId, emptySectionId],
+    },
+  },
+  decorators: FirstAgent.decorators,
+};
+
 export const FirstAgentNarrow: Story = {
   ...FirstAgent,
   decorators: [(Story) => <div style={{ width: "220px", height: "100vh" }}>{Story()}</div>],
