@@ -240,7 +240,7 @@ it("keeps both removals when the second starts before the first save lands", asy
  * the automatic assignment limit, so the stopped task arrives through the read.
  */
 const STOPPED_TASK_REASON = "The automatic assignment limit was reached. Continue or reassign this task.";
-async function openChannelWithStoppedTask(options: { withChild?: boolean } = {}) {
+async function openChannelWithStoppedTask(options: { withChild?: boolean; state?: "paused" | "failed" } = {}) {
   await window.openbot.agent.channelCommand({
     type: "save",
     operationId: "create",
@@ -267,7 +267,11 @@ async function openChannelWithStoppedTask(options: { withChild?: boolean } = {})
   vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => {
     const page = await originalRead(input);
     state.taskId = page.tasks[0]?.id ?? "";
-    const stopped = page.tasks.map((task) => ({ ...task, state: "paused" as const, error: STOPPED_TASK_REASON }));
+    const stopped = page.tasks.map((task) => ({
+      ...task,
+      state: options.state ?? ("paused" as const),
+      error: STOPPED_TASK_REASON,
+    }));
     // The assignment limit stops the root task and everything under it, so the child arrives
     // stopped with the same reason on it.
     const child = stopped[0] ? [{ ...stopped[0], id: `${stopped[0].id}-child`, parentTaskId: stopped[0].id }] : [];
@@ -297,6 +301,17 @@ it("shows one notice for a stopped run and continues it at the root", async () =
   const { command, state } = await openChannelWithStoppedTask({ withChild: true });
   expect(screen.getAllByRole("region", { name: /^Stopped task for / })).toHaveLength(1);
   const notice = screen.getByRole("region", { name: /^Stopped task for / });
+  await fireEvent.click(within(notice).getByRole("button", { name: "Continue" }));
+  await waitFor(() =>
+    expect(command).toHaveBeenCalledWith(expect.objectContaining({ type: "resume", taskId: state.taskId })),
+  );
+});
+
+it("continues a task that failed, which nothing but the reader starts again", async () => {
+  // A provider that cannot start, and a turn that ends in an error, both leave a failed task. Its
+  // parent waits for it, so the request never finishes until the reader continues it.
+  const { notice, command, state } = await openChannelWithStoppedTask({ state: "failed" });
+  expect(notice).toHaveTextContent(STOPPED_TASK_REASON);
   await fireEvent.click(within(notice).getByRole("button", { name: "Continue" }));
   await waitFor(() =>
     expect(command).toHaveBeenCalledWith(expect.objectContaining({ type: "resume", taskId: state.taskId })),

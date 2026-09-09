@@ -904,6 +904,51 @@ describe("shared channel coordination", () => {
     expect(data.mailbox.nextQueued("agent-b")).toBeNull();
   });
 
+  it("starts the rest of a stopped run when one of its tasks is reassigned", async () => {
+    const parent = await send("Prepare the report");
+    const first = required(service.store.assignments("channel-1")[0]);
+    const deliveryId = required(first.deliveryId);
+    const execution = required(await service.prepare(required(data.mailbox.getDelivery(deliveryId))));
+    await data.mailbox.markStarting(deliveryId);
+    await data.mailbox.markRunning(deliveryId, "parent-stop-turn");
+    service.accepted(deliveryId, "session-stop", "parent-stop-turn");
+    await service.tool("channel-1", "agent-a", "parent-stop-turn", "child-1", "channel_assign", {
+      recipientAgentId: "agent-b",
+      task: "Research",
+      expectedResult: "Findings",
+      sourceMessageIds: [parent.requestMessageId],
+    });
+    await service.command(
+      { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: parent.id, recipientAgentId: null },
+      actor,
+    );
+    expect(service.store.tasks("channel-1").every((item) => item.state === "paused")).toBe(true);
+    await data.mailbox.markTerminal(deliveryId, "interrupted");
+    service.event({
+      type: "turn-completed",
+      agentId: "agent-a",
+      threadId: execution.threadId,
+      turnId: "parent-stop-turn",
+      status: "interrupted",
+    });
+    await service.command(
+      {
+        type: "reassign",
+        channelId: "channel-1",
+        operationId: operationId(),
+        taskId: parent.id,
+        recipientAgentId: "agent-b",
+      },
+      actor,
+    );
+    // The parent waits for the task it delegated, so the run moves only when the child starts again.
+    const child = required(service.store.tasks("channel-1").find((item) => item.parentTaskId === parent.id));
+    await vi.waitFor(() =>
+      expect(service.store.assignments("channel-1").some((item) => item.taskId === child.id)).toBe(true),
+    );
+    expect(service.store.tasks("channel-1").find((item) => item.id === parent.id)?.ownerAgentId).toBe("agent-b");
+  });
+
   it("lists an archived channel among the sidebar ids so its place in the layout survives", async () => {
     await service.command({ type: "archive", channelId: "channel-1", operationId: operationId() }, actor);
     expect(service.store.ids()).toContain("channel-1");

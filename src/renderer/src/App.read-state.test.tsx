@@ -1885,6 +1885,56 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.agent.markConversationRead).not.toHaveBeenCalled();
   });
 
+  it("keeps a private message unread while an open channel covers the conversation", async () => {
+    function DirectUnreadProbe() {
+      const direct = useDirectMessages();
+      return (
+        <output aria-label="Alice unread">
+          {direct.directConversations()["member-alice"]?.readState?.unreadCount ?? 0}
+        </output>
+      );
+    }
+    render(() => (
+      <AppProviders peopleEnabled>
+        <AppAccessGate />
+        <ChannelProbe />
+        <DirectUnreadProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+    emitPresence?.({
+      serverId: "server-1",
+      updatedAt: "2026-08-19T10:00:00.000Z",
+      members: [
+        presenceMember("member-self", "person@example.com", "Person"),
+        presenceMember("member-alice", "alice@example.com", "Alice"),
+      ],
+    });
+    await fireEvent.click(await screen.findByRole("button", { name: /Alice/ }));
+    await waitFor(() => expect(window.openbot.servers.readDirectConversationPage).toHaveBeenCalled());
+    vi.mocked(window.openbot.servers.markDirectRead).mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open channel" }));
+    await screen.findByRole("heading", { level: 1, name: "Project" });
+    emitDirectMessage?.({
+      type: "team-direct-message",
+      memberIds: ["member-alice", "member-self"],
+      message: {
+        id: "direct-under-channel",
+        threadId: "thread-member-alice",
+        senderMemberId: "member-alice",
+        recipientMemberId: "member-self",
+        text: "Private result while the channel was open",
+        createdAt: "2026-08-19T10:01:00.000Z",
+        sequence: 1,
+      },
+    });
+
+    // The channel covers the private conversation, so the message is still waiting for the reader.
+    await waitFor(() => expect(screen.getByLabelText("Alice unread")).toHaveTextContent("1"));
+    expect(window.openbot.servers.markDirectRead).not.toHaveBeenCalled();
+  });
+
   it("uncovers the conversation a global search result opens", async () => {
     const result = {
       id: "sales-search-hit",

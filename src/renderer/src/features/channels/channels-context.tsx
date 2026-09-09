@@ -9,6 +9,7 @@ import { createEffect, createStore, flush, onSettled, reconcile, untrack } from 
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
+import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useServers } from "../servers/servers-context";
 import { mergeChannelPage } from "./channel-page-merge";
 import { readChannelSelection, writeChannelSelection } from "./channel-selection";
@@ -30,6 +31,7 @@ const Channels = createSimpleContext({
   init: () => {
     const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
     const { setAgentSetupOpen } = useAgents();
+    const { clearDirectSelection, setDirectTyping } = useDirectMessages();
     const { centralAuth } = useAuth();
     const selectionServerId = untrack(activeServerId);
     const accountKey = () => {
@@ -122,6 +124,11 @@ const Channels = createSimpleContext({
     }
     async function open(channelId: string) {
       setAgentSetupOpen(false);
+      // The channel covers the workspace, and a direct conversation left selected under it is read
+      // automatically as its messages arrive. Selecting an agent closes the channel in the shared
+      // navigation; this is the same exchange the other way round.
+      setDirectTyping(false);
+      clearDirectSelection();
       persistChannelSelection(channelId);
       flush(() =>
         setState((state) => {
@@ -165,7 +172,11 @@ const Channels = createSimpleContext({
         await window.openbot.agent.channelCommand(attempt);
         if (disposed || account !== accountKey()) return false;
         failedCommand = null;
-        if (input.type === "save") setAgentSetupOpen(false);
+        if (input.type === "save") {
+          setAgentSetupOpen(false);
+          setDirectTyping(false);
+          clearDirectSelection();
+        }
         // Only creation closes the editor. Settings save on every field, so closing on a save
         // would shut the panel under the user between two edits.
         if (input.type === "save") {

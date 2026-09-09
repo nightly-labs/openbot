@@ -323,7 +323,15 @@ export class ChannelService {
       if (!command.recipientAgentId) throw new Error("Select an agent.");
       this.requireMember(channel, command.recipientAgentId);
     }
-    const affected = command.type === "reassign" ? [selected] : descendants(tasks, selected.id);
+    // `stop` and `resume` hold the whole run below the selected task. `reassign` gives one task
+    // another owner, but it must start the rest of the stopped run with it: a parent waits for each
+    // task it delegated, so a root that started alone would wait for a stopped child for ever. A
+    // task that still runs keeps its turn; only a stopped one starts again.
+    const branch = descendants(tasks, selected.id);
+    const affected =
+      command.type === "reassign"
+        ? branch.filter((task) => task.id === selected.id || task.state === "paused" || task.state === "failed")
+        : branch;
     const updated = affected.map(
       (task): ChannelTask => ({
         ...task,
@@ -331,7 +339,8 @@ export class ChannelService {
         error: null,
         revision: task.revision + 1,
         assignmentCount: command.type !== "stop" ? 0 : task.assignmentCount,
-        ownerAgentId: command.type === "reassign" ? command.recipientAgentId : task.ownerAgentId,
+        ownerAgentId:
+          command.type === "reassign" && task.id === selected.id ? command.recipientAgentId : task.ownerAgentId,
       }),
     );
     const result = this.store.update(channel, { tasks: updated }, operationId);
