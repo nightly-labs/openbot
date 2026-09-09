@@ -22,7 +22,7 @@ export function ProviderLogo(props: ProviderLogoProps) {
       class={props.class}
       viewBox={
         props.provider === "opencode"
-          ? "0 0 24 24"
+          ? "0 0 240 300"
           : isGrok()
             ? "0 0 24 24"
             : isClaude()
@@ -33,8 +33,11 @@ export function ProviderLogo(props: ProviderLogoProps) {
       data-provider={props.provider}
     >
       {props.provider === "opencode" ? (
-        // A terminal mark identifies the installed OpenCode CLI within the shared provider icon set.
-        <path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 3 4 4-4 4-1.4-1.4 2.6-2.6-2.6-2.6L7 8zm5 6h5v2h-5v-2z" />
+        // Official mark: https://github.com/anomalyco/opencode/blob/dev/packages/console/app/src/asset/brand/opencode-logo-dark.svg
+        <>
+          <path d="M180 240H60V120H180V240Z" opacity="0.3" />
+          <path d="M180 60H60V240H180V60ZM240 300H0V0H240V300Z" />
+        </>
       ) : isGrok() ? (
         <>
           <path d="M9.26905 15.284 17.2479 9.36086c.3912-.29039.9502-.17712 1.1366.27392.981 2.37872.5427 5.23732-1.409 7.20012-1.9517 1.9627-4.6673 2.3931-7.1494 1.4128L7.1146 19.5102c3.8891 2.6732 8.6117 2.0121 11.5628-.9577 2.3408-2.354 3.0658-5.5628 2.3879-8.4564l.0061.0062c-.983-4.25087.2417-5.94997 2.7504-9.424387L24 .428711l-3.3013 3.319949v-.0103L9.267 15.2861" />
