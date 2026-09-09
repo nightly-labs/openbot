@@ -102,6 +102,40 @@ function nativeDragEvent(
   return event;
 }
 
+describe("Sidebar timestamps", () => {
+  it.each([
+    { label: "today", date: new Date(2026, 8, 9, 0, 1), options: { hour: "2-digit", minute: "2-digit" } },
+    {
+      label: "yesterday before midnight",
+      date: new Date(2026, 8, 8, 23, 59),
+      options: { month: "short", day: "numeric" },
+    },
+    { label: "last month", date: new Date(2026, 7, 12, 14, 42), options: { month: "short", day: "numeric" } },
+  ] satisfies { label: string; date: Date; options: Intl.DateTimeFormatOptions }[])(
+    "shows the local timestamp for $label",
+    async ({ date, options }) => {
+      vi.setSystemTime(new Date(2026, 8, 9, 0, 5));
+      try {
+        const props = sidebarProps();
+        const agent = { ...STORY_AGENTS[0], updatedAt: date.toISOString(), time: "stale label" };
+        render(() => <Sidebar {...props} agents={[agent]} />);
+        const row = await screen.findByRole("button", { name: new RegExp(`^${agent.name}`) });
+        expect(within(row).getByText(new Intl.DateTimeFormat(undefined, options).format(date))).toBeVisible();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it.each([undefined, null, ""])("keeps the current label when updatedAt is %s", async (updatedAt) => {
+    const props = sidebarProps();
+    const agent = { ...STORY_AGENTS[0], updatedAt, time: "now" };
+    render(() => <Sidebar {...props} agents={[agent]} />);
+    const row = await screen.findByRole("button", { name: new RegExp(`^${agent.name}`) });
+    expect(within(row).getByText("now")).toBeVisible();
+  });
+});
+
 describe("Sidebar pinned chats", () => {
   it("shows agent pins, ignores legacy person pins, and filters with search", async () => {
     const props = sidebarProps([
