@@ -121,15 +121,28 @@ export function ChannelEditor(props: ChannelEditorProps) {
    * of them, so the second save would put the first member back.
    */
   let saving: Promise<unknown> = Promise.resolve();
+  /** The draft the save before this one sent, for the channel it was sent to. */
+  let sent: { channelId: string; draft: ChannelDraft } | null = null;
   function commit(patch?: (draft: ChannelDraft) => void): Promise<boolean> {
+    const target = channel();
+    if (!target) return Promise.resolve(false);
+    // The edit belongs to the channel that is open now, and the panel is open in the workspace the
+    // sidebar shares: the reader can leave for another channel while this save waits for the one
+    // before it. A queued save therefore keeps the channel and the fields it was made in, or it
+    // would send this channel's members and text to the one the reader went to.
+    const targetId = target.id;
+    const captured = draftFrom(target);
     const next = saving
       .catch(() => undefined)
       .then(() => {
         const current = channel();
-        if (!current) return false;
-        const draft = draftFrom(current);
+        // The live page first, because the save before this one landed in it: two removals in a
+        // row build on each other. It is the same channel or nothing.
+        const draft =
+          current?.id === targetId ? draftFrom(current) : sent?.channelId === targetId ? { ...sent.draft } : captured;
         patch?.(draft);
-        return channels.command({ type: "save", operationId: crypto.randomUUID(), channelId: current.id, draft });
+        sent = { channelId: targetId, draft };
+        return channels.command({ type: "save", operationId: crypto.randomUUID(), channelId: targetId, draft });
       });
     saving = next;
     return next;

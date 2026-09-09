@@ -283,6 +283,54 @@ it("keeps both removals when the second starts before the first save lands", asy
   expect(within(chat).queryByRole("button", { name: "Remove Chief" })).toBeNull();
 });
 
+it("keeps a queued settings save on the channel it was made in", async () => {
+  for (const [channelId, name] of [
+    ["channel-test", "Project room"],
+    ["channel-other", "Release room"],
+  ]) {
+    await window.openbot.agent.channelCommand({
+      type: "save",
+      operationId: `create-${channelId}`,
+      channelId,
+      draft: {
+        name,
+        title: "",
+        instructions: "",
+        members: [{ agentId: "chief" }, { agentId: "sales-outbound" }],
+        leadAgentId: "chief",
+      },
+    });
+  }
+  render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+  await fireEvent.click(await screen.findByRole("button", { name: /Project room/ }));
+  const chat = await screen.findByRole("main", { name: "Channel conversation" });
+  await within(chat).findByRole("heading", { name: "Project room", level: 1 });
+  await openChannelMenuItem("Edit channel");
+  await within(chat).findByRole("button", { name: "Remove Chief" });
+
+  // Both removals wait on one gate, and the reader opens the other channel while they wait.
+  const original = window.openbot.agent.channelCommand;
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const save = vi.spyOn(window.openbot.agent, "channelCommand").mockImplementation(async (input) => {
+    if (input.type === "save") await gate;
+    return original(input);
+  });
+  void fireEvent.click(within(chat).getByRole("button", { name: "Remove Chief" }));
+  void fireEvent.click(within(chat).getByRole("button", { name: "Remove Sales Outbound" }));
+  await fireEvent.click(screen.getByRole("button", { name: /Release room/ }));
+  release();
+
+  // Both saves belong to the channel they were made in, and the second builds on the first.
+  await waitFor(() => expect(save.mock.calls.filter(([input]) => input.type === "save")).toHaveLength(2));
+  const saves = save.mock.calls.map(([input]) => input).filter((input) => input.type === "save");
+  expect(saves.map((input) => input.channelId)).toEqual(["channel-test", "channel-test"]);
+  expect(saves.at(-1)).toMatchObject({ draft: { name: "Project room", members: [] } });
+});
+
 /**
  * A channel with one task that the service stopped and wrote a reason on. The stub does not run
  * the automatic assignment limit, so the stopped task arrives through the read.

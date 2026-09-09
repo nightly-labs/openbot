@@ -5,7 +5,7 @@ import { serializeAttachmentReference } from "@openbot/contracts/attachment-refe
 import type { ChannelDraft, ChannelMessage } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stores } from "./agent-service-test-harness";
-import { ChannelHistory } from "./channel-history";
+import { ChannelHistory, type ChannelTextModel } from "./channel-history";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import { ChannelService, resourcesConflict } from "./channel-service";
 
@@ -583,6 +583,56 @@ describe("shared channel coordination", () => {
     expect(late.text).toContain("Apply the shared decision");
     expect(service.store.messages("channel-1")).toHaveLength(151);
     expect(late.text.length).toBeLessThanOrEqual(120_000);
+  });
+
+  it("summarizes a message larger than one summary input instead of blocking the channel", async () => {
+    const task = await send("Apply the shared decision");
+    // The command contract accepts 100000 characters, and half the context budget is the largest
+    // input the summary takes, so one stored message can be larger than any single input.
+    const messages: ChannelMessage[] = [
+      {
+        id: "history-huge",
+        channelId: "channel-1",
+        sequence: 0,
+        author: { kind: "member", ...actor },
+        taskId: task.id,
+        superseded: false,
+        message: {
+          id: "history-huge",
+          author: "user",
+          text: `DECISION_A ${"detail ".repeat(12_000)}`,
+          status: "completed",
+          createdAt: "2026-09-07T12:00:00.000Z",
+        },
+      },
+      {
+        id: "history-short",
+        channelId: "channel-1",
+        sequence: 0,
+        author: { kind: "member", ...actor },
+        taskId: task.id,
+        superseded: false,
+        message: {
+          id: "history-short",
+          author: "user",
+          text: "context",
+          status: "completed",
+          createdAt: "2026-09-07T12:00:01.000Z",
+        },
+      },
+    ];
+    service.store.update(service.store.get("channel-1"), { messages });
+    const model = vi.fn<ChannelTextModel>(async () => "DECISION_A applies. Source: history-huge.");
+    const history = new ChannelHistory(service.store, model, service.memories);
+    const agents = data.store.list();
+    const prepared = await history.prepare(task, required(agents[0]), required(agents[0]));
+    expect(prepared.text).toContain("DECISION_A applies");
+    expect(service.store.summary("channel-1").throughSequence).toBeGreaterThan(0);
+    // Every part of the large message reaches the model, and each one fits the input it accepts.
+    expect(model.mock.calls.length).toBeGreaterThan(1);
+    for (const [, prompt] of model.mock.calls) expect(prompt.length).toBeLessThanOrEqual(120_000);
+    // The message stays in the channel, so it is still available by its source ID.
+    expect(service.store.messages("channel-1").some((message) => message.id === "history-huge")).toBe(true);
   });
 
   it("transfers one owner and waits for the declared task dependency", async () => {

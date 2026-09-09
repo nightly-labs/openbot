@@ -386,20 +386,23 @@ export class ChannelService {
 
   wake(channelId?: string): void {
     if (this.#stopped) return;
-    for (const channel of this.store.list("local")) {
-      if (this.#deletedChannels.has(channel.id)) continue;
-      if (channel.archived || (channelId && channelId !== channel.id)) continue;
-      if (this.#pumps.has(channel.id)) {
-        this.#wakeAgain.add(channel.id);
+    // Every completed turn of every normal chat ends here, so this loop reads ids and the archived
+    // flag alone. The sidebar summary that `list` builds parses every message of every channel.
+    const archived = this.store.archivedIds();
+    for (const id of this.store.ids()) {
+      if (this.#deletedChannels.has(id)) continue;
+      if (archived.has(id) || (channelId && channelId !== id)) continue;
+      if (this.#pumps.has(id)) {
+        this.#wakeAgain.add(id);
         continue;
       }
-      const promise = this.pump(channel.id)
+      const promise = this.pump(id)
         .catch((error) => this.hooks.error(error))
         .finally(() => {
-          this.#pumps.delete(channel.id);
-          if (this.#wakeAgain.delete(channel.id)) this.wake(channel.id);
+          this.#pumps.delete(id);
+          if (this.#wakeAgain.delete(id)) this.wake(id);
         });
-      this.#pumps.set(channel.id, promise);
+      this.#pumps.set(id, promise);
     }
   }
 
@@ -585,8 +588,8 @@ export class ChannelService {
         continue;
       }
       const allAssignments = this.store
-        .list("local")
-        .flatMap((item) => this.store.assignments(item.id))
+        .ids()
+        .flatMap((id) => this.store.assignments(id))
         .filter(activeAssignment);
       // A task keeps one owner at a time. A transfer replaces the owner and the resources of the
       // task record while the previous owner still runs its turn, so the identity of the owner
@@ -598,7 +601,7 @@ export class ChannelService {
         allAssignments.filter((assignment) => assignment.channelId === channelId).length >= CHANNEL_PARALLEL_LIMIT
       )
         continue;
-      const allTasks = this.store.list("local").flatMap((item) => this.store.tasks(item.id));
+      const allTasks = this.store.ids().flatMap((id) => this.store.tasks(id));
       if (task.dependencies.some((id) => !allTasks.some((item) => item.id === id && item.state === "completed")))
         continue;
       // Read the reservation from the assignment, not from its task: a transfer can lower the
@@ -732,12 +735,12 @@ export class ChannelService {
   }
 
   restoreDeliveryLinks(): void {
-    for (const channel of this.store.list("local"))
-      for (const assignment of this.store.assignments(channel.id)) {
+    for (const channelId of this.store.ids())
+      for (const assignment of this.store.assignments(channelId)) {
         if (assignment.deliveryId || !activeAssignment(assignment)) continue;
         const delivery = this.mailbox.deliveryForKey(`channel-assignment:${assignment.id}`);
         if (delivery)
-          this.store.update(this.store.get(channel.id), {
+          this.store.update(this.store.get(channelId), {
             assignments: [{ ...assignment, deliveryId: delivery.delivery.id }],
           });
       }
@@ -765,21 +768,22 @@ export class ChannelService {
     this.#stopped = false;
     for (const context of this.store.executionThreads())
       this.capture(this.store.database.readConversation(context.id, context.threadId));
-    for (const channel of this.store.list("local")) {
-      for (let assignment of this.store.assignments(channel.id).filter(activeAssignment)) {
+    const archived = this.store.archivedIds();
+    for (const channelId of this.store.ids()) {
+      for (let assignment of this.store.assignments(channelId).filter(activeAssignment)) {
         const context = assignment.deliveryId
           ? this.mailbox.getDelivery(assignment.deliveryId)
           : this.mailbox.deliveryForKey(`channel-assignment:${assignment.id}`);
-        const task = this.store.tasks(channel.id).find((item) => item.id === assignment.taskId);
+        const task = this.store.tasks(channelId).find((item) => item.id === assignment.taskId);
         if (context && !assignment.deliveryId) {
           assignment = { ...assignment, deliveryId: context.delivery.id };
-          this.store.update(this.store.get(channel.id), { assignments: [assignment] });
+          this.store.update(this.store.get(channelId), { assignments: [assignment] });
         }
         if (
           context?.delivery.status === "queued" &&
           task?.state === "queued" &&
           task.revision === assignment.taskRevision &&
-          !channel.archived
+          !archived.has(channelId)
         )
           continue;
         if (context?.delivery.status === "queued") await this.mailbox.cancel(assignment.agentId, context.delivery.id);
@@ -789,13 +793,13 @@ export class ChannelService {
           assignment.pendingRevision === null
         ) {
           assignment = { ...assignment, turnId: context.delivery.turnId };
-          this.store.update(this.store.get(channel.id), {
+          this.store.update(this.store.get(channelId), {
             assignments: [assignment],
             tasks: task?.revision === assignment.taskRevision ? [{ ...task, state: "running" }] : [],
           });
-          this.complete(channel.id, context.delivery.turnId, "completed");
+          this.complete(channelId, context.delivery.turnId, "completed");
         } else {
-          this.store.update(this.store.get(channel.id), {
+          this.store.update(this.store.get(channelId), {
             assignments: [{ ...assignment, state: "interrupted" }],
             tasks:
               task && (task.revision === assignment.taskRevision || task.revision === assignment.pendingRevision)
@@ -810,7 +814,7 @@ export class ChannelService {
           });
         }
       }
-      this.publish(channel.id);
+      this.publish(channelId);
     }
     this.wake();
   }

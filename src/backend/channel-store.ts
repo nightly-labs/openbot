@@ -75,8 +75,8 @@ export class ChannelStore {
 
   /**
    * Only the ids, in one query. Placing channels in the sidebar layout needs the set of ids that
-   * exist - archived ones included, so an archived channel keeps its section - and `list` would
-   * read every message of every channel to answer that.
+   * exist - archived ones included, so an archived channel keeps its section - and the scheduler
+   * works by id as well. `list` would read every message of every channel to answer either.
    */
   ids(): string[] {
     return databaseRows(this.database.connection.prepare("SELECT channel_id FROM projection_channels").all()).map(
