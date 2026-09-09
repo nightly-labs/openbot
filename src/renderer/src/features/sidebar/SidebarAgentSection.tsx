@@ -16,7 +16,6 @@ export function SidebarAgentSection(sectionProps: { sectionId: string }) {
     dragOffset,
     filteredAgentsBySection,
     normalizedQuery,
-    layoutMutable,
     sectionDragClasses,
     sectionIsCollapsed,
   } = useSidebarScope();
@@ -40,15 +39,6 @@ export function SidebarAgentSection(sectionProps: { sectionId: string }) {
           inert={sectionIsCollapsed(sectionId()) ? true : undefined}
         >
           <div id={`sidebar-section-body-${sectionId()}`} class="sidebar-section-body">
-            <Show when={agents().length === 0}>
-              <p class="empty-search">
-                No agents in this section.
-                <Show when={layoutMutable()}>
-                  <br />
-                  Drag an agent here to move it.
-                </Show>
-              </p>
-            </Show>
             <For each={agents()}>{(agent) => <SidebarAgentRow agent={agent} />}</For>
           </div>
         </div>

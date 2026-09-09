@@ -377,8 +377,7 @@ describe("Sidebar sections", () => {
     await fireEvent.input(input, { target: { value: "Product" } });
     await fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(screen.queryByRole("textbox", { name: "New section name" })).not.toBeInTheDocument());
-    expect(screen.getByRole("region", { name: "Product" })).toHaveTextContent("No agents in this section.");
-    expect(screen.getByRole("region", { name: "Product" })).toHaveTextContent("Drag an agent here to move it.");
+    expect(screen.getByRole("region", { name: "Product" })).toBeInTheDocument();
 
     setAgents([]);
     await fireEvent.click(await screen.findByRole("button", { name: "Create your first agent" }));
