@@ -3,6 +3,7 @@ import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/cur
 import { createMemo, createSignal, flush, onSettled } from "solid-js";
 import { FALLBACK_HOST_STATUS } from "../../app-defaults";
 import { toast } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 import { createSimpleContext } from "../../simple-context";
 import { serverSupportsCapability } from "./server-capabilities";
 
@@ -165,7 +166,10 @@ const Servers = createSimpleContext({
       } catch (error) {
         pendingCompatibilityRetryServerId = null;
         toast.error("The connection failed", {
-          description: error instanceof Error ? error.message : String(error),
+          description: errorMessage(
+            error,
+            "Could not connect to this server. Check that the host is online and try again.",
+          ),
         });
       }
     }

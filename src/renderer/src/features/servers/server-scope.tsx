@@ -1,4 +1,5 @@
 import { createEffect, createSignal, flush, getOwner, isDisposed, onSettled } from "solid-js";
+import { errorMessage } from "../../error-message";
 import { useNavigation } from "../../navigation";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
@@ -104,7 +105,10 @@ const ServerScope = createSimpleContext({
           })
           .catch((error) => {
             if (!isCurrent()) return;
-            setAgentStatus((current) => ({ ...current, message: String(error) }));
+            setAgentStatus((current) => ({
+              ...current,
+              message: errorMessage(error, "Could not load agents. Check the server connection and try again."),
+            }));
           }),
         loadSidebarLayout(server)
           .then((value) => {

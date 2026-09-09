@@ -11,6 +11,7 @@ import type {
   DynamicIslandTakeoverItem,
   QueueSnapshot,
 } from "@openbot/contracts/ipc";
+import { errorMessage } from "../../error-message";
 
 type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
 type BrowserTakeoverEvent = Extract<AgentEvent, { type: "browser-takeover-requested" }>;
@@ -244,7 +245,10 @@ function collectAttention(
 }
 
 function failureDetail(error: string | null | undefined): string {
-  return truncate(error?.trim() || "The task stopped before it could finish.", 600);
+  return truncate(
+    errorMessage(error, "The task stopped before it could finish. Open the conversation to try again."),
+    600,
+  );
 }
 
 function truncate(value: string, length: number): string {

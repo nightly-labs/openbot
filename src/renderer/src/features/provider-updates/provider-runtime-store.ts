@@ -2,6 +2,7 @@ import type { AgentProviderId, ProviderRuntimeSnapshot, ProviderRuntimesDesktopA
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_PROVIDER_RUNTIMES } from "../../app-defaults";
+import { errorMessage } from "../../error-message";
 import { type ProviderUpdate, providerUpdatesToAnnounce } from "./provider-update";
 import {
   dismissProviderUpdateToast,
@@ -103,7 +104,7 @@ export function createProviderRuntimeStore(
       await run(provider);
     } catch (error) {
       if (disposed) return;
-      const message = error instanceof Error ? error.message : "The update could not start. Try again.";
+      const message = errorMessage(error, "The update could not start. Try again.");
       reportProviderUpdateToast(
         { ...update, runtime: { ...update.runtime, phase: "download-error", message } },
         () => void startProviderUpdate(provider),

@@ -1,4 +1,5 @@
 import type { DraftAttachment, QueueDelivery } from "@openbot/contracts/ipc";
+import { errorMessage } from "../../../error-message";
 import { expandComposerMentions } from "../ComposerEditor";
 import { copyComposerDraft, EMPTY_DRAFT } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
@@ -204,7 +205,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         target ?? (agentId ? { agentId, serverId } : undefined),
       );
     } catch (error) {
-      deps.setComposerError(error instanceof Error ? error.message : String(error));
+      deps.setComposerError(errorMessage(error, "Could not update the queued message. Try again."));
     } finally {
       deps.setSubmitting(false);
     }
