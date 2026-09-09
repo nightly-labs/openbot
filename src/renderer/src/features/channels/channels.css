@@ -406,8 +406,12 @@
 .channel-create-form .channel-member-copy strong {
   font-weight: var(--openbot-weight-regular);
 }
-/* The avatar sets the floor for a one-line row, so it is the smaller identifying size here. */
+/* The avatar sets the floor for a one-line row, so it is the smaller identifying size here.
+   The drawn bloub overflows its own box and lands 14% of the avatar below the center of the row,
+   so the shape reads low beside the name. The lift is the one the other 24px avatar uses. */
 .channel-create-form .channel-picker-entry .agent-avatar {
+  --agent-avatar-optical-offset: -3.25px;
+
   width: var(--openbot-space-6);
   height: var(--openbot-space-6);
 }
