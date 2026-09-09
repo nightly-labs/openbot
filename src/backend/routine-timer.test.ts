@@ -109,3 +109,34 @@ it("does not wake a stopped service and stops waking after dispose", async () =>
   await vi.advanceTimersByTimeAsync(60_000);
   expect(pending.asked).toBe(0);
 });
+
+it("asks each owner once for a wake a fire arms again", async () => {
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  // Firing a routine writes, and every write arms the timer. The owner behind this one is still
+  // due at that moment, so a second pass would fire it while this pass still holds it in the list
+  // it read - and the repeated command answers with the receipt of the first one.
+  const slow = source("2026-08-25T10:01:00.000Z", async () => {
+    timer.arm();
+    await gate;
+  });
+  const behind = source("2026-08-25T10:01:00.000Z");
+  const timer = new RoutineTimer(
+    () => [slow.record, behind.record],
+    () => true,
+    () => undefined,
+  );
+  timer.arm();
+
+  await vi.advanceTimersByTimeAsync(60_000);
+  // The pass is in flight, and it armed the timer from inside its own fire. No wake of that timer
+  // may start a second pass while this one still holds the owners it read.
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(slow.asked).toBe(1);
+  release();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(behind.asked).toBe(1);
+  timer.dispose();
+});

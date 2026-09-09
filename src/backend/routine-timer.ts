@@ -17,6 +17,7 @@ const MAX_DELAY = 2_147_000_000;
 
 export class RoutineTimer {
   #timer: NodeJS.Timeout | null = null;
+  #firing = false;
 
   constructor(
     private readonly sources: () => Iterable<RoutineDueSource>,
@@ -25,6 +26,11 @@ export class RoutineTimer {
   ) {}
 
   arm(): void {
+    // A pass owns the wake until it ends. A fire writes, a write arms the timer, and a routine
+    // that the pass has not reached yet is still due: a second pass would fire it while the first
+    // one holds the list that still names it. Every pass ends in `arm()`, which reads the sources
+    // again, so a change that arrives during a pass is answered, not lost.
+    if (this.#firing) return;
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
     if (!this.isRunning()) return;
@@ -53,13 +59,18 @@ export class RoutineTimer {
    */
   async #fire(): Promise<void> {
     const now = new Date();
-    for (const source of this.sources()) {
-      try {
-        await source.processDue(now);
-      } catch (error) {
-        this.onError("routine_scheduler_failed", error);
+    this.#firing = true;
+    try {
+      for (const source of this.sources()) {
+        try {
+          await source.processDue(now);
+        } catch (error) {
+          this.onError("routine_scheduler_failed", error);
+        }
       }
+    } finally {
+      this.#firing = false;
+      this.arm();
     }
-    this.arm();
   }
 }
