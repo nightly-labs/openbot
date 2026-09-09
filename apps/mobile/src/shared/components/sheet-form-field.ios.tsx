@@ -29,7 +29,7 @@ export function SheetFormField({
   returnKeyType,
   value,
 }: SheetFormFieldProps) {
-  const [foreground, muted, surface, border] = useThemeColor(["foreground", "muted", "surface", "border"]);
+  const [foreground, muted, border] = useThemeColor(["foreground", "muted", "border"]);
   const nativeValue = useNativeState(value);
   useEffect(() => {
     nativeValue.set(value);
@@ -39,14 +39,14 @@ export function SheetFormField({
   return (
     <View className="gap-2">
       {!hideLabel && (
-        <Typography type="body-sm" weight="semibold">
+        <Typography type="body-xs" className="px-4 text-grouped-secondary">
           {label}
           {isRequired ? " *" : ""}
         </Typography>
       )}
       <View
+        className="bg-grouped"
         style={{
-          backgroundColor: surface,
           borderColor: border,
           borderCurve: "continuous",
           borderRadius: 16,

@@ -1,8 +1,8 @@
 import { GlassView } from "expo-glass-effect";
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import { Typography } from "heroui-native";
 import { ArrowLeft } from "lucide-react-native";
-import { View, type ViewStyle } from "react-native";
+import { Pressable, View, type ViewStyle } from "react-native";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
@@ -53,20 +53,31 @@ export function ChatHeader({
             borderCurve: "continuous",
             borderRadius: 24,
             flexDirection: "row",
-            gap: 8,
             maxWidth: 220,
             overflow: "hidden",
-            paddingHorizontal: 12,
           }}
         >
-          <Link.AppleZoomTarget>
-            <AgentPinAvatar agentId={agent.id} location="chat" size={28}>
-              <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={28} />
-            </AgentPinAvatar>
-          </Link.AppleZoomTarget>
-          <Typography.Paragraph className="min-w-0 shrink" weight="semibold" numberOfLines={1}>
-            {agent.name}
-          </Typography.Paragraph>
+          <Pressable
+            className="min-w-0 shrink flex-row items-center gap-2 self-stretch px-3"
+            accessibilityRole="button"
+            accessibilityLabel={`Info for ${agent.name}`}
+            hitSlop={8}
+            onPress={() =>
+              router.push({
+                pathname: "/agent-info/[agentId]",
+                params: { agentId: agent.id, serverId: agent.serverId },
+              })
+            }
+          >
+            <Link.AppleZoomTarget>
+              <AgentPinAvatar agentId={agent.id} location="chat" size={28}>
+                <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={28} />
+              </AgentPinAvatar>
+            </Link.AppleZoomTarget>
+            <Typography.Paragraph className="min-w-0 shrink" weight="semibold" numberOfLines={1}>
+              {agent.name}
+            </Typography.Paragraph>
+          </Pressable>
         </GlassView>
 
         <View className="flex-1" />

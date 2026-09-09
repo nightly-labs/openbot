@@ -1,11 +1,12 @@
+import { type MenuComponentRef, MenuView } from "@expo/ui/community/menu";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { BlurView } from "expo-blur";
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Pin } from "lucide-react-native";
 import { type PropsWithChildren, useEffect, useId, useRef } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 import ReanimatedSwipeable, { type SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
 import Animated, {
   Easing,
@@ -18,6 +19,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
+import { useUniwind } from "uniwind";
 import { useAgentContextMenu } from "@/features/agents/components/agent-context-menu";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { type AgentAvatarLocation, useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
@@ -99,11 +101,13 @@ export function AgentListRow({
   leftInset = 20,
   rightInset = 20,
 }: AgentListRowProps) {
+  const { theme } = useUniwind();
   const [background, accent, accentForeground] = useThemeColor(["background", "accent", "accent-foreground"]);
   const { unreadAgentIds } = useMobileWorkspace();
   const { openingGesture } = useAppDrawer();
   const { startAgentNavigationAnimated, toggleAgentPinAnimated, transition } = useAgentPinTransition();
   const pendingPinRef = useRef(false);
+  const editMenu = useRef<MenuComponentRef>(null);
   const agentContextMenu = useAgentContextMenu(agent);
   const isUnread = unreadAgentIds.includes(agent.id);
   const isUnpinTarget = transition?.agentId === agent.id && transition.target === "row";
@@ -123,6 +127,7 @@ export function AgentListRow({
         accessibilityLabel={`Open chat with ${agent.name}`}
         accessibilityRole="button"
         className="w-full"
+        onLongPress={enableActions && Platform.OS === "android" ? () => editMenu.current?.show() : undefined}
       >
         {({ pressed }) => (
           <View
@@ -213,7 +218,25 @@ export function AgentListRow({
       )}
       rightThreshold={42}
     >
-      {agentLink}
+      {Platform.OS === "android" ? (
+        <MenuView
+          ref={editMenu}
+          colorScheme={theme === "dark" ? "dark" : "light"}
+          shouldOpenOnLongPress
+          actions={[{ id: "edit", title: "Info" }]}
+          onPressAction={({ nativeEvent }) => {
+            if (nativeEvent.event === "edit")
+              router.push({
+                pathname: "/agent-info/[agentId]",
+                params: { agentId: agent.id, serverId: agent.serverId },
+              });
+          }}
+        >
+          {agentLink}
+        </MenuView>
+      ) : (
+        agentLink
+      )}
     </ReanimatedSwipeable>
   );
 }

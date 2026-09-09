@@ -72,17 +72,13 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
-          name="edit-agent/[agentId]"
+          name="agent-info/[agentId]"
           options={{
             contentStyle: { backgroundColor: sheetBackground },
-            headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
-            headerTransparent: isIOS,
-            headerBlurEffect: "none",
-            scrollEdgeEffects: { top: "soft" },
+            headerShown: false,
             presentation: "formSheet",
-            sheetAllowedDetents: "fitToContents",
+            sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
-            title: "Edit agent",
           }}
         />
         <Stack.Screen name="scan-invite" options={{ title: "Scan invitation", presentation: "fullScreenModal" }} />

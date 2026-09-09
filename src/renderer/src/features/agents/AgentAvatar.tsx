@@ -154,15 +154,20 @@ function GeneratedAvatar(props: {
       <Show
         when={animated()}
         fallback={
-          <BloubBot
-            size={100}
-            shape={props.shape ?? profile().shape}
-            color={profile().color}
-            expression={profile().expression}
-            frozenAt={frozenAt}
-            ariaLabel=""
-            class="bloub-avatar-svg"
-          />
+          // A frozen Bloub frame cannot finish a shape morph. Recreate it when the profile changes.
+          <Show when={profile()} keyed>
+            {(appearance) => (
+              <BloubBot
+                size={100}
+                shape={props.shape ?? appearance.shape}
+                color={appearance.color}
+                expression={appearance.expression}
+                frozenAt={frozenAt}
+                ariaLabel=""
+                class="bloub-avatar-svg"
+              />
+            )}
+          </Show>
         }
       >
         {avatar()}
