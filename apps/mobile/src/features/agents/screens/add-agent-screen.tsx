@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AvatarHue } from "@openbot/contracts/ipc";
+import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import * as Crypto from "expo-crypto";
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
@@ -34,7 +35,7 @@ export function AddAgentScreen() {
       });
       router.back();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "OpenBot could not create this agent.");
+      setError(errorMessage(cause, "OpenBot could not create this agent."));
       setSaving(false);
     }
   }

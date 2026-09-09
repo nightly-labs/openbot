@@ -251,6 +251,12 @@ describe("desktop analytics", () => {
       }),
     ).toEqual({ action: "delete", result: "failed", failure_code: "unknown" });
     expect(
+      sanitizeDesktopAnalyticsEvent("account_sign_in_started", {
+        result: "failed",
+        failure_code: "email_delivery_rate_limited",
+      }),
+    ).toEqual({ result: "failed", failure_code: "email_delivery_rate_limited" });
+    expect(
       sanitizeDesktopAnalyticsEvent(
         "routine_action",
         Object.assign(

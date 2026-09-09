@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 import { AgentAvatar } from "../agents/AgentAvatar";
 
 interface RemoteDesktopWorkspaceProps {
@@ -98,7 +99,11 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
     const parsed = viewerMessageSchema.safeParse(event.data);
     if (!parsed.success || parsed.data.sessionId !== session.id) return;
     setViewerState(parsed.data.state);
-    setViewerError(parsed.data.state === "error" ? (parsed.data.message ?? "Remote control failed.") : null);
+    setViewerError(
+      parsed.data.state === "error"
+        ? errorMessage(parsed.data.message, "Remote control failed. Reconnect and try again.")
+        : null,
+    );
   };
   window.addEventListener("message", receiveViewerState);
   onCleanup(() => window.removeEventListener("message", receiveViewerState));
@@ -112,7 +117,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
       await props.onRetry();
     } catch (error) {
       setViewerState("error");
-      setViewerError(error instanceof Error ? error.message : "Could not start remote control.");
+      setViewerError(errorMessage(error, "Could not start remote control."));
     } finally {
       setActionBusy(null);
     }
@@ -126,7 +131,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
       await props.onDisconnect();
     } catch (error) {
       setViewerState("error");
-      setViewerError(error instanceof Error ? error.message : "Could not disconnect remote control.");
+      setViewerError(errorMessage(error, "Could not disconnect remote control."));
       setActionBusy(null);
     }
   }
@@ -140,7 +145,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
       await props.onSelectDisplay(props.server.id, displayId);
     } catch (error) {
       setViewerState("error");
-      setViewerError(error instanceof Error ? error.message : "Could not switch the shared monitor.");
+      setViewerError(errorMessage(error, "Could not switch the shared monitor."));
     } finally {
       setActionBusy(null);
     }
@@ -235,7 +240,12 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
           <Show when={effectiveState() === "error" || props.session?.errorCode}>
             <div class="remote-desktop-overlay remote-desktop-error" role="alert">
               <strong>Could not open the desktop</strong>
-              <span>{viewerError() ?? props.connectionError ?? props.session?.message}</span>
+              <span>
+                {errorMessage(
+                  viewerError() ?? props.connectionError ?? props.session?.message,
+                  "Remote control failed. Reconnect and try again.",
+                )}
+              </span>
               <Button variant="outline" type="button" loading={actionBusy() === "retry"} onClick={() => void retry()}>
                 Try again
               </Button>

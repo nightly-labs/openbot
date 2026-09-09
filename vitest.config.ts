@@ -50,6 +50,7 @@ export default defineConfig({
             "scripts/**/*.test.ts",
             "packages/contracts/**/*.test.ts",
             "packages/logging/**/*.test.ts",
+            "packages/user-errors/**/*.test.ts",
             "packages/team-client/**/*.test.ts",
             "apps/mobile/src/**/*.test.ts",
           ],

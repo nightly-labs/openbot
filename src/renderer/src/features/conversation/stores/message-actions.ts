@@ -7,6 +7,7 @@ import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references"
 import type { InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import { desktopAnalytics } from "../../../analytics";
 import type { AgentMessage } from "../../../data";
+import { errorMessage } from "../../../error-message";
 import type { ComposerDraft, ConversationProps } from "../conversation-types";
 
 export interface MessageActionsDeps {
@@ -49,7 +50,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
         result: "failed",
         failure_code: "reaction_failed",
       });
-      deps.setComposerError(error instanceof Error ? error.message : String(error));
+      deps.setComposerError(errorMessage(error, "Could not update the reaction. Try again."));
     }
   }
 
@@ -87,7 +88,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
         if (deps.copiedMessageId() === message.id) deps.setCopiedMessageId(null);
       }, 1_400);
     } catch (error) {
-      deps.setComposerError(error instanceof Error ? error.message : "Could not copy the message.");
+      deps.setComposerError(errorMessage(error, "Could not copy the message."));
     }
   }
 

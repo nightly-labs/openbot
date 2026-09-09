@@ -7,6 +7,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, flush } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { errorMessage } from "../../error-message";
 import { createSimpleContext } from "../../simple-context";
 import { useServers } from "./servers-context";
 
@@ -78,7 +79,7 @@ const ServerSettings = createSimpleContext({
             setServers((current) => current.map((item) => (item.id === serverId ? refreshed : item)));
             server = refreshed;
           } catch (error) {
-            identityError = error instanceof Error ? error.message : "The server identity could not refresh.";
+            identityError = errorMessage(error, "The server identity could not refresh.");
           }
         }
         const canManage =
@@ -110,7 +111,7 @@ const ServerSettings = createSimpleContext({
         if (identityError) setServerSettingsError(identityError);
       } catch (error) {
         if (request === serverSettingsRequest && serverSettingsTargetId() === serverId) {
-          setServerSettingsError(error instanceof Error ? error.message : "The server settings could not load.");
+          setServerSettingsError(errorMessage(error, "The server settings could not load."));
         }
       } finally {
         if (request === serverSettingsRequest) setServerSettingsLoading(false);

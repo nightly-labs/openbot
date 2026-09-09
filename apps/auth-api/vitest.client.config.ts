@@ -11,6 +11,7 @@ export default defineConfig({
       "test/analytics.test.ts",
       "test/hero-download-selector.test.tsx",
       "test/join-page.test.tsx",
+      "test/page-error.test.tsx",
       "test/landing-app-preview.test.tsx",
       "test/landing-glow.test.tsx",
       "test/landing-reveal.test.tsx",

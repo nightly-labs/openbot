@@ -99,13 +99,17 @@ describe("remote connection recovery", () => {
   it("does not expose credentials or response contents in connection diagnostics", () => {
     const sensitive = "Bearer test-private-token; secret=private-value; conversation=private-message";
     expect(remoteConnectionFailure("compatibility", new Error(sensitive))).toBe(
-      "Checking desktop compatibility: Unexpected error.",
+      "Checking desktop compatibility: Could not complete this connection step.",
     );
     expect(remoteConnectionFailure("preferences", new TypeError(sensitive))).toBe(
-      "Loading local chat preferences: TypeError.",
+      "Loading local chat preferences: Could not complete this connection step.",
     );
-    expect(remoteConnectionFailure("agents", new SyntaxError(sensitive))).toBe("Loading agents: SyntaxError.");
-    expect(remoteConnectionFailure("reads", sensitive)).toBe("Loading read status: Unexpected error.");
+    expect(remoteConnectionFailure("agents", new SyntaxError(sensitive))).toBe(
+      "Loading agents: Could not complete this connection step.",
+    );
+    expect(remoteConnectionFailure("reads", sensitive)).toBe(
+      "Loading read status: Could not complete this connection step.",
+    );
     expect(
       remoteRecoveryMessage(
         { phase: "cooldown", attempt: 5, remainingSeconds: 120 },

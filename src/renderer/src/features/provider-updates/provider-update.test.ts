@@ -46,6 +46,15 @@ describe("presentProviderUpdate", () => {
     expect(presentProviderUpdate(update({ availableVersion: "2.1.246" })).detail).toBe("v2.1.246");
   });
 
+  it("explains a provider update failure without displaying the download path", () => {
+    const failed = presentProviderUpdate(
+      update({ runtime: runtime({ phase: "download-error", message: "ENOSPC: write '/private/provider.zip'" }) }),
+    );
+    expect(failed.detail).toBe(
+      "There is not enough storage space. Free some space on the computer running OpenBot, then try again.",
+    );
+  });
+
   it("reports progress while the update runs, and the reason when it fails", () => {
     const running = presentProviderUpdate(update({ runtime: runtime({ phase: "downloading", progress: 42.4 }) }));
     expect(running.progress).toBe(42);

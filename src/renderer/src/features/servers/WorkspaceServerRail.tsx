@@ -1,5 +1,6 @@
 import { Show } from "solid-js";
 import { toast } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 import { usePlatform } from "../../platform";
 import { useUsage } from "../usage/usage-context";
 import { ServerRail } from "./ServerRail";
@@ -27,7 +28,7 @@ export function WorkspaceServerRail() {
         onSelect={(serverId) =>
           void selectServer(serverId).catch((error) => {
             toast.error("Could not select the server", {
-              description: error instanceof Error ? error.message : String(error),
+              description: errorMessage(error, "Could not switch servers. Try again."),
             });
           })
         }

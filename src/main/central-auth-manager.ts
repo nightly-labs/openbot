@@ -64,6 +64,7 @@ const EMAIL_CODE_REQUEST_TIMEOUT_MS = 35_000;
 const RESEND_FALLBACK_DELAY_MS = 60_000;
 const DEFINITIVE_EMAIL_CODE_REQUEST_FAILURES = new Set([
   "email_delivery_failed",
+  "email_delivery_rate_limited",
   "idempotency_conflict",
   "idempotency_key_completed",
   "invalid_email",

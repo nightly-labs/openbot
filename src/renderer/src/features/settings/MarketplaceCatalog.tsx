@@ -2,6 +2,7 @@ import { type MarketplaceSkillQuery, SKILL_CATEGORIES, type SkillCategory } from
 import type { JSX } from "@solidjs/web";
 import { createEffect, createStore, For, onCleanup, Show } from "solid-js";
 import { Button, ChevronDown, DropdownMenu, Input, Search, Skeleton, UserAvatar } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 
 export const CATEGORY_LABELS: Record<SkillCategory, string> = {
   coding: "Coding",
@@ -116,7 +117,7 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
     } catch (error) {
       if (version === requestVersion)
         setState((s) => {
-          s.error = error instanceof Error ? error.message : "Could not load the marketplace.";
+          s.error = errorMessage(error, "Could not load the marketplace.");
         });
     } finally {
       if (version === requestVersion)

@@ -1,4 +1,5 @@
 import type { AgentProviderId, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import { errorMessage } from "../../error-message";
 
 /**
  * A managed provider CLI, and the newer version main says exists for it.
@@ -108,7 +109,8 @@ function updateDetail(update: ProviderUpdate, updatable: boolean): string {
   const { runtime, availableVersion } = update;
   if (updatable || runtime.phase === "downloading") return versionTransition(runtime.version, availableVersion);
   if (runtime.phase === "finishing") return "Setting up";
-  if (runtime.phase === "download-error") return runtime.message ?? "The update was interrupted.";
+  if (runtime.phase === "download-error")
+    return errorMessage(runtime.message, "The update was interrupted. Try again.");
   return formatVersion(runtime.version ?? availableVersion);
 }
 

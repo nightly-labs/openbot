@@ -642,32 +642,42 @@ describe("CentralAuthManager", () => {
   });
 
   it("creates a new idempotency key after a confirmed delivery failure", async () => {
-    const root = await createRoot();
-    const keys: string[] = [];
-    const fetchMock = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-      keys.push(new Headers(init?.headers).get("Idempotency-Key") ?? "");
-      if (keys.length === 1) {
-        return Response.json(
-          { error: { code: "email_delivery_failed", message: "Delivery failed." } },
-          { status: 502 },
-        );
-      }
-      return Response.json({ challengeId: "challenge-2", expiresAt: 610_000 });
-    });
-    const manager = new CentralAuthManager({
-      apiUrl: "http://127.0.0.1:3100",
-      storagePath: join(root, "session.bin"),
-      encrypt: (value) => Buffer.from(value),
-      decrypt: (value) => value.toString(),
-      fetch: fetchMock,
-    });
+    const failures = [
+      { code: "email_delivery_failed", status: 502, retryAfterSeconds: undefined },
+      { code: "email_delivery_rate_limited", status: 429, retryAfterSeconds: 300 },
+    ];
+    for (const failure of failures) {
+      const root = await createRoot();
+      const keys: string[] = [];
+      const fetchMock = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        keys.push(new Headers(init?.headers).get("Idempotency-Key") ?? "");
+        if (keys.length === 1) {
+          return Response.json(
+            { error: { code: failure.code, message: "Delivery failed." } },
+            {
+              status: failure.status,
+              headers:
+                failure.retryAfterSeconds === undefined ? {} : { "Retry-After": String(failure.retryAfterSeconds) },
+            },
+          );
+        }
+        return Response.json({ challengeId: "challenge-2", expiresAt: 610_000 });
+      });
+      const manager = new CentralAuthManager({
+        apiUrl: "http://127.0.0.1:3100",
+        storagePath: join(root, "session.bin"),
+        encrypt: (value) => Buffer.from(value),
+        decrypt: (value) => value.toString(),
+        fetch: fetchMock,
+      });
 
-    await expect(manager.requestEmailCode("person@example.com")).resolves.toMatchObject({
-      status: "error",
-      issue: { code: "email_delivery_failed" },
-    });
-    await expect(manager.requestEmailCode("person@example.com")).resolves.toMatchObject({ status: "code_sent" });
-    expect(keys[1]).not.toBe(keys[0]);
+      const state = await manager.requestEmailCode("person@example.com");
+      expect(state).toMatchObject({ status: "error", issue: { code: failure.code } });
+      if (state.status !== "error") throw new Error("Expected a failed code request.");
+      expect(state.issue.retryAfterSeconds).toBe(failure.retryAfterSeconds);
+      await expect(manager.requestEmailCode("person@example.com")).resolves.toMatchObject({ status: "code_sent" });
+      expect(keys[1]).not.toBe(keys[0]);
+    }
   });
 
   it("accepts an HTTP-date Retry-After value", async () => {
