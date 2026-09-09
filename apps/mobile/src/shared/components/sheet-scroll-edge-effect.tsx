@@ -5,9 +5,10 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 interface SheetScrollEdgeEffectProps {
   style: StyleProp<ViewStyle>;
+  edge?: "top" | "bottom";
 }
 
-export function SheetScrollEdgeEffect({ style }: SheetScrollEdgeEffectProps) {
+export function SheetScrollEdgeEffect({ style, edge = "top" }: SheetScrollEdgeEffectProps) {
   const colorScheme = useColorScheme();
   const blurTint = colorScheme === "dark" ? "dark" : "light";
 
@@ -18,7 +19,13 @@ export function SheetScrollEdgeEffect({ style }: SheetScrollEdgeEffectProps) {
         maskElement={
           <Svg height="100%" width="100%">
             <Defs>
-              <LinearGradient id="sheet-scroll-edge-mask" x1="0" x2="0" y1="0" y2="1">
+              <LinearGradient
+                id="sheet-scroll-edge-mask"
+                x1="0"
+                x2="0"
+                y1={edge === "top" ? "0" : "1"}
+                y2={edge === "top" ? "1" : "0"}
+              >
                 <Stop offset="0" stopColor="#000000" stopOpacity="1" />
                 <Stop offset="0.24" stopColor="#000000" stopOpacity="0.96" />
                 <Stop offset="0.5" stopColor="#000000" stopOpacity="0.76" />

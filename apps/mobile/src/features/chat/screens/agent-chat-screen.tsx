@@ -24,7 +24,7 @@ export function AgentChatScreen() {
     return (
       <>
         <Stack.Screen options={{ animation: animateAvatarOnExit ? "fade" : "slide_from_right" }} />
-        <MobileChatView animateAvatarOnExit={animateAvatarOnExit} agent={agent} />
+        <MobileChatView key={agent.id} animateAvatarOnExit={animateAvatarOnExit} agent={agent} />
       </>
     );
   }
