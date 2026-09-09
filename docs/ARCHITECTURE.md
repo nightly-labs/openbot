@@ -447,16 +447,24 @@ stays dismissed until the offer changes. Closing the notification does not cance
 and later reports do not reopen it. Fresh provider downloads retain their existing flow. These
 actions apply only to the local desktop host.
 
-A CLI the user installed themselves is not managed, but it is still compared against the lock.
-Each provider status row reports `cliSource`, and main passes the version of a `system` row to
-`ProviderRuntimeManager.setSystemVersion`, which compares it against the pinned version exactly as
-it compares a managed installation. The row and the notification therefore use the one update offer, the
-one Update button, and one entry point in the runtime store, `startProviderUpdate`. Only the work
-behind it differs: a `system` install goes to `updateProviderCli`, which runs that CLI's own updater
-(`codex update`) and then restarts the provider on the binary now on disk. That updater reports no
-progress, so the notification holds its indeterminate step until the provider comes back, and a
-failure keeps the reason the CLI gave, redacted, in one error that goes to the provider row and to
-the caller - and on, through the Team API, to the team's connected clients.
+A CLI the user installed themselves is not managed, and it is not compared against the lock.
+`ProviderRuntimeManager.getStatus` offers the pinned version only to the copy it owns. The user's
+install answers to them: its own release channel decides what "newest" means for it, and that answer
+can be older than the lock, so a pinned version offered for it names a version its updater would
+never install. `MINIMUM_CODEX_VERSION` and the other minimums in `src/backend/cli.ts` are the one
+version claim OpenBot makes about a foreign install, and the resolver already refuses anything below
+one. Each provider status row reports `cliSource`, and a `system` row keeps the update itself
+without an offer: the picker gives it an always-available Update CLI action, which says nothing
+about the version it will reach, and the notification opens on the running step when the user
+presses it. Both paths use one entry point in the runtime store, `startProviderUpdate`. Only the
+work behind it differs: a `system` install goes to `updateProviderCli`, which runs that CLI's own
+updater (`codex update`) and then restarts the provider on the binary now on disk. That updater
+reports no progress, so the notification holds its indeterminate step until the provider comes back,
+and it then names the version the provider reports, whatever that version is. A failure keeps the
+reason the CLI gave, redacted, in one error that goes to the provider row and to the caller - and
+on, through the Team API, to the team's connected clients. A refusal that reaches neither updater,
+such as an update started while a workspace on another computer is open, is put on the same
+notification with a Retry, because the user pressed a button and the outcome belongs on screen.
 The owner comes from the last resolution of the binary, not from the client that runs it, so a
 provider that is signed out still reports its own install rather than reading as the managed copy.
 OpenBot downloads nothing on this path, so the pinned artifact checksums are untouched. The managed
@@ -475,8 +483,7 @@ provider that has one, `#connect` connects one whose client is gone, and both sk
 that hook is restart recovery: it settles every unresolved delivery, and the other providers keep
 running through the replacement, so a live turn would be recorded as `interrupted` - which
 `MailboxStore.markTerminal` then refuses to correct. `onProviderResumed` schedules the deliveries
-the replacement held back. The refusal record is written through one queue, because two providers
-can finish an update at once and the older snapshot must not be renamed over the newer one.
+the replacement held back.
 
 The update replaces the binary under a running client. A provider that has an agent in a turn -
 a delivery on its way to one, which holds no turn id yet, or a context compaction, whose
@@ -486,16 +493,14 @@ scheduler skips an agent whose provider reports `isReplacingCli`, before it can 
 delivery, and `onProviderResumed` schedules the held deliveries when the replacement ends, after a
 failure as well as after a success.
 
-That updater decides for itself what the newest version is, and its release channel can name an
-older one than the lock: `grok update` can report success and leave the CLI where it was. The IPC
-handler therefore reports the version before and after the run to
-`ProviderRuntimeManager.noteSystemCliUpdate`. An update that finishes on the version it started on
-is the updater's answer: the manager records that pair of versions in `cli-update-refusals.json`
-beside the managed runtimes, and drops the offer from `availableVersion`, so the row and the
-notification stop offering an update that cannot happen. The record is kept against both the
-installed and the pinned version, so a new pinned version is a new offer, and so is a CLI the user
-moves by other means. The runtime store keeps the same answer in memory for the run that produced
-it, only to settle the notification before the next snapshot arrives.
+`updateProviderCli` refuses an update while another command runs on that provider, instead of
+queueing it: `#runProviderConnectionCommand` serializes the commands of one provider, and a sign-in
+waits for the user, so an update behind one waits with it - for minutes, with nothing on screen but
+the step it is on. The caller gets that reason at once, and the user can start the update again.
+
+Nothing records an offer the CLI's own updater turned down, because OpenBot no longer makes one for
+a foreign install. `initialize` deletes the `cli-update-refusals.json` a previous version wrote
+beside the managed runtimes, so a profile that upgraded keeps no file that no reader opens.
 
 ## Agent usage analytics
 

@@ -526,6 +526,33 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
   });
 
+  it("refuses a second update instead of holding it behind the one that is running", async () => {
+    const gate = join(root, "claude-update-gate");
+    const claude = await createUpdatableFakeClaude(root, "2.1.250", undefined, gate);
+    process.env.OPENBOT_CLAUDE_PATH = claude.executable;
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "claude",
+      (provider) => new FakeAgentClient(provider),
+    );
+    await service.initialize();
+
+    const update = service.updateProviderCli("claude");
+    await waitFor(() => existsSync(claude.started));
+
+    // Queued, this waited for the whole first update - up to ten minutes - and reported nothing
+    // until then. The caller gets the reason at once instead.
+    await expect(service.updateProviderCli("claude")).rejects.toThrow(/already working on the Claude CLI/u);
+
+    await writeFile(gate, "go");
+    const status = await update;
+    expect(status.providers).toContainEqual(expect.objectContaining({ id: "claude", version: "2.1.250" }));
+  });
+
   it("refuses to run a self-updater against the CLI copy OpenBot manages", async () => {
     const claude = await createUpdatableFakeClaude(root, "2.1.250");
     const { store, mailbox } = stores(root);

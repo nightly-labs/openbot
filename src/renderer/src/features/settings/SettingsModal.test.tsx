@@ -143,7 +143,7 @@ describe("SettingsModal", () => {
     expect(await screen.findByRole("switch", { name: "Automatically download updates" })).not.toBeChecked();
   });
 
-  it("offers an update for a CLI the user installed, which has no managed download", async () => {
+  it("runs the updater of a CLI the user installed, without naming a version for it", async () => {
     const onUpdateProvider = vi.fn(async () => undefined);
     const agentStatus: AgentStatus = {
       phase: "ready",
@@ -176,12 +176,18 @@ describe("SettingsModal", () => {
           codex: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: "0.153.4" },
           claude: { phase: "ready", progress: null, message: null, version: "2.1.246", availableVersion: "2.1.263" },
         }}
-        providerAvailableVersions={{ codex: "0.153.4", claude: "2.1.263" }}
+        /*
+         * No version for ChatGPT: the CLI on this computer is the user's own, and its own updater
+         * decides what it can reach. The managed copy beside it has a newer version pinned, and
+         * offering that one would name a version this install may never install.
+         */
+        providerAvailableVersions={{ codex: null, claude: "2.1.263" }}
         onUpdateProvider={onUpdateProvider}
       />
     ));
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Update ChatGPT to 0.153.4" }));
+    expect(screen.queryByRole("button", { name: /Update ChatGPT to/u })).not.toBeInTheDocument();
+    await fireEvent.click(await screen.findByRole("button", { name: "Update the ChatGPT CLI" }));
     await waitFor(() => expect(onUpdateProvider).toHaveBeenCalledWith("codex"));
   });
 

@@ -88,57 +88,18 @@ describe("ProviderRuntimeManager", () => {
     },
   );
 
-  it("offers the pinned version to an older CLI the user installed", async () => {
+  it("removes the record of refused updates a previous version left behind", async () => {
     const root = await temporaryRoot();
+    const refusals = join(root, "cli-update-refusals.json");
+    await writeFile(refusals, JSON.stringify({ grok: { installId: "0.0.1", version: "1.0.22" } }));
     const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
-    await manager.initialize();
-    const pinned = parseAgentRuntimeLock(structuredClone(lockValue)).grok.version;
-    const snapshots: ProviderRuntimeSnapshot[] = [];
-    manager.on("status", (snapshot) => snapshots.push(snapshot));
 
-    manager.setSystemVersion("grok", "0.0.1");
-    expect(snapshots.at(-1)?.providers.grok).toMatchObject({ version: null, availableVersion: pinned });
+    const snapshot = await manager.initialize();
 
-    manager.setSystemVersion("grok", pinned);
-    expect(manager.getStatus().providers.grok.availableVersion).toBeNull();
-
-    manager.setSystemVersion("grok", pinned);
-    expect(snapshots).toHaveLength(2);
-  });
-
-  it("stops offering a version the user's own updater leaves uninstalled, across restarts", async () => {
-    const root = await temporaryRoot();
-    const pinned = parseAgentRuntimeLock(structuredClone(lockValue)).grok.version;
-    const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
-    await manager.initialize();
-    manager.setSystemVersion("grok", "0.0.1");
-    expect(manager.getStatus().providers.grok.availableVersion).toBe(pinned);
-
-    // The CLI ran its updater and stayed where it was: its own channel has nothing newer for it.
-    await manager.noteSystemCliUpdate("grok", "0.0.1", "0.0.1");
-    expect(manager.getStatus().providers.grok.availableVersion).toBeNull();
-
-    const restarted = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
-    await restarted.initialize();
-    restarted.setSystemVersion("grok", "0.0.1");
-    expect(restarted.getStatus().providers.grok.availableVersion).toBeNull();
-
-    // A CLI that moved on its own is a different install, so the pinned version is offered again.
-    restarted.setSystemVersion("grok", "0.0.2");
-    expect(restarted.getStatus().providers.grok.availableVersion).toBe(pinned);
-  });
-
-  it("offers again once the updater installs something", async () => {
-    const root = await temporaryRoot();
-    const pinned = parseAgentRuntimeLock(structuredClone(lockValue)).grok.version;
-    const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
-    await manager.initialize();
-    manager.setSystemVersion("grok", "0.0.1");
-    await manager.noteSystemCliUpdate("grok", "0.0.1", "0.0.1");
-    manager.setSystemVersion("grok", "0.0.2");
-    await manager.noteSystemCliUpdate("grok", "0.0.1", "0.0.2");
-    expect(manager.getStatus().providers.grok.availableVersion).toBe(pinned);
-    expect(JSON.parse(await readFile(join(root, "cli-update-refusals.json"), "utf8"))).toEqual({});
+    // Nothing writes this file now: a CLI the user installed is not compared against the lock, so
+    // there is no offer of ours for its updater to refuse. A profile that has one keeps no reader.
+    await expect(access(refusals)).rejects.toThrow();
+    expect(snapshot.providers.grok).toMatchObject({ phase: "not-downloaded", version: null, availableVersion: null });
   });
 
   it("allows three transfers and cancels only the selected provider", async () => {

@@ -424,6 +424,15 @@ export class ProviderRuntime implements ProviderPort {
     const driver = requireProviderDriver(provider);
     const command = driver.cliUpdate;
     if (!command) throw new Error(`OpenBot cannot update the ${providerLabel(provider)} CLI.`);
+    // Refused rather than queued. `#runProviderConnectionCommand` waits for the command that runs
+    // on this provider now, and a sign-in waits for the user, so an update queued behind one waits
+    // with it - for as long as the user takes, with nothing on screen but the step it is on. The
+    // caller can say that instead, and the user can start the update again.
+    if (this.#providerConnectionCommands.has(provider) || this.#providerStarts.has(provider)) {
+      throw new Error(
+        `OpenBot is already working on the ${providerLabel(provider)} CLI. Wait for it to finish, then update.`,
+      );
+    }
     return this.#runProviderConnectionCommand(provider, async () => {
       const cli = await this.#resolveProviderCli(provider);
       if (cli.source === "managed") {

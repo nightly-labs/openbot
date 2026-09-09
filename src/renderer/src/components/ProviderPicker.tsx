@@ -21,6 +21,14 @@ export interface ProviderPickerOption {
   runtimeStatus?: ProviderRuntimeStatus;
   /** The newer runtime main says exists. The renderer never works this out itself. */
   availableVersion?: string | null;
+  /**
+   * Who owns the binary the provider runs, as the last resolution found it.
+   *
+   * A `system` install has no offer, because its own updater decides which version it can reach.
+   * It keeps the action instead: the row can run that updater whenever the user asks, and says
+   * nothing about what it will install.
+   */
+  cliSource?: "system" | "managed";
 }
 
 export interface ProviderPickerProps {
@@ -38,8 +46,9 @@ export interface ProviderPickerProps {
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   /**
-   * Starts the update the row offers. Whether that re-downloads the managed runtime or runs the
-   * CLI's own updater is decided by the caller, which knows who owns the install.
+   * Starts the update the row offers, or the one a `system` install can always ask for. Whether
+   * that re-downloads the managed runtime or runs the CLI's own updater is decided by the caller,
+   * which knows who owns the install.
    */
   onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
@@ -215,6 +224,23 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       onClick={() => void props.onUpdateProvider?.(option().id)}
                     >
                       Update
+                    </Button>
+                  </Show>
+                  {/* The user's own install, which is offered no version and so is never
+                      `updatable()`. The action is still here, because running that CLI's updater is
+                      the only way OpenBot has to move it, and it is quieter than a notification:
+                      the row waits to be asked instead of announcing a version it cannot promise. */}
+                  <Show when={!updatable() && option().cliSource === "system" && props.onUpdateProvider}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      class="provider-picker-install"
+                      aria-label={`Update the ${option().name} CLI`}
+                      disabled={props.disabled || props.refreshingProviders || connecting()}
+                      onClick={() => void props.onUpdateProvider?.(option().id)}
+                    >
+                      Update CLI
                     </Button>
                   </Show>
                   <Show

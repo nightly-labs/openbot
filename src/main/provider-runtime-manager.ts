@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { createReadStream, createWriteStream } from "node:fs";
 import {
@@ -67,18 +67,6 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #controllers = new Map<AgentProviderId, AbortController>();
   readonly #tasks = new Map<AgentProviderId, Promise<void>>();
   readonly #cancelled = new Set<AgentProviderId>();
-  /** Versions of provider CLIs the user installed, kept only to compare against the lock. */
-  readonly #systemVersions = new Map<AgentProviderId, string>();
-  /**
-   * The offers the user's own CLI updater has already turned down, one per provider.
-   *
-   * A CLI decides for itself what its newest version is, and its release channel can name an older
-   * one than the lock: `grok update` reports success and leaves the CLI where it was. Kept on disk,
-   * because an offer that returns on the next start is the same dead end again.
-   */
-  readonly #refusedUpdates = new Map<AgentProviderId, { version: string; pinnedVersion: string }>();
-  /** The queue that keeps the record's writes in the order the refusals were recorded. */
-  #refusedUpdatesWrite: Promise<void> = Promise.resolve();
   #revision = 0;
   #stopping = false;
 
@@ -105,7 +93,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   async initialize(): Promise<ProviderRuntimeSnapshot> {
     await mkdir(this.#root, { recursive: true });
     await this.#removeAbandonedStaging();
-    await this.#readRefusedUpdates();
+    await this.#removeRefusedUpdatesRecord();
     await Promise.all(PROVIDERS.map((provider) => this.#inspect(provider)));
     const target = this.#target;
     if (target) {
@@ -116,103 +104,36 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     return this.getStatus();
   }
 
+  /**
+   * The statuses, with the pinned version offered to a managed installation that is behind it.
+   *
+   * The comparison is made against the copy this manager owns and nothing else. A CLI the user
+   * installed answers to them: its own channel decides what "newest" means for it, and that answer
+   * can be older than the lock, so a pinned version offered for it names a version it would never
+   * install. `MINIMUM_*_VERSION` in `src/backend/cli.ts` is the one version claim OpenBot makes
+   * about a foreign install, and the resolver already refuses anything below it.
+   */
   getStatus(): ProviderRuntimeSnapshot {
     const providers = structuredClone(this.#statuses);
     if (this.#target) {
       for (const provider of PROVIDERS) {
         const version = runtimeSpec(provider, this.#target, this.#lock).version;
-        // The install in use, which is the user's own copy whenever there is one: the resolver
-        // prefers it, so the managed version on disk is not what the provider runs.
-        const installed = this.#systemVersions.get(provider) ?? providers[provider].version;
-        const refused = this.#refusedUpdates.get(provider);
-        const offer = installed !== null && installed !== undefined && olderVersion(installed, version);
-        providers[provider].availableVersion =
-          offer && !(refused?.version === installed && refused.pinnedVersion === version) ? version : null;
+        const installed = providers[provider].version;
+        providers[provider].availableVersion = installed !== null && olderVersion(installed, version) ? version : null;
       }
     }
     return { revision: this.#revision, providers };
   }
 
   /**
-   * Records the version of a provider CLI the user installed, as the agent service resolved it.
+   * Deletes the record of update offers a user's own CLI updater turned down.
    *
-   * The manager does not own that install and never downloads for it. It owns the lock, though, and
-   * the lock is what says which version is current, so the comparison belongs here with the managed
-   * one rather than in the renderer, which must not compare versions at all. Pass `null` when the
-   * provider went back to the managed copy or resolved nothing.
+   * Nothing writes it now: a CLI the user installed is no longer compared against the lock, so
+   * there is no offer for its updater to refuse. Removed rather than left behind, because a
+   * profile that upgraded from a version that wrote it would keep a file no reader opens.
    */
-  setSystemVersion(provider: AgentProviderId, version: string | null): void {
-    if ((this.#systemVersions.get(provider) ?? null) === version) return;
-    if (version) this.#systemVersions.set(provider, version);
-    else this.#systemVersions.delete(provider);
-    this.#revision += 1;
-    this.emit("status", this.getStatus());
-  }
-
-  /**
-   * The result of a run of the provider CLI's own updater: the version the CLI was on before it, and
-   * the version it reports now.
-   *
-   * A CLI that finishes on the version it started on has answered: the version the lock pins is not
-   * one its own channel will install, so OpenBot stops offering it. The record is kept against both
-   * versions, so a new pinned version is a new offer, and so is a CLI the user moves by other means.
-   */
-  async noteSystemCliUpdate(provider: AgentProviderId, before: string | null, after: string | null): Promise<void> {
-    if (!this.#target) return;
-    const pinnedVersion = runtimeSpec(provider, this.#target, this.#lock).version;
-    const refused = after !== null && after === before && olderVersion(after, pinnedVersion);
-    const current = this.#refusedUpdates.get(provider);
-    if (refused && current?.version === after && current.pinnedVersion === pinnedVersion) return;
-    if (!refused && !current) return;
-    if (refused && after) this.#refusedUpdates.set(provider, { version: after, pinnedVersion });
-    else this.#refusedUpdates.delete(provider);
-    await this.#writeRefusedUpdates();
-    this.#revision += 1;
-    this.emit("status", this.getStatus());
-  }
-
-  async #readRefusedUpdates(): Promise<void> {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(await readFile(this.#refusedUpdatesPath(), "utf8"));
-    } catch {
-      // A record that is missing or unreadable only costs the user one more refused offer.
-      return;
-    }
-    if (!isDynamicRecord(parsed)) return;
-    for (const provider of PROVIDERS) {
-      const entry = parsed[provider];
-      if (!isDynamicRecord(entry) || !isString(entry.version) || !isString(entry.pinnedVersion)) continue;
-      this.#refusedUpdates.set(provider, { version: entry.version, pinnedVersion: entry.pinnedVersion });
-    }
-  }
-
-  /**
-   * Writes the record, one write at a time.
-   *
-   * Two providers can finish an update at once. Each write serializes the record as it stands when
-   * its turn comes and renames its own temporary file into place, so without the queue the older
-   * snapshot could be renamed last and drop the newer provider's refusal - which the user would meet
-   * as an offer that provider has already turned down.
-   */
-  async #writeRefusedUpdates(): Promise<void> {
-    const write = this.#refusedUpdatesWrite.then(async () => {
-      const path = this.#refusedUpdatesPath();
-      const temporaryPath = `${path}.${randomUUID()}.tmp`;
-      try {
-        await mkdir(this.#root, { recursive: true });
-        await writeFile(temporaryPath, `${JSON.stringify(Object.fromEntries(this.#refusedUpdates))}\n`, "utf8");
-        await rename(temporaryPath, path);
-      } catch {
-        await rm(temporaryPath, { force: true }).catch(() => undefined);
-      }
-    });
-    this.#refusedUpdatesWrite = write;
-    await write;
-  }
-
-  #refusedUpdatesPath(): string {
-    return join(this.#root, "cli-update-refusals.json");
+  async #removeRefusedUpdatesRecord(): Promise<void> {
+    await rm(join(this.#root, "cli-update-refusals.json"), { force: true }).catch(() => undefined);
   }
 
   executablePath(provider: AgentProviderId): string | null {

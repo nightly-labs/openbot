@@ -19,6 +19,14 @@ export interface ProviderUpdate {
   /** The product name, as the picker shows it - "ChatGPT", "Claude", "Grok". */
   name: string;
   runtime: ProviderRuntimeStatus;
+  /**
+   * The version main offers for the managed copy, or `null`.
+   *
+   * `null` for every CLI the user installed themselves: OpenBot does not decide what version those
+   * reach. Such an update is still reported here - it is started by hand, so it opens on its
+   * running step and settles on the version the CLI came back with, and no state before it claims
+   * one is waiting.
+   */
   availableVersion: string | null;
 }
 

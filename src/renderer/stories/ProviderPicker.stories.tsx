@@ -105,9 +105,9 @@ export const UpdateFailed: Story = {
 };
 
 /**
- * A CLI the user installed themselves, with a newer version pinned by this OpenBot release. The row
- * reads exactly like a managed update - same badge, same button - because only the work behind the
- * button differs, and the row does not choose it.
+ * A CLI the user installed themselves. The row names one version - the one that install reports -
+ * and no badge, because that CLI's own updater decides what it can reach and OpenBot promises
+ * nothing about it. The quieter Update CLI action runs that updater whenever the user asks.
  */
 export const UserOwnedCliUpdate: Story = {
   args: {
@@ -117,7 +117,8 @@ export const UserOwnedCliUpdate: Story = {
         ? {
             ...option,
             runtimeStatus: { phase: "ready", progress: null, message: null, version: "0.146.0" },
-            availableVersion: "0.153.4",
+            availableVersion: null,
+            cliSource: "system",
           }
         : option,
     ),

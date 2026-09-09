@@ -1,6 +1,5 @@
 // Signing in to Codex, Claude and Grok, and downloading the CLI runtimes they need.
 
-import type { AgentProviderId, AgentStatus } from "@openbot/contracts/ipc";
 import { shell } from "electron";
 import type { AgentService } from "../../backend/agent-service";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
@@ -26,16 +25,11 @@ export function providerIpcHandlers({
         }),
       ),
       /*
-       * The CLI's own updater decides what it installs, and it can finish on the version it started
-       * on. The runtime manager owns the offer, so it is told the outcome and can stop repeating one
-       * the updater has already turned down.
+       * The CLI's own updater decides what it installs, and OpenBot makes no claim about the
+       * version it will reach: what comes back is the status of the restarted provider, with the
+       * version the CLI now reports.
        */
-      updateProviderCli: payloadHandler(parseProviderId, async (provider) => {
-        const before = systemCliVersion(service.getStatus(), provider);
-        const status = await service.updateProviderCli(provider);
-        await providerRuntimes.noteSystemCliUpdate(provider, before, systemCliVersion(status, provider));
-        return status;
-      }),
+      updateProviderCli: payloadHandler(parseProviderId, (provider) => service.updateProviderCli(provider)),
       refreshAgentProviders: handler(() => service.refreshProviders()),
     },
     providerRuntimes: {
@@ -44,10 +38,4 @@ export function providerIpcHandlers({
       cancel: payloadHandler(parseProviderId, (parsed) => providerRuntimes.cancel(parsed)),
     },
   };
-}
-
-/** The version of a provider CLI the user installed themselves, or `null` for a managed copy. */
-function systemCliVersion(status: AgentStatus, provider: AgentProviderId): string | null {
-  const entry = status.providers?.find((candidate) => candidate.id === provider);
-  return entry?.cliSource === "system" ? (entry.version ?? null) : null;
 }
