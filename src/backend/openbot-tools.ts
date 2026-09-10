@@ -97,7 +97,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "update_profile",
     description:
-      "Update a local OpenBot agent’s name, title, instructions, or generated avatar from the user’s request.",
+      "Update a local OpenBot agent’s name, title, instructions, or avatar from the user’s request. For an uploaded or local image, use avatarPath. Prepare a PNG, JPEG, or WebP copy up to 512 KB with your available tools if needed.",
     shape: updateProfileToolSchema.shape,
   },
   {
