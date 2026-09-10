@@ -1356,8 +1356,6 @@ body,
   color: var(--openbot-text-primary);
 }
 
-.choice-options,
-.choice-option,
 .provider-picker-option,
 .provider-model-option {
   border-color: var(--openbot-border);
@@ -1365,8 +1363,6 @@ body,
   color: var(--openbot-text-secondary);
 }
 
-.choice-option:hover,
-.choice-option-selected,
 .provider-picker-option:hover:not(.provider-picker-option-unavailable),
 .provider-picker-option:focus-within,
 .provider-model-option:hover,
