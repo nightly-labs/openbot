@@ -52,7 +52,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A tab nobody is driving: the toolbar carries the viewport chip and nothing else. */
+/** An idle tab with no recording or diagnostic indicators. */
 export const Idle: Story = {
   args: {
     activeTab: {
@@ -66,7 +66,7 @@ export const Idle: Story = {
   },
 };
 
-/** `set_environment` moved the tab to the mobile preset, so the chip reports the emulated size. */
+/** A tab with the mobile viewport preset. */
 export const MobileViewport: Story = {
   args: {
     activeTab: {
@@ -80,7 +80,7 @@ export const MobileViewport: Story = {
   },
 };
 
-/** All three chips at once -- the widest the toolbar ever gets before the address bar starts shrinking. */
+/** Recording and diagnostic indicators appear together beside the address bar. */
 export const RecordingWithDiagnosticErrors: Story = {
   args: {
     activeTab: {
@@ -117,7 +117,7 @@ export const SingleDiagnosticError: Story = {
   },
 };
 
-/** The same three chips in a panel narrow enough to prove they never push the address bar out. */
+/** Recording and diagnostic indicators in a narrow panel. */
 export const NarrowPanel: Story = {
   args: {
     ...RecordingWithDiagnosticErrors.args,
