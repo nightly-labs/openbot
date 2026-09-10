@@ -1,6 +1,7 @@
 import type { AgentPromptQuestion, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import {
+  indexChatMessages,
   latestReadableMessage,
   type PendingChatMessage,
   presentChatMessages,
@@ -46,6 +47,26 @@ function conversation(): ConversationSnapshot {
 }
 
 describe("mobile question forms", () => {
+  it("resolves a desktop reply to a mobile message whose render ID has been replaced", () => {
+    const snapshot = conversation();
+    snapshot.messages = [
+      { id: "mobile-delivery", author: "user", text: "Sent from mobile", status: "completed", createdAt: "now" },
+      {
+        id: "desktop-reply",
+        author: "user",
+        text: "Reply from desktop",
+        replyToMessageId: "mobile-delivery",
+        status: "completed",
+        createdAt: "now",
+      },
+    ];
+    const aliases = new Map([["mobile-delivery", "local-1"]]);
+    const messages = presentChatMessages(projectChatMessages(snapshot.messages), null, aliases);
+    const index = indexChatMessages(messages, aliases);
+    const reply = messages[1];
+    const source = reply.kind === "message" && reply.replyToMessageId ? index.get(reply.replyToMessageId) : null;
+    expect(source).toMatchObject({ id: "local-1", body: "Sent from mobile" });
+  });
   it("keeps a reply attached to its source after the pending message receives its host ID", () => {
     const snapshot = conversation();
     snapshot.messages = [

@@ -1,7 +1,8 @@
 import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { CornerUpRight, X } from "lucide-react-native";
-import { Pressable, View, type ViewStyle } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { AccessibilityInfo, Pressable, View, type ViewStyle } from "react-native";
 import { KeyboardChatScrollView } from "react-native-keyboard-controller";
 import Animated, {
   Easing,
@@ -18,7 +19,7 @@ import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-pro
 import type { ChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
-import type { ChatMessage } from "@/features/chat/model/chat-messages";
+import { type ChatMessage, indexChatMessages } from "@/features/chat/model/chat-messages";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
@@ -54,6 +55,7 @@ interface ChatMessageListProps {
   foreground: ViewStyle["backgroundColor"];
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
   messages: ChatMessage[];
+  messageAliases: ReadonlyMap<string, string>;
   muted: ViewStyle["backgroundColor"];
   raised: ViewStyle["backgroundColor"];
   showStarter: boolean;
@@ -79,6 +81,7 @@ export function ChatMessageList({
   foreground,
   historyState,
   messages,
+  messageAliases,
   muted,
   raised,
   showStarter,
@@ -90,6 +93,19 @@ export function ChatMessageList({
   onOpenActions,
 }: ChatMessageListProps) {
   const isFocused = useIsFocused();
+  const messagesById = useMemo(() => indexChatMessages(messages, messageAliases), [messages, messageAliases]);
+  const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isScreenReaderEnabled().then((enabled) => {
+      if (active) setScreenReaderEnabled(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener("screenReaderChanged", setScreenReaderEnabled);
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
   const replyColor = String(useCSSVariable("--openbot-text-dim"));
   const reducedMotion = useReducedMotion();
   const animateMessages = isFocused && canSend && appActive;
@@ -214,6 +230,7 @@ export function ChatMessageList({
       return (
         <ChatMessageGesture
           key={message.id}
+          screenReaderEnabled={screenReaderEnabled}
           onReply={onReply ? () => onReply(message) : undefined}
           onOpenActions={() => onOpenActions(message)}
         >
@@ -221,7 +238,7 @@ export function ChatMessageList({
         </ChatMessageGesture>
       );
     }
-    const source = messages.find((candidate) => candidate.id === message.replyToMessageId);
+    const source = message.replyToMessageId ? messagesById.get(message.replyToMessageId) : undefined;
     return (
       <View
         key={message.id}

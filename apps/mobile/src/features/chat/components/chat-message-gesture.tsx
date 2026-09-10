@@ -1,4 +1,5 @@
 import * as Haptics from "expo-haptics";
+import { Button } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Reply } from "lucide-react-native";
 import type { PropsWithChildren } from "react";
@@ -9,9 +10,11 @@ import { scheduleOnRN } from "react-native-worklets";
 
 export function ChatMessageGesture({
   children,
+  screenReaderEnabled,
   onReply,
   onOpenActions,
 }: PropsWithChildren<{
+  screenReaderEnabled: boolean;
   onReply?: () => void;
   onOpenActions: () => void;
 }>) {
@@ -49,20 +52,20 @@ export function ChatMessageGesture({
         <Reply color={muted} size={22} />
       </Animated.View>
       <GestureDetector gesture={Gesture.Race(swipe, hold)}>
-        <Animated.View
-          style={bubbleStyle}
-          accessible
-          accessibilityRole="text"
-          accessibilityActions={[
-            { name: "longpress", label: "Message actions" },
-            ...(onReply ? [{ name: "reply", label: "Reply" }] : []),
-          ]}
-          onAccessibilityAction={({ nativeEvent }) => {
-            if (nativeEvent.actionName === "reply" && onReply) reply();
-            else if (nativeEvent.actionName === "longpress") openActions();
-          }}
-        >
+        <Animated.View style={bubbleStyle}>
           {children}
+          {screenReaderEnabled ? (
+            <Button
+              variant="ghost"
+              onPress={openActions}
+              accessibilityActions={onReply ? [{ name: "reply", label: "Reply" }] : []}
+              onAccessibilityAction={({ nativeEvent }) => {
+                if (nativeEvent.actionName === "reply" && onReply) reply();
+              }}
+            >
+              <Button.Label>Message actions</Button.Label>
+            </Button>
+          ) : null}
         </Animated.View>
       </GestureDetector>
     </View>

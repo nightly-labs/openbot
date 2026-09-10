@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import MessageActionsScreen from "@/app/(app)/message-actions";
 import SelectMessageTextScreen from "@/app/(app)/message-actions/select-text";
+import { ChatMessageGesture } from "../components/chat-message-gesture";
 import { MessageActionsProvider, useMessageActions } from "./message-actions-context";
 
 const mocks = vi.hoisted(() => ({
@@ -15,6 +16,10 @@ const mocks = vi.hoisted(() => ({
 const Container = ({ children }: PropsWithChildren) => <div>{children}</div>;
 vi.mock("react-native", () => ({
   Alert: { alert: mocks.alert },
+  // iOS accessible containers combine their children into one accessibility element.
+  View: ({ children, accessible }: PropsWithChildren<{ accessible?: boolean }>) => (
+    <div>{accessible ? <div aria-hidden="true">{children}</div> : children}</div>
+  ),
   TextInput: ({
     value,
     editable,
@@ -27,8 +32,62 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("@/shared/lib/platform", () => ({ isIOS: true }));
 vi.mock("expo-clipboard", () => ({ setStringAsync: mocks.copy }));
+vi.mock("expo-haptics", () => ({ impactAsync: async () => {}, ImpactFeedbackStyle: { Light: "light" } }));
+vi.mock("react-native-reanimated", async () => {
+  const { View } = await import("react-native");
+  return {
+    default: { View },
+    ReduceMotion: { System: "system" },
+    useAnimatedStyle: () => ({}),
+    useSharedValue: (initial: number) => ({ get: () => initial, set: () => {} }),
+    withSpring: (value: number) => value,
+  };
+});
+vi.mock("react-native-worklets", () => ({ scheduleOnRN: (callback: () => void) => callback() }));
+vi.mock("react-native-gesture-handler", () => {
+  function gesture() {
+    return {
+      enabled() {
+        return this;
+      },
+      activeOffsetX() {
+        return this;
+      },
+      failOffsetX() {
+        return this;
+      },
+      failOffsetY() {
+        return this;
+      },
+      onUpdate() {
+        return this;
+      },
+      onEnd() {
+        return this;
+      },
+      onFinalize() {
+        return this;
+      },
+      onStart() {
+        return this;
+      },
+    };
+  }
+  return {
+    Gesture: { Pan: gesture, LongPress: gesture, Race: gesture },
+    GestureDetector: ({ children }: PropsWithChildren) => children,
+  };
+});
 vi.mock("heroui-native/hooks", () => ({ useThemeColor: () => "black" }));
 vi.mock("heroui-native", () => ({
+  Button: Object.assign(
+    ({ children, onPress }: PropsWithChildren<{ onPress: () => void }>) => (
+      <button type="button" onClick={onPress}>
+        {children}
+      </button>
+    ),
+    { Label: ({ children }: PropsWithChildren) => <span>{children}</span> },
+  ),
   Typography: Object.assign(({ children }: PropsWithChildren) => <span>{children}</span>, {
     Paragraph: ({ children }: PropsWithChildren) => <p>{children}</p>,
   }),
@@ -95,6 +154,26 @@ afterEach(async () => {
   await act(() => root.unmount());
   root = createRoot(container);
   vi.clearAllMocks();
+});
+
+it("keeps code copy and message actions separately accessible with a screen reader", async () => {
+  const copyCode = vi.fn();
+  const openActions = vi.fn();
+  await act(() =>
+    root.render(
+      <ChatMessageGesture screenReaderEnabled onOpenActions={openActions}>
+        <button type="button" onClick={copyCode}>
+          Copy code
+        </button>
+      </ChatMessageGesture>,
+    ),
+  );
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Copy code" })));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Message actions" })));
+  expect({ copiedCode: copyCode.mock.calls.length, openedActions: openActions.mock.calls.length }).toEqual({
+    copiedCode: 1,
+    openedActions: 1,
+  });
 });
 async function open(canReply = true) {
   await act(() =>

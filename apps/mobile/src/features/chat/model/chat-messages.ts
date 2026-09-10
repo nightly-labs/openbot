@@ -25,6 +25,16 @@ export interface PendingChatMessage {
   serverId: string | null;
 }
 
+export function indexChatMessages(messages: readonly ChatMessage[], aliases: ReadonlyMap<string, string>) {
+  const index = new Map(messages.map((message) => [message.id, message]));
+  // Reply references use host IDs even when a delivered bubble keeps its local render key.
+  for (const [hostId, localId] of aliases) {
+    const message = index.get(localId);
+    if (message) index.set(hostId, message);
+  }
+  return index;
+}
+
 export function presentChatMessages(
   messages: ChatMessage[],
   pending: PendingChatMessage | null,

@@ -307,6 +307,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
             fieldBackground={fieldBackground}
             foreground={foreground}
             messages={messages}
+            messageAliases={messageAliases}
             onReply={
               !questionForm.question
                 ? (message) => {
