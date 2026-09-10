@@ -93,6 +93,55 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.agent.updateQueuedMessage).not.toHaveBeenCalled();
   });
 
+  it("keeps a taken edit when another row is edited and after switching servers", async () => {
+    const local = testServer("local", true);
+    const remote = testServer("remote-1", false);
+    vi.mocked(window.openbot.servers.list).mockResolvedValue([local, remote]);
+    vi.mocked(window.openbot.servers.select).mockImplementation(async (serverId) => [
+      { ...local, active: serverId === "local" },
+      { ...remote, active: serverId === "remote-1" },
+    ]);
+    const running = queuedDelivery("running", "Running", null, { status: "running", turnId: "turn-running" });
+    const second = queuedDelivery("second", "Second draft", 2);
+    vi.mocked(window.openbot.agent.listQueue).mockResolvedValue({
+      agentId: "chief",
+      deliveries: [
+        running,
+        queuedDelivery("first", "First draft", 1, { attachments: [attachment("copied-file", "note.png", "image")] }),
+        second,
+      ],
+    });
+    render(() => <App />);
+    await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+    await screen.findByRole("button", { name: "Save queued message" });
+    const composer = screen.getByRole("textbox", { name: "Message Chief" });
+    composer.textContent = "Keep this edit";
+    await fireEvent.input(composer);
+    await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 2" }));
+    expect(composer).toHaveTextContent("Keep this edit");
+    expect(window.openbot.agent.takeQueuedMessage).toHaveBeenCalledTimes(1);
+    expect(window.openbot.agent.discardDraftAttachment).not.toHaveBeenCalled();
+    vi.mocked(window.openbot.agent.listQueue).mockResolvedValue({ agentId: "chief", deliveries: [running, second] });
+    await fireEvent.click(screen.getByRole("button", { name: "Studio Mac server" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Studio Mac server" })).toHaveAttribute("aria-pressed", "true"),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: "Local server" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Save queued message" }));
+    await waitFor(() =>
+      expect(window.openbot.agent.sendMessage).toHaveBeenCalledWith(
+        {
+          agentId: "chief",
+          text: "Keep this edit",
+          attachmentDraftIds: ["copied-file"],
+        },
+        "local",
+      ),
+    );
+    expect(window.openbot.agent.updateQueuedMessage).not.toHaveBeenCalled();
+    expect(window.openbot.agent.discardDraftAttachment).not.toHaveBeenCalled();
+  });
+
   it("updates a queued message on an older remote host and keeps its attachments", async () => {
     vi.mocked(window.openbot.servers.list).mockResolvedValue([testServer("remote-1", true)]);
     vi.mocked(window.openbot.agent.listQueue).mockResolvedValue({

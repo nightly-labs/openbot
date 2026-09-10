@@ -5,6 +5,7 @@ interface ComposerState {
   draft: string;
   items: ChatAttachment[];
   preparing: boolean;
+  sending: boolean;
   focusRequest: number;
   queueEdit: { message: QueueMessage; text: string; files: ChatAttachment[] } | null;
 }
@@ -16,7 +17,7 @@ export function createQueueEditStore() {
   function get(key: string): ComposerState {
     let state = states.get(key);
     if (!state) {
-      state = { draft: "", items: [], preparing: false, focusRequest: 0, queueEdit: null };
+      state = { draft: "", items: [], preparing: false, sending: false, focusRequest: 0, queueEdit: null };
       states.set(key, state);
     }
     return state;

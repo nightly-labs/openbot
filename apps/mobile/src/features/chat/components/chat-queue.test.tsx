@@ -320,3 +320,65 @@ it.each([false, true])("keeps a queued reply when navigation precedes take compl
   await act(() => root.render(<Composer />));
   expect(screen.queryByRole("button", { name: "Cancel edit" })).toBeNull();
 });
+
+it.each([false, true])("locks an edited send across navigation and permits retry after failure: %s", async (fail) => {
+  const store = createQueueEditStore();
+  const completion = Promise.withResolvers<void>();
+  const send = vi.fn(() => completion.promise);
+  const message: Extract<ChatMessage, { kind: "message" }> = {
+    id: "queued",
+    kind: "message",
+    author: "user",
+    body: "Send once",
+    streaming: false,
+    delivery: { id: "delivery", status: "queued", position: 1 },
+  };
+  function Composer() {
+    const editor = useQueueEdit(store, { serverId: "server", id: "agent" }, async () => message);
+    return (
+      <>
+        <button type="button" onClick={() => void editor.startQueueEdit(message)}>
+          Edit
+        </button>
+        <input aria-label="Message" value={editor.draft} onChange={(event) => editor.setDraft(event.target.value)} />
+        {editor.queueEdit ? (
+          <>
+            <button
+              type="button"
+              disabled={editor.sending}
+              onClick={() => void editor.sendQueueEdit(send).catch(() => {})}
+            >
+              Send
+            </button>
+            <button type="button" onClick={editor.finishQueueEdit}>
+              Cancel edit
+            </button>
+          </>
+        ) : null}
+      </>
+    );
+  }
+  await act(() => root.render(<Composer />));
+  await act(() => fireEvent.click(screen.getByRole("button", { name: "Edit" })));
+  await act(() => fireEvent.click(screen.getByRole("button", { name: "Send" })));
+  await act(() => root.render(null));
+  await act(() => root.render(<Composer />));
+  expect(screen.getByRole("button", { name: "Send" })).toHaveProperty("disabled", true);
+  await act(() => fireEvent.click(screen.getByRole("button", { name: "Send" })));
+  await act(() => fireEvent.click(screen.getByRole("button", { name: "Cancel edit" })));
+  await act(() =>
+    fireEvent.input(screen.getByRole("textbox", { name: "Message" }), { target: { value: "Unsafe replacement" } }),
+  );
+  expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty("value", "Send once");
+  expect(send).toHaveBeenCalledTimes(1);
+  if (fail) {
+    await act(() => completion.reject(new Error("Host unavailable")));
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty("value", "Send once");
+    send.mockResolvedValueOnce();
+    await act(() => fireEvent.click(screen.getByRole("button", { name: "Send" })));
+    expect(send).toHaveBeenCalledTimes(2);
+  } else {
+    await act(() => completion.resolve());
+  }
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+});

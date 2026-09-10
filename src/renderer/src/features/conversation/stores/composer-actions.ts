@@ -7,6 +7,7 @@ import type { ComposerDraft, ConversationProps, ConversationTarget } from "../co
 
 export interface ComposerActionsDeps {
   props: ConversationProps;
+  takenQueueEdits: Set<string>;
   agentReady: () => boolean;
   drafts: () => Record<string, ComposerDraft>;
   setDrafts: (update: (current: Record<string, ComposerDraft>) => Record<string, ComposerDraft>) => void;
@@ -60,7 +61,7 @@ export interface ComposerActionsDeps {
 }
 
 export function createComposerActions(deps: ComposerActionsDeps) {
-  const takenEdits = new Set<string>();
+  const takenEdits = deps.takenQueueEdits;
   const editKey = (serverId: string, agentId: string, deliveryId: string) =>
     JSON.stringify([serverId, agentId, deliveryId]);
 
@@ -119,7 +120,10 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const agentId = deps.props.agent?.id;
     const serverId = deps.props.server?.id ?? "local";
     if (!agentId || delivery.status !== "queued" || deps.submitting()) return;
-    if (deps.editingDeliveryId()) cancelQueuedMessageEdit();
+    if (deps.editingDeliveryId()) {
+      deps.setComposerError("Send or cancel the current edit before editing another queued message.");
+      return;
+    }
     deps.clearConversationError({ agentId, serverId });
     deps.setSubmitting(true);
     let prepared: { text: string; attachments: DraftAttachment[] };

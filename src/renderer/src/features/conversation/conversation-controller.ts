@@ -87,6 +87,7 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
   const [drafts, setDrafts] = createSignal<Record<string, ComposerDraft>>({});
   const [editingAgentId, setEditingAgentId] = createSignal<string | null>(null);
   const [editingServerId, setEditingServerId] = createSignal<string | null>(null);
+  const takenQueueEdits = new Set<string>();
   const [editingDeliveryId, setEditingDeliveryId] = createSignal<string | null>(null);
   const [editingDraftBackup, setEditingDraftBackup] = createSignal<ComposerDraft | null>(null);
   const [editingOriginalAttachmentIds, setEditingOriginalAttachmentIds] = createSignal<string[]>([]);
@@ -157,6 +158,7 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
     setEditingAgentId,
     editingServerId,
     setEditingServerId,
+    takenQueueEdits,
     editingDeliveryId,
     setEditingDeliveryId,
     editingDraftBackup,

@@ -64,7 +64,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     "background",
   ]);
   const [sendError, setSendError] = useState<{ agentId: string; message: string } | null>(null);
-  const [sending, setSending] = useState(false);
+  const [normalSending, setSending] = useState(false);
   const [sendRetryVersion, setSendRetryVersion] = useState(0);
   const queueAnimating = useRef(false);
   const measuredComposerHeight = useRef<number | null>(null);
@@ -104,6 +104,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     return { body: message.body, attachments: [] };
   });
   const { draft, setDraft, preparing, queueEdit, focusRequest, startQueueEdit, finishQueueEdit } = editor;
+  const sending = normalSending || editor.sending;
   const attachments = useChatAttachments(editor);
   const conversation = conversations[agent.id];
   const activity = useAgentActivity(agent.id);
@@ -233,7 +234,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   );
 
   function sendMessage(value: string): void {
-    if (!serverOnline || preparing || sendingRef.current || pendingMessage) return;
+    if (!serverOnline || preparing || sending || sendingRef.current || pendingMessage) return;
     const body = value.trim();
     if (!body && attachments.items.length === 0 && !queueEdit?.message.attachments?.length) return;
     if (queueEdit) {
@@ -243,14 +244,15 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
       const uploaded: string[] = [];
       void (async () => {
         try {
-          for (const file of attachments.items) uploaded.push((await uploadAttachment(agent.id, file)).id);
-          await sendTeamMessage(
-            agent.id,
-            body,
-            [...(queueEdit.message.attachments?.map((file) => file.id) ?? []), ...uploaded],
-            queueEdit.message.replyToMessageId,
-          );
-          finishQueueEdit();
+          await editor.sendQueueEdit(async () => {
+            for (const file of attachments.items) uploaded.push((await uploadAttachment(agent.id, file)).id);
+            await sendTeamMessage(
+              agent.id,
+              body,
+              [...(queueEdit.message.attachments?.map((file) => file.id) ?? []), ...uploaded],
+              queueEdit.message.replyToMessageId,
+            );
+          });
           setSendRetryVersion((version) => version + 1);
         } catch (error) {
           await Promise.allSettled(uploaded.map((id) => discardAttachment(agent.id, id)));

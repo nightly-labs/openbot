@@ -30,15 +30,33 @@ export function useQueueEdit(
 
   function finishQueueEdit() {
     const edit = store.get(key).queueEdit;
-    if (!edit) return;
+    if (!edit || store.get(key).sending) return;
     store.update(key, { draft: edit.text, items: edit.files, queueEdit: null });
+  }
+
+  async function sendQueueEdit(send: () => Promise<void>): Promise<boolean> {
+    const current = store.get(key);
+    if (!current.queueEdit || current.sending || current.preparing) return false;
+    store.update(key, { sending: true });
+    try {
+      await send();
+      store.update(key, { draft: current.queueEdit.text, items: current.queueEdit.files, queueEdit: null });
+      return true;
+    } finally {
+      store.update(key, { sending: false });
+    }
   }
 
   return {
     ...state,
-    setDraft: (draft: string | ((current: string) => string)) =>
-      store.update(key, { draft: typeof draft === "function" ? draft(store.get(key).draft) : draft }),
-    replace: (items: ChatAttachment[]) => store.update(key, { items }),
+    setDraft: (draft: string | ((current: string) => string)) => {
+      if (store.get(key).sending) return;
+      store.update(key, { draft: typeof draft === "function" ? draft(store.get(key).draft) : draft });
+    },
+    replace: (items: ChatAttachment[]) => {
+      if (!store.get(key).sending) store.update(key, { items });
+    },
+    sendQueueEdit,
     startQueueEdit,
     finishQueueEdit,
   };
