@@ -53,18 +53,20 @@ export function GeneralSettingsScreen() {
         <SettingsNote>{error || "System follows your device’s appearance."}</SettingsNote>
       </SettingsSection>
       <SettingsSection title="Privacy">
-        <SettingsRow
-          trailing={
-            <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-              <Switch
-                value={analytics.enabled}
-                disabled={!analytics.ready || analytics.saving}
-                label="Share product analytics"
-                onValueChange={saveAnalytics}
-              />
-            </Host>
-          }
-        />
+        <SettingsRow>
+          <Host
+            matchContents={{ vertical: true }}
+            style={{ width: "100%" }}
+            colorScheme={theme === "dark" ? "dark" : "light"}
+          >
+            <Switch
+              value={analytics.enabled}
+              disabled={!analytics.ready || analytics.saving}
+              label="Share product analytics"
+              onValueChange={saveAnalytics}
+            />
+          </Host>
+        </SettingsRow>
         {retryAnalyticsValue !== null ? (
           <SettingsRow
             disabled={analytics.saving}

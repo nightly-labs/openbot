@@ -53,6 +53,8 @@ beforeEach(() => {
   native.active.clear();
 });
 afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
@@ -199,6 +201,38 @@ function captureRequests() {
 }
 
 describe("installed React Native SDK", () => {
+  it.each(["identify", "track"])("aborts %s retries across opt-out and opt-in", async (kind) => {
+    vi.useFakeTimers();
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const requests: string[] = [];
+    let fail = true;
+    vi.stubGlobal("fetch", async (_url: string, input: RequestInit) => {
+      // Match native fetch: an aborted signal cannot start a network request.
+      input.signal?.throwIfAborted();
+      requests.push(String(input.body));
+      return new Response("{}", { status: fail ? 503 : 200 });
+    });
+    const { mobileAnalytics } = await import("./mobile-analytics");
+    if (kind === "identify") mobileAnalytics.setUser({ id: "account", email: "person@example.com" });
+    mobileAnalytics.setEnabled(true);
+    if (kind === "track") mobileAnalytics.track("usage_viewed", {});
+    await vi.advanceTimersByTimeAsync(0);
+    expect(requests).toHaveLength(1);
+    expect(JSON.parse(requests[0]).type).toBe(kind);
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+    mobileAnalytics.setEnabled(false);
+    fail = false;
+    mobileAnalytics.setEnabled(true);
+    mobileAnalytics.track("mobile_app_opened", { kind: "foreground", signed_in: kind === "identify" });
+    await vi.runAllTimersAsync();
+    await mobileAnalytics.settled();
+    expect(requests.map((body) => JSON.parse(body).type)).toEqual(
+      kind === "identify" ? ["identify", "identify", "track"] : ["track", "track"],
+    );
+    expect(JSON.parse(requests[requests.length - 1]).payload.name).toBe("mobile_app_opened");
+  });
+
   it("uses the native endpoint and strips SDK referrers, identifiers and content from actual HTTP requests", async () => {
     const requests = captureRequests();
     const { mobileAnalytics } = await import("./mobile-analytics");

@@ -53,10 +53,17 @@ export const mobileAnalytics = new MobileAnalytics(() => {
     filter: filterMobilePayload,
     debug: false,
   });
+  // The SDK retries below its payload filter. Keep one signal for each consent
+  // period so even retries delayed until after opt-in remain aborted.
+  let transport = new AbortController();
+  const send = client.api.fetch.bind(client.api);
+  client.api.fetch = (path, data, options) => send(path, data, { ...options, signal: transport.signal });
   return {
     track: (name, properties) => client.track(name, properties),
     identify: (user) => client.identify(user),
     clear: () => {
+      transport.abort();
+      transport = new AbortController();
       client.queue.length = 0;
       client.clear();
     },
