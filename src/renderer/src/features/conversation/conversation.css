@@ -2661,6 +2661,11 @@
     transform var(--openbot-duration-fast) cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+/*
+ * The two ends match: `space-4` from the pill edge to the arrow, and the same from the pill edge
+ * to the round dismiss mark, whose own `space-1` sits inside it. `space-2` divides arrow from
+ * label and label from mark.
+ */
 .scroll-to-latest[data-new-messages] .scroll-to-latest-button {
   width: auto;
   grid-auto-flow: column;
@@ -2685,7 +2690,7 @@
   place-items: center;
   border: 0;
   background: none;
-  padding-inline: var(--openbot-space-1) var(--openbot-space-3);
+  padding-inline: 0 var(--openbot-space-4);
   color: inherit;
   transition: transform var(--openbot-duration-fast) cubic-bezier(0.23, 1, 0.32, 1);
 }
