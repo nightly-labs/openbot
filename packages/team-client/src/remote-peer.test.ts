@@ -72,6 +72,27 @@ describe("browser remote peer recovery", () => {
     }
   });
 
+  it("keeps the connection online when an attachment download expires", async () => {
+    const network = await setupNetwork({ responseFile: { transferId: "b6396068-3405-4e51-9b42-d97bfd1e2f33" } });
+    await network.connect();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const result = network.runtime.execute({
+        id: "expired-download",
+        type: "request",
+        method: "GET",
+        path: "/v1/attachments/file-1",
+        body: null,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(await result).toMatchObject({ ok: false, error: "The attachment download timed out. Try again." });
+      expect(network.updates.at(-1)?.state).toBe("online");
+    } finally {
+      await network.runtime.dispose();
+    }
+  });
+
   it("returns authenticated attachment bytes through the native command bridge", async () => {
     const transferId = "b6396068-3405-4e51-9b42-d97bfd1e2f33";
     const network = await setupNetwork({

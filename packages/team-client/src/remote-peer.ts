@@ -612,8 +612,15 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       else if (!isDynamicRecord(frame.result) || !isNumber(frame.result.status) || !("body" in frame.result)) {
         pending.reject(new Error("The host returned an invalid response."));
       } else if (isDynamicRecord(frame.result.file) && isString(frame.result.file.transferId)) {
-        const file = await downloads.take(frame.result.file.transferId);
-        pending.resolve({ status: frame.result.status, body: { ...file } });
+        // The RPC response arrived; the file receiver now owns the inactivity
+        // deadline. A download failure rejects this request, not the peer.
+        clearTimeout(pending.timer);
+        try {
+          const file = await downloads.take(frame.result.file.transferId);
+          pending.resolve({ status: frame.result.status, body: { ...file } });
+        } catch (error) {
+          pending.reject(error instanceof Error ? error : new Error("The attachment download failed."));
+        }
       } else {
         pending.resolve({
           status: frame.result.status,

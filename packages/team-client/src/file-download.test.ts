@@ -3,9 +3,11 @@ import {
   encodeTeamProtocolV2FileChunk,
   encodeTeamProtocolV2Frame,
 } from "@openbot/contracts/team-protocol/v2";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRemoteFileReceiver } from "./file-download";
 import { createRemoteFileSender, MOBILE_ATTACHMENT_BYTES } from "./file-upload";
+
+afterEach(() => vi.useRealTimers());
 
 const transferId = "b6396068-3405-4e51-9b42-d97bfd1e2f33";
 const open = {
@@ -74,4 +76,53 @@ describe("mobile attachment downloads", () => {
     receiver.clear();
     await expect(result).rejects.toThrow("connection closed");
   });
+});
+
+it("keeps a progressing download alive beyond sixty seconds", async () => {
+  vi.useFakeTimers();
+  const receiver = createRemoteFileReceiver(async () => {});
+  const result = receiver.take(transferId);
+  const checked = expect(result).resolves.toMatchObject({ base64: btoa("hello") });
+  await receiver.receive(encodeTeamProtocolV2Frame(open));
+  for (let offset = 0; offset < 5; offset++) {
+    await vi.advanceTimersByTimeAsync(30_000);
+    await receiver.receive(
+      new Uint8Array(
+        encodeTeamProtocolV2FileChunk({
+          transferId,
+          offset,
+          bytes: new TextEncoder().encode("hello"[offset]),
+        }),
+      ).buffer,
+    );
+  }
+  await receiver.receive(encodeTeamProtocolV2Frame({ version: 2, type: "file-complete", transferId }));
+  await checked;
+  receiver.clear();
+});
+
+it("rejects an idle download and cancels late chunks without a protocol error", async () => {
+  vi.useFakeTimers();
+  const frames: string[] = [];
+  const receiver = createRemoteFileReceiver(async (data) => {
+    frames.push(data);
+  });
+  await receiver.receive(encodeTeamProtocolV2Frame(open));
+  const checked = expect(receiver.take(transferId)).rejects.toThrow("timed out");
+  await vi.advanceTimersByTimeAsync(60_000);
+  await checked;
+  await receiver.receive(
+    new Uint8Array(
+      encodeTeamProtocolV2FileChunk({
+        transferId,
+        offset: 0,
+        bytes: new TextEncoder().encode("hello"),
+      }),
+    ).buffer,
+  );
+  expect(decodeTeamProtocolV2FileControlFrame(frames.at(-1) ?? "")).toMatchObject({ type: "file-cancel", transferId });
+  await expect(
+    receiver.receive(encodeTeamProtocolV2Frame({ version: 2, type: "file-complete", transferId })),
+  ).resolves.toBe(true);
+  receiver.clear();
 });

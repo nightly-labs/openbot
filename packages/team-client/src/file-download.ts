@@ -28,6 +28,27 @@ export function createRemoteFileReceiver(send: (data: string) => Promise<void>) 
     if (entry) clearTimeout(entry.timer);
     downloads.delete(id);
   }
+  function expire(id: string) {
+    remove(id);
+    const waiter = waiters.get(id);
+    if (waiter) {
+      clearTimeout(waiter.timer);
+      waiters.delete(id);
+      waiter.reject(new Error("The attachment download timed out. Try again."));
+    }
+  }
+  function touch(id: string) {
+    const entry = downloads.get(id);
+    if (entry) {
+      clearTimeout(entry.timer);
+      entry.timer = setTimeout(() => expire(id), 60_000);
+    }
+    const waiter = waiters.get(id);
+    if (waiter) {
+      clearTimeout(waiter.timer);
+      waiter.timer = setTimeout(() => expire(id), 60_000);
+    }
+  }
   return {
     clear() {
       for (const id of downloads.keys()) remove(id);
@@ -41,11 +62,7 @@ export function createRemoteFileReceiver(send: (data: string) => Promise<void>) 
       if (!downloads.get(id)?.complete) {
         if (waiters.has(id) || waiters.size >= 10) throw new Error("Too many attachment downloads.");
         await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(() => {
-            waiters.delete(id);
-            remove(id);
-            reject(new Error("The attachment download timed out. Try again."));
-          }, 60_000);
+          const timer = setTimeout(() => expire(id), 60_000);
           waiters.set(id, { resolve, reject, timer });
         });
       }
@@ -61,15 +78,24 @@ export function createRemoteFileReceiver(send: (data: string) => Promise<void>) 
       if (typeof data !== "string") {
         const chunk = decodeTeamProtocolV2FileChunk(data);
         const entry = downloads.get(chunk.transferId);
-        if (
-          !entry ||
-          entry.complete ||
-          chunk.offset !== entry.received ||
-          chunk.offset + chunk.bytes.length > entry.bytes.length
-        )
+        // A timed-out transfer may still have chunks in flight. Cancel only that
+        // transfer; an expired download must not invalidate the peer connection.
+        if (!entry) {
+          await send(
+            encodeTeamProtocolV2Frame({
+              version: 2,
+              type: "file-cancel",
+              transferId: chunk.transferId,
+              reason: "The attachment download is no longer active.",
+            }),
+          );
+          return true;
+        }
+        if (entry.complete || chunk.offset !== entry.received || chunk.offset + chunk.bytes.length > entry.bytes.length)
           throw new Error("The host sent an invalid attachment chunk.");
         entry.bytes.set(chunk.bytes, chunk.offset);
         entry.received += chunk.bytes.length;
+        if (chunk.bytes.length > 0) touch(chunk.transferId);
         await send(
           encodeTeamProtocolV2Frame({
             version: 2,
@@ -106,8 +132,9 @@ export function createRemoteFileReceiver(send: (data: string) => Promise<void>) 
           received: 0,
           digest: frame.sha256,
           complete: false,
-          timer: setTimeout(() => remove(frame.transferId), 60_000),
+          timer: setTimeout(() => expire(frame.transferId), 60_000),
         });
+        touch(frame.transferId);
         await send(
           encodeTeamProtocolV2Frame({ version: 2, type: "file-ack", transferId: frame.transferId, receivedThrough: 0 }),
         );
@@ -115,13 +142,15 @@ export function createRemoteFileReceiver(send: (data: string) => Promise<void>) 
       }
       if (frame.type === "file-complete") {
         const entry = downloads.get(frame.transferId);
-        if (!entry || entry.received !== entry.bytes.length) throw new Error("The attachment download is incomplete.");
+        if (!entry) return true;
+        if (entry.received !== entry.bytes.length) throw new Error("The attachment download is incomplete.");
         const digest = Array.from(sha256(entry.bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
         if (digest !== entry.digest) {
           remove(frame.transferId);
           throw new Error("The attachment download is damaged. Try again.");
         }
         entry.complete = true;
+        touch(frame.transferId);
         const waiter = waiters.get(frame.transferId);
         if (waiter) {
           clearTimeout(waiter.timer);
