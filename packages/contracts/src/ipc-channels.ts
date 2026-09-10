@@ -145,6 +145,7 @@ export const IPC_CHANNELS = {
   browserPictureInPictureEvent: "browser:picture-in-picture-event",
   serversList: "servers:list",
   serversSelect: "servers:select",
+  serversSetMuted: "servers:set-muted",
   serversReorder: "servers:reorder",
   serversJoin: "servers:join",
   serversPreviewInvite: "servers:preview-invite",

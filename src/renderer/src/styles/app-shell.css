@@ -3113,3 +3113,12 @@ textarea {
   border-color: var(--openbot-border-strong);
   background: var(--openbot-bg-surface);
 }
+
+.server-rail-muted {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  color: var(--openbot-text-secondary);
+  background: var(--openbot-bg-sidebar);
+  border-radius: var(--openbot-radius-sm);
+}

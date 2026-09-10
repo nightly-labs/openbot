@@ -280,24 +280,42 @@ export class RemoteServerStore implements RemoteServerDirectory {
     await this.persist();
   }
 
-  // Snapshots before queueing, so a write that is still waiting behind an earlier one records the
-  // state as it was when its caller asked, not as it is when the disk gets around to it. The
-  // temporary file plus rename is what keeps a half-written `servers.json` from ever existing.
-  async persist(): Promise<void> {
-    const snapshot = structuredClone(this.#state);
+  isMuted(serverId: string): boolean {
+    return this.#state.mutedServerIds.includes(serverId);
+  }
+
+  async setMuted(serverId: string, muted: boolean): Promise<void> {
     const operation = this.#writeChain.then(async () => {
-      const temporary = `${this.#path}.${randomUUID()}.tmp`;
-      try {
-        await writeFile(temporary, `${JSON.stringify(serializeStoredRemoteServers(snapshot))}\n`, {
-          encoding: "utf8",
-          mode: 0o600,
-        });
-        await rename(temporary, this.#path);
-      } finally {
-        await rm(temporary, { force: true });
-      }
+      if (serverId !== LOCAL_SERVER_ID && !this.has(serverId)) throw new Error("Remote server not found.");
+      const mutedServerIds = this.#state.mutedServerIds.filter((id) => id !== serverId);
+      if (muted) mutedServerIds.push(serverId);
+      await this.#writeSnapshot({ ...structuredClone(this.#state), mutedServerIds });
+      this.#state.mutedServerIds = mutedServerIds;
     });
     this.#writeChain = operation.catch(() => undefined);
     await operation;
+  }
+
+  // Capture server state now, but use the mute preference committed by preceding writes.
+  async persist(): Promise<void> {
+    const snapshot = structuredClone(this.#state);
+    const operation = this.#writeChain.then(() =>
+      this.#writeSnapshot({ ...snapshot, mutedServerIds: [...this.#state.mutedServerIds] }),
+    );
+    this.#writeChain = operation.catch(() => undefined);
+    await operation;
+  }
+
+  async #writeSnapshot(snapshot: StoredRemoteServers): Promise<void> {
+    const temporary = `${this.#path}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporary, `${JSON.stringify(serializeStoredRemoteServers(snapshot))}\n`, {
+        encoding: "utf8",
+        mode: 0o600,
+      });
+      await rename(temporary, this.#path);
+    } finally {
+      await rm(temporary, { force: true });
+    }
   }
 }

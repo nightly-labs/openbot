@@ -125,6 +125,7 @@ describe("OpenBot connected desktop shell", () => {
         id: "local",
         name: "Local",
         logoUrl: null,
+        notificationsMuted: false,
         kind: "local",
         state: "online",
         apiUrl: null,
@@ -136,6 +137,7 @@ describe("OpenBot connected desktop shell", () => {
         id: "remote-1",
         name: "Studio Mac",
         logoUrl: null,
+        notificationsMuted: false,
         kind: "remote",
         state: "online",
         apiUrl: "https://studio.example.com",
@@ -396,6 +398,7 @@ describe("OpenBot connected desktop shell", () => {
         id: "local",
         name: "Local",
         logoUrl: null,
+        notificationsMuted: false,
         kind: "local",
         state: "online",
         apiUrl: null,
@@ -407,6 +410,7 @@ describe("OpenBot connected desktop shell", () => {
         id: "remote-1",
         name: "Studio Mac",
         logoUrl: null,
+        notificationsMuted: false,
         kind: "remote",
         state: "online",
         apiUrl: "https://studio.example.com",
@@ -494,6 +498,7 @@ describe("OpenBot connected desktop shell", () => {
       id: "local",
       name: "Local",
       logoUrl: null,
+      notificationsMuted: false,
       kind: "local",
       state: "online",
       apiUrl: null,
@@ -505,6 +510,7 @@ describe("OpenBot connected desktop shell", () => {
       id: "remote-1",
       name: "Studio Mac",
       logoUrl: null,
+      notificationsMuted: false,
       kind: "remote",
       state: "online",
       apiUrl: "https://studio.example.com",
@@ -556,6 +562,7 @@ describe("OpenBot connected desktop shell", () => {
       id: "local",
       name: "Local",
       logoUrl: null,
+      notificationsMuted: false,
       kind: "local",
       state: "online",
       apiUrl: null,
@@ -567,6 +574,7 @@ describe("OpenBot connected desktop shell", () => {
       id: "remote-1",
       name: "Studio Mac",
       logoUrl: null,
+      notificationsMuted: false,
       kind: "remote",
       state: "online",
       apiUrl: "https://studio.example.com",
@@ -912,6 +920,7 @@ describe("OpenBot connected desktop shell", () => {
           id: "remote-1",
           name: "Studio Mac",
           logoUrl: null,
+          notificationsMuted: false,
           kind: "remote",
           state: "online",
           apiUrl: "https://studio-mac-k7m4q2pz-host.openbot.run",
@@ -981,6 +990,7 @@ describe("OpenBot connected desktop shell", () => {
         id: "remote-1",
         name: "Studio Mac",
         logoUrl: null,
+        notificationsMuted: false,
         kind: "remote" as const,
         state: "online" as const,
         apiUrl: "https://studio.example.com",
@@ -992,6 +1002,7 @@ describe("OpenBot connected desktop shell", () => {
         id: "remote-2",
         name: "Office PC",
         logoUrl: null,
+        notificationsMuted: false,
         kind: "remote" as const,
         state: "online" as const,
         apiUrl: "https://office.example.com",
@@ -1290,6 +1301,7 @@ describe("OpenBot connected desktop shell", () => {
       id: "studio",
       name: "Design studio",
       logoUrl: null,
+      notificationsMuted: false,
       kind: "remote" as const,
       state: "online" as const,
       apiUrl: "https://studio.example.com",
@@ -1302,6 +1314,7 @@ describe("OpenBot connected desktop shell", () => {
         id: "local",
         name: "Local",
         logoUrl: null,
+        notificationsMuted: false,
         kind: "local",
         state: "online",
         apiUrl: null,
@@ -1351,6 +1364,7 @@ describe("OpenBot connected desktop shell", () => {
           id: "local",
           name: "Local",
           logoUrl: null,
+          notificationsMuted: false,
           kind: "local",
           state: "online",
           apiUrl: null,
@@ -1469,4 +1483,33 @@ describe("OpenBot connected desktop shell", () => {
 
     expect(await screen.findByRole("heading", { name: /Usage.*Studio Mac/ })).toBeInTheDocument();
   });
+});
+
+it("mutes and unmutes a server without changing other servers", async () => {
+  installOpenbotStub();
+  let servers = [testServer("local", true), testServer("remote-1", false)];
+  vi.mocked(window.openbot.servers.list).mockResolvedValue(servers);
+  vi.mocked(window.openbot.servers.setMuted).mockImplementation(async ({ serverId, muted }) => {
+    servers = servers.map((server) => (server.id === serverId ? { ...server, notificationsMuted: muted } : server));
+    return servers;
+  });
+  render(() => <App />);
+  await fireEvent.contextMenu(await screen.findByRole("button", { name: "Studio Mac server" }));
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Mute notifications" }), { button: 0 });
+  const muted = await screen.findByRole("button", { name: "Studio Mac server, notifications muted" });
+  expect(screen.getByRole("button", { name: "Local server" })).toBeVisible();
+  await fireEvent.contextMenu(muted);
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Unmute notifications" }), { button: 0 });
+  expect(await screen.findByRole("button", { name: "Studio Mac server" })).toBeVisible();
+});
+
+it("keeps a server unmuted when saving fails", async () => {
+  installOpenbotStub();
+  vi.mocked(window.openbot.servers.list).mockResolvedValue([testServer("local", true)]);
+  vi.mocked(window.openbot.servers.setMuted).mockRejectedValue(new Error("Disk is full."));
+  render(() => <App />);
+  await fireEvent.contextMenu(await screen.findByRole("button", { name: "Local server" }));
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Mute notifications" }), { button: 0 });
+  expect(await screen.findByText("Could not change server notifications")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Local server" })).toBeVisible();
 });
