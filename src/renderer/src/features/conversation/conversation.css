@@ -2633,9 +2633,16 @@
   transition: background-color var(--openbot-duration-hover) ease;
 }
 
-/* With a count the pill wears the colours of the unread banner: it is the same news. */
+/*
+ * With a count the pill wears the colours of the unread banner: it is the same news. It is also
+ * lower than the round arrow, and the label makes it wider, so the bottom edge is held where the
+ * circle had it: `100% - 58px` plus `44px` is the same line as `100% - 50px` plus `36px`.
+ */
 .scroll-to-latest[data-new-messages] {
+  top: calc(100% - 50px);
+  height: 36px;
   border-color: transparent;
+  margin-bottom: -36px;
   background: var(--openbot-unread-surface);
   color: var(--openbot-unread-text);
 }
@@ -2657,8 +2664,8 @@
 .scroll-to-latest[data-new-messages] .scroll-to-latest-button {
   width: auto;
   grid-auto-flow: column;
-  gap: var(--openbot-space-1-5);
-  padding-inline: var(--openbot-space-3) var(--openbot-space-2);
+  gap: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-4) var(--openbot-space-2);
 }
 
 .scroll-to-latest-count {
@@ -2669,16 +2676,16 @@
 
 /*
  * The whole height stays clickable, but nothing here is painted: a highlight on this button would
- * fill the end of the pill. The hover and focus marks sit on the icon below, which is round.
+ * fill the end of the pill. The hover and focus marks sit on the icon below, which is round, and
+ * that round mark is what separates the two halves. No rule divides them.
  */
 .scroll-to-latest-dismiss {
   display: grid;
   height: 100%;
   place-items: center;
   border: 0;
-  border-inline-start: 1px solid color-mix(in srgb, currentcolor 24%, transparent);
   background: none;
-  padding-inline: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-1) var(--openbot-space-3);
   color: inherit;
   transition: transform var(--openbot-duration-fast) cubic-bezier(0.23, 1, 0.32, 1);
 }
@@ -2749,8 +2756,9 @@
     background: var(--openbot-bg-control-active);
   }
 
+  /* The pill has one hover, on the dismiss icon. Its body is a wide target and needs no mark. */
   .scroll-to-latest[data-new-messages] .scroll-to-latest-button:hover:not(:disabled):not([data-disabled]) {
-    background: color-mix(in srgb, var(--openbot-unread-text) 12%, transparent);
+    background: none;
   }
 
   .scroll-to-latest[data-new-messages] .scroll-to-latest-dismiss:hover svg {
