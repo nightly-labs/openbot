@@ -271,7 +271,7 @@ Advancing a cursor emits a conversation invalidation without the reader's identi
 clients reload their own read state even when the conversation content revision is unchanged.
 Mobile acknowledges rendered replies only in the foreground, focused chat at the latest messages.
 Mobile attachments use the shared desktop filename allowlist in `packages/contracts/src/attachment-files.ts`.
-The native document, photo, and camera pickers prepare local drafts. The existing Team file protocol
+The native document and photo pickers and the in-chat camera panel prepare local drafts. The existing Team file protocol
 uploads them to the host before one message commits the ordered draft IDs. Mobile limits each file
 to 10 MB because the native/DOM bridge copies Base64 data. Downloads use the same authenticated file
 channel, validate size, chunk order, and SHA-256, and pass verified bytes back through the command

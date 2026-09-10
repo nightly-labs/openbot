@@ -13,7 +13,7 @@ const native = vi.hoisted(() => ({
   alert: vi.fn(),
   size: 5,
 }));
-vi.mock("react-native", () => ({ Alert: { alert: native.alert } }));
+vi.mock("react-native", () => ({ Alert: { alert: native.alert }, Keyboard: { dismiss: () => {} } }));
 vi.mock("expo-document-picker", () => ({ getDocumentAsync: native.documents }));
 vi.mock("expo-image-picker", () => ({
   launchCameraAsync: native.camera,
@@ -110,10 +110,15 @@ describe("mobile attachment selection", () => {
     });
     expect(state().items).toEqual([]);
     native.permission.mockResolvedValue({ granted: true });
-    native.camera.mockResolvedValue({ canceled: false, assets: [{ uri: "file:///photo.jpg", fileName: null }] });
+
     await act(async () => {
       await state().takePhoto();
     });
+    expect(state().cameraOpen).toBe(true);
+    await act(async () => {
+      await state().addPhoto("file:///photo.jpg");
+    });
+    expect(state().cameraOpen).toBe(false);
     expect(state().items.map((item) => ({ name: item.name, mime: item.mimeType }))).toEqual([
       { name: "photo.jpg", mime: "image/jpeg" },
     ]);

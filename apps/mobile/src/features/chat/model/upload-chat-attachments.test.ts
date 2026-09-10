@@ -3,7 +3,7 @@ import { uploadChatAttachments } from "./upload-chat-attachments";
 
 const files = ["first.txt", "second.csv"].map((name) => ({ name, mimeType: "text/plain", base64: btoa(name) }));
 describe("chat attachment send", () => {
-  it("associates all uploaded IDs with one message in selection order", async () => {
+  it.each([true, false])("associates uploads with one message (progress enabled: %s)", async (showProgress) => {
     const progress: number[] = [];
     const sent: string[][] = [];
     const result = await uploadChatAttachments(files, {
@@ -13,13 +13,12 @@ describe("chat attachment send", () => {
         sent.push(ids);
         return "message";
       },
-      cancelled: () => false,
-      progress: (count) => progress.push(count),
+      ...(showProgress ? { cancelled: () => false, progress: (count: number) => progress.push(count) } : {}),
     });
     expect({ result, sent, progress }).toEqual({
       result: "message",
       sent: [["first.txt", "second.csv"]],
-      progress: [0, 1, 2],
+      progress: showProgress ? [0, 1, 2] : [],
     });
   });
   it.each(["cancel", "failure"])(

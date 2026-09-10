@@ -10,7 +10,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { useRef, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, Keyboard } from "react-native";
 
 export interface ChatAttachment extends RemoteFileUpload {
   id: string;
@@ -25,6 +25,7 @@ function base64(bytes: Uint8Array) {
 }
 
 export function useChatAttachments() {
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [items, setItems] = useState<ChatAttachment[]>([]);
   const itemsRef = useRef<ChatAttachment[]>([]);
   const sequence = useRef(0);
@@ -58,20 +59,22 @@ export function useChatAttachments() {
     const result = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true });
     if (!result.canceled) for (const asset of result.assets) await addFile(asset.uri, asset.name);
   }
-  async function choosePhotos(camera: boolean) {
+  async function openCamera() {
     if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error("You can attach up to 10 files.");
-    if (camera && !(await ImagePicker.requestCameraPermissionsAsync()).granted) {
+    if (!(await ImagePicker.requestCameraPermissionsAsync()).granted)
       throw new Error("Allow camera access in Settings to take a photo.");
-    }
-    const result = camera
-      ? await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 1 })
-      : await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ["images"],
-          allowsMultipleSelection: true,
-          quality: 1,
-          preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
-          selectionLimit: INPUT_LIMITS.attachments - itemsRef.current.length,
-        });
+    Keyboard.dismiss();
+    setCameraOpen(true);
+  }
+  async function choosePhotos() {
+    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error("You can attach up to 10 files.");
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      quality: 1,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+      selectionLimit: INPUT_LIMITS.attachments - itemsRef.current.length,
+    });
     if (!result.canceled)
       for (const asset of result.assets) {
         const extension = asset.uri.split(".").at(-1)?.toLowerCase();
@@ -103,8 +106,14 @@ export function useChatAttachments() {
   return {
     items,
     preparing,
-    choosePhotos: () => report(() => choosePhotos(false)),
-    takePhoto: () => report(() => choosePhotos(true)),
+    cameraOpen,
+    closeCamera: () => setCameraOpen(false),
+    addPhoto: async (uri: string) => {
+      await addFile(uri, "photo.jpg");
+      setCameraOpen(false);
+    },
+    choosePhotos: () => report(choosePhotos),
+    takePhoto: () => report(openCamera),
     chooseFiles: () => report(chooseFiles),
     paste,
     remove: (id: string) => replace(itemsRef.current.filter((item) => item.id !== id)),

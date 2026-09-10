@@ -7,19 +7,19 @@ export async function uploadChatAttachments(
     upload: (file: RemoteFileUpload) => Promise<{ id: string }>;
     discard: (id: string) => Promise<void>;
     send: (ids: string[]) => Promise<string>;
-    cancelled: () => boolean;
-    progress: (completed: number) => void;
+    cancelled?: () => boolean;
+    progress?: (completed: number) => void;
   },
 ): Promise<string> {
   const ids: string[] = [];
   try {
-    actions.progress(0);
+    actions.progress?.(0);
     for (const file of files) {
-      if (actions.cancelled()) throw new Error("Attachment upload cancelled.");
+      if (actions.cancelled?.()) throw new Error("Attachment upload cancelled.");
       ids.push((await actions.upload(file)).id);
-      actions.progress(ids.length);
+      actions.progress?.(ids.length);
     }
-    if (actions.cancelled()) throw new Error("Attachment upload cancelled.");
+    if (actions.cancelled?.()) throw new Error("Attachment upload cancelled.");
     return await actions.send(ids);
   } catch (error) {
     await Promise.allSettled(ids.map(actions.discard));

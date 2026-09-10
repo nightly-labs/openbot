@@ -2,7 +2,7 @@ import { userErrorMessage } from "@openbot/user-errors";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import * as Haptics from "expo-haptics";
 import { router, useIsFocused } from "expo-router";
-import { Button, Typography } from "heroui-native";
+import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ArrowDown } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -33,6 +33,7 @@ import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { isIOS } from "@/shared/lib/platform";
 import { uploadChatAttachments } from "../model/upload-chat-attachments";
+import { ChatCameraPanel } from "./chat-camera-panel";
 
 interface MobileChatViewProps {
   animateAvatarOnExit?: boolean;
@@ -70,9 +71,6 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   const [sending, setSending] = useState(false);
   const [sendRetryVersion, setSendRetryVersion] = useState(0);
   const [composerGestureHeight, setComposerGestureHeight] = useState(0);
-  const [uploadProgress, setUploadProgress] = useState<{ completed: number; total: number } | null>(null);
-  const [cancellingUpload, setCancellingUpload] = useState(false);
-  const uploadCancelled = useRef(false);
   const sendingRef = useRef(false);
   const attachments = useChatAttachments();
   const [pendingMessage, setPendingMessage] = useState<PendingChatMessage | null>(null);
@@ -184,7 +182,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   const edgeBackGesture = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(!isIOS)
+        .enabled(!isIOS && !attachments.cameraOpen)
         .hitSlop({ left: 0, width: CHAT_BACK_EDGE_WIDTH })
         .activeOffsetX(12)
         .failOffsetX(-8)
@@ -192,7 +190,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
         .onEnd((event) => {
           if (event.translationX >= 48 || event.velocityX >= 650) scheduleOnRN(handleLeaveConversation);
         }),
-    [handleLeaveConversation],
+    [handleLeaveConversation, attachments.cameraOpen],
   );
 
   function sendMessage(value: string): void {
@@ -240,21 +238,12 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
       baseline: new Set(projectedMessages.map((message) => message.id)),
       serverId: null,
     });
-    uploadCancelled.current = false;
-    setCancellingUpload(false);
     void (async () => {
       try {
         const serverId = await uploadChatAttachments(files, {
           upload: (file) => uploadAttachment(agent.id, file),
           discard: (id) => discardAttachment(agent.id, id),
-          send: (ids) => {
-            setUploadProgress(null);
-            return sendTeamMessage(agent.id, body, ids, submittedReply?.id ?? null);
-          },
-          cancelled: () => uploadCancelled.current,
-          progress: (completed) => {
-            if (files.length) setUploadProgress({ completed, total: files.length });
-          },
+          send: (ids) => sendTeamMessage(agent.id, body, ids, submittedReply?.id ?? null),
         });
         setMessageAliases((current) => new Map(current).set(serverId, localId));
         setPendingMessage((current) => (current?.message.id === localId ? { ...current, serverId } : current));
@@ -273,7 +262,6 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
           ),
         });
       } finally {
-        setUploadProgress(null);
         sendingRef.current = false;
         setSending(false);
       }
@@ -283,153 +271,143 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   return (
     <GestureDetector gesture={edgeBackGesture}>
       <View className="flex-1" style={{ backgroundColor: background }}>
-        <KeyboardGestureArea
-          style={{ flex: 1 }}
-          textInputNativeID="chat-composer-input"
-          interpolator="ios"
-          enableSwipeToDismiss
-          offset={Math.max(0, composerGestureHeight - keyboardOffset)}
+        <View
+          className="flex-1"
+          accessibilityElementsHidden={attachments.cameraOpen}
+          importantForAccessibility={attachments.cameraOpen ? "no-hide-descendants" : "auto"}
+          pointerEvents={attachments.cameraOpen ? "none" : "auto"}
         >
-          <ChatHeader
-            agent={agent}
-            fallbackBackground={fieldBackground}
-            foreground={foreground}
-            liquidGlassAvailable={liquidGlassAvailable}
-            topInset={insets.top}
-            onBack={handleLeaveConversation}
-          />
-          <ChatMessageList
-            agents={agents.filter((candidate) => candidate.serverId === agent.serverId)}
-            agent={agent}
-            motion={motion}
-            sending={sending}
-            keyboardOffset={keyboardOffset}
-            canSend={serverOnline}
-            historyState={
-              conversation
-                ? "ready"
-                : server?.initialConnectionPending
-                  ? "connecting"
-                  : !serverOnline
-                    ? "waiting"
-                    : historyLoadFailed
-                      ? "error"
-                      : "loading"
-            }
-            appActive={appActive}
-            activeTurnId={conversation?.activeTurnId ?? null}
-            questionForm={questionForm}
-            fieldBackground={fieldBackground}
-            foreground={foreground}
-            messages={messages}
-            messageAliases={messageAliases}
-            onReply={
-              !questionForm.question
-                ? (message) => {
-                    setReplyTarget(message);
-                    setReplyFocusVersion((version) => version + 1);
-                  }
-                : undefined
-            }
-            onOpenActions={(message) => {
-              Keyboard.dismiss();
-              selectMessageActions({
-                message,
-                onReply: !questionForm.question
-                  ? () => {
-                      setReplyTarget(message);
-                      setReplyFocusVersion((version) => version + 1);
-                    }
-                  : null,
-              });
-              router.push("/message-actions");
-            }}
-            muted={muted}
-            raised={raised}
-            showStarter={showStarter && serverOnline && !activity && conversation?.messages.length === 0}
-            topInset={insets.top}
-            onDismissStarter={() => setShowStarter(false)}
-            onSelectStarter={sendMessage}
-            onRetryHistory={fetchHistory}
-          />
-          <Animated.View
-            style={[{ position: "absolute", left: 0, right: 0, bottom: 0 }, motion.composerStyle]}
-            pointerEvents="box-none"
-            onLayout={(event) => {
-              motion.onComposerLayout(event);
-              setComposerGestureHeight(event.nativeEvent.layout.height);
-            }}
+          <KeyboardGestureArea
+            style={{ flex: 1 }}
+            textInputNativeID="chat-composer-input"
+            interpolator="ios"
+            enableSwipeToDismiss
+            offset={Math.max(0, composerGestureHeight - keyboardOffset)}
           >
-            {!atLatest && motion.historyVisible && messages.length > 0 ? (
-              <View className="absolute -top-14 self-center">
-                <ChatGlassIconButton
-                  accessibilityLabel="Scroll to latest message"
-                  fallbackBackground={fieldBackground}
-                  liquidGlassAvailable={liquidGlassAvailable}
-                  onPress={motion.scrollToLatest}
-                >
-                  <ArrowDown color={String(foreground)} size={22} />
-                </ChatGlassIconButton>
-              </View>
-            ) : null}
-            <ConnectionStatus server={server} />
-            {sendError?.agentId === agent.id ? (
-              <Typography.Paragraph accessibilityRole="alert" className="bg-background px-4 py-2 text-danger">
-                {sendError.message}
-              </Typography.Paragraph>
-            ) : null}
-            {uploadProgress ? (
-              <View className="flex-row items-center justify-between px-4">
-                <Typography.Paragraph type="body-xs" accessibilityLiveRegion="polite">
-                  {cancellingUpload
-                    ? "Cancelling upload…"
-                    : `Uploading attachments: ${uploadProgress.completed} of ${uploadProgress.total}`}
-                </Typography.Paragraph>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  isDisabled={cancellingUpload}
-                  onPress={() => {
-                    uploadCancelled.current = true;
-                    setCancellingUpload(true);
-                  }}
-                >
-                  <Button.Label>Cancel upload</Button.Label>
-                </Button>
-              </View>
-            ) : null}
-            <ChatComposer
-              sendRetryVersion={sendRetryVersion}
-              replyTarget={questionForm.question ? null : replyTarget}
-              replyFocusVersion={replyFocusVersion}
-              onCancelReply={() => setReplyTarget(null)}
-              mentionAgents={agents.filter(
-                (candidate) => candidate.serverId === agent.serverId && candidate.id !== agent.id,
-              )}
-              key={JSON.stringify([
-                agent.id,
-                questionForm.question ? questionForm.messageId : null,
-                questionForm.question?.id,
-              ])}
-              action={action}
-              actionForeground={actionForeground}
-              agentName={agent.name}
-              bottomInset={insets.bottom}
-              disabled={!serverOnline || questionForm.pending}
-              sending={sending || Boolean(pendingMessage)}
-              attachments={attachments}
-              answerQuestion={questionForm.question}
-              draft={questionForm.question ? questionForm.draft : draft}
+            <ChatHeader
+              agent={agent}
               fallbackBackground={fieldBackground}
               foreground={foreground}
               liquidGlassAvailable={liquidGlassAvailable}
+              topInset={insets.top}
+              onBack={handleLeaveConversation}
+            />
+            <ChatMessageList
+              agents={agents.filter((candidate) => candidate.serverId === agent.serverId)}
+              agent={agent}
+              motion={motion}
+              sending={sending}
+              keyboardOffset={keyboardOffset}
+              canSend={serverOnline}
+              historyState={
+                conversation
+                  ? "ready"
+                  : server?.initialConnectionPending
+                    ? "connecting"
+                    : !serverOnline
+                      ? "waiting"
+                      : historyLoadFailed
+                        ? "error"
+                        : "loading"
+              }
+              appActive={appActive}
+              activeTurnId={conversation?.activeTurnId ?? null}
+              questionForm={questionForm}
+              fieldBackground={fieldBackground}
+              foreground={foreground}
+              messages={messages}
+              messageAliases={messageAliases}
+              onReply={
+                !questionForm.question
+                  ? (message) => {
+                      setReplyTarget(message);
+                      setReplyFocusVersion((version) => version + 1);
+                    }
+                  : undefined
+              }
+              onOpenActions={(message) => {
+                Keyboard.dismiss();
+                selectMessageActions({
+                  message,
+                  onReply: !questionForm.question
+                    ? () => {
+                        setReplyTarget(message);
+                        setReplyFocusVersion((version) => version + 1);
+                      }
+                    : null,
+                });
+                router.push("/message-actions");
+              }}
               muted={muted}
               raised={raised}
-              onChangeDraft={questionForm.question ? questionForm.setDraft : setDraft}
-              onSend={sendMessage}
+              showStarter={showStarter && serverOnline && !activity && conversation?.messages.length === 0}
+              topInset={insets.top}
+              onDismissStarter={() => setShowStarter(false)}
+              onSelectStarter={sendMessage}
+              onRetryHistory={fetchHistory}
             />
-          </Animated.View>
-        </KeyboardGestureArea>
+            <Animated.View
+              style={[{ position: "absolute", left: 0, right: 0, bottom: 0 }, motion.composerStyle]}
+              pointerEvents="box-none"
+              onLayout={(event) => {
+                motion.onComposerLayout(event);
+                setComposerGestureHeight(event.nativeEvent.layout.height);
+              }}
+            >
+              {!atLatest && motion.historyVisible && messages.length > 0 ? (
+                <View className="absolute -top-14 self-center">
+                  <ChatGlassIconButton
+                    accessibilityLabel="Scroll to latest message"
+                    fallbackBackground={fieldBackground}
+                    liquidGlassAvailable={liquidGlassAvailable}
+                    onPress={motion.scrollToLatest}
+                  >
+                    <ArrowDown color={String(foreground)} size={22} />
+                  </ChatGlassIconButton>
+                </View>
+              ) : null}
+              <ConnectionStatus server={server} />
+              {sendError?.agentId === agent.id ? (
+                <Typography.Paragraph accessibilityRole="alert" className="bg-background px-4 py-2 text-danger">
+                  {sendError.message}
+                </Typography.Paragraph>
+              ) : null}
+              <ChatComposer
+                sendRetryVersion={sendRetryVersion}
+                replyTarget={questionForm.question ? null : replyTarget}
+                replyFocusVersion={replyFocusVersion}
+                onCancelReply={() => setReplyTarget(null)}
+                mentionAgents={agents.filter(
+                  (candidate) => candidate.serverId === agent.serverId && candidate.id !== agent.id,
+                )}
+                key={JSON.stringify([
+                  agent.id,
+                  questionForm.question ? questionForm.messageId : null,
+                  questionForm.question?.id,
+                ])}
+                action={action}
+                actionForeground={actionForeground}
+                agentName={agent.name}
+                bottomInset={insets.bottom}
+                disabled={!serverOnline || questionForm.pending}
+                sending={sending || Boolean(pendingMessage)}
+                attachments={attachments}
+                answerQuestion={questionForm.question}
+                draft={questionForm.question ? questionForm.draft : draft}
+                fallbackBackground={fieldBackground}
+                foreground={foreground}
+                liquidGlassAvailable={liquidGlassAvailable}
+                muted={muted}
+                raised={raised}
+                onChangeDraft={questionForm.question ? questionForm.setDraft : setDraft}
+                onSend={sendMessage}
+              />
+            </Animated.View>
+          </KeyboardGestureArea>
+        </View>
+        {attachments.cameraOpen && isFocused && appActive ? (
+          <ChatCameraPanel onClose={attachments.closeCamera} onPhoto={attachments.addPhoto} />
+        ) : null}
       </View>
     </GestureDetector>
   );
