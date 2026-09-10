@@ -137,7 +137,10 @@ bun run dev
 ```
 
 The seed adds agents, rich conversations, managed files and references, reactions, completed
-agent exchanges, and local team chat data. It does not add live queue items or start model turns.
+agent exchanges, two channels with a delegated task run, channel memories and routines, and local
+team chat data. It dates every record backwards from the run, so the transcripts read Today and
+Yesterday. It does not add live queue items, open routine runs, or queued channel tasks, so it
+starts no model turn.
 Use `bun run dev:seed --dry-run` to inspect the target and fixture counts without changing files.
 
 ### Marketplace launch catalog
@@ -165,7 +168,7 @@ Seed the approved OpenBot team catalog locally with `bun run marketplace:seed:lo
 | `bun run remote:update` | Update Signal, then drain and update the single coturn instance. |
 | `bun run dev:all` | Start the Auth API, Signal service, and single local Electron instance. |
 | `bun run dev:test-client` | Start the Auth API, Signal service, local instance, and an isolated second client for team testing. |
-| `bun run dev:seed` | Replace only the app development profile with deterministic showcase data. |
+| `bun run dev:seed` | Replace only the app development profile with durable showcase data. |
 | `bun run dev:reset` | Delete the local app, test-client, and legacy host development state. |
 | `bun run dev:status` | Print, as JSON, every dev stack and dev app instance live on this machine: services, ports, pids, which of them belong to this worktree, and which are orphaned - a supervisor that is gone with its children still holding the ports. Each recorded process carries the state a stop command acts on: `live`, `gone` with `groupLive` for a survivor of a dead leader, and `unverified` for a pid this machine cannot date. |
 | `bun run dev:stop` | Stop this worktree's dev stack, children included, using the pids in the registry rather than a process-name pattern. It signals only a pid whose start time still matches the record, so a recycled pid is never sent SIGTERM; anything it cannot confirm is reported, left running and kept in the registry, and the command exits non-zero. `--pid=<supervisor pid>` stops one other stack, `--all` stops every stack on the machine. |
