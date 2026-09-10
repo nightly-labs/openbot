@@ -902,6 +902,7 @@ export class BrowserHost {
         allowRunningInsecureContent: false,
       },
     });
+    view.webContents.setAudioMuted(true);
     view.setBackgroundColor("#0b0b0b");
     return view;
   }
