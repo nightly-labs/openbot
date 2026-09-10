@@ -44,10 +44,6 @@ function AuthenticatedStack() {
       >
         <Stack.Screen name="connected" options={{ animation: "fade", gestureEnabled: false, title: "" }} />
         <Stack.Screen
-          name="agent-usage/[agentId]"
-          options={{ title: "Usage", contentStyle: { backgroundColor: background } }}
-        />
-        <Stack.Screen
           name="chat/[agentId]"
           options={{
             animation: "slide_from_right",

@@ -61,6 +61,7 @@ import {
 } from "@/features/workspace/components/server-connection";
 import { type MobileAgentActivities, reduceAgentActivity } from "@/features/workspace/model/agent-activity";
 import { conversationMessageId, decodeConversation } from "@/features/workspace/model/conversation";
+import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
 import { applyServerRecovery, serverKind } from "@/features/workspace/model/server-status";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
 import type {
@@ -629,44 +630,75 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return host.hostId;
       },
       saveAgentMemory: async (agentId, text, serverId, memoryId) => {
-        await request(
-          memoryId ? "PATCH" : "POST",
-          memoryId ? TEAM_API_ROUTES.agent.memory(agentId, memoryId) : TEAM_API_ROUTES.agent.memories(agentId),
-          ignoreResponse,
-          { text },
-          serverId,
+        await saveAgentRecord(
+          queryClient,
+          ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, agentId, "memories"],
+          () =>
+            request(
+              memoryId ? "PATCH" : "POST",
+              memoryId ? TEAM_API_ROUTES.agent.memory(agentId, memoryId) : TEAM_API_ROUTES.agent.memories(agentId),
+              (value) => {
+                if (
+                  !isAgentMemory(value) ||
+                  value.agentId !== agentId ||
+                  (memoryId !== undefined && value.id !== memoryId)
+                )
+                  throw new Error("The host returned an invalid saved record.");
+                return value;
+              },
+              { text },
+              serverId,
+            ),
         );
       },
       deleteAgentMemory: async (agentId, memoryId, serverId) => {
         await request("DELETE", TEAM_API_ROUTES.agent.memory(agentId, memoryId), ignoreResponse, undefined, serverId);
       },
       createAgentRoutine: async (input, serverId) => {
-        await request(
-          "POST",
-          TEAM_API_ROUTES.agent.routines(input.agentId),
-          ignoreResponse,
-          {
-            name: input.name,
-            instruction: input.instruction,
-            active: input.active,
-            timezone: input.timezone,
-            schedule: input.schedule,
-          },
-          serverId,
+        await saveAgentRecord(
+          queryClient,
+          ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, input.agentId, "routines"],
+          () =>
+            request(
+              "POST",
+              TEAM_API_ROUTES.agent.routines(input.agentId),
+              (value) => {
+                if (!isRoutine(value) || value.agentId !== input.agentId)
+                  throw new Error("The host returned an invalid saved record.");
+                return value;
+              },
+              {
+                name: input.name,
+                instruction: input.instruction,
+                active: input.active,
+                timezone: input.timezone,
+                schedule: input.schedule,
+              },
+              serverId,
+            ),
         );
       },
       updateAgentRoutine: async (input, serverId) => {
-        await request(
-          "PATCH",
-          TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
-          ignoreResponse,
-          {
-            ...(input.name === undefined ? {} : { name: input.name }),
-            ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
-            ...(input.active === undefined ? {} : { active: input.active }),
-            ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
-          },
-          serverId,
+        await saveAgentRecord(
+          queryClient,
+          ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, input.agentId, "routines"],
+          () =>
+            request(
+              "PATCH",
+              TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+              (value) => {
+                if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
+                  throw new Error("The host returned an invalid saved record.");
+                return value;
+              },
+              {
+                ...(input.name === undefined ? {} : { name: input.name }),
+                ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
+                ...(input.active === undefined ? {} : { active: input.active }),
+                ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+              },
+              serverId,
+            ),
         );
       },
       deleteAgentRoutine: async (agentId, routineId, serverId) => {
@@ -880,6 +912,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     serverDirectoryState,
     servers,
     session.host,
+    session.apiUrl,
+    session.user.id,
+    sessionScope,
+    queryClient,
     unreadAgentIds,
     preferences,
     updatePreferences,

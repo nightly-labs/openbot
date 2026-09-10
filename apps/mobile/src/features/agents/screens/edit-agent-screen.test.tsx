@@ -13,6 +13,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { ChatHeader } from "../../chat/components/chat-header";
+import { saveAgentRecord } from "../../workspace/model/save-agent-record";
 import type { MobileAgent, MobileServer } from "../../workspace/model/workspace-types";
 import { useAgentContextMenu } from "../components/agent-context-menu";
 import { EditAgentScreen } from "./edit-agent-screen";
@@ -726,8 +727,21 @@ it("creates, edits, and deletes a memory on its host", async () => {
   expect(screen.getByRole("textbox", { name: "Memory" })).toHaveProperty("value", "Changed note");
   await click("Retry memory");
   await waitFor(() => expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy());
+  workspace.saveAgentMemory.mockImplementationOnce(() =>
+    saveAgentRecord(client, ["agent-info", "test", "user", 1, host.id, original.id, "memories"], async () => ({
+      ...memory,
+      text: "Changed note",
+    })),
+  );
+  workspace.loadAgentMemories.mockRejectedValueOnce(new Error("Refresh failed after save"));
   await click("Save changes");
   expect(workspace.saveAgentMemory).toHaveBeenCalledWith(original.id, "Changed note", host.id, memory.id);
+  await waitFor(() => expect(screen.getByText("Could not refresh memory.")).toBeTruthy());
+  expect(screen.getByRole("textbox", { name: "Memory" })).toHaveProperty("value", "Changed note");
+  expect(mocks.blocked).toBe(false);
+  memory = { ...memory, text: "Changed note" };
+  await click("Retry memory");
+  await waitFor(() => expect(screen.queryByText("Could not refresh memory.")).toBeNull());
   await click("Delete memory");
   await act(async () => mocks.alert.mock.calls.at(-1)?.[2][1].onPress());
   expect(workspace.deleteAgentMemory).toHaveBeenCalledWith(original.id, memory.id, host.id);
@@ -797,6 +811,13 @@ it("creates, edits, pauses, resumes, and deletes a routine without changing its 
     expect(screen.getByRole("textbox", { name: "Routine instructions" })).toHaveProperty("value", "Updated on desktop"),
   );
   expect(screen.getByLabelText("Time")).toHaveProperty("value", "16:00");
+  workspace.updateAgentRoutine.mockImplementationOnce(() =>
+    saveAgentRecord(client, ["agent-info", "test", "user", 1, host.id, original.id, "routines"], async () => ({
+      ...routine,
+      name: "Renamed",
+    })),
+  );
+  workspace.loadAgentRoutines.mockRejectedValueOnce(new Error("Refresh failed after save"));
   await click("Save changes");
   expect(workspace.updateAgentRoutine).toHaveBeenCalledWith(
     {
@@ -806,6 +827,12 @@ it("creates, edits, pauses, resumes, and deletes a routine without changing its 
     },
     host.id,
   );
+  await waitFor(() => expect(screen.getByText("Could not refresh routine.")).toBeTruthy());
+  expect(screen.getByRole("textbox", { name: "Routine name" })).toHaveProperty("value", "Renamed");
+  expect(mocks.blocked).toBe(false);
+  routine = { ...routine, name: "Renamed" };
+  await click("Retry routine");
+  await waitFor(() => expect(screen.queryByText("Could not refresh routine.")).toBeNull());
   let finishToggle: () => void = () => {};
   workspace.updateAgentRoutine.mockImplementationOnce(
     () =>
@@ -879,4 +906,38 @@ it("saves the selected monthly day and wall-clock time", async () => {
     expect.objectContaining({ timezone: "Europe/Warsaw", schedule: { kind: "monthly", day: 22, time: "17:45" } }),
     host.id,
   );
+});
+
+it("keeps an acknowledged memory save when an older read completes on the same host", async () => {
+  const memory: AgentMemory = {
+    id: "memory",
+    agentId: original.id,
+    text: "Old",
+    origin: "manual",
+    sourceTurnId: null,
+    createdAt: "",
+    updatedAt: "",
+  };
+  const key = ["agent-info", "test", "user", 1, host.id, original.id, "memories"];
+  const otherHostKey = ["agent-info", "test", "user", 1, "other-host", original.id, "memories"];
+  client.setQueryData(key, [memory]);
+  client.setQueryData(otherHostKey, [memory]);
+  const started = Promise.withResolvers<void>();
+  const response = Promise.withResolvers<AgentMemory[]>();
+  const read = client
+    .fetchQuery({
+      queryKey: key,
+      queryFn: () => {
+        started.resolve();
+        return response.promise;
+      },
+    })
+    .catch(() => undefined);
+  await started.promise;
+  const saved = { ...memory, text: "Saved by host", updatedAt: "2026-09-10" };
+  await saveAgentRecord(client, key, async () => saved);
+  response.resolve([memory]);
+  await read;
+  expect(client.getQueryData(key)).toEqual([saved]);
+  expect(client.getQueryData(otherHostKey)).toEqual([memory]);
 });
