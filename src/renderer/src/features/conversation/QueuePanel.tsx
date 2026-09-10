@@ -61,7 +61,9 @@ export function QueuePanel(props: QueuePanelProps) {
   const initialSourceDeliveries = untrack(sourceDeliveries);
   const [renderedDeliveries, setRenderedDeliveries] = createSignal<QueueDelivery[]>(initialSourceDeliveries);
   const visibleDeliveries = createMemo(() =>
-    renderedDeliveries().filter((delivery) => delivery.id !== hiddenEditingId()),
+    renderedDeliveries().filter(
+      (delivery) => delivery.id !== props.editingDeliveryId && delivery.id !== hiddenEditingId(),
+    ),
   );
   let knownSourceIds = new Set(initialSourceDeliveries.map((delivery) => delivery.id));
 

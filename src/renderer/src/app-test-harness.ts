@@ -713,6 +713,17 @@ export function installOpenbotStub(): void {
         setMessageReaction: vi.fn().mockResolvedValue(undefined),
         listQueue: vi.fn().mockImplementation(async (agentId) => ({ agentId, deliveries: [] })),
         acknowledgeFailedTurn: vi.fn().mockResolvedValue(undefined),
+        takeQueuedMessage: vi.fn().mockImplementation(async (input) => {
+          const result = vi.mocked(window.openbot.agent.listQueue).mock.results.at(-1);
+          const queue = result?.type === "return" ? await result.value : { agentId: input.agentId, deliveries: [] };
+          const delivery = queue.deliveries.find((item) => item.id === input.deliveryId);
+          if (!delivery) throw new Error("Queued message was not found.");
+          emitAgentEvent?.({
+            type: "queue-changed",
+            snapshot: { ...queue, deliveries: queue.deliveries.filter((item) => item.id !== input.deliveryId) },
+          });
+          return { text: delivery.text, attachments: delivery.attachments };
+        }),
         cancelQueuedMessage: vi.fn().mockResolvedValue(undefined),
         steerQueuedMessage: vi.fn().mockResolvedValue(undefined),
         updateQueuedMessage: vi.fn().mockResolvedValue(undefined),

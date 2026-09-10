@@ -141,6 +141,7 @@ export const TEAM_API_ROUTES = {
     interrupt: (agentId: string) => `/v1/agents/${segment(agentId)}/interrupt`,
     failuresAcknowledge: (agentId: string) => `/v1/agents/${segment(agentId)}/failures/acknowledge`,
     queue: (agentId: string) => `/v1/agents/${segment(agentId)}/queue`,
+    queueTake: (agentId: string) => `/v1/agents/${segment(agentId)}/queue/take`,
     queueCancel: (agentId: string) => `/v1/agents/${segment(agentId)}/queue/cancel`,
     queueSteer: (agentId: string) => `/v1/agents/${segment(agentId)}/queue/steer`,
     queueUpdate: (agentId: string) => `/v1/agents/${segment(agentId)}/queue/update`,

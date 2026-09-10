@@ -407,6 +407,12 @@ function decodeReadStates(value: unknown): Record<string, ConversationReadState>
   return Object.fromEntries(Object.entries(item).map(([agentId, state]) => [agentId, decodeReadState(state)]));
 }
 
+function decodeQueuedMessageDraft(value: unknown) {
+  const record = decodeRecord(value, "queued message draft");
+  if (typeof record.text !== "string") throw new Error("Invalid queued message draft text.");
+  return { text: record.text, attachments: decodeAttachments(record.attachments) };
+}
+
 function decodeAttachments(value: unknown): DraftAttachment[] {
   if (!Array.isArray(value) || !value.every(isAttachmentSummary)) {
     throw new Error("Invalid attachment response.");
@@ -878,6 +884,8 @@ const openbotApi: OpenBotDesktopApi = {
     setMessageReaction: (input) => invokeAgent(IPC_CHANNELS.agentSetMessageReaction, input, decodeVoid),
     listQueue: (agentId) => invokeAgent(IPC_CHANNELS.agentListQueue, agentId, decodeQueue),
     acknowledgeFailedTurn: (input) => invokeAgent(IPC_CHANNELS.agentAcknowledgeFailedTurn, input, decodeVoid),
+    takeQueuedMessage: (input, serverId = selectedServerId) =>
+      invokeAgentForServer(serverId, IPC_CHANNELS.agentTakeQueuedMessage, input, decodeQueuedMessageDraft),
     cancelQueuedMessage: (input) => invokeAgent(IPC_CHANNELS.agentCancelQueuedMessage, input, decodeVoid),
     steerQueuedMessage: (input) => invokeAgent(IPC_CHANNELS.agentSteerQueuedMessage, input, decodeVoid),
     updateQueuedMessage: (input, serverId = selectedServerId) =>

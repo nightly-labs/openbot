@@ -200,6 +200,7 @@ const ROUTE_METHODS: Record<string, string> = {
   "agent.interrupt": "POST",
   "agent.failuresAcknowledge": "POST",
   "agent.queue": "GET",
+  "agent.queueTake": "POST",
   "agent.queueCancel": "POST",
   "agent.queueSteer": "POST",
   "agent.queueUpdate": "POST",
@@ -246,6 +247,7 @@ const ROUTES_WITHOUT_A_CLASSIFIED_JSON_BODY = new Set([
   "agent.skills",
   // Protocol v3 only: its own adapter names these routes before delegating the rest to v1. A v1 peer
   // that calls either anyway is answered 500 rather than a protocol error - see the PR body.
+  "agent.queueTake",
   "agent.duplicate",
   "agent.usage",
   "agent.analytics",

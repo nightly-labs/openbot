@@ -668,6 +668,32 @@ export class MailboxStore {
     await this.#updateDelivery(deliveryId, ["starting", "running"], { status, error });
   }
 
+  async takeQueuedMessage(
+    agentId: string,
+    deliveryId: string,
+  ): Promise<{ text: string; attachments: DraftAttachment[] }> {
+    const context = this.getDelivery(deliveryId);
+    if (!context || context.delivery.recipientAgentId !== agentId || context.delivery.status !== "queued") {
+      throw new Error("Only queued messages can be edited.");
+    }
+    const drafts = await this.prepareAttachments(context.managedAttachments.map((file) => file.path));
+    try {
+      // Recheck after copying files: the worker may have claimed the delivery meanwhile.
+      this.cancelNow(agentId, deliveryId);
+    } catch (error) {
+      await Promise.allSettled(drafts.map((draft) => this.discardDraft(draft.id)));
+      throw error;
+    }
+    const ids = new Map(context.managedAttachments.map((file, index) => [file.id, drafts[index]?.id]));
+    return {
+      text: rewriteAttachmentReferences(context.delivery.text, (reference) => {
+        const id = ids.get(reference.attachmentId);
+        return id ? { ...reference, attachmentId: id } : reference;
+      }),
+      attachments: drafts,
+    };
+  }
+
   async cancel(agentId: string, deliveryId: string): Promise<void> {
     this.cancelNow(agentId, deliveryId);
   }

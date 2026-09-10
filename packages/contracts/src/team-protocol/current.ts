@@ -1,3 +1,5 @@
+import { isAttachmentSummary } from "../ipc-attachments";
+import { isDynamicRecord, isString } from "../runtime-values";
 import { TEAM_PROTOCOL_V4_CAPABILITIES } from "./v4";
 
 export const TEAM_SEMANTIC_TAGS_CAPABILITY = "installed-skills";
@@ -9,6 +11,7 @@ export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
 
 export const TEAM_CURRENT_CAPABILITIES = [
   ...TEAM_PROTOCOL_V4_CAPABILITIES,
+  "queue-take",
   "agent-profile-generation",
   "agent-analytics",
   "host-analytics",
@@ -52,4 +55,22 @@ export function isAgentAnalyticsRoute(method: string, path: string): boolean {
 
 export function isHostAnalyticsRoute(method: string, path: string): boolean {
   return method === "GET" && new URL(path, "http://openbot.invalid").pathname === "/v1/analytics";
+}
+
+export function isQueueTakeRoute(method: string, path: string): boolean {
+  return (
+    method === "POST" && /^\/v1\/agents\/[^/]+\/queue\/take$/u.test(new URL(path, "http://openbot.invalid").pathname)
+  );
+}
+
+export function decodeQueueDraft(value: unknown) {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.text) ||
+    !Array.isArray(value.attachments) ||
+    !value.attachments.every(isAttachmentSummary)
+  ) {
+    throw new Error("Invalid queued message draft.");
+  }
+  return { text: value.text, attachments: value.attachments };
 }

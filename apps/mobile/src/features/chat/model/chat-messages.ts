@@ -14,6 +14,8 @@ export type ChatMessage =
       author: "agent" | "user";
       body: string;
       streaming: boolean;
+      delivery?: ConversationMessage["delivery"];
+      awaitingQueueReceipt?: boolean;
       attachments?: AttachmentSummary[];
     }
   | { id: string; kind: "thinking"; turnId: string | undefined; steps: { id: string; text: string }[] };
@@ -44,6 +46,7 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
   const result: ChatMessage[] = [];
   const thinkingByTurn = new Map<string, Extract<ChatMessage, { kind: "thinking" }>>();
   for (const message of messages) {
+    if (message.delivery?.status === "cancelled") continue;
     if (message.exchange) {
       result.push({ id: `exchange:${message.id}`, kind: "exchange", exchange: message.exchange });
       // Match desktop: exchanges have markers, not another agent's text bubble.
@@ -72,6 +75,7 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
         body: message.exchange ? "" : message.text,
         streaming: message.status === "streaming",
         attachments: message.attachments,
+        ...(message.delivery ? { delivery: message.delivery } : {}),
       });
     }
   }
@@ -84,4 +88,23 @@ export function latestReadableMessage(messages: ConversationMessage[]) {
       Boolean(message.questionPrompt) ||
       (message.author !== "system" && (message.text.trim().length > 0 || Boolean(message.attachments?.length))),
   );
+}
+
+export function partitionChatMessages(messages: ChatMessage[], immediateMessageId: string | null = null) {
+  const history: ChatMessage[] = [];
+  const queued: Extract<ChatMessage, { kind: "message" }>[] = [];
+  for (const message of messages) {
+    if (
+      message.kind === "message" &&
+      message.id !== immediateMessageId &&
+      (message.awaitingQueueReceipt || message.delivery?.status === "queued" || message.delivery?.status === "starting")
+    )
+      queued.push(message);
+    else history.push(message);
+  }
+  queued.sort(
+    (left, right) =>
+      (left.delivery?.position ?? Number.MAX_SAFE_INTEGER) - (right.delivery?.position ?? Number.MAX_SAFE_INTEGER),
+  );
+  return { history, queued };
 }

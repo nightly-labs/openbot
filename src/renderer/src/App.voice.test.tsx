@@ -365,6 +365,7 @@ describe("OpenBot connected desktop shell", () => {
     await screen.findByRole("heading", { name: "Chief" });
 
     await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+    await screen.findByRole("button", { name: "Save queued message" });
     await fireEvent.click(screen.getByRole("button", { name: "Create prompt with voice" }));
     await screen.findByRole("group", { name: "Voice recording" });
     await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
@@ -377,18 +378,16 @@ describe("OpenBot connected desktop shell", () => {
 
     resolveTranscription?.({ text: "Voice transcript" });
     await waitFor(() =>
-      expect(window.openbot.agent.updateQueuedMessage).toHaveBeenCalledWith(
+      expect(window.openbot.agent.sendMessage).toHaveBeenCalledWith(
         {
           agentId: "chief",
-          deliveryId: "delivery-voice-edit",
           text: "Queued draft Voice transcript",
-          keepAttachmentIds: [],
           attachmentDraftIds: [],
         },
         "local",
       ),
     );
-    expect(window.openbot.agent.sendMessage).not.toHaveBeenCalled();
+    expect(window.openbot.agent.updateQueuedMessage).not.toHaveBeenCalled();
   });
 
   it("retains a queued-message edit only in its original conversation", async () => {
@@ -412,6 +411,7 @@ describe("OpenBot connected desktop shell", () => {
     composer.textContent = "Personal draft";
     await fireEvent.input(composer);
     await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+    await screen.findByRole("button", { name: "Save queued message" });
     expect(composer).toHaveTextContent("Queued draft");
 
     await fireEvent.click(screen.getByRole("button", { name: "Studio Mac server" }));
@@ -425,6 +425,6 @@ describe("OpenBot connected desktop shell", () => {
 
     await fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Personal draft");
-    expect(window.openbot.agent.updateQueuedMessage).not.toHaveBeenCalled();
+    expect(window.openbot.agent.sendMessage).not.toHaveBeenCalled();
   });
 });

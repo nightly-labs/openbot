@@ -7,15 +7,19 @@ import type {
   AgentProviderId,
   AgentReasoningEffort,
   AvatarHue,
+  CancelQueuedMessageInput,
   ConversationSnapshot,
   CreateAgentInput,
   CreateRoutineInput,
   DraftAttachment,
   RespondToPromptInput,
   Routine,
+  SteerQueuedMessageInput,
   UpdateAgentInput,
+  UpdateQueuedMessageInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
+import type { decodeQueueDraft } from "@openbot/contracts/team-protocol/current";
 import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import type { MobileAgentActivities } from "./agent-activity";
@@ -91,6 +95,13 @@ export interface MobileWorkspaceContextValue {
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
   loadAgentAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
+  takeQueuedMessage: (
+    input: CancelQueuedMessageInput,
+    serverId: string,
+  ) => Promise<ReturnType<typeof decodeQueueDraft>>;
+  steerQueuedMessage: (input: SteerQueuedMessageInput, serverId: string) => Promise<void>;
+  cancelQueuedMessage: (input: CancelQueuedMessageInput, serverId: string) => Promise<void>;
+  updateQueuedMessage: (input: UpdateQueuedMessageInput, serverId: string) => Promise<void>;
   loadConversation: (agentId: string) => Promise<ConversationSnapshot>;
   respondToPrompt: (agentId: string, input: RespondToPromptInput) => Promise<void>;
   sendMessage: (agentId: string, text: string, attachmentDraftIds?: string[]) => Promise<string>;

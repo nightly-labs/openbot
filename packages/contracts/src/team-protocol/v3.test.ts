@@ -391,3 +391,29 @@ it("freezes the v3 provider vocabulary", () => {
     "Invalid Team protocol v1 HTTP request",
   );
 });
+
+it("carries queue drafts over WebRTC and rejects malformed attachment data", () => {
+  const path = "/v1/agents/chief/queue/take";
+  expect(encodeTeamProtocolV3WebRtcHttpRequest("POST", path, { deliveryId: "delivery" })).toEqual({
+    deliveryId: "delivery",
+  });
+  const draft = {
+    text: "Edited later",
+    attachments: [
+      {
+        id: "draft-file",
+        name: "notes.txt",
+        size: 5,
+        kind: "file",
+        mimeType: "text/plain",
+        previewKind: "none",
+        previewUrl: null,
+      },
+    ],
+  };
+  const wire = encodeTeamProtocolV3WebRtcHttpResponse("POST", path, 200, draft);
+  expect(decodeTeamProtocolV3WebRtcHttpResponse("POST", path, 200, wire)).toEqual(draft);
+  expect(() => decodeTeamProtocolV3WebRtcHttpResponse("POST", path, 200, { text: "Draft", attachments: [{}] })).toThrow(
+    "Invalid queued message draft.",
+  );
+});

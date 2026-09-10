@@ -66,6 +66,7 @@ export function useChatAttachments() {
   }
   return {
     items,
+    replace,
     chooseFiles: () => report(chooseFiles),
     paste,
     remove: (id: string) => replace(itemsRef.current.filter((item) => item.id !== id)),

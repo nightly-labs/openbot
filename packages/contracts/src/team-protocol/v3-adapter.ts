@@ -8,7 +8,14 @@ import {
 import { decodeHostAnalytics } from "../ipc-host-analytics";
 import { isDynamicRecord } from "../runtime-values";
 import { decodeAnalyticsV1Response } from "./analytics-v1";
-import { isAgentAnalyticsRoute, isAgentProfileRoute, isConversationUnreadRoute, isHostAnalyticsRoute } from "./current";
+import {
+  decodeQueueDraft,
+  isAgentAnalyticsRoute,
+  isAgentProfileRoute,
+  isConversationUnreadRoute,
+  isHostAnalyticsRoute,
+  isQueueTakeRoute,
+} from "./current";
 import { toCurrentAgentKeys, toCurrentAgentKeysObjectForPath, toWireAgentKeys } from "./current-agent-keys";
 import { decodeHostAnalyticsV1Response } from "./host-analytics-v1";
 import { decodeProfileV1Request, decodeProfileV1Response } from "./profile-v1";
@@ -19,6 +26,7 @@ import {
   encodeTeamProtocolV1CurrentHttpRequest,
   encodeTeamProtocolV1CurrentHttpResponse,
 } from "./v1-adapter";
+import { decodeTeamProtocolV2Json } from "./v2";
 import { decodeTeamProtocolV3HttpRequest, decodeTeamProtocolV3HttpResponse } from "./v3";
 
 export function encodeTeamProtocolV3CurrentHttpRequest(
@@ -27,6 +35,8 @@ export function encodeTeamProtocolV3CurrentHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ): string {
+  if (isQueueTakeRoute(method, path))
+    return encodeTeamProtocolV1CurrentHttpRequest(method, path.replace(/take$/u, "cancel"), value, options);
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path))
     return JSON.stringify(decodeScopedUsageRequest(value));
   if (isAgentProfileRoute(method, path)) return JSON.stringify(encodeProfileRequest(path, value));
@@ -46,6 +56,8 @@ export function decodeTeamProtocolV3CurrentHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ): TeamProtocolV1JsonObject {
+  if (isQueueTakeRoute(method, path))
+    return decodeTeamProtocolV1CurrentHttpRequest(method, path.replace(/take$/u, "cancel"), value);
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path)) return decodeScopedUsageRequest(value);
   if (isAgentProfileRoute(method, path))
     return profileRequest(path, decodeProfileV1Request(profileGeneration(path), value));
@@ -73,6 +85,10 @@ export function encodeTeamProtocolV3CurrentHttpResponse(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ): string {
+  if (isQueueTakeRoute(method, path))
+    return status < 400
+      ? JSON.stringify(decodeQueueDraft(value))
+      : encodeTeamProtocolV1CurrentHttpResponse(method, path.replace(/take$/u, "cancel"), status, value, options);
   if (isHostAnalyticsRoute(method, path) && status < 400)
     return JSON.stringify(decodeHostAnalyticsV1Response(decodeHostAnalytics(value)));
   if (isAgentAnalyticsRoute(method, path) && status < 400)
@@ -97,6 +113,10 @@ export function decodeTeamProtocolV3CurrentHttpResponse(
   status: number,
   value: unknown,
 ): TeamProtocolV1JsonValue {
+  if (isQueueTakeRoute(method, path))
+    return status < 400
+      ? decodeTeamProtocolV2Json(JSON.parse(JSON.stringify(decodeQueueDraft(value))))
+      : decodeTeamProtocolV1CurrentHttpResponse(method, path.replace(/take$/u, "cancel"), status, value);
   if (isHostAnalyticsRoute(method, path) && status < 400)
     return JSON.parse(JSON.stringify(decodeHostAnalytics(decodeHostAnalyticsV1Response(value))));
   if (isAgentAnalyticsRoute(method, path) && status < 400)

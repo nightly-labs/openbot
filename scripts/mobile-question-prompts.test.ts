@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   latestReadableMessage,
   type PendingChatMessage,
+  partitionChatMessages,
   presentChatMessages,
   projectChatMessages,
 } from "../apps/mobile/src/features/chat/model/chat-messages";
@@ -182,4 +183,163 @@ describe("mobile question forms", () => {
     expect(answeredPromptResolution(questions, {})).toEqual({ status: "cancelled" });
     expect(answers.token).toEqual(["private-value"]);
   });
+});
+
+describe("mobile queue presentation", () => {
+  it("keeps the active response in history and orders waiting messages by the host queue", () => {
+    const snapshot = conversation();
+    snapshot.messages = [
+      {
+        id: "active",
+        author: "user",
+        text: "Think for ten seconds",
+        status: "completed",
+        createdAt: "now",
+        delivery: { id: "active", status: "running", position: null },
+      },
+      {
+        id: "second",
+        author: "user",
+        text: "test",
+        status: "completed",
+        createdAt: "now",
+        delivery: { id: "second", status: "queued", position: 2 },
+      },
+      {
+        id: "first",
+        author: "user",
+        text: "test",
+        status: "completed",
+        createdAt: "now",
+        delivery: { id: "first", status: "queued", position: 1 },
+      },
+      {
+        id: "response",
+        author: "assistant",
+        text: "Working on the first request",
+        status: "streaming",
+        createdAt: "now",
+      },
+    ];
+    const result = partitionChatMessages(projectChatMessages(decodeConversation(snapshot).messages));
+    expect({
+      history: result.history.map((message) => message.id),
+      queue: result.queued.map((message) => [message.id, message.delivery?.position]),
+    }).toEqual({
+      history: ["active", "response"],
+      queue: [
+        ["first", 1],
+        ["second", 2],
+      ],
+    });
+  });
+
+  it("moves a starting delivery into history only when the host starts running it", () => {
+    const message = {
+      id: "delivery",
+      author: "user" as const,
+      text: "Next task",
+      status: "completed" as const,
+      createdAt: "now",
+    };
+    const states = (["queued", "starting", "running", "completed", "failed", "interrupted"] as const).map((status) => {
+      const result = partitionChatMessages(
+        projectChatMessages([
+          { ...message, delivery: { id: message.id, status, position: status === "queued" ? 1 : null } },
+        ]),
+      );
+      return { status, history: result.history.map((item) => item.id), queue: result.queued.map((item) => item.id) };
+    });
+    expect(states).toEqual([
+      { status: "queued", history: [], queue: ["delivery"] },
+      { status: "starting", history: [], queue: ["delivery"] },
+      { status: "running", history: ["delivery"], queue: [] },
+      { status: "completed", history: ["delivery"], queue: [] },
+      { status: "failed", history: ["delivery"], queue: [] },
+      { status: "interrupted", history: ["delivery"], queue: [] },
+    ]);
+  });
+
+  it("keeps an optimistic busy send in the queue and reconciles its receipt without duplication", () => {
+    const pending: PendingChatMessage = {
+      message: {
+        id: "local",
+        kind: "message",
+        author: "user",
+        body: "test",
+        streaming: false,
+        awaitingQueueReceipt: true,
+      },
+      baseline: new Set(),
+      serverId: null,
+    };
+    const optimistic = partitionChatMessages(presentChatMessages([], pending, new Map()));
+    const received = projectChatMessages([
+      {
+        id: "delivery",
+        author: "user",
+        text: "test",
+        status: "completed",
+        createdAt: "now",
+        delivery: { id: "delivery", status: "queued", position: 1 },
+      },
+    ]);
+    const confirmed = partitionChatMessages(
+      presentChatMessages(received, { ...pending, serverId: "delivery" }, new Map([["delivery", "local"]])),
+    );
+    expect({
+      optimistic: {
+        history: optimistic.history,
+        queue: optimistic.queued.map((item) => [item.id, item.awaitingQueueReceipt]),
+      },
+      confirmed: {
+        history: confirmed.history,
+        queue: confirmed.queued.map((item) => [item.id, item.delivery?.status, item.awaitingQueueReceipt ?? false]),
+      },
+    }).toEqual({
+      optimistic: { history: [], queue: [["local", true]] },
+      confirmed: { history: [], queue: [["local", "queued", false]] },
+    });
+  });
+});
+
+it("keeps an idle send in chat while the host hands it from queued to running", () => {
+  const states = (["queued", "starting", "running"] as const).map((status) => {
+    const messages = projectChatMessages([
+      {
+        id: "host-id",
+        author: "user",
+        text: "First task",
+        status: "completed",
+        createdAt: "now",
+        delivery: { id: "host-id", status, position: status === "queued" ? 1 : null },
+      },
+    ]);
+    const aliased = presentChatMessages(messages, null, new Map([["host-id", "local-id"]]));
+    const presented = partitionChatMessages(aliased, "local-id");
+    return {
+      history: presented.history.map((message) => message.id),
+      queue: presented.queued.map((message) => message.id),
+    };
+  });
+  expect(states).toEqual([
+    { history: ["local-id"], queue: [] },
+    { history: ["local-id"], queue: [] },
+    { history: ["local-id"], queue: [] },
+  ]);
+});
+
+it("removes a cancelled delivery instead of showing it as a sent chat bubble", () => {
+  expect(
+    projectChatMessages([
+      {
+        id: "cancelled",
+        author: "user",
+        text: "Do not send",
+        status: "completed",
+        createdAt: "now",
+        delivery: { id: "cancelled", status: "cancelled", position: null },
+      },
+    ]),
+  ).toEqual([]);
 });

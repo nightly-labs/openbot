@@ -17,7 +17,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { decodeQueueDraft, TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -261,6 +261,24 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     },
     [],
   );
+
+  const markQueueCancelled = useCallback((agentId: string, deliveryId: string) => {
+    setConversations((current) => {
+      const conversation = current[agentId];
+      if (!conversation) return current;
+      return {
+        ...current,
+        [agentId]: {
+          ...conversation,
+          messages: conversation.messages.map((message) =>
+            message.delivery?.id === deliveryId
+              ? { ...message, delivery: { ...message.delivery, status: "cancelled" } }
+              : message,
+          ),
+        },
+      };
+    });
+  }, []);
 
   const replaceServerAgents = useCallback((serverId: string, summaries: RemoteAgent[]) => {
     const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
@@ -794,6 +812,57 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           operationId: Crypto.randomUUID(),
         });
       },
+      takeQueuedMessage: async (input, serverId) => {
+        if (!serverCapabilities.current.get(serverId)?.includes("queue-take"))
+          throw new Error("Update the host to edit queued messages with attachments.");
+        const draft = await request(
+          "POST",
+          TEAM_API_ROUTES.agent.queueTake(input.agentId),
+          decodeQueueDraft,
+          { deliveryId: input.deliveryId },
+          serverId,
+        );
+        markQueueCancelled(input.agentId, input.deliveryId);
+        // The mutation succeeded even if the subsequent projection refresh fails.
+        void loadConversation(input.agentId, serverId).catch(() => {});
+        return draft;
+      },
+      steerQueuedMessage: async (input, serverId) => {
+        await request(
+          "POST",
+          TEAM_API_ROUTES.agent.queueSteer(input.agentId),
+          ignoreResponse,
+          { deliveryId: input.deliveryId, expectedTurnId: input.expectedTurnId },
+          serverId,
+        );
+        void loadConversation(input.agentId, serverId).catch(() => {});
+      },
+      cancelQueuedMessage: async (input, serverId) => {
+        await request(
+          "POST",
+          TEAM_API_ROUTES.agent.queueCancel(input.agentId),
+          ignoreResponse,
+          { deliveryId: input.deliveryId },
+          serverId,
+        );
+        markQueueCancelled(input.agentId, input.deliveryId);
+        void loadConversation(input.agentId, serverId).catch(() => {});
+      },
+      updateQueuedMessage: async (input, serverId) => {
+        await request(
+          "POST",
+          TEAM_API_ROUTES.agent.queueUpdate(input.agentId),
+          ignoreResponse,
+          {
+            deliveryId: input.deliveryId,
+            text: input.text,
+            keepAttachmentIds: input.keepAttachmentIds,
+            attachmentDraftIds: input.attachmentDraftIds,
+          },
+          serverId,
+        );
+        await loadConversation(input.agentId, serverId);
+      },
       loadConversation,
       uploadAttachment: async (agentId, input) => {
         const serverId = agents.find((candidate) => candidate.id === agentId)?.serverId;
@@ -902,6 +971,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     directory,
     directoryRefresh,
     hiddenAgentIds,
+    markQueueCancelled,
     loadConversation,
     markAgentRead,
     pinnedAgentIds,

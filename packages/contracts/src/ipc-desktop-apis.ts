@@ -45,6 +45,7 @@ import type {
   OpenAttachmentInput,
   OpenSharedFileInput,
   OpenWorkspaceFileInput,
+  QueuedMessageDraft,
 } from "./ipc-attachments";
 import type {
   BrowserBounds,
@@ -204,6 +205,7 @@ export interface AgentDesktopApi {
   setMessageReaction: (input: SetMessageReactionInput) => Promise<void>;
   listQueue: (agentId: string) => Promise<QueueSnapshot>;
   acknowledgeFailedTurn: (input: AcknowledgeFailedTurnInput) => Promise<void>;
+  takeQueuedMessage: (input: CancelQueuedMessageInput, serverId?: string) => Promise<QueuedMessageDraft>;
   cancelQueuedMessage: (input: CancelQueuedMessageInput) => Promise<void>;
   steerQueuedMessage: (input: SteerQueuedMessageInput) => Promise<void>;
   updateQueuedMessage: (input: UpdateQueuedMessageInput, serverId?: string) => Promise<void>;

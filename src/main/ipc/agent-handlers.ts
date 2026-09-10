@@ -10,6 +10,7 @@ import {
   parseHostAnalyticsInput,
   parseSaveAgentProfile,
 } from "@openbot/contracts/ipc";
+import { decodeQueueDraft } from "@openbot/contracts/team-protocol/current";
 import { decodeAgentAnalyticsFromHost, decodeHostAnalyticsFromHost } from "../remote-agent-decoding";
 // An agent's core surface: status, agents, conversations, the queue and the prompts
 // a turn can raise. Memories, routines and attachments are their own registrars.
@@ -287,6 +288,25 @@ export function agentIpcHandlers({
               method: "POST",
               body: { turnId: parsed.turnId },
             }),
+        });
+      }),
+      takeQueuedMessage: payloadHandler(parseAgentRequest, (scoped) => {
+        const parsed = parseCancelQueuedMessage(scoped.payload);
+        return routeToServer(scoped.serverId, {
+          local: () => service.takeQueuedMessage(parsed.agentId, parsed.deliveryId),
+          remote: (serverId) => {
+            if (
+              !remoteServers
+                .list()
+                .find((server) => server.id === serverId)
+                ?.compatibility?.capabilities.includes("queue-take")
+            )
+              throw new Error("Update the host to edit queued messages.");
+            return remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueTake(parsed.agentId), decodeQueueDraft, {
+              method: "POST",
+              body: { deliveryId: parsed.deliveryId },
+            });
+          },
         });
       }),
       cancelQueuedMessage: payloadHandler(parseAgentRequest, (scoped) => {

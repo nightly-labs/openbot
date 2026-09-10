@@ -174,9 +174,9 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     },
     [position],
   );
-  const onComposerLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      const height = event.nativeEvent.layout.height + 20;
+  const onComposerHeight = useCallback(
+    (measuredHeight: number) => {
+      const height = measuredHeight + 20;
       measurements.current.composer = height;
       composerHeight.set(height);
       position();
@@ -254,7 +254,7 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     onContentSizeChange,
     onTailLayout,
     onUserLayout,
-    onComposerLayout,
+    onComposerHeight,
     onContentInsetChange,
     onScroll,
     beginSend,

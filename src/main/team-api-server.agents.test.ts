@@ -526,3 +526,37 @@ it("requires authentication and the profile capability before generating an edit
   expect(incompatible.status).toBe(400);
   expect(prompt).toBeUndefined();
 });
+
+it("takes a queue draft through the optional v3 route only for authenticated capable clients", async () => {
+  const { start, signIn } = await createTeamApiFixture("queue-take", { configure: true });
+  const take = vi.fn(async (_agentId: string, _deliveryId: string) => ({ text: "Draft", attachments: [] }));
+  const { base } = await start({ agents: createAgents({ takeQueuedMessage: take }) });
+  const token = await signIn({ protocol: TEAM_PROTOCOL_V3 });
+  const headers = {
+    "Content-Type": "application/json",
+    [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V3),
+    [TEAM_APP_VERSION_HEADER]: "1.0.0",
+    [TEAM_CAPABILITIES_HEADER]: "queue-take",
+  };
+  const url = `${base}/v1/agents/chief/queue/take`;
+  const body = JSON.stringify({ deliveryId: "delivery" });
+  expect((await fetch(url, { method: "POST", headers, body })).status).toBe(401);
+  expect(
+    (
+      await fetch(url, {
+        method: "POST",
+        headers: { ...headers, Authorization: `Bearer ${token}`, [TEAM_CAPABILITIES_HEADER]: "" },
+        body,
+      })
+    ).status,
+  ).toBe(400);
+  expect(take).not.toHaveBeenCalled();
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { ...headers, Authorization: `Bearer ${token}` },
+    body,
+  });
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ text: "Draft", attachments: [] });
+  expect(take).toHaveBeenCalledWith("chief", "delivery");
+});

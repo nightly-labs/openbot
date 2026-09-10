@@ -27,6 +27,40 @@ afterEach(async () => {
 });
 
 describe("MailboxStore", () => {
+  it("takes a queued delivery out of dispatch and keeps editable attachment drafts", async () => {
+    const [file] = await store.prepareImportedAttachments(
+      [],
+      [{ name: "notes.txt", mimeType: "text/plain", bytes: Buffer.from("Notes") }],
+    );
+    if (!file) throw new Error("Missing draft");
+    const receipt = await store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Original",
+      draftIds: [file.id],
+    });
+    const id = receipt.deliveries[0].id;
+    await expect(store.takeQueuedMessage("other", id)).rejects.toThrow("Only queued messages can be edited.");
+    const draft = await store.takeQueuedMessage("chief", id);
+    expect(store.getDelivery(id)?.delivery.status).toBe("cancelled");
+    await store.markStarting(id);
+    expect(store.getDelivery(id)?.delivery.status).toBe("cancelled");
+    expect(draft.text).toBe("Original");
+    const edited = await store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Revised",
+      draftIds: draft.attachments.map((attachment) => attachment.id),
+    });
+    const context = store.getDelivery(edited.deliveries[0].id);
+    expect(context?.delivery.text).toBe("Revised");
+    expect(await readFile(context?.managedAttachments[0]?.path ?? "missing", "utf8")).toBe("Notes");
+    await store.markStarting(edited.deliveries[0].id);
+    await expect(store.takeQueuedMessage("chief", edited.deliveries[0].id)).rejects.toThrow(
+      "Only queued messages can be edited.",
+    );
+  });
+
   it("keeps staged generated attachments out of unrelated mailbox writes", async () => {
     const sourcePath = join(root, "staged-screenshot.png");
     await writeFile(sourcePath, "image bytes");

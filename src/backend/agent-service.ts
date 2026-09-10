@@ -971,6 +971,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#turn.acknowledgeFailedTurn(agentId, turnId);
   }
 
+  async takeQueuedMessage(agentId: string, deliveryId: string) {
+    const draft = await this.#mailbox.takeQueuedMessage(agentId, deliveryId);
+    this.#mailboxSync.emitQueue(agentId);
+    return draft;
+  }
+
   async cancelQueuedMessage(agentId: string, deliveryId: string): Promise<void> {
     await this.#mailbox.cancel(agentId, deliveryId);
     this.#mailboxSync.emitQueue(agentId);

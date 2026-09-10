@@ -44,6 +44,9 @@ interface ChatComposerProps {
   attachments: ChatAttachments;
   sending: boolean;
   sendRetryVersion: number;
+  editingQueue?: boolean;
+  retainedAttachments?: boolean;
+  focusRequest?: number;
 }
 
 export function ChatComposer({
@@ -65,6 +68,9 @@ export function ChatComposer({
   attachments,
   sending,
   sendRetryVersion,
+  editingQueue = false,
+  retainedAttachments = false,
+  focusRequest = 0,
 }: ChatComposerProps) {
   const display = mentionDraft(answerQuestion ? "" : draft);
   const displayText = answerQuestion ? draft : display.text;
@@ -77,8 +83,11 @@ export function ChatComposer({
         )
         .slice(0, 8)
     : [];
-  const hasDraft = Boolean(draft.trim()) || attachments.items.length > 0;
+  const hasDraft = Boolean(draft.trim()) || attachments.items.length > 0 || retainedAttachments;
   const inputRef = useRef<TextInput>(null);
+  useEffect(() => {
+    if (focusRequest > 0 && !disabled) inputRef.current?.focus();
+  }, [focusRequest, disabled]);
   const pendingCursor = useRef<number | null>(null);
   useLayoutEffect(() => {
     if (pendingCursor.current === null) return;
@@ -398,7 +407,15 @@ export function ChatComposer({
               </TextInput>
             </View>
             <Pressable
-              accessibilityLabel={hasDraft ? (answerQuestion ? "Send answer" : "Send message") : "Start voice message"}
+              accessibilityLabel={
+                hasDraft
+                  ? editingQueue
+                    ? "Send edited message"
+                    : answerQuestion
+                      ? "Send answer"
+                      : "Send message"
+                  : "Start voice message"
+              }
               accessibilityRole="button"
               accessibilityState={{ disabled: disabled || sending }}
               disabled={disabled || sending}

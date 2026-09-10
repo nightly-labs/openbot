@@ -217,6 +217,13 @@ the saved messages, and can be tried again when the provider connects or the app
 
 ## Team API compatibility boundary
 
+Desktop and mobile queue editing cancel the host delivery before opening its text in the composer. Send
+creates a new delivery; cancelling the edit does not restore the old delivery. Mobile text-only edits use
+the released cancel endpoint. Desktop edits use the server-scoped `agent:take-queued-message` IPC endpoint. The optional `queue-take` capability adds `POST /v1/agents/:id/queue/take`
+for attachment edits: the host copies attachment drafts, rechecks and cancels the queued delivery,
+and returns the draft text and attachment summaries. A stale delivery is rejected. Released protocol
+schemas stay unchanged; this extension belongs to the current v3 adapters.
+
 Current remote connections use Team API protocol v3 over three ordered WebRTC DataChannels: `rpc`,
 `events`, and `files`. A sandboxed hidden Chromium page owns each `RTCPeerConnection`. Electron main
 uses a `MessagePort` and transfers binary data as `ArrayBuffer`. Signal carries SDP and ICE only.

@@ -2,7 +2,7 @@ import { userErrorMessage } from "@openbot/user-errors";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import * as Haptics from "expo-haptics";
 import { router, useIsFocused } from "expo-router";
-import { Typography } from "heroui-native";
+import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ArrowDown } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -16,12 +16,14 @@ import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
+import { ChatQueue } from "@/features/chat/components/chat-queue";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import {
   latestReadableMessage,
   type PendingChatMessage,
+  partitionChatMessages,
   presentChatMessages,
   projectChatMessages,
 } from "@/features/chat/model/chat-messages";
@@ -31,6 +33,7 @@ import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { isIOS } from "@/shared/lib/platform";
+import { useQueueEdit } from "./use-queue-edit";
 
 interface MobileChatViewProps {
   animateAvatarOnExit?: boolean;
@@ -64,9 +67,13 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   const [sendError, setSendError] = useState<{ agentId: string; message: string } | null>(null);
   const [sending, setSending] = useState(false);
   const [sendRetryVersion, setSendRetryVersion] = useState(0);
+  const queueAnimating = useRef(false);
+  const measuredComposerHeight = useRef<number | null>(null);
   const [composerGestureHeight, setComposerGestureHeight] = useState(0);
   const sendingRef = useRef(false);
   const attachments = useChatAttachments();
+
+  const [immediateMessageId, setImmediateMessageId] = useState<string | null>(null);
   const [pendingMessage, setPendingMessage] = useState<PendingChatMessage | null>(null);
   const [messageAliases, setMessageAliases] = useState<ReadonlyMap<string, string>>(new Map());
   const sendSequence = useRef(0);
@@ -81,15 +88,45 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     servers,
     respondToPrompt,
     sendMessage: sendTeamMessage,
+    cancelQueuedMessage,
+    steerQueuedMessage,
+    takeQueuedMessage,
     uploadAttachment,
     discardAttachment,
   } = useMobileWorkspace();
+  const { preparing, queueEdit, focusRequest, startQueueEdit, finishQueueEdit } = useQueueEdit(
+    draft,
+    setDraft,
+    attachments,
+    async (message) => {
+      const delivery = message.delivery;
+      if (!delivery) throw new Error("This message is not queued.");
+      if (message.attachments?.length) {
+        const prepared = await takeQueuedMessage({ agentId: agent.id, deliveryId: delivery.id }, agent.serverId);
+        return { body: prepared.text, attachments: prepared.attachments };
+      }
+      await cancelQueuedMessage({ agentId: agent.id, deliveryId: delivery.id }, agent.serverId);
+      return { body: message.body, attachments: [] };
+    },
+  );
   const conversation = conversations[agent.id];
   const activity = useAgentActivity(agent.id);
   const projectedMessages = useMemo(() => projectChatMessages(conversation?.messages ?? []), [conversation]);
-  const messages = useMemo(
-    () => presentChatMessages(projectedMessages, pendingMessage, messageAliases),
-    [projectedMessages, pendingMessage, messageAliases],
+  const otherTurnActive =
+    conversation?.activeTurnId &&
+    conversation.messages.some(
+      (message) =>
+        message.author === "user" &&
+        message.turnId === conversation.activeTurnId &&
+        (messageAliases.get(message.id) ?? message.id) !== immediateMessageId,
+    );
+  const { history: messages, queued } = useMemo(
+    () =>
+      partitionChatMessages(
+        presentChatMessages(projectedMessages, pendingMessage, messageAliases),
+        otherTurnActive ? null : immediateMessageId,
+      ),
+    [projectedMessages, pendingMessage, messageAliases, otherTurnActive, immediateMessageId],
   );
   useEffect(() => {
     if (pendingMessage?.serverId && projectedMessages.some((message) => message.id === pendingMessage.serverId))
@@ -187,13 +224,64 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     [handleLeaveConversation],
   );
 
+  const onQueueAnimatingChange = useCallback(
+    (animating: boolean) => {
+      queueAnimating.current = animating;
+      const height = measuredComposerHeight.current;
+      if (!animating && height !== null) {
+        motion.onComposerHeight(height);
+        setComposerGestureHeight(height);
+      }
+    },
+    [motion.onComposerHeight],
+  );
+
   function sendMessage(value: string): void {
-    if (!serverOnline || sendingRef.current || pendingMessage) return;
+    if (!serverOnline || preparing || sendingRef.current || pendingMessage) return;
     const body = value.trim();
-    if (!body && attachments.items.length === 0) return;
+    if (!body && attachments.items.length === 0 && !queueEdit?.message.attachments?.length) return;
+    if (queueEdit) {
+      sendingRef.current = true;
+      setSending(true);
+      setSendError(null);
+      const uploaded: string[] = [];
+      void (async () => {
+        try {
+          for (const file of attachments.items) uploaded.push((await uploadAttachment(agent.id, file)).id);
+          await sendTeamMessage(agent.id, body, [
+            ...(queueEdit.message.attachments?.map((file) => file.id) ?? []),
+            ...uploaded,
+          ]);
+          finishQueueEdit();
+          setSendRetryVersion((version) => version + 1);
+        } catch (error) {
+          await Promise.allSettled(uploaded.map((id) => discardAttachment(agent.id, id)));
+          setSendRetryVersion((version) => version + 1);
+          setSendError({
+            agentId: agent.id,
+            message: userErrorMessage(error, "Could not send the edited message. Your draft is kept here."),
+          });
+        } finally {
+          sendingRef.current = false;
+          setSending(false);
+        }
+      })();
+      return;
+    }
 
     setSendError(null);
-    motion.beginSend();
+    const queueing = Boolean(
+      activity ||
+        conversation?.activeTurnId ||
+        projectedMessages.some(
+          (message) =>
+            message.kind === "message" &&
+            (message.delivery?.status === "queued" ||
+              message.delivery?.status === "starting" ||
+              message.delivery?.status === "running"),
+        ),
+    );
+    if (!queueing) motion.beginSend();
     Keyboard.dismiss();
 
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -209,6 +297,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     setSending(true);
     const files = attachments.items;
     const localId = `local-message-${++sendSequence.current}`;
+    if (!queueing) setImmediateMessageId(localId);
     setPendingMessage({
       message: {
         id: localId,
@@ -216,6 +305,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
         author: "user",
         body,
         streaming: false,
+        awaitingQueueReceipt: queueing,
         attachments: files.map((file) => ({
           id: file.id,
           name: file.name,
@@ -313,8 +403,11 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
             offset={{ opened: keyboardOffset }}
             pointerEvents="box-none"
             onLayout={(event) => {
-              motion.onComposerLayout(event);
-              setComposerGestureHeight(event.nativeEvent.layout.height);
+              const height = event.nativeEvent.layout.height;
+              measuredComposerHeight.current = height;
+              if (queueAnimating.current) return;
+              motion.onComposerHeight(height);
+              setComposerGestureHeight(height);
             }}
           >
             {liquidGlassAvailable ? (
@@ -341,7 +434,62 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
                 {sendError.message}
               </Typography.Paragraph>
             ) : null}
+            <ChatQueue
+              onAnimatingChange={onQueueAnimatingChange}
+              messages={queued.filter(
+                (message) => !queueEdit || message.delivery?.id !== queueEdit.message.delivery?.id,
+              )}
+              canManage={serverOnline && !preparing && !sending && !pendingMessage && !queueEdit}
+              onEdit={async (message) => {
+                await startQueueEdit(message);
+                setSendError(null);
+                setSendRetryVersion((version) => version + 1);
+              }}
+              canSteer={Boolean(conversation?.activeTurnId)}
+              onSteer={async (deliveryId) => {
+                const expectedTurnId = conversation?.activeTurnId;
+                if (!expectedTurnId) throw new Error("There is no active turn to steer.");
+                await steerQueuedMessage({ agentId: agent.id, deliveryId, expectedTurnId }, agent.serverId);
+              }}
+              onDelete={(deliveryId) => cancelQueuedMessage({ agentId: agent.id, deliveryId }, agent.serverId)}
+              liquidGlassAvailable={liquidGlassAvailable}
+              fallbackBackground={fieldBackground}
+              foreground={foreground}
+              muted={muted}
+            />
+            {queueEdit ? (
+              <View className="mx-4 flex-row items-center gap-2 px-2 py-1">
+                <View className="min-w-0 flex-1">
+                  <Typography.Paragraph type="body-xs" style={{ color: muted }}>
+                    Editing message
+                  </Typography.Paragraph>
+                  {queueEdit.message.attachments?.length ? (
+                    <Typography.Paragraph type="body-xs" numberOfLines={1} style={{ color: muted }}>
+                      {queueEdit.message.attachments.map((file) => file.name).join(" · ")}
+                    </Typography.Paragraph>
+                  ) : null}
+                </View>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  isDisabled={sending}
+                  onPress={() => {
+                    void Promise.allSettled(
+                      (queueEdit.message.attachments ?? []).map((file) => discardAttachment(agent.id, file.id)),
+                    );
+                    finishQueueEdit();
+                    setSendError(null);
+                    setSendRetryVersion((version) => version + 1);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </View>
+            ) : null}
             <ChatComposer
+              focusRequest={focusRequest}
+              editingQueue={Boolean(queueEdit)}
+              retainedAttachments={Boolean(queueEdit?.message.attachments?.length)}
               sendRetryVersion={sendRetryVersion}
               mentionAgents={agents.filter(
                 (candidate) => candidate.serverId === agent.serverId && candidate.id !== agent.id,
@@ -355,17 +503,17 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
               actionForeground={actionForeground}
               agentName={agent.name}
               bottomInset={insets.bottom}
-              disabled={!serverOnline || questionForm.pending}
+              disabled={!serverOnline || preparing || (queueEdit ? sending : questionForm.pending)}
               sending={sending || Boolean(pendingMessage)}
               attachments={attachments}
-              answerQuestion={questionForm.question}
-              draft={questionForm.question ? questionForm.draft : draft}
+              answerQuestion={queueEdit ? undefined : questionForm.question}
+              draft={!queueEdit && questionForm.question ? questionForm.draft : draft}
               fallbackBackground={fieldBackground}
               foreground={foreground}
               liquidGlassAvailable={liquidGlassAvailable}
               muted={muted}
               raised={raised}
-              onChangeDraft={questionForm.question ? questionForm.setDraft : setDraft}
+              onChangeDraft={!queueEdit && questionForm.question ? questionForm.setDraft : setDraft}
               onSend={sendMessage}
             />
           </KeyboardStickyView>

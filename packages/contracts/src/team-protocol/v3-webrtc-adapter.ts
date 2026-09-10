@@ -1,4 +1,10 @@
-import { isAgentAnalyticsRoute, isAgentProfileRoute, isConversationUnreadRoute, isHostAnalyticsRoute } from "./current";
+import {
+  isAgentAnalyticsRoute,
+  isAgentProfileRoute,
+  isConversationUnreadRoute,
+  isHostAnalyticsRoute,
+  isQueueTakeRoute,
+} from "./current";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./v2";
 import {
   decodeTeamProtocolV2CurrentHttpRequest,
@@ -65,6 +71,7 @@ export function decodeTeamProtocolV3WebRtcHttpResponse(
 // The host's local HTTP protocol selection must match the WebRTC codec selection.
 export function isTeamProtocolV3OnlyRoute(method: string, path: string): boolean {
   if (
+    isQueueTakeRoute(method, path) ||
     isAgentAnalyticsRoute(method, path) ||
     isHostAnalyticsRoute(method, path) ||
     isAgentProfileRoute(method, path) ||

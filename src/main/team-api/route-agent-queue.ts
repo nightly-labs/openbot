@@ -1,3 +1,5 @@
+import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
+import { HttpError } from "./http-error";
 // One agent's outgoing queue, and the ways a member can change their mind about it.
 //
 // Cancel, steer, update and reorder all name the delivery they mean, and `steer` also names the
@@ -15,6 +17,7 @@ export interface AgentQueueRouteDependencies {
     TeamApiAgents,
     | "listQueue"
     | "acknowledgeFailedTurn"
+    | "takeQueuedMessage"
     | "cancelQueuedMessage"
     | "steerQueuedMessage"
     | "updateQueuedMessage"
@@ -37,6 +40,12 @@ export async function routeAgentQueue(
     const body = await readJson(request);
     agents.acknowledgeFailedTurn(agentId, stringField(body, "turnId"));
     return empty(204);
+  }
+  if (method === "POST" && action === "queue/take") {
+    if (context.protocol !== TEAM_PROTOCOL_V3 || !context.capabilities.has("queue-take"))
+      throw new HttpError(400, "This client does not support taking queued messages.");
+    const body = await readJson(request);
+    return json(200, await agents.takeQueuedMessage(agentId, stringField(body, "deliveryId")));
   }
   if (method === "POST" && action === "queue/cancel") {
     const body = await readJson(request);

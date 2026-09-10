@@ -62,6 +62,12 @@ describe("OpenBot connected desktop shell", () => {
     ));
     const composer = await screen.findByRole("textbox", { name: "Message Chief" });
     await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+    await screen.findByRole("button", { name: "Save queued message" });
+    expect(window.openbot.agent.takeQueuedMessage).toHaveBeenCalledWith(
+      { agentId: "chief", deliveryId: "delivery-covered-edit" },
+      "local",
+    );
+    expect(screen.queryByRole("button", { name: "Edit queued message 1" })).not.toBeInTheDocument();
     composer.textContent = "Queued draft with more to say";
     await fireEvent.input(composer);
 
@@ -77,6 +83,14 @@ describe("OpenBot connected desktop shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close usage" }));
     expect(await screen.findByRole("button", { name: "Save queued message" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Queued draft with more to say");
+    await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
+    await waitFor(() =>
+      expect(window.openbot.agent.sendMessage).toHaveBeenCalledWith(
+        { agentId: "chief", text: "Queued draft with more to say", attachmentDraftIds: [] },
+        "local",
+      ),
+    );
+    expect(window.openbot.agent.updateQueuedMessage).not.toHaveBeenCalled();
   });
 
   it("keeps a failed send in the composer and clears it only after a successful retry", async () => {

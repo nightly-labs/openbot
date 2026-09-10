@@ -1328,6 +1328,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       listQueue: async (agentId) => clone(queues.get(agentId) ?? emptyQueue(agentId)),
       acknowledgeFailedTurn: async () => undefined,
+      takeQueuedMessage: async (input) => {
+        const queue = queues.get(input.agentId) ?? emptyQueue(input.agentId);
+        const delivery = queue.deliveries.find((item) => item.id === input.deliveryId);
+        if (!delivery || delivery.status !== "queued") throw new Error("Only queued messages can be edited.");
+        delivery.status = "cancelled";
+        emitAgentEvent({ type: "queue-changed", snapshot: queue });
+        return { text: delivery.text, attachments: clone(delivery.attachments) };
+      },
       cancelQueuedMessage: async (input) => {
         const queue = queues.get(input.agentId) ?? emptyQueue(input.agentId);
         queue.deliveries = queue.deliveries.map((delivery) =>

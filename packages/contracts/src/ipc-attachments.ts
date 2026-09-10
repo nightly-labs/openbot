@@ -31,6 +31,11 @@ export function isAttachmentSummary(value: unknown): value is AttachmentSummary 
 
 export type DraftAttachment = AttachmentSummary;
 
+export interface QueuedMessageDraft {
+  text: string;
+  attachments: DraftAttachment[];
+}
+
 export interface ChooseAttachmentsInput {
   filter: "all" | "images";
 }
