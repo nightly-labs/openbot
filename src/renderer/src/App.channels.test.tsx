@@ -660,6 +660,25 @@ it("opens channel memories and channel routines from the settings panel", async 
   await within(chat).findByRole("heading", { name: "Channel settings", level: 2 });
 });
 
+it("shows the saved memory and routine counts before either view opens", async () => {
+  const chat = await openSavedChannel();
+  await window.openbot.agent.createChannelMemory({ channelId: "channel-test", text: "Ship on Fridays." });
+  await window.openbot.agent.createChannelRoutine({
+    channelId: "channel-test",
+    name: "Morning brief",
+    instruction: "Summarise the open work.",
+    active: true,
+    timezone: "UTC",
+    schedule: { kind: "daily", time: "09:00" },
+  });
+  await openChannelMenuItem("Edit channel");
+
+  // The row reads both counts from the channel, not from the view that lists the entries. That
+  // view renders only after the reader opens it, so the row held zero until then.
+  await within(chat).findByRole("button", { name: /^Memories1 saved$/ });
+  await within(chat).findByRole("button", { name: /^Routines1 configured$/ });
+});
+
 it("addresses a channel member only while the request names one", async () => {
   const chat = await openSavedChannel();
   const command = vi.spyOn(window.openbot.agent, "channelCommand");

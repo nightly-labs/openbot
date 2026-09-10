@@ -12,6 +12,7 @@ import {
   decodeChannel,
   isChannelMessage,
   isChannelTask,
+  SIGNED_OUT_CHANNEL_MEMBER_ID,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { databaseRow, databaseRows, requiredNumberColumn, requiredStringColumn } from "./database/database-rows";
@@ -458,6 +459,29 @@ export class ChannelStore {
     );
   }
 
+  /**
+   * Channel read cursors follow the reader when an account signs in.
+   *
+   * `HostService.channelActor` answers `local` while no account is signed in and the team member
+   * id after it, so without this every channel the reader already read turns unread on sign-in.
+   * Direct threads already adopt their cursors this way. A target that read a channel under its
+   * own id keeps that position, and the shared operation id makes a repeated adoption a no-op.
+   */
+  adoptReads(sourceMemberId: string, targetMemberId: string): void {
+    if (sourceMemberId === targetMemberId) return;
+    const rows = databaseRows(
+      this.database.connection
+        .prepare("SELECT channel_id, through_sequence FROM projection_channel_reads WHERE member_id = ?")
+        .all(sourceMemberId),
+    );
+    for (const row of rows) {
+      const channelId = requiredStringColumn(row, "channel_id");
+      if (this.#hasReadCursor(channelId, targetMemberId)) continue;
+      const throughSequence = requiredNumberColumn(row, "through_sequence");
+      this.markRead(channelId, targetMemberId, throughSequence, `adopt:${sourceMemberId}`);
+    }
+  }
+
   markRead(channelId: string, memberId: string, throughSequence: number, operationId: string): Channel {
     const maximum = this.page(channelId).throughSequence;
     if (throughSequence > maximum) throw new Error("The read position exceeds the channel history.");
@@ -584,9 +608,11 @@ export class ChannelStore {
       this.database.connection
         .prepare(
           `SELECT COUNT(*) AS count FROM projection_channel_messages
-           WHERE channel_id = ? AND sequence > ? AND json_extract(message_json, '$.author.id') IS NOT ?`,
+           WHERE channel_id = ? AND sequence > ?
+             AND json_extract(message_json, '$.author.id') IS NOT ?
+             AND json_extract(message_json, '$.author.id') IS NOT ?`,
         )
-        .get(channelId, this.readSequence(channelId, memberId), memberId),
+        .get(channelId, this.readSequence(channelId, memberId), memberId, SIGNED_OUT_CHANNEL_MEMBER_ID),
     );
     return row ? requiredNumberColumn(row, "count") : 0;
   }
@@ -600,6 +626,15 @@ export class ChannelStore {
         .get(channelId, state),
     );
     return row ? requiredNumberColumn(row, "count") : 0;
+  }
+
+  /** A stored cursor of zero is a reader that read nothing, not a reader with no cursor at all. */
+  #hasReadCursor(channelId: string, memberId: string): boolean {
+    return (
+      this.database.connection
+        .prepare("SELECT 1 FROM projection_channel_reads WHERE channel_id = ? AND member_id = ?")
+        .get(channelId, memberId) !== undefined
+    );
   }
 
   private readSequence(channelId: string, memberId: string): number {

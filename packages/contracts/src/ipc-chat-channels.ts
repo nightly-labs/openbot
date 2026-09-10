@@ -5,6 +5,12 @@ import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "./runtim
 
 export const CHANNEL_CHATS_CAPABILITY = "channel-chats-v1";
 export const CHANNEL_DELETE_CAPABILITY = "channel-delete-v1";
+/**
+ * The id a channel row carries for the reader, and for its own author, while no account is signed
+ * in. The person behind it does not change when they sign in, so their read cursors follow them and
+ * their own messages stay their own in the transcript.
+ */
+export const SIGNED_OUT_CHANNEL_MEMBER_ID = "local";
 export const CHANNEL_PARALLEL_LIMIT = 2;
 export const CHANNEL_ASSIGNMENT_LIMIT = 8;
 

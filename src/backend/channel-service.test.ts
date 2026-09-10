@@ -1873,6 +1873,51 @@ describe("shared channel coordination", () => {
     expect(service.store.list("human-2").at(0)?.lastMessage?.authorName).toBe(name);
   });
 
+  it("keeps a channel read when the reader signs in", async () => {
+    await send("Draft the release note.");
+    const through = service.store.page("channel-1").throughSequence;
+    service.store.markRead("channel-1", "local", through, operationId());
+    expect(required(service.store.list("local")[0]).unreadCount).toBe(0);
+
+    service.store.adoptReads("local", "member-9");
+
+    // `channelActor` answers `local` while no account is signed in and a member id after it. The
+    // reader that signs in has read this channel, so nothing here is unread for it.
+    expect(required(service.store.list("member-9")[0]).unreadCount).toBe(0);
+  });
+
+  it("leaves the read position a signed-in reader already holds", async () => {
+    await send("Draft the release note.");
+    const through = service.store.page("channel-1").throughSequence;
+    service.store.markRead("channel-1", "local", through, operationId());
+    service.store.markRead("channel-1", "member-9", 0, operationId());
+
+    service.store.adoptReads("local", "member-9");
+
+    // A reader with its own cursor keeps it. Adoption carries a position to a reader that has
+    // none; it does not read messages on behalf of one that stayed behind.
+    expect(required(service.store.list("member-9")[0]).unreadCount).toBe(through);
+  });
+
+  it("keeps a message the reader wrote before signing in out of the unread count", async () => {
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: "Draft the release note.",
+        recipientAgentId: "agent-a",
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      { id: "local", name: "You" },
+    );
+
+    // The signed-in reader holds no cursor here, so only authorship can hold this message out of
+    // the count. It carries the signed-out id, and that is the same person as the member.
+    expect(required(service.store.list("member-9")[0]).unreadCount).toBe(0);
+  });
+
   it("serializes overlapping workspaces and permits independent declared resources", () => {
     expect(resourcesConflict(["workspace:/work/project"], ["workspace:/work/project/src"])).toBe(true);
     expect(resourcesConflict(["browser"], ["browser"])).toBe(true);

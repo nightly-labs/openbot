@@ -35,6 +35,7 @@ import type {
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
@@ -963,7 +964,7 @@ export class HostService extends EventEmitter<HostEvents> {
     try {
       user = this.#options.getSignedInUser();
     } catch {
-      return { id: "local", name: "You" };
+      return { id: SIGNED_OUT_CHANNEL_MEMBER_ID, name: "You" };
     }
     return { id: this.#currentAgentReaderId(), name: user.name ?? "You" };
   }
@@ -971,8 +972,14 @@ export class HostService extends EventEmitter<HostEvents> {
   #currentAgentReaderId(): string {
     const accountReaderId = `local-user:${this.#options.getSignedInUser().id}`;
     const memberId = this.#findCurrentMemberId();
-    if (!memberId) return accountReaderId;
+    // Channel reads are keyed by the reader id this method answers, so they adopt with it.
+    if (!memberId) {
+      this.#options.channels?.store.adoptReads(SIGNED_OUT_CHANNEL_MEMBER_ID, accountReaderId);
+      return accountReaderId;
+    }
     this.#options.agents.adoptConversationReads(accountReaderId, memberId);
+    this.#options.channels?.store.adoptReads(accountReaderId, memberId);
+    this.#options.channels?.store.adoptReads(SIGNED_OUT_CHANNEL_MEMBER_ID, memberId);
     return memberId;
   }
 

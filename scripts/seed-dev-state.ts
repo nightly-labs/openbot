@@ -44,7 +44,10 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const CHANNEL_LAUNCH_ROOM = "channel-launch-room";
 const CHANNEL_BETA_FEEDBACK = "channel-beta-feedback";
-/** The reader id `HostService.channelActor` uses while no account is signed in. */
+/**
+ * The reader id `HostService.channelActor` uses while no account is signed in. The signed-in reader
+ * adopts these cursors through `ChannelStore.adoptReads`, so the seeded read state follows it.
+ */
 const LOCAL_MEMBER_ID = "local";
 const SEED_AGENT_MODEL = "gpt-5.6-luna";
 const SEED_AGENT_REASONING_EFFORT = "low";
@@ -320,7 +323,7 @@ async function seedRoutines(agentStore: AgentStore, mailbox: MailboxStore, clock
     },
     now,
   );
-  routines.create(
+  const fridayReview = routines.create(
     {
       agentId: "chief",
       name: "Friday launch review",
@@ -365,8 +368,11 @@ async function seedRoutines(agentStore: AgentStore, mailbox: MailboxStore, clock
     now,
   );
 
+  // Each run holds its own `scheduledFor`, but the request it delivers carries the mailbox clock,
+  // which is the moment the seed runs. So two runs of one routine would render as one instruction
+  // repeated at one time. Two routines keep the scheduled and the manual run apart in the thread.
   await seedRoutineRun(routines, mailbox, morningBrief, "scheduled", clock.at(26 * HOUR), "succeeded");
-  await seedRoutineRun(routines, mailbox, morningBrief, "manual", clock.at(2 * HOUR), "succeeded");
+  await seedRoutineRun(routines, mailbox, fridayReview, "manual", clock.at(2 * HOUR), "succeeded");
   await seedRoutineRun(
     routines,
     mailbox,

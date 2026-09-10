@@ -1,6 +1,6 @@
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { chatTagReferences, expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
-import type { DraftAttachment } from "@openbot/contracts/ipc";
+import { type DraftAttachment, SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { QuestionPromptBubble } from "../../components/QuestionPromptBubble";
 import {
@@ -47,9 +47,12 @@ export function ChannelConversation() {
   const { currentTeamMember } = usePresence();
   const isOwnMessage = (authorId: string) => {
     const auth = centralAuth();
+    // A message written before the reader signed in carries the signed-out id. It is the same
+    // person, so it stays their own message, the way its read cursor stays their read cursor.
     return (
+      authorId === SIGNED_OUT_CHANNEL_MEMBER_ID ||
       authorId === currentTeamMember()?.id ||
-      authorId === (auth.status === "signed_in" ? `local-user:${auth.user.id}` : "local")
+      (auth.status === "signed_in" && authorId === `local-user:${auth.user.id}`)
     );
   };
   /**
@@ -87,6 +90,38 @@ export function ChannelConversation() {
     const id = channelId();
     return id ? channelRoutinesPort(id) : null;
   });
+  // The settings row reads both counts before either view opens, so it cannot take them from the
+  // view that renders the list. It loads them here and follows the events those views follow.
+  createEffect(
+    () => memoriesPort(),
+    (port) => {
+      if (!port) return;
+      const load = () => {
+        void port.list().then((entries) => {
+          setPanel((state) => {
+            state.memories.count = entries.length;
+          });
+        });
+      };
+      load();
+      onCleanup(port.subscribe(load));
+    },
+  );
+  createEffect(
+    () => routinesPort(),
+    (port) => {
+      if (!port) return;
+      const load = () => {
+        void port.list().then((entries) => {
+          setPanel((state) => {
+            state.routines.count = entries.length;
+          });
+        });
+      };
+      load();
+      onCleanup(port.subscribe(load));
+    },
+  );
   const { pendingApprovals, pendingPrompts } = useTurns();
   const { browserTabs } = useBrowserTabs();
   const { agentList } = useAgents();
