@@ -2606,15 +2606,21 @@
   font-size: var(--openbot-text-sm);
 }
 
-.scroll-to-latest-button {
+/*
+ * The way back to the newest message. The wrapper carries the pill, because the count turns one
+ * round button into two buttons the reader reads as one control, and only the wrapper knows how
+ * wide that is. The circle becomes a pill in one step: `44px` to `auto` cannot be animated, and a
+ * scale would fight the centring transform.
+ */
+.scroll-to-latest {
   position: sticky;
   z-index: 3;
   top: calc(100% - 58px);
   left: 50%;
-  display: grid;
-  width: 44px;
+  display: flex;
+  width: max-content;
   height: 44px;
-  place-items: center;
+  align-items: center;
   margin-bottom: -44px;
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-pill);
@@ -2624,6 +2630,53 @@
     inset 0 0 0 1px var(--openbot-shadow-ring);
   color: var(--openbot-text-primary);
   transform: translateX(-50%);
+  transition: background-color var(--openbot-duration-hover) ease;
+}
+
+/* With a count the pill wears the colours of the unread banner: it is the same news. */
+.scroll-to-latest[data-new-messages] {
+  border-color: transparent;
+  background: var(--openbot-unread-surface);
+  color: var(--openbot-unread-text);
+}
+
+.scroll-to-latest-button {
+  display: grid;
+  width: 44px;
+  height: 100%;
+  place-items: center;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  transition:
+    background-color var(--openbot-duration-hover) ease,
+    transform var(--openbot-duration-fast) cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.scroll-to-latest[data-new-messages] .scroll-to-latest-button {
+  width: auto;
+  grid-auto-flow: column;
+  gap: var(--openbot-space-1-5);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-2);
+}
+
+.scroll-to-latest-count {
+  font-size: var(--openbot-text-sm);
+  font-weight: 620;
+  white-space: nowrap;
+}
+
+.scroll-to-latest-dismiss {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  border: 0;
+  border-inline-start: 1px solid color-mix(in srgb, currentcolor 24%, transparent);
+  border-radius: inherit;
+  background: none;
+  padding-inline: var(--openbot-space-2);
+  color: inherit;
   transition:
     background-color var(--openbot-duration-hover) ease,
     transform var(--openbot-duration-fast) cubic-bezier(0.23, 1, 0.32, 1);
@@ -2639,28 +2692,50 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
-.scroll-to-latest-button:focus-visible {
-  outline: 2px solid var(--openbot-border-focus);
-  outline-offset: 2px;
+.scroll-to-latest-dismiss svg {
+  width: 15px;
+  height: 15px;
 }
 
-.scroll-to-latest-button:active {
-  transform: translateX(-50%) scale(0.96);
+/* The ring follows the pill: an offset ring would draw a circle around one half of it. */
+.scroll-to-latest-button:focus-visible,
+.scroll-to-latest-dismiss:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: -2px;
+}
+
+.scroll-to-latest[data-new-messages] .scroll-to-latest-button:focus-visible,
+.scroll-to-latest[data-new-messages] .scroll-to-latest-dismiss:focus-visible {
+  outline-color: var(--openbot-unread-text);
+}
+
+.scroll-to-latest-button:active,
+.scroll-to-latest-dismiss:active {
+  transform: scale(0.96);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .scroll-to-latest-button:hover {
+  .scroll-to-latest-button:hover,
+  .scroll-to-latest-dismiss:hover {
     background: var(--openbot-bg-control-active);
+  }
+
+  .scroll-to-latest[data-new-messages] .scroll-to-latest-button:hover,
+  .scroll-to-latest[data-new-messages] .scroll-to-latest-dismiss:hover {
+    background: color-mix(in srgb, var(--openbot-unread-text) 12%, transparent);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .scroll-to-latest-button {
+  .scroll-to-latest,
+  .scroll-to-latest-button,
+  .scroll-to-latest-dismiss {
     transition: none;
   }
 
-  .scroll-to-latest-button:active {
-    transform: translateX(-50%);
+  .scroll-to-latest-button:active,
+  .scroll-to-latest-dismiss:active {
+    transform: none;
   }
 }
 

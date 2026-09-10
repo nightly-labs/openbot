@@ -90,6 +90,28 @@ const unreadStoryMessages: RendererAgentMessage[] = [
   ),
 ];
 
+/*
+ * The pill that counts what arrived below the reader. The messages live in a signal, because the
+ * count is a function of arrival: the play function has to append to a transcript the reader is
+ * already scrolled away from.
+ */
+const newMessagePillHistory: RendererAgentMessage[] = unreadStoryMessages.map((message, index) => ({
+  ...message,
+  id: `pill-history-${index + 1}`,
+}));
+
+function newMessagePillArrival(index: number): RendererAgentMessage {
+  return {
+    id: `pill-arrival-${index}`,
+    author: "agent",
+    body: `Arrived while the reader was scrolled up (${index}). The pill above the composer counts this one.`,
+    time: `09:${String(50 + index).padStart(2, "0")}`,
+    kind: "text",
+  };
+}
+
+const [newMessagePillMessages, setNewMessagePillMessages] = createSignal<RendererAgentMessage[]>(newMessagePillHistory);
+
 const imageGenerationMessages: RendererAgentMessage[] = [
   ...messages,
   {
@@ -1113,6 +1135,49 @@ export const ScrollToLatest: Story = {
     scrollElement.scrollTop = 0;
     scrollElement.dispatchEvent(new Event("scroll"));
     await expect(canvas.findByRole("button", { name: "Scroll to latest message" })).resolves.toBeVisible();
+  },
+};
+
+export const NewMessagesPill: Story = {
+  name: "New messages pill",
+  args: {
+    messages: newMessagePillHistory,
+    unreadCount: 0,
+    firstUnreadMessageId: null,
+  },
+  render: (storyArgs) => <MockedConversation args={storyArgs} messages={newMessagePillMessages()} />,
+  play: async ({ canvas, canvasElement }) => {
+    setNewMessagePillMessages(newMessagePillHistory);
+    const scrollElement = canvasElement.querySelector<HTMLElement>(".conversation-scroll");
+    if (!scrollElement) throw new Error("Conversation scroll element is missing.");
+    Object.defineProperties(scrollElement, {
+      clientHeight: { configurable: true, value: 600 },
+      scrollHeight: { configurable: true, value: 1_200 },
+    });
+    scrollElement.scrollTop = 0;
+    scrollElement.dispatchEvent(new Event("scroll"));
+    await expect(canvas.findByRole("button", { name: "Scroll to latest message" })).resolves.toBeVisible();
+
+    setNewMessagePillMessages((current) => [...current, newMessagePillArrival(1)]);
+    await expect(canvas.findByRole("button", { name: "Jump to 1 new message" })).resolves.toBeVisible();
+
+    setNewMessagePillMessages((current) => [...current, newMessagePillArrival(2), newMessagePillArrival(3)]);
+    await expect(canvas.findByRole("button", { name: "Jump to 3 new messages" })).resolves.toBeVisible();
+
+    // The reader's own message is not news to them.
+    setNewMessagePillMessages((current) => [
+      ...current,
+      { id: "pill-own-message", author: "you", body: "Reading up from here.", time: "09:54", kind: "text" },
+    ]);
+    await expect(canvas.findByRole("button", { name: "Jump to 3 new messages" })).resolves.toBeVisible();
+
+    fireEvent.click(await canvas.findByRole("button", { name: "Dismiss new message count" }));
+    await expect(canvas.findByRole("button", { name: "Scroll to latest message" })).resolves.toBeVisible();
+    expect(scrollElement.scrollTop).toBe(0);
+
+    // A dismissed count comes back with the next arrival, from zero.
+    setNewMessagePillMessages((current) => [...current, newMessagePillArrival(4)]);
+    await expect(canvas.findByRole("button", { name: "Jump to 1 new message" })).resolves.toBeVisible();
   },
 };
 

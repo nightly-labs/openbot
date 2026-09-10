@@ -4,6 +4,12 @@ import { errorMessage } from "../../../error-message";
 import type { ConversationProps } from "../conversation-types";
 import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "../createChatVirtualizer";
 import { scrollToLatestMessage } from "../MessageNavigation";
+import {
+  anchorNewMessages,
+  countableTimelineMessage,
+  type NewMessageTally,
+  tallyNewMessages,
+} from "../new-message-tally";
 import { scrollToUnreadBoundary, unreadMessagesDividerIsVisible } from "../UnreadMessages";
 
 export interface ScrollElements {
@@ -33,10 +39,48 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   const [showScrollToLatest, setShowScrollToLatest] = createSignal(false);
   const [atHistoryBoundary, setAtHistoryBoundary] = createSignal(false);
   const [unreadDividerVisible, setUnreadDividerVisible] = createSignal(false);
+  const [newMessageCount, setNewMessageCount] = createSignal(0);
   let unreadVisibilityFrame: number | undefined;
   let firstRenderedIndex = 0;
+  let newMessages: NewMessageTally = { count: 0, anchorId: undefined };
+  let talliedConversationIdentity: string | undefined;
 
   const timelineMessages = createMemo(() => deps.props.messages.filter((message) => message.kind !== "thinking"));
+  const countableMessageIds = createMemo(() =>
+    deps.props.messages.filter(countableTimelineMessage).map((message) => message.id),
+  );
+
+  function clearNewMessages(): void {
+    newMessages = anchorNewMessages(countableMessageIds());
+    setNewMessageCount(0);
+  }
+
+  /*
+   * The count owns its identity guard instead of leaning on the effect that follows the bottom:
+   * that one is created later, so on a thread switch this would run first and carry the count of
+   * the thread the reader left into the thread they opened.
+   */
+  createEffect(
+    () => {
+      const ids = countableMessageIds();
+      return {
+        identity: `${deps.props.server?.id ?? "local"}:${deps.props.agent?.id ?? ""}`,
+        length: ids.length,
+        lastId: ids[ids.length - 1],
+      };
+    },
+    ({ identity }) => {
+      const ids = countableMessageIds();
+      if (identity !== talliedConversationIdentity) {
+        talliedConversationIdentity = identity;
+        newMessages = anchorNewMessages(ids);
+        setNewMessageCount(0);
+        return;
+      }
+      newMessages = tallyNewMessages(newMessages, ids, deps.sticky.getStickToLatest());
+      setNewMessageCount(newMessages.count);
+    },
+  );
 
   createEffect(
     () =>
@@ -74,7 +118,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     if (!element) return;
     scrollFades.measure();
     updateHistoryBoundary(element);
-    setShowScrollToLatest(element.scrollHeight - element.scrollTop - element.clientHeight > 80);
+    const remaining = element.scrollHeight - element.scrollTop - element.clientHeight;
+    setShowScrollToLatest(remaining > 80);
+    if (remaining <= 80) clearNewMessages();
   }
 
   function updateVirtualScrollMargin(): void {
@@ -147,6 +193,8 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     const scrollElement = deps.elements.scrollElement();
     if (!scrollElement) return;
     deps.sticky.setStickToLatest(true);
+    // A smooth scroll fires no scroll event in a test environment, so the count clears here too.
+    clearNewMessages();
     if (deps.props.discontinuous) {
       await deps.props.onLoadLatest?.();
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -161,6 +209,8 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     setShowScrollToLatest,
     unreadDividerVisible,
     setUnreadDividerVisible,
+    newMessageCount,
+    clearNewMessages,
     messageVirtualizer,
     timelineMessages,
     updateScrollFade,

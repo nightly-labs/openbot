@@ -26,6 +26,12 @@ import { calculateChatScrollMargin, createChatVirtualizer } from "../conversatio
 import { ScrollToLatestButton, scrollToLatestMessage } from "../conversation/MessageNavigation";
 import { MessageActions } from "../conversation/MessageRendering";
 import { channelMemoriesPort } from "../conversation/memories-port";
+import {
+  anchorNewMessages,
+  countableTimelineMessage,
+  type NewMessageTally,
+  tallyNewMessages,
+} from "../conversation/new-message-tally";
 import { channelRoutinesPort } from "../conversation/routines-port";
 import {
   scrollToUnreadBoundary,
@@ -162,7 +168,9 @@ export function ChannelConversation() {
   const [virtualScrollMargin, setVirtualScrollMargin] = createSignal(0);
   const [openMoreMessageId, setOpenMoreMessageId] = createSignal<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = createSignal<string | null>(null);
+  const [newMessageCount, setNewMessageCount] = createSignal(0);
   let stickToLatest = true;
+  let newMessages: NewMessageTally = { count: 0, anchorId: undefined };
   let scrollFrame: number | undefined;
   let unreadVisibilityFrame: number | undefined;
   let scrolledChannel: string | undefined;
@@ -174,6 +182,16 @@ export function ChannelConversation() {
     () => channels.state.channels.find((channel) => channel.id === channels.state.selectedId)?.unreadCount ?? 0,
   );
   const firstUnreadId = createMemo(() => firstUnreadChannelMessageId(timeline(), unreadCount()));
+  /** What the reader would call a new message: another author's, not their own. */
+  const countableMessageIds = createMemo(() =>
+    timeline()
+      .filter((entry) => countableTimelineMessage(entry.message))
+      .map((entry) => entry.id),
+  );
+  const clearNewMessages = () => {
+    newMessages = anchorNewMessages(untrack(countableMessageIds));
+    setNewMessageCount(0);
+  };
   /**
    * Everyone the channel waits on: the owner of a running task, the author of a message that is
    * still arriving, and the lead while it chooses an owner. They read as one row under the
@@ -230,7 +248,9 @@ export function ChannelConversation() {
     return true;
   };
   const updateScrollState = (element: HTMLElement) => {
-    setShowScrollToLatest(element.scrollHeight - element.scrollTop - element.clientHeight > 80);
+    const remaining = element.scrollHeight - element.scrollTop - element.clientHeight;
+    setShowScrollToLatest(remaining > 80);
+    if (remaining <= 80) clearNewMessages();
   };
   const updateVirtualScrollMargin = () => {
     setVirtualScrollMargin(calculateChatScrollMargin(messageList, virtualRoot));
@@ -274,6 +294,7 @@ export function ChannelConversation() {
   const jumpToLatestMessage = () => {
     if (!messageList) return;
     stickToLatest = true;
+    clearNewMessages();
     scrollToLatestMessage(messageList);
   };
   /**
@@ -298,11 +319,26 @@ export function ChannelConversation() {
     }, 1_400);
   };
   createEffect(
-    () => ({ id: channels.state.page?.channel.id, revision: channels.state.page?.channel.revision }),
+    () => {
+      const ids = countableMessageIds();
+      return {
+        id: channels.state.page?.channel.id,
+        revision: channels.state.page?.channel.revision,
+        length: ids.length,
+        latestId: ids[ids.length - 1],
+      };
+    },
     ({ id }) => {
+      const ids = untrack(countableMessageIds);
       if (id !== scrolledChannel) {
         scrolledChannel = id;
         stickToLatest = true;
+        newMessages = anchorNewMessages(ids);
+        setNewMessageCount(0);
+      } else {
+        // The sticky flag has to be read here: the frame below has already moved the view.
+        newMessages = tallyNewMessages(newMessages, ids, stickToLatest);
+        setNewMessageCount(newMessages.count);
       }
       if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame);
       scrollFrame = requestAnimationFrame(() => {
@@ -436,7 +472,11 @@ export function ChannelConversation() {
                 />
               </Show>
               <Show when={showScrollToLatest()}>
-                <ScrollToLatestButton onClick={jumpToLatestMessage} />
+                <ScrollToLatestButton
+                  onClick={jumpToLatestMessage}
+                  newMessageCount={newMessageCount()}
+                  onDismiss={clearNewMessages}
+                />
               </Show>
               <Show when={page().olderCursor}>
                 <Button variant="ghost" onClick={() => void channels.loadOlder()}>
