@@ -276,7 +276,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
 
   const loadServer = useCallback(
     async (serverId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext) => {
-      setActivityByServer((current) => ({ ...current, [serverId]: {} }));
+      // Runtime events and snapshots own activity; workspace reads must preserve it.
       context.stage = "preferences";
       const saved = preferenceStore.read(serverId);
       setPreferences((current) => ({ ...current, [serverId]: saved }));
