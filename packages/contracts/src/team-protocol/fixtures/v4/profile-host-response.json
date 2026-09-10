@@ -1,0 +1,41 @@
+{
+  "agent": {
+    "id": "agent-copy",
+    "provider": "opencode",
+    "name": "Research copy",
+    "title": "Research lead",
+    "description": "Finds primary sources.",
+    "notifications": true,
+    "model": "opencode/example-model",
+    "reasoningEffort": "medium",
+    "threadId": null,
+    "workspacePath": "/OpenBot/Agents/agent-copy",
+    "preview": "No messages yet",
+    "updatedAt": null,
+    "avatarSeed": "research",
+    "avatarHue": 215,
+    "avatarUrl": null,
+    "marketplaceSource": {
+      "agentId": "market-research",
+      "versionId": "market-research-v2",
+      "version": 2,
+      "skillIds": ["primary-sources"],
+      "routineIds": ["routine-copy"]
+    }
+  },
+  "layout": {
+    "revision": 4,
+    "sections": [
+      {
+        "id": "section-core",
+        "name": "Core"
+      }
+    ],
+    "order": ["people", "unassigned", "section-core"],
+    "agentAssignments": {
+      "agent-source": "section-core",
+      "agent-copy": "section-core"
+    },
+    "agentOrder": ["agent-source", "agent-copy"]
+  }
+}
