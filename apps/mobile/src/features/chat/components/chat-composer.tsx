@@ -116,6 +116,11 @@ export function ChatComposer({
   const [sendGate] = useState(createComposerSendGate);
 
   useLayoutEffect(() => {
+    // Selecting a file is a draft edit even when TextInput never receives focus.
+    if (attachments.items.length > 0) sendGate.edit();
+  }, [attachments.items, sendGate]);
+
+  useLayoutEffect(() => {
     if (sendRetryVersion > 0) sendGate.allowRetry();
   }, [sendGate, sendRetryVersion]);
 

@@ -7,8 +7,24 @@ import { type ChatMotion, useChatMotion } from "./use-chat-motion";
 const native = vi.hoisted(() => {
   const keyboard: Record<string, (event: { height: number }) => void> = {};
   const reactions: (() => void)[] = [];
-  return { keyboard, reactions, frames: new Map<number, FrameRequestCallback>(), nextFrame: 0, scrollTo: vi.fn() };
+  return {
+    hidden: () => {},
+    keyboard,
+    reactions,
+    frames: new Map<number, FrameRequestCallback>(),
+    nextFrame: 0,
+    scrollTo: vi.fn(),
+  };
 });
+
+vi.mock("react-native", () => ({
+  Keyboard: {
+    addListener: (_event: string, callback: () => void) => {
+      native.hidden = callback;
+      return { remove: () => {} };
+    },
+  },
+}));
 
 // Replace the native event/runtime boundary; run the real chat hook and React lifecycle.
 vi.mock("react-native-keyboard-controller", () => ({
@@ -122,6 +138,13 @@ it("keeps replies visible and does not scroll after keyboard dismissal, includin
   native.keyboard.onMove({ height: 300 });
   await flush();
   expect(motion.atLatest).toBe(false);
+
+  // Native dismissal can arrive without any controller completion frame.
+  native.hidden();
+  await act(() => root.render(<Chat />));
+  await flush();
+  expect(motion.atLatest).toBe(true);
+  expect(native.scrollTo).not.toHaveBeenCalled();
 });
 
 it("reveals a virtualized history and does not jump to the end when older messages load", async () => {
