@@ -148,3 +148,19 @@ export type ManagedProviderId = (typeof MANAGED_RUNTIME_PROVIDERS)[number];
 export function isManagedRuntimeProvider(provider: AgentProviderId): provider is ManagedProviderId {
   return isOneOf(MANAGED_RUNTIME_PROVIDERS, provider);
 }
+
+/**
+ * Whether an OpenCode model's display name marks it as one the free tier covers.
+ *
+ * OpenCode states the price in the name and nowhere else: `model/list` carries no price field, and
+ * neither OpenCode Zen endpoint authenticates, so this trailing word is the only thing that
+ * separates a model any user can run from one that bills. The picker labels a model with it and the
+ * catalog order picks the default from it, and those two have to agree -- a "Free" badge on a model
+ * OpenBot would never default to, or a default that quietly bills, is the same bug twice.
+ *
+ * Only a trailing word counts. Anything looser would catch a model named for something else that
+ * happens to contain "free".
+ */
+export function isFreeOpencodeModelName(name: string): boolean {
+  return /\bfree$/i.test(name.trim());
+}

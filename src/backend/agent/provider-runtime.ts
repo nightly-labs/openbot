@@ -7,7 +7,7 @@ import type {
   AgentStatus,
   AgentSummary,
 } from "@openbot/contracts/ipc";
-import { agentProviderDescriptor, isReasoningEffort } from "@openbot/contracts/ipc";
+import { agentProviderDescriptor, isFreeOpencodeModelName, isReasoningEffort } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -139,6 +139,32 @@ const SUPPRESSED_MODEL_IDS: ReadonlyMap<AgentProvider, ReadonlySet<string>> = ne
  * model can only come from the user's own OpenCode sign-in, and that one does buy it.
  */
 const CREDENTIAL_ONLY_MODEL_PREFIXES: ReadonlyMap<AgentProvider, string> = new Map([["opencode", "opencode-go/"]]);
+
+/**
+ * Which OpenCode model a new agent runs, as the tier its catalog leads with.
+ *
+ * A provider with no `defaultProviderModel` falls back to the first model of its catalog, so list
+ * position is the default. OpenCode reports the third-party services the user signed in to before
+ * its own, so that fallback used to land on `openai/gpt-5.3-codex-spark` and the agent's first
+ * message failed with "Token refresh failed: 401" although the free models needed no account.
+ *
+ * The order is free first, Muse ahead of the rest of the free tier, so nobody is billed for a model
+ * they did not choose. Below the free tier come OpenCode's own paid models -- OpenBot supplies the
+ * key for those and can say why one failed -- and last the models behind a separate sign-in, whose
+ * token OpenBot can neither see nor refresh. That tail matters only for a catalog with no free tier
+ * at all; it is the difference between a bad default and an unusable one.
+ */
+function opencodeModelRank(model: AgentModelOption): 0 | 1 | 2 | 3 {
+  // Names, not ids, because the price is a naming convention and `isFreeOpencodeModelName` is what
+  // the picker badges a model with. An id reaches here as the name anyway when the CLI sends no
+  // display name, and both spellings carry the same two words.
+  if (isFreeOpencodeModelName(model.name)) return /\bmuse\b/i.test(model.name) ? 0 : 1;
+  return model.id.toLowerCase().startsWith("opencode/") ? 2 : 3;
+}
+
+const PREFERRED_MODEL_ORDER: ReadonlyMap<AgentProvider, (model: AgentModelOption) => number> = new Map([
+  ["opencode", opencodeModelRank],
+]);
 
 /**
  * The product name of a Claude model, from its id, or `null` for an id that does not read as one.
@@ -1359,7 +1385,10 @@ export class ProviderRuntime implements ProviderPort {
                   : (fallback?.supportedReasoningEfforts ?? ["medium"]),
               });
             }
-            return models;
+            const rank = PREFERRED_MODEL_ORDER.get(client.provider);
+            if (!rank) return models;
+            // Sort is stable, so the CLI's own order still decides inside one tier.
+            return [...models].sort((left, right) => rank(left) - rank(right));
           } catch {
             return previous;
           }

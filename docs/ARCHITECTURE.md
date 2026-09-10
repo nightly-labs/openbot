@@ -596,6 +596,19 @@ drops the `opencode-go/` models from `#refreshModelCatalog` while OpenBot is the
 key; with no key stored those models can only come from the user's own OpenCode sign-in, which does
 buy them. Neither `/models` endpoint authenticates, so entitlement cannot be read back and the
 split is a product rule rather than a check.
+
+`PREFERRED_MODEL_ORDER` in the same pass reorders that catalog, because a provider with no
+`defaultProviderModel` runs the first model of its list and OpenCode reports the third-party
+services the user signed in to before its own — so the fallback used to pick a model behind a token
+OpenBot can neither see nor refresh. `opencodeModelRank` sorts free models first with Muse ahead of
+the rest, then OpenCode's own paid models, then everything behind a separate sign-in. The sort is
+stable, so the CLI's order survives inside one tier.
+
+Free means a display name ending in "Free": `model/list` carries no price and neither Zen endpoint
+authenticates, so the name is the only signal. `isFreeOpencodeModelName` in
+`packages/contracts/src/agent-providers.ts` is shared with the picker badge in
+`src/renderer/src/components/provider-model-options.ts`, so a badge and a default cannot disagree
+about what costs money.
 Provider session IDs remain in `projection_provider_sessions`; migration 17 adds OpenCode while
 preserving turn links. Provider switches keep the same agent, workspace, and local thread.
 

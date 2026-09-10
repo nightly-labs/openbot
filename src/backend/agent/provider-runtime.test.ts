@@ -189,7 +189,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         .map((model) => model.id),
     ).toEqual(["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.4", "gpt-5.3-codex-spark"]);
   });
-  async function opencodeModelIds(storedKey: string | null): Promise<string[]> {
+  async function opencodeModelIds(storedKey: string | null, catalog?: string[]): Promise<string[]> {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
     const { store, mailbox } = stores(root);
     service = new AgentService(
@@ -203,13 +203,8 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         // Zen and Go reach OpenBot as one catalog, which is what makes the split a decision this
         // app has to make rather than one it can read off the response.
         if (provider === "opencode") {
-          client.modelList = () => ({
-            data: [
-              { model: "opencode/big-pickle" },
-              { model: "opencode/claude-opus-5" },
-              { model: "opencode-go/kimi-k3" },
-            ],
-          });
+          const ids = catalog ?? ["opencode/big-pickle", "opencode/claude-opus-5", "opencode-go/kimi-k3"];
+          client.modelList = () => ({ data: ids.map((model) => ({ model })) });
         }
         return client;
       },
@@ -235,6 +230,28 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       "opencode/big-pickle",
       "opencode/claude-opus-5",
       "opencode-go/kimi-k3",
+    ]);
+  });
+
+  it("leads the OpenCode catalog with the free models, Muse first", async () => {
+    // An agent that has chosen no model runs whatever comes first, and OpenCode reports the
+    // services the user signed in to before its own. So the order carries four claims: Muse leads,
+    // no billed model outranks a free one, OpenCode's own paid models outrank a third-party
+    // sign-in OpenBot cannot refresh, and the CLI's order survives inside one tier.
+    expect(
+      await opencodeModelIds(null, [
+        "openai/gpt-5.3-codex-spark",
+        "opencode/big-pickle",
+        "opencode/nemotron-3.5-lightning-free",
+        "opencode/mimo-v2.5-free",
+        "opencode/muse-spark-1.3-contributor-free",
+      ]),
+    ).toEqual([
+      "opencode/muse-spark-1.3-contributor-free",
+      "opencode/nemotron-3.5-lightning-free",
+      "opencode/mimo-v2.5-free",
+      "opencode/big-pickle",
+      "openai/gpt-5.3-codex-spark",
     ]);
   });
 
