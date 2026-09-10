@@ -48,9 +48,11 @@ export function presentChatMessages(
   // which could incorrectly merge another member's identical message.
   const visible =
     pending && !pending.serverId ? messages.filter((message) => pending.baseline.has(message.id)) : messages;
-  const result = visible.map((message) =>
-    aliases.has(message.id) ? { ...message, id: aliases.get(message.id) ?? message.id } : message,
-  );
+  const result = visible.map((message) => {
+    // Keep the local image mounted until the caller caches the final attachment IDs.
+    if (pending?.serverId === message.id) return pending.message;
+    return aliases.has(message.id) ? { ...message, id: aliases.get(message.id) ?? message.id } : message;
+  });
   if (pending && !messages.some((message) => message.id === pending.serverId)) result.push(pending.message);
   return result;
 }

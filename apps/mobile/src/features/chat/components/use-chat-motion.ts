@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent } from "react-native";
+import { Keyboard, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { useKeyboardHandler } from "react-native-keyboard-controller";
 import type Animated from "react-native-reanimated";
 import {
@@ -52,6 +52,11 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     },
     [keyboardHeight],
   );
+  useEffect(() => {
+    // A native picker or interrupted dismissal can omit the controller's final frame.
+    const subscription = Keyboard.addListener("keyboardDidHide", () => keyboardHeight.set(0));
+    return () => subscription.remove();
+  }, [keyboardHeight]);
   const composerStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -Math.max(0, keyboardHeight.get() - keyboardOffset) }],
   }));

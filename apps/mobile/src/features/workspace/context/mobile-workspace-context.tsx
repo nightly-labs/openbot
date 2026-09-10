@@ -247,6 +247,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     };
   }, [directoryRefresh]);
 
+  const attachmentDownloads = useRef<Promise<void>>(Promise.resolve());
   const request = useCallback(
     async <T,>(
       method: string,
@@ -805,6 +806,33 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           input,
         );
       },
+      downloadAttachment: (serverId, attachmentId) => {
+        const download = () =>
+          request(
+            "GET",
+            TEAM_API_ROUTES.attachment(attachmentId),
+            (value) => {
+              if (
+                !isDynamicRecord(value) ||
+                !isString(value.name) ||
+                !isString(value.mimeType) ||
+                !isString(value.base64)
+              )
+                throw new Error("The host returned an invalid file.");
+              return { name: value.name, mimeType: value.mimeType, base64: value.base64 };
+            },
+            undefined,
+            serverId,
+          );
+        // Limit native/DOM copies when a message contains several large images.
+        const result = attachmentDownloads.current.then(download);
+        attachmentDownloads.current = result.then(
+          () => {},
+          () => {},
+        );
+        return result;
+      },
+
       discardAttachment: async (agentId, attachmentId) => {
         const serverId = agents.find((candidate) => candidate.id === agentId)?.serverId;
         if (!serverId) throw new Error("The agent is unavailable.");

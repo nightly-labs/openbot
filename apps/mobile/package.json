@@ -46,6 +46,7 @@
     "expo-router": "~57.0.17",
     "expo-secure-store": "~57.0.2",
     "expo-sensors": "~57.0.2",
+    "expo-sharing": "~57.0.18",
     "expo-splash-screen": "~57.0.8",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.2",

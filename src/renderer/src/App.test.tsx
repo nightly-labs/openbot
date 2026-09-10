@@ -1106,9 +1106,9 @@ describe("OpenBot connected desktop shell", () => {
       },
     });
 
-    expect(await screen.findByText("Grant permissions?")).toBeInTheDocument();
+    expect(await screen.findByText("Grant permissions")).toBeInTheDocument();
     expect(screen.getByText("Network access")).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Deny" }));
     await waitFor(() =>
       expect(window.openbot.agent.respondToApproval).toHaveBeenCalledWith({
         requestId: 14,

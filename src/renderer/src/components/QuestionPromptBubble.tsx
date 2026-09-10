@@ -2,6 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentPromptQuestion, AgentPromptResolution } from "@openbot/contracts/ipc";
 import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import {
+  Badge,
   Bubble,
   BubbleContent,
   ChevronLeft,
@@ -14,6 +15,7 @@ import {
   ItemMedia,
   ItemTitle,
   Kbd,
+  LoaderCircle,
   PencilLine,
   Questionnaire,
   Spinner,
@@ -391,8 +393,12 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
             onKeyDown={(event) => handleShortcut(event, current(), pageProps.index)}
             onSubmit={(event) => event.preventDefault()}
           >
-            <header class="question-prompt-header">
+            <header class="question-prompt-header conversation-interaction-header">
               <Questionnaire.Title>{current().question}</Questionnaire.Title>
+              <Badge variant="warning-light" class="conversation-interaction-status">
+                <LoaderCircle data-icon="inline-start" aria-hidden="true" />
+                Input required
+              </Badge>
             </header>
             <Questionnaire.Choices role="radiogroup" aria-label={current().question}>
               <ItemGroup class="question-prompt-options">
@@ -462,7 +468,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
 
   return (
     <Bubble variant="muted" class="question-prompt-bubble" data-state={busy() ? "pending" : "idle"}>
-      <BubbleContent>
+      <BubbleContent class="conversation-interaction-card">
         <Show
           when={initialContent()}
           fallback={
@@ -473,9 +479,6 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
           }
         >
           <div class="question-prompt-layout">
-            <Show when={slotPages()[activeSlot()]?.kind === "question"}>
-              <PromptNavigation />
-            </Show>
             <div
               ref={stage}
               class="question-prompt-stage t-page-slide"
@@ -516,6 +519,9 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                 )}
               </For>
             </div>
+            <Show when={slotPages()[activeSlot()]?.kind === "question"}>
+              <PromptNavigation />
+            </Show>
           </div>
         </Show>
       </BubbleContent>
