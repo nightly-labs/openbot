@@ -8,7 +8,8 @@ import { ArrowDown } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, AppState, Keyboard, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { KeyboardGestureArea, KeyboardStickyView } from "react-native-keyboard-controller";
+import { KeyboardGestureArea } from "react-native-keyboard-controller";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
@@ -337,9 +338,8 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
             onSelectStarter={sendMessage}
             onRetryHistory={fetchHistory}
           />
-          <KeyboardStickyView
-            style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
-            offset={{ opened: keyboardOffset }}
+          <Animated.View
+            style={[{ position: "absolute", left: 0, right: 0, bottom: 0 }, motion.composerStyle]}
             pointerEvents="box-none"
             onLayout={(event) => {
               motion.onComposerLayout(event);
@@ -394,7 +394,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
               onChangeDraft={questionForm.question ? questionForm.setDraft : setDraft}
               onSend={sendMessage}
             />
-          </KeyboardStickyView>
+          </Animated.View>
         </KeyboardGestureArea>
       </View>
     </GestureDetector>
