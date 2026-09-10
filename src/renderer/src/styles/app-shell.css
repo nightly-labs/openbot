@@ -3122,3 +3122,8 @@ textarea {
   background: var(--openbot-bg-sidebar);
   border-radius: var(--openbot-radius-sm);
 }
+
+.ui-action-menu .server-notification-action[role="menuitem"]:is(:hover, :focus-visible, [data-highlighted]) {
+  background: var(--openbot-bg-control-active);
+  box-shadow: inset 0 0 0 1px var(--openbot-image-outline);
+}
