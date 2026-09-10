@@ -6,7 +6,7 @@ import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { SidebarAgentContextMenu } from "./SidebarAgentContextMenu";
 import { SidebarAgentIndicator } from "./SidebarAgentIndicator";
-import { sidebarAgentStateLabel } from "./sidebar-filtering";
+import { sidebarAgentStateLabel, sidebarMessageTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
@@ -73,7 +73,9 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
                   )}
                 </Show>
               </span>
-              <span class="agent-row-time">{rowProps.agent.time}</span>
+              <span class="agent-row-time">
+                {rowProps.agent.updatedAt ? sidebarMessageTime(rowProps.agent.updatedAt) : rowProps.agent.time}
+              </span>
             </span>
             <span class="agent-row-preview">{rowProps.agent.preview}</span>
           </span>
