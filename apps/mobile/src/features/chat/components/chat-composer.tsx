@@ -224,11 +224,6 @@ export function ChatComposer({
           </ScrollView>
         </GlassView>
       ) : null}
-      {attachments.preparing ? (
-        <Typography.Paragraph type="body-xs" className="px-4">
-          Preparing attachments…
-        </Typography.Paragraph>
-      ) : null}
       {!sending && attachments.items.length > 0 ? (
         <ScrollView
           horizontal
