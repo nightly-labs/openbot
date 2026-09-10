@@ -97,6 +97,7 @@ export interface MobileWorkspaceContextValue {
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
   loadAgentAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
+  canTakeQueuedMessage: (serverId: string) => boolean;
   takeQueuedMessage: (
     input: CancelQueuedMessageInput,
     serverId: string,

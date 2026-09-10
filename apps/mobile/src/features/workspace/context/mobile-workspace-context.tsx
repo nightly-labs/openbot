@@ -814,9 +814,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           operationId: Crypto.randomUUID(),
         });
       },
+      canTakeQueuedMessage: (serverId) => serverCapabilities.current.get(serverId)?.includes("queue-take") === true,
       takeQueuedMessage: async (input, serverId) => {
         if (!serverCapabilities.current.get(serverId)?.includes("queue-take"))
-          throw new Error("Update the host to edit queued messages with attachments.");
+          throw new Error("The host does not support taking queued messages for editing.");
         const draft = await request(
           "POST",
           TEAM_API_ROUTES.agent.queueTake(input.agentId),
@@ -863,7 +864,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           },
           serverId,
         );
-        await loadConversation(input.agentId, serverId);
+        void loadConversation(input.agentId, serverId).catch(() => {});
       },
       loadConversation,
       uploadAttachment: async (agentId, input) => {

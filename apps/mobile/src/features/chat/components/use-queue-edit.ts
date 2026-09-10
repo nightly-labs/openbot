@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import type { PreparedQueueEdit } from "../model/queue-edit-operations";
 import type { QueueEditStore } from "../model/queue-edit-store";
 import type { QueueMessage } from "./chat-queue";
 import type { ChatAttachment } from "./use-chat-attachments";
@@ -6,7 +7,7 @@ import type { ChatAttachment } from "./use-chat-attachments";
 export function useQueueEdit(
   store: QueueEditStore,
   scope: { serverId: string; id: string },
-  take: (message: QueueMessage) => Promise<Pick<QueueMessage, "body" | "attachments">>,
+  take: (message: QueueMessage) => Promise<PreparedQueueEdit>,
 ) {
   const key = JSON.stringify([scope.serverId, scope.id]);
   const state = useSyncExternalStore(store.subscribe, () => store.get(key));
@@ -18,7 +19,12 @@ export function useQueueEdit(
     try {
       const prepared = await take(message);
       store.update(key, {
-        queueEdit: { message: { ...message, ...prepared }, text: current.draft, files: current.items },
+        queueEdit: {
+          message: { ...message, body: prepared.body, attachments: prepared.attachments },
+          mode: prepared.mode,
+          text: current.draft,
+          files: current.items,
+        },
         draft: prepared.body,
         items: [],
         focusRequest: current.focusRequest + 1,

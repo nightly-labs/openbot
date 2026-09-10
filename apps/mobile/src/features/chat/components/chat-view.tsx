@@ -33,6 +33,7 @@ import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { isIOS } from "@/shared/lib/platform";
+import { discardQueueEdit, prepareQueueEdit, saveQueueEdit } from "../model/queue-edit-operations";
 import { useQueueEdit } from "./use-queue-edit";
 
 interface MobileChatViewProps {
@@ -78,6 +79,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   const [showStarter, setShowStarter] = useState(true);
   const [historyLoadFailed, setHistoryLoadFailed] = useState(false);
   const historyRequestRef = useRef(0);
+  const workspace = useMobileWorkspace();
   const {
     agents,
     queueEdits,
@@ -89,20 +91,10 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     sendMessage: sendTeamMessage,
     cancelQueuedMessage,
     steerQueuedMessage,
-    takeQueuedMessage,
     uploadAttachment,
     discardAttachment,
-  } = useMobileWorkspace();
-  const editor = useQueueEdit(queueEdits, agent, async (message) => {
-    const delivery = message.delivery;
-    if (!delivery) throw new Error("This message is not queued.");
-    if (message.attachments?.length) {
-      const prepared = await takeQueuedMessage({ agentId: agent.id, deliveryId: delivery.id }, agent.serverId);
-      return { body: prepared.text, attachments: prepared.attachments };
-    }
-    await cancelQueuedMessage({ agentId: agent.id, deliveryId: delivery.id }, agent.serverId);
-    return { body: message.body, attachments: [] };
-  });
+  } = workspace;
+  const editor = useQueueEdit(queueEdits, agent, (message) => prepareQueueEdit(workspace, agent, message));
   const { draft, setDraft, preparing, queueEdit, focusRequest, startQueueEdit, finishQueueEdit } = editor;
   const sending = normalSending || editor.sending;
   const attachments = useChatAttachments(editor);
@@ -246,12 +238,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
         try {
           await editor.sendQueueEdit(async () => {
             for (const file of attachments.items) uploaded.push((await uploadAttachment(agent.id, file)).id);
-            await sendTeamMessage(
-              agent.id,
-              body,
-              [...(queueEdit.message.attachments?.map((file) => file.id) ?? []), ...uploaded],
-              queueEdit.message.replyToMessageId,
-            );
+            await saveQueueEdit(workspace, agent, queueEdit, body, uploaded);
           });
           setSendRetryVersion((version) => version + 1);
         } catch (error) {
@@ -474,9 +461,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
                   size="sm"
                   isDisabled={sending}
                   onPress={() => {
-                    void Promise.allSettled(
-                      (queueEdit.message.attachments ?? []).map((file) => discardAttachment(agent.id, file.id)),
-                    );
+                    void discardQueueEdit(workspace, agent, queueEdit);
                     finishQueueEdit();
                     setSendError(null);
                     setSendRetryVersion((version) => version + 1);

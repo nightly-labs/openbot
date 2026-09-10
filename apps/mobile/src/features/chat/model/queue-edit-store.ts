@@ -1,5 +1,5 @@
-import type { QueueMessage } from "../components/chat-queue";
 import type { ChatAttachment } from "../components/use-chat-attachments";
+import type { QueueEditTarget } from "./queue-edit-operations";
 
 interface ComposerState {
   draft: string;
@@ -7,7 +7,7 @@ interface ComposerState {
   preparing: boolean;
   sending: boolean;
   focusRequest: number;
-  queueEdit: { message: QueueMessage; text: string; files: ChatAttachment[] } | null;
+  queueEdit: (QueueEditTarget & { text: string; files: ChatAttachment[] }) | null;
 }
 
 // The workspace owns this store so navigation cannot discard a message taken from the host.

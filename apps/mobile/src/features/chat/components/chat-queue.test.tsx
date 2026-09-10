@@ -3,6 +3,12 @@ import { act, type PropsWithChildren, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { type ChatMessage, projectChatMessages } from "../model/chat-messages";
+import {
+  discardQueueEdit,
+  type PreparedQueueEdit,
+  prepareQueueEdit,
+  saveQueueEdit,
+} from "../model/queue-edit-operations";
 import { createQueueEditStore } from "../model/queue-edit-store";
 import { ChatQueue } from "./chat-queue";
 import { useQueueEdit } from "./use-queue-edit";
@@ -193,7 +199,7 @@ it("loads a queued message into the composer and restores the previous draft on 
     streaming: false,
     delivery: { id: "host", status: "queued", position: 1 },
   };
-  const confirmation = Promise.withResolvers<Pick<typeof message, "body" | "attachments">>();
+  const confirmation = Promise.withResolvers<PreparedQueueEdit>();
   const take = vi.fn(async (_message: typeof message) => confirmation.promise);
   take.mockRejectedValueOnce(new Error("Host unavailable"));
   const store = createQueueEditStore();
@@ -230,7 +236,7 @@ it("loads a queued message into the composer and restores the previous draft on 
   expect(screen.getByText("draft.txt")).toBeTruthy();
   await act(() => fireEvent.click(screen.getByRole("button", { name: "Edit queued message 1" })));
   expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty("value", "Unsent draft");
-  await act(async () => confirmation.resolve({ body: message.body, attachments: [] }));
+  await act(async () => confirmation.resolve({ body: message.body, attachments: [], mode: "taken" }));
   expect(take).toHaveBeenLastCalledWith(message);
   expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty("value", "Queued task");
   expect(screen.queryByText("Up next")).toBeNull();
@@ -260,7 +266,7 @@ it.each([false, true])("keeps a queued reply when navigation precedes take compl
   ])[0];
   if (message?.kind !== "message") throw new Error("Expected a queued reply");
   const queuedReply = message;
-  const confirmation = Promise.withResolvers<Pick<typeof message, "body" | "attachments">>();
+  const confirmation = Promise.withResolvers<PreparedQueueEdit>();
   const take = () => confirmation.promise;
   function Composer({ serverId = scope.serverId }: { serverId?: string }) {
     const editor = useQueueEdit(store, { ...scope, serverId }, take);
@@ -289,6 +295,7 @@ it.each([false, true])("keeps a queued reply when navigation precedes take compl
   if (leaveBeforeTake) await act(() => root.render(null));
   await act(() =>
     confirmation.resolve({
+      mode: "taken",
       body: message.body,
       attachments: [
         {
@@ -334,7 +341,11 @@ it.each([false, true])("locks an edited send across navigation and permits retry
     delivery: { id: "delivery", status: "queued", position: 1 },
   };
   function Composer() {
-    const editor = useQueueEdit(store, { serverId: "server", id: "agent" }, async () => message);
+    const editor = useQueueEdit(store, { serverId: "server", id: "agent" }, async () => ({
+      ...message,
+      attachments: message.attachments,
+      mode: "taken",
+    }));
     return (
       <>
         <button type="button" onClick={() => void editor.startQueueEdit(message)}>
@@ -381,4 +392,72 @@ it.each([false, true])("locks an edited send across navigation and permits retry
     await act(() => completion.resolve());
   }
   expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+});
+
+it.each([true, false])("uses the host snapshot for text edits when queue-take is supported: %s", async (capable) => {
+  const hostFile = {
+    id: "host-draft",
+    name: "latest.txt",
+    size: 1,
+    kind: "file" as const,
+    mimeType: "text/plain",
+    previewKind: "none" as const,
+    previewUrl: null,
+  };
+  const workspace = {
+    canTakeQueuedMessage: vi.fn(() => capable),
+    takeQueuedMessage: vi.fn(async () => ({ text: "Latest host text", attachments: [hostFile] })),
+    updateQueuedMessage: vi.fn(async () => {}),
+    sendMessage: vi.fn(async () => "sent"),
+    discardAttachment: vi.fn(async () => {}),
+  };
+  const agent = { id: "agent", serverId: "server" };
+  const message: Extract<ChatMessage, { kind: "message" }> = {
+    id: "message",
+    kind: "message",
+    author: "user",
+    body: "Old mobile text",
+    streaming: false,
+    replyToMessageId: "reply",
+    delivery: { id: "delivery", status: "queued", position: 1 },
+  };
+  const prepared = await prepareQueueEdit(workspace, agent, message);
+  const edit = { message: { ...message, ...prepared }, mode: prepared.mode };
+  await saveQueueEdit(workspace, agent, edit, prepared.body, []);
+  if (capable) {
+    expect(workspace.takeQueuedMessage).toHaveBeenCalledWith({ agentId: "agent", deliveryId: "delivery" }, "server");
+    expect(workspace.sendMessage).toHaveBeenCalledWith("agent", "Latest host text", ["host-draft"], "reply");
+    expect(workspace.updateQueuedMessage).not.toHaveBeenCalled();
+  } else {
+    expect(workspace.takeQueuedMessage).not.toHaveBeenCalled();
+    expect(workspace.sendMessage).not.toHaveBeenCalled();
+    expect(workspace.updateQueuedMessage).toHaveBeenCalledWith(
+      {
+        agentId: "agent",
+        deliveryId: "delivery",
+        text: "Old mobile text",
+        keepAttachmentIds: [],
+        attachmentDraftIds: [],
+      },
+      "server",
+    );
+  }
+  const withFile = { ...message, attachments: [hostFile] };
+  const fileEdit = await prepareQueueEdit(workspace, agent, withFile);
+  await discardQueueEdit(workspace, agent, { message: { ...withFile, ...fileEdit }, mode: fileEdit.mode });
+  if (capable) expect(workspace.discardAttachment).toHaveBeenCalledWith("agent", "host-draft");
+  else {
+    expect(workspace.discardAttachment).not.toHaveBeenCalled();
+    await saveQueueEdit(workspace, agent, { message: withFile, mode: fileEdit.mode }, "Edited", ["new-draft"]);
+    expect(workspace.updateQueuedMessage).toHaveBeenLastCalledWith(
+      {
+        agentId: "agent",
+        deliveryId: "delivery",
+        text: "Edited",
+        keepAttachmentIds: ["host-draft"],
+        attachmentDraftIds: ["new-draft"],
+      },
+      "server",
+    );
+  }
 });

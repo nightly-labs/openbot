@@ -217,18 +217,20 @@ the saved messages, and can be tried again when the provider connects or the app
 
 ## Team API compatibility boundary
 
-Desktop queue editing on hosts with `queue-take`, and mobile queue editing, cancel the host delivery before opening its text in the composer. Send
-creates a new delivery; cancelling the edit does not restore the old delivery. Mobile text-only edits use
-the released cancel endpoint. Mobile keeps drafts in the workspace provider, keyed by server and agent,
+Desktop and mobile use `queue-take` for every edit when the host supports it, including text-only messages.
+The host cancels the delivery and returns its current content. Send creates a new delivery; cancelling
+the edit does not restore the old delivery. Mobile keeps drafts in the workspace provider, keyed by server and agent,
 so navigation and late take responses preserve edits, attachments, and reply targets until send or explicit cancellation.
 Pending edited sends also belong to this store: navigation cannot enable a duplicate send or replace the draft
 before the request completes. Desktop keeps taken-delivery IDs with its stable editing state across view
 replacement, and requires send or explicit cancellation before another queue edit can start. Pending desktop
 queue operations also live in stable state, keyed by server and agent. The matching composer remains locked
 across server switches until the request completes; other server composers remain available.
-Desktop hosts without `queue-take` keep the original delivery and save edits through `queue/update`.
+On hosts without `queue-take`, both clients keep the original delivery and save edits through `queue/update`.
+Cancelling those edits preserves the queued delivery and its attachments. The edit keeps its original mode
+through navigation, even if the host capabilities change.
 Desktop hosts with that capability use the server-scoped `agent:take-queued-message` IPC endpoint. The optional `queue-take` capability adds `POST /v1/agents/:id/queue/take`
-for attachment edits: the host copies attachment drafts, rechecks and cancels the queued delivery,
+for queue edits: the host copies attachment drafts, rechecks and cancels the queued delivery,
 and returns the draft text and attachment summaries. A stale delivery is rejected. Released protocol
 schemas stay unchanged; this extension belongs to the current v3 adapters.
 
