@@ -2,7 +2,7 @@ import { userErrorMessage } from "@openbot/user-errors";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import * as Haptics from "expo-haptics";
 import { router, useIsFocused } from "expo-router";
-import { Typography } from "heroui-native";
+import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ArrowDown } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -32,6 +32,7 @@ import { useAgentActivity } from "@/features/workspace/components/use-agent-acti
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { isIOS } from "@/shared/lib/platform";
+import { uploadChatAttachments } from "../model/upload-chat-attachments";
 
 interface MobileChatViewProps {
   animateAvatarOnExit?: boolean;
@@ -69,6 +70,9 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   const [sending, setSending] = useState(false);
   const [sendRetryVersion, setSendRetryVersion] = useState(0);
   const [composerGestureHeight, setComposerGestureHeight] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [cancellingUpload, setCancellingUpload] = useState(false);
+  const uploadCancelled = useRef(false);
   const sendingRef = useRef(false);
   const attachments = useChatAttachments();
   const [pendingMessage, setPendingMessage] = useState<PendingChatMessage | null>(null);
@@ -230,17 +234,28 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
           size: file.size,
           kind: file.mimeType.startsWith("image/") ? "image" : "file",
           previewKind: "none",
-          previewUrl: null,
+          previewUrl: file.mimeType.startsWith("image/") ? `data:${file.mimeType};base64,${file.base64}` : null,
         })),
       },
       baseline: new Set(projectedMessages.map((message) => message.id)),
       serverId: null,
     });
-    const uploaded: string[] = [];
+    uploadCancelled.current = false;
+    setCancellingUpload(false);
     void (async () => {
       try {
-        for (const file of files) uploaded.push((await uploadAttachment(agent.id, file)).id);
-        const serverId = await sendTeamMessage(agent.id, body, uploaded, submittedReply?.id ?? null);
+        const serverId = await uploadChatAttachments(files, {
+          upload: (file) => uploadAttachment(agent.id, file),
+          discard: (id) => discardAttachment(agent.id, id),
+          send: (ids) => {
+            setUploadProgress(null);
+            return sendTeamMessage(agent.id, body, ids, submittedReply?.id ?? null);
+          },
+          cancelled: () => uploadCancelled.current,
+          progress: (completed) => {
+            if (files.length) setUploadProgress({ completed, total: files.length });
+          },
+        });
         setMessageAliases((current) => new Map(current).set(serverId, localId));
         setPendingMessage((current) => (current?.message.id === localId ? { ...current, serverId } : current));
         attachments.clear();
@@ -249,8 +264,6 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
         setPendingMessage((current) => (current?.message.id === localId ? null : current));
         setReplyTarget((current) => current ?? submittedReply);
         setDraft((current) => (current ? `${body}\n${current}` : body));
-        // Only discard drafts created by this attempt. Keep the local files and text for retry.
-        await Promise.allSettled(uploaded.map((id) => discardAttachment(agent.id, id)));
         setSendRetryVersion((version) => version + 1);
         setSendError({
           agentId: agent.id,
@@ -260,6 +273,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
           ),
         });
       } finally {
+        setUploadProgress(null);
         sendingRef.current = false;
         setSending(false);
       }
@@ -363,6 +377,26 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
               <Typography.Paragraph accessibilityRole="alert" className="bg-background px-4 py-2 text-danger">
                 {sendError.message}
               </Typography.Paragraph>
+            ) : null}
+            {uploadProgress ? (
+              <View className="flex-row items-center justify-between px-4">
+                <Typography.Paragraph type="body-xs" accessibilityLiveRegion="polite">
+                  {cancellingUpload
+                    ? "Cancelling upload…"
+                    : `Uploading attachments: ${uploadProgress.completed} of ${uploadProgress.total}`}
+                </Typography.Paragraph>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  isDisabled={cancellingUpload}
+                  onPress={() => {
+                    uploadCancelled.current = true;
+                    setCancellingUpload(true);
+                  }}
+                >
+                  <Button.Label>Cancel upload</Button.Label>
+                </Button>
+              </View>
             ) : null}
             <ChatComposer
               sendRetryVersion={sendRetryVersion}

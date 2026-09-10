@@ -25,6 +25,7 @@ import { useConnectionAppearance } from "@/features/workspace/components/use-con
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import type { ChatBubbleMessage } from "../context/message-actions-context";
 import { mentionDraft } from "../model/chat-mentions";
+import { ChatAttachmentView } from "./chat-attachment";
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { StreamingTailText, StreamRevealProvider } from "./streaming-tail-text";
 import { ThinkingTextGradient } from "./thinking-text-gradient";
@@ -207,13 +208,7 @@ export function ChatMessageList({
           ]}
         >
           {message.attachments?.map((attachment) => (
-            <Typography.Paragraph
-              key={attachment.id}
-              type="body-sm"
-              style={{ color: message.author === "user" ? "#0a0a0c" : foreground }}
-            >
-              {attachment.name}
-            </Typography.Paragraph>
+            <ChatAttachmentView key={attachment.id} attachment={attachment} serverId={agent.serverId} />
           ))}
           <ChatMarkdown
             agents={agents}

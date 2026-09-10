@@ -144,7 +144,11 @@ Mobile chat can send selected files to the conversation's desktop host through t
 team connection. Text pasted into the input is processed only after the user pastes it. A text paste
 longer than 4,000 characters becomes a text attachment. Selected documents can also have a temporary
 copy in the phone's system cache. Uploads are limited to 10 MB per file on mobile; successful uploads
-become managed attachments on the host. Cloudflare account storage does not receive these files.
+become managed attachments on the host. Camera and photo selection use the phone's system interfaces.
+Image attachment previews are downloaded from the desktop host through the same encrypted connection.
+Other attachments are downloaded when you choose Open or save. The phone creates a temporary file for
+the system share sheet and removes it when that sheet closes. The app you select can keep its own copy.
+Cloudflare account storage does not receive these files.
 
 ## Email delivery and infrastructure providers
 
