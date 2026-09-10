@@ -270,7 +270,14 @@ Conversation read cursors belong to a team member and are shared across that mem
 Advancing a cursor emits a conversation invalidation without the reader's identity or cursor;
 clients reload their own read state even when the conversation content revision is unchanged.
 Mobile acknowledges rendered replies only in the foreground, focused chat at the latest messages.
-Mobile chat keeps viewport, tail-group, and composer measurements in its motion controller. The
+Mobile chat loads the latest 50 messages through `conversation-page` and loads older pages by cursor.
+Its `FlatList` virtualizes messages and retains the visible position when older pages are added.
+Reply references travel with each page. A page with no overlap replaces the cached window so a
+reconnect cannot leave an invisible gap. Older-page responses do not advance the live revision.
+The in-memory conversation store notifies subscribers per agent and combines streamed text once
+per animation frame. Windows above 50 messages are released when their last subscriber leaves;
+the complete history remains in the host database. Connection recovery prioritizes observed chats.
+Mobile chat keeps viewport, latest-user, and composer measurements in its motion controller. The
 last user message anchors a native blank-space inset; streamed replies consume that inset without
 autoscrolling. Initial history positioning and the first-send/first-response animation are separate
 states. Pending message bubbles reconcile through the host receipt ID, not message text.
