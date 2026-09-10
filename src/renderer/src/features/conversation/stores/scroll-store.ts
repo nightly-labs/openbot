@@ -46,12 +46,13 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   let talliedConversationIdentity: string | undefined;
 
   const timelineMessages = createMemo(() => deps.props.messages.filter((message) => message.kind !== "thinking"));
-  const countableMessageIds = createMemo(() =>
-    deps.props.messages.filter(countableTimelineMessage).map((message) => message.id),
+  /* Every row anchors the count, but only some rows add to it. */
+  const timelineRows = createMemo(() =>
+    deps.props.messages.map((message) => ({ id: message.id, countable: countableTimelineMessage(message) })),
   );
 
   function clearNewMessages(): void {
-    newMessages = anchorNewMessages(countableMessageIds());
+    newMessages = anchorNewMessages(timelineRows());
     setNewMessageCount(0);
   }
 
@@ -62,22 +63,22 @@ export function createScrollStore(deps: ScrollStoreDeps) {
    */
   createEffect(
     () => {
-      const ids = countableMessageIds();
+      const rows = timelineRows();
       return {
         identity: `${deps.props.server?.id ?? "local"}:${deps.props.agent?.id ?? ""}`,
-        length: ids.length,
-        lastId: ids[ids.length - 1],
+        length: rows.length,
+        lastId: rows.at(-1)?.id,
       };
     },
     ({ identity }) => {
-      const ids = countableMessageIds();
+      const rows = timelineRows();
       if (identity !== talliedConversationIdentity) {
         talliedConversationIdentity = identity;
-        newMessages = anchorNewMessages(ids);
+        newMessages = anchorNewMessages(rows);
         setNewMessageCount(0);
         return;
       }
-      newMessages = tallyNewMessages(newMessages, ids, deps.sticky.getStickToLatest());
+      newMessages = tallyNewMessages(newMessages, rows, deps.sticky.getStickToLatest());
       setNewMessageCount(newMessages.count);
     },
   );

@@ -182,14 +182,12 @@ export function ChannelConversation() {
     () => channels.state.channels.find((channel) => channel.id === channels.state.selectedId)?.unreadCount ?? 0,
   );
   const firstUnreadId = createMemo(() => firstUnreadChannelMessageId(timeline(), unreadCount()));
-  /** What the reader would call a new message: another author's, not their own. */
-  const countableMessageIds = createMemo(() =>
-    timeline()
-      .filter((entry) => countableTimelineMessage(entry.message))
-      .map((entry) => entry.id),
+  /* Every row anchors the count, but only another author's message adds to it. */
+  const timelineRows = createMemo(() =>
+    timeline().map((entry) => ({ id: entry.id, countable: countableTimelineMessage(entry.message) })),
   );
   const clearNewMessages = () => {
-    newMessages = anchorNewMessages(untrack(countableMessageIds));
+    newMessages = anchorNewMessages(untrack(timelineRows));
     setNewMessageCount(0);
   };
   /**
@@ -320,24 +318,24 @@ export function ChannelConversation() {
   };
   createEffect(
     () => {
-      const ids = countableMessageIds();
+      const rows = timelineRows();
       return {
         id: channels.state.page?.channel.id,
         revision: channels.state.page?.channel.revision,
-        length: ids.length,
-        latestId: ids[ids.length - 1],
+        length: rows.length,
+        latestId: rows.at(-1)?.id,
       };
     },
     ({ id }) => {
-      const ids = untrack(countableMessageIds);
+      const rows = untrack(timelineRows);
       if (id !== scrolledChannel) {
         scrolledChannel = id;
         stickToLatest = true;
-        newMessages = anchorNewMessages(ids);
+        newMessages = anchorNewMessages(rows);
         setNewMessageCount(0);
       } else {
         // The sticky flag has to be read here: the frame below has already moved the view.
-        newMessages = tallyNewMessages(newMessages, ids, stickToLatest);
+        newMessages = tallyNewMessages(newMessages, rows, stickToLatest);
         setNewMessageCount(newMessages.count);
       }
       if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame);

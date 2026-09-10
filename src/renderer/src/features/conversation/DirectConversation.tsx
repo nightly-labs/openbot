@@ -60,15 +60,16 @@ export function DirectConversation(props: DirectConversationProps) {
   let stickToLatest = true;
   let lastThreadId: string | undefined;
   let newMessages: NewMessageTally = { count: 0, anchorId: undefined };
-  /** The other person's messages only: the reader's own arrival is not news to them. */
-  const countableMessageIds = createMemo(
+  /* Every message anchors the count, but the reader's own arrival is not news to them. */
+  const timelineRows = createMemo(
     () =>
-      props.snapshot?.messages
-        .filter((message) => message.senderMemberId !== props.currentMemberId)
-        .map((message) => message.id) ?? [],
+      props.snapshot?.messages.map((message) => ({
+        id: message.id,
+        countable: message.senderMemberId !== props.currentMemberId,
+      })) ?? [],
   );
   const clearNewMessages = (): void => {
-    newMessages = anchorNewMessages(countableMessageIds());
+    newMessages = anchorNewMessages(timelineRows());
     setNewMessageCount(0);
   };
   const messageVirtualizer = createChatVirtualizer<HTMLDivElement, HTMLDivElement>({
@@ -101,26 +102,26 @@ export function DirectConversation(props: DirectConversationProps) {
 
   createEffect(
     () => {
-      const ids = countableMessageIds();
+      const rows = timelineRows();
       return {
         threadId: props.snapshot?.threadId,
         revision: props.snapshot?.revision ?? -1,
-        messageCount: props.snapshot?.messages.length ?? 0,
+        messageCount: rows.length,
         unreadCount: props.snapshot?.readState?.unreadCount ?? 0,
-        latestMessageId: ids[ids.length - 1],
+        latestMessageId: rows.at(-1)?.id,
       };
     },
     ({ threadId, unreadCount }) => {
       currentUnreadCount = unreadCount;
-      const ids = countableMessageIds();
+      const rows = timelineRows();
       if (threadId !== lastThreadId) {
         lastThreadId = threadId;
         stickToLatest = true;
-        newMessages = anchorNewMessages(ids);
+        newMessages = anchorNewMessages(rows);
         setNewMessageCount(0);
       } else {
         // The sticky flag has to be read here: the frame below has already moved the view.
-        newMessages = tallyNewMessages(newMessages, ids, stickToLatest);
+        newMessages = tallyNewMessages(newMessages, rows, stickToLatest);
         setNewMessageCount(newMessages.count);
       }
       requestAnimationFrame(() => {
