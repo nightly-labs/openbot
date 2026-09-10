@@ -5,6 +5,7 @@
   },
   "build": {
     "development": {
+      "bun": "1.4.0",
       "developmentClient": true,
       "distribution": "internal",
       "channel": "development",
@@ -14,6 +15,7 @@
       }
     },
     "preview": {
+      "bun": "1.4.0",
       "distribution": "internal",
       "channel": "preview",
       "environment": "preview",
@@ -22,6 +24,7 @@
       }
     },
     "production": {
+      "bun": "1.4.0",
       "autoIncrement": true,
       "channel": "production",
       "environment": "production",
