@@ -20,13 +20,15 @@ export function ChoiceCard(props: {
     if (value && !props.pending) await props.onSubmit(value);
   };
   return (
-    <div class="choice-card">
-      <div class="choice-card-heading">
-        <div>
-          <strong>{props.title}</strong>
-          <span>{props.hint ?? "Pick whatever fits, or type your own."}</span>
-        </div>
-      </div>
+    <div class="choice-card conversation-interaction-card" aria-busy={props.pending ? "true" : undefined}>
+      <header class="conversation-interaction-header">
+        <strong>{props.title}</strong>
+        <Badge variant="warning-light" class="conversation-interaction-status" role="status">
+          <LoaderCircle data-icon="inline-start" aria-hidden="true" />
+          {props.pending ? "Sending…" : "Input required"}
+        </Badge>
+      </header>
+      <p class="choice-card-hint">{props.hint ?? "Pick whatever fits, or type your own."}</p>
       <RadioGroup.Root
         class="choice-options"
         aria-label={props.title}
