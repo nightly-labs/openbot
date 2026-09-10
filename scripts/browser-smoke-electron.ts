@@ -1617,10 +1617,9 @@ async function main(): Promise<void> {
       throw new Error("A target=_blank tab did not preserve agent ownership.");
     }
     process.stdout.write("BrowserHost: child-tab ownership passed.\n");
-    const childContents = webContents
-      .getAllWebContents()
-      .find((contents) => !contents.isDestroyed() && contents.getURL() === childTab.url);
-    if (!childContents) throw new Error("Child web contents were not available.");
+    const childContents = await waitForValue(() =>
+      webContents.getAllWebContents().find((contents) => !contents.isDestroyed() && contents.getURL() === childTab.url),
+    );
     if (!childContents.isAudioMuted()) unmutedTabs.push("child tab");
 
     const screenshot = await browser.screenshot(tab.id);
