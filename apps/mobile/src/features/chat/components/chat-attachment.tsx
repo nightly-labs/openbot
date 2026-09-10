@@ -56,7 +56,7 @@ export function ChatAttachmentView({ attachment, serverId }: { attachment: Attac
     }
   }
   return (
-    <View className="mb-2 max-w-full gap-2">
+    <View className="max-w-full gap-2">
       {image && uri && !imageFailed ? (
         <Button
           variant="ghost"
