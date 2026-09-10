@@ -111,3 +111,40 @@ it("resolves plain names in old messages and replies, with longest names first",
       .join(""),
   ).toBe(body);
 });
+
+it("restores attachment-only messages in file order from a reloaded conversation", () => {
+  const attachments = [
+    {
+      id: "image",
+      name: "photo.png",
+      mimeType: "image/png",
+      size: 42,
+      kind: "image" as const,
+      previewKind: "none" as const,
+      previewUrl: null,
+    },
+    {
+      id: "sheet",
+      name: "data.xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      size: 50,
+      kind: "file" as const,
+      previewKind: "none" as const,
+      previewUrl: null,
+    },
+  ];
+  const messages = [
+    { id: "sent", author: "user" as const, text: "", createdAt: "now", status: "completed" as const, attachments },
+  ];
+  expect(projectChatMessages(messages)).toEqual([
+    {
+      id: "sent",
+      kind: "message",
+      author: "user",
+      body: "",
+      streaming: false,
+      replyToMessageId: undefined,
+      attachments,
+    },
+  ]);
+});

@@ -1,5 +1,8 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import {
+  decodeTeamProtocolV2FileChunk,
+  decodeTeamProtocolV2FileControlFrame,
+  encodeTeamProtocolV2FileChunk,
   encodeTeamProtocolV2Frame,
   TEAM_PROTOCOL_V2_CHANNELS,
   type TeamProtocolV2Json,
@@ -13,6 +16,7 @@ import {
   type RemoteTeamCommand,
   type RemoteTeamConnectionUpdate,
 } from "./remote-peer";
+import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./webrtc-framing";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -20,6 +24,123 @@ afterEach(() => {
 });
 
 describe("browser remote peer recovery", () => {
+  it("uploads photo bytes when the mobile runtime has no crypto.randomUUID", async () => {
+    const random = crypto.getRandomValues.bind(crypto);
+    vi.stubGlobal("crypto", { getRandomValues: random, subtle: crypto.subtle });
+    const summary = {
+      id: "uploaded-photo",
+      name: "photo.png",
+      kind: "image",
+      mimeType: "image/png",
+      size: 5,
+      previewKind: "none",
+      previewUrl: null,
+    };
+    const network = await setupNetwork({ responseBody: summary });
+    await network.connect();
+    const channel = network.connection().channel(TEAM_PROTOCOL_V2_CHANNELS.files);
+    const decoder = new TeamWebRtcPayloadDecoder();
+    const chunks: number[] = [];
+    vi.spyOn(channel, "send").mockImplementation((data: string | ArrayBuffer) => {
+      const payload = decoder.push(data);
+      if (payload === undefined) return;
+      if (typeof payload !== "string") {
+        chunks.push(...decodeTeamProtocolV2FileChunk(payload).bytes);
+        return;
+      }
+      const frame = decodeTeamProtocolV2FileControlFrame(payload);
+      if (frame.type === "file-open")
+        channel.receive(
+          encodeTeamProtocolV2Frame({ version: 2, type: "file-ack", transferId: frame.transferId, receivedThrough: 0 }),
+        );
+    });
+    try {
+      const result = await network.runtime.execute({
+        id: "upload",
+        type: "request",
+        method: "POST",
+        path: "/v1/attachments?name=photo.png",
+        body: null,
+        upload: { name: "photo.png", mimeType: "image/png", base64: btoa("hello") },
+      });
+      expect({ result, bytes: chunks }).toEqual({
+        result: { commandId: "upload", ok: true, status: 200, body: summary },
+        bytes: [...new TextEncoder().encode("hello")],
+      });
+    } finally {
+      await network.runtime.dispose();
+    }
+  });
+
+  it("keeps the connection online when an attachment download expires", async () => {
+    const network = await setupNetwork({ responseFile: { transferId: "b6396068-3405-4e51-9b42-d97bfd1e2f33" } });
+    await network.connect();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const result = network.runtime.execute({
+        id: "expired-download",
+        type: "request",
+        method: "GET",
+        path: "/v1/attachments/file-1",
+        body: null,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(await result).toMatchObject({ ok: false, error: "The attachment download timed out. Try again." });
+      expect(network.updates.at(-1)?.state).toBe("online");
+    } finally {
+      await network.runtime.dispose();
+    }
+  });
+
+  it("returns authenticated attachment bytes through the native command bridge", async () => {
+    const transferId = "b6396068-3405-4e51-9b42-d97bfd1e2f33";
+    const network = await setupNetwork({
+      responseFile: { transferId, name: "hello.txt", mimeType: "text/plain", size: 5 },
+      beforeResponse: async () => {
+        const channel = network.connection().channel(TEAM_PROTOCOL_V2_CHANNELS.files);
+        channel.receive(
+          encodeTeamProtocolV2Frame({
+            version: 2,
+            type: "file-open",
+            transferId,
+            name: "hello.txt",
+            mimeType: "text/plain",
+            size: 5,
+            sha256: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+          }),
+        );
+        for (const frame of encodeTeamWebRtcPayload(
+          new Uint8Array(
+            encodeTeamProtocolV2FileChunk({ transferId, offset: 0, bytes: new TextEncoder().encode("hello") }),
+          ).buffer,
+          65536,
+        ))
+          channel.receive(frame);
+        channel.receive(encodeTeamProtocolV2Frame({ version: 2, type: "file-complete", transferId }));
+      },
+    });
+    await network.connect();
+    try {
+      expect(
+        await network.runtime.execute({
+          id: "download",
+          type: "request",
+          method: "GET",
+          path: "/v1/attachments/file-1",
+          body: null,
+        }),
+      ).toEqual({
+        commandId: "download",
+        ok: true,
+        status: 200,
+        body: { name: "hello.txt", mimeType: "text/plain", base64: btoa("hello") },
+      });
+    } finally {
+      await network.runtime.dispose();
+    }
+  });
+
   it("reports session revocation so the client can refresh memberships immediately", async () => {
     const network = await setupNetwork();
     await network.connect();
@@ -492,6 +613,7 @@ async function setupNetwork(
     beforeAnswer?: () => Promise<void>;
     beforeResponse?: () => Promise<void>;
     responseBody?: TeamProtocolV2Json;
+    responseFile?: TeamProtocolV2Json;
   } = {},
 ) {
   const host = await createEd25519Identity(() => new Uint8Array(32).fill(7));
@@ -560,12 +682,12 @@ async function setupNetwork(
     readyState = "connecting";
     bufferedAmount = 0;
     onopen: (() => void) | null = null;
-    onmessage: ((event: { data: string }) => void) | null = null;
+    onmessage: ((event: { data: string | ArrayBuffer }) => void) | null = null;
     onclose: (() => void) | null = null;
     constructor(readonly label: string) {
       super();
     }
-    receive(data: string) {
+    receive(data: string | ArrayBuffer) {
       this.onmessage?.({ data });
     }
     send(data: string) {
@@ -614,7 +736,9 @@ async function setupNetwork(
               version: 2,
               type: "response",
               requestId: frame.requestId,
-              result: { status: 200, body: options.responseBody ?? [] },
+              result: options.responseFile
+                ? { status: 200, body: null, file: options.responseFile }
+                : { status: 200, body: options.responseBody ?? [] },
             }),
           );
         })();

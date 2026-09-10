@@ -19,6 +19,7 @@ import type {
 import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import type { MobileAgentActivities } from "./agent-activity";
+import type { MobileConversationStore } from "./conversation-store";
 
 export type MobileServerKind = "local" | "remote";
 export type MobileServerState = "unknown" | "connecting" | "online" | "offline" | "error";
@@ -71,7 +72,7 @@ export interface MobileWorkspaceContextValue {
   hiddenAgents: MobileAgent[];
   pinnedAgentIds: string[];
   unreadAgentIds: string[];
-  conversations: Record<string, ConversationSnapshot>;
+  conversationStore: MobileConversationStore;
   activityByServer: Record<string, MobileAgentActivities>;
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
@@ -92,6 +93,7 @@ export interface MobileWorkspaceContextValue {
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
   loadAgentAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
   loadConversation: (agentId: string) => Promise<ConversationSnapshot>;
+  loadOlderMessages: (agentId: string) => Promise<void>;
   respondToPrompt: (agentId: string, input: RespondToPromptInput) => Promise<void>;
   sendMessage: (
     agentId: string,
@@ -100,6 +102,7 @@ export interface MobileWorkspaceContextValue {
     replyToMessageId?: string | null,
   ) => Promise<string>;
   uploadAttachment: (agentId: string, input: RemoteFileUpload) => Promise<DraftAttachment>;
+  downloadAttachment: (serverId: string, attachmentId: string) => Promise<RemoteFileUpload>;
   discardAttachment: (agentId: string, attachmentId: string) => Promise<void>;
   hideAgent: (agentId: string) => void;
   unhideAgent: (agentId: string) => void;

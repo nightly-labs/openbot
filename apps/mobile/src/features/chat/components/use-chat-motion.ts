@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { LayoutChangeEvent } from "react-native";
+import { Keyboard, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { useKeyboardHandler } from "react-native-keyboard-controller";
 import type Animated from "react-native-reanimated";
 import {
@@ -7,7 +7,6 @@ import {
   ReduceMotion,
   useAnimatedReaction,
   useAnimatedRef,
-  useAnimatedScrollHandler,
   useAnimatedStyle,
   useDerivedValue,
   useReducedMotion,
@@ -53,12 +52,19 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     },
     [keyboardHeight],
   );
+  useEffect(() => {
+    // A native picker or interrupted dismissal can omit the controller's final frame.
+    const subscription = Keyboard.addListener("keyboardDidHide", () => keyboardHeight.set(0));
+    return () => subscription.remove();
+  }, [keyboardHeight]);
   const composerStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -Math.max(0, keyboardHeight.get() - keyboardOffset) }],
   }));
   const layout = useSharedValue<ChatLayout>({ viewport: 0, content: 0, header, tailY: 0, tailHeight: 0 });
   const composerHeight = useSharedValue(0);
-  const blankSpace = useDerivedValue(() => (lastUserId ? chatBlankSpace(layout.get()) : 0));
+  const blankSpace = useDerivedValue(() =>
+    lastUserId && layout.get().tailHeight > 0 ? chatBlankSpace(layout.get()) : 0,
+  );
   const scrollY = useSharedValue(0);
   const firstOffset = useSharedValue(0);
   const firstOpacity = useSharedValue(1);
@@ -76,6 +82,7 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     userHeight: number;
     tailId: string | null;
     initialized: boolean;
+    virtualized: boolean;
   }>({
     layout: { viewport: 0, content: 0, header, tailY: 0, tailHeight: 0 },
     inset: 0,
@@ -83,6 +90,7 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     userHeight: 0,
     tailId: null,
     initialized: false,
+    virtualized: false,
   });
   const current = useRef({ ready, lastUserId });
   current.current = { ready, lastUserId };
@@ -173,7 +181,13 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
   );
   const onContentSizeChange = useCallback(
     (_width: number, height: number) => {
-      measurements.current.layout = { ...measurements.current.layout, content: height };
+      measurements.current.layout = {
+        ...measurements.current.layout,
+        content: height,
+        ...(measurements.current.virtualized
+          ? { tailHeight: Math.max(0, height - measurements.current.layout.tailY) }
+          : {}),
+      };
       layout.set(measurements.current.layout);
       position();
     },
@@ -189,6 +203,22 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     },
     [layout, position],
   );
+  const onTailStartLayout = useCallback(
+    (id: string, event: Pick<LayoutChangeEvent, "nativeEvent">) => {
+      const m = measurements.current;
+      m.virtualized = true;
+      m.tailId = id;
+      m.layout = {
+        ...m.layout,
+        tailY: event.nativeEvent.layout.y,
+        tailHeight: Math.max(event.nativeEvent.layout.height, m.layout.content - event.nativeEvent.layout.y),
+      };
+      layout.set(m.layout);
+      position();
+    },
+    [layout, position],
+  );
+
   const onUserLayout = useCallback(
     (event: Pick<LayoutChangeEvent, "nativeEvent">) => {
       measurements.current.userHeight = event.nativeEvent.layout.height;
@@ -213,11 +243,12 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     [position],
   );
 
-  const onScroll = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollY.set(event.contentOffset.y);
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollY.set(event.nativeEvent.contentOffset.y);
     },
-  });
+    [scrollY],
+  );
   useAnimatedReaction(
     () =>
       revealed.get() &&
@@ -238,6 +269,8 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     transform: [{ translateY: firstOffset.get() }],
   }));
   const responseStyle = useAnimatedStyle(() => ({ opacity: responseOpacity.get() }));
+
+  const needsSendPosition = useCallback(() => pending.current !== null, []);
 
   function beginSend() {
     const first = current.current.lastUserId === null;
@@ -276,11 +309,13 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     onViewportLayout,
     onContentSizeChange,
     onTailLayout,
+    onTailStartLayout,
     onUserLayout,
     onComposerLayout,
     onContentInsetChange,
     onScroll,
     beginSend,
+    needsSendPosition,
     cancelSend,
     scrollToLatest,
   };
