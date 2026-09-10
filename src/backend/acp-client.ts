@@ -88,6 +88,11 @@ export interface AcpProviderOptions {
   profileGeneration?: boolean;
   argv: readonly string[];
   env: Record<string, string>;
+  /**
+   * Variables read once per spawn rather than once per client, which is what lets a key saved after
+   * construction reach the next process without any other plumbing. Spread after `env`.
+   */
+  extraEnv?: () => Record<string, string>;
   signInMessage: string;
   authenticate?(connection: ClientSideConnection, initialization: InitializeResponse): Promise<void>;
   readRateLimits?(connection: ClientSideConnection): Promise<AccountRateLimitsReadResult>;
@@ -129,7 +134,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#stopping = false;
     const child = spawn(this.#cli.executable, [...this.options.argv], {
       stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, ...this.options.env },
+      env: { ...process.env, ...this.options.env, ...this.options.extraEnv?.() },
       shell: process.platform === "win32",
       windowsHide: true,
     });

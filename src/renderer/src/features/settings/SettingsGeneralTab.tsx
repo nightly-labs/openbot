@@ -33,6 +33,7 @@ interface SettingsGeneralTabProps {
   onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
 }
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
@@ -51,6 +52,7 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
           onUpdateProvider={props.onUpdateProvider}
           onConnectProvider={props.onConnectProvider}
           onInstallProvider={props.onInstallProvider}
+          onSignInProvider={props.onSignInProvider}
         />
       </SettingsSection>
 

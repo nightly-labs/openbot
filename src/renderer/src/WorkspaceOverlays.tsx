@@ -7,6 +7,7 @@ import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-conte
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServers } from "./features/servers/servers-context";
+import type { ProviderKeyApi } from "./features/settings/OpenCodeKeyDialog";
 import { useSettings } from "./features/settings/settings-context";
 import { useUpdates } from "./features/updates/updates-context";
 import {
@@ -25,6 +26,19 @@ import { useProviders } from "./providers";
 interface AccountProps {
   account: () => CentralAuthUser;
 }
+
+/**
+ * The four calls the OpenCode key dialog makes, bound once.
+ *
+ * It is a narrow object rather than `window.openbot` itself so the dialog's props say exactly what
+ * it reaches for, and so a test hands it four functions instead of the whole bridge.
+ */
+const providerKeyApi: ProviderKeyApi = {
+  getProviderApiKeyState: (provider) => window.openbot.getProviderApiKeyState(provider),
+  setProviderApiKey: (input) => window.openbot.setProviderApiKey(input),
+  clearProviderApiKey: (provider) => window.openbot.clearProviderApiKey(provider),
+  openExternal: (destination) => window.openbot.openExternal(destination),
+};
 
 /**
  * Everything the workspace raises over itself: modals, dialogs and the two
@@ -239,6 +253,7 @@ function AppSettings(props: AccountProps) {
         onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
         onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
         onInstallProvider={localProviderDownloads() ? openProviderInstallGuide : undefined}
+        providerKeys={localProviderDownloads() ? providerKeyApi : undefined}
         hostedSitesApi={window.openbot.hostedSites}
         restoreFocusTarget={appSettingsRestoreTarget()}
       />

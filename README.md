@@ -75,11 +75,16 @@ curl -fsSL https://claude.ai/install.sh | bash
 Install Grok CLI following the [Grok Build documentation](https://docs.x.ai/build/overview), then
 authenticate with `grok login` or set `XAI_API_KEY` in the environment used to launch OpenBot.
 
-OpenCode uses your installed CLI through ACP. Install it from [OpenCode](https://opencode.ai/docs/),
-then run `opencode auth login` for the provider you want to use. In OpenBot, select OpenCode and
-click Connect. OpenBot reads the models that the CLI advertises. It does not download or update
-OpenCode. Set `OPENBOT_OPENCODE_PATH` if the executable is outside your shell's search path.
-Remote OpenCode agents require Team API v4; older clients do not show these agents.
+OpenBot downloads and pins the OpenCode CLI, like Codex, Claude, and Grok. OpenCode's free models
+need no account and no sign-in: select OpenCode, click Connect, and OpenBot reads the models that
+the CLI advertises. To use the paid OpenCode Zen models, click Sign in on the OpenCode row and
+paste a key from [opencode.ai/auth](https://opencode.ai/auth). OpenBot encrypts the key on this
+computer and gives it only to the local CLI. OpenCode Go is a separate subscription that a Zen key
+does not buy, so OpenBot leaves the `opencode-go/` models out of the picker unless you signed in to
+Go in OpenCode itself. If you installed OpenCode yourself, OpenBot
+keeps that install and offers no download. Set `OPENBOT_OPENCODE_PATH` to select an executable
+outside your shell's search path. Remote OpenCode agents require Team API v4; older clients do not
+show these agents.
 
 On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is available in PowerShell.
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.

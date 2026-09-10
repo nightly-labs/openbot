@@ -20,6 +20,16 @@ const claudeArtifactSchema = z.object({
   executable: z.enum(["claude", "claude.exe"]),
   platformDirectory: z.enum(["mac", "win"]),
 });
+const opencodeArtifactSchema = z.object({
+  package: z.string().regex(/^opencode-(?:darwin-arm64|windows-x64)$/u),
+  asset: z.string().regex(/^opencode-(?:darwin-arm64|windows-x64)-\d+\.\d+\.\d+\.tgz$/u),
+  assetSha256: sha256Schema,
+  binarySha256: sha256Schema,
+  downloadBytes: z.number().int().positive(),
+  installedBytes: z.number().int().positive(),
+  executable: z.enum(["opencode", "opencode.exe"]),
+  platformDirectory: z.enum(["mac", "win"]),
+});
 const grokArtifactSchema = z.object({
   asset: z.string().regex(/^grok-\d+\.\d+\.\d+-(?:macos-aarch64|windows-x86_64(?:\.exe)?)$/u),
   assetSha256: sha256Schema,
@@ -51,6 +61,24 @@ const agentRuntimeLockSchema = z.object({
     artifacts: z.object({
       "darwin-arm64": claudeArtifactSchema,
       "win32-x64": claudeArtifactSchema,
+    }),
+  }),
+  /**
+   * OpenCode publishes one npm platform package per target, and the CLI reports the npm version
+   * verbatim. There is no `sdkVersion` split like `claude`, so one `version` field is the whole
+   * truth: the tarball name, the `package.json` inside it, and what `opencode --version` prints.
+   */
+  opencode: z.object({
+    registry: z.literal("https://registry.npmjs.org"),
+    /** Canonical name. `github.com/sst/opencode` now redirects here, and the license fetch must not
+     *  have to follow a redirect. */
+    repository: z.literal("https://github.com/anomalyco/opencode"),
+    version: z.string().regex(/^\d+\.\d+\.\d+$/u),
+    license: z.literal("MIT"),
+    licenseSha256: sha256Schema,
+    artifacts: z.object({
+      "darwin-arm64": opencodeArtifactSchema,
+      "win32-x64": opencodeArtifactSchema,
     }),
   }),
   grok: z.object({

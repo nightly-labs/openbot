@@ -68,6 +68,7 @@ import {
   showMainWindow,
 } from "./main-window";
 import { ManagedSkillService } from "./managed-skill-service";
+import { ProviderCredentialStore } from "./provider-credential-store";
 import { ProviderRuntimeManager } from "./provider-runtime-manager";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
@@ -104,6 +105,7 @@ const REMOTE_SERVERS_FILE = "openbot-remote-servers-v1.json";
 const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
 const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential-v1.json";
 const REMOTE_DESKTOP_RUNTIME_SECRET_FILE = "openbot-remote-desktop-runtime-v1.json";
+const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
 
 /**
  * Where each service stops, as a position in the shutdown sequence rather than a position in the
@@ -148,6 +150,7 @@ export interface ApplicationServiceContext {
 export interface ApplicationServices {
   service: AgentService;
   providerRuntimes: ProviderRuntimeManager;
+  providerCredentials: ProviderCredentialStore;
   mailbox: MailboxStore;
   browser: BrowserHost;
   browserPictureInPicture: BrowserPictureInPicture;
@@ -344,6 +347,19 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () => providerRuntimes.stop());
   // Before `new AgentService`, which reads every `executablePath` eagerly.
   await providerRuntimes.initialize();
+  /*
+   * Loaded before the service, not on first use: a provider spawn reads its key synchronously, so
+   * the decrypted map has to already exist by the time any client is built. A machine with no
+   * secret storage keeps working on the free tier -- only saving a key needs the cipher.
+   */
+  const providerCredentials = new ProviderCredentialStore(join(app.getPath("userData"), PROVIDER_CREDENTIAL_FILE), {
+    encrypt: (value) => {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
+      return safeStorage.encryptString(value);
+    },
+    decrypt: (value) => safeStorage.decryptString(value),
+  });
+  await providerCredentials.load();
   const service = new AgentService(
     store,
     mailbox,
@@ -355,6 +371,7 @@ export async function createApplicationServices({
     (agent) => managedSkills.syncAgent(agent),
     hostedSites,
     sidebarLayout,
+    { apiKey: (provider) => providerCredentials.get(provider) },
   );
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
   /*
@@ -593,6 +610,7 @@ export async function createApplicationServices({
   return {
     service,
     providerRuntimes,
+    providerCredentials,
     mailbox,
     browser,
     browserPictureInPicture,

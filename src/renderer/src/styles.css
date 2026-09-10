@@ -19,6 +19,7 @@
 @import "./features/conversation/conversation.css";
 @import "./features/usage/usage.css";
 @import "./features/settings/settings-modal.css";
+@import "./features/settings/opencode-key-dialog.css";
 @import "./features/settings/settings-mobile-connect.css";
 @import "./features/settings/settings-hosted-sites.css";
 @import "./features/computer-use/computer-use.css";

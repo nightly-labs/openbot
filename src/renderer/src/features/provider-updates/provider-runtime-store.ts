@@ -48,7 +48,7 @@ export function createProviderRuntimeStore(
   let disposed = false;
   const isLocalServer = owners.isLocalServer ?? (() => true);
   function providerUpdate(provider: AgentProviderId, snapshot = providerRuntimeSnapshot()): ProviderUpdate {
-    if (!isManagedRuntimeProvider(provider)) throw new Error("OpenCode updates are managed outside OpenBot.");
+    if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
     const runtime = snapshot.providers[provider];
     const systemVersion = owners.systemCliVersion?.(provider) ?? null;
     const availableVersion = runtime.availableVersion ?? null;

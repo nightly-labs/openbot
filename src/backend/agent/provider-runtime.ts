@@ -30,7 +30,12 @@ import {
   isRecord,
   type ModelListResponse,
 } from "./../protocol";
-import { BUILT_IN_PROVIDER_DRIVERS, type ProviderCliCommand, requireProviderDriver } from "./../provider-drivers";
+import {
+  BUILT_IN_PROVIDER_DRIVERS,
+  type ProviderCliCommand,
+  type ProviderClientContext,
+  requireProviderDriver,
+} from "./../provider-drivers";
 import { normalizeAccountUsage } from "./account-usage";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
@@ -114,12 +119,26 @@ const INITIAL_STATUS: AgentStatus = {
  * Models a provider CLI lists that an OpenBot agent is not meant to run. `codex-auto-review` and
  * `gpt-reserve` are Codex picks for its own use -- a review pass and spare capacity -- and
  * `gpt-5.5` and `gpt-5.4-mini` are older models this product does not offer. Everything else the
- * CLI reports reaches the picker, the models it marks hidden included, so this list is the only
- * thing that keeps a model out and adding to it is a product decision, not a guess about a flag.
+ * CLI reports reaches the picker, the models it marks hidden included, so this list and
+ * CREDENTIAL_ONLY_MODEL_PREFIXES below are the only things that keep a model out, and adding to
+ * either is a product decision, not a guess about a flag.
  */
 const SUPPRESSED_MODEL_IDS: ReadonlyMap<AgentProvider, ReadonlySet<string>> = new Map([
   ["codex", new Set(["gpt-reserve", "gpt-5.5", "gpt-5.4-mini", "codex-auto-review"])],
 ]);
+
+/**
+ * Model families a CLI advertises because OpenBot supplied a key, which that key does not buy.
+ *
+ * OpenCode reports OpenCode Zen and OpenCode Go as one catalog although they are two products on
+ * two endpoints -- `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1` -- and one `OPENCODE_API_KEY`
+ * turns both on. A Zen key from `opencode.ai/auth` does not buy Go, so a stored key adds about two
+ * dozen `opencode-go/` models that answer every prompt with "Invalid API key.".
+ *
+ * The prefix is dropped only while OpenBot is the one supplying the key. With no key stored, a Go
+ * model can only come from the user's own OpenCode sign-in, and that one does buy it.
+ */
+const CREDENTIAL_ONLY_MODEL_PREFIXES: ReadonlyMap<AgentProvider, string> = new Map([["opencode", "opencode-go/"]]);
 
 /**
  * The product name of a Claude model, from its id, or `null` for an id that does not read as one.
@@ -212,6 +231,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #requestTimeoutMs: number;
   readonly #clientFactory: AgentClientFactory | null;
   readonly #bundledExecutables: BundledProviderExecutables;
+  readonly #credentials: ProviderClientContext;
   readonly #clients = new Map<AgentProvider, AgentClient>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
   /**
@@ -246,6 +266,7 @@ export class ProviderRuntime implements ProviderPort {
     preferredProvider: AgentProvider;
     clientFactory: AgentClientFactory | null;
     bundledExecutables: BundledProviderExecutables;
+    credentials: ProviderClientContext;
   }) {
     this.#conversation = options.conversation;
     this.#hooks = options.hooks;
@@ -255,6 +276,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#preferredProvider = options.preferredProvider;
     this.#clientFactory = options.clientFactory;
     this.#bundledExecutables = { ...options.bundledExecutables };
+    this.#credentials = options.credentials;
   }
 
   /**
@@ -308,8 +330,8 @@ export class ProviderRuntime implements ProviderPort {
       throw new Error("Connect the selected provider before generating a profile.");
     if (this.#clientFactory) return this.#clientFactory(provider, cli);
     const driver = requireProviderDriver(provider);
-    if (driver.createProfileClient) return driver.createProfileClient(cli, this.#requestTimeoutMs);
-    return driver.createClient(cli, this.#requestTimeoutMs);
+    if (driver.createProfileClient) return driver.createProfileClient(cli, this.#requestTimeoutMs, this.#credentials);
+    return driver.createClient(cli, this.#requestTimeoutMs, this.#credentials);
   }
 
   preferredProvider(): AgentProvider {
@@ -664,7 +686,7 @@ export class ProviderRuntime implements ProviderPort {
     const driver = requireProviderDriver(provider);
     const client = this.#clientFactory
       ? this.#clientFactory(provider, cli)
-      : driver.createClient(cli, this.#requestTimeoutMs);
+      : driver.createClient(cli, this.#requestTimeoutMs, this.#credentials);
     this.#bindClient(client);
     client.start();
     try {
@@ -1089,7 +1111,7 @@ export class ProviderRuntime implements ProviderPort {
           cli = await this.#resolveProviderCli(provider);
           client = this.#clientFactory
             ? this.#clientFactory(provider, cli)
-            : driver.createClient(cli, this.#requestTimeoutMs);
+            : driver.createClient(cli, this.#requestTimeoutMs, this.#credentials);
           this.#bindClient(client);
           client.start();
           await client.request(
@@ -1273,6 +1295,11 @@ export class ProviderRuntime implements ProviderPort {
           const client = this.#clients.get(provider);
           if (!client) return previous;
           const suppressed = SUPPRESSED_MODEL_IDS.get(provider) ?? new Set<string>();
+          // Read once per pass, not per model: a stored key cannot change inside one refresh, and
+          // the prefix is unusable only because OpenBot is what put that key in the environment.
+          const unusablePrefix = this.#credentials.apiKey(provider)
+            ? CREDENTIAL_ONLY_MODEL_PREFIXES.get(provider)
+            : undefined;
           try {
             const serverModels = new Map<string, ModelListResponse["data"][number]>();
             const cursors = new Set<string>();
@@ -1295,6 +1322,7 @@ export class ProviderRuntime implements ProviderPort {
                 // id would fail the contract guard downstream and take the whole list with it.
                 const id = item.model?.trim();
                 if (!id || suppressed.has(id.toLowerCase())) continue;
+                if (unusablePrefix && id.toLowerCase().startsWith(unusablePrefix)) continue;
                 serverModels.set(id, { ...item, model: id });
               }
               cursor = client.provider === "codex" ? response.nextCursor : undefined;

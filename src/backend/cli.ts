@@ -29,7 +29,13 @@ export interface GrokCliInfo {
   source?: "system" | "managed";
 }
 
-export type AgentCliInfo = CodexCliInfo | ClaudeCliInfo | GrokCliInfo;
+export interface OpencodeCliInfo {
+  executable: string;
+  version: string;
+  source?: "system" | "managed";
+}
+
+export type AgentCliInfo = CodexCliInfo | ClaudeCliInfo | GrokCliInfo | OpencodeCliInfo;
 
 export class CodexCliError extends Error {
   constructor(
@@ -179,18 +185,26 @@ export async function resolveGrokCli(
   throw new CodexCliError("Grok is not downloaded. Download it in OpenBot to continue.", "missing");
 }
 
+/**
+ * There is deliberately no minimum version here. OpenBot downloads and pins OpenCode now, but a
+ * user who already has the CLI keeps it, and a floor would newly lock out an install that works.
+ */
 export async function resolveOpencodeCli(
   input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
-): Promise<AgentCliInfo> {
-  const candidates = await cliCandidates("opencode", input.systemCandidates, null);
+): Promise<OpencodeCliInfo> {
+  const bundledExecutable =
+    input.bundledExecutable === undefined ? bundledOpencodeExecutable() : input.bundledExecutable;
+  const candidates = await cliCandidates("opencode", input.systemCandidates, bundledExecutable);
   let found = false;
   for (const candidate of candidates) {
     if (!(await isExecutable(candidate.executable))) continue;
     found = true;
     try {
-      const output = await readCliVersion(candidate.executable);
-      const version = output.trim().match(/^(?:opencode\s+)?(\d+\.\d+\.\d+)(?:[-+][\w.-]+)?$/i)?.[1];
-      if (version) return { executable: candidate.executable, version, source: "system" };
+      const version = parseOpencodeVersion(await readCliVersion(candidate.executable));
+      // `source` has to be the candidate's own: hardcoding "system" made `updateProviderCli` refuse
+      // to activate the managed copy, and made `trackSystemCliVersions` report the managed version
+      // as the user's, which suppressed every later update offer.
+      return { executable: candidate.executable, version, source: candidate.source };
     } catch {
       /* Try the remaining installed candidates. */
     }
@@ -198,9 +212,17 @@ export async function resolveOpencodeCli(
   throw new CodexCliError(
     found
       ? "OpenCode could not start. Run `opencode --version` in a terminal."
-      : "Install OpenCode on this computer to continue.",
+      : "OpenCode is not downloaded. Download it in OpenBot to continue.",
     found ? "invalid" : "missing",
   );
+}
+
+export function bundledOpencodeExecutable(
+  platform = process.platform,
+  architecture = process.arch,
+  resourcesPath: string | null | undefined = process.resourcesPath,
+): string | null {
+  return bundledProviderExecutable("opencode", platform, architecture, resourcesPath);
 }
 
 export function bundledGrokExecutable(
@@ -249,6 +271,13 @@ export function parseClaudeVersion(output: string): string {
 export function parseGrokVersion(output: string): string {
   const match = output.match(/(?:grok(?:-cli)?\s+)?v?(\d+)\.(\d+)\.(\d+)/i);
   if (!match) throw new CodexCliError("Unable to read the Grok CLI version.", "invalid");
+  return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
+}
+
+/** OpenCode prints a bare `1.18.30`, and `verifyInstalledRuntime` compares that exactly. */
+export function parseOpencodeVersion(output: string): string {
+  const match = output.trim().match(/^(?:opencode\s+)?v?(\d+)\.(\d+)\.(\d+)(?:[-+][\w.-]+)?$/i);
+  if (!match) throw new CodexCliError("Unable to read the OpenCode CLI version.", "invalid");
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 

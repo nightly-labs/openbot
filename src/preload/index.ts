@@ -33,6 +33,7 @@ import {
   isAccountUsage,
   isAgentMemory,
   isAgentModelOption,
+  isAgentProvider,
   isAgentStatus,
   isAgentSummary,
   isAttachmentSummary,
@@ -59,6 +60,7 @@ import {
   type MarketplaceSkillDetail,
   type MarketplaceSkillPage,
   type OpenBotDesktopApi,
+  type ProviderApiKeyState,
   type QueuedMessageReceipt,
   type QueueSnapshot,
   type ScopedAgentEvent,
@@ -291,6 +293,14 @@ function decodeFilePreview(value: unknown): FilePreview {
     previewKind: preview.previewKind,
     bytes: preview.bytes,
   };
+}
+
+/** A reply carrying nothing but the provider and a flag, so an unexpected field cannot slip in. */
+function decodeProviderApiKeyState(value: unknown): ProviderApiKeyState {
+  if (!isDynamicRecord(value) || !isAgentProvider(value.provider) || !isBoolean(value.configured)) {
+    throw new Error("Invalid provider key state response.");
+  }
+  return { provider: value.provider, configured: value.configured };
 }
 
 function decodeAgentStatusFromMain(value: unknown): AgentStatus {
@@ -743,6 +753,14 @@ const openbotApi: OpenBotDesktopApi = {
   updateProviderCli: (provider) =>
     ipcRenderer.invoke(IPC_CHANNELS.updateProviderCli, provider).then(decodeAgentStatusFromMain),
   refreshAgentProviders: () => ipcRenderer.invoke(IPC_CHANNELS.refreshAgentProviders),
+  // Both decoded for the same reason as `updateProviderCli`: the caller saved or removed a key and
+  // reads the provider's new state out of the reply.
+  setProviderApiKey: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.setProviderApiKey, input).then(decodeAgentStatusFromMain),
+  clearProviderApiKey: (provider) =>
+    ipcRenderer.invoke(IPC_CHANNELS.clearProviderApiKey, provider).then(decodeAgentStatusFromMain),
+  getProviderApiKeyState: (provider) =>
+    ipcRenderer.invoke(IPC_CHANNELS.getProviderApiKeyState, provider).then(decodeProviderApiKeyState),
   providerRuntimes: {
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.providerRuntimesGetStatus).then(decodeProviderRuntimeSnapshot),
     download: (provider) =>

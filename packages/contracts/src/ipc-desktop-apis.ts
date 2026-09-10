@@ -254,6 +254,17 @@ export interface UpdateDesktopApi {
   onEvent: (listener: (status: UpdateStatus) => void) => () => void;
 }
 
+export interface SetProviderApiKeyInput {
+  provider: AgentProviderId;
+  key: string;
+}
+
+/** What the renderer may know about a stored key: that there is one. Never the key. */
+export interface ProviderApiKeyState {
+  provider: AgentProviderId;
+  configured: boolean;
+}
+
 export interface ProviderRuntimesDesktopApi {
   getStatus: () => Promise<ProviderRuntimeSnapshot>;
   download: (provider: AgentProviderId) => Promise<ProviderRuntimeSnapshot>;
@@ -386,6 +397,16 @@ export interface OpenBotDesktopApi {
    * OpenBot pins for the runtime it manages.
    */
   updateProviderCli: (provider: AgentProviderId) => Promise<AgentStatus>;
+  /**
+   * Stores the optional API key a provider's paid catalog needs, and reconnects the provider.
+   *
+   * The key only ever travels towards main. There is no getter for it, and
+   * `getProviderApiKeyState` answers with a boolean, because a renderer that can read a key back
+   * puts it in every crash report, export and screenshot that follows.
+   */
+  setProviderApiKey: (input: SetProviderApiKeyInput) => Promise<AgentStatus>;
+  clearProviderApiKey: (provider: AgentProviderId) => Promise<AgentStatus>;
+  getProviderApiKeyState: (provider: AgentProviderId) => Promise<ProviderApiKeyState>;
   providerRuntimes: ProviderRuntimesDesktopApi;
   openUrl: (url: string) => Promise<void>;
   voice: VoiceDesktopApi;

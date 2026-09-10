@@ -189,6 +189,55 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         .map((model) => model.id),
     ).toEqual(["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.4", "gpt-5.3-codex-spark"]);
   });
+  async function opencodeModelIds(storedKey: string | null): Promise<string[]> {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "opencode",
+      (provider) => {
+        const client = new FakeAgentClient(provider);
+        // Zen and Go reach OpenBot as one catalog, which is what makes the split a decision this
+        // app has to make rather than one it can read off the response.
+        if (provider === "opencode") {
+          client.modelList = () => ({
+            data: [
+              { model: "opencode/big-pickle" },
+              { model: "opencode/claude-opus-5" },
+              { model: "opencode-go/kimi-k3" },
+            ],
+          });
+        }
+        return client;
+      },
+      {},
+      async () => undefined,
+      null,
+      null,
+      { apiKey: () => storedKey },
+    );
+    await service.initialize();
+    return service
+      .listModels()
+      .filter((model) => model.provider === "opencode")
+      .map((model) => model.id);
+  }
+
+  it("hides the OpenCode Go models that the key OpenBot supplied does not buy", async () => {
+    expect(await opencodeModelIds("zen-key")).toEqual(["opencode/big-pickle", "opencode/claude-opus-5"]);
+  });
+
+  it("keeps the OpenCode Go models when the user's own OpenCode sign-in is what lists them", async () => {
+    expect(await opencodeModelIds(null)).toEqual([
+      "opencode/big-pickle",
+      "opencode/claude-opus-5",
+      "opencode-go/kimi-k3",
+    ]);
+  });
+
   it("uses startup fallbacks when provider discovery is unavailable", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const { store, mailbox } = stores(root);

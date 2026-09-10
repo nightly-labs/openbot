@@ -89,6 +89,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     input !== "agent-setup" &&
     input !== "claude-install" &&
     input !== "opencode-install" &&
+    input !== "opencode-auth" &&
     input !== "claude-sign-in" &&
     input !== "feedback" &&
     input !== "message"

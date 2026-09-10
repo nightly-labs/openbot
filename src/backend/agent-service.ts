@@ -95,6 +95,7 @@ import { type ConversationMarkerExclusions, ConversationReadStore } from "./conv
 import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
+import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePathFromInput } from "./workspace-paths";
 
@@ -164,6 +165,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     prepareAgentWorkspace: (agent: AgentSummary) => Promise<void> = async () => undefined,
     hostedSites: AgentHostedSites | null = null,
     sidebarLayout: AgentSidebar | null = null,
+    credentials: ProviderClientContext = NO_PROVIDER_CREDENTIALS,
   ) {
     super();
     this.#store = store;
@@ -263,6 +265,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       preferredProvider,
       clientFactory,
       bundledExecutables,
+      credentials,
     });
     this.#compaction = new ContextCompaction({
       store,

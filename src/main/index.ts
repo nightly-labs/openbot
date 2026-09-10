@@ -246,6 +246,7 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
 function registerIpcHandlers({
   service,
   providerRuntimes,
+  providerCredentials,
   mailbox,
   browser,
   browserPictureInPicture,
@@ -289,7 +290,7 @@ function registerIpcHandlers({
     }),
     ...dynamicIslandIpcHandlers({ dynamicIsland }),
     ...computerUseIpcHandlers({ computerUseMacSetup }),
-    ...providerIpcHandlers({ service, providerRuntimes }),
+    ...providerIpcHandlers({ service, providerRuntimes, credentials: providerCredentials }),
     ...voiceIpcHandlers({ voice }),
     ...accountIpcHandlers({ centralAuth, host }),
     ...skillIpcHandlers({ skills, getMainWindow }),

@@ -46,6 +46,7 @@ export const FALLBACK_PROVIDER_RUNTIMES: ProviderRuntimeSnapshot = {
     codex: NO_PROVIDER_RUNTIME,
     claude: NO_PROVIDER_RUNTIME,
     grok: NO_PROVIDER_RUNTIME,
+    opencode: NO_PROVIDER_RUNTIME,
   },
 };
 

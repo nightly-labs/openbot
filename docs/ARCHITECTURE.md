@@ -576,8 +576,26 @@ Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact acces
 
 `src/backend/acp-client.ts` owns ACP process transport, model discovery, session start/load,
 streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts` supplies xAI
-login and billing hooks. The OpenCode driver starts the installed `opencode acp` command and
-uses external sign-in. OpenCode is not a managed runtime. Profile clients deny tool permissions.
+login and billing hooks. The OpenCode driver starts `opencode acp` on the runtime OpenBot pins and
+downloads, or on a CLI the user installed. Profile clients deny tool permissions.
+
+OpenCode has no login step OpenBot can drive, because the account is one environment variable: a
+spawn without `OPENCODE_API_KEY` lists the free OpenCode Zen models, and a spawn with one lists the
+paid catalog. So `AcpAgentClient` derives `#signedIn` from the models `session/new` returns, not
+from a credential, and a keyless OpenCode reports `available`. `AcpProviderOptions.extraEnv` is read
+at every spawn, which is what lets a key saved in Settings reach the next process with no other
+plumbing, and what carries `OPENCODE_DISABLE_AUTOUPDATE` to a managed install so the CLI cannot
+update past the pin. `src/main/provider-credential-store.ts` holds that optional key, encrypted by
+`safeStorage` in a `0o600` envelope under `userData`. Only a boolean crosses IPC; no getter returns
+the key.
+
+That one variable turns on two products: OpenCode reports OpenCode Zen and OpenCode Go as a single
+catalog, on the separate endpoints `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and a Zen key
+does not buy Go. So `CREDENTIAL_ONLY_MODEL_PREFIXES` in `src/backend/agent/provider-runtime.ts`
+drops the `opencode-go/` models from `#refreshModelCatalog` while OpenBot is the one supplying the
+key; with no key stored those models can only come from the user's own OpenCode sign-in, which does
+buy them. Neither `/models` endpoint authenticates, so entitlement cannot be read back and the
+split is a product rule rather than a check.
 Provider session IDs remain in `projection_provider_sessions`; migration 17 adds OpenCode while
 preserving turn links. Provider switches keep the same agent, workspace, and local thread.
 
