@@ -102,6 +102,7 @@ export interface MobileWorkspaceContextValue {
     replyToMessageId?: string | null,
   ) => Promise<string>;
   uploadAttachment: (agentId: string, input: RemoteFileUpload) => Promise<DraftAttachment>;
+  downloadAttachment: (serverId: string, attachmentId: string) => Promise<RemoteFileUpload>;
   discardAttachment: (agentId: string, attachmentId: string) => Promise<void>;
   hideAgent: (agentId: string) => void;
   unhideAgent: (agentId: string) => void;

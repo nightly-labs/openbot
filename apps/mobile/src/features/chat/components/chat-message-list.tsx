@@ -25,6 +25,7 @@ import { useConnectionAppearance } from "@/features/workspace/components/use-con
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import type { ChatBubbleMessage } from "../context/message-actions-context";
 import { mentionDraft } from "../model/chat-mentions";
+import { ChatAttachmentView } from "./chat-attachment";
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { StreamingTailText, StreamRevealProvider } from "./streaming-tail-text";
 import { ThinkingTextGradient } from "./thinking-text-gradient";
@@ -246,30 +247,40 @@ export function ChatMessageList({
                 : AGENT_MESSAGE_ENTRANCE
               : undefined
           }
-          className={`max-w-full rounded-[30px] px-4 py-3 ${message.author === "user" ? "self-end" : "self-start bg-control/60"}`}
-          style={[
-            { borderCurve: "circular" },
-            message.author === "user" ? userBubbleStyle : undefined,
-            isFirstUser ? motion.firstMessageStyle : undefined,
-          ]}
+          className={
+            message.author === "user"
+              ? "max-w-full items-end self-end gap-2"
+              : "max-w-full items-start self-start gap-2"
+          }
+          style={[{ borderCurve: "circular" }, isFirstUser ? motion.firstMessageStyle : undefined]}
         >
           {message.attachments?.map((attachment) => (
-            <Typography.Paragraph
+            <ChatAttachmentView
               key={attachment.id}
-              type="body-sm"
-              style={{ color: message.author === "user" ? "#0a0a0c" : foreground }}
-            >
-              {attachment.name}
-            </Typography.Paragraph>
+              attachment={attachment}
+              serverId={agent.serverId}
+              alignment={message.author === "user" ? "right" : "left"}
+            />
           ))}
-          <ChatMarkdown
-            agents={agents}
-            body={message.body}
-            selectable={message.author === "user"}
-            color={message.author === "user" ? "#0a0a0c" : foreground}
-            streaming={message.author === "agent" && message.streaming}
-            animationEnabled={animateMessages && arrivals.has(message.id) && motion.responseVisible}
-          />
+          {message.body.trim() ? (
+            <Animated.View
+              className={
+                message.author === "user"
+                  ? `self-end rounded-[30px] px-4 py-3 ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
+                  : "max-w-full self-start rounded-[30px] bg-control/60 px-4 py-3"
+              }
+              style={[{ borderCurve: "circular" }, message.author === "user" ? userBubbleStyle : undefined]}
+            >
+              <ChatMarkdown
+                agents={agents}
+                body={message.body}
+                selectable={message.author === "user"}
+                color={message.author === "user" ? "#0a0a0c" : foreground}
+                streaming={message.author === "agent" && message.streaming}
+                animationEnabled={animateMessages && arrivals.has(message.id) && motion.responseVisible}
+              />
+            </Animated.View>
+          ) : null}
         </Animated.View>
       );
     if (message.kind !== "message") return rendered;
@@ -289,7 +300,7 @@ export function ChatMessageList({
     return (
       <View
         key={message.id}
-        className="max-w-[88%] self-end gap-1"
+        className={message.attachments?.length ? "max-w-full self-end gap-1" : "max-w-[88%] self-end gap-1"}
         onLayout={isTailUser ? motion.onUserLayout : undefined}
       >
         {message.replyToMessageId ? (

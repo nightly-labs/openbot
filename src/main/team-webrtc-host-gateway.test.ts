@@ -5,7 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isString } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import {
   TEAM_AGENT_ACTIVITY_CAPABILITY,
   TEAM_MODEL_SCOPED_USAGE_CAPABILITY,
@@ -20,6 +20,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebSocketServer } from "ws";
 import opencodeAgents from "../../packages/contracts/src/team-protocol/fixtures/v4/host-http-response.json";
+import { createRemoteFileReceiver } from "../../packages/team-client/src/file-download";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
@@ -102,6 +103,14 @@ describe("TeamWebRtcHostGateway", () => {
         path: request.url ?? "",
         protocol: String(request.headers["openbot-protocol-version"] ?? ""),
       });
+      if (request.url === "/v1/attachments/file-1") {
+        response.writeHead(200, {
+          "content-type": "application/json",
+          "content-disposition": "attachment; filename*=UTF-8''data.json",
+        });
+        response.end('{"file":true}');
+        return;
+      }
       if (request.url === "/v1/agents/bot-1/conversation/unread") {
         const supported = request.headers["openbot-protocol-version"] === "3";
         response.writeHead(supported ? 200 : 400, { "content-type": "application/json" });
@@ -301,6 +310,52 @@ describe("TeamWebRtcHostGateway", () => {
       const frame = decodeTeamProtocolV2RpcFrame(response.data);
       expect(frame).toMatchObject({ type: "response", result: { status: 200, body: scopedUsage } });
     });
+    const receiver = createRemoteFileReceiver(async (data) => {
+      bridge.emit("data", "peer-1", "files", data);
+    });
+    const originalSend = bridge.send.bind(bridge);
+    const fileSend = vi.spyOn(bridge, "send").mockImplementation(async (peerId, channel, data) => {
+      await originalSend(peerId, channel, data);
+      if (channel === "files") await receiver.receive(data);
+    });
+    bridge.emit(
+      "data",
+      "peer-1",
+      "rpc",
+      encodeTeamProtocolV2Frame({
+        version: 2,
+        type: "request",
+        requestId: "json-download",
+        operation: "http.request",
+        payload: { method: "GET", path: "/v1/attachments/file-1", body: null },
+      }),
+    );
+    let downloadedId = "";
+    await vi.waitFor(() => {
+      for (const message of bridge.sent) {
+        if (message.channel !== "rpc" || !isString(message.data)) continue;
+        const candidate = JSON.parse(message.data);
+        if (candidate.requestId !== "json-download") continue;
+        const frame = decodeTeamProtocolV2RpcFrame(message.data);
+        if (
+          frame.type !== "response" ||
+          !("result" in frame) ||
+          !isDynamicRecord(frame.result) ||
+          !isDynamicRecord(frame.result.file) ||
+          !isString(frame.result.file.transferId)
+        )
+          throw new Error("Missing file response");
+        downloadedId = frame.result.file.transferId;
+      }
+      expect(downloadedId).not.toBe("");
+    });
+    expect(await receiver.take(downloadedId)).toEqual({
+      name: "data.json",
+      mimeType: "application/json",
+      base64: btoa('{"file":true}'),
+    });
+    receiver.clear();
+    fileSend.mockRestore();
     let resolveFetch!: (response: Response) => void;
     const fetchRequest = vi
       .spyOn(globalThis, "fetch")

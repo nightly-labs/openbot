@@ -453,7 +453,8 @@ export class TeamWebRtcHostPeer {
                 ),
     });
     const contentType = response.headers.get("content-type") ?? "";
-    const body = response.status === 204 ? {} : contentType.includes("json") ? await response.json() : null;
+    const isFile = response.headers.get("content-disposition")?.startsWith("attachment;") ?? false;
+    const body = response.status === 204 ? {} : contentType.includes("json") && !isFile ? await response.json() : null;
     if (!response.ok) {
       const record = isDynamicRecord(body) ? body : null;
       throw new GatewayError(
@@ -462,7 +463,7 @@ export class TeamWebRtcHostPeer {
         isString(record?.error) ? record.error : `The host returned ${response.status}.`,
       );
     }
-    if (response.status !== 204 && !contentType.includes("json")) {
+    if (response.status !== 204 && (isFile || !contentType.includes("json"))) {
       const bytes = new Uint8Array(await response.arrayBuffer());
       const disposition = response.headers.get("content-disposition") ?? "";
       const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/iu)?.[1];

@@ -22,6 +22,7 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
 import { createEd25519Identity, type Ed25519Identity, signEd25519, verifyEd25519Pem } from "./ed25519";
+import { createRemoteFileReceiver } from "./file-download";
 import { createRemoteFileSender, type RemoteFileUpload } from "./file-upload";
 
 export type { RemoteFileUpload } from "./file-upload";
@@ -169,8 +170,13 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       if (!state || !isPeerOnline(state)) throw new Error("The selected server is offline.");
       await sendPayload(state, "files", data);
     },
-    () => crypto.randomUUID(),
+    () => createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size))),
   );
+  const downloads = createRemoteFileReceiver(async (data) => {
+    const state = peer;
+    if (!state || !isPeerOnline(state)) throw new Error("The selected server is offline.");
+    await sendPayload(state, "files", data);
+  });
   const closingSessions = new Map<string, Promise<void>>();
 
   return {
@@ -586,16 +592,17 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     actions: ActionsRef,
   ): Promise<void> {
     if (state.closed || peer !== state) return;
+    if (kind === "files") {
+      if (!state.authenticated) throw new Error("The host sent data before authentication.");
+      if (!(await downloads.receive(data)) && isString(data)) files.receive(data);
+      return;
+    }
     if (!isString(data)) return;
     if (kind === "rpc" && !state.authenticated) {
       await handleAuthenticationFrame(state, decodeTeamProtocolV2AuthFrame(data), actions);
       return;
     }
     if (!state.authenticated) throw new Error("The host sent data before authentication.");
-    if (kind === "files") {
-      files.receive(data);
-      return;
-    }
     if (kind === "rpc") {
       const frame = decodeTeamProtocolV2RpcFrame(data);
       if (frame.type !== "response") throw new Error("The host returned an invalid RPC frame.");
@@ -604,6 +611,16 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       if ("error" in frame) pending.reject(new Error(frame.error.message));
       else if (!isDynamicRecord(frame.result) || !isNumber(frame.result.status) || !("body" in frame.result)) {
         pending.reject(new Error("The host returned an invalid response."));
+      } else if (isDynamicRecord(frame.result.file) && isString(frame.result.file.transferId)) {
+        // The RPC response arrived; the file receiver now owns the inactivity
+        // deadline. A download failure rejects this request, not the peer.
+        clearTimeout(pending.timer);
+        try {
+          const file = await downloads.take(frame.result.file.transferId);
+          pending.resolve({ status: frame.result.status, body: { ...file } });
+        } catch (error) {
+          pending.reject(error instanceof Error ? error : new Error("The attachment download failed."));
+        }
       } else {
         pending.resolve({
           status: frame.result.status,
@@ -863,6 +880,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
 
   async function closePeer(endSession: (sessionId: string) => Promise<void>): Promise<void> {
     files.cancel();
+    downloads.clear();
     const state = peer;
     peer = null;
     generation += 1;
