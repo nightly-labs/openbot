@@ -22,7 +22,7 @@ import type {
   UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
 
-export function createMockChannels(emit: (event: AgentEvent) => void) {
+export function createMockChannels(emit: (event: AgentEvent) => void, agentName: (agentId: string) => string) {
   const channels = new Map<string, Channel>();
   const messages = new Map<string, ChannelMessage[]>();
   const tasks = new Map<string, ChannelTask[]>();
@@ -91,6 +91,11 @@ export function createMockChannels(emit: (event: AgentEvent) => void) {
         const list = messages.get(channel.id) ?? [];
         const id = crypto.randomUUID();
         const taskId = crypto.randomUUID();
+        // The real service routes a request with no recipient through the lead's model and posts the
+        // choice as a channel message. It skips both when the answer is already known: a named
+        // recipient, or a channel with one member. The preview has no model, so it keeps assigning
+        // the lead, but it reproduces which requests get a visible dispatch row and which do not.
+        const routed = !input.recipientAgentId && channel.members.length > 1 && channel.leadAgentId !== null;
         work.push({
           id: taskId,
           channelId: channel.id,
@@ -125,6 +130,25 @@ export function createMockChannels(emit: (event: AgentEvent) => void) {
             replyToMessageId: input.replyToMessageId,
           },
         });
+        if (routed && channel.leadAgentId) {
+          const dispatchId = crypto.randomUUID();
+          // The name is resolved from the agent roster by the timeline, so the id stands in for it.
+          list.push({
+            id: dispatchId,
+            channelId: channel.id,
+            sequence: list.length + 1,
+            author: { kind: "agent", id: channel.leadAgentId, name: agentName(channel.leadAgentId) },
+            taskId,
+            superseded: false,
+            message: {
+              id: dispatchId,
+              author: "system",
+              text: `Assigned to ${agentName(channel.leadAgentId)}.`,
+              createdAt: new Date().toISOString(),
+              status: "completed",
+            },
+          });
+        }
         messages.set(channel.id, list);
       }
       tasks.set(channel.id, work);

@@ -20,7 +20,7 @@ const changed = vi.fn();
 const schedule = vi.fn();
 const interrupt = vi.fn(async () => undefined);
 const busy = vi.fn((_agentId: string) => false);
-const generate = vi.fn(async () => JSON.stringify({ agentId: "agent-a" }));
+const generate = vi.fn<ChannelTextModel>(async () => JSON.stringify({ agentId: "agent-a" }));
 let count = 0;
 const operationId = () => `command-${++count}`;
 beforeEach(async () => {
@@ -310,6 +310,185 @@ describe("shared channel coordination", () => {
     await vi.waitFor(() => expect(service.store.tasks("channel-1").at(-1)?.state).toBe("paused"));
     expect(service.store.messages("channel-1").filter((item) => item.author.kind === "coordinator")).toHaveLength(2);
     expect(service.store.assignments("channel-1")).toEqual([]);
+  });
+  it("assigns the only available member without a routing turn", async () => {
+    // Membership alone is not eligibility: agent-b stays a member here, but no agent answers for
+    // it, so there is one possible owner and nothing for the lead to decide.
+    vi.spyOn(data.store, "list").mockReturnValue(data.store.list().filter((agent) => agent.id === "agent-a"));
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: "Prepare the report",
+        recipientAgentId: null,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
+    expect(service.store.tasks("channel-1")[0]?.ownerAgentId).toBe("agent-a");
+    expect(generate).not.toHaveBeenCalled();
+    expect(service.store.messages("channel-1")).toHaveLength(1);
+  });
+  it("gives a reply to a member message with no task to that member", async () => {
+    service.store.update(service.store.get("channel-1"), {
+      messages: [
+        {
+          id: "note",
+          channelId: "channel-1",
+          sequence: 0,
+          author: { kind: "agent", id: "agent-b", name: "Agent B" },
+          taskId: null,
+          superseded: false,
+          message: {
+            id: "note",
+            text: "I looked at the archive.",
+            author: "system",
+            createdAt: new Date().toISOString(),
+            status: "completed",
+          },
+        },
+      ],
+    });
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: "Write that up",
+        recipientAgentId: null,
+        replyToMessageId: "note",
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
+    expect(service.store.tasks("channel-1")[0]?.ownerAgentId).toBe("agent-b");
+    expect(generate).not.toHaveBeenCalled();
+  });
+  it("posts the routing decision as one message from the lead", async () => {
+    generate.mockResolvedValueOnce(JSON.stringify({ agentId: "agent-b" }));
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: "Someone please research this",
+        recipientAgentId: null,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
+    const task = required(service.store.tasks("channel-1")[0]);
+    expect(task.ownerAgentId).toBe("agent-b");
+    const dispatch = required(service.store.messages("channel-1").at(-1));
+    expect(dispatch.author).toEqual({ kind: "agent", id: "agent-a", name: required(agent("agent-a")).name });
+    expect(dispatch.taskId).toBe(task.id);
+    expect(dispatch.message.text).toContain(required(agent("agent-b")).name);
+    expect(service.store.messages("channel-1")).toHaveLength(2);
+  });
+  it("tells the renderer about the dispatch before the chosen member is free", async () => {
+    // The owner is busy, so no assignment follows and nothing else publishes this channel. Without
+    // its own publish the routing decision would sit in the database, invisible until the next
+    // unrelated change.
+    busy.mockImplementation((agentId) => agentId === "agent-b");
+    generate.mockResolvedValueOnce(JSON.stringify({ agentId: "agent-b" }));
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: "Someone please research this",
+        recipientAgentId: null,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    await vi.waitFor(() => expect(service.store.messages("channel-1")).toHaveLength(2));
+    expect(service.store.assignments("channel-1")).toEqual([]);
+    expect(changed).toHaveBeenLastCalledWith("channel-1", service.store.get("channel-1").revision);
+  });
+  it("writes no message when routing finds no work to do", async () => {
+    generate.mockResolvedValueOnce(JSON.stringify({ idle: true }));
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: "Thanks all",
+        recipientAgentId: null,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    await vi.waitFor(() => expect(service.store.tasks("channel-1")[0]?.state).toBe("completed"));
+    expect(service.store.messages("channel-1")).toHaveLength(1);
+    expect(service.store.assignments("channel-1")).toEqual([]);
+  });
+  it("routes a decision that arrives after a sentence of prose", async () => {
+    generate.mockResolvedValueOnce('Agent B knows the archive.\n{"agentId":"agent-b"}');
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: "Someone please research this",
+        recipientAgentId: null,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
+    expect(service.store.tasks("channel-1")[0]?.ownerAgentId).toBe("agent-b");
+  });
+  it("routes from the channel summary instead of the message history", async () => {
+    service.store.update(service.store.get("channel-1"), {
+      messages: [
+        {
+          id: "old-note",
+          channelId: "channel-1",
+          sequence: 0,
+          author: { kind: "agent", id: "agent-b", name: "Agent B" },
+          taskId: null,
+          superseded: false,
+          message: {
+            id: "old-note",
+            text: "The archive migration finished last week.",
+            author: "system",
+            createdAt: new Date().toISOString(),
+            status: "completed",
+          },
+        },
+      ],
+    });
+    service.store.saveSummary("channel-1", {
+      version: 1,
+      throughSequence: required(service.store.messages("channel-1").at(-1)).sequence,
+      text: "Earlier the team agreed the archive migration is done.",
+    });
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: "Someone please research this",
+        recipientAgentId: null,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    await vi.waitFor(() => expect(generate).toHaveBeenCalled());
+    const prompt = required(generate.mock.calls[0])[1];
+    expect(prompt).toContain("the team agreed the archive migration is done");
+    expect(prompt).not.toContain("The archive migration finished last week.");
   });
   it("discards routing after the membership changes", async () => {
     let resolve!: (value: string) => void;
@@ -1702,6 +1881,9 @@ describe("shared channel coordination", () => {
   });
 });
 
+function agent(agentId: string) {
+  return data.store.list().find((entry) => entry.id === agentId);
+}
 function required<T>(value: T | null | undefined): T {
   if (value === null || value === undefined) throw new Error("The expected test record is missing.");
   return value;

@@ -113,6 +113,26 @@ describe("channelTimelineEntries", () => {
     expect(entries[0].author).toMatchObject({ kind: "agent", name: "Ada" });
   });
 
+  it("draws the lead routing dispatch as the lead agent", () => {
+    // The lead posts its own choice of owner. It is authored by the lead agent, not by the
+    // anonymous coordinator, so the row has to resolve to that agent's face and colour.
+    const entries = channelTimelineEntries(
+      page([
+        message({
+          id: "m1",
+          sequence: 1,
+          author: { kind: "agent", id: chief.id, name: "Chief" },
+          text: "Assigned to Ada.",
+          createdAt: new Date(2026, 8, 9, 12, 0),
+        }),
+      ]),
+      [chief],
+      () => false,
+      options,
+    );
+    expect(entries[0].author).toMatchObject({ kind: "agent", name: "Chief", agent: chief, avatarSeed: undefined });
+  });
+
   it("draws the coordinator as an author, whatever the reader check says of its id", () => {
     const entries = channelTimelineEntries(
       page([

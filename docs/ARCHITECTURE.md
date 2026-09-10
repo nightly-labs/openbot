@@ -604,10 +604,14 @@ and restart recovery use the explicit execution thread. These internal execution
 create extra navigation entries. The per-agent drain scheduler remains the authority for work.
 
 `ChannelService` selects one owner. A selected recipient has priority, followed by the task attached
-to a reply and a clear follow-up to the sole open task. Other requests use the lead's provider,
-model, and reasoning setting in a separate session with no work tools. Invalid or stale routing
-cannot broadcast a request. Routing can select an existing task, ask a question, or indicate that
-no work is needed.
+to a reply, a reply to a member message that has no task, a clear follow-up to the sole open task,
+and a channel with one available member. These selections use no model. Other requests use the
+lead's provider, model, and reasoning setting in a separate session with no work tools. The request
+supplies the accepted result schema and the channel summary in place of the transcript. Invalid or
+stale routing cannot broadcast a request. Routing can select an existing task, ask a question, or
+indicate that no work is needed. A selected owner or existing task adds one channel message from the
+lead, so the selection is visible and the user can correct it. Deterministic selection adds no
+message.
 
 Channel tools retrieve history, assign a child task, transfer ownership, and report results. The
 runtime supplies channel and caller identity. A child keeps its parent owner; a transfer changes it.

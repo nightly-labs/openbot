@@ -8,8 +8,10 @@ import {
   type GenerateAgentProfileInput,
   type SidebarSection,
 } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import type { AgentClient } from "../agent-client";
 import { decodeRecordResponse, getRecord, getString } from "../protocol";
+import { extractJsonObject, StructuredOutputError } from "../structured-output";
 
 const GENERATION_TIMEOUT_MS = 120_000;
 
@@ -21,15 +23,11 @@ export async function generateProfile(
   sections: SidebarSection[],
 ): Promise<AgentProfileDraft> {
   const result = await generateTextWithoutTools(client, model, profilePrompt(input, sections));
-  let parsed: unknown;
+  let parsed: DynamicRecord;
   try {
-    parsed = JSON.parse(
-      result
-        .trim()
-        .replace(/^```(?:json)?\s*/u, "")
-        .replace(/\s*```$/u, ""),
-    );
-  } catch {
+    parsed = extractJsonObject(result);
+  } catch (error) {
+    if (!(error instanceof StructuredOutputError)) throw error;
     throw new Error("The provider returned an invalid profile. Try revising your prompt.");
   }
   const draft = decodeAgentProfileDraft(parsed);
