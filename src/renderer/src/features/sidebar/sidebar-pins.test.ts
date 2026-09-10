@@ -8,14 +8,18 @@ import {
 } from "./sidebar-pins";
 
 describe("sidebar pins", () => {
-  it("keeps unique agents and removes legacy person pins", () => {
+  it("keeps unique chats of both kinds and removes legacy person pins", () => {
     expect(
       normalizeSidebarPinnedItems([
         { kind: "agent", id: "chief" },
+        { kind: "channel", id: "channel-1" },
         { kind: "person", id: "member-alice" },
         { kind: "agent", id: "chief" },
       ]),
-    ).toEqual([{ kind: "agent", id: "chief" }]);
+    ).toEqual([
+      { kind: "agent", id: "chief" },
+      { kind: "channel", id: "channel-1" },
+    ]);
   });
 
   it("repins an agent migration v13 renamed instead of stranding it", () => {
@@ -82,7 +86,10 @@ describe("sidebar pins", () => {
     };
 
     expect(readSidebarPins(storage)).toEqual({
-      local: [{ kind: "agent", id: "chief" }],
+      local: [
+        { kind: "agent", id: "chief" },
+        { kind: "channel", id: "general" },
+      ],
     });
   });
 

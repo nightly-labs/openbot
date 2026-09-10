@@ -30,22 +30,6 @@ export function StopIcon() {
   );
 }
 
-export function BackIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 settings-back-icon fill-none stroke-current">
-      <path d="m12.5 4-6 6 6 6" stroke-linecap="round" stroke-linejoin="round" />
-    </svg>
-  );
-}
-
-export function SettingsForwardIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 settings-forward-icon fill-none stroke-current">
-      <path d="m5.5 4 6 6-6 6m5-12 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
-    </svg>
-  );
-}
-
 export function PlusIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-[14px] fill-none stroke-current">

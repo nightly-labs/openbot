@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { createScrollFades } from "../../../components/createScrollFades";
 import { errorMessage } from "../../../error-message";
 import type { ConversationProps } from "../conversation-types";
-import { calculateChatScrollMargin, createChatVirtualizer } from "../createChatVirtualizer";
+import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "../createChatVirtualizer";
 import { scrollToLatestMessage } from "../MessageNavigation";
 import { scrollToUnreadBoundary, unreadMessagesDividerIsVisible } from "../UnreadMessages";
 
@@ -34,6 +34,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   const [atHistoryBoundary, setAtHistoryBoundary] = createSignal(false);
   const [unreadDividerVisible, setUnreadDividerVisible] = createSignal(false);
   let unreadVisibilityFrame: number | undefined;
+  let firstRenderedIndex = 0;
 
   const timelineMessages = createMemo(() => deps.props.messages.filter((message) => message.kind !== "thinking"));
 
@@ -58,14 +59,21 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     scrollMargin: virtualScrollMargin,
     onChange: (instance) => {
       const first = instance.getVirtualItems()[0];
-      if (first) setAtHistoryBoundary(first.index <= 5);
+      if (!first) return;
+      firstRenderedIndex = first.index;
+      updateHistoryBoundary();
     },
   });
+
+  /* One writer for the boundary: the row the virtualizer renders first, read where the reader is. */
+  function updateHistoryBoundary(element = deps.elements.scrollElement()): void {
+    setAtHistoryBoundary(chatHistoryBoundaryReached(element, firstRenderedIndex));
+  }
 
   function updateScrollFade(element = deps.elements.scrollElement()) {
     if (!element) return;
     scrollFades.measure();
-    setAtHistoryBoundary(element.scrollTop <= 80);
+    updateHistoryBoundary(element);
     setShowScrollToLatest(element.scrollHeight - element.scrollTop - element.clientHeight > 80);
   }
 

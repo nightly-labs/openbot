@@ -51,7 +51,6 @@ export interface AgentMemoriesOptions {
  * than resurrecting a memory the user just deleted.
  */
 export class AgentMemories {
-  readonly #store: AgentStore;
   readonly #conversation: ConversationRuntime;
   readonly #emit: (event: AgentEvent) => void;
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
@@ -60,7 +59,6 @@ export class AgentMemories {
   readonly #epochs = new Map<string, number>();
 
   constructor(options: AgentMemoriesOptions) {
-    this.#store = options.store;
     this.#conversation = options.conversation;
     this.#emit = options.emit;
     this.#emitError = options.emitError;
@@ -192,13 +190,12 @@ export class AgentMemories {
   }
 
   /**
-   * A memory change invalidates the developer instructions the provider was started with, so the
-   * thread is unloaded and the next turn rebuilds them.
+   * A memory change invalidates the developer instructions the provider was started with, so every
+   * thread of the agent is unloaded and the next turn on each of them rebuilds them.
    */
   stateChanged(agentId: string): void {
     const agent = this.#conversation.requireKnownAgent(agentId);
-    const session = this.#store.activeProviderSession(agent.id);
-    if (session) this.#conversation.unloadThread(session.externalSessionId);
+    this.#conversation.unloadAgentThreads(agent.id);
     this.#emit({ type: "memories-changed", agentId });
   }
 

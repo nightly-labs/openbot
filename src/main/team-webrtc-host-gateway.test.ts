@@ -501,6 +501,48 @@ describe("TeamWebRtcHostGateway", () => {
           .map((message) => message.peerId),
       ),
     ).toEqual(new Set(["peer-1", "peer-2"]));
+    // `channels-changed` is outside the frozen v1 vocabulary, so the base event adapter throws on
+    // it. Without a host-side branch for the optional protocol the frame was dropped silently, and
+    // a remote client saw no incoming message or task update until its next refresh.
+    for (const client of eventsServer.clients)
+      client.send(JSON.stringify({ type: "channels-changed", channelId: "channel-1", revision: 2 }));
+    await vi.waitFor(() =>
+      expect(
+        bridge.sent.filter(
+          (message) =>
+            message.channel === "events" && isString(message.data) && message.data.includes("channels-changed"),
+        ),
+      ).toHaveLength(2),
+    );
+    const forwardedChannelEvent = bridge.sent.find(
+      (message) => message.channel === "events" && isString(message.data) && message.data.includes("channels-changed"),
+    );
+    expect(JSON.parse(isString(forwardedChannelEvent?.data) ? forwardedChannelEvent.data : "{}")).toMatchObject({
+      version: 2,
+      type: "event",
+      payload: { type: "channels-changed", channelId: "channel-1", revision: 2 },
+    });
+    for (const event of [
+      { type: "channel-memories-changed", channelId: "channel-1" },
+      { type: "channel-routines-changed", channelId: "channel-1" },
+    ] as const) {
+      for (const client of eventsServer.clients) client.send(JSON.stringify(event));
+      await vi.waitFor(() =>
+        expect(
+          bridge.sent.filter(
+            (message) => message.channel === "events" && isString(message.data) && message.data.includes(event.type),
+          ),
+        ).toHaveLength(2),
+      );
+      const forwarded = bridge.sent.find(
+        (message) => message.channel === "events" && isString(message.data) && message.data.includes(event.type),
+      );
+      expect(JSON.parse(isString(forwarded?.data) ? forwarded.data : "{}")).toMatchObject({
+        version: 2,
+        type: "event",
+        payload: event,
+      });
+    }
     await gateway.revokeSession("session-2");
     expect(closeLocalSession).toHaveBeenCalledExactlyOnceWith("session-2");
     expect(bridge.disconnectedPeers).toEqual(["peer-2"]);

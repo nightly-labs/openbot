@@ -1193,7 +1193,7 @@ textarea {
   will-change: transform;
 }
 
-.agent-list[data-sidebar-dragging="agent"] .sidebar-agent-item {
+.agent-list[data-sidebar-dragging="chat"] .sidebar-agent-item {
   transition: none;
   will-change: transform;
 }
@@ -2098,7 +2098,8 @@ textarea {
 }
 
 .agent-row-title strong,
-.person-row .agent-row-heading strong {
+.person-row .agent-row-heading strong,
+.channel-row .agent-row-heading strong {
   min-width: 0;
   overflow: hidden;
   color: var(--openbot-text-primary);
@@ -2134,7 +2135,8 @@ textarea {
 }
 
 .agent-row-time,
-.person-row .agent-row-heading > span {
+.person-row .agent-row-heading > span,
+.channel-row .agent-row-heading > span {
   min-width: 0;
   flex: 0 0 auto;
   color: var(--openbot-text-readable);
@@ -2186,17 +2188,6 @@ textarea {
 
 .ui-button.sidebar-first-agent-action {
   flex: 0 0 auto;
-}
-
-.sidebar-first-agent-empty {
-  display: grid;
-  flex: 1;
-  place-items: center;
-  margin: 0;
-  padding-bottom: 54px;
-  color: var(--openbot-text-readable);
-  font-size: var(--openbot-text-md);
-  text-align: center;
 }
 
 .account-dock {
@@ -3063,7 +3054,7 @@ textarea {
 .agent-row:active,
 .composer-button:active,
 .voice-button:active,
-.agent-settings-nav-button:active {
+.settings-panel-nav-button:active {
   transform: scale(0.97);
 }
 
@@ -3080,7 +3071,7 @@ textarea {
   background: var(--openbot-bg-surface);
 }
 
-.agent-settings-content {
+.settings-panel-content {
   color: var(--openbot-text-primary);
 }
 

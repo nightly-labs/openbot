@@ -54,6 +54,7 @@ export class AgentRoster {
         .prepare(
           `SELECT thread_id, agent_id FROM projection_threads
            WHERE thread_id NOT IN (SELECT thread_id FROM projection_agents WHERE thread_id IS NOT NULL)
+             AND thread_id NOT IN (SELECT thread_id FROM projection_channel_contexts)
            ORDER BY thread_id`,
         )
         .all(),

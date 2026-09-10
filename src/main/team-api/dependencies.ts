@@ -1,3 +1,4 @@
+import type { ChannelService } from "../../backend/channel-service";
 // What `TeamApiServer` needs from the rest of the main process, and nothing else.
 //
 // Every service arrives as a `Pick<>` of the real class. The point is not brevity: the Team API is
@@ -36,6 +37,7 @@ type TeamApiAgentMethods = Pick<
   | "getHostAnalytics"
   | "listModels"
   | "listAgents"
+  | "sidebarChatIds"
   | "listConversationReads"
   | "generateProfile"
   | "saveProfile"
@@ -56,6 +58,17 @@ type TeamApiAgentMethods = Pick<
   | "deleteRoutine"
   | "testRoutine"
   | "listRoutineRuns"
+  | "listChannelMemories"
+  | "createChannelMemory"
+  | "updateChannelMemory"
+  | "deleteChannelMemory"
+  | "clearChannelMemories"
+  | "listChannelRoutines"
+  | "createChannelRoutine"
+  | "updateChannelRoutine"
+  | "deleteChannelRoutine"
+  | "testChannelRoutine"
+  | "listChannelRoutineRuns"
   | "setAvatar"
   | "resolveAvatar"
   | "readConversationFor"
@@ -122,6 +135,7 @@ export type TeamApiRemoteScreen = Pick<
 >;
 
 export interface TeamApiOptions {
+  channels?: ChannelService;
   appVersion?: string;
   store: TeamStore;
   agents: TeamApiAgents;

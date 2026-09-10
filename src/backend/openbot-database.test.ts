@@ -23,6 +23,52 @@ afterEach(async () => {
 });
 
 describe("OpenBotDatabase", () => {
+  it("rolls back a failed channel migration and preserves agent history on retry", async () => {
+    const database = await createDatabase();
+    const agent = testAgent();
+    database.replaceAgents("seed-channel-upgrade", [agent], "agents.updated");
+    const original = {
+      agentId: agent.id,
+      threadId: agent.threadId,
+      activeTurnId: null,
+      revision: 0,
+      messages: [
+        {
+          id: "retained-message",
+          author: "user" as const,
+          text: "Keep this conversation",
+          status: "completed" as const,
+          createdAt: "2026-09-07T12:00:00.000Z",
+        },
+      ],
+    };
+    database.persistConversation(original, "conversation.saved");
+    const path = database.path;
+    const root = database.userDataPath;
+    database.close();
+    const legacy = new DatabaseSync(path);
+    removeSchemaAfterVersion14(legacy);
+    // The squatted name is the index's, not a table's: the migration creates its tables with
+    // IF NOT EXISTS, and SQLite refuses an index whose name a table already holds however the
+    // statement is spelled. What is under test is the rollback, not which object collides.
+    legacy.exec("CREATE TABLE channel_tasks_channel (conflict TEXT)");
+    legacy.close();
+    const failed = new OpenBotDatabase(root);
+    await expect(failed.initialize()).rejects.toThrow("migration to version 18 failed");
+    const check = new DatabaseSync(path);
+    expect(check.prepare("SELECT name FROM sqlite_master WHERE name = 'projection_channels'").get()).toBeUndefined();
+    expect(check.prepare("SELECT version FROM schema_migrations WHERE version = 17").get()).toEqual({ version: 17 });
+    expect(check.prepare("SELECT version FROM schema_migrations WHERE version = 18").get()).toBeUndefined();
+    check.exec("DROP TABLE channel_tasks_channel");
+    check.close();
+    const retried = new OpenBotDatabase(root);
+    await retried.initialize();
+    expect(retried.listAgents()).toEqual([agent]);
+    expect(retried.readConversation(agent.id, agent.threadId).messages).toEqual(original.messages);
+    expect(retried.connection.prepare("PRAGMA foreign_keys").get()).toMatchObject({ foreign_keys: 1 });
+    retried.close();
+  });
+
   it("configures a private WAL database with every required projection", async () => {
     const database = await createDatabase();
     const tables = database.connection
@@ -57,6 +103,10 @@ describe("OpenBotDatabase", () => {
         "projection_direct_threads",
         "projection_direct_messages",
         "projection_direct_reads",
+        "projection_channel_memories",
+        "projection_channel_routines",
+        "projection_channel_routine_triggers",
+        "projection_channel_routine_runs",
         "file_deletion_outbox",
       ]),
     );
@@ -75,6 +125,8 @@ describe("OpenBotDatabase", () => {
       { version: 15 },
       { version: 16 },
       { version: 17 },
+      { version: 18 },
+      { version: 19 },
     ]);
     database.close();
   });
@@ -457,6 +509,62 @@ describe("OpenBotDatabase", () => {
     database.close();
   });
 
+  it("keeps the channel thread of an agent out of the conversation search", async () => {
+    const database = await createDatabase();
+    const agent = testAgent();
+    database.replaceAgents("agents-channel-search", [agent], "agents.imported");
+    const channelThreadId = "openbot-thread-channel-search";
+    const now = "2026-09-01T12:00:00.000Z";
+    database.connection
+      .prepare("INSERT INTO projection_channels(channel_id, channel_json) VALUES (?, ?)")
+      .run("channel-1", JSON.stringify({ id: "channel-1", name: "Project" }));
+    database.connection
+      .prepare(
+        `INSERT INTO projection_threads
+           (thread_id, agent_id, title, active_turn_id, created_at, updated_at, last_event_sequence)
+         VALUES (?, ?, ?, NULL, ?, ?, 0)`,
+      )
+      .run(channelThreadId, agent.id, "Project", now, now);
+    database.connection
+      .prepare("INSERT INTO projection_channel_contexts(channel_id, agent_id, thread_id) VALUES (?, ?, ?)")
+      .run("channel-1", agent.id, channelThreadId);
+    const message = (id: string, text: string) => ({
+      id,
+      author: "assistant" as const,
+      text,
+      createdAt: now,
+      status: "completed" as const,
+    });
+    database.persistConversation(
+      {
+        agentId: agent.id,
+        threadId: agent.threadId,
+        activeTurnId: null,
+        revision: 0,
+        messages: [message("normal-hit", "A unique channel needle in the chat")],
+      },
+      "conversation.channel-search-normal",
+    );
+    database.persistConversation(
+      {
+        agentId: agent.id,
+        threadId: channelThreadId,
+        activeTurnId: null,
+        revision: 0,
+        messages: [message("channel-hit", "A unique channel needle in the channel")],
+      },
+      "conversation.channel-search-channel",
+    );
+
+    // A result names an agent and a message, and opening one shows the normal conversation of that
+    // agent. A channel message is not there, so the search must not offer it.
+    const search = database.searchConversationMessages("unique channel needle");
+    expect(search.results.map((result) => result.message.id)).toEqual(["normal-hit"]);
+    expect(search.total).toBe(1);
+    expect(database.searchConversationMessages("unique channel needle", agent.id).total).toBe(1);
+    database.close();
+  });
+
   it("fills legacy pages after excluding action markers", async () => {
     const database = await createDatabase();
     const agent = testAgent();
@@ -750,9 +858,11 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeAnalyticsSchema(legacy);
+    removeSchemaAfterVersion14(legacy);
     legacy.exec("PRAGMA journal_mode = WAL");
-    legacy.prepare("DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17)").run();
+    legacy
+      .prepare("DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)")
+      .run();
     legacy
       .prepare("INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (3, ?)")
       .run("2026-08-20T10:00:00.000Z");
@@ -815,6 +925,156 @@ describe("OpenBotDatabase", () => {
     reopened.close();
   }, 20_000);
 
+  // A release shipped versions 15 and 16 for usage analytics, so every database upgraded by that
+  // release stands at 16 with no channel storage. Channel storage has to arrive above it: numbered
+  // at or below 16 it would be filtered out as already applied, and the tables would never appear.
+  it("adds channel projections to a database that already ran the analytics versions", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-db-v16-"));
+    roots.push(root);
+    const database = new OpenBotDatabase(root);
+    await database.initialize();
+    database.close();
+
+    const analyticsRelease = new DatabaseSync(database.path);
+    for (const table of ["memories", "routines", "routine_triggers", "routine_runs"])
+      analyticsRelease.exec(`DROP TABLE projection_channel_${table}`);
+    for (const table of ["assignments", "tasks", "messages", "summaries", "reads", "contexts"])
+      analyticsRelease.exec(`DROP TABLE projection_channel_${table}`);
+    analyticsRelease.exec("DROP TABLE projection_channels");
+    analyticsRelease.exec("DELETE FROM schema_migrations WHERE version >= 17");
+    analyticsRelease.close();
+
+    const migrated = new OpenBotDatabase(root);
+    await migrated.initialize();
+    expect(
+      migrated.connection
+        .prepare(
+          `SELECT name FROM sqlite_master
+           WHERE type = 'table' AND name IN (
+             'projection_channels', 'projection_channel_messages',
+             'projection_channel_memories', 'projection_channel_routines'
+           ) ORDER BY name`,
+        )
+        .all(),
+    ).toEqual([
+      { name: "projection_channel_memories" },
+      { name: "projection_channel_messages" },
+      { name: "projection_channel_routines" },
+      { name: "projection_channels" },
+    ]);
+    expect(migrated.connection.prepare("SELECT version FROM schema_migrations ORDER BY version").all()).toEqual([
+      { version: 8 },
+      { version: 9 },
+      { version: 10 },
+      { version: 11 },
+      { version: 12 },
+      { version: 13 },
+      { version: 14 },
+      { version: 15 },
+      { version: 16 },
+      { version: 17 },
+      { version: 18 },
+      { version: 19 },
+    ]);
+    expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    migrated.close();
+  });
+
+  it("repairs the provider constraint in a pre-merge channel schema without losing channel data", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-db-channel-v18-"));
+    roots.push(root);
+    const database = new OpenBotDatabase(root);
+    await database.initialize();
+    const agent = testAgent();
+    if (!agent.threadId) throw new Error("The test agent has no thread.");
+    database.replaceAgents("agents-import", [agent], "agents.imported");
+    database.bindProviderSession({
+      threadId: agent.threadId,
+      provider: "codex",
+      externalSessionId: "channel-v18-session",
+      model: "gpt-5.6-luna",
+      effort: "medium",
+    });
+    const sessionId = database
+      .listProviderSessions(agent.threadId)
+      .find((session) => session.externalSessionId === "channel-v18-session")?.id;
+    if (!sessionId) throw new Error("The provider session was not stored.");
+    database.connection
+      .prepare(
+        `INSERT INTO projection_turns
+           (turn_id, thread_id, provider_session_id, status, started_at, completed_at, last_event_sequence)
+         VALUES ('channel-v18-turn', ?, ?, 'completed', '2026-09-07T12:00:00.000Z',
+           '2026-09-07T12:00:05.000Z', 1)`,
+      )
+      .run(agent.threadId, sessionId);
+    database.connection
+      .prepare("INSERT INTO projection_channels(channel_id, channel_json) VALUES (?, ?)")
+      .run("channel-v18", JSON.stringify({ id: "channel-v18", purpose: "Keep this channel" }));
+    database.connection
+      .prepare(
+        `INSERT INTO projection_channel_messages(channel_id, message_id, sequence, message_json)
+         VALUES (?, ?, ?, ?)`,
+      )
+      .run("channel-v18", "channel-v18-message", 1, JSON.stringify({ text: "Keep this channel message" }));
+    database.close();
+
+    // Recreate the unshipped channel branch's version 18 profile: channel migrations are marked through
+    // 18, while its provider table still has the three-provider CHECK that migration 17 widens.
+    const legacy = new DatabaseSync(database.path);
+    legacy.exec(`
+      PRAGMA foreign_keys = OFF;
+      CREATE TABLE projection_provider_sessions_v18 (
+        id TEXT PRIMARY KEY,
+        thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,
+        provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok')),
+        external_session_id TEXT NOT NULL,
+        model TEXT NOT NULL,
+        effort TEXT NOT NULL,
+        state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        resume_cursor TEXT,
+        last_event_sequence INTEGER NOT NULL,
+        UNIQUE(provider, external_session_id)
+      );
+      INSERT INTO projection_provider_sessions_v18 SELECT * FROM projection_provider_sessions;
+      DROP TABLE projection_provider_sessions;
+      ALTER TABLE projection_provider_sessions_v18 RENAME TO projection_provider_sessions;
+      CREATE INDEX provider_sessions_thread
+        ON projection_provider_sessions(thread_id, provider, state);
+      DELETE FROM schema_migrations WHERE version = 19;
+      PRAGMA foreign_keys = ON;
+    `);
+    legacy.close();
+
+    const migrated = new OpenBotDatabase(root);
+    await migrated.initialize();
+    expect(
+      migrated.connection
+        .prepare("SELECT channel_json FROM projection_channels WHERE channel_id = ?")
+        .get("channel-v18"),
+    ).toEqual({ channel_json: JSON.stringify({ id: "channel-v18", purpose: "Keep this channel" }) });
+    expect(
+      migrated.connection
+        .prepare("SELECT message_json FROM projection_channel_messages WHERE message_id = ?")
+        .get("channel-v18-message"),
+    ).toEqual({ message_json: JSON.stringify({ text: "Keep this channel message" }) });
+    expect(
+      migrated.connection
+        .prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = ?")
+        .get("channel-v18-turn"),
+    ).toEqual({ provider_session_id: sessionId });
+    expect(
+      migrated.connection
+        .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projection_provider_sessions'")
+        .get(),
+    ).toMatchObject({ sql: expect.stringContaining("'opencode'") });
+    expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
+      version: 19,
+    });
+    migrated.close();
+  });
+
   it("adds post-v4 agent memory and routine projections", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-db-v4-"));
     roots.push(root);
@@ -823,13 +1083,13 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeAnalyticsSchema(legacy);
+    removeSchemaAfterVersion14(legacy);
     legacy.exec(`
       DROP TABLE projection_routine_runs;
       DROP TABLE projection_routine_triggers;
       DROP TABLE projection_agent_routines;
       DROP TABLE projection_agent_memories;
-      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17);
+      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19);
       INSERT OR IGNORE INTO schema_migrations(version, applied_at)
         VALUES (4, '2026-08-20T10:00:00.000Z');
     `);
@@ -864,6 +1124,8 @@ describe("OpenBotDatabase", () => {
       { version: 15 },
       { version: 16 },
       { version: 17 },
+      { version: 18 },
+      { version: 19 },
     ]);
     migrated.close();
   });
@@ -876,7 +1138,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeAnalyticsSchema(legacy);
+    removeSchemaAfterVersion14(legacy);
     downgradeReactionsToV7(legacy);
     legacy.close();
 
@@ -909,7 +1171,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeAnalyticsSchema(legacy);
+    removeSchemaAfterVersion14(legacy);
     downgradeReactionsToV7(legacy);
     legacy.exec("CREATE TABLE projection_reactions_v8 (blocker TEXT)");
     legacy.close();
@@ -939,6 +1201,8 @@ describe("OpenBotDatabase", () => {
       { version: 15 },
       { version: 16 },
       { version: 17 },
+      { version: 18 },
+      { version: 19 },
     ]);
     retried.close();
   });
@@ -961,7 +1225,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeAnalyticsSchema(legacy);
+    removeSchemaAfterVersion14(legacy);
     legacy.prepare("DELETE FROM schema_migrations WHERE version >= 10").run();
     legacy.close();
 
@@ -992,7 +1256,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeAnalyticsSchema(legacy);
+    removeSchemaAfterVersion14(legacy);
     legacy.prepare("DELETE FROM schema_migrations WHERE version >= 11").run();
     legacy.close();
 
@@ -1026,7 +1290,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeAnalyticsSchema(legacy);
+    removeSchemaAfterVersion14(legacy);
     legacy.exec(`
       DELETE FROM schema_migrations WHERE version >= 11;
       CREATE TRIGGER reject_session_refresh
@@ -1066,7 +1330,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeAnalyticsSchema(legacy);
+    removeSchemaAfterVersion14(legacy);
     downgradeToV11(legacy);
     legacy.exec(`
       INSERT INTO projection_reactions (
@@ -1098,7 +1362,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeAnalyticsSchema(legacy);
+    removeSchemaAfterVersion14(legacy);
     downgradeToV11(legacy);
     legacy.exec(`
       INSERT INTO projection_reactions (
@@ -1153,7 +1417,7 @@ describe("OpenBotDatabase", () => {
     const legacyWorkspace = `/Users/dev/OpenBot/Agents/${legacyId}`;
     const workspace = `/Users/dev/OpenBot/Agents/${agentId}`;
     const legacy = new DatabaseSync(database.path);
-    removeAnalyticsSchema(legacy);
+    removeSchemaAfterVersion14(legacy);
     downgradeToV11(legacy);
     seedLegacyAgent(legacy, legacyId, legacyWorkspace);
     legacy.close();
@@ -1253,7 +1517,7 @@ describe("OpenBotDatabase", () => {
 
     const legacyId = "bot-6d3e8b17-9c04-4f21-8a55-1b2c3d4e5f60";
     const legacy = new DatabaseSync(database.path);
-    removeAnalyticsSchema(legacy);
+    removeSchemaAfterVersion14(legacy);
     downgradeToV11(legacy);
     seedLegacyAgent(legacy, legacyId, `/Users/dev/OpenBot/Bots/${legacyId}`);
     // This migration rewrites every text column in the database with foreign keys switched off, which is
@@ -1297,7 +1561,7 @@ describe("OpenBotDatabase", () => {
     // one onto the other is a primary-key collision the substitution resolves by dropping a row -- so an
     // agent nobody touched disappears on upgrade.
     const legacy = new DatabaseSync(database.path);
-    removeAnalyticsSchema(legacy);
+    removeSchemaAfterVersion14(legacy);
     downgradeToV11(legacy);
     seedLegacyAgent(legacy, "bot-research", "/Users/dev/OpenBot/Agents/bot-research");
     seedLegacyAgent(legacy, "agent-research", "/Users/dev/OpenBot/Agents/agent-research");
@@ -1386,7 +1650,7 @@ describe("OpenBotDatabase", () => {
     database.close();
 
     const legacy = new DatabaseSync(database.path);
-    removeAnalyticsSchema(legacy);
+    removeSchemaAfterVersion14(legacy);
     legacy.exec(`
       PRAGMA foreign_keys = OFF;
       CREATE TABLE projection_provider_sessions_v6 (
@@ -1408,7 +1672,7 @@ describe("OpenBotDatabase", () => {
       ALTER TABLE projection_provider_sessions_v6 RENAME TO projection_provider_sessions;
       CREATE INDEX provider_sessions_thread
         ON projection_provider_sessions(thread_id, provider, state);
-      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17);
+      DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19);
       INSERT OR IGNORE INTO schema_migrations(version, applied_at)
         VALUES (6, '2026-08-20T10:00:00.000Z');
       PRAGMA foreign_keys = ON;
@@ -1477,7 +1741,7 @@ describe("OpenBotDatabase", () => {
       // A v16 database: the shipped three-provider constraint, and the migration ledger stamped one short.
       const legacy = new DatabaseSync(database.path);
       legacy.exec(`
-      DELETE FROM schema_migrations WHERE version = 17;
+      DELETE FROM schema_migrations WHERE version >= 17;
       PRAGMA foreign_keys = OFF;
       CREATE TABLE projection_provider_sessions_v16 (
         id TEXT PRIMARY KEY,
@@ -1757,7 +2021,7 @@ function downgradeReactionsToV7(database: DatabaseSync): void {
     );
     DROP TABLE projection_reactions;
     ALTER TABLE projection_reactions_v7 RENAME TO projection_reactions;
-    DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17);
+    DELETE FROM schema_migrations WHERE version IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19);
     INSERT OR IGNORE INTO schema_migrations(version, applied_at)
       VALUES (7, '2026-08-20T10:00:00.000Z');
   `);
@@ -1829,11 +2093,16 @@ function conversationSnapshot(agent: AgentSummary, text: string): ConversationSn
   };
 }
 
-// Older-release fixtures start from today's schema, so remove the new tables before downgrading.
-function removeAnalyticsSchema(database: DatabaseSync): void {
-  database.exec(
-    // Every version from 15 up goes: a history that keeps 16 and drops 15 has a gap, which
-    // the schema check rejects before any upgrade runs.
-    "DROP TABLE agent_usage_records; DROP TABLE agent_usage_checkpoints; DROP TABLE agent_usage_activity; DELETE FROM schema_migrations WHERE version >= 15",
-  );
+// These tests construct released schemas by stripping newer additions from a fresh fixture.
+function removeSchemaAfterVersion14(db: DatabaseSync): void {
+  // Channel migrations 18 and 19 stand on the provider migration 17, so a fixture below 17 must
+  // drop all three. Every version from 15 up goes: a history that keeps a later version and drops an earlier one has a gap, which the
+  // schema check rejects before any upgrade runs.
+  for (const table of ["memories", "routines", "routine_triggers", "routine_runs"])
+    db.exec(`DROP TABLE projection_channel_${table}`);
+  for (const table of ["assignments", "tasks", "messages", "summaries", "reads", "contexts"])
+    db.exec(`DROP TABLE projection_channel_${table}`);
+  db.exec("DROP TABLE projection_channels");
+  db.exec("DROP TABLE agent_usage_records; DROP TABLE agent_usage_checkpoints; DROP TABLE agent_usage_activity");
+  db.exec("DELETE FROM schema_migrations WHERE version >= 15");
 }

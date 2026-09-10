@@ -43,9 +43,6 @@ export function SidebarEmptyState() {
               </span>
             </span>
           </Button>
-          <Show when={props.layout.sections.length === 0}>
-            <p class="sidebar-first-agent-empty">No chats yet</p>
-          </Show>
         </div>
       )}
     </Show>

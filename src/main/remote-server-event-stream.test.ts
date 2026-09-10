@@ -110,6 +110,14 @@ describe("remote event connections", () => {
       expect.objectContaining({ type: "turn-started", agentId: "research" }),
     );
 
+    for (const event of [
+      { type: "channel-memories-changed", channelId: "channel-1" },
+      { type: "channel-routines-changed", channelId: "channel-1" },
+    ] as const) {
+      sockets[2]?.emit(event);
+      await vi.waitFor(() => expect(agentEvent).toHaveBeenCalledWith("server-1", event));
+    }
+
     fixture.manager.refreshRuntimeSnapshots();
     expect(sockets).toHaveLength(3);
     expect(sockets[1]?.sent).toContainEqual({ type: "runtime-snapshot-request" });

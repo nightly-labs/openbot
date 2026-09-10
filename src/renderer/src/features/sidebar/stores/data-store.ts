@@ -6,11 +6,10 @@
 
 import { SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
 import { createMemo } from "solid-js";
-import type { AgentProfile } from "../../../data";
 import { teamMemberName } from "../../team/TeamPersonAvatar";
-import { agentMatchesQuery, personMatchesQuery } from "../sidebar-filtering";
+import { agentMatchesQuery, channelMatchesQuery, personMatchesQuery } from "../sidebar-filtering";
 import { sidebarPinnedItemKey } from "../sidebar-pins";
-import type { ResolvedPinnedItem, SidebarProps } from "../sidebar-types";
+import type { ResolvedPinnedItem, SidebarChatItem, SidebarProps } from "../sidebar-types";
 
 export function createSidebarDataStore(deps: { normalizedQuery: () => string; props: SidebarProps }) {
   const { normalizedQuery, props } = deps;
@@ -18,34 +17,64 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
   const directThreadByMember = createMemo(
     () => new Map(props.directThreads.map((thread) => [thread.otherMemberId, thread])),
   );
-  const agentPinnedItems = createMemo(() => props.pinnedItems.filter((item) => item.kind === "agent"));
-  const pinnedKeys = createMemo(() => new Set(agentPinnedItems().map(sidebarPinnedItemKey)));
+  const chatPinnedItems = createMemo(() =>
+    props.pinnedItems.filter((item) => item.kind === "agent" || item.kind === "channel"),
+  );
+  const pinnedKeys = createMemo(() => new Set(chatPinnedItems().map(sidebarPinnedItemKey)));
   const agentById = createMemo(() => new Map(props.agents.map((agent) => [agent.id, agent])));
   const personById = createMemo(() => new Map(props.people.map((member) => [member.id, member])));
+  const matchingChannels = createMemo(() =>
+    (props.channels ?? []).filter((channel) => channelMatchesQuery(channel, normalizedQuery())),
+  );
+  const channelById = createMemo(() => new Map(matchingChannels().map((channel) => [channel.id, channel])));
+  /** Both kinds of pinned chat, resolved against the chats the sidebar has: a pin that names none is
+   * kept in storage and simply not drawn, because the chat can be absent for a passing reason. */
   const resolvedPinnedItems = createMemo<ResolvedPinnedItem[]>(() => {
     const items: ResolvedPinnedItem[] = [];
-    for (const ref of agentPinnedItems()) {
+    for (const ref of chatPinnedItems()) {
       if (ref.kind === "agent") {
         const agent = agentById().get(ref.id);
-        if (agent && agentMatchesQuery(agent, normalizedQuery())) items.push({ ref, agent });
+        if (agent && agentMatchesQuery(agent, normalizedQuery())) {
+          items.push({ ref, chat: { kind: "agent", id: agent.id, agent } });
+        }
+      }
+      if (ref.kind === "channel") {
+        const channel = channelById().get(ref.id);
+        if (channel) items.push({ ref, chat: { kind: "channel", id: channel.id, channel } });
       }
     }
     return items;
   });
-  const filteredAgents = createMemo(() => {
-    const orderIndex = new Map(props.layout.agentOrder.map((agentId, index) => [agentId, index]));
-    const naturalIndex = new Map(props.agents.map((agent, index) => [agent.id, index]));
-    return props.agents
-      .filter(
-        (agent) =>
-          !pinnedKeys().has(sidebarPinnedItemKey({ kind: "agent", id: agent.id })) &&
-          agentMatchesQuery(agent, normalizedQuery()),
-      )
-      .sort(
-        (left, right) =>
-          (orderIndex.get(left.id) ?? props.layout.agentOrder.length + (naturalIndex.get(left.id) ?? 0)) -
-          (orderIndex.get(right.id) ?? props.layout.agentOrder.length + (naturalIndex.get(right.id) ?? 0)),
-      );
+  const filteredAgents = createMemo(() =>
+    props.agents.filter(
+      (agent) =>
+        !pinnedKeys().has(sidebarPinnedItemKey({ kind: "agent", id: agent.id })) &&
+        agentMatchesQuery(agent, normalizedQuery()),
+    ),
+  );
+  const filteredChannels = createMemo(() =>
+    matchingChannels().filter(
+      (channel) => !pinnedKeys().has(sidebarPinnedItemKey({ kind: "channel", id: channel.id })),
+    ),
+  );
+  /**
+   * Agents and channels as one ordered list, because the layout places them together: a channel is a
+   * chat the user files and drags exactly like an agent. `agentOrder` is the persisted sequence and
+   * keeps its released name; an id it does not carry yet falls in behind the ones it does, channels
+   * first, which is where channels sat while they had a list of their own.
+   */
+  const filteredChats = createMemo<SidebarChatItem[]>(() => {
+    const items: SidebarChatItem[] = [
+      ...filteredChannels().map((channel) => ({ kind: "channel", id: channel.id, channel }) as const),
+      ...filteredAgents().map((agent) => ({ kind: "agent", id: agent.id, agent }) as const),
+    ];
+    const orderIndex = new Map(props.layout.agentOrder.map((chatId, index) => [chatId, index]));
+    const naturalIndex = new Map(items.map((item, index) => [item.id, index]));
+    return items.sort(
+      (left, right) =>
+        (orderIndex.get(left.id) ?? props.layout.agentOrder.length + (naturalIndex.get(left.id) ?? 0)) -
+        (orderIndex.get(right.id) ?? props.layout.agentOrder.length + (naturalIndex.get(right.id) ?? 0)),
+    );
   });
   const orderedPeople = createMemo(() => {
     const natural = [...props.people].sort((left, right) => {
@@ -80,15 +109,15 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
   // disappeared -- so it goes to the unassigned section, where the user can still open it and move it.
   // `isCompleteSectionOrder` rejects such a layout at the IPC boundary; this keeps the agent visible if
   // one ever reaches the sidebar another way.
-  const filteredAgentsBySection = createMemo(() => {
-    const groups = new Map<string, AgentProfile[]>();
-    for (const agent of filteredAgents()) {
-      const assigned = props.layout.agentAssignments[agent.id];
+  const filteredChatsBySection = createMemo(() => {
+    const groups = new Map<string, SidebarChatItem[]>();
+    for (const item of filteredChats()) {
+      const assigned = props.layout.agentAssignments[item.id];
       const sectionId =
         assigned && customSectionById().has(assigned) && orderedSectionIds().has(assigned)
           ? assigned
           : SIDEBAR_UNASSIGNED_SECTION_ID;
-      groups.set(sectionId, [...(groups.get(sectionId) ?? []), agent]);
+      groups.set(sectionId, [...(groups.get(sectionId) ?? []), item]);
     }
     return groups;
   });
@@ -96,10 +125,10 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
     props.layout.order.filter((sectionId) => {
       if (sectionId === SIDEBAR_PEOPLE_SECTION_ID) return props.showPeople !== false && filteredPeople().length > 0;
       if (customSectionById().has(sectionId)) {
-        return !normalizedQuery() || (filteredAgentsBySection().get(sectionId)?.length ?? 0) > 0;
+        return !normalizedQuery() || (filteredChatsBySection().get(sectionId)?.length ?? 0) > 0;
       }
       if (sectionId !== SIDEBAR_UNASSIGNED_SECTION_ID) return false;
-      return (filteredAgentsBySection().get(sectionId)?.length ?? 0) > 0;
+      return (filteredChatsBySection().get(sectionId)?.length ?? 0) > 0;
     }),
   );
 
@@ -111,17 +140,28 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
     return visibleSectionIds().indexOf(sectionId);
   }
 
-  function sectionAcceptsAgent(sectionId: string): boolean {
+  function sectionAcceptsChat(sectionId: string): boolean {
     return sectionId === SIDEBAR_UNASSIGNED_SECTION_ID || customSectionById().has(sectionId);
   }
 
   /**
-   * The section a dragged agent counts as leaving. Deliberately not the menu's `currentSectionId`,
-   * which answers `null` for an unassigned agent because that is where its tick goes.
+   * The section a dragged chat counts as leaving. Deliberately not the menu's `currentSectionId`,
+   * which answers `null` for an unassigned chat because that is where its tick goes.
    */
-  function assignedSectionId(agentId: string): string {
-    const assigned = props.layout.agentAssignments[agentId];
+  function assignedSectionId(chatId: string): string {
+    const assigned = props.layout.agentAssignments[chatId];
     return assigned && customSectionById().has(assigned) ? assigned : SIDEBAR_UNASSIGNED_SECTION_ID;
+  }
+
+  /** The name for an announcement, whichever kind of chat the id belongs to. */
+  function chatName(chatId: string): string {
+    return agentById().get(chatId)?.name ?? channelById().get(chatId)?.name ?? "chat";
+  }
+
+  /** Which kind of chat an id names, or null when the sidebar shows no chat under it. */
+  function chatKind(chatId: string): "agent" | "channel" | null {
+    if (agentById().has(chatId)) return "agent";
+    return channelById().has(chatId) ? "channel" : null;
   }
 
   function sectionLabel(sectionId: string): string {
@@ -135,18 +175,23 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
   }
 
   return {
-    agentPinnedItems,
     assignedSectionId,
     agentById,
+    channelById,
+    chatKind,
+    chatName,
+    chatPinnedItems,
     customSectionById,
     directThreadByMember,
     filteredAgents,
-    filteredAgentsBySection,
+    filteredChannels,
+    filteredChats,
+    filteredChatsBySection,
     filteredPeople,
     orderedPeople,
     personById,
     resolvedPinnedItems,
-    sectionAcceptsAgent,
+    sectionAcceptsChat,
     sectionIsCollapsed,
     sectionLabel,
     sectionPosition,

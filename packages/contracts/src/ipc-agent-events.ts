@@ -32,11 +32,14 @@ function isAgentTurnOrigin(value: unknown): value is AgentTurnOrigin {
 }
 
 export type AgentEvent =
+  | { type: "channels-changed"; channelId: string; revision: number }
   | { type: "status"; status: AgentStatus }
   | { type: "usage-changed"; usage: AccountUsage }
   | { type: "agents-changed"; agents: AgentSummary[] }
   | { type: "memories-changed"; agentId: string }
   | { type: "routines-changed"; agentId: string }
+  | { type: "channel-memories-changed"; channelId: string }
+  | { type: "channel-routines-changed"; channelId: string }
   | { type: "sidebar-layout-changed"; layout: SidebarLayoutSnapshot }
   | { type: "conversation"; snapshot: ConversationSnapshot }
   | { type: "conversation-invalidated"; agentId: string; revision: number }
@@ -88,6 +91,13 @@ export type AgentEvent =
 export function isAgentEvent(value: unknown): value is AgentEvent {
   if (!isDynamicRecord(value) || !isString(value.type)) return false;
   switch (value.type) {
+    case "channels-changed":
+      return (
+        isIdentifier(value.channelId) &&
+        typeof value.revision === "number" &&
+        Number.isSafeInteger(value.revision) &&
+        value.revision >= 0
+      );
     case "status":
       return isDynamicRecord(value.status);
     case "usage-changed":
@@ -100,6 +110,9 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isString(value.agentId) && value.agentId.length > 0 && value.agentId.length <= INPUT_LIMITS.identifier;
     case "routines-changed":
       return isString(value.agentId) && value.agentId.length > 0 && value.agentId.length <= INPUT_LIMITS.identifier;
+    case "channel-memories-changed":
+    case "channel-routines-changed":
+      return isIdentifier(value.channelId);
     case "sidebar-layout-changed":
       return isSidebarLayoutSnapshot(value.layout);
     case "conversation":

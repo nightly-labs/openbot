@@ -43,6 +43,7 @@ import { isRecord } from "./protocol";
 
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
 interface StoredMessage {
+  channelId?: string;
   id: string;
   sender:
     | { kind: "user" }
@@ -85,6 +86,7 @@ interface StoredReaction {
 }
 
 interface EnqueueInput {
+  channelId?: string;
   sender: StoredMessage["sender"];
   recipientAgentIds: string[];
   text: string;
@@ -191,6 +193,12 @@ export class MailboxStore {
     return this.#deliveryGate.prepare(agentIds);
   }
 
+  deliveryForKey(key: string): DeliveryContext | null {
+    const messageId = this.#state.idempotency[key];
+    const delivery = this.#state.deliveries.find((item) => item.messageId === messageId);
+    return delivery ? this.#context(delivery) : null;
+  }
+
   async enqueue(input: EnqueueInput): Promise<QueuedMessageReceipt> {
     if (input.idempotencyKey) {
       const existingMessageId = this.#state.idempotency[input.idempotencyKey];
@@ -245,6 +253,7 @@ export class MailboxStore {
     }
     const committedByDraftId = new Map(drafts.map((draft, index) => [draft.id, attachments[index]] as const));
     const message: StoredMessage = {
+      channelId: input.channelId,
       id: messageId,
       sender: input.sender,
       text: rewriteAttachmentReferences(text, (reference) => {
@@ -291,14 +300,98 @@ export class MailboxStore {
     return this.#receipt(messageId);
   }
 
+  /**
+   * Commits the uploads of one channel request before any member holds it. A channel dispatches
+   * when a member is free, which can be after a restart, and a restart clears every draft and its
+   * files. The files therefore become a channel-owned message here, with no delivery: the request
+   * keeps durable references, every later dispatch re-sends the stored copies, and the files leave
+   * with the channel through `deleteChannelData`.
+   */
+  async commitChannelAttachments(input: {
+    channelId: string;
+    messageId: string;
+    text: string;
+    draftIds: string[];
+  }): Promise<{ text: string; attachments: AttachmentSummary[] }> {
+    const ids = new Set(input.draftIds);
+    if (ids.size !== input.draftIds.length) throw new Error("Duplicate attachment drafts.");
+    const drafts = input.draftIds.map((id) => {
+      const draft = this.#state.drafts.find((candidate) => candidate.id === id);
+      if (!draft) throw new Error(`Attachment draft no longer exists: ${id}`);
+      return draft;
+    });
+    if (drafts.length > MAX_ATTACHMENTS) throw new Error(`Attach at most ${MAX_ATTACHMENTS} files.`);
+    const sender: StoredMessage["sender"] = { kind: "user" };
+    const createdAt = new Date().toISOString();
+    const attachments = await this.#files.commitMessageTransfer(
+      input.messageId,
+      sender,
+      [],
+      input.messageId,
+      createdAt,
+      drafts.map((draft) => draft.path),
+    );
+    const committedByDraftId = new Map(drafts.map((draft, index) => [draft.id, attachments[index]] as const));
+    const message: StoredMessage = {
+      channelId: input.channelId,
+      id: input.messageId,
+      sender,
+      text: rewriteAttachmentReferences(input.text, (reference) => {
+        const attachment = committedByDraftId.get(reference.attachmentId);
+        return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
+      }),
+      attachments,
+      replyToMessageId: null,
+      createdAt,
+    };
+    this.#state.messages.push(message);
+    this.#state.drafts = this.#state.drafts.filter((draft) => !ids.has(draft.id));
+    try {
+      await this.#persist("channel.attachments-committed", `mailbox:channel-attachments:${input.messageId}`);
+    } catch (error) {
+      this.#state.messages = this.#state.messages.filter((candidate) => candidate !== message);
+      for (const draft of drafts)
+        if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) this.#state.drafts.push(draft);
+      await this.#files.remove(this.#files.transferRoot(input.messageId));
+      throw error;
+    }
+    await this.#files.removeAttachmentDirectories(drafts.map((draft) => draft.path));
+    return { text: message.text, attachments: attachments.map(toAttachmentSummary) };
+  }
+
   listQueue(agentId: string): QueueSnapshot {
+    const channelMessageIds = this.#channelMessageIds();
     const positions = this.#queuedPositions();
     return {
       agentId,
       deliveries: this.#state.deliveries
-        .filter((delivery) => delivery.recipientAgentId === agentId)
+        .filter((delivery) => delivery.recipientAgentId === agentId && !channelMessageIds.has(delivery.messageId))
         .map((delivery) => this.#publicDelivery(delivery, positions)),
     };
+  }
+
+  /**
+   * The queued channel work of this agent, in queue order. `listQueue` hides it, so a caller that
+   * reorders the queue the user sees has to put these ids back before the mailbox reads the order.
+   */
+  queuedChannelDeliveryIds(agentId: string): string[] {
+    const channelMessageIds = this.#channelMessageIds();
+    return this.#state.deliveries
+      .filter(
+        (delivery) =>
+          delivery.recipientAgentId === agentId &&
+          delivery.status === "queued" &&
+          channelMessageIds.has(delivery.messageId),
+      )
+      .sort(compareQueueOrder)
+      .map((delivery) => delivery.id);
+  }
+
+  /** Indexed once for a whole read: a queue holds one delivery for each message the agent has. */
+  #channelMessageIds(): Set<string> {
+    const ids = new Set<string>();
+    for (const message of this.#state.messages) if (message.channelId) ids.add(message.id);
+    return ids;
   }
 
   listRuntimeWork(agentIds: readonly string[], failedTurns: ReadonlyMap<string, string>): AgentRuntimeWorkItem[] {
@@ -353,6 +446,7 @@ export class MailboxStore {
       deliveriesByMessage.set(delivery.messageId, deliveries);
     }
     for (const message of this.#state.messages) {
+      if (message.channelId) continue;
       const deliveries = deliveriesByMessage.get(message.id) ?? [];
       if (message.sender.kind === "agent" && message.sender.agentId === agentId) {
         messages.push({
@@ -538,6 +632,13 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
+  queuedDeliveryIds(agentId: string): string[] {
+    return this.#state.deliveries
+      .filter((delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued")
+      .sort(compareQueueOrder)
+      .map((delivery) => delivery.id);
+  }
+
   getDelivery(deliveryId: string): DeliveryContext | null {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     return delivery ? this.#context(delivery) : null;
@@ -567,17 +668,27 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
-  async deleteAgentData(agentId: string): Promise<void> {
+  /**
+   * Removes the mailbox of one agent. What the agent shared in a channel stays: the message a
+   * channel shows carries the uploaded files of that message, and a file the agent generated
+   * inside a channel thread is part of the shared transcript as well. Both are owned by the
+   * channel and leave with it, through `deleteChannelData`. `channelThreadIds` names the threads
+   * the channels hold, because a generated file records the thread it was made in.
+   */
+  async deleteAgentData(agentId: string, channelThreadIds: readonly string[] = []): Promise<void> {
     const previous = structuredClone(this.#state);
     const removedMessageIds = new Set<string>();
+    const channelThreads = new Set(channelThreadIds);
     const removedGenerated = this.#state.generatedAttachments.filter(
-      (attachment) => attachment.ownerAgentId === agentId,
+      (attachment) =>
+        attachment.ownerAgentId === agentId &&
+        !(attachment.ownerThreadId && channelThreads.has(attachment.ownerThreadId)),
     );
     const removedTransferRoots = new Set<string>();
     this.#state.deliveries = this.#state.deliveries.filter((delivery) => delivery.recipientAgentId !== agentId);
     const remainingMessageIds = new Set(this.#state.deliveries.map((delivery) => delivery.messageId));
     this.#state.messages = this.#state.messages.filter((message) => {
-      const keep = remainingMessageIds.has(message.id);
+      const keep = remainingMessageIds.has(message.id) || message.channelId !== undefined;
       if (!keep) removedMessageIds.add(message.id);
       if (!keep) {
         for (const attachment of message.attachments) {
@@ -596,7 +707,7 @@ export class MailboxStore {
       Object.entries(this.#state.idempotency).filter(([, messageId]) => !removedMessageIds.has(messageId)),
     );
     this.#state.generatedAttachments = this.#state.generatedAttachments.filter(
-      (attachment) => attachment.ownerAgentId !== agentId,
+      (attachment) => !removedGenerated.includes(attachment),
     );
     try {
       await this.#persist(
@@ -608,6 +719,55 @@ export class MailboxStore {
             .map((attachment) => this.#files.generatedRootForPath(attachment.path))
             .filter((path): path is string => path !== null),
         ],
+        true,
+      );
+    } catch (error) {
+      this.#state = previous;
+      throw error;
+    }
+    await this.#drainFileDeletionOutbox();
+  }
+
+  /** Removes messages, deliveries, reactions and attachments that belong to a channel. */
+  async deleteChannelData(channelId: string, threadIds: readonly string[] = []): Promise<void> {
+    const previous = structuredClone(this.#state);
+    const removedMessageIds = new Set(
+      this.#state.messages.filter((message) => message.channelId === channelId).map((message) => message.id),
+    );
+    const removedThreadIds = new Set(threadIds);
+    const removedTransferRoots = new Set<string>();
+    for (const message of this.#state.messages) {
+      if (!removedMessageIds.has(message.id)) continue;
+      removedTransferRoots.add(this.#files.transferRoot(message.id));
+      for (const attachment of message.attachments) {
+        const transferRoot = this.#files.transferRootForPath(attachment.path);
+        if (transferRoot) removedTransferRoots.add(transferRoot);
+      }
+    }
+    const removedGenerated = this.#state.generatedAttachments.filter(
+      (attachment) =>
+        attachment.ownerThreadId !== undefined &&
+        attachment.ownerThreadId !== null &&
+        removedThreadIds.has(attachment.ownerThreadId),
+    );
+    this.#state.messages = this.#state.messages.filter((message) => message.channelId !== channelId);
+    this.#state.deliveries = this.#state.deliveries.filter((delivery) => !removedMessageIds.has(delivery.messageId));
+    this.#state.reactions = this.#state.reactions.filter((reaction) => !removedMessageIds.has(reaction.messageId));
+    this.#state.idempotency = Object.fromEntries(
+      Object.entries(this.#state.idempotency).filter(([, messageId]) => !removedMessageIds.has(messageId)),
+    );
+    this.#state.generatedAttachments = this.#state.generatedAttachments.filter(
+      (attachment) => !removedGenerated.includes(attachment),
+    );
+    for (const attachment of removedGenerated) {
+      const generatedRoot = this.#files.generatedRootForPath(attachment.path);
+      if (generatedRoot) removedTransferRoots.add(generatedRoot);
+    }
+    try {
+      await this.#persist(
+        "mailbox.channel-data-deleted",
+        `mailbox:channel-delete:${randomUUID()}`,
+        [...removedTransferRoots],
         true,
       );
     } catch (error) {
@@ -816,6 +976,21 @@ export class MailboxStore {
       turnId: null,
       error: null,
     });
+  }
+
+  /**
+   * Both guards that ask this - agent deletion and the provider switch - have to see a channel
+   * delivery as well as a normal one, so neither can use {@link listQueue}, which hides channel
+   * messages. `queued` counts: one agent runs at most one work turn across all chats, so a normal
+   * request can wait behind another agent's channel work for as long as that work runs, and
+   * deletion would take its message and files away while it waited.
+   */
+  hasUnfinishedDelivery(agentId: string): boolean {
+    return this.#state.deliveries.some(
+      (delivery) =>
+        delivery.recipientAgentId === agentId &&
+        (delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running"),
+    );
   }
 
   unresolvedDeliveries(): DeliveryContext[] {
@@ -1198,6 +1373,7 @@ function isStoredDraft(value: unknown): value is StoredDraft {
 function isStoredMessage(value: unknown): value is StoredMessage {
   return (
     isRecord(value) &&
+    (value.channelId === undefined || isString(value.channelId)) &&
     isString(value.id) &&
     isRecord(value.sender) &&
     (value.sender.kind === "user" ||

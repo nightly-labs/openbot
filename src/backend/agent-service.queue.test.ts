@@ -1012,6 +1012,80 @@ describe.sequential("AgentService: queue", () => {
     expect(message?.imageGeneration?.error).toBe("Image generation was interrupted.");
   });
 
+  it("reorders the queue the user reads while channel work waits in it", async () => {
+    let failInstall: ((error: Error) => void) | undefined;
+    const gate = new Promise<string>((_resolve, reject) => {
+      failInstall = reject;
+    });
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => new FakeAgentClient(provider, "", false),
+    );
+    await service.initialize();
+    await store.getOrCreate("chief");
+    // The CLI is being replaced, so every delivery that arrives now waits in the mailbox.
+    let installing = false;
+    const update = service.updateProviderCli("codex", () => {
+      installing = true;
+      return gate;
+    });
+    await waitFor(() => installing);
+
+    const actor = { id: "human", name: "Alex" };
+    await service.channels.command(
+      {
+        type: "save",
+        channelId: "channel-1",
+        operationId: "create",
+        draft: {
+          name: "Project",
+          title: "",
+          instructions: "Shared work",
+          members: [{ agentId: "chief" }],
+          leadAgentId: "chief",
+        },
+      },
+      actor,
+    );
+    await service.channels.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: "send",
+        text: "Work in the channel.",
+        recipientAgentId: "chief",
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    await waitFor(() => service?.channels.store.assignments("channel-1").some((item) => item.deliveryId));
+    await service.sendMessage({ agentId: "chief", text: "Read the report" });
+    await service.sendMessage({ agentId: "chief", text: "Send the summary" });
+    await waitFor(() => service?.listQueue("chief").deliveries.length === 2);
+
+    // The queue the user reads holds the two normal messages alone, so the order it sends can name
+    // no more than those two, while the mailbox still holds the channel delivery in the same queue.
+    const queued = service.listQueue("chief").deliveries.map((delivery) => delivery.id);
+    await service.reorderQueue({ agentId: "chief", deliveryIds: [queued[1] ?? "", queued[0] ?? ""] });
+
+    // The queue reads in position order, which is what the reorder writes.
+    const positions = service
+      .listQueue("chief")
+      .deliveries.toSorted((first, second) => (first.position ?? 0) - (second.position ?? 0));
+    expect(positions.map((delivery) => delivery.id)).toEqual([queued[1], queued[0]]);
+    // Channel work keeps the head of the queue: it reserved the agent before these messages.
+    expect(mailbox.queuedDeliveryIds("chief")[0]).toBe(service.channels.store.assignments("channel-1")[0]?.deliveryId);
+
+    failInstall?.(new Error("Runtime download failed."));
+    await expect(update).rejects.toThrow(/Runtime download failed/u);
+  });
+
   it("waits for active queue drains before shutdown completes", async () => {
     process.env.OPENBOT_FAKE_TURN_START_RESPONSE_DELAY = "100";
     const { store, mailbox } = stores(root);

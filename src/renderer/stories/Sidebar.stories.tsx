@@ -1,4 +1,4 @@
-import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import type { ChannelSummary, SidebarLayoutAction, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
 import { createSignal, untrack } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -84,6 +84,31 @@ const stressLayout: SidebarLayoutSnapshot = {
   ),
   agentOrder: stressAgents.map((agent) => agent.id),
 };
+
+/* One channel for each shape the member cluster has to draw: a single face, a pair, the triangle,
+ * the full quad, and the count that takes the last cell when the members outnumber it. */
+const channelSizes = [
+  { name: "Solo", size: 1 },
+  { name: "Pair", size: 2 },
+  { name: "Trio", size: 3 },
+  { name: "Quad", size: 4 },
+  { name: "All hands", size: 6 },
+];
+const storyChannels: ChannelSummary[] = channelSizes.map(({ name, size }, index) => ({
+  id: `channel-${size}`,
+  name,
+  title: "",
+  instructions: "",
+  members: stressAgents.slice(index, index + size).map((agent) => ({ agentId: agent.id })),
+  leadAgentId: null,
+  archived: false,
+  revision: 1,
+  createdAt: "2026-01-01T09:00:00.000Z",
+  unreadCount: size === 2 ? 4 : 0,
+  activeTasks: size === 6 ? 1 : 0,
+  lastMessage:
+    size === 1 ? null : { at: "2026-01-01T10:00:00.000Z", text: `${size} members here`, authorName: "Agent 1" },
+}));
 
 const args: Parameters<typeof Sidebar>[0] = {
   serverName: "Local",
@@ -532,15 +557,13 @@ export const DragStress: Story = {
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelectorAll("[data-pinned-key]")).toHaveLength(6);
     await expect(canvasElement.querySelectorAll("[data-section-id]").length).toBeGreaterThanOrEqual(7);
-    await expect(canvasElement.querySelectorAll("[data-agent-id]").length).toBeGreaterThanOrEqual(24);
-    const source = canvasElement.querySelector<HTMLElement>("[data-agent-id]");
+    await expect(canvasElement.querySelectorAll("[data-chat-id]").length).toBeGreaterThanOrEqual(24);
+    const source = canvasElement.querySelector<HTMLElement>("[data-chat-id]");
     const list = within(canvasElement).getByRole("navigation", { name: "Chat list" });
     const DataTransferConstructor = canvasElement.ownerDocument.defaultView?.DataTransfer;
     if (!source || !list || !DataTransferConstructor) throw new Error("Agent drag stress fixture is unavailable.");
     const section = source.closest<HTMLElement>("[data-section-id]");
-    const target = section?.querySelector<HTMLElement>(
-      `[data-agent-id]:not([data-agent-id="${source.dataset.agentId}"])`,
-    );
+    const target = section?.querySelector<HTMLElement>(`[data-chat-id]:not([data-chat-id="${source.dataset.chatId}"])`);
     if (!target) throw new Error("Agent drag stress target is unavailable.");
     const bounds = source.getBoundingClientRect();
     const targetBounds = target.getBoundingClientRect();
@@ -557,8 +580,8 @@ export const DragStress: Story = {
       dataTransfer,
     });
 
-    await expect(list).toHaveAttribute("data-sidebar-dragging", "agent");
-    for (const row of canvasElement.querySelectorAll<HTMLElement>("[data-agent-id]")) {
+    await expect(list).toHaveAttribute("data-sidebar-dragging", "chat");
+    for (const row of canvasElement.querySelectorAll<HTMLElement>("[data-chat-id]")) {
       await expect(getComputedStyle(row).transitionDuration).toBe("0s");
     }
 
@@ -628,7 +651,7 @@ export const EmptyPinDropTarget: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
   play: async ({ canvas, canvasElement }) => {
     const chief = canvas.getByRole("button", { name: /Chief/ });
-    const source = chief.closest<HTMLElement>("[data-agent-id]");
+    const source = chief.closest<HTMLElement>("[data-chat-id]");
     const DataTransferConstructor = canvasElement.ownerDocument.defaultView?.DataTransfer;
     if (!source || !DataTransferConstructor) throw new Error("Agent drag source is unavailable.");
     const bounds = source.getBoundingClientRect();
@@ -751,9 +774,9 @@ export const DragOffsets: Story = {
 
     // An agent only shifts for a source in its own section, so both rows come from one section.
     const sections = dragRows(canvasElement, "[data-section-id]", "section");
-    const populated = sections.find((section) => section.querySelectorAll("[data-agent-id]").length >= 2);
+    const populated = sections.find((section) => section.querySelectorAll("[data-chat-id]").length >= 2);
     if (!populated) throw new Error("No section holds two agents.");
-    const agents = dragRows(populated, "[data-agent-id]", "agent");
+    const agents = dragRows(populated, "[data-chat-id]", "chat");
     await expectDragShift(canvasElement, agents[0], agents[1], agents[1]);
 
     const handle = sections[0].querySelector<HTMLElement>(".sidebar-section-drag-handle");
@@ -825,6 +848,58 @@ export const FirstAgentNarrow: Story = {
 export const FirstAgentCompact: Story = {
   args: { ...FirstAgent.args, compact: true },
   decorators: [(Story) => <div style={{ width: "80px", height: "100vh" }}>{Story()}</div>],
+};
+
+export const Channels: Story = {
+  args: {
+    agents: stressAgents,
+    channels: storyChannels,
+    activeChannelId: "channel-3",
+    onSelectChannel: fn(),
+    onEditChannel: fn(),
+    onRestoreChannel: fn(async () => undefined),
+    onDeleteChannel: fn(async () => undefined),
+    pinnedItems: [
+      { kind: "channel", id: "channel-4" },
+      { kind: "agent", id: "chief" },
+    ],
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+export const ChannelsCompact: Story = {
+  args: { ...Channels.args, compact: true },
+};
+
+export const ChannelContextMenu: Story = {
+  args: { ...Channels.args, pinnedItems: [] },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+  play: async ({ canvas, canvasElement }) => {
+    const channel = canvas.getByRole("button", { name: "Trio. 3 members here" });
+    const bounds = channel.getBoundingClientRect();
+    fireEvent.contextMenu(channel, {
+      clientX: bounds.left + bounds.width / 2,
+      clientY: bounds.top + bounds.height / 2,
+    });
+    const menu = await within(canvasElement.ownerDocument.body).findByRole("menu", { name: "Channel actions" });
+    await expect(within(menu).getByRole("menuitem", { name: "Pin" })).toBeInTheDocument();
+    await expect(within(menu).getByRole("menuitem", { name: "Move to" })).toBeInTheDocument();
+    await expect(within(menu).getByRole("menuitem", { name: "Edit channel" })).toBeInTheDocument();
+    await expect(within(menu).getByRole("menuitem", { name: "Delete channel" })).toBeInTheDocument();
+    await expect(within(menu).queryByRole("menuitem", { name: /Duplicate/ })).not.toBeInTheDocument();
+  },
+};
+
+export const ChannelDeleteConfirmation: Story = {
+  args: { ...Channels.args, pinnedItems: [] },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const channel = canvas.getByRole("button", { name: "Trio. 3 members here" });
+    fireEvent.contextMenu(channel);
+    const menu = await within(canvasElement.ownerDocument.body).findByRole("menu", { name: "Channel actions" });
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Delete channel" }));
+    await within(canvasElement.ownerDocument.body).findByRole("alertdialog", { name: "Delete Trio?" });
+  },
 };
 
 export const DeleteConfirmationKeyboard: Story = {

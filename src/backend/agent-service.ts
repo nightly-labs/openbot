@@ -15,6 +15,9 @@ import type {
   AgentSummary,
   AttachmentDataInput,
   AvatarImageInput,
+  ChannelMemory,
+  ChannelRoutine,
+  ChannelRoutineRun,
   ConversationPage,
   ConversationPageAnchor,
   ConversationReadState,
@@ -23,13 +26,18 @@ import type {
   ConversationWithReadState,
   CreateAgentInput,
   CreateAgentMemoryInput,
+  CreateChannelMemoryInput,
+  CreateChannelRoutineInput,
   CreateRoutineInput,
   DeleteAgentMemoryInput,
+  DeleteChannelMemoryInput,
+  DeleteChannelRoutineInput,
   DeleteRoutineInput,
   DraftAttachment,
   DuplicateAgentResult,
   GenerateAgentProfileInput,
   HostAnalyticsInput,
+  ListChannelRoutineRunsInput,
   ListRoutineRunsInput,
   QueuedMessageReceipt,
   QueueSnapshot,
@@ -46,9 +54,12 @@ import type {
   SidebarLayoutSnapshot,
   SidebarSection,
   SteerQueuedMessageInput,
+  TestChannelRoutineInput,
   TestRoutineInput,
   UpdateAgentInput,
   UpdateAgentMemoryInput,
+  UpdateChannelMemoryInput,
+  UpdateChannelRoutineInput,
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
@@ -76,7 +87,7 @@ import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-sit
 import { isHostedSiteMutationTool } from "./agent/hosted-site-events";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { MailboxSync } from "./agent/mailbox-sync";
-import { generateProfile } from "./agent/profile-generation";
+import { generateProfile, generateTextWithoutTools } from "./agent/profile-generation";
 import { ProfileSave } from "./agent/profile-save";
 import { createAgentToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
 import { type AgentClientFactory, ProviderRuntime } from "./agent/provider-runtime";
@@ -84,17 +95,20 @@ import { type RoutineMutationOptions, RoutineScheduler } from "./agent/routine-s
 import { type OpenBotToolResponse, openBotToolResult } from "./agent/routine-tools";
 import { fitRuntimeSnapshot } from "./agent/runtime-snapshot";
 import { type AgentSidebar, handleSidebarTool } from "./agent/sidebar-tools";
-import { isDynamicToolCall, providerForAgent, providerLabel } from "./agent/thread-items";
+import { isDynamicToolCall, isRequestTimeout, providerForAgent, providerLabel } from "./agent/thread-items";
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import type { AgentClient, AgentProvider } from "./agent-client";
 import type { AgentStore } from "./agent-store";
 import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
+import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
+import { ChannelService } from "./channel-service";
 import type { BundledProviderExecutables } from "./cli";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "./conversation-read-store";
 import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
+import { RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePathFromInput } from "./workspace-paths";
 
@@ -124,6 +138,7 @@ export interface ResolvedSharedFile {
 }
 
 export class AgentService extends EventEmitter<AgentServiceEvents> {
+  readonly channels: ChannelService;
   readonly #profileSave: ProfileSave;
   readonly #profileClients = new Set<AgentClient>();
   readonly #deletingAgents = new Set<string>();
@@ -133,6 +148,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #conversationReads: ConversationReadStore;
   readonly #memories: AgentMemories;
   readonly #routines: RoutineScheduler;
+  readonly #routineTimer: RoutineTimer;
+  readonly #channelRoutines: ChannelRoutineScheduler;
   readonly #providers: ProviderRuntime;
   readonly #prepareAgentWorkspace: (agent: AgentSummary) => Promise<void>;
   readonly #hostedSites: HostedSiteCoordinator;
@@ -172,8 +189,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       create: (input, configure) =>
         this.createAgent({ ...input.draft, initialMessage: input.initialMessage ?? "" }, configure, input.operationId),
       changed: (agent) => {
-        const session = this.#store.activeProviderSession(agent.id);
-        if (session) this.#conversation.unloadThread(session.externalSessionId);
+        this.#conversation.unloadAgentThreads(agent.id);
         this.#emit({ type: "agents-changed", agents: this.listAgents() });
         this.#drain.scheduleDrain(agent.id);
       },
@@ -197,7 +213,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
     });
+    // One timer for both routine owners. The sources are read lazily because `channels` and its
+    // scheduler are built further down, and because an owner's earliest routine changes constantly.
+    this.#routineTimer = new RoutineTimer(
+      () => [this.#routines, this.#channelRoutines],
+      () => this.#initialized && !this.#stopping,
+      (code, error) => this.#emitError(code, error),
+    );
     this.#routines = new RoutineScheduler({
+      timer: this.#routineTimer,
       store,
       mailbox,
       conversation: this.#conversation,
@@ -230,6 +254,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         onProvidersReady: async () => {
           await this.#boot.reconcileUnresolvedDeliveries();
+          await this.channels.recover();
+          // `recover` settles interrupted assignments, so a run's tasks only reach their real state
+          // after it runs. Reconcile again here, not only in `initialize`.
+          this.#channelRoutines.reconcileAll();
           void this.#boot.backfillProviderHistory();
           for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
         },
@@ -246,10 +274,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#store.list().some(
             (agent) =>
               providerForAgent(agent) === provider &&
+              // A channel turn runs on a thread of its own, so the agent's own conversation holds no
+              // turn id while the CLI works. `workingSnapshot` reads the execution threads as well.
+              //
               // A compaction is a provider turn as well, and it holds no active turn id: its
               // `turn/started` belongs to the compaction, not to the agent, so `claimTurn` takes
               // it away. Only its own guard reports the turn the CLI is running.
-              (this.#conversation.snapshot(agent.id)?.activeTurnId != null || !this.#compaction.mayDrain(agent.id)),
+              (this.#conversation.workingSnapshot(agent.id) != null || !this.#compaction.mayDrain(agent.id)),
           ),
         onProviderResumed: (provider) => {
           for (const agent of this.#store.list()) {
@@ -329,7 +360,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       providers: this.#providers,
       conversation: this.#conversation,
       mailboxSync: this.#mailboxSync,
-      hooks: { emitError: (code, error, agentId) => this.#emitError(code, error, agentId) },
+      hooks: {
+        emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        executionThreads: () => this.channels.store.executionThreads(),
+        deliveryThreadId: (deliveryId) => {
+          const assignment = this.channels.store.assignmentForDelivery(deliveryId);
+          return assignment ? this.channels.store.context(assignment.channelId, assignment.agentId).threadId : null;
+        },
+      },
     });
     this.#attachments = new AttachmentGateway({
       conversation: this.#conversation,
@@ -357,7 +395,98 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
       },
     });
+    this.channels = new ChannelService(store.database, mailbox, {
+      agents: () => this.listAgents(),
+      generate: async (lead, prompt) => {
+        await this.#providers.ensureProvider(lead.provider);
+        const model = this.#providers
+          .listModels()
+          .find((item) => item.provider === lead.provider && item.id === lead.model);
+        if (!model) throw new Error("The channel lead model is unavailable.");
+        const client = this.#providers.createProfileClient(lead.provider);
+        this.#profileClients.add(client);
+        try {
+          return await generateTextWithoutTools(
+            client,
+            { ...model, defaultReasoningEffort: lead.reasoningEffort },
+            prompt,
+          );
+        } finally {
+          this.#profileClients.delete(client);
+        }
+      },
+      schedule: (agentId) => this.#drain.scheduleDrain(agentId),
+      awaitDrain: (agentId) => this.#drain.taskFor(agentId),
+      contextCharacters: (agentId, threadId) => {
+        const agent = this.#store.list().find((item) => item.id === agentId);
+        const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
+        return session ? this.#compaction.contextInputCharacters(session.externalSessionId) : 120_000;
+      },
+      forgetThread: async (threadId) => {
+        const sessions = this.#store.database.listProviderSessions(threadId);
+        for (const session of sessions) await this.#threads.deleteProviderSessionFiles(session.externalSessionId);
+        for (const session of sessions) {
+          this.#conversation.unbindThread(session.externalSessionId);
+          this.#conversation.unloadThread(session.externalSessionId);
+          this.#compaction.forgetThread(session.externalSessionId);
+        }
+        this.#conversation.forgetExecutionThread(threadId);
+      },
+      normalBusy: () =>
+        this.#mailbox
+          .unresolvedDeliveries()
+          .some((item) => !this.channels.store.assignmentForDelivery(item.delivery.id)) ||
+        [...this.#conversation.activeSnapshots()].some(
+          ([, snapshot]) => snapshot.activeTurnId && !this.#conversation.isExecutionThread(snapshot.threadId),
+        ),
+      busy: (agentId) =>
+        Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)),
+      steer: async (agentId, threadId, turnId, messageId, text) => {
+        const agent = this.#store.list().find((item) => item.id === agentId);
+        const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
+        const client = agent ? this.#providers.clientForAgent(agent) : null;
+        if (!session || !client) return "rejected";
+        try {
+          await client.request(
+            "turn/steer",
+            {
+              threadId: session.externalSessionId,
+              expectedTurnId: turnId,
+              clientUserMessageId: messageId,
+              input: [{ type: "text", text }],
+            },
+            decodeRecordResponse,
+          );
+          return "accepted";
+        } catch (error) {
+          return isRequestTimeout(error, "turn/steer") ? "uncertain" : "rejected";
+        }
+      },
+      interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId),
+      // Every channel state change ends in `publish`, so this is the complete trigger surface for
+      // reconciling a channel routine run. It does not depend on `turn-completed`, which never
+      // reaches the agent event forwarder for a channel thread.
+      changed: (channelId, revision) => {
+        this.#channelRoutines.reconcile(channelId);
+        this.#routineTimer.arm();
+        this.#emit({ type: "channels-changed", channelId, revision });
+      },
+      memoriesChanged: (channelId) => this.#emit({ type: "channel-memories-changed", channelId }),
+      error: (error) => this.#emitError("channel_coordination_failed", error),
+    });
+    this.#channelRoutines = new ChannelRoutineScheduler({
+      channels: this.channels,
+      hooks: {
+        changed: (channelId) => {
+          this.#emit({ type: "channel-routines-changed", channelId });
+          this.#routineTimer.arm();
+        },
+        emitError: (code, error) => this.#emitError(code, error),
+        excludedChannels: () => new Set(),
+      },
+    });
     this.#drain = new DrainScheduler({
+      channels: this.channels,
       store,
       mailbox,
       mailboxSync: this.#mailboxSync,
@@ -422,6 +551,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   listAgents(): AgentSummary[] {
     return this.#duplication.visibleAgents(this.#store.list());
+  }
+
+  /**
+   * Every id the sidebar layout may place: agents and channels alike, because the user files and
+   * orders both in the same sections. An id missing from this set is pruned as gone the next time
+   * the layout is reconciled, which would silently drop where the user put a channel.
+   */
+  sidebarChatIds(): Set<string> {
+    const ids = new Set(this.listAgents().map((agent) => agent.id));
+    for (const channelId of this.channels.store.ids()) ids.add(channelId);
+    return ids;
   }
 
   getRuntimeSnapshot(): AgentRuntimeSnapshot {
@@ -522,6 +662,50 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   listRoutineRuns(input: ListRoutineRunsInput): RoutineRun[] {
     return this.#routines.listRuns(input);
+  }
+
+  listChannelMemories(channelId: string): ChannelMemory[] {
+    return this.channels.listMemories(channelId);
+  }
+
+  createChannelMemory(input: CreateChannelMemoryInput): ChannelMemory {
+    return this.channels.createMemory(input);
+  }
+
+  updateChannelMemory(input: UpdateChannelMemoryInput): ChannelMemory {
+    return this.channels.updateMemory(input);
+  }
+
+  deleteChannelMemory(input: DeleteChannelMemoryInput): void {
+    this.channels.deleteMemory(input);
+  }
+
+  clearChannelMemories(channelId: string): void {
+    this.channels.clearMemories(channelId);
+  }
+
+  listChannelRoutines(channelId: string): ChannelRoutine[] {
+    return this.#channelRoutines.list(channelId);
+  }
+
+  createChannelRoutine(input: CreateChannelRoutineInput): ChannelRoutine {
+    return this.#channelRoutines.create(input);
+  }
+
+  updateChannelRoutine(input: UpdateChannelRoutineInput): ChannelRoutine {
+    return this.#channelRoutines.update(input);
+  }
+
+  deleteChannelRoutine(input: DeleteChannelRoutineInput): void {
+    this.#channelRoutines.delete(input);
+  }
+
+  testChannelRoutine(input: TestChannelRoutineInput): Promise<ChannelRoutineRun> {
+    return this.#channelRoutines.test(input);
+  }
+
+  listChannelRoutineRuns(input: ListChannelRoutineRunsInput): ChannelRoutineRun[] {
+    return this.#channelRoutines.listRuns(input);
   }
 
   listModels(): AgentModelOption[] {
@@ -661,11 +845,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (!input.model || !input.provider) {
         throw new Error("Changing provider requires an atomic provider and model selection.");
       }
-      const hasPendingWork = this.#mailbox
-        .listQueue(input.agentId)
-        .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
+      const hasPendingWork = this.#mailbox.hasUnfinishedDelivery(input.agentId);
       const activeTurn =
-        this.#conversation.snapshot(input.agentId)?.activeTurnId ??
+        this.#conversation.workingSnapshot(input.agentId)?.activeTurnId ??
         (previous.threadId
           ? this.#store.database.readConversation(input.agentId, previous.threadId).activeTurnId
           : null);
@@ -695,10 +877,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         agent.reasoningEffort,
       );
     }
-    if (profileChanged && activeSession) {
-      // Re-resume before the next turn so App Server receives the updated standing instructions.
-      this.#conversation.unloadThread(activeSession.externalSessionId);
-    }
+    // Re-resume before the next turn so App Server receives the updated standing instructions. The
+    // agent chat is not the only session that holds them: a channel turn runs on a session of its
+    // own, and it is written from the same profile.
+    if (profileChanged) this.#conversation.unloadAgentThreads(agent.id);
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
     return agent;
   }
@@ -755,10 +937,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   async deleteAgent(agentId: string): Promise<void> {
     if (this.#deletingAgents.has(agentId)) throw new Error("Agent deletion is already in progress.");
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-    const hasPendingWork = this.#mailbox
-      .listQueue(agentId)
-      .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
-    if (hasPendingWork || this.#conversation.snapshot(agentId)?.activeTurnId) {
+    const hasPendingWork = this.#mailbox.hasUnfinishedDelivery(agentId);
+    if (hasPendingWork || this.#conversation.workingSnapshot(agentId)?.activeTurnId) {
       throw new Error("Stop the agent and cancel its queued messages before deleting it.");
     }
 
@@ -779,6 +959,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     }
   }
 
+  deleteChannel(channelId: string): Promise<void> {
+    return this.channels.deleteChannel(channelId);
+  }
+
   async #deleteAgentData(agent: Pick<AgentSummary, "id" | "threadId">): Promise<void> {
     const providerSessions = agent.threadId ? this.#store.database.listProviderSessions(agent.threadId) : [];
     let stage = "provider-files";
@@ -786,7 +970,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // Keep session records available if private file removal needs a retry.
       for (const session of providerSessions) await this.#threads.deleteProviderSessionFiles(session.externalSessionId);
       stage = "mailbox";
-      await this.#mailbox.deleteAgentData(agent.id);
+      await this.#mailbox.deleteAgentData(agent.id, this.channels.store.allContextThreads());
       stage = "agent-files-and-record";
       await this.#store.deleteAgent(agent.id);
     } catch {
@@ -812,15 +996,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#stopping = false;
     await this.#store.initialize();
     await this.#mailbox.initialize();
+    this.channels.restoreDeliveryLinks();
     await this.#threads.reconcileProviderSessionFiles();
     this.#boot.recoverPersistedTurns();
     this.#hostedSites.restore();
     this.#routines.skipMissed(new Date());
+    this.#channelRoutines.skipMissed(new Date());
     this.#initialized = true;
     await this.#providers.start();
     for (const agent of this.#store.list()) this.#mailboxSync.emitQueue(agent.id);
     await this.#routines.resumePendingRuns();
-    this.#routines.arm();
+    await this.#channelRoutines.resumePendingRuns();
+    this.#channelRoutines.reconcileAll();
+    this.#routineTimer.arm();
   }
 
   setPreferredProvider(provider: AgentProvider): Promise<void> {
@@ -849,8 +1037,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async stop(): Promise<void> {
     this.#stopping = true;
+    const channelStop = this.channels.stop();
     this.#initialized = false;
-    this.#routines.dispose();
+    this.#routineTimer.dispose();
     this.#hostedSites.dispose();
     this.#compaction.dispose();
     this.#deltas.dispose();
@@ -863,13 +1052,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#profileClients.clear();
     for (const [agentId, snapshot] of this.#conversation.activeSnapshots()) {
       if (!snapshot.activeTurnId) continue;
-      const session = this.#store.activeProviderSession(agentId);
+      const agent = this.#store.list().find((item) => item.id === agentId);
+      const session =
+        agent && snapshot.threadId
+          ? this.#store.database.activeProviderSession(snapshot.threadId, agent.provider)
+          : null;
       if (session) this.#images.interrupt(agentId, session.externalSessionId, snapshot.activeTurnId);
     }
     this.#turn.dispose();
     this.#drain.dispose();
     this.#browser.clearControls();
     await Promise.all(clients.map((client) => client.stop().catch(() => undefined)));
+    await channelStop;
     await Promise.allSettled(this.#drain.pendingTasks());
     await Promise.allSettled(this.#images.pendingPromises());
     this.#images.dispose();
@@ -973,11 +1167,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   async cancelQueuedMessage(agentId: string, deliveryId: string): Promise<void> {
+    if (this.channels.store.assignmentForDelivery(deliveryId))
+      throw new Error("Use the channel task controls for this assignment.");
     await this.#mailbox.cancel(agentId, deliveryId);
     this.#mailboxSync.emitQueue(agentId);
   }
 
   async updateQueuedMessage(input: UpdateQueuedMessageInput): Promise<void> {
+    if (this.channels.store.assignmentForDelivery(input.deliveryId))
+      throw new Error("Use the channel task controls for this assignment.");
     await this.#mailbox.updateQueuedMessage(
       input.agentId,
       input.deliveryId,
@@ -992,7 +1190,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   async reorderQueue(input: ReorderQueueInput): Promise<void> {
-    await this.#mailbox.reorderQueue(input.agentId, input.deliveryIds);
+    if (input.deliveryIds.some((id) => this.channels.store.assignmentForDelivery(id)))
+      throw new Error("Use the channel task controls for channel work.");
+    // The queue the user reads holds no channel work, so the order it sends names the normal
+    // messages alone, and the mailbox reads the whole queued order. Channel work stays at the head:
+    // it reserved the agent before these messages arrived.
+    const channelDeliveryIds = this.#mailbox.queuedChannelDeliveryIds(input.agentId);
+    await this.#mailbox.reorderQueue(input.agentId, [...channelDeliveryIds, ...input.deliveryIds]);
     this.#mailboxSync.emitQueue(input.agentId);
   }
 
@@ -1004,6 +1208,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!session || !snapshot.activeTurnId || snapshot.activeTurnId !== input.expectedTurnId) {
       throw new Error("The active turn changed before this message could be steered.");
     }
+    if (this.channels.store.assignmentForDelivery(input.deliveryId))
+      throw new Error("Use the channel task controls for this assignment.");
     const context = this.#mailbox.getDelivery(input.deliveryId);
     if (!context || context.delivery.recipientAgentId !== agent.id || context.delivery.status !== "queued") {
       throw new Error("Only queued messages can be steered.");
@@ -1081,10 +1287,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#conversation.emitConversation(current);
   }
 
-  async interrupt(agentId: string, turnId: string): Promise<void> {
+  async interrupt(agentId: string, turnId: string, executionThreadId?: string): Promise<void> {
     const agent = await this.#store.getOrCreate(agentId);
     const client = this.#providers.requireReadyClient(providerForAgent(agent));
-    const session = this.#store.activeProviderSession(agentId);
+    const snapshot = [...this.#conversation.activeSnapshots()].find(
+      ([id, snapshot]) => id === agentId && snapshot.activeTurnId === turnId,
+    )?.[1];
+    const targetThreadId = executionThreadId ?? snapshot?.threadId;
+    const session = targetThreadId
+      ? this.#store.database.activeProviderSession(targetThreadId, agent.provider)
+      : this.#store.activeProviderSession(agentId);
     if (!session) return;
     this.#images.interrupt(agentId, session.externalSessionId, turnId);
     await client.request("turn/interrupt", { threadId: session.externalSessionId, turnId }, decodeRecordResponse);
@@ -1097,7 +1309,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (!snapshot.threadId || !snapshot.activeTurnId) continue;
       const agent = this.#store.list().find((candidate) => candidate.id === agentId);
       const client = agent ? this.#providers.clientForAgent(agent) : null;
-      const session = agent ? this.#store.activeProviderSession(agent.id) : null;
+      const session = agent ? this.#store.database.activeProviderSession(snapshot.threadId, agent.provider) : null;
       if (!client || !session) continue;
       this.#images.interrupt(agentId, session.externalSessionId, snapshot.activeTurnId);
       requests.push(
@@ -1218,6 +1430,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const senderAgentId = this.#conversation.agentForThread(params.threadId);
     if (!senderAgentId) throw new Error("The sending OpenBot agent is unknown.");
 
+    const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
+    const channelId = this.channels.store.channelForThread(executionThreadId);
+    if (channelId && (params.tool.startsWith("channel_") || params.tool === "send_message")) {
+      if (params.tool === "send_message") throw new Error("Use channel_assign or channel_transfer for channel work.");
+      return openBotToolResult(
+        await this.channels.tool(channelId, senderAgentId, params.turnId, params.callId, params.tool, params.arguments),
+      );
+    }
+    if (params.tool.startsWith("channel_")) throw new Error("Channel tools require an active channel assignment.");
+
     if (params.tool === "list_sites") {
       return openBotToolResult({ sites: await this.#hostedSites.listSites(), limit: 10 });
     }
@@ -1247,7 +1469,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           name: agent.name,
           title: agent.title,
           description: agent.description,
-          status: this.#conversation.snapshot(agent.id)?.activeTurnId
+          status: this.#conversation.workingSnapshot(agent.id)?.activeTurnId
             ? "working"
             : queue.deliveries.some((delivery) => delivery.status === "queued")
               ? "queued"
@@ -1422,6 +1644,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #emit(event: AgentEvent): void {
+    if (this.channels?.event(event)) return;
     this.emit("event", event);
   }
 }

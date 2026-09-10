@@ -4,7 +4,7 @@
  */
 
 import type {
-  AgentDragSlot,
+  ChatDragSlot,
   DragSlot,
   PersonDragSlot,
   SectionDragSlot,
@@ -13,13 +13,13 @@ import type {
 
 /**
  * Everything `measureSidebarDragSlots` asks the list for. Each name is emitted by exactly one JSX
- * site: `sectionRegion` by the People and agent sections, `agentRow` by the agent row, `personRow`
+ * site: `sectionRegion` by the People and agent sections, `chatRow` by the agent and channel rows, `personRow`
  * by the people section, `pinnedTile` by the pinned group. Renaming one here without renaming the
  * emitter leaves an empty slot map behind: the drag starts, tracks nothing and drops nowhere, and
  * no test fails loudly on it.
  */
 export const SIDEBAR_DRAG_SELECTORS = {
-  agentRow: "[data-agent-id]",
+  chatRow: "[data-chat-id]",
   personRow: "[data-person-id]",
   pinnedEmptyDrop: ".sidebar-pinned-empty-drop",
   pinnedGroup: ".sidebar-pinned-group",
@@ -30,7 +30,7 @@ export const SIDEBAR_DRAG_SELECTORS = {
 
 /** One pass over the list: every slot cache plus the two rectangles the drop resolver guards on. */
 export interface SidebarDragMeasurement {
-  agents: Map<string, AgentDragSlot>;
+  chats: Map<string, ChatDragSlot>;
   geometry: SidebarDragGeometry;
   people: Map<string, PersonDragSlot>;
   pinned: DragSlot[];
@@ -39,10 +39,10 @@ export interface SidebarDragMeasurement {
 
 export function measureSidebarDragSlots(
   list: HTMLElement,
-  assignedSectionId: (agentId: string) => string,
+  assignedSectionId: (chatId: string) => string,
 ): SidebarDragMeasurement {
   const sections = new Map<string, SectionDragSlot>();
-  const agents = new Map<string, AgentDragSlot>();
+  const chats = new Map<string, ChatDragSlot>();
   const people = new Map<string, PersonDragSlot>();
   const pinned: DragSlot[] = [];
   const pinnedGroup = list.querySelector<HTMLElement>(SIDEBAR_DRAG_SELECTORS.pinnedGroup);
@@ -62,17 +62,17 @@ export function measureSidebarDragSlots(
       centerY: bounds.top + bounds.height / 2,
     });
   }
-  for (const row of list.querySelectorAll<HTMLElement>(SIDEBAR_DRAG_SELECTORS.agentRow)) {
-    const agentId = row.dataset.agentId;
-    if (!agentId) continue;
+  for (const row of list.querySelectorAll<HTMLElement>(SIDEBAR_DRAG_SELECTORS.chatRow)) {
+    const chatId = row.dataset.chatId;
+    if (!chatId) continue;
     const bounds = row.getBoundingClientRect();
-    agents.set(agentId, {
-      agentId,
+    chats.set(chatId, {
       bottom: bounds.bottom,
       centerY: bounds.top + bounds.height / 2,
+      chatId,
       element: row,
       height: bounds.height,
-      sectionId: assignedSectionId(agentId),
+      sectionId: assignedSectionId(chatId),
       top: bounds.top,
     });
   }
@@ -102,7 +102,7 @@ export function measureSidebarDragSlots(
       top: bounds.top,
     });
   }
-  return { agents, geometry, people, pinned, sections };
+  return { chats, geometry, people, pinned, sections };
 }
 
 /** Takes the drop highlight off every section and off the pinned group. */
@@ -117,7 +117,7 @@ export function clearSidebarDragDecorations(list: HTMLElement | undefined): void
   }
 }
 
-export function createSidebarAgentDragCard(source: HTMLElement): HTMLElement {
+export function createSidebarChatDragCard(source: HTMLElement): HTMLElement {
   const card = document.createElement("div");
   card.className = "agent-row sidebar-pinned-row sidebar-agent-drag-card";
 

@@ -9,14 +9,20 @@ interface ControlOptions {
   invalid?: boolean;
 }
 
-interface FieldContextValue {
+export interface FieldContextValue {
   controlId: string;
-  describedBy: string | undefined;
-  invalid: boolean;
-  required: boolean;
+  /* A field that only names its control leaves the rest unset. */
+  describedBy?: string | undefined;
+  invalid?: boolean;
+  required?: boolean;
 }
 
-const FieldContext = createContext<FieldContextValue | null>(null);
+/**
+ * Exported so a surface that draws its own field frame can still hand its control an id. `Input`,
+ * `Textarea` and `NativeSelect` read it, which is what lets a label point at a control it wraps
+ * rather than one it names.
+ */
+export const FieldContext = createContext<FieldContextValue | null>(null);
 
 interface TextControlOptions extends ControlOptions {
   value?: string;

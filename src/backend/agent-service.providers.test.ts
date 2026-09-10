@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readdir, realpath, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
@@ -26,6 +26,7 @@ import {
   waitFor,
 } from "./agent-service-test-harness";
 import type { DynamicToolCallParams } from "./protocol";
+import { SidebarLayoutStore } from "./sidebar-layout-store";
 
 let root: string;
 let logPath: string;
@@ -41,6 +42,189 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentService: providers", () => {
+  it("runs a channel turn in a separate session and returns to the unchanged normal conversation", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE");
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "This is my normal conversation." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const agent = service.listAgents().find((item) => item.id === "chief");
+    if (!agent?.threadId) throw new Error("Normal conversation did not start.");
+    const normalSession = store.activeProviderSession(agent.id)?.externalSessionId;
+    const before = await service.readConversation(agent.id);
+    const actor = { id: "human", name: "Alex" };
+    await service.channels.command(
+      {
+        type: "save",
+        channelId: "channel-1",
+        operationId: "create",
+        draft: {
+          name: "Project",
+          title: "",
+          instructions: "Shared work",
+          members: [{ agentId: agent.id }],
+          leadAgentId: agent.id,
+        },
+      },
+      actor,
+    );
+    await service.channels.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: "send",
+        text: "Work only in this channel.",
+        recipientAgentId: agent.id,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    await waitFor(() => service?.channels.store.tasks("channel-1")[0]?.state === "completed");
+    expect(
+      service.channels.store
+        .messages("channel-1")
+        .filter((item) => item.author.kind === "agent")
+        .map((item) => item.message.text),
+    ).toEqual(["CODEX_DONE"]);
+    expect((await service.readConversation(agent.id)).messages).toEqual(before.messages);
+    expect(store.activeProviderSession(agent.id)?.externalSessionId).toBe(normalSession);
+    expect(store.list().find((item) => item.id === agent.id)?.threadId).toBe(agent.threadId);
+    const execution = service.channels.store.context("channel-1", agent.id);
+    expect(store.database.activeProviderSession(execution.threadId, agent.provider)?.externalSessionId).not.toBe(
+      normalSession,
+    );
+    await service.sendMessage({ agentId: agent.id, text: "Continue in the normal conversation." });
+    await waitFor(() => service?.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"));
+    expect(store.activeProviderSession(agent.id)?.externalSessionId).toBe(normalSession);
+  });
+
+  it("resumes a channel session after the profile or the memories of the agent change", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE");
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    await store.getOrCreate("chief");
+    const actor = { id: "human", name: "Alex" };
+    await service.channels.command(
+      {
+        type: "save",
+        channelId: "channel-1",
+        operationId: "create",
+        draft: {
+          name: "Project",
+          title: "",
+          instructions: "Shared work",
+          members: [{ agentId: "chief" }],
+          leadAgentId: "chief",
+        },
+      },
+      actor,
+    );
+    const ask = async (operationId: string, text: string, tasks: number): Promise<void> => {
+      await service?.channels.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId,
+          text,
+          recipientAgentId: "chief",
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      );
+      // The count is part of the wait: the request of this ask has to reach the channel before the
+      // tasks of the ask before it can answer for it.
+      await waitFor(() => {
+        const open = service?.channels.store.tasks("channel-1") ?? [];
+        return open.length === tasks && open.every((task) => task.state === "completed");
+      });
+    };
+    await ask("first", "Start the shared work.", 1);
+    const execution = service.channels.store.context("channel-1", "chief");
+    const channelSession = store.database.activeProviderSession(execution.threadId, "codex")?.externalSessionId;
+    if (!channelSession) throw new Error("The channel turn started no provider session.");
+    const lastChannelResume = (): string =>
+      JSON.stringify(
+        client.requests
+          .filter((request) => request.method === "thread/resume")
+          .filter((request) => paramsRecord(request.params)?.threadId === channelSession)
+          .at(-1)?.params ?? "no resume of the channel session",
+      );
+
+    // The developer instructions are written when the session loads, so a memory the agent saved
+    // after that reaches the channel only when the next turn loads the session again.
+    service.createMemory({ agentId: "chief", text: "The user prefers concise status updates." });
+    await ask("second", "Continue the shared work.", 2);
+    expect(lastChannelResume()).toContain("The user prefers concise status updates.");
+
+    await service.updateAgent({ agentId: "chief", description: "Owns the quarterly report." });
+    await ask("third", "Report on the shared work.", 3);
+    expect(lastChannelResume()).toContain("Owns the quarterly report.");
+
+    // The profile dialog saves through a second path, which holds the same standing instructions.
+    const sidebar = new SidebarLayoutStore(join(root, "sidebar.json"));
+    await sidebar.initialize();
+    await service.saveProfile(
+      {
+        operationId: randomUUID(),
+        agentId: "chief",
+        draft: {
+          name: "Chief",
+          title: "Local teammate",
+          description: "Runs the weekly review.",
+          avatarSeed: "first-bot",
+          avatarHue: null,
+          sectionId: null,
+        },
+      },
+      sidebar,
+    );
+    await ask("fourth", "Review the shared work.", 4);
+    expect(lastChannelResume()).toContain("Runs the weekly review.");
+  });
+
+  it("keeps an agent with active channel work from being deleted", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "", false);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.channels.command(
+      {
+        type: "save",
+        channelId: "channel-busy",
+        operationId: "create-busy",
+        draft: {
+          name: "Project",
+          title: "",
+          instructions: "Shared work",
+          members: [{ agentId: "chief" }],
+          leadAgentId: "chief",
+        },
+      },
+      { id: "human", name: "Alex" },
+    );
+    await service.channels.command(
+      {
+        type: "send",
+        channelId: "channel-busy",
+        operationId: "send-busy",
+        text: "Continue working",
+        recipientAgentId: "chief",
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      { id: "human", name: "Alex" },
+    );
+    await waitFor(() => service?.channels.store.tasks("channel-busy")[0]?.state === "running");
+    expect(service.listQueue("chief").deliveries).toEqual([]);
+    await expect(service.deleteAgent("chief")).rejects.toThrow("Stop the agent");
+    expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(true);
+  });
+
   it("refreshes outdated Codex tools while preserving the agent and conversation, then resumes unchanged tools", async () => {
     const { store, mailbox } = stores(root);
     let rejectTurn = false;
