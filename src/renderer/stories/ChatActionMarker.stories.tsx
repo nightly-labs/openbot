@@ -252,3 +252,25 @@ function agent(id: string, name: string): AgentProfile {
     preview: "",
   };
 }
+
+export const MessageDates: Story = {
+  render: () => (
+    <main class="foundation-story">
+      <Heading as="h1" size="lg">
+        Daily routine history
+      </Heading>
+      {[1, 0].map((daysAgo) => {
+        const date = new Date();
+        date.setDate(date.getDate() - daysAgo);
+        return (
+          <ChatActionMarker
+            marker={{ ...routineMarker("succeeded"), timestamp: date.toISOString() }}
+            agents={agents}
+            onSelectAgent={onSelectAgent}
+            onOpenRoutine={onOpenRoutine}
+          />
+        );
+      })}
+    </main>
+  ),
+};
