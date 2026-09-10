@@ -20,6 +20,7 @@ import {
 } from "../../components/ui";
 import type { AgentProfile, ChatActionMarkerModel, ChatActionMarkerStatus } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { formatChatTimestamp } from "./chat-timestamp";
 
 interface ChatActionMarkerProps {
   marker: ChatActionMarkerModel;
@@ -385,5 +386,5 @@ function statusIcon(status: ChatActionMarkerStatus) {
 function formatMarkerTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Unknown time";
-  return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date);
+  return formatChatTimestamp(date);
 }

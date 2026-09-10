@@ -2138,13 +2138,10 @@ textarea {
 .person-row .agent-row-heading > span,
 .channel-row .agent-row-heading > span {
   min-width: 0;
-  max-width: 54px;
-  overflow: hidden;
   flex: 0 0 auto;
   color: var(--openbot-text-readable);
   font-size: var(--openbot-text-sm);
   line-height: 16px;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

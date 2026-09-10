@@ -82,20 +82,14 @@ export function useAgentContextMenu(agent: MobileAgent) {
         Hide
       </Link.MenuAction>
       <Link.MenuAction
-        icon="chart.bar"
+        icon="info.circle"
         onPress={() =>
-          router.push({ pathname: "/agent-usage/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } })
+          router.push({ pathname: "/agent-info/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } })
         }
       >
-        Usage
+        Info
       </Link.MenuAction>
       <Link.Menu icon="ellipsis" title="More">
-        <Link.MenuAction
-          icon="pencil"
-          onPress={() => router.push({ pathname: "/edit-agent/[agentId]", params: { agentId: agent.id } })}
-        >
-          Edit
-        </Link.MenuAction>
         <Link.MenuAction icon="doc.on.doc" onPress={handleCopyId}>
           Copy ID
         </Link.MenuAction>

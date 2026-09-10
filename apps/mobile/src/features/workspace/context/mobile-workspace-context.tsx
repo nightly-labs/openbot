@@ -3,9 +3,15 @@ import {
   type AgentSummary,
   type ConversationSnapshot,
   type CreateAgentInput,
+  isAgentMemory,
+  isAgentModel,
+  isAgentModelOption,
+  isAgentProvider,
   isAttachmentSummary,
   isAvatarHue,
   isQueuedMessageReceipt,
+  isReasoningEffort,
+  isRoutine,
   type TeamRealtimeEvent,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -55,6 +61,7 @@ import {
 } from "@/features/workspace/components/server-connection";
 import { type MobileAgentActivities, reduceAgentActivity } from "@/features/workspace/model/agent-activity";
 import { conversationMessageId, decodeConversation } from "@/features/workspace/model/conversation";
+import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
 import { applyServerRecovery, serverKind } from "@/features/workspace/model/server-status";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
 import type {
@@ -81,7 +88,8 @@ const SERVER_ACCENTS = ["#74b9ff", "#f0a06a", "#6bc7d9", "#d98ac9", "#31cf76"] a
 type RemoteAgent = Pick<
   AgentSummary,
   "id" | "name" | "title" | "description" | "preview" | "updatedAt" | "avatarSeed" | "avatarHue"
->;
+> &
+  Partial<Pick<AgentSummary, "provider" | "model" | "reasoningEffort">>;
 const EMPTY_SERVER: MobileServer = {
   id: "unavailable",
   name: "OpenBot",
@@ -399,6 +407,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       ) {
         void refreshConversationReads(serverId).catch(() => undefined);
       }
+      if (event.type === "memories-changed" || event.type === "routines-changed" || event.type === "turn-completed") {
+        void queryClient.invalidateQueries({
+          queryKey: ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, event.agentId],
+        });
+      }
       if (event.type === "agents-changed") replaceServerAgents(serverId, event.agents);
       else if (event.type === "conversation") {
         const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
@@ -616,13 +629,133 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         void refreshHosts().catch(() => undefined);
         return host.hostId;
       },
+      saveAgentMemory: async (agentId, text, serverId, memoryId) => {
+        await saveAgentRecord(
+          queryClient,
+          ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, agentId, "memories"],
+          () =>
+            request(
+              memoryId ? "PATCH" : "POST",
+              memoryId ? TEAM_API_ROUTES.agent.memory(agentId, memoryId) : TEAM_API_ROUTES.agent.memories(agentId),
+              (value) => {
+                if (
+                  !isAgentMemory(value) ||
+                  value.agentId !== agentId ||
+                  (memoryId !== undefined && value.id !== memoryId)
+                )
+                  throw new Error("The host returned an invalid saved record.");
+                return value;
+              },
+              { text },
+              serverId,
+            ),
+        );
+      },
+      deleteAgentMemory: async (agentId, memoryId, serverId) => {
+        await request("DELETE", TEAM_API_ROUTES.agent.memory(agentId, memoryId), ignoreResponse, undefined, serverId);
+      },
+      createAgentRoutine: async (input, serverId) => {
+        await saveAgentRecord(
+          queryClient,
+          ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, input.agentId, "routines"],
+          () =>
+            request(
+              "POST",
+              TEAM_API_ROUTES.agent.routines(input.agentId),
+              (value) => {
+                if (!isRoutine(value) || value.agentId !== input.agentId)
+                  throw new Error("The host returned an invalid saved record.");
+                return value;
+              },
+              {
+                name: input.name,
+                instruction: input.instruction,
+                active: input.active,
+                timezone: input.timezone,
+                schedule: input.schedule,
+              },
+              serverId,
+            ),
+        );
+      },
+      updateAgentRoutine: async (input, serverId) => {
+        await saveAgentRecord(
+          queryClient,
+          ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, input.agentId, "routines"],
+          () =>
+            request(
+              "PATCH",
+              TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+              (value) => {
+                if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
+                  throw new Error("The host returned an invalid saved record.");
+                return value;
+              },
+              {
+                ...(input.name === undefined ? {} : { name: input.name }),
+                ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
+                ...(input.active === undefined ? {} : { active: input.active }),
+                ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+              },
+              serverId,
+            ),
+        );
+      },
+      deleteAgentRoutine: async (agentId, routineId, serverId) => {
+        await request("DELETE", TEAM_API_ROUTES.agent.routine(agentId, routineId), ignoreResponse, undefined, serverId);
+      },
+      loadAgentModels: (serverId) =>
+        request(
+          "GET",
+          TEAM_API_ROUTES.agents.models,
+          (value) => {
+            if (!Array.isArray(value) || !value.every(isAgentModelOption))
+              throw new Error("The host returned invalid models.");
+            return value;
+          },
+          undefined,
+          serverId,
+        ),
+      loadAgentMemories: (agentId, serverId) =>
+        request(
+          "GET",
+          TEAM_API_ROUTES.agent.memories(agentId),
+          (value) => {
+            if (
+              !Array.isArray(value) ||
+              !value.every(isAgentMemory) ||
+              value.some((memory) => memory.agentId !== agentId)
+            )
+              throw new Error("The host returned invalid memories.");
+            return value;
+          },
+          undefined,
+          serverId,
+        ),
+      loadAgentRoutines: (agentId, serverId) =>
+        request(
+          "GET",
+          TEAM_API_ROUTES.agent.routines(agentId),
+          (value) => {
+            if (
+              !Array.isArray(value) ||
+              !value.every(isRoutine) ||
+              value.some((routine) => routine.agentId !== agentId)
+            )
+              throw new Error("The host returned invalid routines.");
+            return value;
+          },
+          undefined,
+          serverId,
+        ),
       loadAgentAnalytics: async (input, serverId) => {
-        if (
-          serverId !== activeServerId ||
-          !agents.some((agent) => agent.id === input.agentId && agent.serverId === serverId)
-        )
-          throw new Error("Agent is not on the selected host.");
-        return readAgentAnalytics(request, serverCapabilities.current.get(serverId) ?? [], input);
+        if (!agents.some((agent) => agent.id === input.agentId && agent.serverId === serverId))
+          throw new Error("Agent is not on this host.");
+        return readAgentAnalytics(
+          (method, path, decode) => request(method, path, decode, undefined, serverId),
+          serverCapabilities.current.get(serverId) ?? [],
+          input,
+        );
       },
       createAgent: async (input: CreateAgentInput) => {
         const created = await request("POST", TEAM_API_ROUTES.agents.all, decodeAgent, {
@@ -637,15 +770,20 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           projectAgent(activeServer.id, created),
         ]);
       },
-      updateAgent: async (input: UpdateAgentInput) => {
+      updateAgent: async (input: UpdateAgentInput, serverId = activeServerIdRef.current ?? undefined) => {
+        if (!serverId || !agents.some((agent) => agent.id === input.agentId && agent.serverId === serverId))
+          throw new Error("The agent is unavailable on this host.");
         const updated = await request(
           "PATCH",
           TEAM_API_ROUTES.agent.one(input.agentId),
           decodeAgent,
           updateAgentPayload(input),
+          serverId,
         );
         setAgents((current) =>
-          current.map((agent) => (agent.id === updated.id ? projectAgent(agent.serverId, updated) : agent)),
+          current.map((agent) =>
+            agent.id === updated.id && agent.serverId === serverId ? projectAgent(serverId, updated) : agent,
+          ),
         );
       },
       deleteAgent: async (agentId) => {
@@ -774,6 +912,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     serverDirectoryState,
     servers,
     session.host,
+    session.apiUrl,
+    session.user.id,
+    sessionScope,
+    queryClient,
     unreadAgentIds,
     preferences,
     updatePreferences,
@@ -817,6 +959,9 @@ function projectAgent(serverId: string, agent: RemoteAgent): MobileAgent {
     description: agent.description,
     preview: agent.preview,
     updatedLabel: formatUpdatedAt(agent.updatedAt),
+    provider: agent.provider,
+    model: agent.model,
+    reasoningEffort: agent.reasoningEffort,
     avatarSeed: agent.avatarSeed,
     avatarHue: agent.avatarHue,
   };
@@ -854,6 +999,9 @@ function decodeAgent(value: unknown): RemoteAgent {
     description: value.description,
     preview: value.preview,
     updatedAt: value.updatedAt,
+    provider: isAgentProvider(value.provider) ? value.provider : undefined,
+    model: isAgentModel(value.model) ? value.model : undefined,
+    reasoningEffort: isReasoningEffort(value.reasoningEffort) ? value.reasoningEffort : undefined,
     avatarSeed: value.avatarSeed,
     avatarHue: value.avatarHue,
   };
