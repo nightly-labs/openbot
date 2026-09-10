@@ -48,6 +48,8 @@ import {
   useState,
 } from "react";
 import { Alert, View } from "react-native";
+import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
 import {
@@ -542,7 +544,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<MobileWorkspaceContextValue>(() => {
     const activeServer = servers.find((server) => server.id === activeServerId) ?? EMPTY_SERVER;
-    return {
+    const workspace: MobileWorkspaceContextValue = {
       servers,
       teamDirectory: directory,
       serverDirectoryState,
@@ -884,16 +886,18 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         void loadConversation(agentId).catch(() => undefined);
       },
       hideAgent: (agentId) => {
-        updatePreferences(activeServer.id, (current) => ({
+        const saved = updatePreferences(activeServer.id, (current) => ({
           hidden: [...new Set([...current.hidden, agentId])],
           pinned: current.pinned.filter((id) => id !== agentId),
         }));
+        mobileAnalytics.track("conversation_action", { action: "hide", result: saved ? "succeeded" : "failed" });
       },
       unhideAgent: (agentId) => {
-        updatePreferences(activeServer.id, (current) => ({
+        const saved = updatePreferences(activeServer.id, (current) => ({
           ...current,
           hidden: current.hidden.filter((id) => id !== agentId),
         }));
+        mobileAnalytics.track("conversation_action", { action: "unhide", result: saved ? "succeeded" : "failed" });
       },
       markAgentRead,
       markAgentUnread: (agentId) => {
@@ -916,6 +920,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           : "error";
       },
     };
+    return trackWorkspaceActions(workspace);
   }, [
     activeServerId,
     activityByServer,

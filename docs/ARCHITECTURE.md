@@ -462,6 +462,21 @@ transaction. Creation follows the existing workspace/initial-message flow with
 cleanup on failure. Receipts make retries after a lost response return the saved
 agent. This does not introduce a schema migration or alter released protocol codecs.
 
+## Mobile product analytics
+
+`apps/mobile/src/features/analytics` owns the React Native OpenPanel client, typed event allowlists,
+account-scoped operations, the local SecureStore preference, and foreground/connection events.
+Workspace command wrappers record outcomes once at the mobile caller; conversation availability is measured in
+the visible chat view, including cached reads, not from background broadcasts. The host remains the only source of turn lifecycle
+events. No Team API or database schema changes are required.
+
+Only native production builds with mobile write credentials initialize the client, after the
+preference is loaded. UI actions never await analytics transport. Account/consent generations
+reject late results; ordered identity changes preserve attribution of already accepted events.
+A final SDK filter replaces properties to remove SDK-added Android referrers and route paths.
+The SDK's optional persistent queue and screen tracking are not enabled. Configuration, event
+semantics and native verification steps are in [the mobile README](../apps/mobile/README.md#openpanel-product-analytics).
+
 ## Website analytics
 
 Public website tracking lives in `apps/auth-api/src/lib/analytics.ts`. It runs only on the

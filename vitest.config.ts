@@ -32,6 +32,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "node",
+          server: { deps: { inline: ["@openpanel/react-native"] } },
           environment: "node",
           // Strictly longer than the harness deadline, so a stalled wait fails
           // with the predicate that never held rather than with vitest's

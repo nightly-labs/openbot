@@ -2,7 +2,10 @@
   "expo": {
     "name": "OpenBot",
     "slug": "openbot",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icons/app-icon.png",
@@ -14,7 +17,8 @@
         "NSLocalNetworkUsageDescription": "Allow OpenBot to connect to your desktop during local development.",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
-        }
+        },
+        "ITSAppUsesNonExemptEncryption": false
       },
       "icon": {
         "light": "./assets/icons/app-icon.png",
@@ -25,7 +29,10 @@
     "android": {
       "package": "run.openbot.mobile",
       "icon": "./assets/icons/app-icon.png",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "plugins": [
       "expo-router",

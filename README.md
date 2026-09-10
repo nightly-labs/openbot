@@ -209,6 +209,9 @@ The development runner advertises both Mobile Connect and its Signal service on 
 LAN interface. Restart the runner after changing networks so newly generated QR codes contain the
 current address.
 
+Production mobile analytics setup and required OpenPanel credentials are documented in
+[OpenBot Mobile](apps/mobile/README.md#openpanel-product-analytics).
+
 `mobile:go:tunnel` exposes only the Expo development server. It does not expose the local account
 API, Signal, or TURN. A phone on 5G cannot use the default LAN addresses. For a test across networks,
 use a VPN that connects both devices, or provide HTTPS and WSS endpoints that forward to this dev
