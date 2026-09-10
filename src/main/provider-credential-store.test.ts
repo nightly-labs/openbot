@@ -31,8 +31,9 @@ describe("ProviderCredentialStore", () => {
     const reopened = new ProviderCredentialStore(path, cipher);
     await reopened.load();
     expect(reopened.get("opencode")).toBe("zen-key-value");
-    expect(reopened.has("opencode")).toBe(true);
+    expect(reopened.status("opencode")).toBe("saved");
     expect(reopened.get("codex")).toBeNull();
+    expect(reopened.status("codex")).toBe("missing");
   });
 
   it("writes no plaintext to disk", async () => {
@@ -54,13 +55,67 @@ describe("ProviderCredentialStore", () => {
     expect(info.mode & 0o777).toBe(0o600);
   });
 
-  it("rejects an envelope it cannot understand", async () => {
+  it("reports an envelope it cannot understand, and leaves it on disk", async () => {
     const { path } = await createStore();
-    await writeFile(path, JSON.stringify({ version: 2, credentials: {} }), "utf8");
-    await expect(new ProviderCredentialStore(path, cipher).load()).rejects.toThrow();
+    // Startup continues past this file: a key OpenBot cannot read must not stop the app, and it
+    // must not be read as "no key" and then written over by the next unrelated save.
+    for (const envelope of [
+      { version: 2, credentials: {} },
+      { version: 1, credentials: { opencode: 7 } },
+    ]) {
+      const source = JSON.stringify(envelope);
+      await writeFile(path, source, "utf8");
+      const store = new ProviderCredentialStore(path, cipher);
 
-    await writeFile(path, JSON.stringify({ version: 1, credentials: { opencode: 7 } }), "utf8");
-    await expect(new ProviderCredentialStore(path, cipher).load()).rejects.toThrow();
+      expect(await store.load()).toBeInstanceOf(Error);
+      expect(store.get("opencode")).toBeNull();
+      expect(store.status("opencode")).toBe("unreadable");
+      expect(await readFile(path, "utf8")).toBe(source);
+    }
+  });
+
+  it("replaces an unreadable envelope with the key the user saves", async () => {
+    const { path } = await createStore();
+    await writeFile(path, "not json", "utf8");
+    const store = new ProviderCredentialStore(path, cipher);
+    await store.load();
+
+    await store.set("opencode", "zen-key-value");
+    expect(store.status("opencode")).toBe("saved");
+    const reopened = new ProviderCredentialStore(path, cipher);
+    expect(await reopened.load()).toBeNull();
+    expect(reopened.get("opencode")).toBe("zen-key-value");
+  });
+
+  it("removes an unreadable envelope when the user removes the key", async () => {
+    const { path } = await createStore();
+    await writeFile(path, "not json", "utf8");
+    const store = new ProviderCredentialStore(path, cipher);
+    await store.load();
+
+    await store.clear("opencode");
+    expect(store.status("opencode")).toBe("missing");
+    await expect(stat(path)).rejects.toThrow();
+  });
+
+  it("changes nothing when a save cannot be written", async () => {
+    const { path, store } = await createStore();
+    await store.set("opencode", "first-key");
+    await store.set("codex", "codex-key-value");
+    // The key file is the source of truth for a spawn: a key held only in memory would reach a CLI
+    // after a failed save, and a removal the file never saw would make a retry do nothing.
+    const failing = new ProviderCredentialStore(path, {
+      ...cipher,
+      encrypt: () => {
+        throw new Error("System secret storage is unavailable.");
+      },
+    });
+    await failing.load();
+
+    await expect(failing.set("opencode", "second-key")).rejects.toThrow("System secret storage is unavailable.");
+    expect(failing.get("opencode")).toBe("first-key");
+    await expect(failing.clear("opencode")).rejects.toThrow("System secret storage is unavailable.");
+    expect(failing.get("opencode")).toBe("first-key");
   });
 
   it("keeps the previous key when a write did not finish", async () => {

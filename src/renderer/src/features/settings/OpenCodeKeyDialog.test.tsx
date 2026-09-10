@@ -12,7 +12,7 @@ import { OpenCodeKeyDialog, type ProviderKeyApi } from "./OpenCodeKeyDialog";
  */
 function createApi(overrides: Partial<ProviderKeyApi> = {}) {
   return {
-    getProviderApiKeyState: vi.fn(async () => ({ provider: "opencode" as const, configured: false })),
+    getProviderApiKeyState: vi.fn(async () => ({ provider: "opencode" as const, status: "missing" as const })),
     setProviderApiKey: vi.fn(async () => undefined),
     clearProviderApiKey: vi.fn(async () => undefined),
     openExternal: vi.fn(async () => undefined),
@@ -47,7 +47,7 @@ describe("OpenCodeKeyDialog", () => {
 
   it("reports a saved key without reading it back into the input", async () => {
     const api = createApi({
-      getProviderApiKeyState: vi.fn(async () => ({ provider: "opencode" as const, configured: true })),
+      getProviderApiKeyState: vi.fn(async () => ({ provider: "opencode" as const, status: "saved" as const })),
     });
     renderDialog(api);
 
@@ -55,9 +55,26 @@ describe("OpenCodeKeyDialog", () => {
     expect(screen.getByLabelText("OpenCode Zen key")).toHaveValue("");
   });
 
+  it("states that a saved key could not be read, and offers to remove it", async () => {
+    const api = createApi({
+      getProviderApiKeyState: vi.fn(async () => ({ provider: "opencode" as const, status: "unreadable" as const })),
+    });
+    const { onClose } = renderDialog(api);
+
+    // Without this the user sees the free list with no reason, while a key they paid for is still
+    // on disk and still the file the next save replaces.
+    await screen.findByText(
+      "OpenBot could not read the saved key, so OpenCode uses only the free models. Paste the key again, or remove it.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Remove key" }));
+
+    await waitFor(() => expect(api.clearProviderApiKey).toHaveBeenCalledWith("opencode"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
   it("removes the saved key on request", async () => {
     const api = createApi({
-      getProviderApiKeyState: vi.fn(async () => ({ provider: "opencode" as const, configured: true })),
+      getProviderApiKeyState: vi.fn(async () => ({ provider: "opencode" as const, status: "saved" as const })),
     });
     const { onClose } = renderDialog(api);
 

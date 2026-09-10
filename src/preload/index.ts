@@ -295,12 +295,16 @@ function decodeFilePreview(value: unknown): FilePreview {
   };
 }
 
-/** A reply carrying nothing but the provider and a flag, so an unexpected field cannot slip in. */
+/** A reply carrying nothing but the provider and a status, so an unexpected field cannot slip in. */
 function decodeProviderApiKeyState(value: unknown): ProviderApiKeyState {
-  if (!isDynamicRecord(value) || !isAgentProvider(value.provider) || !isBoolean(value.configured)) {
+  if (
+    !isDynamicRecord(value) ||
+    !isAgentProvider(value.provider) ||
+    !isOneOf(["missing", "saved", "unreadable"] as const, value.status)
+  ) {
     throw new Error("Invalid provider key state response.");
   }
-  return { provider: value.provider, configured: value.configured };
+  return { provider: value.provider, status: value.status };
 }
 
 function decodeAgentStatusFromMain(value: unknown): AgentStatus {

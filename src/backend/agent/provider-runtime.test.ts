@@ -255,6 +255,51 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     ]);
   });
 
+  it("restarts OpenCode on a changed key before it reports the change", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    let storedKey: string | null = null;
+    const clients: FakeAgentClient[] = [];
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "opencode",
+      (provider) => {
+        const client = new FakeAgentClient(provider);
+        if (provider === "opencode") {
+          client.modelList = () => ({
+            data: ["opencode/big-pickle", "opencode-go/kimi-k3"].map((model) => ({ model })),
+          });
+          clients.push(client);
+        }
+        return client;
+      },
+      {},
+      async () => undefined,
+      null,
+      null,
+      { apiKey: () => storedKey },
+    );
+    await service.initialize();
+
+    await service.changeProviderCredential("opencode", async () => {
+      storedKey = "zen-key";
+    });
+
+    // A CLI reads its key at spawn, so only a new process can list what the key buys. The Go
+    // model leaves the catalog only when that process is the one reporting it.
+    expect(clients).toHaveLength(2);
+    expect(clients[0]?.running).toBe(false);
+    expect(
+      service
+        .listModels()
+        .filter((model) => model.provider === "opencode")
+        .map((model) => model.id),
+    ).toEqual(["opencode/big-pickle"]);
+  });
+
   it("uses startup fallbacks when provider discovery is unavailable", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
@@ -781,6 +826,59 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(service.getStatus().providers).toContainEqual(
       expect.objectContaining({ id: "codex", state: "available", version: "0.144.1" }),
     );
+  });
+
+  it("keeps the old key while the provider is working on a turn", async () => {
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => new FakeAgentClient(provider, "", false),
+    );
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Keep working." });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+
+    // Writing the key and then failing to restart would leave a key on disk that no process uses,
+    // under a dialog that reports the save as failed. So a busy provider is refused first.
+    let changed = false;
+    await expect(
+      service.changeProviderCredential("codex", async () => {
+        changed = true;
+      }),
+    ).rejects.toThrow(/working on a turn/u);
+    expect(changed).toBe(false);
+  });
+
+  it("delivers messages again after a key change that could not be saved", async () => {
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => new FakeAgentClient(provider),
+    );
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+
+    await expect(
+      service.changeProviderCredential("codex", async () => {
+        throw new Error("System secret storage is unavailable.");
+      }),
+    ).rejects.toThrow("System secret storage is unavailable.");
+
+    // The change holds deliveries while it runs. A failed save must release them, or the agent
+    // stays silent until the app restarts.
+    await service.sendMessage({ agentId: "chief", text: "Still there?" });
+    await waitFor(() => events.some((event) => event.type === "turn-completed"));
   });
 
   it("refuses to replace a CLI while a delivery is on its way to a turn", async () => {

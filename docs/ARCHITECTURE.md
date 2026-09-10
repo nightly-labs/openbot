@@ -586,8 +586,13 @@ from a credential, and a keyless OpenCode reports `available`. `AcpProviderOptio
 at every spawn, which is what lets a key saved in Settings reach the next process with no other
 plumbing, and what carries `OPENCODE_DISABLE_AUTOUPDATE` to a managed install so the CLI cannot
 update past the pin. `src/main/provider-credential-store.ts` holds that optional key, encrypted by
-`safeStorage` in a `0o600` envelope under `userData`. Only a boolean crosses IPC; no getter returns
-the key.
+`safeStorage` in a `0o600` envelope under `userData`. Only a status (`missing`, `saved` or
+`unreadable`) crosses IPC; no getter returns the key. A file the store cannot read does not stop
+startup: OpenCode runs keyless, Settings reports the key as unreadable, and the file stays until the
+user saves or removes a key. The store writes a change to disk before it changes memory, so a
+failed write changes neither. `ProviderRuntime.changeProviderCredential` applies a key change inside
+the provider's serialized connection command. It refuses a provider that is running a turn, holds
+deliveries while it writes, and reports success only after a new process runs with the new key.
 
 That one variable turns on two products: OpenCode reports OpenCode Zen and OpenCode Go as a single
 catalog, on the separate endpoints `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and a Zen key

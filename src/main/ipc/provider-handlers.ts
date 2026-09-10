@@ -2,7 +2,7 @@
 // runtimes the providers need.
 
 import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
-import type { AgentProviderId, AgentStatus } from "@openbot/contracts/ipc";
+import type { AgentProviderId } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { shell } from "electron";
 import type { AgentService } from "../../backend/agent-service";
@@ -39,20 +39,19 @@ export function providerIpcHandlers({
         return service.getStatus();
       }),
       refreshAgentProviders: handler(() => service.refreshProviders()),
-      // Saving a key is followed by a reconnect, because the catalog the CLI advertises is decided
-      // at spawn time: without a fresh process the user saves a key and sees the free list.
-      setProviderApiKey: payloadHandler(parseProviderApiKeyInput, async ({ provider, key }) => {
-        await credentials.set(provider, key);
-        return reconnect(provider);
-      }),
-      clearProviderApiKey: payloadHandler(parseProviderId, async (provider) => {
-        await credentials.clear(provider);
-        return reconnect(provider);
-      }),
-      // A boolean, never the key: see `setProviderApiKey` in the desktop API contract.
+      // The key and the process that uses it change as one step, because the catalog the CLI
+      // advertises is decided at spawn time: the service writes the key only when it can restart
+      // the provider on it, and reports success only once the new process is up.
+      setProviderApiKey: payloadHandler(parseProviderApiKeyInput, ({ provider, key }) =>
+        service.changeProviderCredential(provider, () => credentials.set(provider, key)),
+      ),
+      clearProviderApiKey: payloadHandler(parseProviderId, (provider) =>
+        service.changeProviderCredential(provider, () => credentials.clear(provider)),
+      ),
+      // A status, never the key: see `setProviderApiKey` in the desktop API contract.
       getProviderApiKeyState: payloadHandler(parseProviderId, async (provider) => ({
         provider,
-        configured: credentials.has(provider),
+        status: credentials.status(provider),
       })),
     },
     providerRuntimes: {
@@ -61,12 +60,6 @@ export function providerIpcHandlers({
       cancel: payloadHandler(parseManagedProviderId, (parsed) => providerRuntimes.cancel(parsed)),
     },
   };
-
-  async function reconnect(provider: AgentProviderId): Promise<AgentStatus> {
-    return service.connectProvider(provider, async () => {
-      throw new Error("A provider key does not use a browser login.");
-    });
-  }
 }
 
 /**

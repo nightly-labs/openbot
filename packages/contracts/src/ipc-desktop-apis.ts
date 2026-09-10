@@ -259,10 +259,16 @@ export interface SetProviderApiKeyInput {
   key: string;
 }
 
-/** What the renderer may know about a stored key: that there is one. Never the key. */
+/**
+ * Whether a key is stored. `unreadable` is a key file OpenBot could not decrypt or parse: the
+ * provider then runs with no key, and the file stays on disk until the user replaces or removes it.
+ */
+export type ProviderApiKeyStatus = "missing" | "saved" | "unreadable";
+
+/** What the renderer may know about a stored key: its status. Never the key. */
 export interface ProviderApiKeyState {
   provider: AgentProviderId;
-  configured: boolean;
+  status: ProviderApiKeyStatus;
 }
 
 export interface ProviderRuntimesDesktopApi {
@@ -401,7 +407,7 @@ export interface OpenBotDesktopApi {
    * Stores the optional API key a provider's paid catalog needs, and reconnects the provider.
    *
    * The key only ever travels towards main. There is no getter for it, and
-   * `getProviderApiKeyState` answers with a boolean, because a renderer that can read a key back
+   * `getProviderApiKeyState` answers with a status, because a renderer that can read a key back
    * puts it in every crash report, export and screenshot that follows.
    */
   setProviderApiKey: (input: SetProviderApiKeyInput) => Promise<AgentStatus>;

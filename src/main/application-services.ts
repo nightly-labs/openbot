@@ -33,6 +33,7 @@ import type {
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import { IPC_CHANNELS } from "@openbot/contracts/ipc";
+import { createOpenBotLogger } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, safeStorage, screen, shell } from "electron";
 import electronUpdater from "electron-updater";
@@ -92,6 +93,7 @@ import { supportsInstalledUpdates, UpdateService } from "./update-service";
 import { WHISPER_MODEL_NAME, WHISPER_MODEL_URL } from "./voice-model-service";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 
+const logger = createOpenBotLogger("application-services");
 const SETUP_FILE = "openbot-setup-v2.json";
 const ANALYTICS_PREFERENCE_FILE = "openbot-analytics-preference-v1.json";
 const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
@@ -359,7 +361,13 @@ export async function createApplicationServices({
     },
     decrypt: (value) => safeStorage.decryptString(value),
   });
-  await providerCredentials.load();
+  // An unreadable key file is reported, not fatal: the app starts, OpenCode runs on the free models,
+  // and Settings tells the user to save the key again. Only the error's class is logged, because a
+  // parse message quotes the file.
+  const credentialLoadError = await providerCredentials.load();
+  if (credentialLoadError) {
+    logger.warn(`OpenBot could not read the provider key file (${credentialLoadError.name}). It was left unchanged.`);
+  }
   const service = new AgentService(
     store,
     mailbox,

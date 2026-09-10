@@ -471,6 +471,36 @@ export class ProviderRuntime implements ProviderPort {
     });
   }
 
+  /**
+   * Changes a provider's stored credential and restarts the provider on it, as one step.
+   *
+   * A CLI reads its credential when it spawns, so a new key only takes effect in a new process.
+   * The change runs inside the provider's serialized connection command, after any start or refresh
+   * already queued for it, and before the restart. A provider that is working on a turn keeps both
+   * its process and its old credential, and the caller hears why. `#replacingCli` holds new
+   * deliveries from the busy check to the restart, so no turn can start on the old process in
+   * between. Success means that a new process runs with the new credential.
+   */
+  async changeProviderCredential(provider: AgentProvider, change: () => Promise<void>): Promise<AgentStatus> {
+    return this.#runProviderConnectionCommand(provider, async () => {
+      await this.#providerStarts.get(provider);
+      if (this.#hooks.isProviderBusy(provider)) {
+        throw new Error(
+          `The ${providerLabel(provider)} CLI is working on a turn. Wait for it to finish, then try again.`,
+        );
+      }
+      this.#replacingCli.add(provider);
+      try {
+        await change();
+      } catch (error) {
+        this.#replacingCli.delete(provider);
+        this.#hooks.onProviderResumed(provider);
+        throw error;
+      }
+      return this.#reprobeProvider(provider);
+    });
+  }
+
   /** Keeps this provider idle until its managed runtime is installed and activated. */
   async updateProviderCli(provider: AgentProvider, install: () => Promise<string>): Promise<AgentStatus> {
     return this.#runProviderConnectionCommand(provider, async () => {

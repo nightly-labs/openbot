@@ -535,7 +535,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       providerApiKeys.delete(provider);
       return clone(agentStatus);
     },
-    getProviderApiKeyState: async (provider) => ({ provider, configured: providerApiKeys.has(provider) }),
+    getProviderApiKeyState: async (provider) => ({
+      provider,
+      status: providerApiKeys.has(provider) ? "saved" : "missing",
+    }),
     providerRuntimes: {
       getStatus: async () => clone(runtimeSnapshot),
       download: async (provider) => {

@@ -8,7 +8,12 @@
  */
 
 import { ProviderLogo } from "@openbot/brand";
-import type { AgentProviderId, ExternalDestination, ProviderApiKeyState } from "@openbot/contracts/ipc";
+import type {
+  AgentProviderId,
+  ExternalDestination,
+  ProviderApiKeyState,
+  ProviderApiKeyStatus,
+} from "@openbot/contracts/ipc";
 import { createSignal, onSettled, Show } from "solid-js";
 import {
   Alert,
@@ -43,7 +48,7 @@ type DialogPhase = "idle" | "loading" | "saving" | "removing";
 
 export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
   const [key, setKey] = createSignal("");
-  const [configured, setConfigured] = createSignal(false);
+  const [stored, setStored] = createSignal<ProviderApiKeyStatus>("missing");
   const [phase, setPhase] = createSignal<DialogPhase>("loading");
   const [error, setError] = createSignal<string | null>(null);
   const busy = () => phase() !== "idle";
@@ -55,7 +60,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
   async function readState(): Promise<void> {
     setPhase("loading");
     try {
-      setConfigured((await props.api.getProviderApiKeyState("opencode")).configured);
+      setStored((await props.api.getProviderApiKeyState("opencode")).status);
     } catch (cause) {
       setError(errorMessage(cause, "Could not read the saved key."));
     } finally {
@@ -119,9 +124,15 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
               </Dialog.Description>
             </header>
 
-            <Show when={configured()}>
+            <Show when={stored() === "saved"}>
               <Text class="opencode-key-saved" variant="body-sm" tone="secondary">
                 A key is saved on this computer. Paste a new one to replace it.
+              </Text>
+            </Show>
+            <Show when={stored() === "unreadable"}>
+              <Text class="opencode-key-saved" variant="body-sm" tone="secondary">
+                OpenBot could not read the saved key, so OpenCode uses only the free models. Paste the key again, or
+                remove it.
               </Text>
             </Show>
 
@@ -171,7 +182,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                 >
                   Save key
                 </Button>
-                <Show when={configured()}>
+                <Show when={stored() !== "missing"}>
                   <Button
                     type="button"
                     variant="outline"
