@@ -6,6 +6,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { AgentDeliveryMarkerStatus, AgentMessage, AgentProfile, ChatActionMarkerModel } from "./data";
 import { cleanAgentMessageText } from "./features/agents/agent-message-text";
+import { formatChatTimestamp } from "./features/conversation/chat-timestamp";
 import { isRoutineEventItem } from "./features/conversation/conversation-read-state";
 
 export function toAgentProfile(stored: AgentSummary): AgentProfile {
@@ -40,7 +41,7 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
     turnId: message.turnId,
     author: message.author === "user" ? "you" : "agent",
     body: message.author === "user" ? message.text : cleanAgentMessageText(message.text),
-    time: formatTime(message.createdAt),
+    time: formatMessageTime(message.createdAt),
     createdAt: message.createdAt,
     streaming: message.status === "streaming",
     itemType: message.itemType,
@@ -99,7 +100,7 @@ export function toAgentMessages(messages: ConversationMessage[], ownerAgentId?: 
       turnId: message.turnId,
       author: "agent",
       body: "",
-      time: formatTime(message.createdAt),
+      time: formatMessageTime(message.createdAt),
       createdAt: message.createdAt,
       streaming: message.status === "streaming",
       itemType: "commentary",
@@ -317,4 +318,10 @@ export function formatTime(value: string): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+export function formatMessageTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "now";
+  return formatChatTimestamp(date);
 }
