@@ -6808,64 +6808,66 @@ button.chat-action-target:active,
   background: var(--openbot-border);
 }
 
-.browser-takeover-card {
-  display: flex;
-  width: min(460px, 100%);
+.conversation-interaction-card {
   box-sizing: border-box;
-  margin: var(--openbot-space-3) 0 20px;
-  flex-direction: column;
-  gap: var(--openbot-space-3);
-  border: 0;
-  border-radius: var(--openbot-radius-bubble);
-  background: var(--openbot-bg-surface);
-  box-shadow:
-    0 0 0 0.5px var(--openbot-border),
-    0 1px 2px var(--openbot-bg-overlay),
-    0 2px 4px var(--openbot-shadow-popover-ambient);
+  min-width: 0;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-canvas);
   color: var(--openbot-text-primary);
-  padding: var(--openbot-space-3);
-  animation: browser-takeover-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
+  padding: var(--openbot-space-4);
 }
 
-.browser-takeover-header {
+.conversation-interaction-header {
   display: flex;
-  height: var(--openbot-control-xs);
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--openbot-space-3);
 }
 
-.browser-takeover-header > span {
-  overflow: hidden;
-  font-size: var(--openbot-text-sm);
+.conversation-interaction-header > :is(strong, h2) {
+  min-width: 0;
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-lg);
   font-weight: var(--openbot-weight-medium);
-  line-height: var(--openbot-leading-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: var(--openbot-leading-lg);
+  overflow-wrap: anywhere;
 }
 
-.browser-takeover-header [data-slot="badge"] svg {
-  width: var(--openbot-icon-xs);
-  height: var(--openbot-icon-xs);
+.conversation-interaction-status[data-slot="badge"] {
+  flex: 0 0 auto;
+  gap: var(--openbot-space-1-5);
+  border-radius: var(--openbot-radius-md);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.conversation-interaction-status svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
   flex: 0 0 auto;
   stroke-width: var(--openbot-icon-stroke);
 }
 
+.browser-takeover-card {
+  display: flex;
+  width: min(540px, 100%);
+  margin: var(--openbot-space-3) 0 var(--openbot-space-6);
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  animation: browser-takeover-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
+}
+
 .browser-takeover-copy {
+  margin-top: calc(-1 * var(--openbot-space-2));
   display: grid;
   gap: var(--openbot-space-1);
 }
 
-.browser-takeover-copy h2,
 .browser-takeover-copy p {
   margin: 0;
-}
-
-.browser-takeover-copy h2 {
-  font-size: var(--openbot-text-lg);
-  font-weight: var(--openbot-weight-medium);
-  line-height: var(--openbot-leading-lg);
 }
 
 .browser-takeover-copy p {
@@ -6983,8 +6985,8 @@ button.chat-action-target:active,
 .browser-takeover-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: var(--openbot-space-1-5);
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
 }
 
 .browser-takeover-actions .ui-button {
@@ -7015,8 +7017,7 @@ button.chat-action-target:active,
 .question-prompt-bubble > .ui-bubble-content {
   width: 100%;
   border-color: var(--openbot-border);
-  background: var(--openbot-bg-surface);
-  padding: var(--openbot-space-4);
+  background: var(--openbot-bg-canvas);
 }
 
 .question-prompt-bubble:focus-within > .ui-bubble-content {
@@ -7094,8 +7095,7 @@ button.chat-action-target:active,
 
 .question-prompt-header {
   min-width: 0;
-  min-height: 22px;
-  padding-right: 136px;
+  min-height: var(--openbot-control-xs);
 }
 
 .question-prompt-header h2 {
@@ -7120,11 +7120,9 @@ button.chat-action-target:active,
 }
 
 .question-prompt-navigation-root.ui-questionnaire {
-  position: absolute;
-  z-index: 2;
-  top: 0;
-  right: 0;
-  display: block;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--openbot-space-4);
 }
 
 .question-prompt-navigation-button.ui-button {
@@ -7195,8 +7193,9 @@ button.chat-action-target:active,
 }
 
 .question-prompt-options.ui-item-group {
-  border-radius: var(--openbot-radius-bubble-inset);
-  background: transparent;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
 }
 
 .question-prompt-options > :is(.ui-questionnaire-choice, .question-prompt-custom-row) {
@@ -7435,235 +7434,108 @@ button.chat-action-target:active,
 
 .approval-card {
   display: flex;
-  width: min(460px, 100%);
-  overflow: hidden;
-  margin: 12px 0 20px;
-  border: 0;
-  border-radius: var(--openbot-radius-lg);
-  background: var(--openbot-bg-surface);
-  box-shadow:
-    0 0 0 0.5px var(--openbot-border),
-    0 1px 2px var(--openbot-bg-overlay),
-    0 2px 4px var(--openbot-shadow-popover-ambient);
-  color: var(--openbot-text-primary);
+  width: min(540px, 100%);
+  margin: var(--openbot-space-3) 0 var(--openbot-space-6);
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
-  animation: approval-card-in var(--openbot-duration-slow) cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
-.approval-card-header {
-  display: flex;
-  height: 24px;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
-}
-
-.approval-card-header > div {
-  min-width: 0;
-}
-
-.approval-card-header strong,
-.approval-card-header > div > span {
-  display: block;
-}
-
-.approval-card-header strong {
-  font-size: var(--openbot-text-md);
-  font-weight: 500;
-  line-height: 16.875px;
-}
-
-.approval-card-header div > span {
-  margin-top: 1px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: 16px;
-}
-
-.approval-card-icon {
-  display: grid;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-accent-soft);
-  color: var(--openbot-accent-hover);
-}
-
-.approval-card-icon[data-kind="approval"] {
-  background: var(--openbot-success-soft);
-  color: var(--openbot-success);
-}
-
-.approval-card-icon svg {
-  display: block;
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: var(--openbot-icon-stroke);
+  gap: var(--openbot-space-4);
+  animation: approval-card-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
 }
 
 .approval-card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 0 0 0 2px;
-}
-
-.approval-card-footer-end {
-  justify-content: flex-end;
-}
-
-.approval-card-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.approval-button svg {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: var(--openbot-icon-stroke);
+  gap: var(--openbot-space-2);
 }
 
 .approval-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: 0;
   border-radius: var(--openbot-radius-pill);
-  padding: 5px 11px;
-  font-size: var(--openbot-text-sm);
-  font-weight: 520;
-  transition:
-    background-color var(--openbot-duration-hover) ease,
-    border-color var(--openbot-duration-hover) ease,
-    color var(--openbot-duration-hover) ease,
-    transform var(--openbot-duration-fast) ease;
-}
-
-.approval-button:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
-.approval-button-ghost {
-  background: var(--openbot-bg-control);
-  color: var(--openbot-text-secondary);
-}
-
-.approval-button-ghost:hover:not(:disabled) {
-  background: var(--openbot-bg-control-hover);
-  color: var(--openbot-text-primary);
-}
-
-.approval-button-primary {
-  background: var(--openbot-success);
-  color: var(--openbot-text-on-light);
-}
-
-.approval-button-primary:hover:not(:disabled) {
-  background: var(--openbot-success);
-  box-shadow: 0 0 0 3px var(--openbot-success-soft);
-}
-
-.approval-button:disabled {
-  cursor: default;
-  opacity: 0.38;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-regular);
 }
 
 .approval-card-content {
   display: grid;
-  gap: 10px;
-  padding: 4px 13px 14px;
+  min-width: 0;
+  gap: var(--openbot-space-3);
 }
 
-.approval-command-block {
+.approval-card-content:empty {
+  display: none;
+}
+
+.approval-command-block,
+.approval-detail-row,
+.approval-permissions {
+  min-width: 0;
   overflow: hidden;
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-canvas);
+  background: var(--openbot-bg-surface);
 }
 
 .approval-command-block code {
   display: block;
   overflow-x: auto;
-  padding: 10px;
-  color: var(--openbot-text-primary);
-  font-family: "SFMono-Regular", Consolas, monospace;
+  padding: var(--openbot-space-3);
+  color: var(--openbot-text-secondary);
+  font-family: var(--openbot-font-mono);
   font-size: var(--openbot-text-sm);
-  line-height: 17px;
+  line-height: var(--openbot-leading-md);
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .approval-cwd {
-  overflow: hidden;
   border-bottom: 1px solid var(--openbot-border);
-  padding: 7px 10px;
+  padding: var(--openbot-space-2) var(--openbot-space-3);
   color: var(--openbot-text-muted);
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: var(--openbot-font-mono);
   font-size: var(--openbot-text-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .approval-detail-row {
   display: grid;
-  gap: 3px;
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-control);
-  padding: 9px 10px;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-3);
 }
 
 .approval-detail-label {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
 .approval-detail-row strong {
-  overflow: hidden;
-  color: var(--openbot-text-primary);
-  font-family: "SFMono-Regular", Consolas, monospace;
+  color: var(--openbot-text-secondary);
+  font-family: var(--openbot-font-mono);
   font-size: var(--openbot-text-sm);
-  font-weight: 520;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: var(--openbot-weight-medium);
+  overflow-wrap: anywhere;
 }
 
 .approval-permissions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-3);
+}
+
+.approval-permissions:empty {
+  display: none;
 }
 
 .approval-permissions span {
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-control);
-  padding: 5px 8px;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
+  overflow-wrap: anywhere;
 }
 
 .approval-reason {
-  margin: 0;
+  margin: calc(-1 * var(--openbot-space-2)) 0 0;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+  overflow-wrap: anywhere;
 }
 
 @keyframes approval-card-in {

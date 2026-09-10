@@ -1,5 +1,5 @@
 import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
-import { fn } from "storybook/test";
+import { fn, userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { BrowserTakeoverCard } from "../src/features/conversation/ConversationPrompts";
 import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
@@ -30,7 +30,14 @@ const meta = {
     onComplete: fn(async () => true),
     onCancel: fn(async () => true),
   },
-  parameters: { layout: "centered", a11y: { test: "error" } },
+  decorators: [
+    (Story) => (
+      <main class="foundation-story">
+        <Story />
+      </main>
+    ),
+  ],
+  parameters: { layout: "fullscreen", a11y: { test: "error" } },
 } satisfies Meta<typeof BrowserTakeoverCard>;
 
 export default meta;
@@ -48,7 +55,7 @@ export const PreviewUnavailable: Story = {
 
 export const Narrow: Story = {
   render: (args) => (
-    <div style={{ width: "340px" }}>
+    <div style={{ width: "280px", "max-width": "100%" }}>
       <BrowserTakeoverCard {...args} />
     </div>
   ),
@@ -60,4 +67,15 @@ export const Completed: Story = {
 
 export const Cancelled: Story = {
   args: { decision: "cancel" },
+};
+
+export const TabUnavailable: Story = {
+  args: { tab: undefined, preview: null, previewStatus: "failed" },
+};
+
+export const Submitting: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "I’m done" }));
+  },
 };

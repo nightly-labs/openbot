@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentApproval, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { Badge, Button, Check, Input, Monitor, RadioGroup, Skeleton, TriangleAlert, X } from "../../components/ui";
+import { Badge, Button, Check, Input, LoaderCircle, Monitor, RadioGroup, Skeleton, X } from "../../components/ui";
 
 export function ChoiceCard(props: {
   title: string;
@@ -97,15 +97,19 @@ export function ApprovalCard(props: {
   };
 
   return (
-    <section class="approval-card approval-card-approval" aria-label="Agent approval">
-      <header class="approval-card-header">
-        <span class="approval-card-icon" data-kind="approval">
-          <ApprovalIcon />
-        </span>
-        <div>
-          <strong>{approvalTitle(props.approval)}</strong>
-        </div>
+    <section
+      class="approval-card conversation-interaction-card"
+      aria-label="Agent approval"
+      aria-busy={submitting() ? "true" : undefined}
+    >
+      <header class="approval-card-header conversation-interaction-header">
+        <strong>{approvalTitle(props.approval)}</strong>
+        <Badge variant="warning-light" class="conversation-interaction-status" role="status">
+          <LoaderCircle data-icon="inline-start" aria-hidden="true" />
+          Approval
+        </Badge>
       </header>
+      <Show when={props.approval.reason}>{(reason) => <p class="approval-reason">{reason()}</p>}</Show>
       <div class="approval-card-content">
         <Show when={props.approval.command}>
           {(command) => (
@@ -126,30 +130,26 @@ export function ApprovalCard(props: {
         <Show when={props.approval.kind === "permissions"}>
           <PermissionDetails permissions={props.approval.permissions} />
         </Show>
-        <Show when={props.approval.reason}>{(reason) => <p class="approval-reason">{reason()}</p>}</Show>
       </div>
-      <footer class="approval-card-footer approval-card-footer-end">
-        <div class="approval-card-actions">
-          <Button
-            variant="ghost"
-            type="button"
-            class="approval-button approval-button-ghost"
-            disabled={submitting()}
-            onClick={() => void submit("decline")}
-          >
-            {submitting() ? "Waiting…" : "Reject"}
-          </Button>
-          <Button
-            variant="default"
-            type="button"
-            class="approval-button approval-button-primary"
-            disabled={submitting()}
-            onClick={() => void submit("accept")}
-          >
-            {submitting() ? "Sending…" : "Approve"}
-            <ReturnIcon />
-          </Button>
-        </div>
+      <footer class="approval-card-footer">
+        <Button
+          variant="default"
+          type="button"
+          class="approval-button"
+          disabled={submitting()}
+          onClick={() => void submit("accept")}
+        >
+          {submitting() ? "Sending…" : "Allow"}
+        </Button>
+        <Button
+          variant="secondary"
+          type="button"
+          class="approval-button"
+          disabled={submitting()}
+          onClick={() => void submit("decline")}
+        >
+          {submitting() ? "Waiting…" : "Deny"}
+        </Button>
       </footer>
     </section>
   );
@@ -179,31 +179,12 @@ export function BrowserTakeoverCard(props: {
 
   return (
     <section
-      class="browser-takeover-card"
+      class="browser-takeover-card conversation-interaction-card"
       data-decision={props.decision ?? undefined}
       aria-label={accessibleLabel()}
       aria-busy={submitting() ? "true" : undefined}
     >
-      <header class="browser-takeover-header">
-        <span>Browser</span>
-        <Show
-          when={!props.decision}
-          fallback={
-            <Badge variant={completed() ? "success-light" : "secondary"} role="status">
-              <Show when={completed()} fallback={<X data-icon="inline-start" aria-hidden="true" />}>
-                <Check data-icon="inline-start" aria-hidden="true" />
-              </Show>
-              {completed() ? "Done" : "Cancelled"}
-            </Badge>
-          }
-        >
-          <Badge variant="warning-light" role="status">
-            <TriangleAlert data-icon="inline-start" aria-hidden="true" />
-            Action required
-          </Badge>
-        </Show>
-      </header>
-      <div class="browser-takeover-copy">
+      <header class="browser-takeover-header conversation-interaction-header">
         <h2>
           {completed()
             ? `Step completed on ${pageDetails().host}`
@@ -211,6 +192,28 @@ export function BrowserTakeoverCard(props: {
               ? `Step cancelled on ${pageDetails().host}`
               : `Complete the step on ${pageDetails().host}`}
         </h2>
+        <Show
+          when={!props.decision}
+          fallback={
+            <Badge
+              variant={completed() ? "success-light" : "secondary"}
+              class="conversation-interaction-status"
+              role="status"
+            >
+              <Show when={completed()} fallback={<X data-icon="inline-start" aria-hidden="true" />}>
+                <Check data-icon="inline-start" aria-hidden="true" />
+              </Show>
+              {completed() ? "Done" : "Cancelled"}
+            </Badge>
+          }
+        >
+          <Badge variant="warning-light" class="conversation-interaction-status" role="status">
+            <LoaderCircle data-icon="inline-start" aria-hidden="true" />
+            Action required
+          </Badge>
+        </Show>
+      </header>
+      <div class="browser-takeover-copy">
         <p>
           {completed()
             ? `${props.agentName} is continuing.`
@@ -259,18 +262,6 @@ export function BrowserTakeoverCard(props: {
       <Show when={!props.decision}>
         <footer class="browser-takeover-actions">
           <Button
-            variant="ghost"
-            size="sm"
-            type="button"
-            class="approval-button"
-            loading={submitting() === "cancel"}
-            loadingLabel="Cancelling…"
-            disabled={Boolean(submitting())}
-            onClick={() => void submit("cancel")}
-          >
-            Cancel
-          </Button>
-          <Button
             variant="default"
             size="sm"
             type="button"
@@ -281,6 +272,18 @@ export function BrowserTakeoverCard(props: {
             onClick={() => void submit("complete")}
           >
             I’m done
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            class="approval-button"
+            loading={submitting() === "cancel"}
+            loadingLabel="Cancelling…"
+            disabled={Boolean(submitting())}
+            onClick={() => void submit("cancel")}
+          >
+            Cancel
           </Button>
         </footer>
       </Show>
@@ -299,9 +302,9 @@ function browserPageDetails(tab: BrowserTab | undefined): { title: string; host:
 }
 
 function approvalTitle(approval: AgentApproval | undefined) {
-  if (approval?.kind === "command") return "Run this command?";
-  if (approval?.kind === "file-change") return "Approve file changes?";
-  return "Grant permissions?";
+  if (approval?.kind === "command") return "Run a command";
+  if (approval?.kind === "file-change") return "Change files";
+  return "Grant permissions";
 }
 
 function PermissionDetails(props: { permissions: AgentApproval["permissions"] }) {
@@ -318,22 +321,5 @@ function PermissionDetails(props: { permissions: AgentApproval["permissions"] })
     <section class="approval-permissions" aria-label="Requested permissions">
       <For each={details()}>{(detail) => <span>{detail}</span>}</For>
     </section>
-  );
-}
-
-function ApprovalIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20">
-      <path d="M10 2.5 16.2 5v4.3c0 3.8-2.4 6.5-6.2 8.2-3.8-1.7-6.2-4.4-6.2-8.2V5L10 2.5Z" />
-      <path d="m7.3 10 1.8 1.8 3.7-4" />
-    </svg>
-  );
-}
-
-function ReturnIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 16 16">
-      <path d="M4 4.5h5.5a2.5 2.5 0 0 1 0 5H6.8M6.8 7.5l-2.8 2 2.8 2" />
-    </svg>
   );
 }
