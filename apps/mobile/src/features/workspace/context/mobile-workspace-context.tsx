@@ -21,7 +21,7 @@ import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import {
-  createRemoteDirectoryRefresh,
+  createRemoteAccountRefresh,
   createRemoteReadRefresh,
   createWorkspacePreferences,
   mergeRemoteUnreadIds,
@@ -30,7 +30,6 @@ import {
   type RemoteTeamHost,
   type RemoteWorkspacePreferences,
   readAgentAnalytics,
-  watchRemoteDirectory,
 } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { userErrorMessage as errorMessage } from "@openbot/user-errors";
@@ -48,8 +47,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Alert, AppState, View } from "react-native";
-
+import { Alert, View } from "react-native";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
 import {
@@ -69,6 +67,7 @@ import type {
   MobileServerDirectoryState,
   MobileWorkspaceContextValue,
 } from "@/features/workspace/model/workspace-types";
+import { useAppForeground } from "@/shared/lib/use-app-foreground";
 
 export type {
   MobileAgent,
@@ -125,7 +124,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const connections = useRef(new Map<string, ServerConnectionHandle>());
   const loadGeneration = useRef(0);
   const directoryGeneration = useRef(0);
-  const [foreground, setForeground] = useState(AppState.currentState !== "background");
+  const foreground = useAppForeground();
   const [servers, setServers] = useState<MobileServer[]>([]);
   const [serverDirectoryState, setServerDirectoryState] = useState<MobileServerDirectoryState>("loading");
   const [serverDirectoryError, setServerDirectoryError] = useState<string | null>(null);
@@ -216,7 +215,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
 
   const directoryRefresh = useMemo(
     () =>
-      createRemoteDirectoryRefresh(async () => {
+      createRemoteAccountRefresh(async () => {
         const generation = ++directoryGeneration.current;
         setServerDirectoryState("loading");
         setServerDirectoryError(null);
@@ -242,12 +241,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   }, [directoryRefresh]);
 
   useEffect(() => {
-    void refreshHosts().catch(() => undefined);
     return () => {
       directoryGeneration.current += 1;
-      directoryRefresh.invalidate();
+      directoryRefresh.setActive(false);
     };
-  }, [refreshHosts, directoryRefresh]);
+  }, [directoryRefresh]);
 
   const request = useCallback(
     async <T,>(
@@ -338,27 +336,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    let connectionActive = AppState.currentState !== "background";
-    const subscription = AppState.addEventListener("change", (state) => {
-      // iOS system overlays report inactive without putting the app in the background.
-      if (state === "inactive") return;
-      const active = state === "active";
-      if (active === connectionActive) return;
-      connectionActive = active;
-      setForeground(active);
-      if (!active) {
-        loadGeneration.current += 1;
-        conversationStore.cancelRequests();
-        conversationStore.flush();
-      }
-    });
-    return () => subscription.remove();
-  }, [conversationStore]);
-
-  useEffect(() => {
-    if (!foreground) return;
-    return watchRemoteDirectory(() => directoryRefresh.refresh());
-  }, [foreground, directoryRefresh]);
+    if (!foreground) {
+      loadGeneration.current += 1;
+      conversationStore.cancelRequests();
+      conversationStore.flush();
+    }
+    directoryRefresh.setActive(foreground);
+  }, [foreground, directoryRefresh, conversationStore]);
 
   const loadConversation = useCallback(
     async (agentId: string, serverId = activeServerIdRef.current, refresh = false) => {

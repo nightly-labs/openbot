@@ -7,6 +7,7 @@ import {
   type SignalClientMessage,
   type SignalServerMessage,
 } from "@openbot/contracts/signal-protocol/messages";
+import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   decodeTeamProtocolV2AuthFrame,
   decodeTeamProtocolV2EventFrame,
@@ -156,6 +157,7 @@ interface PeerState {
 
 const CHANNELS: ChannelKind[] = ["rpc", "events", "files", "desktop"];
 const DISCONNECT_GRACE_MS = 5_000;
+const COMPATIBILITY_REQUEST_TIMEOUT_MS = 3_000;
 const REQUEST_TIMEOUT_MS = 10 * 60_000 + 30_000;
 
 export function createRemoteTeamPeer(actions: ActionsRef) {
@@ -206,7 +208,9 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         } else {
           scheduleTurnRefresh(state);
           if (!state.socket) openSignal(state, actions);
-          resyncIfNeeded(state, actions);
+          // The recovery owner reloads workspace reads on every foreground return.
+          // Do not request a second reload for reads canceled on background entry.
+          state.needsResync = false;
         }
       }
     },
@@ -707,11 +711,19 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     const bodyTransferId = upload ? await files.upload(upload) : null;
     if (peer !== state || !isPeerOnline(state)) throw new Error("The attachment connection changed.");
     const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
+    const checksConnection = method === "GET" && path === TEAM_API_ROUTES.compatibility;
     const result = new Promise<{ status: number; body: TeamProtocolV2Json }>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        pendingRequests.delete(requestId);
-        reject(new Error("The desktop request timed out."));
-      }, REQUEST_TIMEOUT_MS);
+      const timer = setTimeout(
+        () => {
+          pendingRequests.delete(requestId);
+          const error = new Error("The desktop request timed out.");
+          reject(error);
+          // The required compatibility read also confirms that a reused peer can answer.
+          // Do not keep retrying reads on channels whose local state is stale.
+          if (checksConnection) failPeer(state, error, actions);
+        },
+        checksConnection ? COMPATIBILITY_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
+      );
       pendingRequests.set(requestId, { method, path, resolve, reject, timer });
     });
     void sendPayload(
@@ -806,7 +818,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
   function scheduleReconnect(state: PeerState, actions: ActionsRef): void {
     if (!active || state.reconnectTimer !== null) return;
     // A signaling-only interruption can resume inside Signal's grace window while
-    // the data channels stay online. Offline peers use the one-minute recovery cadence.
+    // the data channels stay online. The recovery owner replaces dead peers.
     const delay = isPeerOnline(state) ? Math.min(30_000, 500 * 2 ** state.reconnectAttempt++) : 60_000;
     state.reconnectTimer = setTimeout(() => {
       state.reconnectTimer = null;

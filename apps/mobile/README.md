@@ -47,7 +47,7 @@ The native UI does not depend on a native WebRTC module. A hidden Expo DOM compo
 events to React Native. This keeps the production transport identical while remaining testable in
 Expo Go without a development build.
 
-Remote connection recovery makes up to five attempts, waiting 10 seconds after each failure. After
+Remote connection recovery starts the first attempt immediately, then waits 10 seconds after each failure. After
 five failures it waits two minutes before starting a new series. The agent list shows `Reconnecting`
 beside the server-list button in the header, with a smaller attempt counter and retry countdown below.
 The status disappears once connected. Chat shows a compact, centered `Reconnecting · x/5 · m:ss`
@@ -57,8 +57,13 @@ The composer and status track interactive keyboard dismissal through `KeyboardSt
 `KeyboardChatScrollView` uses the same native keyboard frames for message insets and scrolling.
 There is no additional `KeyboardAvoidingView` or keyboard-event timer in the chat. The status disappears
 after reconnecting. Countdown ticks are local UI
-updates, not requests. Backgrounding suspends retries; returning respects any remaining wait and
-starts at most one attempt if its deadline has passed. A successful connection resets the counter. Dead
+updates, not requests. Backgrounding suspends retries. Returning reuses the existing peer and reloads
+workspace data silently. A healthy connection stays online and usable during this check; returning
+does not show `Reconnecting` or disable sending. These reads use the existing WebRTC connection,
+without creating an account session or ticket. The required compatibility read has a three-second deadline; a silent peer is closed
+and its first replacement starts immediately. RTC disconnections keep their five-second recovery grace
+period. A previous failed connection attempt keeps its retry deadline across app switches. A successful
+connection resets the counter. Dead
 WebRTC peers are discarded and authenticated again. Recovery reloads cached conversations as well
 as agents and unread counts, including after an event-buffer reset. An interruption of Signal alone
 can resume sooner while the authenticated WebRTC connection is still healthy, without a new ticket.
@@ -107,6 +112,14 @@ successful join or require reusing the one-use invitation.
 After Mobile Connect has enabled publishing, restarting the development desktop restores its
 WebRTC host as well as its local HTTP API. A local-only `online` status is not enough for mobile
 connections. The separate development test client never auto-publishes.
+
+Account validation and the server directory share the same refresh policy, with one controller per
+endpoint and account. They refresh when 15 minutes have passed since the last successful response,
+including on foreground return. Failed requests retry after one minute while foregrounded. Pending
+requests are shared; an invalidation during a request causes one follow-up after success. Background
+entry stops timers, and iOS system overlays do not restart them. Ordinary RTC failures do not reload
+the directory. Session revocation and membership actions still refresh it. A stored session is shown
+while startup validation runs; an invalid credential clears that login, while network failures retain it.
 
 ## Source structure
 

@@ -1,6 +1,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import type { MobileSession } from "../api/mobile-auth";
 import { MobileSessionProvider, useMobileSession } from "./mobile-session-context";
 
@@ -115,11 +116,11 @@ it("checks every 15 minutes while open, preserves the timer through overlays, an
   expect(native.validate).toHaveBeenCalledTimes(1);
   await transition("inactive");
   await transition("active");
-  expect(native.validate).toHaveBeenCalledTimes(1);
+  expect(native.validate).toHaveBeenCalledTimes(2);
   await act(async () => {
     await vi.advanceTimersByTimeAsync(15 * 60_000);
   });
-  expect(native.validate).toHaveBeenCalledTimes(2);
+  expect(native.validate).toHaveBeenCalledTimes(3);
 });
 
 it("coalesces pending profile invalidations and applies the latest profile", async () => {
@@ -134,8 +135,8 @@ it("coalesces pending profile invalidations and applies the latest profile", asy
     refreshing = current.refreshProfile();
   });
   await act(async () => {
-    await current.refreshProfile();
-    await current.refreshProfile();
+    void current.refreshProfile();
+    void current.refreshProfile();
   });
   native.validate.mockImplementation(async (_value, apply) => {
     const updated = { ...session, user: { ...session.user, name: "Latest" } };
@@ -145,6 +146,7 @@ it("coalesces pending profile invalidations and applies the latest profile", asy
   await act(async () => {
     pending.resolve({ ...session, user: { ...session.user, name: "Updated" } });
     await refreshing;
+    await vi.advanceTimersByTimeAsync(0);
   });
   expect(native.validate).toHaveBeenCalledTimes(2);
   expect(current.session?.user.name).toBe("Latest");
@@ -169,4 +171,74 @@ it("retains the credential after a network failure without retrying on backgroun
   await transition("active");
   expect(native.validate).toHaveBeenCalledTimes(1);
   expect(current.session).toBe(session);
+});
+
+it.each([0, 5, 10, 15, 60])("checks on return after %i minutes only when the account is stale", async (minutes) => {
+  await transition("background");
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(minutes * 60_000);
+  });
+  await transition("active");
+  expect(native.validate).toHaveBeenCalledTimes(minutes >= 15 ? 1 : 0);
+});
+
+it("keeps the original validation deadline across repeated short visits", async () => {
+  for (let visit = 0; visit < 3; visit += 1) {
+    await transition("background");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+    });
+    await transition("active");
+  }
+  expect(native.validate).toHaveBeenCalledTimes(1);
+});
+
+it("shows a stored session while validation is pending and ignores its result after account replacement", async () => {
+  const pending = Promise.withResolvers<MobileSession | null>();
+  native.validate.mockImplementationOnce(async (_value, apply) => {
+    const result = await pending.promise;
+    apply?.(result);
+    return result;
+  });
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await act(async () =>
+    root.render(
+      <MobileSessionProvider>
+        <Account />
+      </MobileSessionProvider>,
+    ),
+  );
+  expect(current.loading).toBe(false);
+  expect(current.session).toBe(session);
+  const replacement = { ...session, sessionToken: "replacement" };
+  await act(async () => current.connect(replacement));
+  await act(async () => {
+    pending.resolve(null);
+  });
+  expect(current.session).toBe(replacement);
+});
+
+it("shares one lifecycle subscription with workspace consumers", async () => {
+  let workspaceForeground = true;
+  function Workspace() {
+    workspaceForeground = useAppForeground();
+    return null;
+  }
+  await act(async () =>
+    root.render(
+      <MobileSessionProvider>
+        <Account />
+        <Workspace />
+      </MobileSessionProvider>,
+    ),
+  );
+  expect(native.listeners.size).toBe(1);
+  await transition("background");
+  expect(workspaceForeground).toBe(false);
+  await transition("inactive");
+  expect(workspaceForeground).toBe(false);
+  await transition("active");
+  expect(workspaceForeground).toBe(true);
+  expect(native.validate).not.toHaveBeenCalled();
 });
