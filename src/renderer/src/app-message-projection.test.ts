@@ -5,7 +5,7 @@ import {
   routineConversationEventItemType,
   routineRunConversationEventItemType,
 } from "@openbot/contracts/ipc";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentProfilesEqual, toAgentMessage, toAgentMessages, toAgentProfile } from "./app-message-projection";
 
 describe("toAgentProfile", () => {
@@ -210,3 +210,42 @@ function agentSummary(updatedAt: string): AgentSummary {
     avatarUrl: null,
   };
 }
+
+describe.each(["en-US", "pl-PL"])("chat timestamps in %s", (locale) => {
+  const DateTimeFormat = Intl.DateTimeFormat;
+
+  beforeEach(() => {
+    vi.stubEnv("TZ", "America/Los_Angeles");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T07:05:00Z"));
+    vi.spyOn(Intl, "DateTimeFormat").mockImplementation(function dateTimeFormat(locales, options) {
+      return new DateTimeFormat(locales ?? locale, options);
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  const examples = [
+    ["2026-09-09T07:00:00Z", { hour: "2-digit", minute: "2-digit" }],
+    ["2026-09-09T06:59:00Z", { dateStyle: "medium", timeStyle: "short" }],
+    ["2026-09-08T07:00:00Z", { dateStyle: "medium", timeStyle: "short" }],
+    ["2025-09-09T07:00:00Z", { dateStyle: "medium", timeStyle: "short" }],
+    ["2026-08-09T07:00:00Z", { dateStyle: "medium", timeStyle: "short" }],
+    ["2026-09-10T07:00:00Z", { dateStyle: "medium", timeStyle: "short" }],
+  ] satisfies [string, Intl.DateTimeFormatOptions][];
+
+  it.each(examples)("shows the local timestamp for %s", (createdAt, options) => {
+    const message: ConversationMessage = {
+      id: "dated-message",
+      author: "assistant",
+      text: "Daily report",
+      createdAt,
+      status: "completed",
+    };
+    expect(toAgentMessage(message).time).toBe(new DateTimeFormat(locale, options).format(new Date(createdAt)));
+  });
+});

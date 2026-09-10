@@ -14,6 +14,7 @@ import {
 } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 import { TeamPersonAvatar, teamMemberName } from "../team/TeamPersonAvatar";
+import { formatChatTimestamp } from "./chat-timestamp";
 import { calculateChatScrollMargin, createChatVirtualizer } from "./createChatVirtualizer";
 import { ScrollToLatestButton, scrollToLatestMessage } from "./MessageNavigation";
 import {
@@ -399,10 +400,7 @@ export function DirectConversation(props: DirectConversationProps) {
 }
 
 function messageTime(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+  return formatChatTimestamp(new Date(value));
 }
 
 function LockIcon() {

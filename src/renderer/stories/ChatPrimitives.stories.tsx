@@ -3,6 +3,7 @@ import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, Show } from "solid-js";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { toAgentMessage } from "../src/app-message-projection";
 import {
   Bubble,
   BubbleContent,
@@ -412,4 +413,29 @@ export const NarrowConversation: Story = {
     const stage = canvas.getByRole("region", { name: "Integrated chat example" });
     await expect(stage.scrollWidth).toBeLessThanOrEqual(stage.clientWidth);
   },
+};
+
+export const MessageDates: Story = {
+  render: () => (
+    <main class="foundation-story">
+      <Heading as="h1" size="lg">
+        Chat message dates
+      </Heading>
+      {[1, 0].map((daysAgo) => {
+        const date = new Date();
+        date.setDate(date.getDate() - daysAgo);
+        return (
+          <PrototypeMessage
+            message={toAgentMessage({
+              id: `dated-message-${daysAgo}`,
+              author: daysAgo ? "user" : "assistant",
+              text: daysAgo ? "Yesterday’s request" : "Today’s response",
+              createdAt: date.toISOString(),
+              status: "completed",
+            })}
+          />
+        );
+      })}
+    </main>
+  ),
 };

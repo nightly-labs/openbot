@@ -422,6 +422,23 @@ export const AgentLongLabels: Story = {
   ],
 };
 
+export const TimestampLabels: Story = {
+  ...AgentLongLabels,
+  args: {
+    ...AgentLongLabels.args,
+    agents: longLabelAgents.map((agent, index) => {
+      const updatedAt = new Date();
+      updatedAt.setDate(updatedAt.getDate() - [0, 1, 30][index % 3]);
+      updatedAt.setHours(13, 42, 0, 0);
+      return {
+        ...agent,
+        updatedAt: updatedAt.toISOString(),
+        time: new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(updatedAt),
+      };
+    }),
+  },
+};
+
 export const AgentContextMenu: Story = {
   args: {
     people: [],
