@@ -8,6 +8,8 @@ import type { ComposerDraft, ConversationProps, ConversationTarget } from "../co
 export interface ComposerActionsDeps {
   props: ConversationProps;
   takenQueueEdits: Set<string>;
+  pendingQueueEdit: () => ConversationTarget | null;
+  setPendingQueueEdit: (target: ConversationTarget | null) => void;
   agentReady: () => boolean;
   drafts: () => Record<string, ComposerDraft>;
   setDrafts: (update: (current: Record<string, ComposerDraft>) => Record<string, ComposerDraft>) => void;
@@ -84,6 +86,12 @@ export function createComposerActions(deps: ComposerActionsDeps) {
 
   function addAttachments(selected: DraftAttachment[], target = deps.currentTarget()) {
     if (!target) return;
+    const pending = deps.pendingQueueEdit();
+    if (pending?.agentId === target.agentId && pending.serverId === target.serverId) {
+      for (const attachment of selected)
+        void window.openbot.agent.discardDraftAttachment(attachment.id, target.serverId);
+      return;
+    }
     deps.clearConversationError(target);
     const key = composerDraftKey(target);
     const draft = deps.drafts()[key] ?? EMPTY_DRAFT;
@@ -119,13 +127,14 @@ export function createComposerActions(deps: ComposerActionsDeps) {
   async function editQueuedMessage(delivery: QueueDelivery) {
     const agentId = deps.props.agent?.id;
     const serverId = deps.props.server?.id ?? "local";
-    if (!agentId || delivery.status !== "queued" || deps.submitting()) return;
+    if (!agentId || delivery.status !== "queued" || deps.submitting() || deps.pendingQueueEdit()) return;
     if (deps.editingDeliveryId()) {
       deps.setComposerError("Send or cancel the current edit before editing another queued message.");
       return;
     }
     deps.clearConversationError({ agentId, serverId });
     deps.setSubmitting(true);
+    deps.setPendingQueueEdit({ agentId, serverId });
     let prepared: { text: string; attachments: DraftAttachment[] };
     const canTake =
       deps.props.server?.kind !== "remote" ||
@@ -142,6 +151,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       );
       return;
     } finally {
+      deps.setPendingQueueEdit(null);
       deps.setSubmitting(false);
     }
     const backup = deps.drafts()[composerDraftKey({ agentId, serverId })] ?? EMPTY_DRAFT;
@@ -168,6 +178,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
   }
 
   function cancelQueuedMessageEdit() {
+    if (deps.pendingQueueEdit()) return;
     const agentId = deps.editingAgentId() ?? deps.props.agent?.id;
     const serverId = deps.editingServerId() ?? deps.props.server?.id ?? "local";
     const target = agentId ? { agentId, serverId } : undefined;
@@ -201,7 +212,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const serverId = target?.serverId ?? deps.editingServerId() ?? deps.props.server?.id ?? "local";
     const deliveryId = target?.deliveryId ?? deps.editingDeliveryId();
     const draft = draftOverride ?? deps.currentDraft();
-    if (!agentId || !deliveryId || deps.submitting()) return false;
+    if (!agentId || !deliveryId || deps.submitting() || deps.pendingQueueEdit()) return false;
     const text = expandComposerMentions(draft.text);
     const taken = takenEdits.has(editKey(serverId, agentId, deliveryId));
     if (!taken && !target && deps.props.queue?.deliveries.find((item) => item.id === deliveryId)?.status !== "queued") {
@@ -221,6 +232,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     stopTeamTyping();
     deps.setSubmitting(true);
     deps.setComposerError(null);
+    deps.setPendingQueueEdit({ agentId, serverId });
     let saved = false;
     try {
       saved = taken
@@ -232,6 +244,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     } catch (error) {
       deps.setComposerError(errorMessage(error, "Could not send the edited message. Try again."));
     } finally {
+      deps.setPendingQueueEdit(null);
       deps.setSubmitting(false);
     }
     if (!saved) return false;

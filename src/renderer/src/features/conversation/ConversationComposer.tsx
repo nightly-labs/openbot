@@ -125,7 +125,7 @@ export function ConversationComposer() {
                 variant="ghost"
                 type="button"
                 aria-label="Cancel reply"
-                disabled={voicePhase() === "transcribing"}
+                disabled={submitting() || voicePhase() === "transcribing"}
                 onClick={() => updateCurrentDraft({ replyToMessageId: null })}
               >
                 <CloseIcon />
@@ -172,7 +172,7 @@ export function ConversationComposer() {
                     </Show>
                     <ImageRemoveButton
                       label={`Remove ${attachment.name}`}
-                      disabled={voicePhase() === "transcribing"}
+                      disabled={submitting() || voicePhase() === "transcribing"}
                       onClick={() => removeAttachment(attachment.id)}
                     />
                   </div>

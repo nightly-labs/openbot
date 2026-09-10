@@ -36,6 +36,8 @@ export function createConversationViewScope(props: ConversationProps) {
     editingDraftBackup,
     setEditingDraftBackup,
     takenQueueEdits,
+    pendingQueueEdit,
+    setPendingQueueEdit,
     editingOriginalAttachmentIds,
     setEditingOriginalAttachmentIds,
     composerFocusRequest,
@@ -56,7 +58,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setVoiceElapsedSeconds,
     markingRead,
     setMarkingRead,
-    submitting,
+    submitting: viewSubmitting,
     setSubmitting,
     selectionSending,
     setSelectionSending,
@@ -106,6 +108,11 @@ export function createConversationViewScope(props: ConversationProps) {
     setBrowserPanelWidth,
     resources,
   } = controller;
+  const queueEditPending = () => {
+    const pending = pendingQueueEdit();
+    return pending?.agentId === props.agent?.id && pending?.serverId === (props.server?.id ?? "local");
+  };
+  const submitting = () => viewSubmitting() || queueEditPending();
   const panels = createPanelsStore({
     props,
     rightPanels,
@@ -152,6 +159,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const { installedSkills } = skills;
   const composer = createComposerStore({
     props,
+    queueEditPending,
     drafts,
     setDrafts,
     conversationErrors,
@@ -309,6 +317,8 @@ export function createConversationViewScope(props: ConversationProps) {
     editingDraftBackup,
     setEditingDraftBackup,
     takenQueueEdits,
+    pendingQueueEdit,
+    setPendingQueueEdit,
     editingOriginalAttachmentIds,
     setEditingOriginalAttachmentIds,
     submitting,
@@ -383,6 +393,7 @@ export function createConversationViewScope(props: ConversationProps) {
   } = actions;
   const messageActions = createMessageActions({
     props,
+    queueEditPending,
     installedSkills,
     currentDraft,
     updateCurrentDraft,

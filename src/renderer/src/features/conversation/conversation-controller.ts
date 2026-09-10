@@ -5,6 +5,7 @@ import type { ChatSearchMatch } from "./chat-search";
 import type {
   ComposerDraft,
   ConversationProps,
+  ConversationTarget,
   MediaPreview,
   RightPanelMode,
   SidebarFilePreview,
@@ -88,6 +89,7 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
   const [editingAgentId, setEditingAgentId] = createSignal<string | null>(null);
   const [editingServerId, setEditingServerId] = createSignal<string | null>(null);
   const takenQueueEdits = new Set<string>();
+  const [pendingQueueEdit, setPendingQueueEdit] = createSignal<ConversationTarget | null>(null);
   const [editingDeliveryId, setEditingDeliveryId] = createSignal<string | null>(null);
   const [editingDraftBackup, setEditingDraftBackup] = createSignal<ComposerDraft | null>(null);
   const [editingOriginalAttachmentIds, setEditingOriginalAttachmentIds] = createSignal<string[]>([]);
@@ -159,6 +161,8 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
     editingServerId,
     setEditingServerId,
     takenQueueEdits,
+    pendingQueueEdit,
+    setPendingQueueEdit,
     editingDeliveryId,
     setEditingDeliveryId,
     editingDraftBackup,

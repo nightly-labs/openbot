@@ -223,7 +223,9 @@ the released cancel endpoint. Mobile keeps drafts in the workspace provider, key
 so navigation and late take responses preserve edits, attachments, and reply targets until send or explicit cancellation.
 Pending edited sends also belong to this store: navigation cannot enable a duplicate send or replace the draft
 before the request completes. Desktop keeps taken-delivery IDs with its stable editing state across view
-replacement, and requires send or explicit cancellation before another queue edit can start.
+replacement, and requires send or explicit cancellation before another queue edit can start. Pending desktop
+queue operations also live in stable state, keyed by server and agent. The matching composer remains locked
+across server switches until the request completes; other server composers remain available.
 Desktop hosts without `queue-take` keep the original delivery and save edits through `queue/update`.
 Desktop hosts with that capability use the server-scoped `agent:take-queued-message` IPC endpoint. The optional `queue-take` capability adds `POST /v1/agents/:id/queue/take`
 for attachment edits: the host copies attachment drafts, rechecks and cancels the queued delivery,

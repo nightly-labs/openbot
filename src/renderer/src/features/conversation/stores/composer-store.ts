@@ -7,6 +7,7 @@ import type { ComposerDraft, ConversationProps, ConversationTarget } from "../co
 
 export interface ComposerStoreDeps {
   props: ConversationProps;
+  queueEditPending: () => boolean;
   drafts: () => Record<string, ComposerDraft>;
   setDrafts: (update: (current: Record<string, ComposerDraft>) => Record<string, ComposerDraft>) => void;
   conversationErrors: () => Record<string, string>;
@@ -67,7 +68,7 @@ export function createComposerStore(deps: ComposerStoreDeps) {
 
   const updateCurrentDraft = (patch: Partial<ComposerDraft>) => {
     const target = currentTarget();
-    if (!target) return;
+    if (!target || deps.queueEditPending()) return;
     clearConversationError(target);
     const key = composerDraftKey(target);
     deps.setDrafts((current) => ({

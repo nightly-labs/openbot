@@ -12,6 +12,7 @@ import type { ComposerDraft, ConversationProps } from "../conversation-types";
 
 export interface MessageActionsDeps {
   props: ConversationProps;
+  queueEditPending: () => boolean;
   installedSkills: () => InstalledSkill[];
   currentDraft: () => ComposerDraft;
   updateCurrentDraft: (patch: Partial<ComposerDraft>) => void;
@@ -93,6 +94,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
   }
 
   function removeAttachment(id: string) {
+    if (deps.queueEditPending()) return;
     const serverId = deps.currentTarget()?.serverId;
     deps.updateCurrentDraft({
       attachments: deps.currentDraft().attachments.filter((attachment) => attachment.id !== id),
