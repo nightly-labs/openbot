@@ -319,11 +319,24 @@ account-to-Signal outbox before returning. Worker `waitUntil` delivers notificat
 profile-save response path, with a five-second timeout per request and outbox retries. Signal forwards the optional frame only to authenticated sockets for that
 user; the frame contains no profile or credential. Desktop and mobile fetch the profile through
 the account API on notification, cold launch, and every 15 minutes while active.
-Returning from the background or restoring window focus does not trigger an automatic account
-or directory check. iOS `inactive` alone does not trigger a check or reset the periodic timer.
+Desktop window focus does not trigger an automatic account or directory check.
+Mobile uses one shared lifecycle subscription and a refresh controller per account endpoint.
+A foreground return checks absolute freshness: successful account and directory responses stay fresh
+for 15 minutes, and background time counts toward that deadline. Failed mobile checks retry after
+one minute while foregrounded. Concurrent requests share one promise; invalidations received during
+a request cause one follow-up after success. iOS `inactive` alone does not reset these deadlines.
+Stored mobile sessions become available before startup validation completes; network failures retain
+them, and validation results apply only to the initiating login.
 Explicit profile invalidations trigger an earlier check and are deferred while mobile is in the
 background. Signal readiness does not trigger a profile check; the account timer remains independent
-of transport recovery. Failed automatic checks use the same interval.
+of transport recovery. Failed desktop automatic checks use the same interval.
+Each mobile server has one connection recovery owner. It reloads workspace reads on foreground
+return without changing a healthy server to `connecting` or disabling its actions. These reads reuse
+the existing WebRTC peer and do not request new account sessions or tickets. The first replacement
+starts immediately after actual connection loss.
+The required compatibility read has a three-second timeout to detect stale open channels. Delays
+apply after failed replacements and survive app switches. The peer owns Signal socket recovery,
+not full connection retries. Ordinary transport loss does not invalidate the account directory.
 Older Signal clients ignore this optional event. API and Signal both need the event support for push;
 the periodic check remains the fallback when Signal is unavailable. Unchanged responses do not
 publish a new identity. Desktop ignores reads overtaken by a local edit, sign-out or shutdown;

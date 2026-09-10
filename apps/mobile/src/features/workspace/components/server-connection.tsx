@@ -48,7 +48,6 @@ export function ServerConnection({
   const activeRef = useRef(active);
   activeRef.current = active;
   const generation = useRef(0);
-  const wasOnline = useRef(false);
   const membershipRefreshPending = useRef(false);
   const attach = useCallback((value: RemoteTeamTransportRef | null) => setClient(value), []);
 
@@ -104,13 +103,11 @@ export function ServerConnection({
       onTeamEvent={onTeamEvent}
       onConnectionUpdate={(update) => {
         if (update.hostId !== hostId) return;
-        if (update.state === "online") wasOnline.current = true;
         if (update.state === "offline") {
-          if (update.code === "session_revoked" || wasOnline.current) {
+          if (update.code === "session_revoked") {
             if (activeRef.current) void onMembershipChanged?.().catch(() => undefined);
             else membershipRefreshPending.current = true;
           }
-          wasOnline.current = false;
           const error = new Error(update.message ?? "The desktop went offline.");
           if (update.code === "protocol_error") controller.current?.suspend(error);
           else controller.current?.offline(error);

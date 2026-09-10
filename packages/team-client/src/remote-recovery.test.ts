@@ -12,7 +12,7 @@ import {
 afterEach(() => vi.useRealTimers());
 
 describe("remote connection recovery", () => {
-  it("keeps a healthy connection online across background transitions and data refreshes", async () => {
+  it("keeps foreground checks and explicit data refreshes online", async () => {
     vi.useFakeTimers();
     const load = vi.fn(async () => {});
     const status = vi.fn();
@@ -23,14 +23,61 @@ describe("remote connection recovery", () => {
     recovery.setActive(false);
     recovery.setActive(true);
     await vi.advanceTimersByTimeAsync(0);
-    expect(load).toHaveBeenCalledTimes(1);
-    expect(status).not.toHaveBeenCalled();
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(status.mock.calls.map(([value]) => value.phase)).toEqual(["online"]);
+    status.mockClear();
     recovery.refresh();
     await vi.advanceTimersByTimeAsync(0);
-    expect(load).toHaveBeenCalledTimes(2);
+    expect(load).toHaveBeenCalledTimes(3);
     expect(status.mock.calls.map(([value]) => value.phase)).toEqual(["online"]);
     recovery.dispose();
   });
+
+  it("replaces a stale peer immediately after a resume read fails, then preserves failure backoff", async () => {
+    vi.useFakeTimers();
+    const load = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValue(new Error("Offline"));
+    const recovery = createRemoteConnectionRecovery(load, () => {});
+    recovery.setActive(true);
+    await vi.advanceTimersByTimeAsync(0);
+    recovery.setActive(false);
+    await vi.advanceTimersByTimeAsync(60 * 60_000);
+    recovery.setActive(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(load).toHaveBeenCalledTimes(3);
+    for (let visit = 0; visit < 5; visit += 1) {
+      recovery.setActive(false);
+      recovery.setActive(true);
+    }
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(load).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(load).toHaveBeenCalledTimes(4);
+    recovery.dispose();
+  });
+
+  it.each([true, false])(
+    "preserves failure backoff when an attempt finishes with foreground=%s",
+    async (foreground) => {
+      vi.useFakeTimers();
+      let fail = (_error: Error) => {};
+      const pending = new Promise<void>((_resolve, reject) => {
+        fail = reject;
+      });
+      const load = vi.fn().mockReturnValueOnce(pending).mockResolvedValue(undefined);
+      const recovery = createRemoteConnectionRecovery(load, () => {});
+      recovery.setActive(true);
+      recovery.setActive(false);
+      if (foreground) recovery.setActive(true);
+      fail(new Error("Desktop offline"));
+      await vi.advanceTimersByTimeAsync(0);
+      recovery.setActive(true);
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(load).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(load).toHaveBeenCalledTimes(2);
+      recovery.dispose();
+    },
+  );
 
   it("retains a data invalidation received in the background until resume", async () => {
     vi.useFakeTimers();
@@ -48,11 +95,11 @@ describe("remote connection recovery", () => {
     recovery.dispose();
   });
 
-  it("replaces interrupted reads once after resume without overlapping them", async () => {
+  it.each([false, true])("replaces interrupted reads once after resume with cancellation=%s", async (cancelled) => {
     vi.useFakeTimers();
     let finish = () => {};
-    const pending = new Promise<void>((resolve) => {
-      finish = resolve;
+    const pending = new Promise<void>((resolve, reject) => {
+      finish = () => (cancelled ? reject(new Error("The app is in the background.")) : resolve());
     });
     const load = vi.fn().mockReturnValueOnce(pending).mockResolvedValue(undefined);
     const recovery = createRemoteConnectionRecovery(load, () => {});
@@ -89,9 +136,7 @@ describe("remote connection recovery", () => {
     await vi.advanceTimersByTimeAsync(0);
     recovery.offline(new Error(reason));
     expect(message).toContain(`Connecting to the desktop: ${reason}`);
-    await vi.advanceTimersByTimeAsync(1_000);
-    expect(message).toContain(`Connecting to the desktop: ${reason}`);
-    await vi.advanceTimersByTimeAsync(9_000);
+    await vi.advanceTimersByTimeAsync(0);
     expect(message).toBeNull();
     recovery.dispose();
   });
@@ -235,10 +280,10 @@ describe("remote connection recovery", () => {
     await vi.advanceTimersByTimeAsync(180_000);
     expect(attempts).toBe(6);
     connected = false;
-    recovery.offline();
-    expect(messages.at(-1)).toBe("Connection lost. Retrying in 10s.");
     const attemptsBeforeRetry = connecting.length;
-    await vi.advanceTimersByTimeAsync(10_000);
+    recovery.offline();
+    expect(messages.at(-1)).toBe("Reconnecting 1/5");
+    await vi.advanceTimersByTimeAsync(0);
     expect(connected).toBe(true);
     expect(connecting.slice(attemptsBeforeRetry)).toEqual(["Reconnecting 1/5"]);
     expect(connecting.at(-1)).toBe("Reconnecting 1/5");
@@ -352,8 +397,8 @@ describe("remote connection recovery", () => {
     // The retry deadline already elapsed, but no new work starts until the old work settles.
     await vi.advanceTimersByTimeAsync(0);
     expect(attempts).toBe(2);
-    recovery.offline();
     recovery.dispose();
+    recovery.offline();
     await vi.advanceTimersByTimeAsync(180_000);
     expect(attempts).toBe(2);
   });

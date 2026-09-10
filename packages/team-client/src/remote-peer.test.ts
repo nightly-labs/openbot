@@ -16,6 +16,7 @@ import {
   type RemoteTeamCommand,
   type RemoteTeamConnectionUpdate,
 } from "./remote-peer";
+import { createRemoteConnectionRecovery } from "./remote-recovery";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./webrtc-framing";
 
 afterEach(() => {
@@ -24,6 +25,66 @@ afterEach(() => {
 });
 
 describe("browser remote peer recovery", () => {
+  it("checks healthy foreground returns silently without requesting new session tickets", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    let requested = deferred();
+    let response = Promise.resolve();
+    const network = await setupNetwork({
+      responseBody: { appVersion: "test", protocol: { minimum: 3, maximum: 3 }, capabilities: [] },
+      beforeResponse: () => {
+        requested.resolve();
+        return response;
+      },
+    });
+    let online = deferred();
+    const phases: string[] = [];
+    const recovery = createRemoteConnectionRecovery(
+      async () => {
+        const connected = await network.connect();
+        if (!connected.ok) throw new Error(connected.error);
+        const checked = await network.runtime.execute({
+          id: "foreground-read",
+          type: "request",
+          method: "GET",
+          path: "/v1/compatibility",
+          body: {},
+        });
+        if (!checked.ok) throw new Error(checked.error);
+      },
+      () => {},
+      (status) => {
+        phases.push(status.phase);
+        if (status.phase === "online") online.resolve();
+      },
+    );
+    try {
+      recovery.setActive(true);
+      await online.promise;
+      for (const minutes of [0, 5, 10, 15, 60]) {
+        recovery.setActive(false);
+        network.runtime.setActive(false);
+        await vi.advanceTimersByTimeAsync(minutes * 60_000);
+        phases.length = 0;
+        requested = deferred();
+        online = deferred();
+        const pending = deferred();
+        response = pending.promise;
+        network.runtime.setActive(true);
+        recovery.setActive(true);
+        await requested.promise;
+        // A pending health read must not disable the workspace or show Reconnecting.
+        expect(phases).toEqual([]);
+        expect(network.bootstraps()).toBe(1);
+        pending.resolve();
+        await online.promise;
+        expect(phases).toEqual(["online"]);
+      }
+    } finally {
+      recovery.dispose();
+      await network.runtime.dispose();
+    }
+  });
+
   it("uploads photo bytes when the mobile runtime has no crypto.randomUUID", async () => {
     const random = crypto.getRandomValues.bind(crypto);
     vi.stubGlobal("crypto", { getRandomValues: random, subtle: crypto.subtle });
@@ -208,6 +269,34 @@ describe("browser remote peer recovery", () => {
     }
   });
 
+  it("discards a silent peer after the required compatibility read times out", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const response = deferred();
+    const requested = deferred();
+    const network = await setupNetwork({
+      beforeResponse: () => {
+        requested.resolve();
+        return response.promise;
+      },
+    });
+    await network.connect();
+    const reading = network.runtime.execute({
+      id: "resume-check",
+      type: "request",
+      method: "GET",
+      path: "/v1/compatibility",
+      body: {},
+    });
+    await requested.promise;
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(network.updates.at(-1)).toMatchObject({ state: "offline" });
+    await expect(reading).resolves.toMatchObject({ ok: false, error: "The desktop request timed out." });
+    await expect(network.connect()).resolves.toMatchObject({ ok: true });
+    expect(network.bootstraps()).toBe(2);
+    response.resolve();
+    await network.runtime.dispose();
+  });
+
   it("rejects a malformed bootstrap response instead of leaving the agent loader pending forever", async () => {
     const network = await setupNetwork();
     await network.connect();
@@ -349,7 +438,7 @@ describe("browser remote peer recovery", () => {
     network.connection().drop("disconnected");
     await vi.advanceTimersByTimeAsync(2_000);
     network.connection().drop("connected");
-    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(3_000);
     const result = await network.runtime.execute({
       id: "after-network-change",
       type: "request",
@@ -455,7 +544,7 @@ describe("browser remote peer recovery", () => {
     await network.runtime.dispose();
   });
 
-  it("reports canceled reads for data synchronization without replacing the healthy peer", async () => {
+  it("leaves resume reads to the recovery owner without replacing the healthy peer", async () => {
     const network = await setupNetwork();
     await network.connect();
     network.updates.length = 0;
@@ -474,7 +563,7 @@ describe("browser remote peer recovery", () => {
     network.runtime.setActive(false);
     await read;
     network.runtime.setActive(true);
-    expect(network.updates).toEqual([{ hostId: "host", state: "online", message: null, resync: true }]);
+    expect(network.updates).toEqual([]);
     expect(network.bootstraps()).toBe(1);
     await network.runtime.dispose();
   });

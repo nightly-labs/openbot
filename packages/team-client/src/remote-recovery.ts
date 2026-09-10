@@ -97,6 +97,7 @@ export function createRemoteConnectionRecovery(
   let suspended = false;
   let retryRequested = false;
   let refreshRequested = false;
+  let interrupted = false;
   let attempt = 0;
   let retryAt: number | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -139,19 +140,35 @@ export function createRemoteConnectionRecovery(
     if (!active || disposed || running || suspended) return;
     cancelTimer();
     running = true;
+    const checkingConnection = online;
     retryRequested = false;
     refreshRequested = false;
+    interrupted = false;
     attempt += 1;
-    // Refreshing data on a usable connection must not look like a reconnect.
+    // A foreground read is not a lost connection. Keep the workspace usable
+    // until the transport reports a failure or the read fails.
     if (!online) onStatus({ phase: "connecting", attempt, remainingSeconds: 0 });
     try {
       await connect();
     } catch (error) {
+      if (error instanceof Error && error.message === "The app is in the background.") {
+        interrupted = true;
+        retryRequested = false;
+        retryAt = null;
+        return;
+      }
       if (active) {
         online = false;
         if (!disposed) onError(error);
       }
       retryRequested = true;
+      // A read on a previously usable peer detected a dead connection. Its first
+      // replacement starts now; only a failed replacement earns a retry delay.
+      if (checkingConnection) {
+        attempt = 0;
+        retryAt = Date.now();
+      }
+      scheduleRetry();
     } finally {
       running = false;
       if (!disposed && !suspended && active) {
@@ -159,6 +176,7 @@ export function createRemoteConnectionRecovery(
           retryAt = null;
           void run();
         } else if (retryRequested) scheduleRetry();
+        else if (interrupted) void run();
         else {
           online = true;
           attempt = 0;
@@ -176,7 +194,7 @@ export function createRemoteConnectionRecovery(
       cancelTimer();
       if (!active && running) {
         // Background entry invalidates the consumer's pending workspace reads.
-        refreshRequested = true;
+        interrupted = true;
       }
       if (active) {
         // Coming back to the app is this phone's version of the explicit refresh the desktop asks
@@ -186,7 +204,7 @@ export function createRemoteConnectionRecovery(
         suspended = false;
         if (running) return;
         else if (retryAt !== null) scheduleRetry();
-        else if (!online || refreshRequested) void run();
+        else void run();
       }
     },
     offline(error?: unknown) {
@@ -194,6 +212,8 @@ export function createRemoteConnectionRecovery(
       online = false;
       if (error !== undefined) onError(error);
       retryRequested = true;
+      // Losing a connection is not a failed reconnection attempt.
+      if (!running && retryAt === null) retryAt = Date.now();
       scheduleRetry();
     },
     /**

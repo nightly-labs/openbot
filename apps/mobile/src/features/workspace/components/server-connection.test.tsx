@@ -73,6 +73,7 @@ it("keeps both memberships connected across selection, retries one failure, and 
     states.set(id, value.phase);
   };
   const events = vi.fn();
+  const memberships = vi.fn(async () => {});
   const render = (selected: string, ids = ["local", "remote"]) =>
     root.render(
       <section aria-label={selected}>
@@ -87,6 +88,7 @@ it("keeps both memberships connected across selection, retries one failure, and 
             load={load}
             onStatus={status}
             onTeamEvent={events}
+            onMembershipChanged={memberships}
           />
         ))}
       </section>,
@@ -100,7 +102,7 @@ it("keeps both memberships connected across selection, retries one failure, and 
   expect(loads).toEqual(["local", "remote"]);
   await act(async () => endpoints.get("local")?.update({ hostId: "local", state: "offline", message: null }));
   expect([...states]).toEqual([
-    ["local", "waiting"],
+    ["local", "online"],
     ["remote", "online"],
   ]);
   await act(async () => {
@@ -113,6 +115,7 @@ it("keeps both memberships connected across selection, retries one failure, and 
       ["remote", "online"],
     ],
   });
+  expect(memberships).not.toHaveBeenCalled();
   await act(async () => render("remote", ["remote"]));
   expect([...handles.keys()]).toEqual(["remote"]);
 });
@@ -170,7 +173,7 @@ it("retains background failures and defers membership requests and retries until
   await act(async () => render(true));
   await act(async () => render(false));
   await act(async () => render(true));
-  expect(load).toHaveBeenCalledTimes(1);
+  expect(load).toHaveBeenCalledTimes(2);
   await act(async () => render(false));
   await act(async () =>
     endpoints.get("host")?.update({ hostId: "host", state: "offline", code: "session_revoked", message: null }),
@@ -181,6 +184,6 @@ it("retains background failures and defers membership requests and retries until
   expect(memberships).not.toHaveBeenCalled();
   await act(async () => render(true));
   expect(memberships).toHaveBeenCalledTimes(1);
-  expect(load).toHaveBeenCalledTimes(2);
+  expect(load).toHaveBeenCalledTimes(3);
   expect(status).toHaveBeenLastCalledWith("host", { phase: "online", attempt: 0, remainingSeconds: 0 }, null);
 });

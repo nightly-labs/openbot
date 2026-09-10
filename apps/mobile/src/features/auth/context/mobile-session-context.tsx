@@ -1,4 +1,4 @@
-import { watchRemoteDirectory } from "@openbot/team-client";
+import { createRemoteAccountRefresh } from "@openbot/team-client";
 import {
   createContext,
   type PropsWithChildren,
@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { AppState, type AppStateStatus } from "react-native";
 
 import {
   logoutMobileSession,
@@ -21,8 +20,8 @@ import {
   updateMobileProfile,
   validateMobileSession,
 } from "@/features/auth/api/mobile-auth";
-
 import { queryClient } from "@/shared/lib/query-client";
+import { useAppForeground } from "@/shared/lib/use-app-foreground";
 
 import { resolveSessionValidation } from "./session-validation";
 
@@ -43,6 +42,10 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
   const [sessionState, setSessionState] = useState<MobileSession | null | undefined>(undefined);
   const sessionRef = useRef<MobileSession | null>(null);
   const sessionScope = useRef(0);
+  const foreground = useAppForeground();
+  const foregroundRef = useRef(foreground);
+  foregroundRef.current = foreground;
+  const validation = useRef<ReturnType<typeof createRemoteAccountRefresh> | null>(null);
   const refreshProfileRef = useRef<() => Promise<void>>(async () => undefined);
   const refreshProfile = useCallback(() => refreshProfileRef.current(), []);
 
@@ -69,95 +72,51 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let active = true;
+    const scope = sessionScope.current;
     void readMobileSession()
-      .then(async (stored) => {
-        if (!active) return;
-        if (!stored) {
-          setCurrentSession(null);
-          return;
-        }
-        try {
-          const validated = await validateMobileSession(stored);
-          if (active) setCurrentSession(validated);
-        } catch {
-          if (active) setCurrentSession(stored);
-        }
+      .then((stored) => {
+        if (active && scope === sessionScope.current) setCurrentSession(stored);
       })
       .catch(() => {
-        if (active) setCurrentSession(null);
+        if (active && scope === sessionScope.current) setCurrentSession(null);
       });
     return () => {
       active = false;
     };
   }, [setCurrentSession]);
 
+  const credentialToken = sessionState?.sessionToken;
+  const credentialApiUrl = sessionState?.apiUrl;
   useEffect(() => {
+    if (!credentialToken || !credentialApiUrl) return;
     let active = true;
-    let checking = false;
-    let refreshAgain = false;
-    let appState: AppStateStatus = AppState.currentState;
-    let stopPeriodicCheck: (() => void) | null = null;
-
-    async function checkSession(): Promise<void> {
+    const controller = createRemoteAccountRefresh(async () => {
       const current = sessionRef.current;
-      if (!active || !current) return;
-      if (appState === "background") {
-        refreshAgain = true;
-        return;
-      }
-      if (checking) {
-        refreshAgain = true;
-        return;
-      }
-      checking = true;
-      refreshAgain = false;
-      startPeriodicCheck();
-      try {
-        await validateMobileSession(current, (validated) => {
-          if (active) {
-            const next = resolveSessionValidation(sessionRef.current, current, validated);
-            if (next !== sessionRef.current) setCurrentSession(next);
-          }
-        });
-      } catch {
-        // A temporary network failure must not sign the user out locally.
-      } finally {
-        checking = false;
-        if (refreshAgain) {
-          refreshAgain = false;
-          void checkSession();
-        }
-      }
-    }
-
-    function startPeriodicCheck() {
-      stopPeriodicCheck?.();
-      stopPeriodicCheck = appState === "background" ? null : watchRemoteDirectory(() => checkSession());
-    }
-    startPeriodicCheck();
-
-    const appStateSubscription = AppState.addEventListener("change", (nextAppState) => {
-      if (nextAppState === "inactive") return;
-      const resumed = appState === "background" && nextAppState === "active";
-      appState = nextAppState;
-      if (nextAppState === "background") {
-        stopPeriodicCheck?.();
-        stopPeriodicCheck = null;
-      }
-      if (resumed) {
-        void retryMobileSessionRevocations();
-        startPeriodicCheck();
-        if (refreshAgain) void checkSession();
-      }
+      if (!current) return;
+      await validateMobileSession(current, (validated) => {
+        if (!active) return;
+        const next = resolveSessionValidation(sessionRef.current, current, validated);
+        if (next !== sessionRef.current) setCurrentSession(next);
+      });
     });
-    refreshProfileRef.current = checkSession;
-
+    validation.current = controller;
+    refreshProfileRef.current = () => {
+      controller.invalidate();
+      return controller.refresh().catch(() => undefined);
+    };
+    controller.setActive(foregroundRef.current);
     return () => {
       active = false;
-      stopPeriodicCheck?.();
-      appStateSubscription.remove();
+      controller.dispose();
+      validation.current = null;
+      refreshProfileRef.current = async () => undefined;
     };
-  }, [setCurrentSession]);
+  }, [credentialToken, credentialApiUrl, setCurrentSession]);
+
+  useEffect(() => {
+    validation.current?.setActive(foreground);
+    if (foreground) void retryMobileSessionRevocations();
+  }, [foreground]);
 
   const signOut = useCallback(async () => {
     const current = sessionRef.current;
