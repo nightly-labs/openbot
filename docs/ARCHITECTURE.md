@@ -231,7 +231,10 @@ Cancelling those edits preserves the queued delivery and its attachments. The ed
 through navigation, even if the host capabilities change.
 Desktop hosts with that capability use the server-scoped `agent:take-queued-message` IPC endpoint. The optional `queue-take` capability adds `POST /v1/agents/:id/queue/take`
 for queue edits: the host copies attachment drafts, rechecks and cancels the queued delivery,
-and returns the draft text and attachment summaries. A stale delivery is rejected. Released protocol
+and returns the draft text and attachment summaries. Taken attachment drafts carry their delivery ID in
+existing draft metadata. Ownership and cancellation are persisted together. Host startup keeps those
+drafts while clearing ordinary abandoned drafts; send, explicit cancellation, or agent deletion removes them.
+A stale delivery is rejected. Released protocol
 schemas stay unchanged; this extension belongs to the current v3 adapters.
 
 Current remote connections use Team API protocol v3 over three ordered WebRTC DataChannels: `rpc`,

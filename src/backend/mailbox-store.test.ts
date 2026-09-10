@@ -740,6 +740,43 @@ describe("MailboxStore", () => {
     await expect(access(resolved?.path ?? "missing")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it.each(["send", "cancel", "delete"])("keeps taken drafts across host restarts until %s", async (action) => {
+    const [file] = await store.prepareImportedAttachments(
+      [],
+      [{ name: "notes.txt", mimeType: "text/plain", bytes: Buffer.from("Keep these notes") }],
+    );
+    const receipt = await store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Edit me",
+      draftIds: [file.id],
+    });
+    const edit = await store.takeQueuedMessage("chief", receipt.deliveries[0].id);
+    const draftId = edit.attachments[0].id;
+    const copied = await store.resolveAttachment(draftId);
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    const restarted = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restarted.initialize();
+    expect(await restarted.resolveAttachment(draftId)).not.toBeNull();
+    if (action === "send") {
+      const sent = await restarted.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: edit.text,
+        draftIds: [draftId],
+      });
+      const attachment = restarted.getDelivery(sent.deliveries[0].id)?.managedAttachments[0];
+      expect(await readFile(attachment?.path ?? "missing", "utf8")).toBe("Keep these notes");
+    } else if (action === "cancel") {
+      await restarted.discardDraft(draftId);
+    } else {
+      await restarted.deleteAgentData("chief");
+    }
+    await expect(restarted.resolveAttachment(draftId)).resolves.toBeNull();
+    await expect(access(copied?.path ?? "missing")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("cleans unrecoverable attachment drafts when a new app session starts", async () => {
     const source = join(root, "abandoned.txt");
     await writeFile(source, "abandoned");

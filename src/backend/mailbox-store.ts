@@ -137,11 +137,17 @@ export class MailboxStore {
       await this.#database.backupLegacyFile(this.#statePath);
       await this.#persist("mailbox.legacy-imported", "legacy-import:mailbox:v1");
     }
-    if (this.#state.drafts.length > 0) {
-      this.#state.drafts = [];
+    const cancelledIds = new Set(
+      this.#state.deliveries.filter((delivery) => delivery.status === "cancelled").map((delivery) => delivery.id),
+    );
+    const retainedDrafts = this.#state.drafts.filter(
+      (draft) => draft.queueEditDeliveryId !== undefined && cancelledIds.has(draft.queueEditDeliveryId),
+    );
+    if (retainedDrafts.length !== this.#state.drafts.length) {
+      this.#state.drafts = retainedDrafts;
       await this.#persist("mailbox.drafts-cleared");
     }
-    await this.#files.resetDrafts();
+    await this.#files.resetDrafts(new Set(retainedDrafts.map((draft) => draft.id)));
     await this.#drainFileDeletionOutbox();
   }
 
@@ -573,6 +579,13 @@ export class MailboxStore {
     const removedGenerated = this.#state.generatedAttachments.filter(
       (attachment) => attachment.ownerAgentId === agentId,
     );
+    const removedDeliveryIds = new Set(
+      this.#state.deliveries.filter((delivery) => delivery.recipientAgentId === agentId).map((delivery) => delivery.id),
+    );
+    const removedDrafts = this.#state.drafts.filter(
+      (draft) => draft.queueEditDeliveryId !== undefined && removedDeliveryIds.has(draft.queueEditDeliveryId),
+    );
+    this.#state.drafts = this.#state.drafts.filter((draft) => !removedDrafts.includes(draft));
     const removedTransferRoots = new Set<string>();
     this.#state.deliveries = this.#state.deliveries.filter((delivery) => delivery.recipientAgentId !== agentId);
     const remainingMessageIds = new Set(this.#state.deliveries.map((delivery) => delivery.messageId));
@@ -604,6 +617,7 @@ export class MailboxStore {
         `mailbox:hard-delete:${randomUUID()}`,
         [
           ...removedTransferRoots,
+          ...removedDrafts.map((draft) => dirname(draft.path)),
           ...removedGenerated
             .map((attachment) => this.#files.generatedRootForPath(attachment.path))
             .filter((path): path is string => path !== null),
@@ -687,6 +701,11 @@ export class MailboxStore {
           current.managedAttachments.some((file, index) => file.id !== context.managedAttachments[index]?.id))
       ) {
         throw new Error("Queued message changed while preparing the edit. Try again.");
+      }
+      // Persist draft ownership and cancellation in the same mailbox write.
+      const draftIds = new Set(drafts.map((draft) => draft.id));
+      for (const draft of this.#state.drafts) {
+        if (draftIds.has(draft.id)) draft.queueEditDeliveryId = deliveryId;
       }
       this.cancelNow(agentId, deliveryId);
     } catch (error) {
@@ -1227,7 +1246,12 @@ function isStoredGeneratedAttachment(value: unknown): value is StoredGeneratedAt
 }
 
 function isStoredDraft(value: unknown): value is StoredDraft {
-  return isRecord(value) && isString(value.createdAt) && isStoredAttachment(value);
+  return (
+    isRecord(value) &&
+    isString(value.createdAt) &&
+    (value.queueEditDeliveryId === undefined || isString(value.queueEditDeliveryId)) &&
+    isStoredAttachment(value)
+  );
 }
 
 function isStoredMessage(value: unknown): value is StoredMessage {

@@ -4,6 +4,7 @@ import {
   type FileHandle,
   mkdir,
   open,
+  readdir,
   readFile,
   realpath,
   rename,
@@ -43,6 +44,7 @@ export interface StoredGeneratedAttachment extends StoredAttachment {
 
 export interface StoredDraft extends StoredAttachment {
   createdAt: string;
+  queueEditDeliveryId?: string;
 }
 
 interface TransferManifest {
@@ -106,9 +108,10 @@ export class AttachmentFiles {
     ]);
   }
 
-  async resetDrafts(): Promise<void> {
-    await this.remove(this.#draftsRoot);
-    await mkdir(this.#draftsRoot, { recursive: true, mode: 0o700 });
+  async resetDrafts(retainedIds: ReadonlySet<string>): Promise<void> {
+    for (const name of await readdir(this.#draftsRoot)) {
+      if (!retainedIds.has(name)) await this.remove(join(this.#draftsRoot, name));
+    }
   }
 
   transferRoot(id: string): string {
