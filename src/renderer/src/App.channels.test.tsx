@@ -660,6 +660,30 @@ it("opens channel memories and channel routines from the settings panel", async 
   await within(chat).findByRole("heading", { name: "Channel settings", level: 2 });
 });
 
+it("addresses a channel member only while the request names one", async () => {
+  const chat = await openSavedChannel();
+  const command = vi.spyOn(window.openbot.agent, "channelCommand");
+  const composer = within(chat).getByRole("textbox", { name: "Message to channel" });
+  composer.textContent = "@[Chief](agent:chief) Prepare the report";
+  await fireEvent.input(composer);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  await waitFor(() =>
+    expect(command).toHaveBeenCalledWith(expect.objectContaining({ type: "send", recipientAgentId: "chief" })),
+  );
+
+  // The composer keeps no recipient of its own, so the next request returns to the coordinator. A
+  // recipient that outlives the message that named it silently addresses every later request.
+  await waitFor(() => expect(composer).toHaveTextContent(""));
+  composer.textContent = "Add the rollback step";
+  await fireEvent.input(composer);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  await waitFor(() =>
+    expect(command).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "send", text: "Add the rollback step", recipientAgentId: null }),
+    ),
+  );
+});
+
 /**
  * The routing window as the renderer sees it: a root task that no member owns yet. The lead runs
  * that turn, and `state` chooses whether routing is still open or ended without an owner.

@@ -92,10 +92,9 @@ export function ChannelConversation() {
   const { agentList } = useAgents();
   const [composer, setComposer] = createStore<{
     text: string;
-    recipient: string | null;
     reply: string | null;
     attachments: DraftAttachment[];
-  }>({ text: "", recipient: null, reply: null, attachments: [] });
+  }>({ text: "", reply: null, attachments: [] });
   createEffect(
     () => channels.state.selectedId,
     () => {
@@ -105,7 +104,7 @@ export function ChannelConversation() {
         state.routines.count = 0;
       });
       setComposer((state) => {
-        Object.assign(state, { text: "", recipient: null, reply: null, attachments: [] });
+        Object.assign(state, { text: "", reply: null, attachments: [] });
       });
     },
   );
@@ -319,6 +318,8 @@ export function ChannelConversation() {
     const text = composer.text;
     if (channels.state.pending || (!text.trim() && !composer.attachments.length) || !channels.state.selectedId) return;
     const expanded = expandComposerMentions(text);
+    // A request that opens with a member is addressed to that member, the way a reader writes it.
+    // A mention later in the text is what it reads as: a reference the owner of the work can see.
     const mention = chatTagReferences(expanded).find(
       (reference) => reference.kind === "agent" && !expanded.slice(0, reference.start).trim(),
     );
@@ -328,7 +329,7 @@ export function ChannelConversation() {
         operationId: crypto.randomUUID(),
         channelId: channels.state.selectedId,
         text: expanded,
-        recipientAgentId: composer.recipient ?? mention?.id ?? null,
+        recipientAgentId: mention?.id ?? null,
         replyToMessageId: composer.reply,
         attachmentDraftIds: composer.attachments.map((attachment) => attachment.id),
       })
@@ -755,43 +756,6 @@ export function ChannelConversation() {
                       <Plus aria-hidden="true" />
                     </Button>
                     <div class="composer-primary-actions">
-                      {" "}
-                      <DropdownMenu.Root placement="top-start">
-                        <DropdownMenu.Trigger
-                          class="composer-button"
-                          aria-label={
-                            composer.recipient ? `Choose recipient: ${name(composer.recipient)}` : "Choose recipient"
-                          }
-                        >
-                          <span aria-hidden="true">@</span>
-                        </DropdownMenu.Trigger>
-                        <DropdownMenu.Portal>
-                          <DropdownMenu.Content>
-                            <DropdownMenu.Item
-                              onSelect={() =>
-                                setComposer((state) => {
-                                  state.recipient = null;
-                                })
-                              }
-                            >
-                              Let the channel choose
-                            </DropdownMenu.Item>
-                            <For each={page().channel.members}>
-                              {(member) => (
-                                <DropdownMenu.Item
-                                  onSelect={() =>
-                                    setComposer((state) => {
-                                      state.recipient = member.agentId;
-                                    })
-                                  }
-                                >
-                                  @{name(member.agentId)}
-                                </DropdownMenu.Item>
-                              )}
-                            </For>
-                          </DropdownMenu.Content>
-                        </DropdownMenu.Portal>
-                      </DropdownMenu.Root>
                       <Button
                         type="submit"
                         variant="ghost"
