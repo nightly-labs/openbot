@@ -3,7 +3,7 @@
  * returns a string or a boolean, so a filtering question can be answered without the component.
  */
 
-import type { DirectThreadSummary, TeamPresenceMember } from "@openbot/contracts/ipc";
+import type { ChannelSummary, DirectThreadSummary, TeamPresenceMember } from "@openbot/contracts/ipc";
 import type { AgentProfile } from "../../data";
 import { teamMemberName } from "../team/TeamPersonAvatar";
 import type { SidebarAgentState } from "./sidebar-types";
@@ -32,6 +32,15 @@ export function sidebarMessageTime(value: string): string {
 
 export function agentMatchesQuery(agent: AgentProfile, query: string): boolean {
   return !query || `${agent.name} ${agent.title} ${agent.description} ${agent.preview}`.toLowerCase().includes(query);
+}
+
+export function channelMatchesQuery(channel: ChannelSummary, query: string): boolean {
+  return (
+    !query ||
+    `${channel.name} ${channel.title} ${channel.instructions} ${channel.lastMessage?.text ?? ""}`
+      .toLowerCase()
+      .includes(query)
+  );
 }
 
 export function personMatchesQuery(

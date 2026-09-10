@@ -21,6 +21,7 @@ export function remoteServerSummaries(
     // up.
     {
       id: LOCAL_SERVER_ID,
+      notificationsMuted: false,
       name: "Local",
       kind: "local",
       state: "online",
@@ -36,6 +37,7 @@ export function remoteServerSummaries(
       const status = statusFor(server.id);
       return {
         id: server.id,
+        notificationsMuted: false,
         name: server.name,
         kind: "remote" as const,
         state: status.state,

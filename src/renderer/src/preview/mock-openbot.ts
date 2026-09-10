@@ -104,6 +104,7 @@ import {
   STORY_USAGE,
 } from "./fixtures";
 import { mockAgentAnalytics, mockHostAnalytics } from "./mock-agent-analytics";
+import { createMockChannels } from "./mock-channels";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 
 type Listener<T> = (value: T) => void;
@@ -943,6 +944,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listModels: async () => clone(models),
       listAgents: async () => clone(agents),
       listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
+      ...createMockChannels(emitAgentEvent, (agentId) => agents.find((entry) => entry.id === agentId)?.name ?? agentId),
       getSidebarLayout: async () => clone(sidebarLayout),
       mutateSidebarLayout: async (action) => {
         sidebarLayout = applySidebarLayoutAction(sidebarLayout, action);
@@ -1511,6 +1513,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       exportDiagnostics: async () => ({ saved: true }),
     },
     servers: {
+      setMuted: async ({ serverId, muted }) => {
+        if (!servers.some((server) => server.id === serverId)) throw new Error("Remote server not found.");
+        servers = servers.map((server) => (server.id === serverId ? { ...server, notificationsMuted: muted } : server));
+        return clone(servers);
+      },
       list: async () => clone(servers),
       select: async (serverId) => {
         servers = servers.map((server) => ({ ...server, active: server.id === serverId }));
@@ -1533,6 +1540,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           id: `server-${servers.length + 1}`,
           name: "Joined workspace",
           logoUrl: null,
+          notificationsMuted: false,
           kind: "remote",
           state: "online",
           apiUrl: input.inviteUrl,

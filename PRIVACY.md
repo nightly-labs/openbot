@@ -265,3 +265,22 @@ system's secret storage, writes it to a file that only your user account can rea
 only to the local OpenCode process. No screen, log, data export, or diagnostics report contains it;
 the data export lists it under `scope.excludes`. OpenBot does not copy OpenCode credentials or
 upload its session files. OpenCode manages its own login and resume state.
+
+## Shared desktop channels
+
+Channel names, purposes, participating agents, linked conversation references, messages, tasks,
+assignment records, history summaries, and human read positions are stored in the host's SQLite
+database. All authenticated members of that server can read and use its channels. Agent membership
+selects participating agents; it is not a separate human access boundary.
+
+The selected lead's provider receives relevant channel content for routing and history summaries in
+separate sessions without work tools. Assigned agents receive the channel purpose, responsibilities,
+request, relevant source messages, shared history summary, recent messages, and attachment references.
+Agents can retrieve earlier channel messages and other conversations on that server when needed.
+Unrelated conversations are not sent automatically. Provider session internals remain internal.
+The provider's own data policies apply to content it receives.
+
+Archiving a channel stops its work and retains its transcript. Restore makes the channel available again.
+These actions do not remove agents, their memories, or linked conversations. Channel traffic between
+desktop clients and a host uses the existing host transport. The account API and Signal service do
+not store channel chats or make routing decisions. This feature adds no mobile chat interface.

@@ -2,14 +2,21 @@ import {
   analyticsQuery,
   assertAnalyticsScope,
   assertHostAnalyticsScope,
+  CHANNEL_DELETE_CAPABILITY,
   decodeAgentProfileDraft,
+  decodeChannel,
+  decodeChannelPage,
+  decodeChannelSummaries,
   decodeSaveAgentProfileResult,
   hostAnalyticsQuery,
   parseAgentAnalyticsInput,
+  parseChannelCommand,
+  parseChannelRead,
   parseGenerateAgentProfile,
   parseHostAnalyticsInput,
   parseSaveAgentProfile,
 } from "@openbot/contracts/ipc";
+import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { decodeAgentAnalyticsFromHost, decodeHostAnalyticsFromHost } from "../remote-agent-decoding";
 // An agent's core surface: status, agents, conversations, the queue and the prompts
 // a turn can raise. Memories, routines and attachments are their own registrars.
@@ -153,6 +160,42 @@ export function agentIpcHandlers({
               : Promise.resolve([]),
         });
       }),
+      listChannels: payloadHandler(parseAgentRequest, (scoped) =>
+        routeToServer(scoped.serverId, {
+          local: () => service.channels.store.list(host.channelActor().id),
+          remote: (serverId) => remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries),
+        }),
+      ),
+      readChannel: payloadHandler(parseAgentRequest, (scoped) => {
+        const input = parseChannelRead(scoped.payload);
+        return routeToServer(scoped.serverId, {
+          local: () => service.channels.store.page(input.channelId, input.beforeSequence),
+          remote: (serverId) =>
+            remoteServers.request(serverId, CHANNEL_ROUTES.read, decodeChannelPage, { method: "POST", body: input }),
+        });
+      }),
+      channelCommand: payloadHandler(parseAgentRequest, (scoped) => {
+        const input = parseChannelCommand(scoped.payload);
+        return routeToServer(scoped.serverId, {
+          local: () => service.channels.command(input, host.channelActor()),
+          remote: (serverId) =>
+            remoteServers.request(serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: input }),
+        });
+      }),
+      deleteChannel: payloadHandler(parseAgentRequest, (scoped) => {
+        const channelId = requireString(scoped.payload, "channelId", INPUT_LIMITS.identifier);
+        return routeToServer<void>(scoped.serverId, {
+          local: () => service.deleteChannel(channelId),
+          remote: async (serverId) => {
+            if (!remoteServers.supportsCapability(serverId, CHANNEL_DELETE_CAPABILITY))
+              throw new Error("Channel deletion is not supported by this server.");
+            await remoteServers.request(serverId, CHANNEL_ROUTES.delete, decodeVoid, {
+              method: "POST",
+              body: { channelId },
+            });
+          },
+        });
+      }),
       getSidebarLayout: payloadHandler(parseAgentRequest, (parsed): Promise<SidebarLayoutSnapshot> => {
         return routeToServer(parsed.serverId, {
           local: () => sidebarLayout.getSnapshot(),
@@ -163,7 +206,7 @@ export function agentIpcHandlers({
       mutateSidebarLayout: payloadHandler(parseAgentRequest, (scoped): Promise<SidebarLayoutSnapshot> => {
         const action = parseSidebarLayoutAction(scoped.payload);
         return routeToServer(scoped.serverId, {
-          local: () => sidebarLayout.mutate(action, new Set(service.listAgents().map((agent) => agent.id))),
+          local: () => sidebarLayout.mutate(action, service.sidebarChatIds()),
           remote: (serverId) =>
             remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.actions, decodeSidebarLayoutSnapshot, {
               method: "POST",

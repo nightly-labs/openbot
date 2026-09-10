@@ -140,4 +140,26 @@ describe("conversation transactions", () => {
     expect(store.list().find((candidate) => candidate.id === AGENT_ID)?.threadId).toBeNull();
     expect(threadRowCount()).toBe(threadRowsBefore);
   });
+
+  it("ignores a late provider snapshot after an execution thread is forgotten", () => {
+    const threadId = "channel-execution-thread";
+    const now = new Date().toISOString();
+    store.database.connection
+      .prepare("INSERT INTO projection_threads VALUES (?, ?, ?, NULL, ?, ?, ?)")
+      .run(threadId, AGENT_ID, "Channel", now, now, 0);
+    runtime.registerExecutionThread(AGENT_ID, threadId);
+    const lateSnapshot = runtime.ensureSnapshot(AGENT_ID, threadId);
+
+    runtime.forgetExecutionThread(threadId);
+    lateSnapshot.messages.push(systemMessage("late provider result"));
+    runtime.setSnapshot(AGENT_ID, lateSnapshot);
+    runtime.emitConversation(lateSnapshot, "late-turn.completed");
+
+    expect(runtime.isExecutionThread(threadId)).toBe(false);
+    expect(
+      store.database.connection
+        .prepare("SELECT COUNT(*) AS count FROM projection_thread_messages WHERE thread_id = ?")
+        .get(threadId),
+    ).toEqual({ count: 0 });
+  });
 });

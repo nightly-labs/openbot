@@ -16,7 +16,11 @@ import type {
   RoutineRunConversationEvent,
 } from "@openbot/contracts/ipc";
 
-export type MessageKind = "text" | "thinking" | "exchange" | "question" | "action-marker";
+/**
+ * `error` is a message the renderer wrote itself, not one the provider sent: an action of the
+ * user failed, and `status` names which one.
+ */
+export type MessageKind = "text" | "thinking" | "exchange" | "question" | "action-marker" | "error";
 
 export type ChatActionMarkerStatus =
   | "queued"

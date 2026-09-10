@@ -22,6 +22,7 @@ import {
   testConversationPage,
   testServer,
 } from "./app-test-harness";
+import { useChannels } from "./features/channels/channels-context";
 import { useConversation } from "./features/conversation/conversation-context";
 import { useDirectMessages } from "./features/conversation/direct-messages-context";
 import { useServerScope } from "./features/servers/server-scope";
@@ -45,6 +46,41 @@ function UsageProbe() {
         Close usage
       </button>
     </>
+  );
+}
+
+/**
+ * Opens a channel over the workspace. The agent stays selected under it, which is the state the
+ * read predicate has to refuse: the reply is on a chat the channel covers.
+ */
+function ChannelProbe() {
+  const channels = useChannels();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void (async () => {
+          await window.openbot.agent.channelCommand({
+            type: "save",
+            operationId: "channel-read-op",
+            channelId: "channel-read",
+            draft: { name: "Project", title: "", instructions: "", members: [{ agentId: "chief" }], leadAgentId: null },
+          });
+          await channels.open("channel-read");
+        })();
+      }}
+    >
+      Open channel
+    </button>
+  );
+}
+
+function CloseChannelProbe() {
+  const channels = useChannels();
+  return (
+    <button type="button" onClick={() => channels.close()}>
+      Close channel
+    </button>
   );
 }
 
@@ -1661,8 +1697,9 @@ describe("OpenBot connected desktop shell", () => {
     emitAgentEvent?.({ type: "conversation-page", page: unreadPage });
     window.dispatchEvent(new Event("focus"));
 
-    const sales = screen.getByRole("button", { name: /Sales Outbound/ });
-    await waitFor(() => expect(sales).toHaveTextContent("1 new reply"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Sales Outbound/ })).toHaveTextContent("1 new reply"),
+    );
     expect(window.openbot.agent.markConversationRead).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
@@ -1672,6 +1709,7 @@ describe("OpenBot connected desktop shell", () => {
     );
 
     vi.mocked(window.openbot.agent.readConversationPage).mockResolvedValue(unreadPage);
+    const sales = screen.getByRole("button", { name: /Sales Outbound/ });
     await fireEvent.click(sales);
 
     await waitFor(() =>
@@ -1803,6 +1841,130 @@ describe("OpenBot connected desktop shell", () => {
     expect(await screen.findByRole("status", { name: "1 new message" })).toBeInTheDocument();
   });
 
+  it("keeps an agent reply unread while an open channel covers the conversation", async () => {
+    const unreadPage = testConversationPage(
+      "chief",
+      [
+        {
+          id: "agent-channel-answer",
+          author: "assistant",
+          text: "Ready while the channel was open",
+          createdAt: "2026-08-19T09:06:00.000Z",
+          status: "completed",
+        },
+      ],
+      {
+        revision: 2,
+        readState: {
+          unreadCount: 1,
+          firstUnreadMessageId: "agent-channel-answer",
+          throughMessageId: null,
+        },
+      },
+    );
+
+    render(() => (
+      <AppProviders>
+        <AppAccessGate />
+        <ChannelProbe />
+        <CloseChannelProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+    vi.mocked(window.openbot.agent.markConversationRead).mockClear();
+    vi.mocked(window.openbot.agent.readConversationPage).mockResolvedValue(unreadPage);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open channel" }));
+    await screen.findByRole("heading", { level: 1, name: "Project" });
+    emitAgentEvent?.({ type: "conversation-page", page: unreadPage });
+
+    // Leaving the channel uncovers the chat, and the reply is still waiting there. The boundary is
+    // queryable only now, which is the same reason the reply could not count as seen before.
+    fireEvent.click(screen.getByRole("button", { name: "Close channel" }));
+    expect(await screen.findByRole("status", { name: "1 new message" })).toBeInTheDocument();
+    expect(window.openbot.agent.markConversationRead).not.toHaveBeenCalled();
+  });
+
+  it("keeps a private message unread while an open channel covers the conversation", async () => {
+    function DirectUnreadProbe() {
+      const direct = useDirectMessages();
+      return (
+        <output aria-label="Alice unread">
+          {direct.directConversations()["member-alice"]?.readState?.unreadCount ?? 0}
+        </output>
+      );
+    }
+    render(() => (
+      <AppProviders peopleEnabled>
+        <AppAccessGate />
+        <ChannelProbe />
+        <DirectUnreadProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+    emitPresence?.({
+      serverId: "server-1",
+      updatedAt: "2026-08-19T10:00:00.000Z",
+      members: [
+        presenceMember("member-self", "person@example.com", "Person"),
+        presenceMember("member-alice", "alice@example.com", "Alice"),
+      ],
+    });
+    await fireEvent.click(await screen.findByRole("button", { name: /Alice/ }));
+    await waitFor(() => expect(window.openbot.servers.readDirectConversationPage).toHaveBeenCalled());
+    vi.mocked(window.openbot.servers.markDirectRead).mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open channel" }));
+    await screen.findByRole("heading", { level: 1, name: "Project" });
+    emitDirectMessage?.({
+      type: "team-direct-message",
+      memberIds: ["member-alice", "member-self"],
+      message: {
+        id: "direct-under-channel",
+        threadId: "thread-member-alice",
+        senderMemberId: "member-alice",
+        recipientMemberId: "member-self",
+        text: "Private result while the channel was open",
+        createdAt: "2026-08-19T10:01:00.000Z",
+        sequence: 1,
+      },
+    });
+
+    // The channel covers the private conversation, so the message is still waiting for the reader.
+    await waitFor(() => expect(screen.getByLabelText("Alice unread")).toHaveTextContent("1"));
+    expect(window.openbot.servers.markDirectRead).not.toHaveBeenCalled();
+  });
+
+  it("keeps a channel message unread while the Usage report covers the channel", async () => {
+    render(() => (
+      <AppProviders>
+        <AppAccessGate />
+        <ChannelProbe />
+        <UsageProbe />
+      </AppProviders>
+    ));
+    await screen.findByRole("heading", { name: "Chief" });
+    fireEvent.click(screen.getByRole("button", { name: "Open channel" }));
+    await screen.findByRole("heading", { level: 1, name: "Project" });
+    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
+
+    const command = vi.spyOn(window.openbot.agent, "channelCommand");
+    const read = vi.spyOn(window.openbot.agent, "readChannel");
+    await window.openbot.agent.channelCommand({
+      type: "send",
+      operationId: "channel-usage-send",
+      channelId: "channel-read",
+      text: "The report is ready",
+      recipientAgentId: "chief",
+      replyToMessageId: null,
+      attachmentDraftIds: [],
+    });
+
+    // The report covers the channel, so the message behind it is still waiting for the reader.
+    await waitFor(() => expect(read).toHaveBeenCalled());
+    expect(command).not.toHaveBeenCalledWith(expect.objectContaining({ type: "read" }));
+  });
+
   it("uncovers the conversation a global search result opens", async () => {
     const result = {
       id: "sales-search-hit",
@@ -1878,9 +2040,13 @@ describe("OpenBot connected desktop shell", () => {
 
     expect(await screen.findByRole("main", { name: "Direct conversation with Alice" })).toBeInTheDocument();
 
+    const openCreateAgent = async () => {
+      await fireEvent.pointerDown(screen.getByRole("button", { name: "New agent or channel" }), { button: 0 });
+      await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New agent" }), { button: 0 });
+    };
     fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
     flush();
-    await fireEvent.click(screen.getByRole("button", { name: "Create new agent" }));
+    await openCreateAgent();
 
     expect(await screen.findByRole("main", { name: "Create a new agent" })).toBeInTheDocument();
 
@@ -1888,7 +2054,7 @@ describe("OpenBot connected desktop shell", () => {
     // to: the press does nothing else the user can see.
     fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
     flush();
-    await fireEvent.click(screen.getByRole("button", { name: "Create new agent" }));
+    await openCreateAgent();
 
     expect(await screen.findByRole("main", { name: "Create a new agent" })).toBeInTheDocument();
   });

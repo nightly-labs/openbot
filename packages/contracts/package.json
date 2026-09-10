@@ -33,7 +33,8 @@
     "./team-protocol/v4-adapter": "./src/team-protocol/v4-adapter.ts",
     "./team-protocol/v4-base-adapter": "./src/team-protocol/v4-base-adapter.ts",
     "./team-protocol/v4-webrtc-adapter": "./src/team-protocol/v4-webrtc-adapter.ts",
-    "./validation": "./src/validation.ts"
+    "./validation": "./src/validation.ts",
+    "./team-protocol/channels-v1": "./src/team-protocol/channels-v1.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",

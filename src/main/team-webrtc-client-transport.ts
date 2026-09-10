@@ -2,6 +2,12 @@ import { generateKeyPairSync, randomBytes, sign, verify } from "node:crypto";
 import { EventEmitter } from "node:events";
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import {
+  channelEvent,
+  channelRequest,
+  channelResponse,
+  isChannelRoute,
+} from "@openbot/contracts/team-protocol/channels-v1";
 import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
 import {
   type TeamProtocolV1CurrentEventControl,
@@ -246,9 +252,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         path,
         body: binary
           ? null
-          : encodeTeamProtocolV4WebRtcHttpRequest(method, path, init.body, {
-              preserveSemanticTags: init.preserveSemanticTags,
-            }),
+          : isChannelRoute(path)
+            ? channelRequest(path, init.body)
+            : encodeTeamProtocolV4WebRtcHttpRequest(method, path, init.body, {
+                preserveSemanticTags: init.preserveSemanticTags,
+              }),
         capabilities: [...TEAM_CURRENT_CAPABILITIES],
         ...(bodyTransferId ? { bodyTransferId } : {}),
         ...(init.contentType ? { contentType: init.contentType } : {}),
@@ -287,7 +295,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     let body: ReturnType<typeof decodeTeamProtocolV4WebRtcHttpResponse> = null;
     if (!file) {
       try {
-        body = decodeTeamProtocolV4WebRtcHttpResponse(method, path, envelope.status, envelope.body);
+        body = isChannelRoute(path)
+          ? channelResponse(path, envelope.status, envelope.body)
+          : decodeTeamProtocolV4WebRtcHttpResponse(method, path, envelope.status, envelope.body);
       } catch {
         throw new TeamWebRtcRequestError(502, "protocol_error", "The host returned an invalid response body.");
       }
@@ -714,7 +724,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         this.#failProtocol(hostId, "The host event sequence has a gap.");
         return;
       }
-      const decoded = decodeTeamProtocolV4CurrentEvent(frame);
+      const channel = frame.type === "event" ? channelEvent(frame.payload) : null;
+      const decoded = channel ? { status: "known" as const, event: channel } : decodeTeamProtocolV4CurrentEvent(frame);
       if (decoded.status === "invalid") {
         this.#failProtocol(hostId, "The host returned a malformed known event.");
         return;

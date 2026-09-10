@@ -18,6 +18,8 @@ import {
   stores,
   waitFor,
 } from "./agent-service-test-harness";
+import { ChannelRoutineStore } from "./channel-routine-store";
+import { ChannelStore } from "./channel-store";
 
 let root: string;
 let logPath: string;
@@ -33,6 +35,55 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentService: routines", () => {
+  it("rearms the shared timer when restoring an archived channel routine", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-25T10:00:00.000Z") });
+    const { store, mailbox } = stores(root);
+    await store.initialize();
+    await mailbox.initialize();
+    const agent = await store.getOrCreate("chief");
+    const channels = new ChannelStore(store.database);
+    const channel = channels.create("channel-1", {
+      name: "Project",
+      title: "Release coordination",
+      instructions: "Ship the project.",
+      members: [{ agentId: agent.id }],
+      leadAgentId: agent.id,
+    });
+    channels.commit("test.channel-create", { channel, messages: [], tasks: [], assignments: [] });
+    channels.update({ ...channel, archived: true }, {}, "test.channel-archive");
+    const routines = new ChannelRoutineStore(store.database);
+    const routine = routines.create(
+      {
+        channelId: channel.id,
+        name: "Hourly brief",
+        instruction: "Prepare the brief.",
+        active: true,
+        timezone: "UTC",
+        schedule: { kind: "interval", amount: 15, unit: "minutes", anchorAt: "2026-08-25T10:00:00.000Z" },
+      },
+      new Date("2026-08-25T10:00:00.000Z"),
+    );
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => new FakeAgentClient(provider),
+    );
+    await service.initialize();
+
+    await service.channels.command(
+      { type: "restore", channelId: channel.id, operationId: "test.channel-restore" },
+      { id: "member-1", name: "Alex" },
+    );
+    await vi.advanceTimersByTimeAsync(15 * 60_000);
+
+    expect(service.listChannelRoutineRuns({ channelId: channel.id, routineId: routine.id, limit: 10 })).toEqual([
+      expect.objectContaining({ kind: "scheduled", status: expect.any(String) }),
+    ]);
+  });
+
   it("persists routine lifecycle markers without adding unread or search results", async () => {
     const { store, mailbox } = stores(root);
     service = new AgentService(store, mailbox, fakeBrowser());

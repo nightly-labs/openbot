@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isGeneratedAgentId } from "@openbot/contracts/validation";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { CHANNEL_SCHEMA_SQL, CHANNEL_SETTINGS_SCHEMA_SQL } from "./channel-schema";
 
 const BASELINE_SCHEMA_VERSION = 8;
 
@@ -367,7 +368,9 @@ const LATEST_SCHEMA_SQL =
     V17_PROVIDER_SESSIONS_CHECK_SQL,
   ) +
   ANALYTICS_SCHEMA_SQL +
-  ANALYTICS_DATE_INDEX_SQL;
+  ANALYTICS_DATE_INDEX_SQL +
+  CHANNEL_SCHEMA_SQL +
+  CHANNEL_SETTINGS_SCHEMA_SQL;
 
 // Silence here would ship new installs a table the migrations never produce, so an edit to the baseline
 // that moves this declaration out from under the substitution has to be loud.
@@ -435,6 +438,19 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // so the rebuild runs with them off - the same reason migration 13 does.
     disableForeignKeys: true,
     up: migrateProviderSessionsForOpencode,
+  },
+  {
+    version: 18,
+    up: (db) => db.exec(CHANNEL_SCHEMA_SQL),
+  },
+  {
+    version: 19,
+    // The pre-merge channel branch used versions 17 and 18 for channel storage and settings. Those
+    // versions were never shipped, but a development profile can still have both markers while
+    // retaining the old provider-session constraint. Repair that table before adding the settings
+    // projections so the profile also receives the main branch's migration 17 behavior.
+    disableForeignKeys: true,
+    up: migrateChannelSettings,
   },
 ];
 
@@ -721,6 +737,11 @@ function migrateProviderSessionsForOpencode(db: DatabaseSync): void {
     CREATE INDEX provider_sessions_thread
       ON projection_provider_sessions(thread_id, provider, state);
   `);
+}
+
+function migrateChannelSettings(db: DatabaseSync): void {
+  migrateProviderSessionsForOpencode(db);
+  db.exec(CHANNEL_SETTINGS_SCHEMA_SQL);
 }
 
 // The actor column is part of the primary key, so the table is rebuilt rather than altered. There are no

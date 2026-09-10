@@ -303,7 +303,6 @@ export async function createApplicationServices({
   const hostedSites = new HostedSiteDesktopService(centralAuth);
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await sidebarLayout.initialize();
-  await sidebarLayout.reconcileAgents(new Set(store.list().map((agent) => agent.id)));
   const mailbox = new MailboxStore(app.getPath("userData"), store.sharedRoot, store.database);
   await mailbox.initialize();
   configureApplicationProtocol();
@@ -382,6 +381,10 @@ export async function createApplicationServices({
     { apiKey: (provider) => providerCredentials.get(provider) },
   );
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
+  // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
+  // reconciling against the agents alone would read every channel as gone and drop where it sits.
+  await sidebarLayout.reconcileAgents(service.sidebarChatIds());
+
   /*
    * The runtime manager decides which provider has an update waiting, by comparing against the
    * pinned lock. It knows the copies it downloaded itself; a CLI the user installed is only ever
@@ -439,6 +442,7 @@ export async function createApplicationServices({
     mailbox,
     browser,
     chat: teamChatStore,
+    channels: service.channels,
     teamWebRtcBridge,
     registerRemoteHost: (input) => centralAuth.registerRemoteHost(input),
     issueRemoteHostTicket: (hostId) => centralAuth.issueRemoteHostTicket(hostId),

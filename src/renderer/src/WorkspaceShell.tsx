@@ -3,6 +3,9 @@ import { createMemo, Show } from "solid-js";
 import { WorkspaceAccountDock } from "./features/account/WorkspaceAccountDock";
 import { useAgents } from "./features/agents/agents-context";
 import { WorkspaceAgentSetup } from "./features/agents/WorkspaceAgentSetup";
+import { ChannelConversation } from "./features/channels/ChannelConversation";
+import { ChannelCreateDialog } from "./features/channels/ChannelCreateDialog";
+import { useChannels } from "./features/channels/channels-context";
 import { useDirectMessages } from "./features/conversation/direct-messages-context";
 import { WorkspaceConversation } from "./features/conversation/WorkspaceConversation";
 import { WorkspaceDirectConversation } from "./features/conversation/WorkspaceDirectConversation";
@@ -32,16 +35,17 @@ import { WorkspaceOverlays } from "./WorkspaceOverlays";
  * them is passed on rather than derived twice.
  *
  * The order of the children is the paint order the stylesheet expects, and the
- * three middle-pane `<Show>`s are mutually exclusive by construction: a blocked
- * remote server wins over everything, then the Agent form, then a person, then a
- * Agent.
+ * middle-pane `<Show>`s are mutually exclusive by construction: a blocked remote
+ * server wins over everything, then the Agent form, then a channel, then a
+ * person, then a Agent. The usage panel sits outside that group and inerts it.
  */
 export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   const platform = usePlatform();
+  const channels = useChannels();
+  const channelOpen = () => channels.state.selectedId !== null;
   const usage = useUsage();
-  const { servers } = useServers();
   const layout = useLayout();
-  const { activeServer, activeServerSupportsCapability, retryServerConnection } = useServers();
+  const { activeServer, activeServerSupportsCapability, retryServerConnection, servers } = useServers();
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
   const { agentSetupOpen } = useAgents();
   const { activeDirectMember } = useDirectMessages();
@@ -85,11 +89,23 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
         <Show when={!blockedRemoteServer() && agentSetupOpen()}>
           <WorkspaceAgentSetup />
         </Show>
-        <Show when={!blockedRemoteServer() && activePeopleEnabled() && !agentSetupOpen() && activeDirectMember()} keyed>
+        <Show
+          when={
+            !blockedRemoteServer() &&
+            activePeopleEnabled() &&
+            !agentSetupOpen() &&
+            !channelOpen() &&
+            activeDirectMember()
+          }
+          keyed
+        >
           {(member) => <WorkspaceDirectConversation member={member} />}
         </Show>
-        <Show when={!blockedRemoteServer() && !agentSetupOpen() && !activeDirectMember()}>
+        <Show when={!blockedRemoteServer() && !agentSetupOpen() && !channelOpen() && !activeDirectMember()}>
           <WorkspaceConversation account={props.account} />
+        </Show>
+        <Show when={!blockedRemoteServer() && !agentSetupOpen() && channelOpen()}>
+          <ChannelConversation />
         </Show>
       </div>
       <Show when={usage.state.serverId}>
@@ -105,6 +121,9 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
         )}
       </Show>
       <WorkspaceOverlays account={props.account} />
+      <Show when={channels.state.editing === "create"}>
+        <ChannelCreateDialog />
+      </Show>
     </div>
   );
 }

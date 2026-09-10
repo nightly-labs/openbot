@@ -215,6 +215,37 @@ describe("AgentStore", () => {
     ]);
   });
 
+  it("does not reclaim a channel execution thread as an agent chat", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
+    temporaryRoots.push(root);
+    const userData = join(root, "user-data");
+    const home = join(root, "home");
+    const store = new AgentStore(userData, home);
+    await store.initialize();
+    const agent = await store.getOrCreate("chief");
+    const channelThreadId = "openbot-thread-channel-chief";
+    const now = "2026-09-01T12:00:00.000Z";
+    store.database.connection
+      .prepare("INSERT INTO projection_channels(channel_id, channel_json) VALUES (?, ?)")
+      .run("channel-1", JSON.stringify({ id: "channel-1", name: "Project" }));
+    store.database.connection
+      .prepare(
+        `INSERT INTO projection_threads
+           (thread_id, agent_id, title, active_turn_id, created_at, updated_at, last_event_sequence)
+         VALUES (?, ?, ?, NULL, ?, ?, 0)`,
+      )
+      .run(channelThreadId, agent.id, "Project", now, now);
+    store.database.connection
+      .prepare("INSERT INTO projection_channel_contexts(channel_id, agent_id, thread_id) VALUES (?, ?, ?)")
+      .run("channel-1", agent.id, channelThreadId);
+
+    const restored = new AgentStore(userData, home);
+    await restored.initialize();
+
+    expect(restored.list().find((candidate) => candidate.id === agent.id)?.threadId).toBeNull();
+    expect(restored.database.unclaimedThreads()).toEqual([]);
+  });
+
   it("rebuilds a roster its projection lost from the event log", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
     temporaryRoots.push(root);

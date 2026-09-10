@@ -4,6 +4,7 @@ import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { AgentRoutinesSettings } from "../src/features/conversation/AgentRoutinesSettings";
 import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel";
+import { agentRoutinesPort } from "../src/features/conversation/routines-port";
 import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
@@ -64,7 +65,7 @@ function RoutinesStory(props: { routines?: Routine[]; runs?: RoutineRun[] }) {
   });
   return (
     <main style={{ width: "380px", height: "720px", overflow: "auto", background: "var(--openbot-bg-canvas)" }}>
-      <AgentRoutinesSettings agentId="chief" onCountChange={fn()} onBack={fn()} onClose={fn()} />
+      <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={fn()} onBack={fn()} onClose={fn()} />
     </main>
   );
 }
@@ -122,7 +123,7 @@ function FullSettingsPanelStory() {
 const meta = {
   title: "Settings/Agent Routines",
   component: AgentRoutinesSettings,
-  args: { agentId: "chief", onCountChange: fn() },
+  args: { port: agentRoutinesPort("chief"), onCountChange: fn() },
   parameters: { layout: "centered", a11y: { test: "error" } },
 } satisfies Meta<typeof AgentRoutinesSettings>;
 

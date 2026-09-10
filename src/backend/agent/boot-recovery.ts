@@ -9,6 +9,8 @@ import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
 
 export interface BootRecoveryHooks {
+  executionThreads?(): Array<{ id: string; threadId: string }>;
+  deliveryThreadId?(deliveryId: string): string | null;
   emitError(code: string, error: unknown, agentId?: string): void;
 }
 
@@ -55,6 +57,19 @@ export class BootRecovery {
     this.#hooks = options.hooks;
   }
 
+  private threads() {
+    const agents = this.#store.list();
+    return [
+      ...agents,
+      ...(this.#hooks.executionThreads?.() ?? []).flatMap((context) => {
+        const agent = agents.find((item) => item.id === context.id);
+        if (!agent) return [];
+        this.#conversation.registerExecutionThread(agent.id, context.threadId);
+        return [{ ...agent, threadId: context.threadId }];
+      }),
+    ];
+  }
+
   async reconcileUnresolvedDeliveries(): Promise<void> {
     for (const context of this.#mailbox.unresolvedDeliveries()) {
       const { delivery } = context;
@@ -63,7 +78,8 @@ export class BootRecovery {
       try {
         const agent = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
         const client = agent ? this.#providers.clientForAgent(agent) : null;
-        const session = agent ? this.#store.activeProviderSession(agent.id) : null;
+        const threadId = this.#hooks.deliveryThreadId?.(delivery.id) ?? agent?.threadId;
+        const session = agent && threadId ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
         if (session && client) {
           const response = await client.request(
             "thread/read",
@@ -91,8 +107,9 @@ export class BootRecovery {
       }
       await this.#mailbox.markTerminal(delivery.id, terminal, terminal === "completed" ? null : reason);
       const agent = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
-      if (agent?.threadId) {
-        const snapshot = this.#store.database.readConversation(agent.id, agent.threadId);
+      const threadId = this.#hooks.deliveryThreadId?.(delivery.id) ?? agent?.threadId;
+      if (agent && threadId) {
+        const snapshot = this.#store.database.readConversation(agent.id, threadId);
         snapshot.activeTurnId = null;
         for (const message of snapshot.messages) {
           if (message.turnId === delivery.turnId && message.status === "streaming") {
@@ -110,7 +127,7 @@ export class BootRecovery {
   }
 
   recoverPersistedTurns(): void {
-    for (const agent of this.#store.list()) {
+    for (const agent of this.threads()) {
       if (!agent.threadId) continue;
       const snapshot = this.#store.database.readConversation(agent.id, agent.threadId);
       const turnId = snapshot.activeTurnId;
@@ -137,7 +154,7 @@ export class BootRecovery {
   }
 
   async backfillProviderHistory(): Promise<void> {
-    for (const agent of this.#store.list()) {
+    for (const agent of this.threads()) {
       if (!agent.threadId) continue;
       // Inactive sessions still own history after an upgrade or provider switch.
       for (const session of this.#store.database.listProviderSessions(agent.threadId)) {
@@ -157,7 +174,7 @@ export class BootRecovery {
           const merged = mergeProviderHistory(current, imported, session.provider);
           this.#mailboxSync.syncMailboxMessages(merged);
           if (conversationContentSignature(merged) === conversationContentSignature(current)) {
-            const live = this.#conversation.snapshot(agent.id);
+            const live = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
             if (!live?.activeTurnId) this.#conversation.setSnapshot(agent.id, current);
             continue;
           }
@@ -165,8 +182,11 @@ export class BootRecovery {
             provider: session.provider,
             externalSessionId: session.externalSessionId,
           });
-          const live = this.#conversation.snapshot(agent.id);
-          if (!live?.activeTurnId) this.#conversation.setSnapshot(agent.id, persisted);
+          const live = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
+          if (!live?.activeTurnId) {
+            this.#conversation.setSnapshot(agent.id, persisted);
+            if (this.#conversation.isExecutionThread(agent.threadId)) this.#conversation.publishConversation(persisted);
+          }
         } catch (error) {
           this.#hooks.emitError("provider_history_backfill_pending", error, agent.id);
         }

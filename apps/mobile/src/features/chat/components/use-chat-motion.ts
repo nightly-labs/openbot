@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LayoutChangeEvent } from "react-native";
-import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
+import { useKeyboardHandler } from "react-native-keyboard-controller";
 import type Animated from "react-native-reanimated";
 import {
   cancelAnimation,
@@ -33,7 +33,29 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     [ref],
   );
   const reducedMotion = useReducedMotion();
-  const keyboard = useReanimatedKeyboardAnimation();
+  const keyboardHeight = useSharedValue(0);
+  // Track actual frames and completion, not the iOS provider's start-only target.
+  // A render while the reply streams must not restore a dismissed keyboard's lift.
+  useKeyboardHandler(
+    {
+      onMove: (event) => {
+        "worklet";
+        keyboardHeight.set(event.height);
+      },
+      onInteractive: (event) => {
+        "worklet";
+        keyboardHeight.set(event.height);
+      },
+      onEnd: (event) => {
+        "worklet";
+        keyboardHeight.set(event.height);
+      },
+    },
+    [keyboardHeight],
+  );
+  const composerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -Math.max(0, keyboardHeight.get() - keyboardOffset) }],
+  }));
   const layout = useSharedValue<ChatLayout>({ viewport: 0, content: 0, header, tailY: 0, tailHeight: 0 });
   const composerHeight = useSharedValue(0);
   const blankSpace = useDerivedValue(() => (lastUserId ? chatBlankSpace(layout.get()) : 0));
@@ -87,7 +109,7 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
         setHistoryVisible(true);
         ref.current?.scrollTo({ y: chatSendOffset(m.layout, m.inset), animated: !send.first && !reducedMotion });
         if (send.first) {
-          const lift = Math.max(0, -keyboard.height.get() - keyboardOffset);
+          const lift = Math.max(0, keyboardHeight.get() - keyboardOffset);
           firstOffset.set(Math.max(0, m.layout.viewport - lift - m.composer - m.layout.header - m.userHeight));
           firstOpacity.set(withTiming(1, { duration: 200, reduceMotion: ReduceMotion.System }));
           firstOffset.set(
@@ -117,7 +139,7 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     finishFirstMessage,
     firstOffset,
     firstOpacity,
-    keyboard.height,
+    keyboardHeight,
     keyboardOffset,
     reducedMotion,
     ref,
@@ -138,7 +160,7 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
   );
 
   const onViewportLayout = useCallback(
-    (event: LayoutChangeEvent) => {
+    (event: Pick<LayoutChangeEvent, "nativeEvent">) => {
       measurements.current.layout = {
         ...measurements.current.layout,
         viewport: event.nativeEvent.layout.height,
@@ -158,7 +180,7 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     [layout, position],
   );
   const onTailLayout = useCallback(
-    (id: string, event: LayoutChangeEvent) => {
+    (id: string, event: Pick<LayoutChangeEvent, "nativeEvent">) => {
       const { y, height } = event.nativeEvent.layout;
       measurements.current.tailId = id;
       measurements.current.layout = { ...measurements.current.layout, tailY: y, tailHeight: height };
@@ -168,14 +190,14 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     [layout, position],
   );
   const onUserLayout = useCallback(
-    (event: LayoutChangeEvent) => {
+    (event: Pick<LayoutChangeEvent, "nativeEvent">) => {
       measurements.current.userHeight = event.nativeEvent.layout.height;
       position();
     },
     [position],
   );
   const onComposerLayout = useCallback(
-    (event: LayoutChangeEvent) => {
+    (event: Pick<LayoutChangeEvent, "nativeEvent">) => {
       const height = event.nativeEvent.layout.height + 20;
       measurements.current.composer = height;
       composerHeight.set(height);
@@ -202,7 +224,7 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
       chatContentIsVisible(
         layout.get(),
         scrollY.get(),
-        composerHeight.get() + Math.max(0, -keyboard.height.get() - keyboardOffset),
+        composerHeight.get() + Math.max(0, keyboardHeight.get() - keyboardOffset),
       ),
     (visible, previous) => {
       if (visible !== previous) scheduleOnRN(setAtLatest, visible);
@@ -246,6 +268,7 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     historyVisible,
     responseVisible,
     composerHeight,
+    composerStyle,
     blankSpace,
     historyStyle,
     firstMessageStyle,

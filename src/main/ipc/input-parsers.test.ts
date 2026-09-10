@@ -58,6 +58,7 @@ import {
   parseLoginServer,
   parseMarkDirectRead,
   parseReorderServers,
+  parseSetServerMuted,
   parseUpdateTeamMember,
 } from "./server-inputs";
 import { nullishPayload, optionalPayload, requireString } from "./validation";
@@ -715,4 +716,18 @@ describe("sidebar layout input parsing", () => {
       parseSidebarLayoutAction({ type: "move", sectionId: "section-1", direction: "down", steps: 0 }),
     ).toThrowError("Invalid section move distance.");
   });
+});
+
+it("validates the server mute request", () => {
+  expect(parseSetServerMuted({ serverId: "local", muted: true })).toEqual({ serverId: "local", muted: true });
+  expect(parseSetServerMuted({ serverId: "remote", muted: false })).toEqual({ serverId: "remote", muted: false });
+  for (const input of [
+    null,
+    {},
+    { serverId: "local", muted: "true" },
+    { serverId: "", muted: true },
+    { serverId: 1, muted: true },
+  ]) {
+    expect(() => parseSetServerMuted(input)).toThrow();
+  }
 });

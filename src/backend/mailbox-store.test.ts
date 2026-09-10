@@ -644,6 +644,35 @@ describe("MailboxStore", () => {
     await expect(access(resolved?.path ?? "missing")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("keeps the shared files of a channel when a member agent is deleted", async () => {
+    const source = join(root, "shared-report.txt");
+    await writeFile(source, "shared report");
+    const [draft] = await store.prepareAttachments([source]);
+    const receipt = await store.enqueue({
+      channelId: "channel-1",
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Read the report",
+      draftIds: [draft.id],
+    });
+    const shared = required(store.getDelivery(receipt.deliveries[0].id)?.delivery.attachments[0]);
+    const generated = await store.storeGeneratedAttachment({
+      bytes: new Uint8Array([4, 5, 6]),
+      name: "channel-chart.bin",
+      ownerAgentId: "chief",
+      ownerThreadId: "thread-channel-1",
+    });
+
+    // The channel still shows both files, so they leave with the channel, not with the member.
+    await store.deleteAgentData("chief", ["thread-channel-1"]);
+    await expect(store.resolveAttachment(shared.id)).resolves.not.toBeNull();
+    await expect(store.resolveAttachment(generated.id)).resolves.not.toBeNull();
+
+    await store.deleteChannelData("channel-1", ["thread-channel-1"]);
+    await expect(store.resolveAttachment(shared.id)).resolves.toBeNull();
+    await expect(store.resolveAttachment(generated.id)).resolves.toBeNull();
+  });
+
   it("cleans unrecoverable attachment drafts when a new app session starts", async () => {
     const source = join(root, "abandoned.txt");
     await writeFile(source, "abandoned");
@@ -863,3 +892,8 @@ describe("MailboxStore", () => {
     await expect(store.reorderQueue("chief", [deliveryId])).rejects.toThrow("Queue order is stale");
   });
 });
+
+function required<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) throw new Error("Expected a value.");
+  return value;
+}

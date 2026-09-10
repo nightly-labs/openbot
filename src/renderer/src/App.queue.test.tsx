@@ -681,7 +681,8 @@ describe("OpenBot connected desktop shell", () => {
     );
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
-    await fireEvent.click(screen.getByRole("button", { name: "Create new agent" }));
+    await fireEvent.pointerDown(screen.getByRole("button", { name: "New agent or channel" }), { button: 0 });
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New agent" }), { button: 0 });
     await fireEvent.click(await screen.findByRole("button", { name: /^Writing Partner\./ }));
     const name = screen.getByRole("textbox", { name: "Name" });
     const purpose = screen.getByRole("textbox", { name: "What should this agent help with?" });
@@ -704,7 +705,7 @@ describe("OpenBot connected desktop shell", () => {
       type: "prompt",
       requestId: "prompt-1",
       agentId: "chief",
-      threadId: "thread-1",
+      threadId: "thread-chief",
       turnId: "turn-1",
       questions: [
         {
@@ -731,7 +732,7 @@ describe("OpenBot connected desktop shell", () => {
       type: "conversation",
       snapshot: {
         agentId: "chief",
-        threadId: "thread-1",
+        threadId: "thread-chief",
         activeTurnId: "turn-1",
         revision: 20,
         messages: [
@@ -777,7 +778,7 @@ describe("OpenBot connected desktop shell", () => {
       type: "prompt",
       requestId: "prompt-failure",
       agentId: "chief",
-      threadId: "thread-1",
+      threadId: "thread-chief",
       turnId: "turn-failure",
       questions: [
         {
@@ -807,7 +808,7 @@ describe("OpenBot connected desktop shell", () => {
       type: "prompt",
       requestId: "prompt-external",
       agentId: "chief",
-      threadId: "thread-1",
+      threadId: "thread-chief",
       turnId: "turn-external",
       questions: [
         {
@@ -825,7 +826,7 @@ describe("OpenBot connected desktop shell", () => {
       type: "conversation",
       snapshot: {
         agentId: "chief",
-        threadId: "thread-1",
+        threadId: "thread-chief",
         activeTurnId: "turn-external",
         revision: 20,
         messages: [
@@ -873,7 +874,7 @@ describe("OpenBot connected desktop shell", () => {
       type: "conversation",
       snapshot: {
         agentId: "chief",
-        threadId: "thread-1",
+        threadId: "thread-chief",
         activeTurnId: "turn-first",
         revision: 20,
         messages: [
@@ -909,7 +910,7 @@ describe("OpenBot connected desktop shell", () => {
       type: "prompt",
       requestId: "prompt-first",
       agentId: "chief",
-      threadId: "thread-1",
+      threadId: "thread-chief",
       turnId: "turn-first",
       questions: [
         {
@@ -930,7 +931,7 @@ describe("OpenBot connected desktop shell", () => {
       type: "conversation",
       snapshot: {
         agentId: "chief",
-        threadId: "thread-1",
+        threadId: "thread-chief",
         activeTurnId: "turn-first",
         revision: 21,
         messages: [
@@ -968,7 +969,7 @@ describe("OpenBot connected desktop shell", () => {
       type: "prompt",
       requestId: "prompt-second",
       agentId: "chief",
-      threadId: "thread-1",
+      threadId: "thread-chief",
       turnId: "turn-second",
       questions: [
         {
@@ -993,7 +994,7 @@ describe("OpenBot connected desktop shell", () => {
       type: "conversation",
       snapshot: {
         agentId: "chief",
-        threadId: "thread-1",
+        threadId: "thread-chief",
         activeTurnId: null,
         revision: 20,
         messages: [
@@ -1032,7 +1033,7 @@ describe("OpenBot connected desktop shell", () => {
       type: "prompt",
       requestId: "prompt-reused",
       agentId: "chief",
-      threadId: "thread-1",
+      threadId: "thread-chief",
       turnId: "turn-new",
       questions: [
         {
@@ -1065,7 +1066,7 @@ describe("OpenBot connected desktop shell", () => {
       approval: {
         requestId: "approval-1",
         agentId: "chief",
-        threadId: "thread-1",
+        threadId: "thread-chief",
         turnId: "turn-1",
         kind: "command",
         command: "npm test -- --runInBand",

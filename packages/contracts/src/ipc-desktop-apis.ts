@@ -58,6 +58,22 @@ import type {
   BrowserVisibilityInput,
 } from "./ipc-browser";
 import type {
+  ChannelMemory,
+  CreateChannelMemoryInput,
+  DeleteChannelMemoryInput,
+  UpdateChannelMemoryInput,
+} from "./ipc-channel-memories";
+import type {
+  ChannelRoutine,
+  ChannelRoutineRun,
+  CreateChannelRoutineInput,
+  DeleteChannelRoutineInput,
+  ListChannelRoutineRunsInput,
+  TestChannelRoutineInput,
+  UpdateChannelRoutineInput,
+} from "./ipc-channel-routines";
+import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
+import type {
   ConversationPage,
   ConversationReadState,
   ConversationSearchPage,
@@ -160,6 +176,10 @@ import type {
 import type { VoiceModelStatus, VoiceTranscriptionInput, VoiceTranscriptionResult } from "./ipc-voice";
 
 export interface AgentDesktopApi {
+  listChannels: () => Promise<ChannelSummary[]>;
+  readChannel: (input: ChannelReadInput) => Promise<ChannelPage>;
+  channelCommand: (input: ChannelCommand) => Promise<Channel>;
+  deleteChannel: (channelId: string) => Promise<void>;
   getStatus: () => Promise<AgentStatus>;
   getAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
   getHostAnalytics: (input: HostAnalyticsInput, serverId: string) => Promise<HostAnalytics | null>;
@@ -187,6 +207,17 @@ export interface AgentDesktopApi {
   deleteRoutine: (input: DeleteRoutineInput) => Promise<void>;
   testRoutine: (input: TestRoutineInput) => Promise<RoutineRun>;
   listRoutineRuns: (input: ListRoutineRunsInput) => Promise<RoutineRun[]>;
+  listChannelMemories: (channelId: string) => Promise<ChannelMemory[]>;
+  createChannelMemory: (input: CreateChannelMemoryInput) => Promise<ChannelMemory>;
+  updateChannelMemory: (input: UpdateChannelMemoryInput) => Promise<ChannelMemory>;
+  deleteChannelMemory: (input: DeleteChannelMemoryInput) => Promise<void>;
+  clearChannelMemories: (channelId: string) => Promise<void>;
+  listChannelRoutines: (channelId: string) => Promise<ChannelRoutine[]>;
+  createChannelRoutine: (input: CreateChannelRoutineInput) => Promise<ChannelRoutine>;
+  updateChannelRoutine: (input: UpdateChannelRoutineInput) => Promise<ChannelRoutine>;
+  deleteChannelRoutine: (input: DeleteChannelRoutineInput) => Promise<void>;
+  testChannelRoutine: (input: TestChannelRoutineInput) => Promise<ChannelRoutineRun>;
+  listChannelRoutineRuns: (input: ListChannelRoutineRunsInput) => Promise<ChannelRoutineRun[]>;
   readConversation: (agentId: string) => Promise<ConversationWithReadState>;
   readConversationPage: (input: ReadConversationPageInput, serverId?: string) => Promise<ConversationPage>;
   searchConversationMessages: (input: SearchConversationMessagesInput) => Promise<ConversationSearchPage>;
@@ -298,6 +329,7 @@ export interface DynamicIslandDesktopApi {
 }
 
 export interface ServersDesktopApi {
+  setMuted: (input: { serverId: string; muted: boolean }) => Promise<ServerSummary[]>;
   list: () => Promise<ServerSummary[]>;
   select: (serverId: string) => Promise<ServerSummary[]>;
   reorder: (input: ReorderServersInput) => Promise<ServerSummary[]>;

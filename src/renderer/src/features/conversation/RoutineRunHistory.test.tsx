@@ -43,7 +43,8 @@ describe("RoutineRunHistory", () => {
   });
 
   it("keeps a run without a conversation message non-interactive", () => {
-    render(() => <RoutineRunHistory runs={[{ ...runForStatus("failed", 0), deliveryId: null }]} onOpenRun={vi.fn()} />);
+    const run: RoutineRun = { ...runForStatus("failed", 0), deliveryId: null };
+    render(() => <RoutineRunHistory runs={[run]} onOpenRun={vi.fn()} />);
 
     expect(screen.queryByRole("button", { name: /in chat$/ })).not.toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Failed" })).toBeInTheDocument();

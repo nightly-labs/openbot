@@ -273,8 +273,12 @@ Mobile acknowledges rendered replies only in the foreground, focused chat at the
 Mobile chat keeps viewport, tail-group, and composer measurements in its motion controller. The
 last user message anchors a native blank-space inset; streamed replies consume that inset without
 autoscrolling. Initial history positioning and the first-send/first-response animation are separate
-states. Pending message bubbles reconcile through the host receipt ID, not message text. Selected
-mobile attachments use the existing WebRTC file frames followed by the attachment upload endpoint;
+states. Pending message bubbles reconcile through the host receipt ID, not message text.
+Mobile replies use the existing `replyToMessageId` field and retain their source after delivery.
+Agent bubbles support swipe-to-reply and a long-press action sheet with haptic feedback. The
+sheet has one nested native stack for actions and text selection; message text stays in memory,
+outside route parameters. Failed sends restore the reply target, and the composer can cancel it.
+Selected mobile attachments use the existing WebRTC file frames followed by the attachment upload endpoint;
 the native/DOM bridge limits each file to 10 MB and cancels transfers when its connection is replaced.
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
@@ -622,3 +626,74 @@ with their released provider vocabulary. The host filters OpenCode agents, model
 sidebar references, and runtime events before encoding an older client's response. Requests for
 an OpenCode agent from those clients return 404. WebRTC keeps its v2 frame transport and selects
 the v4 application codec when the peer advertises the `opencode` capability.
+
+### Desktop server notifications
+
+Each desktop profile stores muted server IDs in `servers.json`. `RemoteServerStore` saves a
+mute change before publishing it. These preferences survive restart, re-login, and host-list
+reconciliation. The server context menu controls mute for local and remote servers.
+
+`renderer-forwarders.ts` continues to deliver live events for muted servers, but suppresses
+system notifications. Remote notification content uses the source server's agent list. Both
+server mute and per-agent notification settings apply. Unread state is unchanged. Mobile does
+not yet deliver system notifications; mute settings are not synchronized between devices.
+
+## Shared desktop channel chats
+
+Channels are separate from sidebar sections. A channel has one host, a purpose, participating agents,
+a selected lead, and linked agent conversations. Agent membership selects who can receive work.
+It does not restrict human access: each authenticated server member can read and use its channels.
+The Electron app provides the channel interface. A creation dialog provides member search and optional
+coordination settings. The chat shows each author and keeps settings in a side panel. Channels use the sidebar
+context menu for management and have no Pause or Resume controls. The mobile interface is unchanged.
+
+`ChannelStore` stores the canonical transcript, channel configuration, tasks, assignments, summaries,
+execution threads, and human read positions in SQLite. Migration 18 adds these projections without
+changing existing agent data. Channel commands use the orchestration log and command receipts.
+Messages have stable IDs and per-channel sequences. A channel projection can be rebuilt from its events.
+Archiving stops channel work and retains its records. Restore makes the chat available for new messages again. Neither action removes agents or linked conversations.
+
+Each channel-agent pair has a separate execution thread in `projection_threads`. The normal agent
+thread is never replaced. Provider sessions, turns, questions, approvals, attachments, compaction,
+and restart recovery use the explicit execution thread. These internal execution records do not
+create extra navigation entries. The per-agent drain scheduler remains the authority for work.
+
+`ChannelService` selects one owner. A selected recipient has priority, followed by the task attached
+to a reply, a reply to a member message that has no task, a clear follow-up to the sole open task,
+and a channel with one available member. These selections use no model. Other requests use the
+lead's provider, model, and reasoning setting in a separate session with no work tools. The request
+supplies the accepted result schema and the channel summary in place of the transcript. Invalid or
+stale routing cannot broadcast a request. Routing can select an existing task, ask a question, or
+indicate that no work is needed. A selected owner or existing task adds one channel message from the
+lead, so the selection is visible and the user can correct it. Deterministic selection adds no
+message.
+
+Channel tools retrieve history, assign a child task, transfer ownership, and report results. The
+runtime supplies channel and caller identity. A child keeps its parent owner; a transfer changes it.
+Only assignments and awaited results start turns. Completed child results are combined before the
+owner returns. The limit is eight automatic assignments per root request and two active assignments
+per channel. One agent runs at most one work turn across all chats. Declared workspace and browser
+resources are serialized; undeclared resources reserve the host. An assignment keeps the resources
+it started with until it ends, and a task with an active assignment starts no second owner. These
+controls do not restrict provider process privileges.
+
+Each turn receives bounded channel context: purpose, responsibilities, the current request, source
+messages and replies, shared decisions, recent messages, and attachment references. A versioned
+summary covers older messages, with a sequence and source IDs. Full messages remain retrievable.
+The provider acceptance cursor records context delivery. Context packets remain self-contained so
+provider replacement or compaction does not remove shared decisions. Unrelated server conversations
+are available through paginated retrieval and are not inserted automatically. Agent memories keep
+their existing meaning.
+
+Task revisions prevent an old assignment from completing a corrected request. The stored request
+keeps its own text and files: only its first dispatch converts the attachment drafts, and a later
+dispatch of the same request sends the stored copies again. Stop pauses a task and its descendants
+and interrupts active work. Reassign waits for the old assignment to finish stopping. Restart
+recovery checks accepted provider work before retrying. Unknown outcomes require attention.
+Command, assignment, and result IDs prevent duplicate dispatch and visible results; external side
+effects do not have an exactly-once guarantee.
+
+Desktop IPC and remote desktop transports expose `channel-chats-v1` as an optional capability with
+separate payload codecs. Released Team API adapters keep their existing meaning. A host advertises
+the capability only when its channel service is connected. Unsupported remote hosts show an explanation
+in place of channel controls. The account API and Signal service add no channel storage or routing.

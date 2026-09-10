@@ -506,6 +506,76 @@ describe("TeamWebRtcClientTransport", () => {
     await transport.stop();
   });
 
+  it("carries channel payloads and revision events outside the released base adapter", async () => {
+    const bridge = new TeamWebRtcBridge();
+    vi.spyOn(bridge, "connect").mockImplementation(async ({ peerId }) => {
+      queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
+    });
+    const authentication = mockAuthenticatedSend(bridge);
+    vi.spyOn(bridge, "disconnect").mockResolvedValue();
+    const transport = createTransport(bridge);
+    await transport.listHosts();
+    transport.pinHostKey("host-1", hostKeys.publicKey);
+    await transport.connect("host-1");
+    const pending = transport.request("host-1", "/v1/channels");
+    await vi.waitFor(() => expect(sentRequestId(authentication.send)).toBeTruthy());
+    const channels = [
+      {
+        id: "channel-1",
+        name: "Project",
+        title: "",
+        instructions: "Research",
+        members: [],
+        leadAgentId: null,
+        archived: false,
+        revision: 1,
+        createdAt: "2026-09-07T12:00:00.000Z",
+        unreadCount: 0,
+        activeTasks: 0,
+        lastMessage: null,
+      },
+    ];
+    bridge.emit(
+      "data",
+      "host-1",
+      "rpc",
+      JSON.stringify({
+        version: 2,
+        type: "response",
+        requestId: sentRequestId(authentication.send),
+        result: { status: 200, body: channels },
+      }),
+    );
+    expect(await pending).toEqual(channels);
+    const event = vi.fn();
+    transport.on("event", event);
+    bridge.emit(
+      "data",
+      "host-1",
+      "events",
+      JSON.stringify({
+        version: 2,
+        type: "event",
+        sequence: 1,
+        payload: { type: "channels-changed", channelId: "channel-1", revision: 2 },
+      }),
+    );
+    expect(event).toHaveBeenCalledWith("host-1", { type: "channels-changed", channelId: "channel-1", revision: 2 });
+    for (const [sequence, payload] of [
+      { type: "channel-memories-changed", channelId: "channel-1" },
+      { type: "channel-routines-changed", channelId: "channel-1" },
+    ].entries()) {
+      bridge.emit(
+        "data",
+        "host-1",
+        "events",
+        JSON.stringify({ version: 2, type: "event", sequence: sequence + 2, payload }),
+      );
+      expect(event).toHaveBeenCalledWith("host-1", payload);
+    }
+    await transport.stop();
+  });
+
   it("rejects every concurrent caller when the bridge connection fails", async () => {
     const bridge = new TeamWebRtcBridge();
     let rejectBridge!: (error: Error) => void;

@@ -23,7 +23,9 @@ import {
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { channelEvent, channelResponse, isChannelRoute } from "@openbot/contracts/team-protocol/channels-v1";
 import {
+  CHANNEL_DELETE_CAPABILITY,
   isTeamCurrentCapability,
   supportsTeamSemanticTags,
   TEAM_AGENT_ACTIVITY_CAPABILITY,
@@ -69,6 +71,7 @@ import {
 } from "./team-api/request-helpers";
 import { routeAgents } from "./team-api/route-agents";
 import { routeBrowser } from "./team-api/route-browser";
+import { routeChannels } from "./team-api/route-channels";
 import { routeDirect } from "./team-api/route-direct";
 import { routeFiles } from "./team-api/route-files";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
@@ -519,6 +522,7 @@ export class TeamApiServer {
       if ((await this.#routeDirect(context)) === "handled") return;
       if ((await this.#routeBrowser(context)) === "handled") return;
       if ((await this.#routeFiles(context)) === "handled") return;
+      if ((await routeChannels(context, this.#options.channels, this.#options.agents)) === "handled") return;
       if ((await this.#routeAgents(context)) === "handled") return;
 
       // The only 404 in the Team API.
@@ -644,7 +648,11 @@ export class TeamApiServer {
       let conversationInvalidation: string | undefined;
       let queueInvalidation: string | undefined;
       let outgoing: string;
-      if (event.type === "conversation" && supportsRuntimeSnapshots) {
+      const channel = channelEvent(event);
+      if (channel) {
+        if (!connection.capabilities.has("channel-chats-v1")) continue;
+        outgoing = JSON.stringify(channel);
+      } else if (event.type === "conversation" && supportsRuntimeSnapshots) {
         conversationInvalidation ??=
           encodeEvent({
             type: "conversation-invalidated",
@@ -1023,8 +1031,9 @@ export class TeamApiServer {
     // surfaced as a hung socket and an `ERR_HTTP_HEADERS_SENT` rejection out of `#handle`'s own
     // error path. Encoding first lets that failure become the 500 the caller can read.
     const visibleValue = status < 400 && route.hiddenAgentIds ? legacyProviderView(value, route.hiddenAgentIds) : value;
-    const body =
-      route.protocol === TEAM_PROTOCOL_V4
+    const body = isChannelRoute(route.path)
+      ? JSON.stringify(channelResponse(route.path, status, visibleValue))
+      : route.protocol === TEAM_PROTOCOL_V4
         ? encodeTeamProtocolV4CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
         : route.protocol === TEAM_PROTOCOL_V3
           ? encodeTeamProtocolV3CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
@@ -1038,7 +1047,11 @@ export class TeamApiServer {
     return {
       appVersion: this.#options.appVersion ?? "0.0.0",
       protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V4 },
-      capabilities: [...TEAM_CURRENT_CAPABILITIES],
+      capabilities: TEAM_CURRENT_CAPABILITIES.filter(
+        (capability) =>
+          (capability !== "channel-chats-v1" && capability !== CHANNEL_DELETE_CAPABILITY) ||
+          this.#options.channels !== undefined,
+      ),
     };
   }
 
@@ -1148,6 +1161,12 @@ function unavailableSidebarLayout(): TeamApiSidebarLayout {
 }
 
 function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
+  if (
+    event.type === "channels-changed" ||
+    event.type === "channel-memories-changed" ||
+    event.type === "channel-routines-changed"
+  )
+    return "channel-chats-v1";
   if (event.type === "turn-progress") return TEAM_AGENT_ACTIVITY_CAPABILITY;
   if (event.type === "runtime-snapshot") return "agent-runtime-snapshots";
   if (event.type === "sidebar-layout-changed") return "sidebar-layout";

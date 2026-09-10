@@ -1,10 +1,18 @@
-import type { RoutineRun } from "@openbot/contracts/ipc";
+import { isRoutineRun, type RoutineRunFields } from "@openbot/contracts/ipc";
 import { For, Show } from "solid-js";
 import { Button, Check, CirclePause, Clock3, TriangleAlert, X } from "../../components/ui";
 
 interface RoutineRunHistoryProps {
-  runs: RoutineRun[];
+  runs: RoutineRunFields[];
   onOpenRun?: (messageId: string) => void;
+}
+
+/**
+ * Only an agent run names a message the user can jump to: its mailbox delivery. A channel run
+ * fires into the channel everybody is already reading, so its rows stay plain.
+ */
+function runMessageId(run: RoutineRunFields): string | null {
+  return isRoutineRun(run) ? run.deliveryId : null;
 }
 
 export function RoutineRunHistory(props: RoutineRunHistoryProps) {
@@ -28,7 +36,7 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
               );
               return (
                 <Show
-                  when={run.deliveryId && props.onOpenRun ? run.deliveryId : null}
+                  when={props.onOpenRun ? runMessageId(run) : null}
                   fallback={<div class="agent-routine-run-row">{content}</div>}
                 >
                   {(messageId) => (
@@ -52,7 +60,7 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
   );
 }
 
-function RoutineRunStatus(props: { status: RoutineRun["status"] }) {
+function RoutineRunStatus(props: { status: RoutineRunFields["status"] }) {
   const label = () => routineRunStatusLabel(props.status);
   return (
     <span
@@ -99,6 +107,6 @@ function sameCalendarDay(left: Date, right: Date): boolean {
   );
 }
 
-function routineRunStatusLabel(status: RoutineRun["status"]): string {
+function routineRunStatusLabel(status: RoutineRunFields["status"]): string {
   return status === "needs-attention" ? "Needs attention" : `${status.slice(0, 1).toUpperCase()}${status.slice(1)}`;
 }

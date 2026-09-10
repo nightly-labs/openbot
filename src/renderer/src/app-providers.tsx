@@ -8,6 +8,7 @@ import { AgentEventBridge } from "./features/agents/agent-event-bridge";
 import { AgentReadTrackingProvider } from "./features/agents/agent-read-tracking";
 import { AgentsProvider } from "./features/agents/agents-context";
 import { BrowserTabsProvider } from "./features/browser/browser-context";
+import { ChannelsProvider } from "./features/channels/channels-context";
 import { ConversationProvider } from "./features/conversation/conversation-context";
 import {
   createServerConversationState,
@@ -144,27 +145,29 @@ function ScopedProviders(props: ParentProps<ScopedConversationProps>): JSX.Eleme
       <PresenceProvider>
         <DirectMessagesProvider>
           <AgentsProvider>
-            <ProvidersProvider>
-              <TurnsProvider>
-                <ConversationProvider>
-                  <BrowserTabsProvider>
-                    <SidebarProvider>
-                      <NavigationProvider>
-                        <ServerSelectionProvider>
-                          <AgentActionsProvider>
-                            <ServerScopeProvider>
-                              <AgentEventBridge />
-                              <DynamicIslandBridge />
-                              {props.children}
-                            </ServerScopeProvider>
-                          </AgentActionsProvider>
-                        </ServerSelectionProvider>
-                      </NavigationProvider>
-                    </SidebarProvider>
-                  </BrowserTabsProvider>
-                </ConversationProvider>
-              </TurnsProvider>
-            </ProvidersProvider>
+            <ChannelsProvider>
+              <ProvidersProvider>
+                <TurnsProvider>
+                  <ConversationProvider>
+                    <BrowserTabsProvider>
+                      <SidebarProvider>
+                        <NavigationProvider>
+                          <ServerSelectionProvider>
+                            <AgentActionsProvider>
+                              <ServerScopeProvider>
+                                <AgentEventBridge />
+                                <DynamicIslandBridge />
+                                {props.children}
+                              </ServerScopeProvider>
+                            </AgentActionsProvider>
+                          </ServerSelectionProvider>
+                        </NavigationProvider>
+                      </SidebarProvider>
+                    </BrowserTabsProvider>
+                  </ConversationProvider>
+                </TurnsProvider>
+              </ProvidersProvider>
+            </ChannelsProvider>
           </AgentsProvider>
         </DirectMessagesProvider>
       </PresenceProvider>

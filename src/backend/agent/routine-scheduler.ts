@@ -23,7 +23,8 @@ import type { AgentStore } from "../agent-store";
 import { sortConversationMessages } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
-import { nextRoutineOccurrence } from "../routine-schedule";
+import { collapseMissedOccurrences } from "../routine-schedule";
+import type { RoutineDueSource, RoutineTimer } from "../routine-timer";
 import { type ConversationRuntime, withDatabaseTransaction } from "./conversation-runtime";
 import { routineStatusForDelivery } from "./delivery-content";
 import {
@@ -69,6 +70,8 @@ export interface RoutineSchedulerOptions {
   mailbox: MailboxStore;
   conversation: ConversationRuntime;
   hooks: RoutineHooks;
+  /** Shared with every other routine owner, so one wake time is derived across all of them. */
+  timer: RoutineTimer;
 }
 
 /**
@@ -84,7 +87,7 @@ export interface RoutineSchedulerOptions {
  * blocked on a question is `needs-attention`, and answering returns it to `running`. That is why a
  * user can tell a stalled routine from a working one.
  */
-export class RoutineScheduler {
+export class RoutineScheduler implements RoutineDueSource {
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
   readonly #conversation: ConversationRuntime;
@@ -96,13 +99,14 @@ export class RoutineScheduler {
    * routine that is halfway deleted.
    */
   readonly #deletionAgents = new Set<string>();
-  #timer: NodeJS.Timeout | null = null;
+  readonly #timer: RoutineTimer;
 
   constructor(options: RoutineSchedulerOptions) {
     this.#store = options.store;
     this.#mailbox = options.mailbox;
     this.#conversation = options.conversation;
     this.#hooks = options.hooks;
+    this.#timer = options.timer;
     this.#routines = new AgentRoutineStore(options.store.database);
   }
 
@@ -408,38 +412,31 @@ export class RoutineScheduler {
     this.#hooks.emit({ type: "routines-changed", agentId });
   }
 
-  /** Re-derives the next due time across every routine and arms the single timer for it. */
+  /**
+   * Kept as the callers' only verb for "the schedule moved". The shared timer re-derives the wake
+   * time across every routine owner, so this scheduler no longer holds a timeout of its own.
+   */
   arm(): void {
-    if (this.#timer) clearTimeout(this.#timer);
-    this.#timer = null;
-    if (!this.#hooks.isRunning()) return;
-    const nextDueAt = this.#routines.nextDueAt(this.#hooks.excludedAgents());
-    if (!nextDueAt) return;
-    const delay = Math.max(0, Math.min(new Date(nextDueAt).getTime() - Date.now(), 2_147_000_000));
-    this.#timer = setTimeout(() => {
-      this.#timer = null;
-      void this.#processDue();
-    }, delay);
-    this.#timer.unref?.();
+    this.#timer.arm();
   }
 
-  dispose(): void {
-    if (this.#timer) clearTimeout(this.#timer);
-    this.#timer = null;
+  /** The earliest agent routine, for the shared timer to compare against the other owners. */
+  nextDueAt(): string | null {
+    return this.#routines.nextDueAt(this.#hooks.excludedAgents());
   }
 
-  async #processDue(now = new Date()): Promise<void> {
+  async processDue(now = new Date()): Promise<void> {
     const changedAgents = new Set<string>();
     try {
       for (const due of this.#routines.due(now, this.#hooks.excludedAgents())) {
         // A previous enqueue can yield while another agent starts deletion.
         if (this.#hooks.excludedAgents().has(due.routine.agentId)) continue;
-        let scheduledFor = new Date(due.nextRunAt);
-        let nextRunAt = nextRoutineOccurrence(due.schedule, due.routine.timezone, scheduledFor);
-        while (nextRunAt.getTime() <= now.getTime()) {
-          scheduledFor = nextRunAt;
-          nextRunAt = nextRoutineOccurrence(due.schedule, due.routine.timezone, scheduledFor);
-        }
+        const { scheduledFor, nextRunAt } = collapseMissedOccurrences(
+          due.schedule,
+          due.routine.timezone,
+          new Date(due.nextRunAt),
+          now,
+        );
         const run = this.#routines.createRun(due.routine, due.triggerId, "scheduled", scheduledFor.toISOString());
         this.#routines.advanceTrigger(due.routine.id, due.triggerId, nextRunAt.toISOString());
         changedAgents.add(due.routine.agentId);
@@ -452,8 +449,8 @@ export class RoutineScheduler {
     } catch (error) {
       this.#hooks.emitError("routine_scheduler_failed", error);
     } finally {
+      // The shared timer re-arms after every source has run, so this must not arm on its own.
       for (const agentId of changedAgents) this.stateChanged(agentId);
-      this.arm();
     }
   }
 

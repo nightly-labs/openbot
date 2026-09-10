@@ -19,6 +19,8 @@ import { agentIpcHandlers } from "./ipc/agent-handlers";
 import { appIpcHandlers } from "./ipc/app-handlers";
 import { attachmentIpcHandlers } from "./ipc/attachment-handlers";
 import { browserIpcHandlers } from "./ipc/browser-handlers";
+import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
+import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
 import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
 import { registerIpcGroups } from "./ipc/define-ipc-group";
 import { dynamicIslandIpcHandlers } from "./ipc/dynamic-island-handlers";
@@ -310,6 +312,8 @@ function registerIpcHandlers({
     }),
     ...memoryIpcHandlers({ service, remoteServers }),
     ...routineIpcHandlers({ service, remoteServers }),
+    ...channelMemoryIpcHandlers({ service, remoteServers }),
+    ...channelRoutineIpcHandlers({ service, remoteServers }),
     ...attachmentIpcHandlers({ service, mailbox, remoteServers, getMainWindow }),
     ...agentIpcHandlers({ service, sidebarLayout, host, remoteServers, skills }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers }),

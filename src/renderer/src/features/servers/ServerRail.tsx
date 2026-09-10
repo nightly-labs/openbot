@@ -1,14 +1,15 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, createStore, For, onCleanup, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
-import { buttonVariants, ChartArea, ContextMenu, ServerGradientLogo, Tooltip } from "../../components/ui";
+import { BellOff, buttonVariants, ChartArea, ContextMenu, ServerGradientLogo, Tooltip } from "../../components/ui";
 
 const SERVER_RAIL_TOOLTIP_OPEN_DELAY = 150;
 
 interface ServerRailProps {
   servers: ServerSummary[];
   onSelect: (serverId: string) => void;
+  onSetMuted: (serverId: string, muted: boolean) => void;
   onReorder: (serverIds: string[]) => void;
   onAdd: () => void;
   onOpenUsage?: (serverId: string, trigger: HTMLElement | null) => void;
@@ -213,6 +214,7 @@ export function ServerRail(props: ServerRailProps) {
               server={server()}
               onSelect={props.onSelect}
               onOpenSettings={props.onOpenSettings}
+              onSetMuted={props.onSetMuted}
               onOpenUsage={props.onOpenUsage}
             />
           )}
@@ -257,6 +259,7 @@ export function ServerRail(props: ServerRailProps) {
                     server={server()}
                     onSelect={props.onSelect}
                     onOpenSettings={props.onOpenSettings}
+                    onSetMuted={props.onSetMuted}
                     onOpenUsage={props.onOpenUsage}
                     onMove={(direction) => moveServer(server().id, direction)}
                   />
@@ -295,16 +298,21 @@ export function ServerRail(props: ServerRailProps) {
 function ServerRailButton(props: {
   server: ServerSummary;
   onSelect: (serverId: string) => void;
+  onSetMuted: (serverId: string, muted: boolean) => void;
   onOpenUsage?: (serverId: string, trigger: HTMLElement | null) => void;
   onOpenSettings: (serverId: string, trigger: HTMLElement | null) => void;
   onMove?: (direction: -1 | 1) => void;
 }) {
-  const [tooltipOpen, setTooltipOpen] = createSignal(false);
+  const [overlay, setOverlay] = createStore({ tooltipOpen: false, menuOpen: false });
   let trigger: HTMLElement | null = null;
   return (
     <Tooltip.Root
-      open={tooltipOpen()}
-      onOpenChange={setTooltipOpen}
+      open={overlay.tooltipOpen && !overlay.menuOpen}
+      onOpenChange={(open) =>
+        setOverlay((state) => {
+          state.tooltipOpen = open;
+        })
+      }
       placement="right"
       gutter={10}
       openDelay={SERVER_RAIL_TOOLTIP_OPEN_DELAY}
@@ -312,12 +320,19 @@ function ServerRailButton(props: {
       skipDelayDuration={300}
     >
       <Tooltip.Trigger as="div" class="server-rail-tooltip-trigger">
-        <ContextMenu.Root modal={false}>
+        <ContextMenu.Root
+          modal={false}
+          onOpenChange={(open) =>
+            setOverlay((state) => {
+              state.menuOpen = open;
+            })
+          }
+        >
           <ContextMenu.Trigger
             as="button"
             type="button"
             class={buttonVariants({ variant: "ghost", class: "server-rail-button" })}
-            aria-label={`${props.server.name} server${props.server.state === "online" ? "" : `, ${props.server.state}`}`}
+            aria-label={`${props.server.name} server${props.server.notificationsMuted ? ", notifications muted" : ""}${props.server.state === "online" ? "" : `, ${props.server.state}`}`}
             aria-pressed={props.server.active ? "true" : "false"}
             aria-keyshortcuts={props.onMove ? "Shift+F10 Alt+ArrowUp Alt+ArrowDown" : "Shift+F10"}
             onClick={() => props.onSelect(props.server.id)}
@@ -326,9 +341,15 @@ function ServerRailButton(props: {
             }}
             onFocus={(event) => {
               trigger = event.currentTarget;
-              setTooltipOpen(true);
+              setOverlay((state) => {
+                state.tooltipOpen = true;
+              });
             }}
-            onBlur={() => setTooltipOpen(false)}
+            onBlur={() =>
+              setOverlay((state) => {
+                state.tooltipOpen = false;
+              })
+            }
             onKeyDown={(event: KeyboardEvent & { currentTarget: HTMLButtonElement }) => {
               if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
                 event.preventDefault();
@@ -350,9 +371,16 @@ function ServerRailButton(props: {
           >
             <span class="server-rail-mark" aria-hidden="true" />
             <ServerMark server={props.server} />
+            <Show when={props.server.notificationsMuted}>
+              <BellOff class="server-rail-muted size-3" aria-hidden="true" />
+            </Show>
           </ContextMenu.Trigger>
           <ContextMenu.Portal>
             <ContextMenu.Content class="agent-context-menu" aria-label="Server actions">
+              <ContextMenu.Item onSelect={() => props.onSetMuted(props.server.id, !props.server.notificationsMuted)}>
+                <BellOff class="agent-context-icon size-4" aria-hidden="true" />
+                <span>{props.server.notificationsMuted ? "Unmute notifications" : "Mute notifications"}</span>
+              </ContextMenu.Item>
               <Show when={props.onOpenUsage}>
                 <ContextMenu.Item onSelect={() => props.onOpenUsage?.(props.server.id, trigger)}>
                   <ChartArea class="agent-context-icon size-4" aria-hidden="true" />
@@ -379,7 +407,10 @@ function ServerRailButton(props: {
         </ContextMenu.Root>
       </Tooltip.Trigger>
       <Tooltip.Portal>
-        <Tooltip.Content class="server-rail-tooltip">{props.server.name}</Tooltip.Content>
+        <Tooltip.Content class="server-rail-tooltip">
+          {props.server.name}
+          {props.server.notificationsMuted ? " · Notifications muted" : ""}
+        </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>
   );

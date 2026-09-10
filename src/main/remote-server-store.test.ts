@@ -192,3 +192,62 @@ describe("remote server store", () => {
     expect(JSON.parse(await readFile(path, "utf8")).activeServerId).toBe("beta");
   });
 });
+
+it("keeps independent mute preferences through restart, reconciliation and re-login", async () => {
+  const path = await storePath({
+    version: 1,
+    activeServerId: "alpha",
+    servers: [storedServer("alpha"), storedServer("beta")],
+  });
+  const store = newStore(path);
+  await store.load();
+  expect(store.isMuted("alpha")).toBe(false);
+  await store.setMuted("alpha", true);
+  await store.setMuted(LOCAL_SERVER_ID, true);
+  await store.replaceServers([]);
+  await store.adopt(storedServer("alpha"));
+  const restarted = newStore(path);
+  await restarted.load();
+  expect([restarted.isMuted("alpha"), restarted.isMuted("beta"), restarted.isMuted(LOCAL_SERVER_ID)]).toEqual([
+    true,
+    false,
+    true,
+  ]);
+  await restarted.setMuted("alpha", false);
+  const unmuted = newStore(path);
+  await unmuted.load();
+  expect(unmuted.isMuted("alpha")).toBe(false);
+  expect(unmuted.isMuted(LOCAL_SERVER_ID)).toBe(true);
+  await expect(unmuted.setMuted("missing", true)).rejects.toThrow("Remote server not found.");
+});
+
+it("preserves mute writes when other server writes are queued", async () => {
+  const path = await storePath({ version: 3, activeServerId: "alpha", servers: [storedServer("alpha")] });
+  const store = newStore(path);
+  await store.load();
+  await Promise.all([
+    store.setMuted("alpha", true),
+    store.update("alpha", { name: "Renamed" }),
+    store.setMuted(LOCAL_SERVER_ID, true),
+    store.persist(),
+  ]);
+  const restarted = newStore(path);
+  await restarted.load();
+  expect([restarted.isMuted("alpha"), restarted.isMuted(LOCAL_SERVER_ID), restarted.require("alpha").name]).toEqual([
+    true,
+    true,
+    "Renamed",
+  ]);
+});
+
+it("keeps the prior mute preference when the write fails", async () => {
+  const path = await storePath({ version: 3, activeServerId: "local", servers: [] });
+  const store = newStore(path);
+  await store.load();
+  await store.setMuted(LOCAL_SERVER_ID, true);
+  await rm(path);
+  const { mkdir } = await import("node:fs/promises");
+  await mkdir(path);
+  await expect(store.setMuted(LOCAL_SERVER_ID, false)).rejects.toThrow();
+  expect(store.isMuted(LOCAL_SERVER_ID)).toBe(true);
+});
