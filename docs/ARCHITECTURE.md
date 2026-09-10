@@ -273,8 +273,12 @@ Mobile acknowledges rendered replies only in the foreground, focused chat at the
 Mobile chat keeps viewport, tail-group, and composer measurements in its motion controller. The
 last user message anchors a native blank-space inset; streamed replies consume that inset without
 autoscrolling. Initial history positioning and the first-send/first-response animation are separate
-states. Pending message bubbles reconcile through the host receipt ID, not message text. Selected
-mobile attachments use the existing WebRTC file frames followed by the attachment upload endpoint;
+states. Pending message bubbles reconcile through the host receipt ID, not message text.
+Mobile replies use the existing `replyToMessageId` field and retain their source after delivery.
+Agent bubbles support swipe-to-reply and a long-press action sheet with haptic feedback. The
+sheet has one nested native stack for actions and text selection; message text stays in memory,
+outside route parameters. Failed sends restore the reply target, and the composer can cancel it.
+Selected mobile attachments use the existing WebRTC file frames followed by the attachment upload endpoint;
 the native/DOM bridge limits each file to 10 MB and cancels transfers when its connection is replaced.
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the

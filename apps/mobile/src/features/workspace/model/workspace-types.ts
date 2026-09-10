@@ -93,7 +93,12 @@ export interface MobileWorkspaceContextValue {
   loadAgentAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
   loadConversation: (agentId: string) => Promise<ConversationSnapshot>;
   respondToPrompt: (agentId: string, input: RespondToPromptInput) => Promise<void>;
-  sendMessage: (agentId: string, text: string, attachmentDraftIds?: string[]) => Promise<string>;
+  sendMessage: (
+    agentId: string,
+    text: string,
+    attachmentDraftIds?: string[],
+    replyToMessageId?: string | null,
+  ) => Promise<string>;
   uploadAttachment: (agentId: string, input: RemoteFileUpload) => Promise<DraftAttachment>;
   discardAttachment: (agentId: string, attachmentId: string) => Promise<void>;
   hideAgent: (agentId: string) => void;
