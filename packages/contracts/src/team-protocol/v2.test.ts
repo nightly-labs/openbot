@@ -22,8 +22,21 @@ import {
   encodeTeamProtocolV2CurrentHttpRequest,
   encodeTeamProtocolV2CurrentHttpResponse,
 } from "./v2-adapter";
+import { decodeTeamProtocolV3WebRtcHttpRequest, encodeTeamProtocolV3WebRtcHttpRequest } from "./v3-webrtc-adapter";
+import { decodeTeamProtocolV4WebRtcHttpRequest, encodeTeamProtocolV4WebRtcHttpRequest } from "./v4-webrtc-adapter";
 
 describe("Team protocol v2", () => {
+  it.each([
+    ["v2 outbound", encodeTeamProtocolV2CurrentHttpRequest],
+    ["v2 inbound", decodeTeamProtocolV2CurrentHttpRequest],
+    ["v3 outbound", encodeTeamProtocolV3WebRtcHttpRequest],
+    ["v3 inbound", decodeTeamProtocolV3WebRtcHttpRequest],
+    ["v4 outbound", encodeTeamProtocolV4WebRtcHttpRequest],
+    ["v4 inbound", decodeTeamProtocolV4WebRtcHttpRequest],
+  ] as const)("accepts versioned avatar downloads through %s", (_name, convert) => {
+    expect(convert("GET", "/v1/agents/agent-1/avatar?v=photo-1", undefined)).toEqual({});
+  });
+
   it("keeps the released JSON fixtures valid", () => {
     expect(decodeTeamProtocolV2RpcFrame(requestFixture)).toEqual(requestFixture);
     expect(decodeTeamProtocolV2EventFrame(eventFixture)).toEqual(eventFixture);
