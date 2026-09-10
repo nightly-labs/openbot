@@ -2662,15 +2662,15 @@
 }
 
 /*
- * The two ends match: `space-4` from the pill edge to the arrow, and the same from the pill edge
- * to the round dismiss mark, whose own `space-1` sits inside it. `space-2` divides arrow from
- * label and label from mark.
+ * One padding on all four sides: `space-1-5` from the pill edge to the arrow, to the round dismiss
+ * mark, and above and below both, because each is `22px` tall inside a `36px` pill with a `1px`
+ * border. `space-2` divides arrow from label and label from mark.
  */
 .scroll-to-latest[data-new-messages] .scroll-to-latest-button {
   width: auto;
   grid-auto-flow: column;
   gap: var(--openbot-space-2);
-  padding-inline: var(--openbot-space-4) var(--openbot-space-2);
+  padding-inline: var(--openbot-space-1-5) var(--openbot-space-2);
 }
 
 .scroll-to-latest-count {
@@ -2690,14 +2690,14 @@
   place-items: center;
   border: 0;
   background: none;
-  padding-inline: 0 var(--openbot-space-4);
+  padding-inline: 0 var(--openbot-space-1-5);
   color: inherit;
   transition: transform var(--openbot-duration-fast) cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .scroll-to-latest-button svg {
-  width: 21px;
-  height: 21px;
+  width: 22px;
+  height: 22px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -2705,10 +2705,11 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
+/* The mark is as tall as the arrow, so one padding can hold both away from every edge. */
 .scroll-to-latest-dismiss svg {
   box-sizing: content-box;
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
   border-radius: var(--openbot-radius-pill);
   padding: var(--openbot-space-1);
   transition: background-color var(--openbot-duration-hover) ease;
