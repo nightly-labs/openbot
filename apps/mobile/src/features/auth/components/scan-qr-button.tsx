@@ -13,6 +13,7 @@ export function ScanQrButton({ onPress, width }: ScanQrButtonProps) {
     <Button
       size="lg"
       variant="primary"
+      feedbackVariant="scale"
       className="min-h-13 w-full"
       accessibilityLabel="Scan QR code"
       style={{ width, backgroundColor: brandColor, borderRadius: cornerRadius }}
