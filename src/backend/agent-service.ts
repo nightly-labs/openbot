@@ -69,6 +69,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
 import { AttachmentGateway } from "./agent/attachment-gateway";
 import { AttentionRegistry } from "./agent/attention-registry";
+import { loadAvatarFile } from "./agent/avatar-file";
 import { BootRecovery } from "./agent/boot-recovery";
 import { BrowserUploads } from "./agent/browser-uploads";
 import { ContextCompaction } from "./agent/context-compaction";
@@ -1508,13 +1509,25 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
     if (params.tool === "update_profile") {
       const args = updateProfileToolSchema.parse(params.arguments);
-      const { agentId, avatarHue, ...fields } = args;
-      if (Object.values(fields).every((value) => value === undefined) && avatarHue === undefined) {
+      const { agentId, avatarHue, avatarPath, ...fields } = args;
+      if (avatarPath !== undefined && (args.avatarSeed !== undefined || avatarHue !== undefined)) {
+        throw new Error("Use avatarPath or generated avatar settings, not both.");
+      }
+      if (
+        Object.values(fields).every((value) => value === undefined) &&
+        avatarHue === undefined &&
+        avatarPath === undefined
+      ) {
         throw new Error("At least one profile field is required.");
       }
+      const sender = this.listAgents().find((agent) => agent.id === senderAgentId);
+      if (!sender) throw new Error("The calling agent no longer exists.");
+      const image = avatarPath === undefined ? undefined : await loadAvatarFile(avatarPath, sender.workspacePath);
       const input: UpdateAgentInput = { agentId, ...fields, ...(avatarHue === undefined ? {} : { avatarHue }) };
       let updated = await this.updateAgent(input);
-      if (args.avatarSeed !== undefined || args.avatarHue !== undefined) {
+      if (image !== undefined) {
+        updated = await this.setAvatar(agentId, image);
+      } else if (args.avatarSeed !== undefined || args.avatarHue !== undefined) {
         updated = await this.setAvatar(agentId, null);
       }
       return {
@@ -1529,6 +1542,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               description: updated.description,
               avatarSeed: updated.avatarSeed,
               avatarHue: updated.avatarHue,
+              avatarUrl: updated.avatarUrl,
             }),
           },
         ],

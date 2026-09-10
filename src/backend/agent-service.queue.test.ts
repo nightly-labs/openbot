@@ -1329,6 +1329,55 @@ describe.sequential("AgentService: queue", () => {
       bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     });
     expect(store.resolveAvatar(agentId)).not.toBeNull();
+    const caller = service.listAgents().find((agent) => agent.id === "chief");
+    if (!caller) throw new Error("Missing calling agent.");
+    const avatarPath = join(caller.workspacePath, "custom-avatar.png");
+    const avatarBytes = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9XcAAAAASUVORK5CYII=",
+      "base64",
+    );
+    await writeFile(avatarPath, avatarBytes);
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    const custom = await callOpenBotTool(client, threadId, "update_profile", {
+      agentId,
+      avatarPath: "custom-avatar.png",
+    });
+    expect(custom.error).toBeUndefined();
+    const customUrl = service.listAgents().find((agent) => agent.id === agentId)?.avatarUrl;
+    expect(customUrl).toBeTruthy();
+    expect(openBotToolPayload(custom.result)).toMatchObject({ id: agentId, avatarUrl: customUrl });
+    expect(await readFile(store.resolveAvatar(agentId)?.path ?? "")).toEqual(avatarBytes);
+    expect(await readFile(avatarPath)).toEqual(avatarBytes);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "agents-changed",
+        agents: expect.arrayContaining([expect.objectContaining({ id: agentId, avatarUrl: customUrl })]),
+      }),
+    );
+    const restoredAvatarStore = stores(root).store;
+    await restoredAvatarStore.initialize();
+    expect(restoredAvatarStore.list().find((agent) => agent.id === agentId)?.avatarUrl).toBe(customUrl);
+    restoredAvatarStore.database.close();
+    for (const fields of [
+      { avatarPath: "missing.png" },
+      { avatarPath, avatarHue: null },
+      { avatarPath, avatarSeed: "new-seed" },
+    ]) {
+      const rejected = await callOpenBotTool(client, threadId, "update_profile", {
+        agentId,
+        name: "Must not change",
+        ...fields,
+      });
+      expect(rejected.error).toBeDefined();
+      expect(service.listAgents().find((agent) => agent.id === agentId)).toMatchObject({
+        name: "Research Partner",
+        avatarUrl: customUrl,
+      });
+    }
+    const replaced = await callOpenBotTool(client, threadId, "update_profile", { agentId, avatarPath });
+    expect(replaced.error).toBeUndefined();
+    expect(service.listAgents().find((agent) => agent.id === agentId)?.avatarUrl).not.toBe(customUrl);
     const invalid = await callOpenBotTool(client, threadId, "update_profile", {
       agentId,
       name: "Invalid",

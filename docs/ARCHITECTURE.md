@@ -390,7 +390,11 @@ data and are manual because they can require local credentials.
 Users create and edit agent profiles by asking an agent in the normal desktop or mobile
 conversation. `openbot.create_agent` creates a persistent teammate with instructions and a first
 task; `openbot.update_profile` changes an existing agent's name, title, instructions, or generated
-avatar. Both run through the existing agent service and validate arguments before changing state.
+or custom avatar. `avatarPath` accepts a local PNG, JPEG, or WebP file up to 512 KB, with relative
+paths resolved from the calling agent’s workspace. The agent uses its available tools to resize or
+compress a copy when needed. OpenBot validates the prepared file before profile changes and copies
+it into managed avatar storage. Generated avatar settings remove the custom image. Both run through
+the existing agent service and validate arguments before changing state.
 Codex and Grok receive the dynamic tool definitions; Claude exposes the same operations through
 its SDK MCP bridge. `src/backend/openbot-tools.ts` owns the tool names, descriptions, and Zod
 argument shapes used by both declarations. It reuses the profile, section, and routine schemas.

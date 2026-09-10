@@ -999,7 +999,6 @@
   margin: 0 2px;
 }
 
-.browser-environment-status,
 .browser-recording-status,
 .browser-diagnostic-status {
   display: inline-flex;
@@ -1013,10 +1012,6 @@
   line-height: 1;
 }
 
-.browser-environment-status {
-  color: var(--openbot-text-muted);
-}
-
 .browser-recording-status {
   background: var(--openbot-danger-soft);
   color: var(--openbot-danger);
@@ -1027,7 +1022,6 @@
   color: var(--openbot-warning);
 }
 
-.browser-environment-status svg,
 .browser-recording-status svg,
 .browser-diagnostic-status svg {
   width: 12px;

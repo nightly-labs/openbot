@@ -366,6 +366,8 @@ async function main(): Promise<void> {
       .getAllWebContents()
       .find((contents) => !contents.isDestroyed() && contents.getURL().startsWith(`${origin}/v2`));
     if (!v2Contents) throw new Error("V2 web contents were not available.");
+    const unmutedTabs: string[] = [];
+    if (!v2Contents.isAudioMuted()) unmutedTabs.push("new tab");
     const v2SnapshotResult = await callBrowserTool(browser, "snapshot", { tabId: v2Tab.id, image: "auto" });
     const v2Snapshot = toolTextPayload(v2SnapshotResult);
     if (!v2SnapshotResult.success || !isDynamicRecord(v2Snapshot) || !Array.isArray(v2Snapshot.elements)) {
@@ -1508,6 +1510,7 @@ async function main(): Promise<void> {
     if (!reloaded.success || reloadedText === beforeReloadText || Date.now() - reloadStartedAt < 150) {
       throw new Error(`V2 reload snapshot did not wait for the new document: ${toolError(reloaded)}`);
     }
+    if (!waitContents.isAudioMuted()) unmutedTabs.push("tab after navigation and reload");
     const { tab: boundedTab, contents: boundedContents } = await openTabWithContents(
       browser,
       origin,
@@ -1614,6 +1617,10 @@ async function main(): Promise<void> {
       throw new Error("A target=_blank tab did not preserve agent ownership.");
     }
     process.stdout.write("BrowserHost: child-tab ownership passed.\n");
+    const childContents = await waitForValue(() =>
+      webContents.getAllWebContents().find((contents) => !contents.isDestroyed() && contents.getURL() === childTab.url),
+    );
+    if (!childContents.isAudioMuted()) unmutedTabs.push("child tab");
 
     const screenshot = await browser.screenshot(tab.id);
     if (!screenshot.startsWith("data:image/png;base64,")) throw new Error("Screenshot failed.");
@@ -1720,7 +1727,14 @@ async function main(): Promise<void> {
     const restoredWindow = new BrowserWindow({ show: false });
     window.destroy();
     const restoredBrowser = new BrowserHost(restoredWindow, downloadsRoot, statePath);
+    const existingContentsIds = new Set(webContents.getAllWebContents().map((contents) => contents.id));
     await restoredBrowser.restore();
+    const restoredContents = webContents
+      .getAllWebContents()
+      .filter((contents) => !existingContentsIds.has(contents.id));
+    for (const contents of restoredContents) {
+      if (!contents.isAudioMuted()) unmutedTabs.push(`restored tab ${contents.id}`);
+    }
     const restoredTabs = restoredBrowser.listTabs();
     const restoredTab = restoredTabs.find((candidate) => candidate.id === persistedTab.id);
     if (
@@ -1735,6 +1749,10 @@ async function main(): Promise<void> {
       throw new Error("Restored browser environment was not applied before navigation.");
     }
     process.stdout.write("BrowserHost: persisted tabs passed.\n");
+    if (unmutedTabs.length > 0) {
+      throw new Error(`Browser tabs were not muted: ${unmutedTabs.join(", ")}`);
+    }
+    process.stdout.write("BrowserHost: new, navigated, child, and restored tabs stayed muted.\n");
     await restoredBrowser.destroy();
     const persistedState = JSON.parse(await readFile(statePath, "utf8"));
     if (!isDynamicRecord(persistedState)) throw new Error("Persisted browser state is invalid.");

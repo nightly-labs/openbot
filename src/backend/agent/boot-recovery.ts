@@ -171,7 +171,7 @@ export class BootRecovery {
           );
           imported.threadId = agent.threadId;
           const current = this.#store.database.readConversation(agent.id, agent.threadId);
-          const merged = mergeProviderHistory(current, imported);
+          const merged = mergeProviderHistory(current, imported, session.provider);
           this.#mailboxSync.syncMailboxMessages(merged);
           if (conversationContentSignature(merged) === conversationContentSignature(current)) {
             const live = this.#conversation.ensureSnapshot(agent.id, agent.threadId);

@@ -7,16 +7,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { PanelResizer, readPanelWidth, savePanelWidth } from "../../components/PanelResizer";
-import {
-  Button,
-  buttonVariants,
-  CircleDot,
-  Input,
-  MonitorSmartphone,
-  PictureInPicture2,
-  Tabs,
-  TriangleAlert,
-} from "../../components/ui";
+import { Button, buttonVariants, CircleDot, Input, PictureInPicture2, Tabs, TriangleAlert } from "../../components/ui";
 import type { AgentProfile } from "../../data";
 import {
   BrowserBackIcon,
@@ -292,19 +283,6 @@ export default function BrowserPanel(props: BrowserPanelProps) {
             <BrowserReloadIcon />
           </Button>
           {addressBar()}
-          <Show when={props.activeTab?.environment}>
-            {(environment) => (
-              <span
-                class="browser-environment-status"
-                title={`Viewport ${environment().viewport.width}×${environment().viewport.height}, ${environment().colorScheme} color scheme`}
-              >
-                <MonitorSmartphone />
-                <span>
-                  {environment().viewport.width}×{environment().viewport.height}
-                </span>
-              </span>
-            )}
-          </Show>
           <Show when={props.activeTab?.recording}>
             <span class="browser-recording-status" role="status" aria-label="Browser recording active">
               <CircleDot /> REC

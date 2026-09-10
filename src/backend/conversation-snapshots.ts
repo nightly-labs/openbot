@@ -1,4 +1,4 @@
-import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
+import type { AgentProviderId, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { isImageGenerationAspectRatio } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { DeliveryContext } from "./mailbox-store";
@@ -121,7 +121,11 @@ export function mergeConversationSnapshots(
 export function mergeProviderHistory(
   stored: ConversationSnapshot,
   imported: ConversationSnapshot,
+  provider?: AgentProviderId,
 ): ConversationSnapshot {
+  if (provider === "claude") {
+    return mergeConversationSnapshots(stored, reconcileClaudeHistory(stored, imported));
+  }
   const importedIds = new Set(imported.messages.map((message) => message.id));
   const importedAssistantMessages = new Set(
     imported.messages.filter(isProviderAssistantMessage).map(providerMessageIdentity),
@@ -136,6 +140,39 @@ export function mergeProviderHistory(
     ),
   };
   return mergeConversationSnapshots(reconciledStored, imported);
+}
+
+function reconcileClaudeHistory(stored: ConversationSnapshot, imported: ConversationSnapshot): ConversationSnapshot {
+  const storedMessages = new Map(stored.messages.map((message) => [message.id, message]));
+  const turns = new Map<string, ConversationMessage[]>();
+  for (const message of imported.messages) {
+    if (message.author !== "assistant" || message.itemType !== "agentMessage" || !message.turnId) continue;
+    const parts = turns.get(message.turnId) ?? [];
+    parts.push(message);
+    turns.set(message.turnId, parts);
+  }
+  const replacements = new Map<string, ConversationMessage>();
+  const omitted = new Set<string>();
+  for (const [turnId, parts] of turns) {
+    // Live Claude output combines SDK replies under one ID. Keep that ID and its metadata.
+    const answer = storedMessages.get(`${turnId}:assistant`);
+    if (answer?.author !== "assistant" || answer.itemType !== "agentMessage" || answer.turnId !== turnId) continue;
+    // Existing split records can have saved references. Never remove or combine them.
+    if (parts.some((part) => storedMessages.has(part.id))) continue;
+    const text = parts.map((part) => part.text).join("");
+    if (!answer.text || !text.startsWith(answer.text)) continue;
+    const first = parts[0];
+    const last = parts.at(-1);
+    if (!first || !last) continue;
+    replacements.set(first.id, { ...answer, text, status: last.status });
+    for (const part of parts.slice(1)) omitted.add(part.id);
+  }
+  return {
+    ...imported,
+    messages: imported.messages
+      .filter((message) => !omitted.has(message.id))
+      .map((message) => replacements.get(message.id) ?? message),
+  };
 }
 
 function isProviderAssistantMessage(message: ConversationMessage): boolean {

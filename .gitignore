@@ -47,6 +47,8 @@ index-*.css
 /build/remote-desktop-runtime/
 /build/remote-desktop-release/
 Bots
+# Local dev-profile agent workspaces; root only, so tracked */agents/ paths stay visible.
+/Agents/
 !apps/mobile/src/features/bots/
 !apps/mobile/src/features/bots/**
 mise.local.toml
