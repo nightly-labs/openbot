@@ -343,9 +343,9 @@ export class BrowserHost {
 
   #hasTabCapacity(ownerThreadId: string | null, ownerAgentId: string | null): boolean {
     const tabs = [...this.#tabs.values()].filter((tab) => {
-      if (tab.ownerAgentId) return tab.ownerAgentId === ownerAgentId;
+      if (tab.ownerAgentId && ownerAgentId) return tab.ownerAgentId === ownerAgentId;
       if (tab.ownerThreadId) return tab.ownerThreadId === ownerThreadId;
-      return ownerAgentId === null && ownerThreadId === null;
+      return tab.ownerAgentId === null && ownerAgentId === null && ownerThreadId === null;
     });
     return tabs.length < INPUT_LIMITS.browserTabs;
   }

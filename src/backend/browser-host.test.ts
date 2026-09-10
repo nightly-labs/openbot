@@ -141,6 +141,22 @@ describe("browser tab capacity", () => {
     });
   });
 
+  it("counts agent-owned tabs when a restored legacy tab opens another tab", async () => {
+    const tabs = Array.from({ length: 25 }, (_, index) => ({
+      id: `tab-${index}`,
+      url: `https://example.com/${index}`,
+      ownerThreadId: "thread-a",
+      ownerAgentId: index === 0 ? null : "agent-a",
+    }));
+    await writeFile(statePath, JSON.stringify({ version: 2, tabs, activeTabId: "tab-0" }));
+    await host.restore([{ id: "agent-a", threadId: "thread-a" }]);
+    // Popups inherit the legacy tab's thread ID and null agent ID.
+    await expect(host.open("https://www.google.com", "thread-a", null)).rejects.toThrow("25 open tabs");
+    await host.close("tab-1");
+    await host.open("https://www.google.com", "thread-a", null);
+    expect(host.listTabs()).toHaveLength(25);
+  });
+
   it("restores all agents beyond 25 total tabs and retains active state", async () => {
     await fill("thread-a", "agent-a");
     await fill("thread-b", "agent-b");
