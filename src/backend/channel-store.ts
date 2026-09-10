@@ -99,7 +99,13 @@ export class ChannelStore {
     );
   }
 
-  list(memberId: string): ChannelSummary[] {
+  /**
+   * @param signedOutMessagesAreTheirs true only when `memberId` is the host user of this computer.
+   * Their messages from before they signed in carry `SIGNED_OUT_CHANNEL_MEMBER_ID`, so those
+   * messages are their own and are never unread for them. A remote member is a different person:
+   * the host's signed-out messages are unread for them until they read them.
+   */
+  list(memberId: string, signedOutMessagesAreTheirs = false): ChannelSummary[] {
     return databaseRows(
       this.database.connection.prepare("SELECT channel_json FROM projection_channels ORDER BY rowid").all(),
     ).map((row) => {
@@ -110,7 +116,7 @@ export class ChannelStore {
       const latest = this.messages(channel.id, Number.MAX_SAFE_INTEGER, 1).at(-1);
       return {
         ...channel,
-        unreadCount: this.#unreadCount(channel.id, memberId),
+        unreadCount: this.#unreadCount(channel.id, memberId, signedOutMessagesAreTheirs),
         activeTasks: this.#countTasksInState(channel.id, "running"),
         lastMessage: latest
           ? { authorName: latest.author.name, text: previewText(latest), at: latest.message.createdAt }
@@ -478,7 +484,9 @@ export class ChannelStore {
       const channelId = requiredStringColumn(row, "channel_id");
       if (this.#hasReadCursor(channelId, targetMemberId)) continue;
       const throughSequence = requiredNumberColumn(row, "through_sequence");
-      this.markRead(channelId, targetMemberId, throughSequence, `adopt:${sourceMemberId}`);
+      // The command key holds the target member and this operation id, not the channel. Without the
+      // channel here, every channel after the first would answer with the first channel's receipt.
+      this.markRead(channelId, targetMemberId, throughSequence, `adopt:${sourceMemberId}:${channelId}`);
     }
   }
 
@@ -603,7 +611,7 @@ export class ChannelStore {
   }
 
   /** The unread messages of one member, over the sequence index. A member's own message is read. */
-  #unreadCount(channelId: string, memberId: string): number {
+  #unreadCount(channelId: string, memberId: string, signedOutMessagesAreTheirs: boolean): number {
     const row = databaseRow(
       this.database.connection
         .prepare(
@@ -612,7 +620,12 @@ export class ChannelStore {
              AND json_extract(message_json, '$.author.id') IS NOT ?
              AND json_extract(message_json, '$.author.id') IS NOT ?`,
         )
-        .get(channelId, this.readSequence(channelId, memberId), memberId, SIGNED_OUT_CHANNEL_MEMBER_ID),
+        .get(
+          channelId,
+          this.readSequence(channelId, memberId),
+          memberId,
+          signedOutMessagesAreTheirs ? SIGNED_OUT_CHANNEL_MEMBER_ID : memberId,
+        ),
     );
     return row ? requiredNumberColumn(row, "count") : 0;
   }

@@ -204,7 +204,7 @@ describe("development state seed", () => {
     // The seed reads as `local`, but the app resolves a team member id once the owner signs in.
     // Adoption is what keeps the seeded read state, and the unread count, on that reader.
     channels.adoptReads("local", owner?.id ?? "");
-    expect(channels.list(owner?.id ?? "")[0]?.unreadCount).toBe(2);
+    expect(channels.list(owner?.id ?? "", true)[0]?.unreadCount).toBe(2);
     expect(channelSummaries[1]?.archived).toBe(true);
     const channelMessages = channelSummaries.flatMap((channel) => channels.messages(channel.id));
     expect(channelMessages).toHaveLength(12);

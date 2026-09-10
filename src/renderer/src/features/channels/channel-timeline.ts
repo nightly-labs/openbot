@@ -9,6 +9,7 @@
  */
 
 import type { ChannelMessage, ChannelPage } from "@openbot/contracts/ipc";
+import { SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile } from "../../data";
 import type { ChatMessageAuthor } from "../conversation/ChatMessageRow";
 import { type DayMarkerOptions, dayMarkerLabel } from "../conversation/chat-day-markers";
@@ -55,6 +56,30 @@ function toAgentMessage(entry: ChannelMessage, own: boolean, options: DayMarkerO
     questionPrompt: message.questionPrompt,
     turnId: message.turnId,
   };
+}
+
+/** Who the reader is, as the three ids a channel message can carry for them. */
+export interface ChannelReaderIdentity {
+  /** The reader's id in the team roster, or null while the roster holds none for them. */
+  memberId: string | null;
+  /** The account the reader signed in to, or null while they are signed out. */
+  accountUserId: string | null;
+  /** True while the reader reads the channels of their own computer, not those of a server they joined. */
+  onOwnComputer: boolean;
+}
+
+/**
+ * Does this author id stand for the reader?
+ *
+ * A message the host user wrote before they signed in carries the signed-out id. It is the same
+ * person, so it stays their own message, the way its read cursor stays their read cursor. That
+ * holds on their own computer alone: on a server they joined, the signed-out id is the host, who is
+ * another person.
+ */
+export function isOwnChannelAuthor(authorId: string, reader: ChannelReaderIdentity): boolean {
+  if (authorId === SIGNED_OUT_CHANNEL_MEMBER_ID) return reader.onOwnComputer;
+  if (reader.memberId !== null && authorId === reader.memberId) return true;
+  return reader.accountUserId !== null && authorId === `local-user:${reader.accountUserId}`;
 }
 
 /**
