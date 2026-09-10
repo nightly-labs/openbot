@@ -7,7 +7,9 @@ import type { CanUseTool, ModelInfo, SDKUserMessage, SessionMessage } from "@ant
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { AgentStore } from "./agent-store";
 import { ClaudeAgentClient } from "./claude-client";
+import { mergeProviderHistory, newAssistantMessage, snapshotFromThread } from "./conversation-snapshots";
 import { OPENBOT_DYNAMIC_TOOLS } from "./openbot-tools";
 import {
   decodeAccountRateLimitsReadResult,
@@ -752,6 +754,101 @@ fi
     await client.stop();
   });
 
+  it.each([["Only one answer."], ["Before I prepare the plan, choose a setup.", "Here is the detailed setup plan."]])(
+    "keeps live Claude answers through history backfill: %j",
+    async (...parts: string[]) => {
+      const history: SessionMessage[] = [];
+      const { client, notifications, output, threadId } = await createHarness(history);
+      const turnId = "33333333-3333-4333-8333-333333333388";
+      history.push({
+        type: "user",
+        uuid: turnId,
+        session_id: threadId,
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: "Prepare the setup." },
+      });
+      await startTurn(client, threadId, turnId);
+      parts.forEach((text, index) => {
+        output.push(streamDelta(threadId, turnId, text));
+        output.push(assistantMessage(threadId, `claude-answer-${index}`, text));
+        history.push({
+          type: "assistant",
+          uuid: `claude-answer-${index}`,
+          session_id: threadId,
+          parent_tool_use_id: null,
+          parent_agent_id: null,
+          message: { content: [{ type: "text", text }] },
+        });
+        if (index === 0 && parts.length > 1) {
+          output.push(toolUseMessage(threadId, "question-call", "question-tool", "AskUserQuestion"));
+          output.push(toolResultMessage(threadId, "question-result", "question-tool"));
+          history.push({
+            type: "assistant",
+            uuid: "question-call",
+            session_id: threadId,
+            parent_tool_use_id: null,
+            parent_agent_id: null,
+            message: { content: [{ type: "tool_use", id: "question-tool", name: "AskUserQuestion" }] },
+          });
+          history.push({
+            type: "user",
+            uuid: "question-result",
+            session_id: threadId,
+            parent_tool_use_id: null,
+            parent_agent_id: null,
+            message: {
+              content: [{ type: "tool_result", tool_use_id: "question-tool", content: "Infrastructure only" }],
+            },
+          });
+        }
+      });
+      output.push(resultMessage(threadId, turnId, parts.join("")));
+      await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+      const completed = notifications.find(
+        (event) =>
+          event.method === "item/completed" && getString(getRecord(event.params, "item"), "type") === "agentMessage",
+      );
+      const finalText = getString(getRecord(completed?.params, "item"), "text") ?? "";
+      expect(finalText).toBe(parts.join(""));
+      const itemId = getString(getRecord(completed?.params, "item"), "id");
+      if (!itemId || !root) throw new Error("Missing completed message or test database directory.");
+      const store = new AgentStore(join(root, "data"), join(root, "home"));
+      const database = store.database;
+      try {
+        await store.initialize();
+        const agent = await store.createAgent({
+          name: "History test",
+          description: "Synthetic duplication diagnosis",
+          avatarSeed: "setup:planning",
+          avatarHue: 215,
+        });
+        const publicThreadId = store.ensureThreadIdNow(agent.id);
+        const live = {
+          agentId: agent.id,
+          threadId: publicThreadId,
+          activeTurnId: null,
+          revision: 0,
+          messages: [{ ...newAssistantMessage(itemId, turnId), text: finalText, status: "completed" as const }],
+        };
+        database.persistConversation(live, "test.live-completed");
+        const restored = await client.request("thread/read", { threadId }, decodeThreadResponse);
+        const imported = snapshotFromThread(agent.id, restored.thread, () => null);
+        imported.threadId = publicThreadId;
+        const merged = mergeProviderHistory(database.readConversation(agent.id, publicThreadId), imported, "claude");
+        database.persistConversation(merged, "provider-history.backfilled");
+        const visible = database
+          .readConversation(agent.id, publicThreadId)
+          .messages.filter((message) => message.author === "assistant");
+        expect(visible.map((message) => message.text).join("")).toBe(parts.join(""));
+        expect(visible.map((message) => message.id)).toEqual([itemId]);
+      } finally {
+        database.close();
+        await client.stop();
+      }
+    },
+  );
+
   it("does not duplicate a fully streamed assistant message", async () => {
     const { client, notifications, output, threadId } = await createHarness();
     const turnId = "33333333-3333-4333-8333-333333333333";
@@ -768,7 +865,7 @@ fi
   });
 });
 
-async function createHarness(): Promise<{
+async function createHarness(history?: SessionMessage[]): Promise<{
   client: ClaudeAgentClient;
   notifications: Array<{ method: string; params: unknown }>;
   output: TestQueue<TestStreamMessage>;
@@ -779,10 +876,14 @@ async function createHarness(): Promise<{
   const output = new TestQueue<TestStreamMessage>();
   let prompt: AsyncIterable<SDKUserMessage> | null = null;
   const generator = new TestQuery(output);
-  const client = new ClaudeAgentClient({ executable: "/bin/true", version: "2.1.231" }, (params) => {
-    if (!isString(params.prompt)) prompt = params.prompt;
-    return generator;
-  });
+  const client = new ClaudeAgentClient(
+    { executable: "/bin/true", version: "2.1.231" },
+    (params) => {
+      if (!isString(params.prompt)) prompt = params.prompt;
+      return generator;
+    },
+    history ? async () => history : undefined,
+  );
   const notifications: Array<{ method: string; params: unknown }> = [];
   client.on("notification", (notification) => notifications.push(notification));
   client.start();

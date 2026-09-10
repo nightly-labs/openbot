@@ -28,5 +28,14 @@ export const updateProfileToolSchema = z
     description: profileFields.description.optional(),
     avatarSeed: profileFields.avatarSeed.optional(),
     avatarHue: profileFields.avatarHue.optional(),
+    avatarPath: z
+      .string()
+      .trim()
+      .min(1)
+      .max(INPUT_LIMITS.path)
+      .describe(
+        "Local PNG, JPEG, or WebP file, up to 512 KB. Resize or compress a copy with your available tools first if needed. Use an absolute path or a path relative to your workspace. Do not combine with avatarSeed or avatarHue.",
+      )
+      .optional(),
   })
   .strict();

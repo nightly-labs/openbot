@@ -322,6 +322,7 @@ export function ConversationTimeline() {
                     </Show>
                     <Show
                       when={message()?.questionPrompt}
+                      keyed
                       fallback={
                         <>
                           <Show when={message()?.routine && message()?.actionMarker}>
@@ -475,12 +476,12 @@ export function ConversationTimeline() {
                       }
                     >
                       {(questionPrompt) => (
-                        <Show when={questionPrompt().resolution}>
+                        <Show when={questionPrompt.resolution} keyed>
                           {(resolution) => (
                             <article data-chat-search-message={message()?.id} class="question-prompt-history-entry">
                               <QuestionPromptBubble
-                                questions={questionPrompt().questions}
-                                resolution={resolution()}
+                                questions={questionPrompt.questions}
+                                resolution={resolution}
                                 onSubmit={async () => false}
                               />
                             </article>
