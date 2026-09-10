@@ -8,7 +8,8 @@ import { ArrowDown } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, AppState, Keyboard, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { KeyboardGestureArea, KeyboardStickyView } from "react-native-keyboard-controller";
+import { KeyboardGestureArea } from "react-native-keyboard-controller";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
@@ -19,6 +20,7 @@ import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
+import { type ChatBubbleMessage, useMessageActions } from "@/features/chat/context/message-actions-context";
 import {
   latestReadableMessage,
   type PendingChatMessage,
@@ -29,7 +31,6 @@ import { ConnectionStatus } from "@/features/workspace/components/connection-sta
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
-import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { isIOS } from "@/shared/lib/platform";
 
 interface MobileChatViewProps {
@@ -60,6 +61,9 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     "accent-foreground",
     "background",
   ]);
+  const { select: selectMessageActions } = useMessageActions();
+  const [replyTarget, setReplyTarget] = useState<ChatBubbleMessage | null>(null);
+  const [replyFocusVersion, setReplyFocusVersion] = useState(0);
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<{ agentId: string; message: string } | null>(null);
   const [sending, setSending] = useState(false);
@@ -207,6 +211,8 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     setDraft("");
     sendingRef.current = true;
     setSending(true);
+    const submittedReply = replyTarget;
+    setReplyTarget(null);
     const files = attachments.items;
     const localId = `local-message-${++sendSequence.current}`;
     setPendingMessage({
@@ -216,6 +222,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
         author: "user",
         body,
         streaming: false,
+        replyToMessageId: submittedReply?.id ?? null,
         attachments: files.map((file) => ({
           id: file.id,
           name: file.name,
@@ -233,13 +240,14 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     void (async () => {
       try {
         for (const file of files) uploaded.push((await uploadAttachment(agent.id, file)).id);
-        const serverId = await sendTeamMessage(agent.id, body, uploaded);
+        const serverId = await sendTeamMessage(agent.id, body, uploaded, submittedReply?.id ?? null);
         setMessageAliases((current) => new Map(current).set(serverId, localId));
         setPendingMessage((current) => (current?.message.id === localId ? { ...current, serverId } : current));
         attachments.clear();
       } catch (error) {
         motion.cancelSend();
         setPendingMessage((current) => (current?.message.id === localId ? null : current));
+        setReplyTarget((current) => current ?? submittedReply);
         setDraft((current) => (current ? `${body}\n${current}` : body));
         // Only discard drafts created by this attempt. Keep the local files and text for retry.
         await Promise.allSettled(uploaded.map((id) => discardAttachment(agent.id, id)));
@@ -300,6 +308,28 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
             fieldBackground={fieldBackground}
             foreground={foreground}
             messages={messages}
+            messageAliases={messageAliases}
+            onReply={
+              !questionForm.question
+                ? (message) => {
+                    setReplyTarget(message);
+                    setReplyFocusVersion((version) => version + 1);
+                  }
+                : undefined
+            }
+            onOpenActions={(message) => {
+              Keyboard.dismiss();
+              selectMessageActions({
+                message,
+                onReply: !questionForm.question
+                  ? () => {
+                      setReplyTarget(message);
+                      setReplyFocusVersion((version) => version + 1);
+                    }
+                  : null,
+              });
+              router.push("/message-actions");
+            }}
             muted={muted}
             raised={raised}
             showStarter={showStarter && serverOnline && !activity && conversation?.messages.length === 0}
@@ -308,21 +338,14 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
             onSelectStarter={sendMessage}
             onRetryHistory={fetchHistory}
           />
-          <KeyboardStickyView
-            style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
-            offset={{ opened: keyboardOffset }}
+          <Animated.View
+            style={[{ position: "absolute", left: 0, right: 0, bottom: 0 }, motion.composerStyle]}
             pointerEvents="box-none"
             onLayout={(event) => {
               motion.onComposerLayout(event);
               setComposerGestureHeight(event.nativeEvent.layout.height);
             }}
           >
-            {liquidGlassAvailable ? (
-              <SheetScrollEdgeEffect
-                edge="bottom"
-                style={{ position: "absolute", top: -32, bottom: 0, left: 0, right: 0 }}
-              />
-            ) : null}
             {!atLatest && motion.historyVisible && messages.length > 0 ? (
               <View className="absolute -top-14 self-center">
                 <ChatGlassIconButton
@@ -343,6 +366,9 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
             ) : null}
             <ChatComposer
               sendRetryVersion={sendRetryVersion}
+              replyTarget={questionForm.question ? null : replyTarget}
+              replyFocusVersion={replyFocusVersion}
+              onCancelReply={() => setReplyTarget(null)}
               mentionAgents={agents.filter(
                 (candidate) => candidate.serverId === agent.serverId && candidate.id !== agent.id,
               )}
@@ -368,7 +394,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
               onChangeDraft={questionForm.question ? questionForm.setDraft : setDraft}
               onSend={sendMessage}
             />
-          </KeyboardStickyView>
+          </Animated.View>
         </KeyboardGestureArea>
       </View>
     </GestureDetector>

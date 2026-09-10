@@ -14,8 +14,11 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
+import { encodeTeamProtocolV4WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v4-webrtc-adapter";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AgentStore } from "../backend/agent-store";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
+import { addRemotePreviewUrls } from "./remote-server-urls";
 import {
   createAgents,
   createTeamApiFixture,
@@ -28,6 +31,67 @@ import {
 afterEach(stopTeamApiFixtures);
 
 describe("TeamApiServer agents", () => {
+  it("downloads uploaded and replaced avatars through a WebRTC request and removes them", async () => {
+    const { root, start, signIn } = await createTeamApiFixture("agent-avatar", { configure: true });
+    const store = new AgentStore(join(root, "agents"), join(root, "home"));
+    await store.initialize();
+    await store.getOrCreate("chief");
+    const { base } = await start({
+      agents: createAgents({
+        listAgents: () => store.list(),
+        setAvatar: (id, image) => store.setAvatar(id, image),
+        resolveAvatar: (id) => store.resolveAvatar(id),
+      }),
+    });
+    const token = await signIn();
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "image/png" };
+    const path = "/v1/agents/chief/avatar";
+    const images = [
+      [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+      [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1],
+    ];
+    const downloads = [];
+    let downloadPath = path;
+    for (const image of images) {
+      const upload = await fetch(`${base}${path}`, { method: "PUT", headers, body: Buffer.from(image) });
+      const agent = await upload.json();
+      if (!isAgentSummary(agent) || !agent.avatarUrl) throw new Error("Missing uploaded avatar.");
+      const avatarUrl = new URL(addRemotePreviewUrls(agent, "host-1").avatarUrl ?? "");
+      downloadPath = `${path}${avatarUrl.search}`;
+      const body = encodeTeamProtocolV4WebRtcHttpRequest("GET", downloadPath, undefined);
+      const download = await fetch(`${base}${downloadPath}`, { headers });
+      downloads.push({
+        uploadStatus: upload.status,
+        protocol: avatarUrl.protocol,
+        body,
+        status: download.status,
+        mimeType: download.headers.get("content-type"),
+        bytes: [...new Uint8Array(await download.arrayBuffer())],
+      });
+    }
+    const removal = await fetch(`${base}${path}`, { method: "DELETE", headers });
+    const removed = await removal.json();
+    const missing = await fetch(`${base}${downloadPath}`, { headers });
+    expect({
+      downloads,
+      removalStatus: removal.status,
+      avatarUrl: removed.avatarUrl,
+      missingStatus: missing.status,
+    }).toEqual({
+      downloads: images.map((bytes) => ({
+        uploadStatus: 200,
+        protocol: "openbot-remote-avatar:",
+        body: {},
+        status: 200,
+        mimeType: "image/png",
+        bytes,
+      })),
+      removalStatus: 200,
+      avatarUrl: null,
+      missingStatus: 404,
+    });
+  });
+
   it("hides OpenCode from old clients and allows protocol 4 to read and change it", async () => {
     const source = opencodeFixture[0];
     if (!isAgentSummary(source)) throw new Error("Invalid OpenCode fixture.");

@@ -1,3 +1,4 @@
+import { useSegments } from "expo-router";
 import { Stack } from "expo-router/stack";
 import { useThemeColor } from "heroui-native/hooks";
 import { useState } from "react";
@@ -6,6 +7,7 @@ import { AgentPinTransitionProvider } from "@/features/agents/components/agent-p
 import { ChatNavigationGateContext } from "@/features/agents/components/chat-link-pressable";
 import { createChatNavigationGate } from "@/features/agents/model/chat-navigation-gate";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { MessageActionsProvider } from "@/features/chat/context/message-actions-context";
 import { AppDrawerShell } from "@/features/servers/components/app-drawer-shell";
 import { MobileWorkspaceProvider } from "@/features/workspace/context/mobile-workspace-context";
 import { isIOS } from "@/shared/lib/platform";
@@ -15,6 +17,7 @@ export const unstable_settings = {
 };
 
 function AuthenticatedStack() {
+  const segments = useSegments();
   const background = useThemeColor("background");
   const sheetBackground = String(useCSSVariable("--openbot-bg-sheet") ?? background);
   const [navigationGate] = useState(createChatNavigationGate);
@@ -120,6 +123,16 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="message-actions"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            presentation: "formSheet",
+            sheetAllowedDetents: [segments.at(-1) === "select-text" ? 0.85 : 0.4],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
           name="settings"
           options={{
             contentStyle: { backgroundColor: sheetBackground },
@@ -142,7 +155,9 @@ export default function AuthenticatedLayout() {
     <MobileWorkspaceProvider key={workspaceKey}>
       <AgentPinTransitionProvider>
         <AppDrawerShell>
-          <AuthenticatedStack />
+          <MessageActionsProvider>
+            <AuthenticatedStack />
+          </MessageActionsProvider>
         </AppDrawerShell>
       </AgentPinTransitionProvider>
     </MobileWorkspaceProvider>
