@@ -1,4 +1,4 @@
-import type { QueuedMessageReceipt } from "@openbot/contracts/ipc";
+import type { ConversationPage, QueuedMessageReceipt } from "@openbot/contracts/ipc";
 import { type ConversationMessage, type ConversationSnapshot, isConversationMessage } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 
@@ -27,6 +27,27 @@ export function decodeConversation(value: unknown): ConversationSnapshot {
 function decodeConversationMessage(value: unknown): ConversationMessage {
   if (!isConversationMessage(value)) throw new Error("The server returned an invalid conversation message.");
   return value;
+}
+
+export function decodeConversationPage(value: unknown): ConversationPage {
+  const snapshot = decodeConversation(value);
+  if (
+    !isDynamicRecord(value) ||
+    !isDynamicRecord(value.pageInfo) ||
+    typeof value.pageInfo.hasOlder !== "boolean" ||
+    (value.pageInfo.olderCursor !== null && !isString(value.pageInfo.olderCursor)) ||
+    (value.pageInfo.hasOlder && !value.pageInfo.olderCursor) ||
+    !isDynamicRecord(value.references)
+  ) {
+    throw new Error("The server returned an invalid conversation page.");
+  }
+  return {
+    ...snapshot,
+    pageInfo: { hasOlder: value.pageInfo.hasOlder, olderCursor: value.pageInfo.olderCursor },
+    references: Object.fromEntries(
+      Object.entries(value.references).map(([id, message]) => [id, decodeConversationMessage(message)]),
+    ),
+  };
 }
 
 /** Conversation projections identify user bubbles by recipient delivery, not mailbox message. */

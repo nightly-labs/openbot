@@ -52,6 +52,35 @@
       }
     }
   },
+  "opencode": {
+    "registry": "https://registry.npmjs.org",
+    "repository": "https://github.com/anomalyco/opencode",
+    "version": "1.18.30",
+    "license": "MIT",
+    "licenseSha256": "625f0f619133f89bbbb2abe37369613dfa1885eba1e50d02170deb62bb42cb6b",
+    "artifacts": {
+      "darwin-arm64": {
+        "package": "opencode-darwin-arm64",
+        "asset": "opencode-darwin-arm64-1.18.30.tgz",
+        "assetSha256": "25b722fcdc8c46aebcb6501e1156dc1dc5a392492cc278c65b7775311674e7f8",
+        "binarySha256": "2d0c9c339bb91046c6ea951c97664bc2f8a8eaca707f31fbfbb7bc73c4eddc62",
+        "downloadBytes": 45975576,
+        "installedBytes": 160000000,
+        "executable": "opencode",
+        "platformDirectory": "mac"
+      },
+      "win32-x64": {
+        "package": "opencode-windows-x64",
+        "asset": "opencode-windows-x64-1.18.30.tgz",
+        "assetSha256": "1a5cc50f529cf359fbb6d1a1750c6ae521799f463d00a0215e6eff579a08b036",
+        "binarySha256": "c1bdbb18767048e1853af4238311b3f7e16ff2f91b68fb4c7ced3c5175347eea",
+        "downloadBytes": 60117264,
+        "installedBytes": 190000000,
+        "executable": "opencode.exe",
+        "platformDirectory": "win"
+      }
+    }
+  },
   "grok": {
     "repository": "https://github.com/xai-org/grok-build",
     "distribution": "https://x.ai/cli",

@@ -10,12 +10,21 @@ export function useMessageArrivals(agentId: string, messages: ChatMessage[], ena
     enabled,
     arriving: new Set<string>(),
   }));
-  if (snapshot.agentId !== agentId || snapshot.messages !== messages || snapshot.enabled !== enabled) {
+  if (
+    snapshot.agentId !== agentId ||
+    snapshot.enabled !== enabled ||
+    snapshot.messages.length !== messages.length ||
+    snapshot.messages[0]?.id !== messages[0]?.id ||
+    snapshot.messages.at(-1)?.id !== messages.at(-1)?.id
+  ) {
     const known = new Set(snapshot.messages.map((message) => message.id));
     const arriving = new Set<string>();
     if (enabled && snapshot.enabled && snapshot.agentId === agentId) {
-      for (const message of messages) {
-        if (!known.has(message.id) || snapshot.arriving.has(message.id)) arriving.add(message.id);
+      const previousTail = snapshot.messages.at(-1)?.id;
+      const tailIndex = previousTail ? messages.findIndex((message) => message.id === previousTail) : -1;
+      for (const [index, message] of messages.entries()) {
+        if (snapshot.arriving.has(message.id) || (tailIndex >= 0 && index > tailIndex && !known.has(message.id)))
+          arriving.add(message.id);
       }
     }
     setSnapshot({ agentId, messages, enabled, arriving });

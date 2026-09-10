@@ -73,6 +73,7 @@ function runtimeHarness() {
       codex: { ...offer.runtime, availableVersion: null },
       claude: { ...offer.runtime, phase: "not-downloaded", availableVersion: offer.availableVersion },
       grok: { ...offer.runtime, availableVersion: null },
+      opencode: { ...offer.runtime, availableVersion: null },
     },
   };
   let listener: ((snapshot: ProviderRuntimeSnapshot) => void) | undefined;
@@ -190,6 +191,7 @@ function systemCliHarness(startInstalled = true) {
       codex: { ...status, availableVersion: "0.153.4" },
       claude: { ...status, availableVersion: null },
       grok: { ...status, availableVersion: null },
+      opencode: { ...status, availableVersion: null },
     },
   };
   let listener: ((snapshot: ProviderRuntimeSnapshot) => void) | undefined;

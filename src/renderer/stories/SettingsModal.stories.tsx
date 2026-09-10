@@ -45,7 +45,7 @@ const providerAgentStatus: AgentStatus = {
   phase: "blocked",
   cliVersion: null,
   auth: { kind: "unknown" },
-  providers: (["codex", "claude", "grok"] as const).map((id) => ({
+  providers: (["codex", "claude", "grok", "opencode"] as const).map((id) => ({
     id,
     state: "not-installed",
     version: null,
@@ -59,13 +59,14 @@ const providerRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   codex: { phase: "downloading", progress: 24, message: null, version: null },
   claude: { phase: "downloading", progress: 48, message: null, version: null },
   grok: { phase: "downloading", progress: 72, message: null, version: null },
+  opencode: { phase: "downloading", progress: 96, message: null, version: null },
 };
 
-/** Three connected runtimes, one of which has a newer version waiting. */
+/** Four connected runtimes, one of which has a newer version waiting. */
 const providerUpdateAgentStatus: AgentStatus = {
   ...providerAgentStatus,
   phase: "ready",
-  providers: (["codex", "claude", "grok"] as const).map((id) => ({
+  providers: (["codex", "claude", "grok", "opencode"] as const).map((id) => ({
     id,
     state: "available",
     version: id === "claude" ? "2.1.246" : "1.0.0",
@@ -76,6 +77,7 @@ const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   codex: { phase: "ready", progress: 100, message: null, version: "0.149.1" },
   claude: { phase: "ready", progress: 100, message: null, version: "2.1.246", availableVersion: "2.1.250" },
   grok: { phase: "ready", progress: 100, message: null, version: "1.0.5" },
+  opencode: { phase: "ready", progress: 100, message: null, version: "1.18.30" },
 };
 
 function SettingsModalStory(props: {

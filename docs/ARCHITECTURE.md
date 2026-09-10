@@ -278,7 +278,14 @@ channel, validate size, chunk order, and SHA-256, and pass verified bytes back t
 bridge. Mobile queues downloads to limit concurrent copies. Image previews preserve aspect ratio;
 other files use the system share sheet through a temporary cache file.
 
-Mobile chat keeps viewport, tail-group, and composer measurements in its motion controller. The
+Mobile chat loads the latest 50 messages through `conversation-page` and loads older pages by cursor.
+Its `FlatList` virtualizes messages and retains the visible position when older pages are added.
+Reply references travel with each page. A page with no overlap replaces the cached window so a
+reconnect cannot leave an invisible gap. Older-page responses do not advance the live revision.
+The in-memory conversation store notifies subscribers per agent and combines streamed text once
+per animation frame. Windows above 50 messages are released when their last subscriber leaves;
+the complete history remains in the host database. Connection recovery prioritizes observed chats.
+Mobile chat keeps viewport, latest-user, and composer measurements in its motion controller. The
 last user message anchors a native blank-space inset; streamed replies consume that inset without
 autoscrolling. Initial history positioning and the first-send/first-response animation are separate
 states. Pending message bubbles reconcile through the host receipt ID, not message text.
@@ -588,8 +595,44 @@ Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact acces
 
 `src/backend/acp-client.ts` owns ACP process transport, model discovery, session start/load,
 streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts` supplies xAI
-login and billing hooks. The OpenCode driver starts the installed `opencode acp` command and
-uses external sign-in. OpenCode is not a managed runtime. Profile clients deny tool permissions.
+login and billing hooks. The OpenCode driver starts `opencode acp` on the runtime OpenBot pins and
+downloads, or on a CLI the user installed. Profile clients deny tool permissions.
+
+OpenCode has no login step OpenBot can drive, because the account is one environment variable: a
+spawn without `OPENCODE_API_KEY` lists the free OpenCode Zen models, and a spawn with one lists the
+paid catalog. So `AcpAgentClient` derives `#signedIn` from the models `session/new` returns, not
+from a credential, and a keyless OpenCode reports `available`. `AcpProviderOptions.extraEnv` is read
+at every spawn, which is what lets a key saved in Settings reach the next process with no other
+plumbing, and what carries `OPENCODE_DISABLE_AUTOUPDATE` to a managed install so the CLI cannot
+update past the pin. `src/main/provider-credential-store.ts` holds that optional key, encrypted by
+`safeStorage` in a `0o600` envelope under `userData`. Only a status (`missing`, `saved` or
+`unreadable`) crosses IPC; no getter returns the key. A file the store cannot read does not stop
+startup: OpenCode runs keyless, Settings reports the key as unreadable, and the file stays until the
+user saves or removes a key. The store writes a change to disk before it changes memory, so a
+failed write changes neither. `ProviderRuntime.changeProviderCredential` applies a key change inside
+the provider's serialized connection command. It refuses a provider that is running a turn, holds
+deliveries while it writes, and reports success only after a new process runs with the new key.
+
+That one variable turns on two products: OpenCode reports OpenCode Zen and OpenCode Go as a single
+catalog, on the separate endpoints `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and a Zen key
+does not buy Go. So `CREDENTIAL_ONLY_MODEL_PREFIXES` in `src/backend/agent/provider-runtime.ts`
+drops the `opencode-go/` models from `#refreshModelCatalog` while OpenBot is the one supplying the
+key; with no key stored those models can only come from the user's own OpenCode sign-in, which does
+buy them. Neither `/models` endpoint authenticates, so entitlement cannot be read back and the
+split is a product rule rather than a check.
+
+`PREFERRED_MODEL_ORDER` in the same pass reorders that catalog, because a provider with no
+`defaultProviderModel` runs the first model of its list and OpenCode reports the third-party
+services the user signed in to before its own — so the fallback used to pick a model behind a token
+OpenBot can neither see nor refresh. `opencodeModelRank` sorts free models first with Muse ahead of
+the rest, then OpenCode's own paid models, then everything behind a separate sign-in. The sort is
+stable, so the CLI's order survives inside one tier.
+
+Free means a display name ending in "Free": `model/list` carries no price and neither Zen endpoint
+authenticates, so the name is the only signal. `isFreeOpencodeModelName` in
+`packages/contracts/src/agent-providers.ts` is shared with the picker badge in
+`src/renderer/src/components/provider-model-options.ts`, so a badge and a default cannot disagree
+about what costs money.
 Provider session IDs remain in `projection_provider_sessions`; migration 17 adds OpenCode while
 preserving turn links. Provider switches keep the same agent, workspace, and local thread.
 

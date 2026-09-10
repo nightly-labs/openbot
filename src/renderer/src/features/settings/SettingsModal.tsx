@@ -25,6 +25,7 @@ import {
 } from "../../components/ui";
 import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
 import type { GeneralSettingsValue } from "./app-settings";
+import { OpenCodeKeyDialog, type ProviderKeyApi } from "./OpenCodeKeyDialog";
 import { SettingsDialogShell } from "./SettingsDialogShell";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
 import { SettingsHostedSitesTab } from "./SettingsHostedSitesTab";
@@ -62,6 +63,11 @@ export interface SettingsModalProps {
   onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  /**
+   * Reads and writes the optional provider keys. Absent while the active server is not this
+   * computer, which is also what takes the row's sign-in button away.
+   */
+  providerKeys?: ProviderKeyApi;
   hostedSitesApi?: HostedSitesDesktopApi;
   restoreFocusTarget?: HTMLElement | null;
 }
@@ -101,6 +107,7 @@ const tabDetails: Record<SettingsTab, { title: string; description: string }> = 
  */
 export function SettingsModal(props: SettingsModalProps) {
   const [activeTab, setActiveTab] = createSignal<SettingsTab>("general");
+  const [openCodeKeyOpen, setOpenCodeKeyOpen] = createSignal(false);
   let modalElement: HTMLElement | undefined;
 
   const general = createSettingsGeneralStore(props);
@@ -132,6 +139,11 @@ export function SettingsModal(props: SettingsModalProps) {
     activationMode: "automatic" as const,
   };
 
+  /** OpenCode is the only provider whose sign-in is a pasted key, so it is the only row served. */
+  function openProviderKeyDialog(provider: AgentProviderId): void {
+    if (provider === "opencode") setOpenCodeKeyOpen(true);
+  }
+
   function updateSetting<Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]): void {
     props.onValueChange({ ...props.value, [key]: value });
   }
@@ -147,6 +159,11 @@ export function SettingsModal(props: SettingsModalProps) {
         contentKey={activeTab()}
         restoreFocusTarget={props.restoreFocusTarget}
         onContentElement={(element) => (modalElement = element)}
+        floatingContent={
+          <Show when={openCodeKeyOpen() && props.providerKeys}>
+            {(api) => <OpenCodeKeyDialog api={api()} onClose={() => setOpenCodeKeyOpen(false)} />}
+          </Show>
+        }
         footer={
           <Show when={profile.nameDirty()}>
             <section class="settings-modal-save-bar" aria-label="Unsaved changes">
@@ -210,6 +227,7 @@ export function SettingsModal(props: SettingsModalProps) {
             onUpdateProvider={props.onUpdateProvider}
             onConnectProvider={props.onConnectProvider}
             onInstallProvider={props.onInstallProvider}
+            onSignInProvider={props.providerKeys ? openProviderKeyDialog : undefined}
           />
         </Tabs.Content>
 

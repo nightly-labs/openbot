@@ -258,10 +258,17 @@ Marketplace submissions from the desktop app show the publisher’s current acco
 
 ### OpenCode
 
-OpenBot starts the OpenCode CLI installed on the host with `opencode acp`. Prompts, attachments,
-and tool results go to that local process. OpenCode can send them to the model provider selected
-in its configuration. OpenBot does not copy OpenCode credentials or upload its session files.
-OpenCode manages its own login and resume state.
+OpenBot downloads the pinned OpenCode CLI from `registry.npmjs.org` and its license from
+`github.com/anomalyco/opencode`, then starts it with `opencode acp`. Prompts, attachments, and tool
+results go to that local process. OpenCode can send them to the model provider selected in its
+configuration. OpenCode's free models are the default, and they reach OpenCode Zen with no account,
+so a first OpenCode turn leaves this computer without a sign-in.
+
+An OpenCode Zen key is optional and unlocks the paid catalog. OpenBot encrypts it with the operating
+system's secret storage, writes it to a file that only your user account can read, and passes it
+only to the local OpenCode process. No screen, log, data export, or diagnostics report contains it;
+the data export lists it under `scope.excludes`. OpenBot does not copy OpenCode credentials or
+upload its session files. OpenCode manages its own login and resume state.
 
 ## Shared desktop channels
 

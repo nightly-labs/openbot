@@ -1,9 +1,9 @@
 import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { CornerUpRight, X } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
-import { AccessibilityInfo, Pressable, View, type ViewStyle } from "react-native";
-import { KeyboardChatScrollView } from "react-native-keyboard-controller";
+import { createContext, forwardRef, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { AccessibilityInfo, type CellRendererProps, FlatList, Pressable, View, type ViewStyle } from "react-native";
+import { KeyboardChatScrollView, type KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import Animated, {
   Easing,
   FadeIn,
@@ -29,6 +29,39 @@ import { ChatAttachmentView } from "./chat-attachment";
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { StreamingTailText, StreamRevealProvider } from "./streaming-tail-text";
 import { ThinkingTextGradient } from "./thinking-text-gradient";
+
+type VisibleMessage = Exclude<ChatMessage, { kind: "thinking" }>;
+const TailLayoutContext = createContext<{ id: string | null; motion: ChatMotion } | null>(null);
+
+function MessageCell({ children, item, onLayout, onFocusCapture, style }: CellRendererProps<VisibleMessage>) {
+  const tail = useContext(TailLayoutContext);
+  const nativeProps = { style, onFocusCapture };
+  return (
+    <View
+      {...nativeProps}
+      onLayout={(event) => {
+        onLayout?.(event);
+        if (item.id === tail?.id) tail.motion.onTailStartLayout(item.id, event);
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+const ChatScrollView = forwardRef<Animated.ScrollView, KeyboardChatScrollViewProps & { motion: ChatMotion }>(
+  function ChatScrollView({ motion, ...props }, ref) {
+    const setRef = useCallback(
+      (instance: Animated.ScrollView | null) => {
+        motion.setScrollRef(instance);
+        if (typeof ref === "function") ref(instance);
+        else if (ref) ref.current = instance;
+      },
+      [motion.setScrollRef, ref],
+    );
+    return <KeyboardChatScrollView {...props} ref={setRef} />;
+  },
+);
 
 const STARTER_OPTIONS = [
   { id: "plan", label: "Plan the next steps", detail: "Turn a goal into a clear plan" },
@@ -57,6 +90,11 @@ interface ChatMessageListProps {
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
   messages: ChatMessage[];
   messageAliases: ReadonlyMap<string, string>;
+  referenceMessages: ChatMessage[];
+  hasOlder: boolean;
+  olderLoading: boolean;
+  olderError: boolean;
+  onLoadOlder: () => void;
   muted: ViewStyle["backgroundColor"];
   raised: ViewStyle["backgroundColor"];
   showStarter: boolean;
@@ -83,6 +121,11 @@ export function ChatMessageList({
   historyState,
   messages,
   messageAliases,
+  referenceMessages,
+  hasOlder,
+  olderLoading,
+  olderError,
+  onLoadOlder,
   muted,
   raised,
   showStarter,
@@ -94,7 +137,10 @@ export function ChatMessageList({
   onOpenActions,
 }: ChatMessageListProps) {
   const isFocused = useIsFocused();
-  const messagesById = useMemo(() => indexChatMessages(messages, messageAliases), [messages, messageAliases]);
+  const messagesById = useMemo(
+    () => indexChatMessages(messages, messageAliases, referenceMessages),
+    [messages, messageAliases, referenceMessages],
+  );
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
   useEffect(() => {
     let active = true;
@@ -149,16 +195,17 @@ export function ChatMessageList({
     return { backgroundColor: `rgb(${r}, ${g}, ${b})` };
   });
 
-  const visibleMessages = messages.filter((message) => message.kind !== "thinking");
-  const groups: { id: string; user?: (typeof visibleMessages)[number]; replies: typeof visibleMessages }[] = [];
-  for (const message of visibleMessages) {
-    if (message.kind === "message" && message.author === "user") {
-      groups.push({ id: message.id, user: message, replies: [] });
-    } else {
-      if (groups.length === 0) groups.push({ id: "preamble", replies: [] });
-      groups[groups.length - 1].replies.push(message);
-    }
-  }
+  const visibleMessages = useMemo(() => messages.filter((message) => message.kind !== "thinking"), [messages]);
+  const tailIndex = visibleMessages.findLastIndex((message) => message.kind === "message" && message.author === "user");
+  const tailId = visibleMessages[tailIndex]?.id ?? null;
+  const listRef = useRef<FlatList<VisibleMessage>>(null);
+  const tailLayout = useMemo(() => ({ id: tailId, motion }), [tailId, motion]);
+  const seekLatest = useCallback(() => {
+    if (!motion.historyVisible && visibleMessages.length) listRef.current?.scrollToEnd({ animated: false });
+  }, [motion.historyVisible, visibleMessages.length]);
+  useEffect(() => {
+    if (tailId && motion.needsSendPosition() && !motion.atLatest) listRef.current?.scrollToEnd({ animated: false });
+  }, [tailId, motion.needsSendPosition, motion.atLatest]);
   const renderMessage = (message: (typeof visibleMessages)[number], isTailUser: boolean, isFirstUser: boolean) => {
     const rendered =
       message.kind === "exchange" ? (
@@ -320,138 +367,166 @@ export function ChatMessageList({
       accessibilityElementsHidden={historyState === "ready" && !motion.historyVisible}
       importantForAccessibility={historyState !== "ready" || motion.historyVisible ? "auto" : "no-hide-descendants"}
     >
-      <KeyboardChatScrollView
-        ref={motion.setScrollRef}
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          gap: 10,
-          paddingHorizontal: 16,
-          paddingTop: topInset + 84,
-        }}
-        contentInsetAdjustmentBehavior="never"
-        automaticallyAdjustKeyboardInsets={false}
-        keyboardLiftBehavior="whenAtEnd"
-        offset={keyboardOffset}
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
-        // RN Fabric otherwise ignores drags that start in the contentInset area.
-        applyWorkaroundForContentInsetHitTestBug
-        alwaysBounceVertical
-        blankSpace={motion.blankSpace}
-        extraContentPadding={motion.composerHeight}
-        onContentInsetChange={motion.onContentInsetChange}
-        onContentSizeChange={motion.onContentSizeChange}
-        onLayout={motion.onViewportLayout}
-        onScroll={motion.onScroll}
-        onScrollBeginDrag={motion.cancelSend}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-      >
-        {historyState === "connecting" || historyState === "loading" ? (
-          <View
-            className="flex-1"
-            accessible
-            accessibilityLabel={historyState === "connecting" ? "Connecting to server" : "Loading chat history"}
-            accessibilityState={{ busy: true }}
-          />
-        ) : historyState !== "ready" ? (
-          <View className="flex-1 items-center justify-center gap-2">
-            <Typography.Paragraph align="center" className="text-text-secondary">
-              {historyState === "waiting" ? "Waiting for connection" : "Could not load chat history"}
-            </Typography.Paragraph>
-            {historyState === "waiting" ? (
-              <Typography.Paragraph type="body-xs" align="center" className="text-text-dim">
-                Your chat history will load when the server reconnects.
-              </Typography.Paragraph>
-            ) : null}
-            {historyState === "error" ? (
-              <Button variant="tertiary" onPress={onRetryHistory}>
-                <Button.Label>Try again</Button.Label>
-              </Button>
-            ) : null}
-          </View>
-        ) : null}
-
-        {groups.map((group, index) => {
-          const last = index === groups.length - 1;
-          return (
-            <View
-              key={group.id}
-              style={{ gap: 10 }}
-              onLayout={last && group.user ? (event) => motion.onTailLayout(group.id, event) : undefined}
+      <TailLayoutContext.Provider value={tailLayout}>
+        <FlatList
+          ref={listRef}
+          data={visibleMessages}
+          keyExtractor={(message) => message.id}
+          CellRendererComponent={MessageCell}
+          initialNumToRender={50}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          removeClippedSubviews={false}
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          onStartReached={() => {
+            if (motion.historyVisible && canSend && hasOlder && !olderLoading && !olderError) onLoadOlder();
+          }}
+          onStartReachedThreshold={0.5}
+          renderItem={({ item, index }) => (
+            <Animated.View
+              style={[{ paddingBottom: 10 }, index > tailIndex ? motion.responseStyle : undefined]}
+              accessibilityElementsHidden={index > tailIndex && !motion.responseVisible}
+              importantForAccessibility={index > tailIndex && !motion.responseVisible ? "no-hide-descendants" : "auto"}
             >
-              {group.user ? renderMessage(group.user, last, index === 0) : null}
-              <Animated.View
-                style={[{ gap: 10 }, last ? motion.responseStyle : undefined]}
-                accessibilityElementsHidden={last && !motion.responseVisible}
-                importantForAccessibility={last && !motion.responseVisible ? "no-hide-descendants" : "auto"}
-              >
-                {group.replies.map((message) => renderMessage(message, false, false))}
-                {last ? renderActivity() : null}
-              </Animated.View>
-            </View>
-          );
-        })}
-        {groups.length === 0 ? renderActivity() : null}
-
-        {showStarter ? (
-          <View
-            className="gap-4 rounded-[26px] p-4"
-            style={{ backgroundColor: fieldBackground, borderCurve: "continuous" }}
-          >
-            <View className="flex-row items-start gap-3">
-              <View className="min-w-0 flex-1 gap-1">
-                <Typography.Heading type="h4">What should we work on first?</Typography.Heading>
-                <Typography.Paragraph className="text-text-secondary">
-                  Pick one, or type your own — we can change course anytime.
-                </Typography.Paragraph>
-              </View>
-              <Pressable
-                accessibilityLabel="Dismiss suggestions"
-                accessibilityRole="button"
-                hitSlop={8}
-                onPress={onDismissStarter}
-              >
-                <X color={String(muted)} size={21} strokeWidth={1.8} />
-              </Pressable>
-            </View>
-
-            <View className="overflow-hidden rounded-[18px]" style={{ backgroundColor: raised }}>
-              {STARTER_OPTIONS.map((option, index) => (
-                <Pressable
-                  key={option.id}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: !canSend }}
-                  disabled={!canSend}
-                  className="flex-row gap-3 px-3 py-3"
-                  style={({ pressed }) => ({
-                    borderBottomColor: index < STARTER_OPTIONS.length - 1 ? String(muted) : "transparent",
-                    borderBottomWidth: index < STARTER_OPTIONS.length - 1 ? 0.5 : 0,
-                    opacity: !canSend ? 0.45 : pressed ? 0.55 : 1,
-                  })}
-                  onPress={() => onSelectStarter(option.label)}
+              {renderMessage(item, index === tailIndex, index === 0 && !hasOlder)}
+            </Animated.View>
+          )}
+          renderScrollComponent={(props) => (
+            <ChatScrollView
+              {...props}
+              motion={motion}
+              automaticallyAdjustKeyboardInsets={false}
+              keyboardLiftBehavior="whenAtEnd"
+              offset={keyboardOffset}
+              applyWorkaroundForContentInsetHitTestBug
+              blankSpace={motion.blankSpace}
+              extraContentPadding={motion.composerHeight}
+              onContentInsetChange={motion.onContentInsetChange}
+            />
+          )}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: topInset + 84 }}
+          contentInsetAdjustmentBehavior="never"
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          alwaysBounceVertical
+          onContentSizeChange={(width, height) => {
+            motion.onContentSizeChange(width, height);
+            seekLatest();
+          }}
+          onLayout={(event) => {
+            motion.onViewportLayout(event);
+            seekLatest();
+          }}
+          onScroll={motion.onScroll}
+          onScrollBeginDrag={motion.cancelSend}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <>
+              {hasOlder ? (
+                <View className="items-center pb-3">
+                  <Button variant="tertiary" isDisabled={!canSend || olderLoading} onPress={onLoadOlder}>
+                    <Button.Label>
+                      {olderLoading
+                        ? "Loading older messages…"
+                        : olderError
+                          ? "Try loading older messages again"
+                          : "Load older messages"}
+                    </Button.Label>
+                  </Button>
+                </View>
+              ) : null}
+              {historyState === "connecting" || historyState === "loading" ? (
+                <View
+                  className="flex-1"
+                  accessible
+                  accessibilityLabel={historyState === "connecting" ? "Connecting to server" : "Loading chat history"}
+                  accessibilityState={{ busy: true }}
+                />
+              ) : historyState !== "ready" ? (
+                <View className="flex-1 items-center justify-center gap-2">
+                  <Typography.Paragraph align="center" className="text-text-secondary">
+                    {historyState === "waiting" ? "Waiting for connection" : "Could not load chat history"}
+                  </Typography.Paragraph>
+                  {historyState === "waiting" ? (
+                    <Typography.Paragraph type="body-xs" align="center" className="text-text-dim">
+                      Your chat history will load when the server reconnects.
+                    </Typography.Paragraph>
+                  ) : null}
+                  {historyState === "error" ? (
+                    <Button variant="tertiary" onPress={onRetryHistory}>
+                      <Button.Label>Try again</Button.Label>
+                    </Button>
+                  ) : null}
+                </View>
+              ) : null}
+            </>
+          }
+          ListFooterComponent={
+            <>
+              <Animated.View style={motion.responseStyle}>{renderActivity()}</Animated.View>
+              {showStarter ? (
+                <View
+                  className="gap-4 rounded-[26px] p-4"
+                  style={{ backgroundColor: fieldBackground, borderCurve: "continuous" }}
                 >
-                  <View className="size-7 items-center justify-center rounded-lg bg-control">
-                    <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                      {String.fromCharCode(65 + index)}
-                    </Typography.Paragraph>
+                  <View className="flex-row items-start gap-3">
+                    <View className="min-w-0 flex-1 gap-1">
+                      <Typography.Heading type="h4">What should we work on first?</Typography.Heading>
+                      <Typography.Paragraph className="text-text-secondary">
+                        Pick one, or type your own — we can change course anytime.
+                      </Typography.Paragraph>
+                    </View>
+                    <Pressable
+                      accessibilityLabel="Dismiss suggestions"
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={onDismissStarter}
+                    >
+                      <X color={String(muted)} size={21} strokeWidth={1.8} />
+                    </Pressable>
                   </View>
-                  <View className="min-w-0 flex-1">
-                    <Typography.Paragraph weight="medium">{option.label}</Typography.Paragraph>
-                    <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                      {option.detail}
-                    </Typography.Paragraph>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
 
-            <Typography.Paragraph type="body-xs" className="text-text-secondary">
-              Or answer in the chat below
-            </Typography.Paragraph>
-          </View>
-        ) : null}
-      </KeyboardChatScrollView>
+                  <View className="overflow-hidden rounded-[18px]" style={{ backgroundColor: raised }}>
+                    {STARTER_OPTIONS.map((option, index) => (
+                      <Pressable
+                        key={option.id}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: !canSend }}
+                        disabled={!canSend}
+                        className="flex-row gap-3 px-3 py-3"
+                        style={({ pressed }) => ({
+                          borderBottomColor: index < STARTER_OPTIONS.length - 1 ? String(muted) : "transparent",
+                          borderBottomWidth: index < STARTER_OPTIONS.length - 1 ? 0.5 : 0,
+                          opacity: !canSend ? 0.45 : pressed ? 0.55 : 1,
+                        })}
+                        onPress={() => onSelectStarter(option.label)}
+                      >
+                        <View className="size-7 items-center justify-center rounded-lg bg-control">
+                          <Typography.Paragraph type="body-xs" className="text-text-secondary">
+                            {String.fromCharCode(65 + index)}
+                          </Typography.Paragraph>
+                        </View>
+                        <View className="min-w-0 flex-1">
+                          <Typography.Paragraph weight="medium">{option.label}</Typography.Paragraph>
+                          <Typography.Paragraph type="body-xs" className="text-text-secondary">
+                            {option.detail}
+                          </Typography.Paragraph>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+
+                  <Typography.Paragraph type="body-xs" className="text-text-secondary">
+                    Or answer in the chat below
+                  </Typography.Paragraph>
+                </View>
+              ) : null}
+            </>
+          }
+        />
+      </TailLayoutContext.Provider>
     </Animated.View>
   );
 }

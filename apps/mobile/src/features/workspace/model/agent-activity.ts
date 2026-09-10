@@ -40,6 +40,8 @@ export function reduceAgentActivity(
   }
   if (event.type === "turn-started" || event.type === "turn-progress" || event.type === "conversation-delta") {
     const previous = current[event.agentId];
+    if (event.type === "conversation-delta" && previous?.turnId === event.turnId && previous.phase === "responding")
+      return current;
     return {
       ...current,
       [event.agentId]: {

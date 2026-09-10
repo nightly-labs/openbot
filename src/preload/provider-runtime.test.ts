@@ -3,7 +3,10 @@ import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 
 const runtime = { phase: "ready", progress: null, message: null, version: "1.0.0" };
 function snapshot(availableVersion?: string | number | null) {
-  return { revision: 1, providers: { codex: runtime, claude: { ...runtime, availableVersion }, grok: runtime } };
+  return {
+    revision: 1,
+    providers: { codex: runtime, claude: { ...runtime, availableVersion }, grok: runtime, opencode: runtime },
+  };
 }
 
 describe("provider runtime decoding", () => {

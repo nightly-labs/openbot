@@ -21,7 +21,7 @@ import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { redactText } from "@openbot/logging";
 import type { AgentProvider } from "./agent-client";
-import type { AgentCliInfo } from "./cli";
+import { type AgentCliInfo, cliSpawnTarget } from "./cli";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
 import {
   type AccountRateLimitsReadResult,
@@ -88,6 +88,11 @@ export interface AcpProviderOptions {
   profileGeneration?: boolean;
   argv: readonly string[];
   env: Record<string, string>;
+  /**
+   * Variables read once per spawn rather than once per client, which is what lets a key saved after
+   * construction reach the next process without any other plumbing. Spread after `env`.
+   */
+  extraEnv?: () => Record<string, string>;
   signInMessage: string;
   authenticate?(connection: ClientSideConnection, initialization: InitializeResponse): Promise<void>;
   readRateLimits?(connection: ClientSideConnection): Promise<AccountRateLimitsReadResult>;
@@ -127,10 +132,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   start(): void {
     if (this.running) return;
     this.#stopping = false;
-    const child = spawn(this.#cli.executable, [...this.options.argv], {
+    const target = cliSpawnTarget(this.#cli.executable, this.options.argv);
+    const child = spawn(target.command, target.args, {
       stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, ...this.options.env },
-      shell: process.platform === "win32",
+      env: { ...process.env, ...this.options.env, ...this.options.extraEnv?.() },
+      windowsVerbatimArguments: target.windowsVerbatimArguments,
       windowsHide: true,
     });
     this.#process = child;
