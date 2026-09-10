@@ -7,6 +7,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { ChatAttachmentView } from "./chat-attachment";
 
 const native = vi.hoisted(() => ({
+  imageSource: vi.fn(),
   download: vi.fn(),
   share: vi.fn(),
   write: vi.fn(),
@@ -24,8 +25,10 @@ vi.mock("react-native", () => ({
 vi.mock("heroui-native/hooks", () => ({ useThemeColor: () => ["green", "gray"] }));
 vi.mock("lucide-react-native", () => ({ ExternalLink: () => null, FileText: () => null }));
 vi.mock("expo-image", () => ({
-  Image: ({ accessibilityLabel, source }: { accessibilityLabel: string; source: string | null }) =>
-    source ? <div role="img" aria-label={accessibilityLabel} /> : null,
+  Image: ({ accessibilityLabel, source }: { accessibilityLabel: string; source: string | null }) => {
+    native.imageSource(source);
+    return source ? <div role="img" aria-label={accessibilityLabel} /> : null;
+  },
 }));
 vi.mock("expo-sharing", () => ({ isAvailableAsync: async () => true, shareAsync: native.share }));
 vi.mock("expo-file-system", () => ({
@@ -62,11 +65,15 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
   vi.resetAllMocks();
 });
-function mount(attachment: AttachmentSummary) {
+function mount(
+  attachment: AttachmentSummary,
+  cached?: { name: string; mimeType: string; base64: string; localUri?: string },
+) {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  if (cached) client.setQueryData(["chat-attachment", "selected-host", attachment.id], cached);
   act(() =>
     root.render(
       <QueryClientProvider client={client}>
@@ -132,4 +139,24 @@ it("opens the share sheet when the user taps a message image", async () => {
     expect(native.share).toHaveBeenCalledWith(expect.any(String), { mimeType: "image/png", dialogTitle: "photo.png" }),
   );
   expect(native.write).toHaveBeenCalledWith("aGVsbG8=", { encoding: "base64" });
+});
+
+it("uses the uploaded local image under its host ID without downloading it again", async () => {
+  mount(
+    { ...attachment, name: "photo.png", mimeType: "image/png", kind: "image" },
+    { name: "photo.png", mimeType: "image/png", base64: "aGVsbG8=", localUri: "file:///photo.png" },
+  );
+  expect(screen.getByRole("img", { name: "photo.png" })).toBeTruthy();
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Open or save photo.png" }));
+  });
+  expect(native.download).not.toHaveBeenCalled();
+  expect(native.imageSource).toHaveBeenLastCalledWith("file:///photo.png");
+  expect(native.write).toHaveBeenCalledWith("aGVsbG8=", { encoding: "base64" });
+});
+
+it("renders the device file while its message is still pending", () => {
+  mount({ ...attachment, id: "mobile-draft-attachment-1", kind: "image", previewUrl: "file:///pending.png" });
+  expect(native.imageSource).toHaveBeenLastCalledWith("file:///pending.png");
+  expect(native.download).not.toHaveBeenCalled();
 });

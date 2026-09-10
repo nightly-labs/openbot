@@ -1,4 +1,5 @@
 import { userErrorMessage } from "@openbot/user-errors";
+import { useQueryClient } from "@tanstack/react-query";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import * as Haptics from "expo-haptics";
 import { router, useIsFocused } from "expo-router";
@@ -17,7 +18,7 @@ import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
-import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
+import { type ChatAttachment, useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { type ChatBubbleMessage, useMessageActions } from "@/features/chat/context/message-actions-context";
@@ -32,7 +33,7 @@ import { useAgentActivity } from "@/features/workspace/components/use-agent-acti
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { isIOS } from "@/shared/lib/platform";
-import { uploadChatAttachments } from "../model/upload-chat-attachments";
+import { retainConfirmedAttachments, uploadChatAttachments } from "../model/upload-chat-attachments";
 import { ChatCameraPanel } from "./chat-camera-panel";
 
 interface MobileChatViewProps {
@@ -73,6 +74,8 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   const [composerGestureHeight, setComposerGestureHeight] = useState(0);
   const sendingRef = useRef(false);
   const attachments = useChatAttachments();
+  const queryClient = useQueryClient();
+  const submittedFiles = useRef<ChatAttachment[]>([]);
   const [pendingMessage, setPendingMessage] = useState<PendingChatMessage | null>(null);
   const [messageAliases, setMessageAliases] = useState<ReadonlyMap<string, string>>(new Map());
   const sendSequence = useRef(0);
@@ -116,9 +119,16 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     [projectedMessages, pendingMessage, messageAliases],
   );
   useEffect(() => {
-    if (pendingMessage?.serverId && projectedMessages.some((message) => message.id === pendingMessage.serverId))
+    if (!pendingMessage?.serverId) return;
+    if (
+      retainConfirmedAttachments(projectedMessages, pendingMessage.serverId, submittedFiles.current, (id, file) => {
+        queryClient.setQueryData(["chat-attachment", agent.serverId, id], file);
+      })
+    ) {
+      submittedFiles.current = [];
       setPendingMessage(null);
-  }, [pendingMessage, projectedMessages]);
+    }
+  }, [pendingMessage, projectedMessages, queryClient, agent.serverId]);
   const lastUserId =
     messages.findLast((message) => message.kind === "message" && message.author === "user")?.id ?? null;
   const motion = useChatMotion(insets.top + 84, keyboardOffset, Boolean(conversation), lastUserId);
@@ -234,6 +244,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     const submittedReply = replyTarget;
     setReplyTarget(null);
     const files = attachments.items;
+    submittedFiles.current = files;
     const localId = `local-message-${++sendSequence.current}`;
     setPendingMessage({
       message: {
@@ -250,7 +261,9 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
           size: file.size,
           kind: file.mimeType.startsWith("image/") ? "image" : "file",
           previewKind: "none",
-          previewUrl: file.mimeType.startsWith("image/") ? `data:${file.mimeType};base64,${file.base64}` : null,
+          previewUrl: file.mimeType.startsWith("image/")
+            ? (file.uri ?? `data:${file.mimeType};base64,${file.base64}`)
+            : null,
         })),
       },
       baseline: new Set(projectedMessages.map((message) => message.id)),
@@ -267,6 +280,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
         setPendingMessage((current) => (current?.message.id === localId ? { ...current, serverId } : current));
         attachments.clear();
       } catch (error) {
+        submittedFiles.current = [];
         motion.cancelSend();
         setPendingMessage((current) => (current?.message.id === localId ? null : current));
         setReplyTarget((current) => current ?? submittedReply);

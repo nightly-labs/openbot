@@ -224,7 +224,7 @@ export function ChatComposer({
           Preparing attachments…
         </Typography.Paragraph>
       ) : null}
-      {attachments.items.length > 0 ? (
+      {!sending && attachments.items.length > 0 ? (
         <ScrollView
           horizontal
           keyboardShouldPersistTaps="handled"

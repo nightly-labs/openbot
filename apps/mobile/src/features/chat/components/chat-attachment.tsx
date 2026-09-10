@@ -1,5 +1,5 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
+import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { useQuery } from "@tanstack/react-query";
 import { File, Paths } from "expo-file-system";
 import { Image } from "expo-image";
@@ -28,10 +28,13 @@ export function ChatAttachmentView({
   const { width } = useWindowDimensions();
   const pending = attachment.id.startsWith("mobile-draft-attachment-");
   const image = attachment.kind === "image";
-  const local = attachment.previewUrl?.startsWith("data:image/") ? attachment.previewUrl : null;
+  const local =
+    attachment.previewUrl?.startsWith("data:image/") || (pending && attachment.previewUrl?.startsWith("file://"))
+      ? attachment.previewUrl
+      : null;
   const query = useQuery({
     queryKey: ["chat-attachment", serverId, attachment.id],
-    queryFn: () => {
+    queryFn: (): Promise<RemoteFileUpload & { localUri?: string }> => {
       if (attachment.size > MOBILE_ATTACHMENT_BYTES)
         throw new Error("This file exceeds the mobile 10 MB limit. Open it on desktop.");
       return downloadAttachment(serverId, attachment.id);
@@ -39,9 +42,10 @@ export function ChatAttachmentView({
     enabled: image && !local && !pending,
     retry: false,
     staleTime: Infinity,
-    gcTime: 0,
+    gcTime: 5 * 60 * 1000,
   });
-  const uri = local ?? (query.data ? `data:${query.data.mimeType};base64,${query.data.base64}` : null);
+  const localUri = local ?? query.data?.localUri;
+  const uri = localUri ?? (query.data ? `data:${query.data.mimeType};base64,${query.data.base64}` : null);
   // Keep the message footprint independent of dimensions received after image decoding.
   const frameSize = Math.min(280, width - 80);
   const imageHeight = Math.min(frameSize, frameSize / ratio);
@@ -88,9 +92,9 @@ export function ChatAttachmentView({
           >
             <Image
               source={imageFailed ? null : uri}
-              placeholder={{ blurhash: "A95}pxj[ayfQ" }}
+              placeholder={localUri ? null : { blurhash: "A95}pxj[ayfQ" }}
               placeholderContentFit="cover"
-              transition={250}
+              transition={localUri ? 0 : 250}
               contentFit="contain"
               accessibilityLabel={attachment.name}
               style={{ width: "100%", height: "100%", borderRadius: 18 }}
