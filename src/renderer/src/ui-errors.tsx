@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { formatTime } from "./app-message-projection";
+import { formatMessageTime } from "./app-message-projection";
 import type { AgentMessage } from "./data";
 import { errorMessage } from "./error-message";
 import { agentConversationKey } from "./features/conversation/conversation-keys";
@@ -34,7 +34,7 @@ const UiErrors = createSimpleContext({
             id: `ui-${Date.now()}-${Math.random()}`,
             author: "agent",
             body,
-            time: formatTime(new Date().toISOString()),
+            time: formatMessageTime(new Date().toISOString()),
             status,
           },
         ],

@@ -161,3 +161,16 @@ export const Loading: Story = {
 export const ErrorState: Story = {
   args: { snapshot: undefined, loadError: "The team server is temporarily unavailable." },
 };
+
+export const MessageDates: Story = {
+  args: {
+    snapshot: {
+      ...STORY_DIRECT_SNAPSHOTS[member.id],
+      messages: STORY_DIRECT_SNAPSHOTS[member.id].messages.map((message, index) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (index === 0 ? 1 : 0));
+        return { ...message, createdAt: date.toISOString() };
+      }),
+    },
+  },
+};

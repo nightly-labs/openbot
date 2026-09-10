@@ -10,7 +10,7 @@ import { createEffect, createMemo, createStore, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import {
   agentMessagesEqual,
-  formatTime,
+  formatMessageTime,
   retainThinkingMessages,
   toAgentMessage,
   toAgentMessages,
@@ -431,7 +431,7 @@ const Conversation = createSimpleContext({
           turnId: event.turnId,
           author: "agent",
           body: cleanAgentMessageText(rawBody),
-          time: formatTime(event.createdAt),
+          time: formatMessageTime(event.createdAt),
           createdAt: event.createdAt,
           streaming: true,
           animate: conversations[event.agentId]?.loaded === true,
