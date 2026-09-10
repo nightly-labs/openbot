@@ -46,6 +46,26 @@ function conversation(): ConversationSnapshot {
 }
 
 describe("mobile question forms", () => {
+  it("keeps a reply attached to its source after the pending message receives its host ID", () => {
+    const snapshot = conversation();
+    snapshot.messages = [
+      { id: "source", author: "assistant", text: "Original answer", status: "completed", createdAt: "now" },
+      {
+        id: "delivered",
+        author: "user",
+        text: "Follow up",
+        replyToMessageId: "source",
+        status: "completed",
+        createdAt: "now",
+      },
+    ];
+    const projected = projectChatMessages(decodeConversation(snapshot).messages);
+    const result = presentChatMessages(projected, null, new Map([["delivered", "local"]]));
+    expect(result.find((message) => message.id === "local")).toMatchObject({
+      body: "Follow up",
+      replyToMessageId: "source",
+    });
+  });
   it("keeps attachment-only messages visible and advances their read boundary", () => {
     const snapshot = conversation();
     const attachment = {

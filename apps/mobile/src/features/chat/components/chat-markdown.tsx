@@ -41,6 +41,7 @@ function tokenIs<K extends keyof MarkdownTokenByType>(token: Token, type: K): to
 }
 
 interface TextPresentation {
+  selectable: boolean;
   type: "body" | "body-sm" | "h4" | "h5";
   style: TextStyle;
   codeColor: ColorValue;
@@ -86,7 +87,7 @@ function CodeSpan({ text, presentation }: { text: string; presentation: TextPres
       className={`max-w-full self-start rounded-xl bg-control px-1 ${presentation.type === "body-sm" ? "py-px" : "py-0.5"}`}
     >
       <Typography.Code
-        selectable
+        selectable={presentation.selectable}
         className={presentation.type === "body-sm" ? "bg-transparent p-0 text-xs leading-4" : "bg-transparent p-0"}
         style={{ ...presentation.style, color: presentation.codeColor }}
       >
@@ -236,7 +237,7 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
             return (
               <Typography
                 key={offset}
-                selectable
+                selectable={presentation.selectable}
                 className="max-w-full"
                 type={presentation.type}
                 style={textContainerStyle(source(run), presentation)}
@@ -278,7 +279,7 @@ function MarkdownBlocks({
           return (
             <Typography
               key={offset}
-              selectable
+              selectable={presentation.selectable}
               type={presentation.type}
               style={textContainerStyle(token.raw, presentation)}
             >
@@ -291,7 +292,7 @@ function MarkdownBlocks({
           return (
             <Typography.Heading
               key={offset}
-              selectable
+              selectable={presentation.selectable}
               type={heading.type === "h4" ? "h4" : "h5"}
               style={textContainerStyle(token.raw, presentation)}
             >
@@ -302,7 +303,7 @@ function MarkdownBlocks({
         if (tokenIs(token, "code")) {
           return (
             <StreamingBlock key={offset} enabled={presentation.animateTail}>
-              <ChatCodeBlock text={token.text} language={token.lang} />
+              <ChatCodeBlock selectable={presentation.selectable} text={token.text} language={token.lang} />
             </StreamingBlock>
           );
         }
@@ -352,7 +353,7 @@ function MarkdownBlocks({
                       {sourceEntries(row, (cell) => cell.text).map(({ value: cell, offset: cellOffset }) => (
                         <View key={cellOffset} className="w-44 px-2 py-2">
                           <Typography
-                            selectable
+                            selectable={presentation.selectable}
                             type={presentation.type}
                             style={{
                               ...textContainerStyle(cell.text, presentation),
@@ -376,7 +377,12 @@ function MarkdownBlocks({
         }
         if (token.type === "hr") return <View key={offset} className="h-px bg-separator" />;
         return (
-          <Typography key={offset} selectable type={presentation.type} style={presentation.style}>
+          <Typography
+            key={offset}
+            selectable={presentation.selectable}
+            type={presentation.type}
+            style={presentation.style}
+          >
             {token.raw}
           </Typography>
         );
@@ -391,6 +397,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   compact = false,
   streaming = false,
   animationEnabled = true,
+  selectable = true,
   agents = [],
 }: {
   body: string;
@@ -398,6 +405,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   compact?: boolean;
   streaming?: boolean;
   animationEnabled?: boolean;
+  selectable?: boolean;
   agents?: readonly MobileAgent[];
 }) {
   const reducedMotion = useReducedMotion();
@@ -409,6 +417,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       <MarkdownBlocks
         tokens={tokens}
         presentation={{
+          selectable,
           type: compact ? "body-sm" : "body",
           style: { color: color ?? codeColor },
           codeColor,

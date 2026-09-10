@@ -14,6 +14,7 @@ export type ChatMessage =
       author: "agent" | "user";
       body: string;
       streaming: boolean;
+      replyToMessageId?: string | null;
       attachments?: AttachmentSummary[];
     }
   | { id: string; kind: "thinking"; turnId: string | undefined; steps: { id: string; text: string }[] };
@@ -72,6 +73,7 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
         body: message.exchange ? "" : message.text,
         streaming: message.status === "streaming",
         attachments: message.attachments,
+        replyToMessageId: message.replyToMessageId,
       });
     }
   }

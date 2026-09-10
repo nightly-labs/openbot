@@ -1,6 +1,6 @@
 import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
-import { X } from "lucide-react-native";
+import { CornerUpRight, X } from "lucide-react-native";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { KeyboardChatScrollView } from "react-native-keyboard-controller";
 import Animated, {
@@ -11,6 +11,7 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
 } from "react-native-reanimated";
+import { useCSSVariable } from "uniwind";
 import { BloubAvatar, getBloubAvatarColor } from "@/features/agents/components/bloub-avatar";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
@@ -21,6 +22,9 @@ import type { ChatMessage } from "@/features/chat/model/chat-messages";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import type { ChatBubbleMessage } from "../context/message-actions-context";
+import { mentionDraft } from "../model/chat-mentions";
+import { ChatMessageGesture } from "./chat-message-gesture";
 import { StreamingTailText, StreamRevealProvider } from "./streaming-tail-text";
 import { ThinkingTextGradient } from "./thinking-text-gradient";
 
@@ -57,6 +61,8 @@ interface ChatMessageListProps {
   onDismissStarter: () => void;
   onSelectStarter: (value: string) => void;
   onRetryHistory: () => void;
+  onReply?: (message: ChatBubbleMessage) => void;
+  onOpenActions: (message: ChatBubbleMessage) => void;
 }
 
 export function ChatMessageList({
@@ -80,8 +86,11 @@ export function ChatMessageList({
   onDismissStarter,
   onSelectStarter,
   onRetryHistory,
+  onReply,
+  onOpenActions,
 }: ChatMessageListProps) {
   const isFocused = useIsFocused();
+  const replyColor = String(useCSSVariable("--openbot-text-dim"));
   const reducedMotion = useReducedMotion();
   const animateMessages = isFocused && canSend && appActive;
   const arrivals = useMessageArrivals(agent.id, messages, animateMessages && historyState === "ready");
@@ -133,72 +142,109 @@ export function ChatMessageList({
       groups[groups.length - 1].replies.push(message);
     }
   }
-  const renderMessage = (message: (typeof visibleMessages)[number], isTailUser: boolean, isFirstUser: boolean) =>
-    message.kind === "exchange" ? (
-      <View key={message.id} className="flex-row flex-wrap items-center justify-center gap-2 py-2">
-        <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-          {message.exchange.direction === "outgoing" ? "Messaged" : "Message from"}
-        </Typography.Paragraph>
-        {(message.exchange.direction === "incoming"
-          ? [message.exchange.senderAgentId]
-          : message.exchange.recipientAgentIds
-        ).map((id) => {
-          const participant = agents.find((candidate) => candidate.id === id);
-          return (
-            <View key={id} className="flex-row items-center gap-1">
-              {participant ? (
-                <BloubAvatar agentId={id} hue={participant.avatarHue} seed={participant.avatarSeed} size={22} />
-              ) : null}
-              <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-                {participant?.name ?? "Unknown agent"}
-              </Typography.Paragraph>
-            </View>
-          );
-        })}
-      </View>
-    ) : message.kind === "question" ? (
-      <ChatQuestionPrompt
-        key={message.id}
-        prompt={message.prompt}
-        controller={message.id === questionForm.messageId ? questionForm : undefined}
-        canSend={canSend}
-      />
-    ) : (
-      <Animated.View
-        key={message.id}
-        onLayout={isTailUser ? motion.onUserLayout : undefined}
-        entering={
-          arrivals.has(message.id) && !isFirstUser
-            ? message.author === "user"
-              ? USER_MESSAGE_ENTRANCE
-              : AGENT_MESSAGE_ENTRANCE
-            : undefined
-        }
-        className={`max-w-[88%] rounded-[30px] px-4 py-3 ${message.author === "user" ? "self-end" : "self-start bg-control/60"}`}
-        style={[
-          { borderCurve: "circular" },
-          message.author === "user" ? userBubbleStyle : undefined,
-          isFirstUser ? motion.firstMessageStyle : undefined,
-        ]}
-      >
-        {message.attachments?.map((attachment) => (
-          <Typography.Paragraph
-            key={attachment.id}
-            type="body-sm"
-            style={{ color: message.author === "user" ? "#0a0a0c" : foreground }}
-          >
-            {attachment.name}
+  const renderMessage = (message: (typeof visibleMessages)[number], isTailUser: boolean, isFirstUser: boolean) => {
+    const rendered =
+      message.kind === "exchange" ? (
+        <View key={message.id} className="flex-row flex-wrap items-center justify-center gap-2 py-2">
+          <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+            {message.exchange.direction === "outgoing" ? "Messaged" : "Message from"}
           </Typography.Paragraph>
-        ))}
-        <ChatMarkdown
-          agents={agents}
-          body={message.body}
-          color={message.author === "user" ? "#0a0a0c" : foreground}
-          streaming={message.author === "agent" && message.streaming}
-          animationEnabled={animateMessages && arrivals.has(message.id) && motion.responseVisible}
+          {(message.exchange.direction === "incoming"
+            ? [message.exchange.senderAgentId]
+            : message.exchange.recipientAgentIds
+          ).map((id) => {
+            const participant = agents.find((candidate) => candidate.id === id);
+            return (
+              <View key={id} className="flex-row items-center gap-1">
+                {participant ? (
+                  <BloubAvatar agentId={id} hue={participant.avatarHue} seed={participant.avatarSeed} size={22} />
+                ) : null}
+                <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+                  {participant?.name ?? "Unknown agent"}
+                </Typography.Paragraph>
+              </View>
+            );
+          })}
+        </View>
+      ) : message.kind === "question" ? (
+        <ChatQuestionPrompt
+          key={message.id}
+          prompt={message.prompt}
+          controller={message.id === questionForm.messageId ? questionForm : undefined}
+          canSend={canSend}
         />
-      </Animated.View>
+      ) : (
+        <Animated.View
+          key={message.id}
+          entering={
+            arrivals.has(message.id) && !isFirstUser
+              ? message.author === "user"
+                ? USER_MESSAGE_ENTRANCE
+                : AGENT_MESSAGE_ENTRANCE
+              : undefined
+          }
+          className={`max-w-full rounded-[30px] px-4 py-3 ${message.author === "user" ? "self-end" : "self-start bg-control/60"}`}
+          style={[
+            { borderCurve: "circular" },
+            message.author === "user" ? userBubbleStyle : undefined,
+            isFirstUser ? motion.firstMessageStyle : undefined,
+          ]}
+        >
+          {message.attachments?.map((attachment) => (
+            <Typography.Paragraph
+              key={attachment.id}
+              type="body-sm"
+              style={{ color: message.author === "user" ? "#0a0a0c" : foreground }}
+            >
+              {attachment.name}
+            </Typography.Paragraph>
+          ))}
+          <ChatMarkdown
+            agents={agents}
+            body={message.body}
+            selectable={message.author === "user"}
+            color={message.author === "user" ? "#0a0a0c" : foreground}
+            streaming={message.author === "agent" && message.streaming}
+            animationEnabled={animateMessages && arrivals.has(message.id) && motion.responseVisible}
+          />
+        </Animated.View>
+      );
+    if (message.kind !== "message") return rendered;
+    if (message.author === "agent") {
+      return (
+        <ChatMessageGesture
+          key={message.id}
+          onReply={onReply ? () => onReply(message) : undefined}
+          onOpenActions={() => onOpenActions(message)}
+        >
+          {rendered}
+        </ChatMessageGesture>
+      );
+    }
+    const source = messages.find((candidate) => candidate.id === message.replyToMessageId);
+    return (
+      <View
+        key={message.id}
+        className="max-w-[88%] self-end gap-1"
+        onLayout={isTailUser ? motion.onUserLayout : undefined}
+      >
+        {message.replyToMessageId ? (
+          <View className="flex-row items-center gap-1 self-end">
+            <CornerUpRight size={14} color={replyColor} />
+            <Typography.Paragraph
+              type="body-xs"
+              numberOfLines={1}
+              className="shrink text-text-dim"
+              accessibilityLabel={`Reply to: ${source?.kind === "message" ? mentionDraft(source.body).text || "Attachment" : "Message unavailable"}`}
+            >
+              {source?.kind === "message" ? mentionDraft(source.body).text || "Attachment" : "Message unavailable"}
+            </Typography.Paragraph>
+          </View>
+        ) : null}
+        {rendered}
+      </View>
     );
+  };
   const renderActivity = () =>
     activity || sending ? (
       <View
