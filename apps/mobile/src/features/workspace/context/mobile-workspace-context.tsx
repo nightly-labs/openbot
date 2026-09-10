@@ -816,7 +816,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (!serverId) throw new Error("The agent is unavailable.");
         await request("DELETE", TEAM_API_ROUTES.attachment(attachmentId), ignoreResponse, undefined, serverId);
       },
-      sendMessage: async (agentId, text, attachmentDraftIds = []) => {
+      sendMessage: async (agentId, text, attachmentDraftIds = [], replyToMessageId = null) => {
         const serverId = agents.find((candidate) => candidate.id === agentId)?.serverId;
         if (!serverId) throw new Error("The agent is unavailable.");
         const receipt = await request(
@@ -829,7 +829,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           {
             text,
             attachmentDraftIds,
-            replyToMessageId: null,
+            replyToMessageId,
           },
           serverId,
         );

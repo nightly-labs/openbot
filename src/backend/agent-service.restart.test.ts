@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
 import { AgentService } from "./agent-service";
 import {
+  createFakeClaude,
   FakeAgentClient,
   fakeBrowser,
   firstInputText,
@@ -220,6 +221,63 @@ describe.sequential("AgentService: restart", () => {
       await service.stop();
       restored.store.database.close();
     }
+  });
+
+  it("recovers an interrupted Claude answer under its saved ID after a provider switch", async () => {
+    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    const { store, mailbox } = stores(root);
+    await store.initialize();
+    await store.getOrCreate("chief");
+    const threadId = await store.ensureThreadId("chief");
+    store.database.bindProviderSession({
+      threadId,
+      provider: "claude",
+      externalSessionId: "claude-history",
+      model: "sonnet",
+      effort: "medium",
+    });
+    store.database.deactivateProviderSessions(threadId);
+    const answer = {
+      id: "saved-turn:assistant",
+      turnId: "saved-turn",
+      author: "assistant" as const,
+      itemType: "agentMessage",
+      text: "Before.Af",
+      status: "interrupted" as const,
+      createdAt: "2026-08-01T12:00:00.000Z",
+    };
+    store.database.persistConversation(
+      { agentId: "chief", threadId, activeTurnId: null, revision: 0, messages: [answer] },
+      "test.saved-claude-answer",
+    );
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+      const client = new FakeAgentClient(provider);
+      client.threadRead = () => ({
+        thread: {
+          id: "claude-history",
+          turns: [
+            {
+              id: "saved-turn",
+              status: "completed",
+              items: [
+                { id: "part-1", type: "agentMessage", text: "Before." },
+                { id: "part-2", type: "agentMessage", text: "After." },
+              ],
+            },
+          ],
+        },
+      });
+      return client;
+    });
+    await service.initialize();
+    await waitFor(() =>
+      store.database
+        .readConversation("chief", threadId)
+        .messages.some((message) => message.text === "After." || message.text === "Before.After."),
+    );
+    expect(store.database.readConversation("chief", threadId).messages).toEqual([
+      expect.objectContaining({ ...answer, text: "Before.After.", status: "completed" }),
+    ]);
   });
 
   it("does not persist unchanged provider history after repeated restarts", async () => {

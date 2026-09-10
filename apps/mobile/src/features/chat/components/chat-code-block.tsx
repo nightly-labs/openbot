@@ -7,7 +7,15 @@ import { useEffect, useState } from "react";
 import { Alert, type ColorValue, ScrollView, useWindowDimensions, View } from "react-native";
 import { type CodeToken, codeLanguage, highlightCode } from "../model/code-highlight";
 
-export function ChatCodeBlock({ text, language }: { text: string; language?: string }) {
+export function ChatCodeBlock({
+  text,
+  language,
+  selectable = true,
+}: {
+  text: string;
+  language?: string;
+  selectable?: boolean;
+}) {
   const { fontScale } = useWindowDimensions();
   const [foreground, muted, keyword, string, number, error] = useThemeColor([
     "foreground",
@@ -79,7 +87,7 @@ export function ChatCodeBlock({ text, language }: { text: string; language?: str
         contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 14, alignItems: "flex-start" }}
       >
         <Typography.Code
-          selectable
+          selectable={selectable}
           className="bg-transparent p-0"
           style={{ color: foreground, fontSize: 14, lineHeight: 20 }}
         >

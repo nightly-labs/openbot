@@ -2,8 +2,9 @@ import { MenuView } from "@expo/ui/community/menu";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentPromptQuestion } from "@openbot/contracts/ipc";
 import { GlassView } from "expo-glass-effect";
+import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
-import { ArrowUp, Mic, Plus } from "lucide-react-native";
+import { ArrowUp, Mic, Plus, Reply, X } from "lucide-react-native";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -18,7 +19,9 @@ import {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { scheduleOnRN } from "react-native-worklets";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import type { ChatBubbleMessage } from "@/features/chat/context/message-actions-context";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { largePastedText } from "../model/composer-paste";
 import { createComposerSendGate } from "../model/composer-send";
@@ -44,6 +47,9 @@ interface ChatComposerProps {
   attachments: ChatAttachments;
   sending: boolean;
   sendRetryVersion: number;
+  replyTarget: ChatBubbleMessage | null;
+  replyFocusVersion: number;
+  onCancelReply: () => void;
 }
 
 export function ChatComposer({
@@ -65,6 +71,9 @@ export function ChatComposer({
   attachments,
   sending,
   sendRetryVersion,
+  replyTarget,
+  replyFocusVersion,
+  onCancelReply,
 }: ChatComposerProps) {
   const display = mentionDraft(answerQuestion ? "" : draft);
   const displayText = answerQuestion ? draft : display.text;
@@ -79,6 +88,14 @@ export function ChatComposer({
     : [];
   const hasDraft = Boolean(draft.trim()) || attachments.items.length > 0;
   const inputRef = useRef<TextInput>(null);
+  const isFocused = useIsFocused();
+  const focusedReplyVersion = useRef(0);
+  useEffect(() => {
+    if (isFocused && !disabled && !answerQuestion && replyTarget && focusedReplyVersion.current !== replyFocusVersion) {
+      focusedReplyVersion.current = replyFocusVersion;
+      inputRef.current?.focus();
+    }
+  }, [isFocused, disabled, answerQuestion, replyTarget, replyFocusVersion]);
   const pendingCursor = useRef<number | null>(null);
   useLayoutEffect(() => {
     if (pendingCursor.current === null) return;
@@ -138,6 +155,30 @@ export function ChatComposer({
 
   return (
     <View>
+      {liquidGlassAvailable ? (
+        <SheetScrollEdgeEffect
+          edge="bottom"
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            // Keep the original 32 pt fade above the input, independent of the reply preview.
+            height: inputHeight + 8 + Math.max(bottomInset, 10) + 32,
+          }}
+        />
+      ) : null}
+      {replyTarget ? (
+        <View className="flex-row items-center gap-2 pl-6 pr-4">
+          <Reply color={String(muted)} size={18} />
+          <Typography.Paragraph numberOfLines={1} type="body-sm" className="flex-1 text-text-secondary">
+            {mentionDraft(replyTarget.body).text || "Attachment"}
+          </Typography.Paragraph>
+          <Button isIconOnly variant="ghost" accessibilityLabel="Cancel reply" onPress={onCancelReply}>
+            <X color={String(muted)} size={18} />
+          </Button>
+        </View>
+      ) : null}
       {focused && query && suggestions.length > 0 && !disabled ? (
         <GlassView
           glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}

@@ -273,8 +273,12 @@ Mobile acknowledges rendered replies only in the foreground, focused chat at the
 Mobile chat keeps viewport, tail-group, and composer measurements in its motion controller. The
 last user message anchors a native blank-space inset; streamed replies consume that inset without
 autoscrolling. Initial history positioning and the first-send/first-response animation are separate
-states. Pending message bubbles reconcile through the host receipt ID, not message text. Selected
-mobile attachments use the existing WebRTC file frames followed by the attachment upload endpoint;
+states. Pending message bubbles reconcile through the host receipt ID, not message text.
+Mobile replies use the existing `replyToMessageId` field and retain their source after delivery.
+Agent bubbles support swipe-to-reply and a long-press action sheet with haptic feedback. The
+sheet has one nested native stack for actions and text selection; message text stays in memory,
+outside route parameters. Failed sends restore the reply target, and the composer can cancel it.
+Selected mobile attachments use the existing WebRTC file frames followed by the attachment upload endpoint;
 the native/DOM bridge limits each file to 10 MB and cancels transfers when its connection is replaced.
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
@@ -390,7 +394,11 @@ data and are manual because they can require local credentials.
 Users create and edit agent profiles by asking an agent in the normal desktop or mobile
 conversation. `openbot.create_agent` creates a persistent teammate with instructions and a first
 task; `openbot.update_profile` changes an existing agent's name, title, instructions, or generated
-avatar. Both run through the existing agent service and validate arguments before changing state.
+or custom avatar. `avatarPath` accepts a local PNG, JPEG, or WebP file up to 512 KB, with relative
+paths resolved from the calling agent’s workspace. The agent uses its available tools to resize or
+compress a copy when needed. OpenBot validates the prepared file before profile changes and copies
+it into managed avatar storage. Generated avatar settings remove the custom image. Both run through
+the existing agent service and validate arguments before changing state.
 Codex and Grok receive the dynamic tool definitions; Claude exposes the same operations through
 its SDK MCP bridge. `src/backend/openbot-tools.ts` owns the tool names, descriptions, and Zod
 argument shapes used by both declarations. It reuses the profile, section, and routine schemas.

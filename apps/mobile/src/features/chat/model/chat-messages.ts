@@ -14,6 +14,7 @@ export type ChatMessage =
       author: "agent" | "user";
       body: string;
       streaming: boolean;
+      replyToMessageId?: string | null;
       attachments?: AttachmentSummary[];
     }
   | { id: string; kind: "thinking"; turnId: string | undefined; steps: { id: string; text: string }[] };
@@ -22,6 +23,16 @@ export interface PendingChatMessage {
   message: Extract<ChatMessage, { kind: "message" }>;
   baseline: Set<string>;
   serverId: string | null;
+}
+
+export function indexChatMessages(messages: readonly ChatMessage[], aliases: ReadonlyMap<string, string>) {
+  const index = new Map(messages.map((message) => [message.id, message]));
+  // Reply references use host IDs even when a delivered bubble keeps its local render key.
+  for (const [hostId, localId] of aliases) {
+    const message = index.get(localId);
+    if (message) index.set(hostId, message);
+  }
+  return index;
 }
 
 export function presentChatMessages(
@@ -72,6 +83,7 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
         body: message.exchange ? "" : message.text,
         streaming: message.status === "streaming",
         attachments: message.attachments,
+        replyToMessageId: message.replyToMessageId,
       });
     }
   }
