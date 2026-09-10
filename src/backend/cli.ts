@@ -389,6 +389,30 @@ export function posixFallbackPaths(command: AgentProviderId, userHome = homedir(
   return paths;
 }
 
+/**
+ * How to start a resolved CLI. A `.cmd` or `.bat` wrapper is a script that only the Windows command
+ * processor runs, so it is called through `cmd.exe` with the same verbatim quoting as
+ * `readCliVersion`. Every other executable starts with no shell. That keeps a path that holds a
+ * space runnable: a managed CLI lives under `userData`, which holds a space for a user such as
+ * `C:\Users\Jane Doe` and for the `OpenBot Dev` profile, and `cmd.exe` would split it there.
+ */
+export function cliSpawnTarget(
+  executable: string,
+  argv: readonly string[],
+  platform: NodeJS.Platform = process.platform,
+): { command: string; args: string[]; windowsVerbatimArguments: boolean } {
+  if (platform !== "win32" || ![".bat", ".cmd"].includes(extname(executable).toLowerCase())) {
+    return { command: executable, args: [...argv], windowsVerbatimArguments: false };
+  }
+
+  const commandLine = [`"${executable.replaceAll("%", "%%")}"`, ...argv].join(" ");
+  return {
+    command: process.env.ComSpec?.trim() || "cmd.exe",
+    args: ["/d", "/s", "/c", `"${commandLine}"`],
+    windowsVerbatimArguments: true,
+  };
+}
+
 async function readCliVersion(candidate: string): Promise<string> {
   if (process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase())) {
     const commandProcessor = process.env.ComSpec?.trim() || "cmd.exe";

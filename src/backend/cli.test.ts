@@ -10,6 +10,7 @@ import {
   bundledGrokExecutable,
   bundledOpencodeExecutable,
   CodexCliError,
+  cliSpawnTarget,
   parseClaudeVersion,
   parseCodexVersion,
   parseGrokVersion,
@@ -257,6 +258,35 @@ describe("Windows CLI fallback paths", () => {
     await expect(resolveCodexCli()).rejects.toMatchObject({
       code: "invalid",
       message: "Codex CLI was found but could not be started. Run `codex --version` in a new terminal.",
+    });
+  });
+});
+
+describe("CLI spawn target", () => {
+  it("starts a Windows executable whose path contains a space", () => {
+    // A managed CLI lives under `userData`. Through `cmd.exe` the unquoted path splits at the space
+    // and the downloaded CLI never connects, so a native executable must start with no shell.
+    const executable = "C:\\Users\\Jane Doe\\AppData\\Roaming\\OpenBot Dev\\provider-runtimes\\opencode.exe";
+
+    expect(cliSpawnTarget(executable, ["acp"], "win32")).toEqual({
+      command: executable,
+      args: ["acp"],
+      windowsVerbatimArguments: false,
+    });
+  });
+
+  it("runs a Windows command shim through the command processor", () => {
+    const target = cliSpawnTarget("C:\\Users\\Jane Doe\\AppData\\Roaming\\npm\\opencode.cmd", ["acp"], "win32");
+
+    expect(target.windowsVerbatimArguments).toBe(true);
+    expect(target.args).toEqual(["/d", "/s", "/c", '""C:\\Users\\Jane Doe\\AppData\\Roaming\\npm\\opencode.cmd" acp"']);
+  });
+
+  it("uses no command processor away from Windows", () => {
+    expect(cliSpawnTarget("/opt/homebrew/bin/opencode", ["acp"], "darwin")).toEqual({
+      command: "/opt/homebrew/bin/opencode",
+      args: ["acp"],
+      windowsVerbatimArguments: false,
     });
   });
 });
