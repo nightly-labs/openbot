@@ -32,6 +32,7 @@ vi.mock("electron", async () => {
       this.emit("did-stop-loading");
     }
     close() {}
+    setAudioMuted() {}
     setWindowOpenHandler() {}
     async executeJavaScript() {
       return null;
