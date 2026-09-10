@@ -11,11 +11,19 @@ import { useState } from "react";
 import { Alert, useWindowDimensions, View } from "react-native";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 
-export function ChatAttachmentView({ attachment, serverId }: { attachment: AttachmentSummary; serverId: string }) {
+export function ChatAttachmentView({
+  attachment,
+  serverId,
+  alignment = "left",
+}: {
+  attachment: AttachmentSummary;
+  serverId: string;
+  alignment?: "left" | "right";
+}) {
   const [fileColor, muted] = useThemeColor(["success", "muted"]);
   const { downloadAttachment } = useMobileWorkspace();
-  const [sharing, setSharing] = useState(false);
   const [ratio, setRatio] = useState(1);
+  const [sharing, setSharing] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const { width } = useWindowDimensions();
   const pending = attachment.id.startsWith("mobile-draft-attachment-");
@@ -34,7 +42,9 @@ export function ChatAttachmentView({ attachment, serverId }: { attachment: Attac
     gcTime: 0,
   });
   const uri = local ?? (query.data ? `data:${query.data.mimeType};base64,${query.data.base64}` : null);
-  const imageHeight = Math.min(360, Math.min(280, width - 80) / ratio);
+  // Keep the message footprint independent of dimensions received after image decoding.
+  const frameSize = Math.min(280, width - 80);
+  const imageHeight = Math.min(frameSize, frameSize / ratio);
   const imageWidth = imageHeight * ratio;
   async function share() {
     setSharing(true);
@@ -57,32 +67,40 @@ export function ChatAttachmentView({ attachment, serverId }: { attachment: Attac
   }
   return (
     <View className="max-w-full gap-2">
-      {image && uri && !imageFailed ? (
-        <Button
-          variant="ghost"
-          className="self-start overflow-hidden p-0"
-          isDisabled={pending || sharing || query.isFetching}
-          accessibilityLabel={`Open or save ${attachment.name}`}
-          onPress={() => void share()}
-          style={{
-            width: imageWidth,
-            height: imageHeight,
-            maxWidth: "100%",
-            borderRadius: 18,
-            borderCurve: "circular",
-          }}
+      {image ? (
+        <View
+          className={alignment === "right" ? "items-end justify-end" : "items-start justify-end"}
+          style={{ width: frameSize, height: frameSize, maxWidth: "100%" }}
         >
-          <Image
-            source={uri}
-            contentFit="contain"
-            accessibilityLabel={attachment.name}
-            style={{ width: "100%", height: "100%", borderRadius: 18 }}
-            onLoad={({ source }) => {
-              if (source.width > 0 && source.height > 0) setRatio(source.width / source.height);
+          <Button
+            variant="ghost"
+            className="min-h-0 min-w-0 overflow-hidden p-0"
+            isDisabled={pending || sharing || query.isFetching || !uri || imageFailed}
+            accessibilityLabel={`Open or save ${attachment.name}`}
+            onPress={() => void share()}
+            style={{
+              width: imageWidth,
+              height: imageHeight,
+              maxWidth: "100%",
+              borderRadius: 18,
+              borderCurve: "circular",
             }}
-            onError={() => setImageFailed(true)}
-          />
-        </Button>
+          >
+            <Image
+              source={imageFailed ? null : uri}
+              placeholder={{ blurhash: "A95}pxj[ayfQ" }}
+              placeholderContentFit="cover"
+              transition={250}
+              contentFit="contain"
+              accessibilityLabel={attachment.name}
+              style={{ width: "100%", height: "100%", borderRadius: 18 }}
+              onLoad={({ source }) => {
+                if (source.width > 0 && source.height > 0) setRatio(source.width / source.height);
+              }}
+              onError={() => setImageFailed(true)}
+            />
+          </Button>
+        </View>
       ) : null}
       {!image ? (
         <Button
@@ -107,7 +125,6 @@ export function ChatAttachmentView({ attachment, serverId }: { attachment: Attac
           <ExternalLink size={18} color={muted} />
         </Button>
       ) : null}
-      {image && query.isFetching ? <Typography.Paragraph type="body-xs">Loading image…</Typography.Paragraph> : null}
       {query.error || imageFailed ? (
         <Typography.Paragraph type="body-xs">
           {query.error?.message ?? "Could not display this image."}

@@ -24,7 +24,8 @@ vi.mock("react-native", () => ({
 vi.mock("heroui-native/hooks", () => ({ useThemeColor: () => ["green", "gray"] }));
 vi.mock("lucide-react-native", () => ({ ExternalLink: () => null, FileText: () => null }));
 vi.mock("expo-image", () => ({
-  Image: ({ accessibilityLabel }: { accessibilityLabel: string }) => <div role="img" aria-label={accessibilityLabel} />,
+  Image: ({ accessibilityLabel, source }: { accessibilityLabel: string; source: string | null }) =>
+    source ? <div role="img" aria-label={accessibilityLabel} /> : null,
 }));
 vi.mock("expo-sharing", () => ({ isAvailableAsync: async () => true, shareAsync: native.share }));
 vi.mock("expo-file-system", () => ({

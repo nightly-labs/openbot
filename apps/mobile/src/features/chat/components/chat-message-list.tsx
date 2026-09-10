@@ -208,7 +208,12 @@ export function ChatMessageList({
           style={[{ borderCurve: "circular" }, isFirstUser ? motion.firstMessageStyle : undefined]}
         >
           {message.attachments?.map((attachment) => (
-            <ChatAttachmentView key={attachment.id} attachment={attachment} serverId={agent.serverId} />
+            <ChatAttachmentView
+              key={attachment.id}
+              attachment={attachment}
+              serverId={agent.serverId}
+              alignment={message.author === "user" ? "right" : "left"}
+            />
           ))}
           {message.body.trim() ? (
             <Animated.View
