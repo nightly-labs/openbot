@@ -154,8 +154,10 @@ export const ChannelTranscriptWithSeveralAuthors: Story = {
   play: async ({ canvas }) => {
     await expect(await canvas.findAllByRole("article", { name: `Message from ${chief.name}` })).toHaveLength(2);
     await expect(await canvas.findByRole("article", { name: "Message from You" })).toBeInTheDocument();
+    // The label after the colon shifts on every turn, the way it does in the agent chat, so the
+    // announcement is matched on its subject.
     await expect(
-      await canvas.findByRole("status", { name: `${chief.name} and ${sales.name} are working…` }),
+      await canvas.findByRole("status", { name: new RegExp(`^${chief.name} and ${sales.name} are working: `) }),
     ).toBeInTheDocument();
   },
 };

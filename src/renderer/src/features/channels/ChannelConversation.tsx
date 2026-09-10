@@ -141,9 +141,15 @@ export function ChannelConversation() {
   );
   const firstUnreadId = createMemo(() => firstUnreadChannelMessageId(timeline(), unreadCount()));
   /**
-   * Everyone the channel waits on: the owner of a running task, and the author of a message that is
-   * still arriving. They read as one row under the transcript, because a channel runs several
-   * agents at once and a row for each would push the messages off the screen.
+   * Everyone the channel waits on: the owner of a running task, the author of a message that is
+   * still arriving, and the lead while it chooses an owner. They read as one row under the
+   * transcript, because a channel runs several agents at once and a row for each would push the
+   * messages off the screen.
+   *
+   * The lead is the coordinator, and its routing turn moves no task out of `queued` and writes no
+   * message of its own. Without it the transcript stands still for as long as the coordinator
+   * thinks, which reads as a channel that dropped the request. A lead that also owns running work
+   * lands in the same set once, so it keeps one face.
    */
   const workers = createMemo<ChannelWorker[]>(() => {
     const page = channels.state.page;
@@ -152,6 +158,11 @@ export function ChannelConversation() {
     for (const task of page.tasks) if (task.state === "running" && task.ownerAgentId) ids.add(task.ownerAgentId);
     for (const entry of page.messages)
       if (entry.message.status === "streaming" && entry.author.kind !== "member") ids.add(entry.author.id);
+    const lead = page.channel.leadAgentId;
+    // Only `queued` and `waiting`: routing that ends without an owner leaves the task `paused` with
+    // the coordinator's reason under the transcript, and that notice is the indicator from then on.
+    if (lead && page.tasks.some((task) => !task.ownerAgentId && (task.state === "queued" || task.state === "waiting")))
+      ids.add(lead);
     return [...ids].map((id) => {
       const agent = agentList().find((candidate) => candidate.id === id);
       const authored = page.messages.find((entry) => entry.author.id === id);

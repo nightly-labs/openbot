@@ -166,9 +166,14 @@
 }
 /* The avatar sets the floor of a one-line row, the same size the create dialog uses. A menu row
    is the same row before it is a member, so it takes the same avatar: at its own 32px the bloub
-   fills the whole menu item and paints past it, because it is drawn at 128% of its box. */
+   fills the whole menu item and paints past it, because it is drawn at 128% of its box.
+   That same 128% is why the lift is needed: the drawn shape lands 14% of the avatar below the
+   middle of its box, so without it the bloub reads low beside the name. Every 24px avatar in the
+   channel surfaces takes this one value, and the New channel dialog reads it from here. */
 .channel-member .agent-avatar,
 .channel-member-menu .agent-avatar {
+  --agent-avatar-optical-offset: -3.25px;
+
   width: var(--openbot-space-6);
   height: var(--openbot-space-6);
 }
@@ -361,9 +366,12 @@
   border-radius: 0;
   transition: background-color var(--openbot-duration-normal) var(--openbot-ease-out);
 }
+/* Here the label is the row and paints the hover, so the shared member row must not paint a second,
+   inset one inside it. In Channel settings the member row is the row, and keeps its own hover. */
 .channel-create-form .channel-picker-entry .channel-member:is(.ui-item) {
   min-height: 0;
   padding: 0;
+  background: transparent;
 }
 @media (prefers-reduced-motion: reduce) {
   .channel-create-form .channel-picker-entry {
@@ -396,15 +404,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* The avatar sets the floor for a one-line row, so it is the smaller identifying size here.
-   The drawn bloub overflows its own box and lands 14% of the avatar below the center of the row,
-   so the shape reads low beside the name. The lift is the one the other 24px avatar uses. */
-.channel-create-form .channel-picker-entry .agent-avatar {
-  --agent-avatar-optical-offset: -3.25px;
-
-  width: var(--openbot-space-6);
-  height: var(--openbot-space-6);
-}
 .channel-create-form .channel-editor-footer {
   justify-content: flex-end;
   padding: var(--channel-dialog-inset);
@@ -427,7 +426,9 @@
   margin-left: -8px;
 }
 
-/* Keep the working faces in one stack at the message avatars' left edge. */
+/* Keep the working faces in one stack at the message avatars' left edge. The face itself takes the
+   agent chat's size and optical offset, so the two indicators only differ in how many faces they
+   hold. */
 .agent-activity-content.channel-activity-content {
   padding-left: var(--openbot-space-0-5);
 }
@@ -436,12 +437,6 @@
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-}
-.channel-activity-faces .agent-activity-avatar {
-  --agent-avatar-optical-offset: -3px;
-
-  width: var(--openbot-space-8);
-  height: var(--openbot-space-8);
 }
 .channel-activity-faces .agent-activity-avatar + .agent-activity-avatar {
   margin-left: calc(-1 * var(--openbot-space-2));

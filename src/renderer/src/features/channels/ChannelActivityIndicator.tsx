@@ -11,26 +11,27 @@ export interface ChannelWorker {
 }
 
 /**
- * One sentence for everyone who is working.
+ * Who the channel is waiting on, for the announcement only.
  *
  * A channel runs several agents at once, and a row for each would push the transcript off the
- * screen every time work started. The names read as a list, so the reader counts the workers in
- * one line.
+ * screen every time work started. The names read as a list, so the listener counts the workers in
+ * one line. It takes the subject of the agent chat's announcement - `<name> is working` - so both
+ * chats announce work the same way.
  */
 export function channelActivitySentence(names: string[]): string {
   if (names.length === 0) return "";
-  if (names.length === 1) return `${names[0]} is working…`;
+  if (names.length === 1) return `${names[0]} is working`;
   const last = names[names.length - 1];
-  return `${names.slice(0, -1).join(", ")} and ${last} are working…`;
+  return `${names.slice(0, -1).join(", ")} and ${last} are working`;
 }
 
 /**
  * The activity row of a channel shows the face of each working agent.
  *
- * It uses the `agent-activity-*` rules of the agent chat, so the two chats keep one look and one
- * animation. A face animates while it works, and a channel runs at most `CHANNEL_PARALLEL_LIMIT`
- * agents, which is what keeps the count of animating avatars low - each one costs the renderer a
- * style recalculation and a paint per frame.
+ * It uses the `agent-activity-*` rules and the same shifting label as the agent chat, so a reader
+ * who moves between a channel and an agent chat meets one indicator. What differs is the number of
+ * faces: a channel runs at most `CHANNEL_PARALLEL_LIMIT` agents, which is what keeps the count of
+ * animating avatars low - each one costs the renderer a style recalculation and a paint per frame.
  */
 export function ChannelActivityIndicator(props: { workers: ChannelWorker[] }) {
   const key = createMemo(() =>
@@ -50,7 +51,13 @@ export function ChannelActivityIndicator(props: { workers: ChannelWorker[] }) {
   const sentence = () => channelActivitySentence(props.workers.map((worker) => worker.name));
   return (
     <div class="agent-activity-entry" data-state="active">
-      <span class="sr-only" role="status" aria-live="polite" aria-atomic="true" aria-label={sentence()} />
+      <span
+        class="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-label={`${sentence()}: ${presentation().label}`}
+      />
       <section class="agent-activity-content channel-activity-content" aria-label="Current activity">
         <div class="channel-activity-faces">
           <For each={props.workers}>
@@ -66,6 +73,7 @@ export function ChannelActivityIndicator(props: { workers: ChannelWorker[] }) {
             )}
           </For>
         </div>
+        <span class="agent-activity-label">{presentation().label}</span>
       </section>
     </div>
   );

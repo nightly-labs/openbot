@@ -659,3 +659,61 @@ it("opens channel memories and channel routines from the settings panel", async 
   await fireEvent.click(within(chat).getByRole("button", { name: "Back to settings" }));
   await within(chat).findByRole("heading", { name: "Channel settings", level: 2 });
 });
+
+/**
+ * The routing window as the renderer sees it: a root task that no member owns yet. The lead runs
+ * that turn, and `state` chooses whether routing is still open or ended without an owner.
+ */
+async function openChannelWhileRouting(state: "queued" | "paused") {
+  await window.openbot.agent.channelCommand({
+    type: "save",
+    operationId: "create",
+    channelId: "channel-test",
+    draft: {
+      name: "Project room",
+      title: "",
+      instructions: "",
+      members: [{ agentId: "chief" }, { agentId: "sales-outbound" }],
+      leadAgentId: "chief",
+    },
+  });
+  await window.openbot.agent.channelCommand({
+    type: "send",
+    operationId: "request",
+    channelId: "channel-test",
+    text: "Prepare the report",
+    recipientAgentId: null,
+    replyToMessageId: null,
+    attachmentDraftIds: [],
+  });
+  const originalRead = window.openbot.agent.readChannel;
+  vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => {
+    const page = await originalRead(input);
+    return {
+      ...page,
+      tasks: page.tasks.map((task) => ({
+        ...task,
+        ownerAgentId: null,
+        state,
+        error: state === "paused" ? STOPPED_TASK_REASON : null,
+      })),
+    };
+  });
+  render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+  await fireEvent.click(await screen.findByRole("button", { name: /Project room/ }));
+  return screen.findByRole("main", { name: "Channel conversation" });
+}
+
+it("keeps the working indicator while the coordinator chooses an owner", async () => {
+  const chat = await openChannelWhileRouting("queued");
+  // The lead is the coordinator. Its routing turn holds the task and posts nothing until it
+  // decides, so the indicator is the only sign that the request is alive.
+  expect(await within(chat).findByRole("status", { name: /^Chief is working: / })).toBeInTheDocument();
+});
+
+it("drops the working indicator when routing ends without an owner", async () => {
+  const chat = await openChannelWhileRouting("paused");
+  await within(chat).findByRole("article", { name: "Message from You" });
+  expect(within(chat).queryByRole("status", { name: / is working: / })).not.toBeInTheDocument();
+});
