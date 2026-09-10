@@ -10,7 +10,12 @@ React Native app built with Expo SDK 57, Expo Router, TypeScript 7, Biome, and B
 
 ## Development
 
-Expo Router 57.0.17 is patched in `patches/expo-router@57.0.17.patch` to apply zoom dismissal
+The repository uses Bun’s hoisted linker so native Expo modules resolve to one installation.
+The root `postinstall` runs `bun run --cwd apps/mobile setup:skia` after dependency installation.
+Skia 2.6.2 needs this step to copy its packaged native libraries before CocoaPods runs;
+EAS and local installs use the same setup.
+
+Expo Router 57.0.20 is patched in `patches/expo-router@57.0.20.patch` to apply zoom dismissal
 bounds when its enabler registers after the chat mounts. This keeps the avatar-to-header zoom
 interactive from the left edge without enabling dismissal from the middle of the chat.
 The same patch keeps navigation queue snapshots immutable so React observes every navigation

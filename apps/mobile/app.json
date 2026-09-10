@@ -72,7 +72,9 @@
           }
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-font",
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true,

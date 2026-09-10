@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import { createChatNavigationGate } from "../apps/mobile/src/features/agents/model/chat-navigation-gate";
@@ -17,7 +18,9 @@ function loadRoutingQueue() {
   // Exercise the installed patch without loading native route resolution in Node.
   runInNewContext(
     readFileSync(
-      new URL("../apps/mobile/node_modules/expo-router/build/global-state/routingQueue.js", import.meta.url),
+      createRequire(new URL("../apps/mobile/package.json", import.meta.url)).resolve(
+        "expo-router/build/global-state/routingQueue.js",
+      ),
       "utf8",
     ),
     {
