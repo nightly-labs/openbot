@@ -14,6 +14,7 @@ export type ChatMessage =
       author: "agent" | "user";
       body: string;
       streaming: boolean;
+      replyToMessageId?: string | null;
       delivery?: ConversationMessage["delivery"];
       awaitingQueueReceipt?: boolean;
       attachments?: AttachmentSummary[];
@@ -75,6 +76,7 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
         body: message.exchange ? "" : message.text,
         streaming: message.status === "streaming",
         attachments: message.attachments,
+        ...(message.replyToMessageId ? { replyToMessageId: message.replyToMessageId } : {}),
         ...(message.delivery ? { delivery: message.delivery } : {}),
       });
     }

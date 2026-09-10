@@ -60,6 +60,10 @@ export interface ComposerActionsDeps {
 }
 
 export function createComposerActions(deps: ComposerActionsDeps) {
+  const takenEdits = new Set<string>();
+  const editKey = (serverId: string, agentId: string, deliveryId: string) =>
+    JSON.stringify([serverId, agentId, deliveryId]);
+
   function updateTeamTyping(text: string): void {
     const agentId = deps.props.agent?.id;
     if (deps.typing.idleTimer) clearTimeout(deps.typing.idleTimer);
@@ -119,8 +123,14 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     deps.clearConversationError({ agentId, serverId });
     deps.setSubmitting(true);
     let prepared: { text: string; attachments: DraftAttachment[] };
+    const canTake =
+      deps.props.server?.kind !== "remote" ||
+      deps.props.server.compatibility?.capabilities.includes("queue-take") === true;
     try {
-      prepared = await window.openbot.agent.takeQueuedMessage({ agentId, deliveryId: delivery.id }, serverId);
+      prepared = canTake
+        ? await window.openbot.agent.takeQueuedMessage({ agentId, deliveryId: delivery.id }, serverId)
+        : { text: delivery.text, attachments: [...delivery.attachments] };
+      if (canTake) takenEdits.add(editKey(serverId, agentId, delivery.id));
     } catch (error) {
       deps.setConversationError(
         { agentId, serverId },
@@ -138,7 +148,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       attachments: [...backup.attachments],
       replyToMessageId: backup.replyToMessageId,
     });
-    deps.setEditingOriginalAttachmentIds([]);
+    deps.setEditingOriginalAttachmentIds(canTake ? [] : delivery.attachments.map((file) => file.id));
     deps.setEditingDeliveryId(delivery.id);
     deps.setDrafts((current) => ({
       ...current,
@@ -189,26 +199,39 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const draft = draftOverride ?? deps.currentDraft();
     if (!agentId || !deliveryId || deps.submitting()) return false;
     const text = expandComposerMentions(draft.text);
-    const attachmentDraftIds = draft.attachments.map((attachment) => attachment.id);
-    if (!text.trim() && attachmentDraftIds.length === 0) return false;
+    const taken = takenEdits.has(editKey(serverId, agentId, deliveryId));
+    if (!taken && !target && deps.props.queue?.deliveries.find((item) => item.id === deliveryId)?.status !== "queued") {
+      deps.setComposerError("This queued message is no longer available.");
+      cancelQueuedMessageEdit();
+      return false;
+    }
+    const originalIds = new Set(target?.originalAttachmentIds ?? deps.editingOriginalAttachmentIds());
+    const keepAttachmentIds = taken
+      ? []
+      : draft.attachments.filter((file) => originalIds.has(file.id)).map((file) => file.id);
+    const attachmentDraftIds = draft.attachments
+      .filter((file) => taken || !originalIds.has(file.id))
+      .map((file) => file.id);
+    if (!text.trim() && attachmentDraftIds.length === 0 && keepAttachmentIds.length === 0) return false;
 
     stopTeamTyping();
     deps.setSubmitting(true);
     deps.setComposerError(null);
     let saved = false;
     try {
-      saved = await deps.props.onSendMessage(
-        text,
-        attachmentDraftIds,
-        draft.replyToMessageId,
-        target ?? (agentId ? { agentId, serverId } : undefined),
-      );
+      saved = taken
+        ? await deps.props.onSendMessage(text, attachmentDraftIds, draft.replyToMessageId, { agentId, serverId })
+        : await deps.props.onUpdateQueuedMessage(deliveryId, text, keepAttachmentIds, attachmentDraftIds, {
+            agentId,
+            serverId,
+          });
     } catch (error) {
       deps.setComposerError(errorMessage(error, "Could not send the edited message. Try again."));
     } finally {
       deps.setSubmitting(false);
     }
     if (!saved) return false;
+    takenEdits.delete(editKey(serverId, agentId, deliveryId));
     const savedTarget = { agentId, serverId };
     deps.clearConversationError(savedTarget);
     if (submittedSnapshot) deps.clearSubmittedDraft(savedTarget, submittedSnapshot);

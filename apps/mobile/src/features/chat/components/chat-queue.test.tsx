@@ -2,9 +2,9 @@ import { fireEvent, screen } from "@testing-library/dom";
 import { act, type PropsWithChildren, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
-import type { ChatMessage } from "../model/chat-messages";
+import { type ChatMessage, projectChatMessages } from "../model/chat-messages";
+import { createQueueEditStore } from "../model/queue-edit-store";
 import { ChatQueue } from "./chat-queue";
-import type { ChatAttachment } from "./use-chat-attachments";
 import { useQueueEdit } from "./use-queue-edit";
 
 // Native layout and text have no DOM implementation. Keep text available to accessibility queries.
@@ -196,22 +196,19 @@ it("loads a queued message into the composer and restores the previous draft on 
   const confirmation = Promise.withResolvers<Pick<typeof message, "body" | "attachments">>();
   const take = vi.fn(async (_message: typeof message) => confirmation.promise);
   take.mockRejectedValueOnce(new Error("Host unavailable"));
+  const store = createQueueEditStore();
+  store.update(JSON.stringify(["server", "agent"]), {
+    draft: "Unsent draft",
+    items: [{ id: "local-file", name: "draft.txt", mimeType: "text/plain", base64: "YQ==", size: 1 }],
+  });
   function Composer() {
     const [available, setAvailable] = useState(true);
-    const [draft, setDraft] = useState("Unsent draft");
-    const [items, setItems] = useState<ChatAttachment[]>([
-      { id: "local-file", name: "draft.txt", mimeType: "text/plain", base64: "YQ==", size: 1 },
-    ]);
-    const editor = useQueueEdit(
-      draft,
-      setDraft,
-      { items, replace: setItems, clear: () => setItems([]) },
-      async (queued) => {
-        const prepared = await take(queued);
-        setAvailable(false);
-        return prepared;
-      },
-    );
+    const editor = useQueueEdit(store, { serverId: "server", id: "agent" }, async (queued) => {
+      const prepared = await take(queued);
+      setAvailable(false);
+      return prepared;
+    });
+    const { draft, setDraft, items } = editor;
     return (
       <>
         <ChatQueue {...appearance} {...actions} messages={available ? [message] : []} onEdit={editor.startQueueEdit} />
@@ -245,4 +242,81 @@ it("loads a queued message into the composer and restores the previous draft on 
   expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty("value", "Unsent draft");
   expect(screen.getByText("draft.txt")).toBeTruthy();
   expect(screen.queryByText("Up next")).toBeNull();
+});
+
+it.each([false, true])("keeps a queued reply when navigation precedes take completion: %s", async (leaveBeforeTake) => {
+  const store = createQueueEditStore();
+  const scope = { serverId: "server-one", id: "agent" };
+  const message = projectChatMessages([
+    {
+      id: "reply",
+      author: "user",
+      text: "Queued reply",
+      createdAt: "2026-09-10T10:00:00Z",
+      status: "completed",
+      replyToMessageId: "original-message",
+      delivery: { id: "delivery", status: "queued", position: 1 },
+    },
+  ])[0];
+  if (message?.kind !== "message") throw new Error("Expected a queued reply");
+  const queuedReply = message;
+  const confirmation = Promise.withResolvers<Pick<typeof message, "body" | "attachments">>();
+  const take = () => confirmation.promise;
+  function Composer({ serverId = scope.serverId }: { serverId?: string }) {
+    const editor = useQueueEdit(store, { ...scope, serverId }, take);
+    return (
+      <>
+        <button type="button" onClick={() => void editor.startQueueEdit(queuedReply)}>
+          Edit
+        </button>
+        <input aria-label="Message" value={editor.draft} onChange={(event) => editor.setDraft(event.target.value)} />
+        {editor.queueEdit ? (
+          <>
+            <p>{editor.queueEdit.message.replyToMessageId}</p>
+            {editor.queueEdit.message.attachments?.map((file) => (
+              <p key={file.id}>{file.name}</p>
+            ))}
+            <button type="button" onClick={editor.finishQueueEdit}>
+              Cancel edit
+            </button>
+          </>
+        ) : null}
+      </>
+    );
+  }
+  await act(() => root.render(<Composer />));
+  await act(() => fireEvent.click(screen.getByRole("button", { name: "Edit" })));
+  if (leaveBeforeTake) await act(() => root.render(null));
+  await act(() =>
+    confirmation.resolve({
+      body: message.body,
+      attachments: [
+        {
+          id: "retained",
+          name: "reply.txt",
+          size: 1,
+          kind: "file",
+          mimeType: "text/plain",
+          previewKind: "none",
+          previewUrl: null,
+        },
+      ],
+    }),
+  );
+  if (leaveBeforeTake) await act(() => root.render(<Composer />));
+  await act(() =>
+    fireEvent.input(screen.getByRole("textbox", { name: "Message" }), { target: { value: "Changed reply" } }),
+  );
+  await act(() => root.render(null));
+  await act(() => root.render(<Composer serverId="server-two" />));
+  expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty("value", "");
+  await act(() => root.render(null));
+  await act(() => root.render(<Composer />));
+  expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty("value", "Changed reply");
+  expect(screen.getByText("original-message")).toBeTruthy();
+  expect(screen.getByText("reply.txt")).toBeTruthy();
+  await act(() => fireEvent.click(screen.getByRole("button", { name: "Cancel edit" })));
+  await act(() => root.render(null));
+  await act(() => root.render(<Composer />));
+  expect(screen.queryByRole("button", { name: "Cancel edit" })).toBeNull();
 });

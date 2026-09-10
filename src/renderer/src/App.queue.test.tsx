@@ -93,6 +93,40 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.agent.updateQueuedMessage).not.toHaveBeenCalled();
   });
 
+  it("updates a queued message on an older remote host and keeps its attachments", async () => {
+    vi.mocked(window.openbot.servers.list).mockResolvedValue([testServer("remote-1", true)]);
+    vi.mocked(window.openbot.agent.listQueue).mockResolvedValue({
+      agentId: "chief",
+      deliveries: [
+        queuedDelivery("older-running", "Running", null, { status: "running", turnId: "turn-running" }),
+        queuedDelivery("older-delivery", "Queued draft", 1, {
+          attachments: [attachment("original-file", "original.png", "image")],
+        }),
+      ],
+    });
+    render(() => <App />);
+    const composer = await screen.findByRole("textbox", { name: "Message Chief" });
+    await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+    await screen.findByRole("button", { name: "Save queued message" });
+    composer.textContent = "Revised draft";
+    await fireEvent.input(composer);
+    await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
+    await waitFor(() =>
+      expect(window.openbot.agent.updateQueuedMessage).toHaveBeenCalledWith(
+        {
+          agentId: "chief",
+          deliveryId: "older-delivery",
+          text: "Revised draft",
+          keepAttachmentIds: ["original-file"],
+          attachmentDraftIds: [],
+        },
+        "remote-1",
+      ),
+    );
+    expect(window.openbot.agent.takeQueuedMessage).not.toHaveBeenCalled();
+    expect(window.openbot.agent.sendMessage).not.toHaveBeenCalled();
+  });
+
   it("keeps a failed send in the composer and clears it only after a successful retry", async () => {
     vi.mocked(window.openbot.agent.sendMessage).mockRejectedValueOnce(new Error("Mailbox unavailable"));
     render(() => <App />);

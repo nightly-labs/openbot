@@ -63,7 +63,6 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     "accent-foreground",
     "background",
   ]);
-  const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<{ agentId: string; message: string } | null>(null);
   const [sending, setSending] = useState(false);
   const [sendRetryVersion, setSendRetryVersion] = useState(0);
@@ -71,7 +70,6 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   const measuredComposerHeight = useRef<number | null>(null);
   const [composerGestureHeight, setComposerGestureHeight] = useState(0);
   const sendingRef = useRef(false);
-  const attachments = useChatAttachments();
 
   const [immediateMessageId, setImmediateMessageId] = useState<string | null>(null);
   const [pendingMessage, setPendingMessage] = useState<PendingChatMessage | null>(null);
@@ -82,6 +80,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   const historyRequestRef = useRef(0);
   const {
     agents,
+    queueEdits,
     conversations,
     loadConversation,
     markAgentRead,
@@ -94,21 +93,18 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     uploadAttachment,
     discardAttachment,
   } = useMobileWorkspace();
-  const { preparing, queueEdit, focusRequest, startQueueEdit, finishQueueEdit } = useQueueEdit(
-    draft,
-    setDraft,
-    attachments,
-    async (message) => {
-      const delivery = message.delivery;
-      if (!delivery) throw new Error("This message is not queued.");
-      if (message.attachments?.length) {
-        const prepared = await takeQueuedMessage({ agentId: agent.id, deliveryId: delivery.id }, agent.serverId);
-        return { body: prepared.text, attachments: prepared.attachments };
-      }
-      await cancelQueuedMessage({ agentId: agent.id, deliveryId: delivery.id }, agent.serverId);
-      return { body: message.body, attachments: [] };
-    },
-  );
+  const editor = useQueueEdit(queueEdits, agent, async (message) => {
+    const delivery = message.delivery;
+    if (!delivery) throw new Error("This message is not queued.");
+    if (message.attachments?.length) {
+      const prepared = await takeQueuedMessage({ agentId: agent.id, deliveryId: delivery.id }, agent.serverId);
+      return { body: prepared.text, attachments: prepared.attachments };
+    }
+    await cancelQueuedMessage({ agentId: agent.id, deliveryId: delivery.id }, agent.serverId);
+    return { body: message.body, attachments: [] };
+  });
+  const { draft, setDraft, preparing, queueEdit, focusRequest, startQueueEdit, finishQueueEdit } = editor;
+  const attachments = useChatAttachments(editor);
   const conversation = conversations[agent.id];
   const activity = useAgentActivity(agent.id);
   const projectedMessages = useMemo(() => projectChatMessages(conversation?.messages ?? []), [conversation]);
@@ -248,10 +244,12 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
       void (async () => {
         try {
           for (const file of attachments.items) uploaded.push((await uploadAttachment(agent.id, file)).id);
-          await sendTeamMessage(agent.id, body, [
-            ...(queueEdit.message.attachments?.map((file) => file.id) ?? []),
-            ...uploaded,
-          ]);
+          await sendTeamMessage(
+            agent.id,
+            body,
+            [...(queueEdit.message.attachments?.map((file) => file.id) ?? []), ...uploaded],
+            queueEdit.message.replyToMessageId,
+          );
           finishQueueEdit();
           setSendRetryVersion((version) => version + 1);
         } catch (error) {

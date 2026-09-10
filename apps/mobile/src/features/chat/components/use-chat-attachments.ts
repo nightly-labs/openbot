@@ -20,13 +20,19 @@ function base64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
-export function useChatAttachments() {
-  const [items, setItems] = useState<ChatAttachment[]>([]);
+export function useChatAttachments(controlled?: {
+  items: ChatAttachment[];
+  replace: (items: ChatAttachment[]) => void;
+}) {
+  const [localItems, setItems] = useState<ChatAttachment[]>([]);
+  const items = controlled?.items ?? localItems;
   const itemsRef = useRef<ChatAttachment[]>([]);
+  itemsRef.current = items;
   const sequence = useRef(0);
   function replace(next: ChatAttachment[]) {
     itemsRef.current = next;
-    setItems(next);
+    if (controlled) controlled.replace(next);
+    else setItems(next);
   }
   function add(input: RemoteFileUpload) {
     const size =
@@ -34,7 +40,7 @@ export function useChatAttachments() {
       (input.base64.endsWith("==") ? 2 : input.base64.endsWith("=") ? 1 : 0);
     if (size > MOBILE_ATTACHMENT_BYTES) throw new Error("Attachments must be 10 MB or smaller.");
     if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error("You can attach up to 10 files.");
-    const item = { ...input, size, id: `attachment-${++sequence.current}` };
+    const item = { ...input, size, id: `attachment-${Date.now()}-${++sequence.current}` };
     replace([...itemsRef.current, item]);
   }
   async function addFile(uri: string, name: string, mimeType: string) {

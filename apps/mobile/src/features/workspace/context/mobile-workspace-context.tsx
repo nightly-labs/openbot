@@ -51,7 +51,6 @@ import {
   useState,
 } from "react";
 import { Alert, AppState, View } from "react-native";
-
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
 import {
@@ -70,6 +69,7 @@ import type {
   MobileServerDirectoryState,
   MobileWorkspaceContextValue,
 } from "@/features/workspace/model/workspace-types";
+import { createQueueEditStore } from "../../chat/model/queue-edit-store";
 
 export type {
   MobileAgent,
@@ -141,6 +141,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const [activeServerId, setActiveServerId] = useState<string | null>(session.host?.hostId ?? null);
   const activeServerIdRef = useRef(activeServerId);
   activeServerIdRef.current = activeServerId;
+  const [queueEdits] = useState(createQueueEditStore);
   const [conversations, setConversations] = useState<Record<string, ConversationSnapshot>>({});
   const [activityByServer, setActivityByServer] = useState<Record<string, MobileAgentActivities>>({});
   const conversationsRef = useRef(conversations);
@@ -568,6 +569,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     return {
       servers,
       teamDirectory: directory,
+      queueEdits,
       serverDirectoryState,
       serverDirectoryError,
       agents,
@@ -885,7 +887,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (!serverId) throw new Error("The agent is unavailable.");
         await request("DELETE", TEAM_API_ROUTES.attachment(attachmentId), ignoreResponse, undefined, serverId);
       },
-      sendMessage: async (agentId, text, attachmentDraftIds = []) => {
+      sendMessage: async (agentId, text, attachmentDraftIds = [], replyToMessageId = null) => {
         const serverId = agents.find((candidate) => candidate.id === agentId)?.serverId;
         if (!serverId) throw new Error("The agent is unavailable.");
         const receipt = await request(
@@ -898,7 +900,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           {
             text,
             attachmentDraftIds,
-            replyToMessageId: null,
+            replyToMessageId,
           },
           serverId,
         );
@@ -964,6 +966,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       },
     };
   }, [
+    queueEdits,
     activeServerId,
     activityByServer,
     agents,

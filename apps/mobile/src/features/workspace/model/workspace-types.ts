@@ -22,6 +22,7 @@ import type {
 import type { decodeQueueDraft } from "@openbot/contracts/team-protocol/current";
 import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import type { QueueEditStore } from "../../chat/model/queue-edit-store";
 import type { MobileAgentActivities } from "./agent-activity";
 
 export type MobileServerKind = "local" | "remote";
@@ -65,6 +66,7 @@ interface AddRemoteServerInput {
 }
 
 export interface MobileWorkspaceContextValue {
+  queueEdits: QueueEditStore;
   servers: MobileServer[];
   teamDirectory: RemoteTeamDirectoryClient;
   serverDirectoryState: MobileServerDirectoryState;
@@ -104,7 +106,12 @@ export interface MobileWorkspaceContextValue {
   updateQueuedMessage: (input: UpdateQueuedMessageInput, serverId: string) => Promise<void>;
   loadConversation: (agentId: string) => Promise<ConversationSnapshot>;
   respondToPrompt: (agentId: string, input: RespondToPromptInput) => Promise<void>;
-  sendMessage: (agentId: string, text: string, attachmentDraftIds?: string[]) => Promise<string>;
+  sendMessage: (
+    agentId: string,
+    text: string,
+    attachmentDraftIds?: string[],
+    replyToMessageId?: string | null,
+  ) => Promise<string>;
   uploadAttachment: (agentId: string, input: RemoteFileUpload) => Promise<DraftAttachment>;
   discardAttachment: (agentId: string, attachmentId: string) => Promise<void>;
   hideAgent: (agentId: string) => void;
