@@ -108,11 +108,13 @@
         "@openbot/contracts": "workspace:*",
         "@openbot/team-client": "workspace:*",
         "@openbot/user-errors": "workspace:*",
+        "@openpanel/react-native": "1.4.1",
         "@react-native-masked-view/masked-view": "0.3.2",
         "@shopify/react-native-skia": "2.6.2",
         "@speed-highlight/core": "catalog:",
         "@tanstack/react-query": "^5.102.8",
         "expo": "~57.0.18",
+        "expo-application": "~57.0.2",
         "expo-blur": "~57.0.2",
         "expo-build-properties": "~57.0.15",
         "expo-camera": "~57.0.4",
@@ -836,6 +838,8 @@
     "@openbot/team-client": ["@openbot/team-client@workspace:packages/team-client"],
 
     "@openbot/user-errors": ["@openbot/user-errors@workspace:packages/user-errors"],
+
+    "@openpanel/react-native": ["@openpanel/react-native@1.4.1", "", { "dependencies": { "@openpanel/sdk": "1.3.1" }, "peerDependencies": { "expo-application": "5 - 7", "expo-constants": "14 - 18", "react-native": "*" } }, "sha512-Ix0KAlys2V8LVQIfYTQIdyk5r9xlLSUyaPA7Asf2tqjm2lBa/26JbpUslHHbVS2rk28fYcvmdgAw739pJZXatQ=="],
 
     "@openpanel/sdk": ["@openpanel/sdk@1.3.1", "", {}, "sha512-mQ5xaBUGXnyRg3qYxwnbVaUYyW7w8u+munrWk/ClnqxEeR2j+FYPiA6noHbHMCFC2aZutYD5OoRzEvw3FBNFxw=="],
 

@@ -1,9 +1,16 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { MobileAnalyticsLifecycle } from "@/features/analytics/lifecycle";
+import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import type { MobileSession } from "../api/mobile-auth";
 import { MobileSessionProvider, useMobileSession } from "./mobile-session-context";
+
+vi.mock("@/features/analytics/preference", () => ({
+  loadAnalyticsPreference: async () => {},
+  useAnalyticsPreference: (select: (value: { ready: boolean }) => boolean) => select({ ready: true }),
+}));
 
 const native = vi.hoisted(() => ({
   state: "active",
@@ -241,4 +248,25 @@ it("shares one lifecycle subscription with workspace consumers", async () => {
   await transition("active");
   expect(workspaceForeground).toBe(true);
   expect(native.validate).not.toHaveBeenCalled();
+});
+
+it("records one cold open and one background return, without treating overlays or sign-out as a new visit", async () => {
+  const track = vi.spyOn(mobileAnalytics, "track");
+  await act(async () =>
+    root.render(
+      <MobileSessionProvider>
+        <Account />
+        <MobileAnalyticsLifecycle />
+      </MobileSessionProvider>,
+    ),
+  );
+  await transition("inactive");
+  await transition("active");
+  await transition("background");
+  await transition("active");
+  await act(async () => current.signOut());
+  expect(track.mock.calls.filter(([name]) => name === "mobile_app_opened")).toEqual([
+    ["mobile_app_opened", { kind: "cold_start", signed_in: true }],
+    ["mobile_app_opened", { kind: "foreground", signed_in: true }],
+  ]);
 });

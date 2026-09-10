@@ -36,6 +36,7 @@ export function ScanInviteScreen() {
         <AddServerScreen initialInvite={invite} onJoined={() => router.dismissTo("/connected")} />
       ) : (
         <QrScanner
+          pairing={false}
           onScan={async (data) => {
             parseInviteUrl(data);
             setInvite(data);

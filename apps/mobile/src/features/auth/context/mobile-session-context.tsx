@@ -9,7 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
-
+import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { loadAnalyticsPreference } from "@/features/analytics/preference";
 import {
   logoutMobileSession,
   type MobileProfileChange,
@@ -54,6 +55,7 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       sessionScope.current += 1;
       queryClient.removeQueries({ queryKey: ["account-sessions"] });
     }
+    mobileAnalytics.setUser(session?.user ?? null);
     sessionRef.current = session;
     setSessionState(session);
   }, []);
@@ -73,6 +75,7 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let active = true;
     const scope = sessionScope.current;
+    void loadAnalyticsPreference();
     void readMobileSession()
       .then((stored) => {
         if (active && scope === sessionScope.current) setCurrentSession(stored);
@@ -121,7 +124,7 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
   const signOut = useCallback(async () => {
     const current = sessionRef.current;
     if (!current) return;
-    await logoutMobileSession(current);
+    await mobileAnalytics.operation("account_sign_out", {}, () => logoutMobileSession(current));
     if (sessionRef.current?.sessionToken === current.sessionToken && sessionRef.current?.apiUrl === current.apiUrl) {
       setCurrentSession(null);
     }
