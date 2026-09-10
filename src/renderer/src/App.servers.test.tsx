@@ -29,6 +29,89 @@ describe("OpenBot connected desktop shell", () => {
     installOpenbotStub();
   });
 
+  it.each(["darwin", "win32", "linux"] as const)(
+    "switches servers with numbered shortcuts on %s and releases the listener",
+    async (platform) => {
+      vi.mocked(window.openbot.getAppInfo).mockResolvedValue({
+        name: "OpenBot",
+        version: "test",
+        platform,
+        variant: "production",
+      });
+      const modifier = platform === "darwin" ? { metaKey: true } : { ctrlKey: true };
+      // Local must come first even when the source list puts it last.
+      const servers = [testServer("remote-1", false), testServer("local", true)];
+      vi.mocked(window.openbot.servers.list).mockResolvedValue(servers);
+      vi.mocked(window.openbot.servers.select).mockImplementation(async (id) =>
+        servers.map((server) => ({ ...server, active: server.id === id })),
+      );
+      const view = render(() => <App />);
+      const composer = await screen.findByRole("textbox", { name: "Message Chief" });
+      composer.focus();
+      await fireEvent.keyDown(composer, { key: "2", ...modifier });
+      await waitFor(() => expect(window.openbot.servers.select).toHaveBeenCalledExactlyOnceWith("remote-1"));
+      await waitFor(() => expect(window.openbot.servers.onPresence).toHaveBeenCalledTimes(2));
+      await fireEvent.keyDown(window, { key: "1", ...modifier });
+      await waitFor(() => expect(window.openbot.servers.select).toHaveBeenLastCalledWith("local"));
+      await waitFor(() => expect(window.openbot.servers.onPresence).toHaveBeenCalledTimes(3));
+      expect(window.openbot.servers.select).toHaveBeenCalledTimes(2);
+      view.unmount();
+      const afterUnmount = new KeyboardEvent("keydown", { key: "2", ...modifier, cancelable: true });
+      window.dispatchEvent(afterUnmount);
+      expect(afterUnmount.defaultPrevented).toBe(false);
+      expect(window.openbot.servers.select).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("uses the current rail order for numbered shortcuts and reports switch failures", async () => {
+    const local = testServer("local", true);
+    const studio = testServer("remote-1", false);
+    const office = { ...testServer("remote-2", false), name: "Office PC" };
+    vi.mocked(window.openbot.servers.list).mockResolvedValue([local, studio, office]);
+    vi.mocked(window.openbot.servers.select).mockRejectedValue(new Error("Server unavailable"));
+    render(() => <App />);
+    await screen.findByRole("button", { name: "Office PC server" });
+    emitServers?.([local, office, studio]);
+    await fireEvent.keyDown(window, { key: "2", metaKey: true });
+    await waitFor(() => expect(window.openbot.servers.select).toHaveBeenCalledExactlyOnceWith("remote-2"));
+    expect(await screen.findByText("Could not select the server")).toBeVisible();
+    expect(await screen.findByText("Server unavailable")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Local server" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("ignores invalid numbered shortcuts and does not reload the active server", async () => {
+    vi.mocked(window.openbot.servers.list).mockResolvedValue([
+      testServer("local", true),
+      testServer("remote-1", false),
+    ]);
+    render(() => <App />);
+    await screen.findByRole("button", { name: "Studio Mac server" });
+    const inputs = [
+      { key: "2" },
+      { key: "2", ctrlKey: true },
+      { key: "2", metaKey: true, ctrlKey: true },
+      { key: "2", metaKey: true, altKey: true },
+      { key: "2", metaKey: true, shiftKey: true },
+      { key: "2", metaKey: true, repeat: true },
+      { key: "2", metaKey: true, isComposing: true },
+      { key: "0", metaKey: true },
+      { key: "3", metaKey: true },
+      { key: "a", metaKey: true },
+    ];
+    for (const input of inputs) {
+      const event = new KeyboardEvent("keydown", { ...input, cancelable: true });
+      window.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    }
+    const handled = new KeyboardEvent("keydown", { key: "2", metaKey: true, cancelable: true });
+    handled.preventDefault();
+    window.dispatchEvent(handled);
+    const active = new KeyboardEvent("keydown", { key: "1", metaKey: true, cancelable: true });
+    window.dispatchEvent(active);
+    expect(active.defaultPrevented).toBe(true);
+    expect(window.openbot.servers.select).not.toHaveBeenCalled();
+  });
+
   it("restores a separate selected agent for each server", async () => {
     vi.mocked(window.openbot.servers.list).mockResolvedValue([
       testServer("local", true),
