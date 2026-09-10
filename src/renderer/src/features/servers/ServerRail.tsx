@@ -377,10 +377,7 @@ function ServerRailButton(props: {
           </ContextMenu.Trigger>
           <ContextMenu.Portal>
             <ContextMenu.Content class="agent-context-menu" aria-label="Server actions">
-              <ContextMenu.Item
-                class="server-notification-action"
-                onSelect={() => props.onSetMuted(props.server.id, !props.server.notificationsMuted)}
-              >
+              <ContextMenu.Item onSelect={() => props.onSetMuted(props.server.id, !props.server.notificationsMuted)}>
                 <BellOff class="agent-context-icon size-4" aria-hidden="true" />
                 <span>{props.server.notificationsMuted ? "Unmute notifications" : "Mute notifications"}</span>
               </ContextMenu.Item>
