@@ -1077,10 +1077,10 @@ describe("OpenBot connected desktop shell", () => {
       },
     });
 
-    expect(await screen.findByText("Run this command?")).toBeInTheDocument();
+    expect(await screen.findByText("Run a command")).toBeInTheDocument();
     expect(screen.getByText("npm test -- --runInBand")).toBeInTheDocument();
     expect(screen.getByText("Run the verification suite.")).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Allow" }));
     expect(screen.getByRole("button", { name: "Sending…" })).toBeDisabled();
     expect(window.openbot.agent.respondToApproval).toHaveBeenCalledWith({
       requestId: "approval-1",
@@ -1088,7 +1088,7 @@ describe("OpenBot connected desktop shell", () => {
     });
 
     resolveApproval?.();
-    await waitFor(() => expect(screen.queryByText("Run this command?")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText("Run a command")).not.toBeInTheDocument());
   });
 
   // A queue belongs to one server, and a server switch now discards that
