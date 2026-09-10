@@ -56,6 +56,7 @@ export function ConversationTimeline() {
     chatSearchOpen,
     chatSearchQuery,
     chatSearchTotal,
+    clearNewMessages,
     closeChatSearch,
     copiedMessageId,
     copyMessage,
@@ -68,6 +69,7 @@ export function ConversationTimeline() {
     markUnreadMessages,
     markingRead,
     messageVirtualizer,
+    newMessageCount,
     timelineMessages,
     moveChatSearch,
     openExternalMessageUrl,
@@ -147,7 +149,11 @@ export function ConversationTimeline() {
         }}
       >
         <Show when={showScrollToLatest() || props.discontinuous}>
-          <ScrollToLatestButton onClick={() => void jumpToLatestMessage()} />
+          <ScrollToLatestButton
+            onClick={() => void jumpToLatestMessage()}
+            newMessageCount={newMessageCount()}
+            onDismiss={clearNewMessages}
+          />
         </Show>
         <Show when={props.loaded}>
           <Show when={!agentReady()}>
