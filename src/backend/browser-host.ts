@@ -184,21 +184,19 @@ export class BrowserHost {
     const state = await readBrowserState(this.#statePath);
     if (state.tabs.length === 0) return;
 
-    const tabs = state.tabs
-      .slice(0, INPUT_LIMITS.browserTabs)
-      .map((tab) => reownStoredBrowserTab(tab, agents))
-      .map((stored) => {
-        const tab = this.#createTab(
-          stored.id,
-          stored.url,
-          stored.ownerThreadId,
-          stored.ownerAgentId,
-          stored.environment,
-        );
-        this.#tabs.set(tab.id, tab);
-        this.#bindTabEvents(tab);
-        return tab;
-      });
+    const tabs: InternalTab[] = [];
+    for (const saved of state.tabs) {
+      const stored = reownStoredBrowserTab(saved, agents);
+      const ownerAgentId =
+        stored.ownerAgentId ??
+        agents.find((agent) => agent.threadId === stored.ownerThreadId && stored.ownerThreadId !== null)?.id ??
+        null;
+      if (!this.#hasTabCapacity(stored.ownerThreadId, ownerAgentId)) continue;
+      const tab = this.#createTab(stored.id, stored.url, stored.ownerThreadId, stored.ownerAgentId, stored.environment);
+      this.#tabs.set(tab.id, tab);
+      this.#bindTabEvents(tab);
+      tabs.push(tab);
+    }
     this.#activeTabId = this.#tabs.has(state.activeTabId ?? "") ? state.activeTabId : (tabs[0]?.id ?? null);
     this.#syncAttachedView();
     this.#emitChanged();
@@ -298,7 +296,7 @@ export class BrowserHost {
     ownerAgentId: string | null = null,
     focus = false,
   ): Promise<BrowserTab> {
-    if (this.#tabs.size >= INPUT_LIMITS.browserTabs) {
+    if (!this.#hasTabCapacity(ownerThreadId, ownerAgentId)) {
       throw new Error(`The browser can have up to ${INPUT_LIMITS.browserTabs} open tabs.`);
     }
     const normalizedUrl = normalizeBrowserUrl(url);
@@ -341,6 +339,15 @@ export class BrowserHost {
     }
 
     return toPublicTab(tab);
+  }
+
+  #hasTabCapacity(ownerThreadId: string | null, ownerAgentId: string | null): boolean {
+    const tabs = [...this.#tabs.values()].filter((tab) => {
+      if (tab.ownerAgentId && ownerAgentId) return tab.ownerAgentId === ownerAgentId;
+      if (tab.ownerThreadId) return tab.ownerThreadId === ownerThreadId;
+      return tab.ownerAgentId === null && ownerAgentId === null && ownerThreadId === null;
+    });
+    return tabs.length < INPUT_LIMITS.browserTabs;
   }
 
   async activate(tabId: string): Promise<void> {
