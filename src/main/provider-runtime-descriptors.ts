@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { ManagedProviderId } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import type { AgentRuntimeLock } from "../../scripts/agent-runtime-lock";
-import { parseClaudeVersion, parseCodexVersion, parseGrokVersion } from "../backend/cli";
+import { parseClaudeVersion, parseCodexVersion, parseGrokVersion, parseOpencodeVersion } from "../backend/cli";
 import { assertSafeArchive, extractArchive, rejectNonRegularFiles, sha256File } from "./provider-runtime-archive";
 
 export type RuntimeTarget = "darwin-arm64" | "win32-x64";
@@ -153,6 +153,75 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedProviderId, ProviderRun
       }
     },
     parseVersion: parseClaudeVersion,
+  },
+  opencode: {
+    provider: "opencode",
+    spec: (target, lock) => {
+      const artifact = lock.opencode.artifacts[target];
+      return {
+        provider: "opencode",
+        target,
+        version: lock.opencode.version,
+        url: `${lock.opencode.registry}/${artifact.package}/-/${artifact.asset}`,
+        archiveSha256: artifact.assetSha256,
+        downloadBytes: artifact.downloadBytes,
+        installedBytes: artifact.installedBytes,
+        executableName: artifact.executable,
+      };
+    },
+    stage: async ({ spec, downloadedPath, staging, lock, downloadSmallFile }) => {
+      const extracted = `${staging}.extracted`;
+      await rm(extracted, { recursive: true, force: true });
+      await mkdir(extracted, { recursive: true });
+      try {
+        await assertSafeArchive(downloadedPath, ["package"], "The OpenCode archive has an unexpected path.");
+        await extractArchive(downloadedPath, extracted);
+        await rejectNonRegularFiles(extracted);
+        const packageRoot = join(extracted, "package");
+        const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
+        const artifact = lock.opencode.artifacts[spec.target];
+        if (
+          !isDynamicRecord(packageManifest) ||
+          packageManifest.name !== artifact.package ||
+          packageManifest.version !== lock.opencode.version
+        ) {
+          throw new Error("The OpenCode package does not match the runtime catalog.");
+        }
+        // The platform tarball carries no licence, so it comes from the tagged source like Codex's.
+        const license = await downloadSmallFile(
+          `${lock.opencode.repository}/raw/v${lock.opencode.version}/LICENSE`,
+          lock.opencode.licenseSha256,
+        );
+        await mkdir(join(staging, "bin"), { recursive: true });
+        await Promise.all([
+          copyFile(join(packageRoot, "bin", artifact.executable), join(staging, "bin", artifact.executable)),
+          writeFile(join(staging, "LICENSE"), license),
+          writeFile(
+            join(staging, "opencode-package.json"),
+            `${JSON.stringify({
+              layoutVersion: 1,
+              version: lock.opencode.version,
+              target: spec.target,
+              executable: `bin/${artifact.executable}`,
+            })}\n`,
+          ),
+        ]);
+        if (spec.target === "darwin-arm64") await chmod(join(staging, "bin", artifact.executable), 0o755);
+      } finally {
+        await rm(extracted, { recursive: true, force: true });
+      }
+    },
+    verify: async (root, spec, lock) => {
+      const artifact = lock.opencode.artifacts[spec.target];
+      const executable = join(root, "bin", spec.executableName);
+      if ((await sha256File(executable)) !== artifact.binarySha256) {
+        throw new Error("OpenCode runtime checksum mismatch.");
+      }
+      if ((await sha256File(join(root, "LICENSE"))) !== lock.opencode.licenseSha256) {
+        throw new Error("OpenCode license checksum mismatch.");
+      }
+    },
+    parseVersion: parseOpencodeVersion,
   },
   grok: {
     provider: "grok",

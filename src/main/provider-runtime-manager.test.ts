@@ -237,11 +237,15 @@ describe("ProviderRuntimeManager", () => {
     await manager.initialize();
 
     await Promise.all([manager.download("codex"), manager.download("claude"), manager.download("grok")]);
-    expect(Object.values(manager.getStatus().providers).map((status) => status.phase)).toEqual([
+    // Named one by one rather than read off the snapshot in order: the managed set grows, and a
+    // fourth provider nobody asked to download must not read as a fourth transfer here.
+    const started = manager.getStatus().providers;
+    expect([started.codex.phase, started.claude.phase, started.grok.phase]).toEqual([
       "downloading",
       "downloading",
       "downloading",
     ]);
+    expect(started.opencode.phase).toBe("not-downloaded");
 
     await manager.cancel("claude");
     const snapshot = manager.getStatus();
@@ -481,7 +485,118 @@ describe("ProviderRuntimeManager", () => {
       );
     }
   });
+
+  /*
+   * OpenCode ships as an npm platform tarball holding exactly `package/package.json` and
+   * `package/bin/opencode`, and no licence at all. Staging has to pick those two files out, fetch
+   * the licence from the tagged source, and refuse anything else -- this is the whole path a user
+   * gets by pressing Download, with no terminal step behind it.
+   */
+  it("stages the OpenCode binary, its license and its layout file", async () => {
+    const root = await temporaryRoot();
+    const fixture = await opencodeFixture();
+    const manager = opencodeManager(root, fixture);
+    await manager.initialize();
+
+    await manager.downloadAndWait("opencode");
+
+    const version = fixture.lock.opencode.version;
+    expect(manager.getStatus().providers.opencode).toMatchObject({ phase: "ready", version });
+    const installed = join(root, "opencode", "darwin-arm64", version);
+    expect(await readFile(join(installed, "bin", "opencode"), "utf8")).toBe(fixture.binaryText);
+    expect(await readFile(join(installed, "LICENSE"), "utf8")).toBe(fixture.licenseText);
+    expect(JSON.parse(await readFile(join(installed, "opencode-package.json"), "utf8"))).toMatchObject({
+      layoutVersion: 1,
+      version,
+      target: "darwin-arm64",
+      executable: "bin/opencode",
+    });
+  });
+
+  it("refuses a package that is not the pinned OpenCode release", async () => {
+    const root = await temporaryRoot();
+    // The checksum still matches: this is a correctly transferred tarball of the wrong release, which
+    // is what a registry mix-up or a stale mirror hands back.
+    const fixture = await opencodeFixture({ manifestVersion: "1.18.29" });
+    const manager = opencodeManager(root, fixture);
+    await manager.initialize();
+
+    await expect(manager.downloadAndWait("opencode")).rejects.toThrow("does not match the runtime catalog");
+  });
+
+  it("refuses a binary whose checksum is not the pinned one", async () => {
+    const root = await temporaryRoot();
+    const fixture = await opencodeFixture();
+    fixture.lock.opencode.artifacts["darwin-arm64"].binarySha256 = digest(new TextEncoder().encode("wrong"));
+    const manager = opencodeManager(root, fixture);
+    await manager.initialize();
+
+    await expect(manager.downloadAndWait("opencode")).rejects.toThrow("checksum mismatch");
+  });
+
+  it("installs nothing when the staged OpenCode reports another version", async () => {
+    const root = await temporaryRoot();
+    // `OPENCODE_DISABLE_AUTOUPDATE` keeps a managed install on the pin, and this is the check behind
+    // it: a binary that answers with any other version must not become the runtime OpenBot starts.
+    const fixture = await opencodeFixture({ reportedVersion: "1.18.29" });
+    const manager = opencodeManager(root, fixture);
+    await manager.initialize();
+
+    await expect(manager.downloadAndWait("opencode")).rejects.toThrow("unexpected version");
+
+    const entries = await readdir(join(root, "opencode")).catch(() => []);
+    expect(entries).not.toContain("darwin-arm64");
+    expect(entries.some((entry) => entry.startsWith(".installing-"))).toBe(false);
+  });
 });
+
+interface OpencodeFixture {
+  archive: Uint8Array;
+  binaryText: string;
+  licenseText: string;
+  lock: ReturnType<typeof parseAgentRuntimeLock>;
+}
+
+/** A served `opencode-darwin-arm64` tarball with the lock rewritten to match it. */
+async function opencodeFixture(options?: {
+  manifestVersion?: string;
+  reportedVersion?: string;
+}): Promise<OpencodeFixture> {
+  const lock = parseAgentRuntimeLock(structuredClone(lockValue));
+  const artifact = lock.opencode.artifacts["darwin-arm64"];
+  const binaryText = `#!/bin/sh\necho ${options?.reportedVersion ?? lock.opencode.version}\n`;
+  const licenseText = "MIT license\n";
+  const source = await temporaryRoot();
+  await mkdir(join(source, "package", "bin"), { recursive: true });
+  await writeFile(
+    join(source, "package", "package.json"),
+    JSON.stringify({ name: artifact.package, version: options?.manifestVersion ?? lock.opencode.version }),
+  );
+  await writeFile(join(source, "package", "bin", artifact.executable), binaryText, { mode: 0o755 });
+  const archivePath = join(source, artifact.asset);
+  execFileSync("tar", ["-czf", archivePath, "-C", source, "package"]);
+  const archive = await readFile(archivePath);
+
+  artifact.assetSha256 = digest(archive);
+  artifact.binarySha256 = digest(new TextEncoder().encode(binaryText));
+  artifact.downloadBytes = archive.byteLength;
+  artifact.installedBytes = archive.byteLength + 1_024;
+  lock.opencode.licenseSha256 = digest(new TextEncoder().encode(licenseText));
+  return { archive, binaryText, licenseText, lock };
+}
+
+function opencodeManager(root: string, fixture: OpencodeFixture): ProviderRuntimeManager {
+  return new ProviderRuntimeManager({
+    root,
+    platform: "darwin",
+    architecture: "arm64",
+    lock: fixture.lock,
+    fetchImpl: async (input) =>
+      String(input).endsWith("/LICENSE")
+        ? new Response(new TextEncoder().encode(fixture.licenseText))
+        : chunkedResponse(fixture.archive, 4_096),
+  });
+}
 
 async function temporaryRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "openbot-provider-runtime-test-"));

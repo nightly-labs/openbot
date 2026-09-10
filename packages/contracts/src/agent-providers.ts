@@ -96,9 +96,11 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     id: "opencode",
     displayName: "OpenCode",
     cliName: "OpenCode CLI",
-    onboardingDescription: "Use your installed OpenCode CLI",
-    signInMessage: "Install OpenCode and run `opencode auth login`, then connect again.",
-    installGuideLink: "opencode-install",
+    onboardingDescription: "Free models, no account needed",
+    // Only reached when a spawn lists no model at all, which is not the keyless free tier: that
+    // one works with no credential. So this asks for the optional key instead of a terminal login.
+    signInMessage: "OpenCode listed no model. Add an OpenCode Zen key to continue.",
+    installGuideLink: null,
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "opencode",
@@ -135,9 +137,30 @@ export const PICKER_PROVIDERS: readonly AgentProviderId[] = AGENT_PROVIDER_DESCR
  * a total record, so every reader gets a status without a guard, and a managed provider that has no
  * runtime entry is a compile error instead of an empty download card.
  */
-export const MANAGED_RUNTIME_PROVIDERS = ["codex", "claude", "grok"] as const satisfies readonly AgentProviderId[];
+export const MANAGED_RUNTIME_PROVIDERS = [
+  "codex",
+  "claude",
+  "grok",
+  "opencode",
+] as const satisfies readonly AgentProviderId[];
 export type ManagedProviderId = (typeof MANAGED_RUNTIME_PROVIDERS)[number];
 
 export function isManagedRuntimeProvider(provider: AgentProviderId): provider is ManagedProviderId {
   return isOneOf(MANAGED_RUNTIME_PROVIDERS, provider);
+}
+
+/**
+ * Whether an OpenCode model's display name marks it as one the free tier covers.
+ *
+ * OpenCode states the price in the name and nowhere else: `model/list` carries no price field, and
+ * neither OpenCode Zen endpoint authenticates, so this trailing word is the only thing that
+ * separates a model any user can run from one that bills. The picker labels a model with it and the
+ * catalog order picks the default from it, and those two have to agree -- a "Free" badge on a model
+ * OpenBot would never default to, or a default that quietly bills, is the same bug twice.
+ *
+ * Only a trailing word counts. Anything looser would catch a model named for something else that
+ * happens to contain "free".
+ */
+export function isFreeOpencodeModelName(name: string): boolean {
+  return /\bfree$/i.test(name.trim());
 }

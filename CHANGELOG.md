@@ -5,6 +5,28 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Download and pin the OpenCode CLI, like the other three providers. The Install button that sent
+  you to the OpenCode website is gone.
+- Use OpenCode's free models with no account and no sign-in. A new OpenCode agent answers as soon
+  as the CLI is downloaded.
+- Add an optional OpenCode Zen key in Settings for the paid OpenCode Zen models. OpenBot encrypts
+  the key on this computer, gives it only to the local OpenCode CLI, and keeps it out of every
+  export, log, and diagnostics report.
+
+### Changed
+
+- Keep an OpenCode CLI you installed yourself. OpenBot reports its version, offers an update, and
+  never forces the download.
+- Leave the OpenCode Go models out of the model picker when a Zen key is what lists them. OpenCode
+  reports Zen and Go as one catalog, but a Zen key does not buy Go, so those models answered every
+  prompt with "Invalid API key.". They still appear when you signed in to Go in OpenCode itself.
+- Start a new OpenCode agent on a free model, Muse for choice. OpenCode reports the services you
+  signed in to before its own, so a new agent picked a model behind one of those sign-ins and its
+  first message could fail with "Token refresh failed: 401" while the free models sat further down
+  the list. No model that bills is ever the default now.
+
 ## [0.7.0] - 2026-09-09
 
 ### Added

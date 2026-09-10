@@ -87,6 +87,32 @@ The installer accepts only the exact prerelease and assets in the lock file. It 
 manifest, a changed archive, an unsafe archive path, and a mismatched source manifest. Do not replace
 assets in an existing runtime prerelease. Increase `recipeVersion` when the build process changes.
 
+## Pin the OpenCode CLI
+
+`native-runtime.lock.json` also pins the OpenCode CLI that OpenBot downloads for the OpenCode
+provider, by npm platform package, asset SHA-256, extracted binary SHA-256, byte counts, and the
+MIT license file it fetches from `github.com/anomalyco/opencode`. Codex, Claude, and Grok are pinned
+in the same file by hand; OpenCode has a script, because the version, both platform packages, and
+the license have to agree:
+
+```bash
+bun run pin:opencode-runtime          # the newest published release
+bun run pin:opencode-runtime 1.18.30  # one exact version
+```
+
+The script downloads both platform tarballs, checks that `package/package.json` names the package
+and version the lock claims, hashes the extracted binary and the license, and on macOS runs the
+extracted binary with `--version` and refuses a value that is not the pinned one. That last check is
+what protects `verifyInstalledRuntime`, which compares the installed version for exact equality. The
+script prints the block for review instead of rewriting the lock, so paste it over the `opencode`
+entry and re-run it with that exact version: the command reports `already pins OpenCode <version>`
+when the committed block matches byte for byte.
+
+Run it on a version bump only. A bump also needs the Windows checks in
+[the OpenCode notes](ARCHITECTURE.md#opencode-and-acp): the `win32-x64` values come from the
+published tarball read on macOS, so a staged `opencode.exe --version` must be confirmed on Windows
+before release.
+
 ## Publish a version
 
 Start from a clean, up-to-date `main` branch. For the first release, `package.json` and

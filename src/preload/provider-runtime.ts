@@ -15,6 +15,7 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
       codex: decodeProviderRuntimeStatus(providers.codex),
       claude: decodeProviderRuntimeStatus(providers.claude),
       grok: decodeProviderRuntimeStatus(providers.grok),
+      opencode: decodeProviderRuntimeStatus(providers.opencode),
     },
   };
 }
