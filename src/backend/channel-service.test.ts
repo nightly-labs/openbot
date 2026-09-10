@@ -1914,8 +1914,37 @@ describe("shared channel coordination", () => {
     );
 
     // The signed-in reader holds no cursor here, so only authorship can hold this message out of
-    // the count. It carries the signed-out id, and that is the same person as the member.
-    expect(required(service.store.list("member-9")[0]).unreadCount).toBe(0);
+    // the count. It carries the signed-out id, and that is the same person as the host member.
+    expect(required(service.store.list("member-9", true)[0]).unreadCount).toBe(0);
+
+    // A remote member is another person. The host wrote this message, so it is unread for them.
+    expect(required(service.store.list("member-9")[0]).unreadCount).toBe(1);
+  });
+
+  it("carries every read channel to the reader that signs in", async () => {
+    await service.command({ type: "save", channelId: "channel-2", operationId: operationId(), draft }, actor);
+    await send("Draft the release note.");
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-2",
+        operationId: operationId(),
+        text: "Check the changelog.",
+        recipientAgentId: "agent-a",
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    for (const channelId of ["channel-1", "channel-2"]) {
+      service.store.markRead(channelId, "local", service.store.page(channelId).throughSequence, operationId());
+    }
+
+    service.store.adoptReads("local", "member-9");
+
+    // Each channel needs its own command, or the second adoption answers with the first receipt
+    // and the reader that signs in sees a channel it has read as unread.
+    expect(service.store.list("member-9").map((channel) => channel.unreadCount)).toEqual([0, 0]);
   });
 
   it("serializes overlapping workspaces and permits independent declared resources", () => {

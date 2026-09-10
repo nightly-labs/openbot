@@ -990,7 +990,7 @@ export class TeamApiServer {
     const agent = await this.#options.agents.duplicateAgent(sourceAgentId, operationId);
     try {
       const layout = await this.#options.sidebarLayout.placeDuplicateAfter(sourceAgentId, agent.id, [
-        ...this.#options.agents.listAgents().map((candidate) => candidate.id),
+        ...this.#options.agents.sidebarChatIds(),
         agent.id,
       ]);
       return await this.#options.agents.commitAgentDuplication(agent.id, layout);
