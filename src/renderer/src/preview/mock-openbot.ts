@@ -104,6 +104,7 @@ import {
   STORY_USAGE,
 } from "./fixtures";
 import { mockAgentAnalytics, mockHostAnalytics } from "./mock-agent-analytics";
+import { createMockChannels } from "./mock-channels";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 
 type Listener<T> = (value: T) => void;
@@ -926,6 +927,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listModels: async () => clone(models),
       listAgents: async () => clone(agents),
       listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
+      ...createMockChannels(emitAgentEvent, (agentId) => agents.find((entry) => entry.id === agentId)?.name ?? agentId),
       getSidebarLayout: async () => clone(sidebarLayout),
       mutateSidebarLayout: async (action) => {
         sidebarLayout = applySidebarLayoutAction(sidebarLayout, action);

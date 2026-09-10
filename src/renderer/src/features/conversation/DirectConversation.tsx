@@ -15,7 +15,7 @@ import {
 import { errorMessage } from "../../error-message";
 import { TeamPersonAvatar, teamMemberName } from "../team/TeamPersonAvatar";
 import { formatChatTimestamp } from "./chat-timestamp";
-import { calculateChatScrollMargin, createChatVirtualizer } from "./createChatVirtualizer";
+import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "./createChatVirtualizer";
 import { ScrollToLatestButton, scrollToLatestMessage } from "./MessageNavigation";
 import {
   scrollToUnreadBoundary,
@@ -69,7 +69,11 @@ export function DirectConversation(props: DirectConversationProps) {
     scrollMargin: virtualScrollMargin,
     onChange: (instance) => {
       const first = instance.getVirtualItems()[0];
-      if (first && first.index <= 5 && props.hasOlder && !props.loadingOlder) props.onLoadOlder?.();
+      if (!first) return;
+      // The reader has to be at the top as well: a short thread renders row 0 at the newest message.
+      if (chatHistoryBoundaryReached(messageList, first.index) && props.hasOlder && !props.loadingOlder) {
+        props.onLoadOlder?.();
+      }
     },
   });
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());

@@ -35,8 +35,10 @@ import type {
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type { AgentService } from "../backend/agent-service";
+import type { ChannelService } from "../backend/channel-service";
 import type { TeamChatStore } from "../backend/team-chat-store";
 import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
@@ -67,6 +69,7 @@ interface HostEvents {
 type ForwardedApiOptions = ConstructorParameters<typeof TeamApiServer>[0];
 
 interface HostServiceOptions {
+  channels?: ChannelService;
   appVersion: string;
   store: TeamStore;
   agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads">;
@@ -197,6 +200,7 @@ export class HostService extends EventEmitter<HostEvents> {
       appVersion: options.appVersion,
       store: options.store,
       agents: options.agents,
+      channels: options.channels,
       skills: options.skills,
       sidebarLayout: options.sidebarLayout,
       mailbox: options.mailbox,
@@ -955,11 +959,27 @@ export class HostService extends EventEmitter<HostEvents> {
     return memberId;
   }
 
+  channelActor(): { id: string; name: string } {
+    let user: CentralAuthUser;
+    try {
+      user = this.#options.getSignedInUser();
+    } catch {
+      return { id: SIGNED_OUT_CHANNEL_MEMBER_ID, name: "You" };
+    }
+    return { id: this.#currentAgentReaderId(), name: user.name ?? "You" };
+  }
+
   #currentAgentReaderId(): string {
     const accountReaderId = `local-user:${this.#options.getSignedInUser().id}`;
     const memberId = this.#findCurrentMemberId();
-    if (!memberId) return accountReaderId;
+    // Channel reads are keyed by the reader id this method answers, so they adopt with it.
+    if (!memberId) {
+      this.#options.channels?.store.adoptReads(SIGNED_OUT_CHANNEL_MEMBER_ID, accountReaderId);
+      return accountReaderId;
+    }
     this.#options.agents.adoptConversationReads(accountReaderId, memberId);
+    this.#options.channels?.store.adoptReads(accountReaderId, memberId);
+    this.#options.channels?.store.adoptReads(SIGNED_OUT_CHANNEL_MEMBER_ID, memberId);
     return memberId;
   }
 

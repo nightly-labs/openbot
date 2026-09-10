@@ -1,5 +1,6 @@
 import type {
   AvatarHue,
+  ChannelSummary,
   DirectThreadSummary,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
@@ -16,6 +17,15 @@ import type { SidebarPinnedItem } from "./sidebar-pins";
  * view to borrow a name.
  */
 export interface SidebarProps {
+  channels?: ChannelSummary[];
+  activeChannelId?: string | null;
+  onSelectChannel?: (channelId: string) => void;
+  showingArchivedChannels?: boolean;
+  onToggleArchivedChannels?: () => void;
+  onCreateChannel?: () => void;
+  onEditChannel?: (channelId: string) => void;
+  onRestoreChannel?: (channelId: string) => Promise<void>;
+  onDeleteChannel?: (channelId: string) => Promise<void>;
   serverName: string;
   onOpenServerSettings: (trigger: HTMLElement) => void;
   agents: AgentProfile[];
@@ -58,4 +68,14 @@ export interface SidebarProps {
 
 export type SidebarAgentState = { kind: "working" } | { kind: "responded" } | { kind: "unread"; count: number };
 
-export type ResolvedPinnedItem = { ref: SidebarPinnedItem; agent: AgentProfile };
+/** A pin paired with the chat it names, so the pinned strip renders the same two kinds the list does. */
+export type ResolvedPinnedItem = { ref: SidebarPinnedItem; chat: SidebarChatItem };
+
+/**
+ * A row inside a section. Agents and channels share the sidebar layout - one order, one set of
+ * section assignments - so the list, the grouping and the drag pipeline carry them as one type and
+ * only the row component asks which kind it has.
+ */
+export type SidebarChatItem =
+  | { kind: "agent"; id: string; agent: AgentProfile }
+  | { kind: "channel"; id: string; channel: ChannelSummary };

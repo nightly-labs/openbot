@@ -101,6 +101,86 @@ export const CommandSearch: Story = {
   },
 };
 
+type PlayContext = Parameters<NonNullable<Story["play"]>>[0];
+
+/*
+ * The expanded sidebar is a precondition, not a detail: the compact rail hides the new-chat button
+ * from the accessibility tree, so a channel story must pin the sidebar open rather than inherit
+ * whatever width the last visitor left in local storage.
+ */
+function ChannelPlayground() {
+  return <SidebarStatePlayground compact={false} />;
+}
+
+async function openNewChannelDialog(context: PlayContext): Promise<HTMLElement> {
+  const body = within(context.canvasElement.ownerDocument.body);
+  await context.canvas.findByRole("heading", { name: "Chief" });
+  const expandSidebar = context.canvas.queryByRole("button", { name: "Expand sidebar" });
+  if (expandSidebar) await context.userEvent.click(expandSidebar);
+  await context.userEvent.click(context.canvas.getByRole("button", { name: "New agent or channel" }));
+  await context.userEvent.click(await body.findByRole("menuitem", { name: "New channel" }));
+  return await body.findByRole("dialog", { name: "New channel" });
+}
+
+export const NewChannel: Story = {
+  render: () => <ChannelPlayground />,
+  play: async (context) => {
+    const dialog = await openNewChannelDialog(context);
+    await expect(within(dialog).getByRole("searchbox", { name: "Search agents" })).toBeVisible();
+    await expect(within(dialog).getByRole("button", { name: "Create" })).toBeDisabled();
+  },
+};
+
+export const NewChannelWithMembers: Story = {
+  render: () => <ChannelPlayground />,
+  play: async (context) => {
+    const dialog = await openNewChannelDialog(context);
+    const field = within(dialog);
+    const userEvent = context.userEvent;
+    await userEvent.type(field.getByRole("textbox", { name: "Channel name" }), "Project Falcon");
+    await userEvent.click(field.getByRole("checkbox", { name: /Chief/ }));
+    await userEvent.click(field.getByRole("checkbox", { name: /Research/ }));
+    await expect(field.getByRole("checkbox", { name: /Chief/ })).toBeChecked();
+    await expect(field.getByRole("checkbox", { name: /Research/ })).toBeChecked();
+    await expect(field.getByRole("button", { name: "Create" })).toBeEnabled();
+  },
+};
+
+/**
+ * The channel after it exists: a sidebar row with a preview line, and the chat itself, which reuses
+ * the agent chat's header, message column and composer. Creation runs through the dialog because the
+ * preview mock seeds no channel of its own.
+ */
+export const Channel: Story = {
+  render: () => <ChannelPlayground />,
+  play: async (context) => {
+    const dialog = await openNewChannelDialog(context);
+    const field = within(dialog);
+    const userEvent = context.userEvent;
+    await userEvent.type(field.getByRole("textbox", { name: "Channel name" }), "Project Falcon");
+    await userEvent.click(field.getByRole("checkbox", { name: /Chief/ }));
+    await userEvent.click(field.getByRole("checkbox", { name: /Research/ }));
+    await userEvent.click(field.getByRole("button", { name: "Create" }));
+
+    const chat = await context.canvas.findByRole("main", { name: "Channel conversation" });
+    const composer = within(chat).getByRole("textbox", { name: "Message to channel" });
+    composer.textContent = "Let's align on the launch milestones before Friday.";
+    await fireEvent.input(composer);
+    await userEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+
+    await expect(within(chat).findByRole("article", { name: "Message from You" })).resolves.toBeInTheDocument();
+    // A request that names no recipient is routed by the lead, and the lead posts its choice as an
+    // ordinary channel message. So the newest message of the channel, and the sidebar line that
+    // previews it, is the dispatch rather than the request.
+    await expect(within(chat).findByRole("article", { name: "Message from Chief" })).resolves.toBeInTheDocument();
+    await waitFor(() =>
+      expect(context.canvas.getByRole("button", { name: /^Project Falcon\./ })).toHaveAccessibleName(
+        "Project Falcon. Assigned to Chief.",
+      ),
+    );
+  },
+};
+
 export const AccountMenu: Story = {
   render: () => <SidebarStatePlayground compact={false} />,
   play: async ({ canvas, canvasElement, userEvent }) => {
@@ -251,7 +331,6 @@ export const EmptyWorkspace: Story = {
     />
   ),
   play: async ({ canvas }) => {
-    await expect(canvas.findByText("No chats yet")).resolves.toBeInTheDocument();
     await expect(canvas.queryByRole("heading", { name: "People" })).not.toBeInTheDocument();
     await expect(canvas.queryByRole("button", { name: "OpenBot team server" })).not.toBeInTheDocument();
     await expect(canvas.getAllByRole("listitem")).toHaveLength(6);

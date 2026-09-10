@@ -446,7 +446,8 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
 
-    await fireEvent.click(screen.getByRole("button", { name: "Create new agent" }));
+    await fireEvent.pointerDown(screen.getByRole("button", { name: "New agent or channel" }), { button: 0 });
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New agent" }), { button: 0 });
     expect(await screen.findByRole("heading", { name: "Create a new agent" })).toBeInTheDocument();
     expect(window.openbot.agent.createAgent).not.toHaveBeenCalled();
     await fireEvent.click(screen.getByRole("button", { name: /^Trip Planner\./ }));
@@ -489,7 +490,8 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(await screen.findByRole("button", { name: /Alice/ }));
     expect(await screen.findByRole("main", { name: "Direct conversation with Alice" })).toBeInTheDocument();
 
-    await fireEvent.click(screen.getByRole("button", { name: "Create new agent" }));
+    await fireEvent.pointerDown(screen.getByRole("button", { name: "New agent or channel" }), { button: 0 });
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New agent" }), { button: 0 });
 
     expect(await screen.findByRole("heading", { name: "Create a new agent" })).toBeInTheDocument();
     expect(window.openbot.agent.createAgent).not.toHaveBeenCalled();
@@ -681,7 +683,7 @@ describe("OpenBot connected desktop shell", () => {
       type: "prompt",
       requestId: "prompt-island",
       agentId: "chief",
-      threadId: "thread-1",
+      threadId: "thread-chief",
       turnId: "turn-1",
       questions: [
         {
@@ -1090,7 +1092,7 @@ describe("OpenBot connected desktop shell", () => {
       approval: {
         requestId: 14,
         agentId: "chief",
-        threadId: "thread-1",
+        threadId: "thread-chief",
         turnId: "turn-1",
         kind: "permissions",
         command: null,

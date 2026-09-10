@@ -3,6 +3,7 @@ import { desktopAnalytics } from "./analytics";
 import { toAgentMessage } from "./app-message-projection";
 import type { AgentMessage } from "./data";
 import { useAgents } from "./features/agents/agents-context";
+import { useChannels } from "./features/channels/channels-context";
 import { useConversation } from "./features/conversation/conversation-context";
 import { useDirectMessages } from "./features/conversation/direct-messages-context";
 import { useServers } from "./features/servers/servers-context";
@@ -50,6 +51,7 @@ const Navigation = createSimpleContext({
       appendUiError,
     } = useAgents();
     const { setDirectTyping, clearDirectSelection, openDirectConversation } = useDirectMessages();
+    const channels = useChannels();
     const { dismissUsage } = useUsage();
     const scopeIsCurrent = createScopeGuard();
     const {
@@ -75,6 +77,10 @@ const Navigation = createSimpleContext({
       // explicit read, and a search result runs `openAgentMessage`, which marks every
       // message through the match. Both would be messages nobody saw.
       dismissUsage();
+      // An open channel covers the workspace the same way the report does, so it has to leave here
+      // rather than in each caller: Edit agent and a global-search result open a chat that would
+      // otherwise stay hidden under it.
+      channels.close();
       const previousAgentId = activeAgentId();
       if (previousAgentId && previousAgentId !== agentId) pruneInactiveAgentHistory(previousAgentId);
       setAgentSetupOpen(false);
@@ -90,8 +96,9 @@ const Navigation = createSimpleContext({
     async function selectDirectMember(memberId: string): Promise<void> {
       if (agentSetupOpen() && creatingAgent()) return;
       if (!peopleEnabled || !currentTeamMember() || !directPeople().some((member) => member.id === memberId)) return;
-      // Past the guards, so a call that opens nothing leaves the report alone.
+      // Past the guards, so a call that opens nothing leaves the report or the channel alone.
       dismissUsage();
+      channels.close();
       const previousAgentId = activeAgentId();
       if (previousAgentId) pruneInactiveAgentHistory(previousAgentId);
       setExplicitlyOpenedAgentChatId(null);

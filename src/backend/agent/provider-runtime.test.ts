@@ -717,6 +717,60 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
   });
 
+  it("refuses to replace a CLI that is running a channel turn", async () => {
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => new FakeAgentClient(provider, "", false),
+    );
+    await service.initialize();
+    await store.getOrCreate("chief");
+    const actor = { id: "human", name: "Alex" };
+    await service.channels.command(
+      {
+        type: "save",
+        channelId: "channel-1",
+        operationId: "create",
+        draft: {
+          name: "Project",
+          title: "",
+          instructions: "Shared work",
+          members: [{ agentId: "chief" }],
+          leadAgentId: "chief",
+        },
+      },
+      actor,
+    );
+    await service.channels.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: "send",
+        text: "Work in the channel.",
+        recipientAgentId: "chief",
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    // A channel turn runs on a thread of its own, so the conversation of the agent holds no turn id
+    // while the CLI works. The delivery has reached its turn, so no counter reports it either.
+    // The assignment holds the turn id the provider answered with, so the CLI is on a turn. The
+    // channel keeps that turn out of the conversation of the agent, and the delivery has left the
+    // counter of the deliveries that are starting.
+    await waitFor(() => service?.channels.store.assignments("channel-1").some((item) => item.turnId));
+
+    await expect(
+      service.updateProviderCli("codex", async () => {
+        throw new Error("Busy provider started an install.");
+      }),
+    ).rejects.toThrow(/working on a turn/u);
+  });
+
   it("refuses to replace a CLI while a delivery is on its way to a turn", async () => {
     let releaseTurnStart: (() => void) | undefined;
     const blocked = new Promise<void>((resolve) => {

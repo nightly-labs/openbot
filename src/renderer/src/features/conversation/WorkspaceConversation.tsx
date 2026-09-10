@@ -84,13 +84,21 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const activePrompt = createMemo(() => {
     const agent = activeAgent();
     const event = agent ? pendingPrompts()[agent.id] : undefined;
-    return event?.type === "prompt" ? event : undefined;
+    return event?.type === "prompt" && event.threadId === agent?.threadId ? event : undefined;
+  });
+
+  const activeApproval = createMemo(() => {
+    const agent = activeAgent();
+    const approval = agent ? pendingApprovals()[agent.id] : undefined;
+    return approval?.threadId === agent?.threadId ? approval : undefined;
   });
 
   const activeBrowserTakeover = createMemo(() => {
     const agent = activeAgent();
     const event = agent ? pendingPrompts()[agent.id] : undefined;
-    return event?.type === "browser-takeover-requested" ? event.request : undefined;
+    return event?.type === "browser-takeover-requested" && event.request.threadId === agent?.threadId
+      ? event.request
+      : undefined;
   });
 
   /** Provider downloads are the local machine's business, never a remote host's. */
@@ -138,7 +146,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       remoteDesktopVisible={remoteDesktopWorkspaceVisible()}
       remoteDesktopEnabled={!platform.landingPreview && activeServerSupportsCapability("remote-desktop")}
       prompt={activePrompt()}
-      approval={activeAgent() ? pendingApprovals()[activeAgent()?.id ?? ""] : undefined}
+      approval={activeApproval()}
       browserTakeover={activeBrowserTakeover()}
       activeTurnId={activeAgent() ? activeTurns()[activeAgent()?.id ?? ""] : null}
       activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}

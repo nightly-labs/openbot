@@ -1,3 +1,4 @@
+import { channelRequest, channelResponse, isChannelRoute } from "@openbot/contracts/team-protocol/channels-v1";
 import {
   decodeTeamProtocolV4CurrentHttpResponse,
   encodeTeamProtocolV4CurrentHttpRequest,
@@ -72,17 +73,19 @@ export async function requestJson<T>(
       body:
         options.body === undefined
           ? undefined
-          : options.protocol === 4
-            ? encodeTeamProtocolV4CurrentHttpRequest(method, path, options.body, {
-                preserveSemanticTags: options.preserveSemanticTags,
-              })
-            : options.protocol === TEAM_PROTOCOL_V3
-              ? encodeTeamProtocolV3CurrentHttpRequest(method, path, options.body, {
+          : isChannelRoute(path)
+            ? JSON.stringify(channelRequest(path, options.body))
+            : options.protocol === 4
+              ? encodeTeamProtocolV4CurrentHttpRequest(method, path, options.body, {
                   preserveSemanticTags: options.preserveSemanticTags,
                 })
-              : encodeTeamProtocolV1CurrentHttpRequest(method, path, options.body, {
-                  preserveSemanticTags: options.preserveSemanticTags,
-                }),
+              : options.protocol === TEAM_PROTOCOL_V3
+                ? encodeTeamProtocolV3CurrentHttpRequest(method, path, options.body, {
+                    preserveSemanticTags: options.preserveSemanticTags,
+                  })
+                : encodeTeamProtocolV1CurrentHttpRequest(method, path, options.body, {
+                    preserveSemanticTags: options.preserveSemanticTags,
+                  }),
     },
     options.timeoutMs,
   );
@@ -102,8 +105,9 @@ export async function requestJson<T>(
   }
   if (value !== undefined) {
     try {
-      value =
-        options.protocol === 4
+      value = isChannelRoute(path)
+        ? channelResponse(path, response.status, value)
+        : options.protocol === 4
           ? decodeTeamProtocolV4CurrentHttpResponse(method, path, response.status, value)
           : options.protocol === TEAM_PROTOCOL_V3
             ? decodeTeamProtocolV3CurrentHttpResponse(method, path, response.status, value)

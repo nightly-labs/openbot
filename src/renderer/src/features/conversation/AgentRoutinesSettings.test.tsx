@@ -4,6 +4,7 @@ import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMockOpenBot, type MockOpenBotControls } from "../../preview/mock-openbot";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
+import { agentRoutinesPort } from "./routines-port";
 
 const routine: Routine = {
   id: "routine-1",
@@ -68,7 +69,7 @@ describe("AgentRoutinesSettings", () => {
     });
     render(() => (
       <AgentRoutinesSettings
-        agentId="chief"
+        port={agentRoutinesPort("chief")}
         onCountChange={vi.fn()}
         selectionRequest={selectionRequest()}
         onSelectionRequestHandled={onSelectionRequestHandled}
@@ -92,7 +93,7 @@ describe("AgentRoutinesSettings", () => {
     const onSelectionRequestHandled = vi.fn();
     render(() => (
       <AgentRoutinesSettings
-        agentId="chief"
+        port={agentRoutinesPort("chief")}
         onCountChange={vi.fn()}
         selectionRequest={{ routineId: "deleted-routine", routineName: "Old brief", nonce: 1 }}
         onSelectionRequestHandled={onSelectionRequestHandled}
@@ -119,7 +120,11 @@ describe("AgentRoutinesSettings", () => {
       nonce: 1,
     });
     render(() => (
-      <AgentRoutinesSettings agentId="chief" onCountChange={vi.fn()} selectionRequest={selectionRequest()} />
+      <AgentRoutinesSettings
+        port={agentRoutinesPort("chief")}
+        onCountChange={vi.fn()}
+        selectionRequest={selectionRequest()}
+      />
     ));
 
     const name = await screen.findByRole("textbox", { name: "Name" });
@@ -137,7 +142,9 @@ describe("AgentRoutinesSettings", () => {
     const mock = setupOpenBot({ routines: { chief: [routine] } });
     vi.spyOn(mock.api.agent, "listRoutineRuns").mockResolvedValue([run]);
     const onOpenRun = vi.fn();
-    render(() => <AgentRoutinesSettings agentId="chief" onCountChange={vi.fn()} onOpenRun={onOpenRun} />);
+    render(() => (
+      <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} onOpenRun={onOpenRun} />
+    ));
 
     await fireEvent.click(await screen.findByRole("button", { name: /Morning brief/ }));
     await fireEvent.input(screen.getByRole("textbox", { name: "Name" }), {
@@ -156,7 +163,7 @@ describe("AgentRoutinesSettings", () => {
   it("keeps an empty draft local and discards it on Back", async () => {
     const mock = setupOpenBot();
     const createRoutine = vi.spyOn(mock.api.agent, "createRoutine");
-    render(() => <AgentRoutinesSettings agentId="chief" onCountChange={vi.fn()} />);
+    render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} />);
 
     expect(await screen.findByText("No routines yet.")).toBeInTheDocument();
     const createButton = screen.getByRole("button", { name: "Create Routine" });
@@ -170,7 +177,7 @@ describe("AgentRoutinesSettings", () => {
 
   it("asks before discarding an edited draft on Back", async () => {
     setupOpenBot({ routines: { chief: [routine] } });
-    render(() => <AgentRoutinesSettings agentId="chief" onCountChange={vi.fn()} />);
+    render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} />);
 
     await fireEvent.click(await screen.findByRole("button", { name: /Morning brief/ }));
     const name = screen.getByRole("textbox", { name: "Name" });
@@ -190,7 +197,7 @@ describe("AgentRoutinesSettings", () => {
   it("runs the requested Close action after discard confirmation", async () => {
     setupOpenBot({ routines: { chief: [routine] } });
     const onClose = vi.fn();
-    render(() => <AgentRoutinesSettings agentId="chief" onCountChange={vi.fn()} onClose={onClose} />);
+    render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} onClose={onClose} />);
 
     await fireEvent.click(await screen.findByRole("button", { name: /Morning brief/ }));
     await fireEvent.input(screen.getByRole("textbox", { name: "Instruction" }), {
@@ -207,7 +214,7 @@ describe("AgentRoutinesSettings", () => {
     const mock = setupOpenBot();
     const createRoutine = vi.spyOn(mock.api.agent, "createRoutine");
     const onCountChange = vi.fn();
-    render(() => <AgentRoutinesSettings agentId="chief" onCountChange={onCountChange} />);
+    render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={onCountChange} />);
 
     await screen.findByText("No routines yet.");
     await fireEvent.click(screen.getByRole("button", { name: "Create Routine" }));
@@ -245,7 +252,7 @@ describe("AgentRoutinesSettings", () => {
     const testRoutine = vi.spyOn(mock.api.agent, "testRoutine");
     const deleteRoutine = vi.spyOn(mock.api.agent, "deleteRoutine");
     vi.spyOn(mock.api.agent, "listRoutineRuns").mockResolvedValue([run]);
-    render(() => <AgentRoutinesSettings agentId="chief" onCountChange={vi.fn()} />);
+    render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} />);
 
     await fireEvent.click(await screen.findByRole("button", { name: /Morning brief/ }));
     expect(await screen.findByRole("img", { name: "Needs attention" })).toBeInTheDocument();
@@ -276,7 +283,7 @@ describe("AgentRoutinesSettings", () => {
           resolveUpdate = resolve;
         }),
     );
-    render(() => <AgentRoutinesSettings agentId="chief" onCountChange={vi.fn()} onClose={vi.fn()} />);
+    render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} onClose={vi.fn()} />);
 
     await fireEvent.click(await screen.findByRole("button", { name: /Morning brief/ }));
     await fireEvent.input(screen.getByRole("textbox", { name: "Name" }), {
@@ -293,7 +300,7 @@ describe("AgentRoutinesSettings", () => {
   it("offers 96 quarter-hour values and saves a selected time", async () => {
     const mock = setupOpenBot({ routines: { chief: [routine] } });
     const updateRoutine = vi.spyOn(mock.api.agent, "updateRoutine");
-    render(() => <AgentRoutinesSettings agentId="chief" onCountChange={vi.fn()} />);
+    render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} />);
 
     await fireEvent.click(await screen.findByRole("button", { name: /Morning brief/ }));
     await fireEvent.click(screen.getByRole("button", { name: /On weekdays at 7:00 AM/ }));
@@ -320,7 +327,7 @@ describe("AgentRoutinesSettings", () => {
       trigger: { ...routine.trigger, schedule: { kind: "weekdays", time: "07:07" } },
     };
     setupOpenBot({ routines: { chief: [customTimeRoutine] } });
-    render(() => <AgentRoutinesSettings agentId="chief" onCountChange={vi.fn()} />);
+    render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} />);
 
     await fireEvent.click(await screen.findByRole("button", { name: /Morning brief/ }));
     await fireEvent.click(screen.getByRole("button", { name: /On weekdays at 7:07 AM/ }));
@@ -334,7 +341,7 @@ describe("AgentRoutinesSettings", () => {
 
   it("opens the time picker from the keyboard", async () => {
     setupOpenBot({ routines: { chief: [routine] } });
-    render(() => <AgentRoutinesSettings agentId="chief" onCountChange={vi.fn()} />);
+    render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} />);
 
     await fireEvent.click(await screen.findByRole("button", { name: /Morning brief/ }));
     await fireEvent.click(screen.getByRole("button", { name: /On weekdays at 7:00 AM/ }));

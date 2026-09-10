@@ -8,6 +8,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { AgentMemoryStore } from "../src/backend/agent-memory-store";
 import { AgentRoutineStore } from "../src/backend/agent-routine-store";
 import { AgentStore } from "../src/backend/agent-store";
+import { ChannelMemoryStore } from "../src/backend/channel-memory-store";
+import { ChannelRoutineStore } from "../src/backend/channel-routine-store";
+import { ChannelStore } from "../src/backend/channel-store";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
 import { developmentUserDataName } from "../src/main/development-profile";
@@ -39,7 +42,7 @@ describe("development state seed", () => {
       dryRun: false,
       agents: 4,
       conversations: 4,
-      attachments: 4,
+      attachments: 5,
       teamMembers: 4,
       activeInvites: 1,
       sessions: 4,
@@ -48,6 +51,12 @@ describe("development state seed", () => {
       memories: 7,
       routines: 5,
       routineRuns: 3,
+      channels: 2,
+      channelMessages: 12,
+      channelTasks: 5,
+      channelMemories: 3,
+      channelRoutines: 2,
+      channelRoutineRuns: 2,
     });
     await expect(readSetupState(join(profilePath, "openbot-setup-v2.json"))).resolves.toEqual({
       completed: true,
@@ -83,6 +92,22 @@ describe("development state seed", () => {
     expect(persistedMessages.some((message) => message.replyToMessageId !== undefined)).toBe(true);
     expect(mailbox.reactionFor("chief", "chief-assistant-plan")).toBe("🎉");
     expect(mailbox.reactionFor("research", "research-assistant")).toBe("✅");
+    // The showcase is dated backwards from the run, so the newest seeded exchange is from today.
+    // A fixed date puts the whole transcript weeks away from the routine runs, which the
+    // schedulers date from the real clock.
+    const newest = persistedMessages.find((message) => message.id === "chief-assistant-interrupted");
+    expect(Date.parse(newest?.createdAt ?? "")).toBeGreaterThan(Date.now() - 6 * 60 * 60 * 1_000);
+    // Every reply follows a request, and each preview repeats that request the way the app writes
+    // it: the last user message, with its agent and attachment references expanded.
+    for (const agent of summaries) {
+      const messages = agents.database.readConversation(agent.id, agent.threadId).messages;
+      expect(messages[0]?.author).toBe("user");
+      const request = [...messages].reverse().find((message) => message.author === "user");
+      expect(request?.text).toBeDefined();
+      expect(agent.preview).not.toContain("@[");
+      expect(agent.preview).not.toContain("attachment:");
+      expect(agent.preview.length).toBeGreaterThan(0);
+    }
 
     const attachments = new Map(
       persistedMessages
@@ -169,6 +194,53 @@ describe("development state seed", () => {
     const directThreads = chat.listThreads(owner?.id ?? "");
     expect(directThreads).toHaveLength(3);
     expect(directThreads.reduce((total, thread) => total + thread.unreadCount, 0)).toBeGreaterThan(0);
+    const channels = new ChannelStore(agents.database);
+    const channelSummaries = channels.list("local");
+    expect(channelSummaries.map((channel) => channel.id)).toEqual(["channel-launch-room", "channel-beta-feedback"]);
+    const launchRoom = channelSummaries[0];
+    expect(launchRoom?.archived).toBe(false);
+    expect(launchRoom?.unreadCount).toBe(2);
+    expect(launchRoom?.activeTasks).toBe(0);
+    // The seed reads as `local`, but the app resolves a team member id once the owner signs in.
+    // Adoption is what keeps the seeded read state, and the unread count, on that reader.
+    channels.adoptReads("local", owner?.id ?? "");
+    expect(channels.list(owner?.id ?? "")[0]?.unreadCount).toBe(2);
+    expect(channelSummaries[1]?.archived).toBe(true);
+    const channelMessages = channelSummaries.flatMap((channel) => channels.messages(channel.id));
+    expect(channelMessages).toHaveLength(12);
+    const channelTasks = channelSummaries.flatMap((channel) => channels.tasks(channel.id));
+    expect(channelTasks).toHaveLength(5);
+    // A queued task or an open routine run would make `bun run dev` start a real provider turn on
+    // the seeded state at startup.
+    expect(channelTasks.some((task) => task.state === "queued")).toBe(false);
+    expect(channelTasks.some((task) => task.state === "failed" && task.error !== null)).toBe(true);
+    // The delegated run keeps its shape: the root waits on the child it created.
+    const root = channelTasks.find((task) => task.id === "channel-launch-task-release-note");
+    expect(root?.dependencies).toEqual(["channel-launch-task-evidence"]);
+    expect(channelTasks.find((task) => task.id === "channel-launch-task-evidence")?.parentTaskId).toBe(root?.id);
+    const channelAttachments = channelMessages.flatMap((message) => message.message.attachments ?? []);
+    expect(channelAttachments).toHaveLength(1);
+    // The channel file lives in a channel execution thread, so it stays with the shared transcript.
+    expect(channels.contextThreads("channel-launch-room")).toHaveLength(4);
+    for (const attachment of channelAttachments) {
+      const resolved = await mailbox.resolveAttachment(attachment.id);
+      await expect(stat(resolved?.path ?? "")).resolves.toBeDefined();
+      expect(
+        new Set(channelMessages.flatMap((message) => [...attachmentReferenceIds(message.message.text)])),
+      ).toContain(attachment.id);
+    }
+    expect(new ChannelMemoryStore(agents.database).list("channel-launch-room")).toHaveLength(3);
+    const channelRoutines = new ChannelRoutineStore(agents.database);
+    const seededRoutines = channelRoutines.list("channel-launch-room");
+    expect(seededRoutines).toHaveLength(2);
+    expect(seededRoutines.filter((routine) => routine.active)).toHaveLength(1);
+    expect(channelRoutines.openRuns("channel-launch-room")).toHaveLength(0);
+    const channelRuns = seededRoutines.flatMap((routine) =>
+      channelRoutines.listRuns(routine.channelId, routine.id, 10),
+    );
+    expect(channelRuns).toHaveLength(2);
+    expect(channelRuns.map((run) => run.status)).toEqual(expect.arrayContaining(["succeeded", "failed"]));
+    expect(channelRoutines.runForRequest("channel-launch-request-standup")?.status).toBe("succeeded");
     agents.database.close();
 
     await expect(readFile(productionSentinel, "utf8")).resolves.toBe("production");
@@ -180,12 +252,12 @@ describe("development state seed", () => {
     await seedDevelopmentState({ appDataRoot, homeDirectory });
     const generatedRoot = join(homeDirectory, "OpenBot", "Shared", "Transfers", "generated");
     const firstDirectories = await readdir(generatedRoot);
-    expect(firstDirectories).toHaveLength(4);
+    expect(firstDirectories).toHaveLength(5);
 
     await seedDevelopmentState({ appDataRoot, homeDirectory });
 
     const secondDirectories = await readdir(generatedRoot);
-    expect(secondDirectories).toHaveLength(4);
+    expect(secondDirectories).toHaveLength(5);
     expect(secondDirectories.every((directory) => !firstDirectories.includes(directory))).toBe(true);
     for (const directory of firstDirectories) {
       await expect(stat(join(generatedRoot, directory))).rejects.toMatchObject({ code: "ENOENT" });

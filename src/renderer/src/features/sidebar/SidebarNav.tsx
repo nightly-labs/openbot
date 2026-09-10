@@ -15,7 +15,7 @@ export function SidebarNav() {
   const {
     draggingKind,
     dropSidebarNativeDrag,
-    filteredAgents,
+    filteredChats,
     filteredPeople,
     handleListDragLeave,
     layoutMutable,
@@ -43,7 +43,7 @@ export function SidebarNav() {
         <Show
           when={
             resolvedPinnedItems().length === 0 &&
-            filteredAgents().length === 0 &&
+            filteredChats().length === 0 &&
             (props.showPeople === false || filteredPeople().length === 0) &&
             pending.sectionEditor?.target.kind !== "create"
           }
@@ -56,15 +56,22 @@ export function SidebarNav() {
           {reorderAnnouncement()}
         </span>
       </div>
-      <Show when={layoutMutable()}>
+      <Show when={layoutMutable() || props.onToggleArchivedChannels}>
         <ContextMenu.Root modal={false}>
           <ContextMenu.Trigger class="sidebar-list-context-trigger" aria-label="Sidebar free area" />
           <ContextMenu.Portal>
             <ContextMenu.Content class="agent-context-menu" aria-label="Sidebar actions">
-              <ContextMenu.Item onSelect={() => startCreateSection()}>
-                <FolderPlus class="agent-context-icon size-4" aria-hidden="true" />
-                <span>New section</span>
-              </ContextMenu.Item>
+              <Show when={layoutMutable()}>
+                <ContextMenu.Item onSelect={() => startCreateSection()}>
+                  <FolderPlus class="agent-context-icon size-4" aria-hidden="true" />
+                  <span>New section</span>
+                </ContextMenu.Item>
+              </Show>
+              <Show when={props.onToggleArchivedChannels}>
+                <ContextMenu.Item onSelect={() => props.onToggleArchivedChannels?.()}>
+                  {props.showingArchivedChannels ? "Show active chats" : "Archived chats"}
+                </ContextMenu.Item>
+              </Show>
             </ContextMenu.Content>
           </ContextMenu.Portal>
         </ContextMenu.Root>

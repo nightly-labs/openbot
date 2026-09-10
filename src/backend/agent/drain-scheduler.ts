@@ -1,6 +1,7 @@
 import { AGENT_PROVIDERS } from "@openbot/contracts/ipc";
 import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
+import type { ChannelService } from "../channel-service";
 import type { DeliveryContext, MailboxStore } from "../mailbox-store";
 import { decodeTurnResponse } from "../protocol";
 import type { ContextCompaction } from "./context-compaction";
@@ -31,6 +32,7 @@ export interface DrainSchedulerOptions {
   routines: RoutineScheduler;
   threads: ThreadLifecycle;
   hooks: DrainHooks;
+  channels?: ChannelService;
 }
 
 /**
@@ -55,6 +57,7 @@ export class DrainScheduler {
   readonly #routines: RoutineScheduler;
   readonly #threads: ThreadLifecycle;
   readonly #hooks: DrainHooks;
+  readonly #channels: ChannelService | undefined;
   readonly #drainingAgents = new Set<string>();
   /**
    * How many deliveries are on their way to a turn, per provider.
@@ -79,10 +82,13 @@ export class DrainScheduler {
     this.#routines = options.routines;
     this.#threads = options.threads;
     this.#hooks = options.hooks;
+    this.#channels = options.channels;
   }
 
   mayDrain(agentId: string): boolean {
     return (
+      !this.#conversation.workingSnapshot(agentId)?.activeTurnId &&
+      (this.#channels?.mayDrain(agentId) ?? true) &&
       this.#profileSave.mayDrain(agentId) &&
       this.#duplication.mayDrain(agentId) &&
       this.#compaction.mayDrain(agentId) &&
@@ -101,14 +107,19 @@ export class DrainScheduler {
       return;
     }
     this.#scheduledDrains.add(agentId);
-    queueMicrotask(() => {
-      this.#scheduledDrains.delete(agentId);
-      if (this.#hooks.isStopping()) return;
-      const task = this.drainAgent(agentId).finally(() => {
+    const task = Promise.resolve()
+      .then(() => {
+        this.#scheduledDrains.delete(agentId);
+        if (this.#hooks.isStopping()) return;
+        return this.drainAgent(agentId);
+      })
+      .finally(() => {
         if (this.#drainTasks.get(agentId) === task) this.#drainTasks.delete(agentId);
       });
-      this.#drainTasks.set(agentId, task);
-    });
+    // Track the microtask as soon as it is scheduled. A channel can be deleted in the same
+    // turn that queues its delivery, before the microtask has entered drainAgent. Deletion must
+    // still wait for that start attempt so a provider turn cannot outlive the channel records.
+    this.#drainTasks.set(agentId, task);
   }
 
   pendingTasks(): Promise<void>[] {
@@ -142,12 +153,17 @@ export class DrainScheduler {
       return;
     this.#drainingAgents.add(agentId);
     try {
-      const snapshot = this.#conversation.snapshot(agentId);
+      const snapshot = this.#conversation.workingSnapshot(agentId);
       if (snapshot?.activeTurnId) return;
       const context = this.#mailbox.nextQueued(agentId);
       if (!context) return;
       const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-      const session = agent ? this.#store.activeProviderSession(agentId) : null;
+      const assignment = this.#channels?.store.assignmentForDelivery(context.delivery.id);
+      const publicThreadId = assignment
+        ? this.#channels?.store.context(assignment.channelId, assignment.agentId).threadId
+        : agent?.threadId;
+      const session =
+        agent && publicThreadId ? this.#store.database.activeProviderSession(publicThreadId, agent.provider) : null;
       if (session && this.#compaction.reserve(agentId, session.externalSessionId)) {
         await this.#compaction.request(agentId, session.externalSessionId);
         return;
@@ -161,6 +177,7 @@ export class DrainScheduler {
 
   async startDelivery(context: DeliveryContext): Promise<void> {
     const { delivery, managedAttachments } = context;
+    const channelDelivery = this.#channels ? this.#channels.store.assignmentForDelivery(delivery.id) !== null : false;
     let confirmedTurnId: string | null = null;
     const claimed = this.#deliveryProviders(delivery.recipientAgentId);
     for (const provider of claimed) this.#startingDeliveries.set(provider, this.#starting(provider) + 1);
@@ -172,7 +189,14 @@ export class DrainScheduler {
       this.#threads.applyPendingRuntimeRefresh(agent);
       await this.#providers.ensureProvider(providerForAgent(agent));
       const client = this.#providers.requireReadyClient(providerForAgent(agent));
-      let threadId = await this.#threads.ensureThread(agent, client);
+      const execution = this.#channels ? await this.#channels.prepare(context) : null;
+      if (channelDelivery && !execution) {
+        const current = this.#mailbox.getDelivery(delivery.id)?.delivery;
+        if (current?.status === "starting")
+          await this.#mailbox.markTerminal(delivery.id, "interrupted", "The channel was deleted before starting.");
+        return;
+      }
+      let threadId = await this.#threads.ensureThread(agent, client, execution?.threadId);
       const snapshot = this.#conversation.ensureSnapshot(agent.id, threadId);
       if (snapshot.activeTurnId) {
         await this.#mailbox.markTerminal(delivery.id, "failed", "The recipient already has an active turn.");
@@ -182,7 +206,7 @@ export class DrainScheduler {
 
       const agentNames = agentNamesById(this.#store.list());
       const displayText = displayMessageReferences(delivery.text, delivery.attachments, agentNames);
-      let text = displayText || "The user shared attached local files.";
+      let text = execution?.text ?? (displayText || "The user shared attached local files.");
       if (delivery.sender.kind === "user" && delivery.replyToMessageId) {
         const referenced = snapshot.messages.find((message) => message.id === delivery.replyToMessageId);
         text = [
@@ -307,7 +331,7 @@ export class DrainScheduler {
         if (this.#conversation.loadedClientFor(unavailableThreadId) === client) {
           this.#conversation.unloadThread(unavailableThreadId);
         }
-        threadId = await this.#threads.ensureThread(agent, client);
+        threadId = await this.#threads.ensureThread(agent, client, execution?.threadId);
         response = await startTurn(threadId);
         if (threadId === unavailableThreadId) {
           this.#threads.logRecovery(agent.id, client.provider, "resumed");
@@ -315,12 +339,13 @@ export class DrainScheduler {
       }
       await this.#mailbox.markRunning(delivery.id, response.turn.id);
       confirmedTurnId = response.turn.id;
+      this.#channels?.accepted(delivery.id, threadId, response.turn.id);
       const currentDelivery = this.#mailbox.getDelivery(delivery.id)?.delivery;
       if (currentDelivery?.status === "running" && currentDelivery.turnId === response.turn.id) {
         snapshot.activeTurnId = response.turn.id;
         this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.id);
         this.#mailboxSync.emitQueue(agent.id);
-        this.#conversation.emitConversation(this.#conversation.snapshot(agent.id) ?? snapshot);
+        this.#conversation.emitConversation(snapshot);
       }
       await this.#threads.deletePendingHandoff(threadId).catch((error) => {
         this.#hooks.emitError("history_handoff_cleanup_failed", error, agent.id);
@@ -333,6 +358,7 @@ export class DrainScheduler {
         return;
       }
       if (isRequestTimeout(error, "turn/start")) {
+        this.#channels?.deliveryUncertain(delivery.id);
         this.#hooks.emitError(
           "delivery_start_unconfirmed",
           "Codex did not confirm the turn start in time. OpenBot will wait for lifecycle events instead of retrying potentially duplicated work.",
@@ -342,6 +368,7 @@ export class DrainScheduler {
       }
       await this.#mailbox.markTerminal(delivery.id, "failed", error instanceof Error ? error.message : String(error));
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+      this.#channels?.deliveryFailed(delivery.id, "The provider could not start this assignment. Resume to try again.");
       this.#hooks.emitError("delivery_start_failed", error, delivery.recipientAgentId);
       this.scheduleDrain(delivery.recipientAgentId);
     } finally {

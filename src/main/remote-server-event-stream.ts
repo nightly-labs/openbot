@@ -1,3 +1,4 @@
+import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
 import { decodeTeamProtocolV4BaseCurrentEvent } from "@openbot/contracts/team-protocol/v4-base-adapter";
 // The live event channel for HTTPS servers, and the reconnect policy both transports share.
 //
@@ -365,7 +366,11 @@ export class RemoteEventStream {
             return;
           }
           try {
-            const decoded = decodeTeamProtocolV4BaseCurrentEvent(JSON.parse(message.data));
+            const value = JSON.parse(message.data);
+            const channel = channelEvent(value);
+            const decoded = channel
+              ? { kind: "known" as const, event: channel }
+              : decodeTeamProtocolV4BaseCurrentEvent(value);
             if (decoded.kind === "unknown") return;
             if (decoded.kind === "invalid") {
               protocolFailed = true;

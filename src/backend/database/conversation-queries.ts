@@ -27,6 +27,14 @@ export interface ConversationQueriesOptions {
 }
 
 /**
+ * A channel gives each of its members a thread of its own, under the same agent id as the normal
+ * chat. A search result carries an agent id and a message, and opening one shows the normal
+ * conversation of that agent, where a channel message does not exist. The thread stays out of the
+ * search until a result can name the channel it belongs to.
+ */
+const CHANNEL_THREAD_EXCLUSION = "AND message.thread_id NOT IN (SELECT thread_id FROM projection_channel_contexts)";
+
+/**
  * Every read of a thread's messages: the whole snapshot, one anchored page, a page's supported
  * cursor, and a text search across the thread.
  *
@@ -259,6 +267,7 @@ export class ConversationQueries {
              AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
              AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
              AND COALESCE(message.item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
+             ${CHANNEL_THREAD_EXCLUSION}
              ${filter}`,
         )
         .get(...parameters),
@@ -276,6 +285,7 @@ export class ConversationQueries {
              AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
              AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
              AND COALESCE(message.item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
+             ${CHANNEL_THREAD_EXCLUSION}
              ${filter}
            ORDER BY message.created_at DESC, message.ordinal DESC, message.message_id DESC
            LIMIT ? OFFSET ?`,
