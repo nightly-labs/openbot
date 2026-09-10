@@ -15,6 +15,13 @@ The root `postinstall` runs `bun run --cwd apps/mobile setup:skia` after depende
 Skia 2.6.2 needs this step to copy its packaged native libraries before CocoaPods runs;
 EAS and local installs use the same setup.
 
+EAS profiles pin Bun 1.4.0 to match the root `packageManager`. Use the same Bun version
+locally: dependency paths and package patch metadata affect the runtime fingerprint.
+After switching from the isolated linker to the hoisted linker, move the old
+`apps/mobile/node_modules` directory out of the app and run `bun install --frozen-lockfile`
+from the repository root. A normal install can retain old workspace symlinks and cause
+the local fingerprint to differ from the clean EAS installation.
+
 Expo Router 57.0.20 is patched in `patches/expo-router@57.0.20.patch` to apply zoom dismissal
 bounds when its enabler registers after the chat mounts. This keeps the avatar-to-header zoom
 interactive from the left edge without enabling dismissal from the middle of the chat.
