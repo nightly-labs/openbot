@@ -2667,19 +2667,20 @@
   white-space: nowrap;
 }
 
+/*
+ * The whole height stays clickable, but nothing here is painted: a highlight on this button would
+ * fill the end of the pill. The hover and focus marks sit on the icon below, which is round.
+ */
 .scroll-to-latest-dismiss {
   display: grid;
   height: 100%;
   place-items: center;
   border: 0;
   border-inline-start: 1px solid color-mix(in srgb, currentcolor 24%, transparent);
-  border-radius: inherit;
   background: none;
   padding-inline: var(--openbot-space-2);
   color: inherit;
-  transition:
-    background-color var(--openbot-duration-hover) ease,
-    transform var(--openbot-duration-fast) cubic-bezier(0.23, 1, 0.32, 1);
+  transition: transform var(--openbot-duration-fast) cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .scroll-to-latest-button svg {
@@ -2693,19 +2694,34 @@
 }
 
 .scroll-to-latest-dismiss svg {
+  box-sizing: content-box;
   width: 15px;
   height: 15px;
+  border-radius: var(--openbot-radius-pill);
+  padding: var(--openbot-space-1);
+  transition: background-color var(--openbot-duration-hover) ease;
 }
 
 /* The ring follows the pill: an offset ring would draw a circle around one half of it. */
-.scroll-to-latest-button:focus-visible,
-.scroll-to-latest-dismiss:focus-visible {
+.scroll-to-latest-button:focus-visible {
   outline: 2px solid var(--openbot-border-focus);
   outline-offset: -2px;
 }
 
-.scroll-to-latest[data-new-messages] .scroll-to-latest-button:focus-visible,
-.scroll-to-latest[data-new-messages] .scroll-to-latest-dismiss:focus-visible {
+/* The dismiss ring follows its round icon mark, for the same reason its hover does. */
+.scroll-to-latest-dismiss:focus-visible {
+  outline: none;
+}
+
+.scroll-to-latest-dismiss:focus-visible svg {
+  outline: 2px solid var(--openbot-border-focus);
+}
+
+.scroll-to-latest[data-new-messages] .scroll-to-latest-button:focus-visible {
+  outline-color: var(--openbot-unread-text);
+}
+
+.scroll-to-latest[data-new-messages] .scroll-to-latest-dismiss:focus-visible svg {
   outline-color: var(--openbot-unread-text);
 }
 
@@ -2715,21 +2731,38 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .scroll-to-latest-button:hover,
-  .scroll-to-latest-dismiss:hover {
+  /* These are shared ghost buttons, whose own hover is written with two `:not()`s and so outweighs
+     a plain class. Each rule that has to replace it is matched at the same strength, or its own
+     hover paints over the pill and repaints the text for a light background. */
+  .scroll-to-latest-button:hover:not(:disabled):not([data-disabled]) {
+    background: var(--openbot-bg-control-active);
+    color: inherit;
+  }
+
+  /* The dismiss box itself stays unpainted: its mark is the round one on the icon. */
+  .scroll-to-latest-dismiss:hover:not(:disabled):not([data-disabled]) {
+    background: none;
+    color: inherit;
+  }
+
+  .scroll-to-latest-dismiss:hover svg {
     background: var(--openbot-bg-control-active);
   }
 
-  .scroll-to-latest[data-new-messages] .scroll-to-latest-button:hover,
-  .scroll-to-latest[data-new-messages] .scroll-to-latest-dismiss:hover {
+  .scroll-to-latest[data-new-messages] .scroll-to-latest-button:hover:not(:disabled):not([data-disabled]) {
     background: color-mix(in srgb, var(--openbot-unread-text) 12%, transparent);
+  }
+
+  .scroll-to-latest[data-new-messages] .scroll-to-latest-dismiss:hover svg {
+    background: color-mix(in srgb, var(--openbot-unread-text) 18%, transparent);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .scroll-to-latest,
   .scroll-to-latest-button,
-  .scroll-to-latest-dismiss {
+  .scroll-to-latest-dismiss,
+  .scroll-to-latest-dismiss svg {
     transition: none;
   }
 
