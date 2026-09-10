@@ -1,4 +1,5 @@
 import type { AgentModelId, AgentProviderId, AgentReasoningEffort, BrowserBounds } from "@openbot/contracts/ipc";
+import type { QueueEditSession } from "@openbot/team-client/queue-edit-session";
 import { createSignal, onCleanup } from "solid-js";
 import type { AgentActivityPresentation } from "./AgentActivity";
 import type { ChatSearchMatch } from "./chat-search";
@@ -88,7 +89,7 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
   const [drafts, setDrafts] = createSignal<Record<string, ComposerDraft>>({});
   const [editingAgentId, setEditingAgentId] = createSignal<string | null>(null);
   const [editingServerId, setEditingServerId] = createSignal<string | null>(null);
-  const takenQueueEdits = new Set<string>();
+  const queueEditSessions = new Map<string, QueueEditSession>();
   const [pendingQueueEdit, setPendingQueueEdit] = createSignal<ConversationTarget | null>(null);
   const [editingDeliveryId, setEditingDeliveryId] = createSignal<string | null>(null);
   const [editingDraftBackup, setEditingDraftBackup] = createSignal<ComposerDraft | null>(null);
@@ -160,7 +161,7 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
     setEditingAgentId,
     editingServerId,
     setEditingServerId,
-    takenQueueEdits,
+    queueEditSessions,
     pendingQueueEdit,
     setPendingQueueEdit,
     editingDeliveryId,

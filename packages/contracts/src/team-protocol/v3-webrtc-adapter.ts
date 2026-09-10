@@ -3,6 +3,7 @@ import {
   isAgentProfileRoute,
   isConversationUnreadRoute,
   isHostAnalyticsRoute,
+  isQueueEditRoute,
   isQueueTakeRoute,
 } from "./current";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./v2";
@@ -72,6 +73,7 @@ export function decodeTeamProtocolV3WebRtcHttpResponse(
 export function isTeamProtocolV3OnlyRoute(method: string, path: string): boolean {
   if (
     isQueueTakeRoute(method, path) ||
+    isQueueEditRoute(method, path) ||
     isAgentAnalyticsRoute(method, path) ||
     isHostAnalyticsRoute(method, path) ||
     isAgentProfileRoute(method, path) ||

@@ -157,6 +157,7 @@ export const IPC_ENDPOINTS = {
     setMessageReaction: request(IPC_CHANNELS.agentSetMessageReaction),
     listQueue: request(IPC_CHANNELS.agentListQueue),
     acknowledgeFailedTurn: request(IPC_CHANNELS.agentAcknowledgeFailedTurn),
+    queueEdit: request(IPC_CHANNELS.agentQueueEdit),
     takeQueuedMessage: request(IPC_CHANNELS.agentTakeQueuedMessage),
     cancelQueuedMessage: request(IPC_CHANNELS.agentCancelQueuedMessage),
     steerQueuedMessage: request(IPC_CHANNELS.agentSteerQueuedMessage),

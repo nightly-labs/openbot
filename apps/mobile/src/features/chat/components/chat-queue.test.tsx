@@ -1,3 +1,5 @@
+import type { QueueEditInput, QueueEditState } from "@openbot/contracts/ipc";
+import { QueueEditSession } from "@openbot/team-client/queue-edit-session";
 import { fireEvent, screen } from "@testing-library/dom";
 import { act, type PropsWithChildren, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -7,11 +9,20 @@ import {
   discardQueueEdit,
   type PreparedQueueEdit,
   prepareQueueEdit,
+  recoverQueueEdit,
   saveQueueEdit,
 } from "../model/queue-edit-operations";
 import { createQueueEditStore } from "../model/queue-edit-store";
 import { ChatQueue } from "./chat-queue";
 import { useQueueEdit } from "./use-queue-edit";
+
+function testSession() {
+  return new QueueEditSession(
+    "agent",
+    { deliveryId: "delivery", revision: 1, text: "Queued task", attachments: [], replyToMessageId: null },
+    async () => null,
+  );
+}
 
 // Native layout and text have no DOM implementation. Keep text available to accessibility queries.
 vi.mock("react-native", () => ({
@@ -236,7 +247,7 @@ it("loads a queued message into the composer and restores the previous draft on 
   expect(screen.getByText("draft.txt")).toBeTruthy();
   await act(() => fireEvent.click(screen.getByRole("button", { name: "Edit queued message 1" })));
   expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty("value", "Unsent draft");
-  await act(async () => confirmation.resolve({ body: message.body, attachments: [], mode: "taken" }));
+  await act(async () => confirmation.resolve({ body: message.body, attachments: [], session: testSession() }));
   expect(take).toHaveBeenLastCalledWith(message);
   expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty("value", "Queued task");
   expect(screen.queryByText("Up next")).toBeNull();
@@ -295,7 +306,7 @@ it.each([false, true])("keeps a queued reply when navigation precedes take compl
   if (leaveBeforeTake) await act(() => root.render(null));
   await act(() =>
     confirmation.resolve({
-      mode: "taken",
+      session: testSession(),
       body: message.body,
       attachments: [
         {
@@ -344,7 +355,7 @@ it.each([false, true])("locks an edited send across navigation and permits retry
     const editor = useQueueEdit(store, { serverId: "server", id: "agent" }, async () => ({
       ...message,
       attachments: message.attachments,
-      mode: "taken",
+      session: testSession(),
     }));
     return (
       <>
@@ -394,70 +405,90 @@ it.each([false, true])("locks an edited send across navigation and permits retry
   expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
 });
 
-it.each([true, false])("uses the host snapshot for text edits when queue-take is supported: %s", async (capable) => {
-  const hostFile = {
-    id: "host-draft",
-    name: "latest.txt",
-    size: 1,
-    kind: "file" as const,
-    mimeType: "text/plain",
-    previewKind: "none" as const,
-    previewUrl: null,
-  };
-  const workspace = {
-    canTakeQueuedMessage: vi.fn(() => capable),
-    takeQueuedMessage: vi.fn(async () => ({ text: "Latest host text", attachments: [hostFile] })),
-    updateQueuedMessage: vi.fn(async () => {}),
-    sendMessage: vi.fn(async () => "sent"),
-    discardAttachment: vi.fn(async () => {}),
-  };
-  const agent = { id: "agent", serverId: "server" };
-  const message: Extract<ChatMessage, { kind: "message" }> = {
-    id: "message",
-    kind: "message",
-    author: "user",
-    body: "Old mobile text",
-    streaming: false,
-    replyToMessageId: "reply",
-    delivery: { id: "delivery", status: "queued", position: 1 },
-  };
-  const prepared = await prepareQueueEdit(workspace, agent, message);
-  const edit = { message: { ...message, ...prepared }, mode: prepared.mode };
-  await saveQueueEdit(workspace, agent, edit, prepared.body, []);
-  if (capable) {
-    expect(workspace.takeQueuedMessage).toHaveBeenCalledWith({ agentId: "agent", deliveryId: "delivery" }, "server");
-    expect(workspace.sendMessage).toHaveBeenCalledWith("agent", "Latest host text", ["host-draft"], "reply");
-    expect(workspace.updateQueuedMessage).not.toHaveBeenCalled();
-  } else {
-    expect(workspace.takeQueuedMessage).not.toHaveBeenCalled();
-    expect(workspace.sendMessage).not.toHaveBeenCalled();
-    expect(workspace.updateQueuedMessage).toHaveBeenCalledWith(
+it.each(["user", "agent", "routine"] as const)(
+  "recovers and sends a held %s message through its original delivery",
+  async (source) => {
+    const hostFile = {
+      id: "host-draft",
+      name: "latest.txt",
+      size: 1,
+      kind: "file" as const,
+      mimeType: "text/plain",
+      previewKind: "none" as const,
+      previewUrl: null,
+    };
+    const state: QueueEditState = {
+      deliveryId: "delivery",
+      revision: 2,
+      text: "Latest host text",
+      attachments: [hostFile],
+      replyToMessageId: "reply",
+    };
+    const workspace = {
+      queueEdit: vi.fn(async (input: QueueEditInput, _serverId: string) =>
+        input.operation === "read" || input.operation === "begin"
+          ? state
+          : input.operation === "save"
+            ? { ...state, revision: input.revision + 1, text: input.text }
+            : null,
+      ),
+    };
+    const agent = { id: "chief", serverId: "server" };
+    const projected = projectChatMessages([
       {
-        agentId: "agent",
+        id: "delivery",
+        author: source === "agent" ? "agent" : "user",
+        source,
+        text: "Original instructions",
+        createdAt: "2026-09-10T10:00:00Z",
+        status: "completed",
+        delivery: { id: "delivery", status: "queued", position: 1 },
+        ...(source === "agent"
+          ? {
+              exchange: {
+                direction: "incoming" as const,
+                messageId: "message",
+                senderAgentId: "sales",
+                recipientAgentIds: ["chief"],
+                replyToMessageId: null,
+                deliveries: [],
+              },
+            }
+          : {}),
+      },
+    ]);
+    const message = projected.find((item) => item.kind === "message");
+    if (message?.kind !== "message") throw new Error("Missing queued message");
+    expect(message.body).toBe("Original instructions");
+    const prepared = await prepareQueueEdit(workspace, agent, message);
+    expect(prepared.body).toBe("Latest host text");
+    // A new workspace store represents a new app process, with no in-memory edit to recover.
+    const store = createQueueEditStore();
+    const recover = () => recoverQueueEdit(workspace, agent);
+    function Composer() {
+      const editor = useQueueEdit(store, agent, async () => prepared, recover);
+      return <input aria-label="Recovered message" value={editor.draft} readOnly />;
+    }
+    await act(() => root.render(<Composer />));
+    expect(screen.getByRole("textbox", { name: "Recovered message" })).toHaveProperty("value", "Latest host text");
+    const recovered = await recover();
+    if (!recovered) throw new Error("Missing recovery");
+    await saveQueueEdit({ message: recovered.message, session: recovered.session }, "Revised", []);
+    expect(workspace.queueEdit).toHaveBeenLastCalledWith(
+      {
+        agentId: "chief",
         deliveryId: "delivery",
-        text: "Old mobile text",
-        keepAttachmentIds: [],
-        attachmentDraftIds: [],
+        revision: 3,
+        operation: "send",
+        text: "Revised",
+        attachmentDraftIds: ["host-draft"],
       },
       "server",
     );
-  }
-  const withFile = { ...message, attachments: [hostFile] };
-  const fileEdit = await prepareQueueEdit(workspace, agent, withFile);
-  await discardQueueEdit(workspace, agent, { message: { ...withFile, ...fileEdit }, mode: fileEdit.mode });
-  if (capable) expect(workspace.discardAttachment).toHaveBeenCalledWith("agent", "host-draft");
-  else {
-    expect(workspace.discardAttachment).not.toHaveBeenCalled();
-    await saveQueueEdit(workspace, agent, { message: withFile, mode: fileEdit.mode }, "Edited", ["new-draft"]);
-    expect(workspace.updateQueuedMessage).toHaveBeenLastCalledWith(
-      {
-        agentId: "agent",
-        deliveryId: "delivery",
-        text: "Edited",
-        keepAttachmentIds: ["host-draft"],
-        attachmentDraftIds: ["new-draft"],
-      },
+    await discardQueueEdit({ message, session: prepared.session });
+    expect(workspace.queueEdit).toHaveBeenLastCalledWith(
+      { agentId: "chief", deliveryId: "delivery", revision: 2, operation: "cancel" },
       "server",
     );
-  }
-});
+  },
+);

@@ -2,6 +2,7 @@ import type { ChatAttachment } from "../components/use-chat-attachments";
 import type { QueueEditTarget } from "./queue-edit-operations";
 
 interface ComposerState {
+  error: string | null;
   draft: string;
   items: ChatAttachment[];
   preparing: boolean;
@@ -17,7 +18,7 @@ export function createQueueEditStore() {
   function get(key: string): ComposerState {
     let state = states.get(key);
     if (!state) {
-      state = { draft: "", items: [], preparing: false, sending: false, focusRequest: 0, queueEdit: null };
+      state = { error: null, draft: "", items: [], preparing: false, sending: false, focusRequest: 0, queueEdit: null };
       states.set(key, state);
     }
     return state;

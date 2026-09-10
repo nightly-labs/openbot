@@ -217,25 +217,21 @@ the saved messages, and can be tried again when the provider connects or the app
 
 ## Team API compatibility boundary
 
-Desktop and mobile use `queue-take` for every edit when the host supports it, including text-only messages.
-The host cancels the delivery and returns its current content. Send creates a new delivery; cancelling
-the edit does not restore the old delivery. Mobile keeps drafts in the workspace provider, keyed by server and agent,
-so navigation and late take responses preserve edits, attachments, and reply targets until send or explicit cancellation.
-Pending edited sends also belong to this store: navigation cannot enable a duplicate send or replace the draft
-before the request completes. Desktop keeps taken-delivery IDs with its stable editing state across view
-replacement, and requires send or explicit cancellation before another queue edit can start. Pending desktop
-queue operations also live in stable state, keyed by server and agent. The matching composer remains locked
-across server switches until the request completes; other server composers remain available.
-On hosts without `queue-take`, both clients keep the original delivery and save edits through `queue/update`.
-Cancelling those edits preserves the queued delivery and its attachments. The edit keeps its original mode
-through navigation, even if the host capabilities change.
-Desktop hosts with that capability use the server-scoped `agent:take-queued-message` IPC endpoint. The optional `queue-take` capability adds `POST /v1/agents/:id/queue/take`
-for queue edits: the host copies attachment drafts, rechecks and cancels the queued delivery,
-and returns the draft text and attachment summaries. Taken attachment drafts carry their delivery ID in
-existing draft metadata. Ownership and cancellation are persisted together. Host startup keeps those
-drafts while clearing ordinary abandoned drafts; send, explicit cancellation, or agent deletion removes them.
-A stale delivery is rejected. Released protocol
-schemas stay unchanged; this extension belongs to the current v3 adapters.
+Desktop and mobile use the optional `queue-edit` capability and `POST /v1/agents/:id/queue/edit`.
+Desktop IPC exposes the same operation through `agent:queue-edit`. Beginning an edit copies attachments
+and atomically stores the draft with a cancelled delivery. The dispatcher cannot start that delivery.
+Draft text, attachment ownership, and edit revision live in SQLite metadata and survive client and host
+restarts. Clients recover the edit when the chat opens and serialize draft saves, send, and cancellation.
+Send updates and requeues the original delivery, preserving its sender and reply target. Cancel removes
+the saved edit and its drafts without restoring the delivery. A revision check rejects stale clients;
+retrying a completed operation does not send another message. Pending client operations remain scoped
+to their server and agent through navigation. A host without this capability requires an update before
+editing can pause a message safely.
+
+The earlier optional `queue-take` route remains available for compatible clients. It returns copied
+attachment drafts after cancellation. Such drafts also survive host restart until send, explicit discard,
+or agent deletion. Frozen protocol schemas stay unchanged; optional queue operations belong to the
+current v3 adapters.
 
 Current remote connections use Team API protocol v3 over three ordered WebRTC DataChannels: `rpc`,
 `events`, and `files`. A sandboxed hidden Chromium page owns each `RTCPeerConnection`. Electron main

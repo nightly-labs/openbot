@@ -35,7 +35,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setEditingDeliveryId,
     editingDraftBackup,
     setEditingDraftBackup,
-    takenQueueEdits,
+    queueEditSessions,
     pendingQueueEdit,
     setPendingQueueEdit,
     editingOriginalAttachmentIds,
@@ -316,7 +316,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setEditingDeliveryId,
     editingDraftBackup,
     setEditingDraftBackup,
-    takenQueueEdits,
+    queueEditSessions,
     pendingQueueEdit,
     setPendingQueueEdit,
     editingOriginalAttachmentIds,
@@ -579,6 +579,17 @@ export function createConversationViewScope(props: ConversationProps) {
       window.removeEventListener("pointerdown", closeMessageMenus);
     };
   });
+
+  createEffect(
+    () => ({ agentId: props.agent?.id, serverId: props.server?.id, state: props.server?.state, loaded: props.loaded }),
+    ({ agentId, loaded }) => {
+      if (agentId && loaded) void actions.recoverQueueEdit();
+    },
+  );
+  createEffect(
+    () => ({ drafts: drafts(), deliveryId: editingDeliveryId(), pending: pendingQueueEdit() }),
+    () => actions.persistQueueEdit(),
+  );
 
   createEffect(
     () => ({

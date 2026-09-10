@@ -14,6 +14,7 @@ export type ChatMessage =
       author: "agent" | "user";
       body: string;
       streaming: boolean;
+      source?: ConversationMessage["source"];
       replyToMessageId?: string | null;
       delivery?: ConversationMessage["delivery"];
       awaitingQueueReceipt?: boolean;
@@ -48,7 +49,8 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
   const thinkingByTurn = new Map<string, Extract<ChatMessage, { kind: "thinking" }>>();
   for (const message of messages) {
     if (message.delivery?.status === "cancelled") continue;
-    if (message.exchange) {
+    const queued = message.delivery?.status === "queued" || message.delivery?.status === "starting";
+    if (message.exchange && !queued) {
       result.push({ id: `exchange:${message.id}`, kind: "exchange", exchange: message.exchange });
       // Match desktop: exchanges have markers, not another agent's text bubble.
       // Incoming attachments remain visible below their marker.
@@ -73,7 +75,8 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
         id: message.id,
         kind: "message",
         author: message.author === "user" ? "user" : "agent",
-        body: message.exchange ? "" : message.text,
+        body: message.exchange && !queued ? "" : message.text,
+        ...(message.source ? { source: message.source } : {}),
         streaming: message.status === "streaming",
         attachments: message.attachments,
         ...(message.replyToMessageId ? { replyToMessageId: message.replyToMessageId } : {}),

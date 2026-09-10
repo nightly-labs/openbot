@@ -105,6 +105,7 @@ import type {
   SteerQueuedMessageInput,
   UpdateQueuedMessageInput,
 } from "./ipc-queue";
+import type { QueueEditInput, QueueEditState } from "./ipc-queue-edit";
 import type {
   CreateRoutineInput,
   DeleteRoutineInput,
@@ -205,6 +206,7 @@ export interface AgentDesktopApi {
   setMessageReaction: (input: SetMessageReactionInput) => Promise<void>;
   listQueue: (agentId: string) => Promise<QueueSnapshot>;
   acknowledgeFailedTurn: (input: AcknowledgeFailedTurnInput) => Promise<void>;
+  queueEdit: (input: QueueEditInput, serverId?: string) => Promise<QueueEditState | null>;
   takeQueuedMessage: (input: CancelQueuedMessageInput, serverId?: string) => Promise<QueuedMessageDraft>;
   cancelQueuedMessage: (input: CancelQueuedMessageInput) => Promise<void>;
   steerQueuedMessage: (input: SteerQueuedMessageInput) => Promise<void>;

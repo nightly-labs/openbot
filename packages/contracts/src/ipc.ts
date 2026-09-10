@@ -22,6 +22,7 @@ export * from "./ipc-host-analytics";
 export * from "./ipc-hosted-sites";
 export * from "./ipc-marketplace-agents";
 export * from "./ipc-queue";
+export * from "./ipc-queue-edit";
 export * from "./ipc-routines";
 export * from "./ipc-sidebar-layout";
 export * from "./ipc-skills";

@@ -560,3 +560,37 @@ it("takes a queue draft through the optional v3 route only for authenticated cap
   expect(await response.json()).toEqual({ text: "Draft", attachments: [] });
   expect(take).toHaveBeenCalledWith("chief", "delivery");
 });
+
+it("gates durable queue edits by authentication, capability, and agent scope", async () => {
+  const { start, signIn } = await createTeamApiFixture("queue-edit", { configure: true });
+  const edit = { deliveryId: "delivery", revision: 1, text: "Held", attachments: [], replyToMessageId: null };
+  const queueEdit = vi.fn(async () => edit);
+  const { base } = await start({ agents: createAgents({ queueEdit }) });
+  const token = await signIn({ protocol: TEAM_PROTOCOL_V3 });
+  const headers = {
+    "Content-Type": "application/json",
+    [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V3),
+    [TEAM_APP_VERSION_HEADER]: "1.0.0",
+    [TEAM_CAPABILITIES_HEADER]: "queue-edit",
+  };
+  const url = `${base}/v1/agents/chief/queue/edit`;
+  const body = JSON.stringify({ agentId: "chief", operation: "begin", deliveryId: "delivery" });
+  expect((await fetch(url, { method: "POST", headers, body })).status).toBe(401);
+  const authorized = { ...headers, Authorization: `Bearer ${token}` };
+  expect(
+    (await fetch(url, { method: "POST", headers: { ...authorized, [TEAM_CAPABILITIES_HEADER]: "" }, body })).status,
+  ).toBe(400);
+  expect(
+    (
+      await fetch(url, {
+        method: "POST",
+        headers: authorized,
+        body: JSON.stringify({ agentId: "other", operation: "read" }),
+      })
+    ).status,
+  ).toBe(400);
+  expect(queueEdit).not.toHaveBeenCalled();
+  const response = await fetch(url, { method: "POST", headers: authorized, body });
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual(edit);
+});

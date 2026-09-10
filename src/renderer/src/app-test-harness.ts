@@ -11,6 +11,7 @@ import type {
   DirectTypingRealtimeEvent,
   DynamicIslandAction,
   QueueDelivery,
+  QueueEditState,
   ScopedAgentEvent,
   ServerSummary,
   TeamPresenceSnapshot,
@@ -367,6 +368,7 @@ export function installVoiceRecordingMocks(): void {
 }
 
 export function installOpenbotStub(): void {
+  const queueEdits = new Map<string, QueueEditState>();
   for (const bridge of Object.values(eventBridges)) bridge.reset();
   trackAnalytics.mockClear();
   installAnalyticsSpies();
@@ -713,6 +715,36 @@ export function installOpenbotStub(): void {
         setMessageReaction: vi.fn().mockResolvedValue(undefined),
         listQueue: vi.fn().mockImplementation(async (agentId) => ({ agentId, deliveries: [] })),
         acknowledgeFailedTurn: vi.fn().mockResolvedValue(undefined),
+        queueEdit: vi.fn().mockImplementation(async (input) => {
+          if (input.operation === "read") return queueEdits.get(input.agentId) ?? null;
+          if (input.operation === "begin") {
+            const result = vi.mocked(window.openbot.agent.listQueue).mock.results.at(-1);
+            const queue = result?.type === "return" ? await result.value : { agentId: input.agentId, deliveries: [] };
+            const delivery = queue.deliveries.find((item) => item.id === input.deliveryId);
+            if (!delivery) throw new Error("Queued message was not found.");
+            const state = {
+              deliveryId: delivery.id,
+              revision: 1,
+              text: delivery.text,
+              attachments: delivery.attachments,
+              replyToMessageId: delivery.replyToMessageId,
+            };
+            queueEdits.set(input.agentId, state);
+            emitAgentEvent?.({
+              type: "queue-changed",
+              snapshot: { ...queue, deliveries: queue.deliveries.filter((item) => item.id !== delivery.id) },
+            });
+            return state;
+          }
+          const state = queueEdits.get(input.agentId);
+          if (input.operation === "save" && state) {
+            const updated = { ...state, revision: state.revision + 1, text: input.text };
+            queueEdits.set(input.agentId, updated);
+            return updated;
+          }
+          queueEdits.delete(input.agentId);
+          return null;
+        }),
         takeQueuedMessage: vi.fn().mockImplementation(async (input) => {
           const result = vi.mocked(window.openbot.agent.listQueue).mock.results.at(-1);
           const queue = result?.type === "return" ? await result.value : { agentId: input.agentId, deliveries: [] };

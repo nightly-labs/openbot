@@ -417,3 +417,32 @@ it("carries queue drafts over WebRTC and rejects malformed attachment data", () 
     "Invalid queued message draft.",
   );
 });
+
+it("carries durable edits over WebRTC and rejects invalid revisions", () => {
+  const path = "/v1/agents/chief/queue/edit";
+  const request = {
+    agentId: "chief",
+    deliveryId: "delivery",
+    operation: "send",
+    revision: 2,
+    text: "Revised",
+    attachmentDraftIds: [],
+  };
+  expect(encodeTeamProtocolV3WebRtcHttpRequest("POST", path, request)).toEqual(request);
+  expect(() => encodeTeamProtocolV3WebRtcHttpRequest("POST", path, { ...request, revision: 0 })).toThrow(
+    "Invalid queue edit revision.",
+  );
+  const state = {
+    deliveryId: "delivery",
+    revision: 2,
+    text: "Saved draft",
+    attachments: [],
+    replyToMessageId: "reply",
+  };
+  const wire = encodeTeamProtocolV3WebRtcHttpResponse("POST", path, 200, state);
+  expect(decodeTeamProtocolV3WebRtcHttpResponse("POST", path, 200, wire)).toEqual(state);
+  expect(decodeTeamProtocolV3WebRtcHttpResponse("POST", path, 200, null)).toBeNull();
+  expect(() => decodeTeamProtocolV3WebRtcHttpResponse("POST", path, 200, { ...state, attachments: [{}] })).toThrow(
+    "Invalid queue edit state.",
+  );
+});

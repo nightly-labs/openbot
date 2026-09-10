@@ -1,3 +1,4 @@
+import type { QueueEditState } from "@openbot/contracts/ipc";
 import {
   type AccountUsage,
   type AgentIpcRequest,
@@ -405,6 +406,28 @@ function decodeReadState(value: unknown): ConversationReadState {
 function decodeReadStates(value: unknown): Record<string, ConversationReadState> {
   const item = decodeRecord(value, "conversation reads");
   return Object.fromEntries(Object.entries(item).map(([agentId, state]) => [agentId, decodeReadState(state)]));
+}
+
+function decodeQueueEdit(value: unknown): QueueEditState | null {
+  if (value === null) return null;
+  const record = decodeRecord(value, "queue edit");
+  if (
+    typeof record.deliveryId !== "string" ||
+    !record.deliveryId ||
+    typeof record.revision !== "number" ||
+    !Number.isSafeInteger(record.revision) ||
+    record.revision < 1 ||
+    typeof record.text !== "string" ||
+    !(record.replyToMessageId === null || typeof record.replyToMessageId === "string")
+  )
+    throw new Error("Invalid queue edit state.");
+  return {
+    deliveryId: record.deliveryId,
+    revision: record.revision,
+    text: record.text,
+    attachments: decodeAttachments(record.attachments),
+    replyToMessageId: record.replyToMessageId,
+  };
 }
 
 function decodeQueuedMessageDraft(value: unknown) {
@@ -884,6 +907,8 @@ const openbotApi: OpenBotDesktopApi = {
     setMessageReaction: (input) => invokeAgent(IPC_CHANNELS.agentSetMessageReaction, input, decodeVoid),
     listQueue: (agentId) => invokeAgent(IPC_CHANNELS.agentListQueue, agentId, decodeQueue),
     acknowledgeFailedTurn: (input) => invokeAgent(IPC_CHANNELS.agentAcknowledgeFailedTurn, input, decodeVoid),
+    queueEdit: (input, serverId = selectedServerId) =>
+      invokeAgentForServer(serverId, IPC_CHANNELS.agentQueueEdit, input, decodeQueueEdit),
     takeQueuedMessage: (input, serverId = selectedServerId) =>
       invokeAgentForServer(serverId, IPC_CHANNELS.agentTakeQueuedMessage, input, decodeQueuedMessageDraft),
     cancelQueuedMessage: (input) => invokeAgent(IPC_CHANNELS.agentCancelQueuedMessage, input, decodeVoid),

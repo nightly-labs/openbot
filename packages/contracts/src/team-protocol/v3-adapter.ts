@@ -6,6 +6,7 @@ import {
   parseSaveAgentProfile,
 } from "../ipc-agent-profile";
 import { decodeHostAnalytics } from "../ipc-host-analytics";
+import { decodeQueueEditState, parseQueueEditInput } from "../ipc-queue-edit";
 import { isDynamicRecord } from "../runtime-values";
 import { decodeAnalyticsV1Response } from "./analytics-v1";
 import {
@@ -14,6 +15,7 @@ import {
   isAgentProfileRoute,
   isConversationUnreadRoute,
   isHostAnalyticsRoute,
+  isQueueEditRoute,
   isQueueTakeRoute,
 } from "./current";
 import { toCurrentAgentKeys, toCurrentAgentKeysObjectForPath, toWireAgentKeys } from "./current-agent-keys";
@@ -35,6 +37,7 @@ export function encodeTeamProtocolV3CurrentHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ): string {
+  if (isQueueEditRoute(method, path)) return JSON.stringify(parseQueueEditInput(value));
   if (isQueueTakeRoute(method, path))
     return encodeTeamProtocolV1CurrentHttpRequest(method, path.replace(/take$/u, "cancel"), value, options);
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path))
@@ -56,6 +59,7 @@ export function decodeTeamProtocolV3CurrentHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ): TeamProtocolV1JsonObject {
+  if (isQueueEditRoute(method, path)) return { ...parseQueueEditInput(value) };
   if (isQueueTakeRoute(method, path))
     return decodeTeamProtocolV1CurrentHttpRequest(method, path.replace(/take$/u, "cancel"), value);
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path)) return decodeScopedUsageRequest(value);
@@ -85,6 +89,10 @@ export function encodeTeamProtocolV3CurrentHttpResponse(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ): string {
+  if (isQueueEditRoute(method, path))
+    return status < 400
+      ? JSON.stringify(decodeQueueEditState(value))
+      : encodeTeamProtocolV1CurrentHttpResponse(method, path.replace(/edit$/u, "cancel"), status, value);
   if (isQueueTakeRoute(method, path))
     return status < 400
       ? JSON.stringify(decodeQueueDraft(value))
@@ -113,6 +121,10 @@ export function decodeTeamProtocolV3CurrentHttpResponse(
   status: number,
   value: unknown,
 ): TeamProtocolV1JsonValue {
+  if (isQueueEditRoute(method, path))
+    return status < 400
+      ? JSON.parse(JSON.stringify(decodeQueueEditState(value)))
+      : decodeTeamProtocolV1CurrentHttpResponse(method, path.replace(/edit$/u, "cancel"), status, value);
   if (isQueueTakeRoute(method, path))
     return status < 400
       ? decodeTeamProtocolV2Json(JSON.parse(JSON.stringify(decodeQueueDraft(value))))

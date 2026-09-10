@@ -118,6 +118,7 @@ export const IPC_CHANNELS = {
   agentPreviewWorkspaceFile: "agent:preview-workspace-file",
   agentListQueue: "agent:list-queue",
   agentAcknowledgeFailedTurn: "agent:acknowledge-failed-turn",
+  agentQueueEdit: "agent:queue-edit",
   agentTakeQueuedMessage: "agent:take-queued-message",
   agentCancelQueuedMessage: "agent:cancel-queued-message",
   agentSteerQueuedMessage: "agent:steer-queued-message",

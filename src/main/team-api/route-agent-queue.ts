@@ -1,3 +1,4 @@
+import { parseQueueEditInput } from "@openbot/contracts/ipc";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { HttpError } from "./http-error";
 // One agent's outgoing queue, and the ways a member can change their mind about it.
@@ -17,6 +18,7 @@ export interface AgentQueueRouteDependencies {
     TeamApiAgents,
     | "listQueue"
     | "acknowledgeFailedTurn"
+    | "queueEdit"
     | "takeQueuedMessage"
     | "cancelQueuedMessage"
     | "steerQueuedMessage"
@@ -40,6 +42,14 @@ export async function routeAgentQueue(
     const body = await readJson(request);
     agents.acknowledgeFailedTurn(agentId, stringField(body, "turnId"));
     return empty(204);
+  }
+  if (method === "POST" && action === "queue/edit") {
+    if (context.protocol !== TEAM_PROTOCOL_V3 || !context.capabilities.has("queue-edit"))
+      throw new HttpError(400, "This client does not support durable queue edits.");
+    const body = await readJson(request);
+    const input = parseQueueEditInput(body);
+    if (input.agentId !== agentId) throw new HttpError(400, "Queue edit agent does not match the route.");
+    return json(200, await agents.queueEdit(input));
   }
   if (method === "POST" && action === "queue/take") {
     if (context.protocol !== TEAM_PROTOCOL_V3 || !context.capabilities.has("queue-take"))

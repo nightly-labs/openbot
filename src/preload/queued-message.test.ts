@@ -48,3 +48,15 @@ it("takes a queued draft from the requested server and rejects invalid main-proc
     "Invalid attachment response.",
   );
 });
+
+it("validates a recovered queue edit and preserves its requested server", async () => {
+  const api = bridge.api.current;
+  if (!api) throw new Error("The preload API was not exposed.");
+  const input = { agentId: "chief", operation: "read" as const };
+  const edit = { deliveryId: "delivery", revision: 2, text: "Held", attachments: [], replyToMessageId: null };
+  bridge.invoke.mockResolvedValueOnce(edit);
+  await expect(api.agent.queueEdit(input, "remote")).resolves.toEqual(edit);
+  expect(bridge.invoke).toHaveBeenLastCalledWith(IPC_CHANNELS.agentQueueEdit, { serverId: "remote", payload: input });
+  bridge.invoke.mockResolvedValueOnce({ ...edit, revision: 0 });
+  await expect(api.agent.queueEdit(input, "remote")).rejects.toThrow("Invalid queue edit state.");
+});

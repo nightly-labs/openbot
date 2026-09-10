@@ -1,4 +1,5 @@
-import type { DraftAttachment, QueueDelivery } from "@openbot/contracts/ipc";
+import type { DraftAttachment, QueueDelivery, QueueEditState } from "@openbot/contracts/ipc";
+import { QueueEditSession } from "@openbot/team-client/queue-edit-session";
 import { errorMessage } from "../../../error-message";
 import { expandComposerMentions } from "../ComposerEditor";
 import { copyComposerDraft, EMPTY_DRAFT } from "../composer-draft";
@@ -7,7 +8,7 @@ import type { ComposerDraft, ConversationProps, ConversationTarget } from "../co
 
 export interface ComposerActionsDeps {
   props: ConversationProps;
-  takenQueueEdits: Set<string>;
+  queueEditSessions: Map<string, QueueEditSession>;
   pendingQueueEdit: () => ConversationTarget | null;
   setPendingQueueEdit: (target: ConversationTarget | null) => void;
   agentReady: () => boolean;
@@ -63,7 +64,7 @@ export interface ComposerActionsDeps {
 }
 
 export function createComposerActions(deps: ComposerActionsDeps) {
-  const takenEdits = deps.takenQueueEdits;
+  const sessions = deps.queueEditSessions;
   const editKey = (serverId: string, agentId: string, deliveryId: string) =>
     JSON.stringify([serverId, agentId, deliveryId]);
 
@@ -135,25 +136,30 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     deps.clearConversationError({ agentId, serverId });
     deps.setSubmitting(true);
     deps.setPendingQueueEdit({ agentId, serverId });
-    let prepared: { text: string; attachments: DraftAttachment[] };
-    const canTake =
-      deps.props.server?.kind !== "remote" ||
-      deps.props.server.compatibility?.capabilities.includes("queue-take") === true;
     try {
-      prepared = canTake
-        ? await window.openbot.agent.takeQueuedMessage({ agentId, deliveryId: delivery.id }, serverId)
-        : { text: delivery.text, attachments: [...delivery.attachments] };
-      if (canTake) takenEdits.add(editKey(serverId, agentId, delivery.id));
+      const prepared = await window.openbot.agent.queueEdit(
+        { agentId, deliveryId: delivery.id, operation: "begin" },
+        serverId,
+      );
+      if (!prepared) throw new Error("The queue edit is unavailable.");
+      openQueueEdit({ agentId, serverId }, prepared);
     } catch (error) {
       deps.setConversationError(
         { agentId, serverId },
-        errorMessage(error, "Could not take the queued message for editing."),
+        errorMessage(error, "Could not pause the queued message for editing."),
       );
-      return;
     } finally {
       deps.setPendingQueueEdit(null);
       deps.setSubmitting(false);
     }
+  }
+
+  function openQueueEdit({ agentId, serverId }: ConversationTarget, prepared: QueueEditState) {
+    const deliveryId = prepared.deliveryId;
+    sessions.set(
+      editKey(serverId, agentId, deliveryId),
+      new QueueEditSession(agentId, prepared, (input) => window.openbot.agent.queueEdit(input, serverId)),
+    );
     const backup = deps.drafts()[composerDraftKey({ agentId, serverId })] ?? EMPTY_DRAFT;
     deps.setEditingAgentId(agentId);
     deps.setEditingServerId(serverId);
@@ -162,14 +168,14 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       attachments: [...backup.attachments],
       replyToMessageId: backup.replyToMessageId,
     });
-    deps.setEditingOriginalAttachmentIds(canTake ? [] : delivery.attachments.map((file) => file.id));
-    deps.setEditingDeliveryId(delivery.id);
+    deps.setEditingOriginalAttachmentIds([]);
+    deps.setEditingDeliveryId(deliveryId);
     deps.setDrafts((current) => ({
       ...current,
       [composerDraftKey({ agentId, serverId })]: {
         text: prepared.text,
         attachments: prepared.attachments,
-        replyToMessageId: delivery.replyToMessageId,
+        replyToMessageId: prepared.replyToMessageId,
       },
     }));
     deps.setComposerFocusRequest((current) => current + 1);
@@ -177,11 +183,57 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     deps.setComposerError(null);
   }
 
-  function cancelQueuedMessageEdit() {
+  async function recoverQueueEdit() {
+    const target = deps.currentTarget();
+    if (!target || deps.editingDeliveryId() || deps.pendingQueueEdit()) return;
+    try {
+      const edit = await window.openbot.agent.queueEdit(
+        { agentId: target.agentId, operation: "read" },
+        target.serverId,
+      );
+      if (edit && !deps.editingDeliveryId() && !deps.pendingQueueEdit()) openQueueEdit(target, edit);
+    } catch (error) {
+      deps.setConversationError(target, errorMessage(error, "Could not recover the queue edit."));
+    }
+  }
+
+  function persistQueueEdit() {
+    const agentId = deps.editingAgentId();
+    const serverId = deps.editingServerId();
+    const deliveryId = deps.editingDeliveryId();
+    if (!agentId || !serverId || !deliveryId || deps.pendingQueueEdit()) return;
+    const draft = deps.drafts()[composerDraftKey({ agentId, serverId })];
+    const session = sessions.get(editKey(serverId, agentId, deliveryId));
+    if (!draft || !session) return;
+    void session
+      .save({ text: draft.text, attachmentDraftIds: draft.attachments.map((file) => file.id) })
+      .catch((error) => {
+        deps.setConversationError(
+          { agentId, serverId },
+          errorMessage(error, "Could not save the edit on the host. Try again."),
+        );
+      });
+  }
+
+  async function cancelQueuedMessageEdit() {
     if (deps.pendingQueueEdit()) return;
     const agentId = deps.editingAgentId() ?? deps.props.agent?.id;
     const serverId = deps.editingServerId() ?? deps.props.server?.id ?? "local";
     const target = agentId ? { agentId, serverId } : undefined;
+    const deliveryId = deps.editingDeliveryId();
+    if (!target || !deliveryId) return;
+    const session = sessions.get(editKey(serverId, target.agentId, deliveryId));
+    if (!session) return;
+    deps.setPendingQueueEdit(target);
+    try {
+      await session.cancel();
+    } catch (error) {
+      deps.setConversationError(target, errorMessage(error, "Could not cancel the edit. Try again."));
+      return;
+    } finally {
+      deps.setPendingQueueEdit(null);
+    }
+    sessions.delete(editKey(serverId, target.agentId, deliveryId));
     const backup = deps.editingDraftBackup();
     const draft = target ? (deps.drafts()[composerDraftKey(target)] ?? EMPTY_DRAFT) : EMPTY_DRAFT;
     const preservedAttachmentIds = new Set([
@@ -214,20 +266,10 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const draft = draftOverride ?? deps.currentDraft();
     if (!agentId || !deliveryId || deps.submitting() || deps.pendingQueueEdit()) return false;
     const text = expandComposerMentions(draft.text);
-    const taken = takenEdits.has(editKey(serverId, agentId, deliveryId));
-    if (!taken && !target && deps.props.queue?.deliveries.find((item) => item.id === deliveryId)?.status !== "queued") {
-      deps.setComposerError("This queued message is no longer available.");
-      cancelQueuedMessageEdit();
-      return false;
-    }
-    const originalIds = new Set(target?.originalAttachmentIds ?? deps.editingOriginalAttachmentIds());
-    const keepAttachmentIds = taken
-      ? []
-      : draft.attachments.filter((file) => originalIds.has(file.id)).map((file) => file.id);
-    const attachmentDraftIds = draft.attachments
-      .filter((file) => taken || !originalIds.has(file.id))
-      .map((file) => file.id);
-    if (!text.trim() && attachmentDraftIds.length === 0 && keepAttachmentIds.length === 0) return false;
+    const session = sessions.get(editKey(serverId, agentId, deliveryId));
+    if (!session) return false;
+    const attachmentDraftIds = draft.attachments.map((file) => file.id);
+    if (!text.trim() && attachmentDraftIds.length === 0) return false;
 
     stopTeamTyping();
     deps.setSubmitting(true);
@@ -235,12 +277,8 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     deps.setPendingQueueEdit({ agentId, serverId });
     let saved = false;
     try {
-      saved = taken
-        ? await deps.props.onSendMessage(text, attachmentDraftIds, draft.replyToMessageId, { agentId, serverId })
-        : await deps.props.onUpdateQueuedMessage(deliveryId, text, keepAttachmentIds, attachmentDraftIds, {
-            agentId,
-            serverId,
-          });
+      await session.send({ text, attachmentDraftIds });
+      saved = true;
     } catch (error) {
       deps.setComposerError(errorMessage(error, "Could not send the edited message. Try again."));
     } finally {
@@ -248,11 +286,15 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       deps.setSubmitting(false);
     }
     if (!saved) return false;
-    takenEdits.delete(editKey(serverId, agentId, deliveryId));
+    sessions.delete(editKey(serverId, agentId, deliveryId));
     const savedTarget = { agentId, serverId };
     deps.clearConversationError(savedTarget);
     if (submittedSnapshot) deps.clearSubmittedDraft(savedTarget, submittedSnapshot);
-    else deps.setDrafts((current) => ({ ...current, [composerDraftKey(savedTarget)]: EMPTY_DRAFT }));
+    else
+      deps.setDrafts((current) => ({
+        ...current,
+        [composerDraftKey(savedTarget)]: deps.editingDraftBackup() ?? EMPTY_DRAFT,
+      }));
     if (
       deps.editingAgentId() === agentId &&
       deps.editingServerId() === serverId &&
@@ -367,6 +409,8 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     addAttachments,
     openAttachmentPicker,
     openAttachmentPickerFromKey,
+    recoverQueueEdit,
+    persistQueueEdit,
     editQueuedMessage,
     cancelQueuedMessageEdit,
     saveQueuedMessageEdit,

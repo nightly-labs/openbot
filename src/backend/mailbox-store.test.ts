@@ -27,6 +27,151 @@ afterEach(async () => {
 });
 
 describe("MailboxStore", () => {
+  it.each(["send", "cancel"] as const)(
+    "recovers a held edit after restart and cleans its attachments on %s",
+    async (operation) => {
+      const sender = { kind: "agent" as const, agentId: "sales" };
+      const [file] = await store.prepareImportedAttachments(
+        [],
+        [{ name: "notes.txt", mimeType: "text/plain", bytes: Buffer.from("Notes") }],
+      );
+      const receipt = await store.enqueue({
+        sender,
+        recipientAgentIds: ["chief"],
+        text: "Original",
+        draftIds: [file.id],
+      });
+      const id = receipt.deliveries[0].id;
+      const target = { agentId: "chief", deliveryId: id };
+      const edit = await store.queueEdit({ ...target, operation: "begin" });
+      if (!edit) throw new Error("Missing edit");
+      expect(store.nextQueued("chief")).toBeNull();
+      const saving = {
+        ...target,
+        operation: "save" as const,
+        revision: edit.revision,
+        text: "Edited instructions",
+        attachmentDraftIds: edit.attachments.map((item) => item.id),
+      };
+      const saved = await store.queueEdit(saving);
+      await expect(store.queueEdit(saving)).resolves.toEqual(saved);
+      await expect(store.queueEdit({ ...saving, text: "Stale edit" })).rejects.toThrow("changed on another client");
+      await store.discardDraft(edit.attachments[0].id);
+      const restarted = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+      await restarted.initialize();
+      const recovered = await restarted.queueEdit({ agentId: "chief", operation: "read" });
+      expect(recovered).toEqual(saved);
+      expect(restarted.nextQueued("chief")).toBeNull();
+      if (!recovered) throw new Error("Missing recovery");
+      const attachment = await restarted.resolveAttachment(recovered.attachments[0].id);
+      if (!attachment) throw new Error("Missing retained attachment");
+      expect(await readFile(attachment.path, "utf8")).toBe("Notes");
+      const finish = {
+        ...target,
+        operation,
+        revision: recovered.revision,
+        text: recovered.text,
+        attachmentDraftIds: [],
+      };
+      await restarted.queueEdit(finish);
+      await restarted.queueEdit(finish);
+      expect(await restarted.queueEdit({ agentId: "chief", operation: "read" })).toBeNull();
+      expect(await restarted.resolveAttachment(recovered.attachments[0].id)).toBeNull();
+      expect(restarted.listQueue("chief").deliveries).toHaveLength(1);
+      expect(restarted.getDelivery(id)?.delivery).toMatchObject({
+        sender,
+        status: operation === "send" ? "queued" : "cancelled",
+      });
+      if (operation === "send") expect(restarted.nextQueued("chief")?.delivery.text).toBe("Edited instructions");
+    },
+  );
+
+  it("allows only one held edit per agent while attachment preparation is pending", async () => {
+    const first = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "First" });
+    const second = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Second" });
+    let finishCopy: (value: []) => void = () => {
+      throw new Error("Copy was not started");
+    };
+    const copying = new Promise<[]>((resolve) => {
+      finishCopy = resolve;
+    });
+    vi.spyOn(store, "prepareAttachments").mockImplementationOnce(() => copying);
+    const beginning = store.queueEdit({ agentId: "chief", deliveryId: first.deliveries[0].id, operation: "begin" });
+    await expect(
+      store.queueEdit({ agentId: "chief", deliveryId: second.deliveries[0].id, operation: "begin" }),
+    ).rejects.toThrow("already in progress");
+    finishCopy([]);
+    await beginning;
+    expect(store.nextQueued("chief")?.delivery.id).toBe(second.deliveries[0].id);
+  });
+
+  it("edits one recipient without changing an already running broadcast delivery", async () => {
+    const receipt = await store.enqueue({
+      sender: { kind: "agent", agentId: "sales" },
+      recipientAgentIds: ["chief", "support"],
+      text: "Shared instructions",
+      idempotencyKey: "agent:sales:source-turn:operation",
+    });
+    const [chief, support] = receipt.deliveries;
+    await store.markStarting(support.id);
+    const edit = await store.queueEdit({ agentId: "chief", deliveryId: chief.id, operation: "begin" });
+    if (!edit) throw new Error("Missing edit");
+    await store.queueEdit({
+      agentId: "chief",
+      deliveryId: chief.id,
+      operation: "send",
+      revision: edit.revision,
+      text: "Chief only",
+      attachmentDraftIds: [],
+    });
+    expect(store.hasAgentMessageFromTurnTo("sales", "source-turn", "chief")).toBe(true);
+    expect(store.getDelivery(chief.id)?.delivery.text).toBe("Chief only");
+    expect(store.getDelivery(support.id)?.delivery).toMatchObject({ text: "Shared instructions", status: "starting" });
+  });
+
+  it("sends retained edit attachments with rewritten references and the original reply", async () => {
+    const [file] = await store.prepareImportedAttachments(
+      [],
+      [{ name: "notes.txt", mimeType: "text/plain", bytes: Buffer.from("Notes") }],
+    );
+    const receipt = await store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Original",
+      draftIds: [file.id],
+      replyToMessageId: "original-reply",
+    });
+    const target = { agentId: "chief", deliveryId: receipt.deliveries[0].id };
+    const edit = await store.queueEdit({ ...target, operation: "begin" });
+    if (!edit) throw new Error("Missing edit");
+    const draft = edit.attachments[0];
+    await store.queueEdit({
+      ...target,
+      operation: "send",
+      revision: edit.revision,
+      text: serializeAttachmentReference(draft.name, draft.id),
+      attachmentDraftIds: [draft.id],
+    });
+    const sent = store.nextQueued("chief");
+    if (!sent) throw new Error("Missing queued delivery");
+    const attachment = sent.managedAttachments[0];
+    expect(sent.delivery).toMatchObject({
+      replyToMessageId: "original-reply",
+      text: serializeAttachmentReference(attachment.name, attachment.id),
+    });
+    expect(await readFile(attachment.path, "utf8")).toBe("Notes");
+    expect(await store.resolveAttachment(draft.id)).toBeNull();
+  });
+
+  it("preserves agent identity when editing a collaborator message", async () => {
+    const sender = { kind: "agent" as const, agentId: "sales" };
+    const receipt = await store.enqueue({ sender, recipientAgentIds: ["chief"], text: "Return the result to Sales" });
+    const id = receipt.deliveries[0].id;
+    await expect(store.takeQueuedMessage("chief", id)).rejects.toThrow("Only user messages can be taken for editing.");
+    await store.updateQueuedMessage("chief", id, "Updated instructions", [], []);
+    expect(store.getDelivery(id)?.delivery).toMatchObject({ sender, text: "Updated instructions", status: "queued" });
+  });
+
   it("takes a queued delivery out of dispatch and keeps editable attachment drafts", async () => {
     const [file] = await store.prepareImportedAttachments(
       [],

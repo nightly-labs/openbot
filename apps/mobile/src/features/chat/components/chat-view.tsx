@@ -33,7 +33,7 @@ import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { isIOS } from "@/shared/lib/platform";
-import { discardQueueEdit, prepareQueueEdit, saveQueueEdit } from "../model/queue-edit-operations";
+import { discardQueueEdit, prepareQueueEdit, recoverQueueEdit, saveQueueEdit } from "../model/queue-edit-operations";
 import { useQueueEdit } from "./use-queue-edit";
 
 interface MobileChatViewProps {
@@ -94,8 +94,17 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     uploadAttachment,
     discardAttachment,
   } = workspace;
-  const editor = useQueueEdit(queueEdits, agent, (message) => prepareQueueEdit(workspace, agent, message));
-  const { draft, setDraft, preparing, queueEdit, focusRequest, startQueueEdit, finishQueueEdit } = editor;
+  const server = servers.find((server) => server.id === agent.serverId);
+  const serverOnline = server?.state === "online";
+  const recoverEdit = useCallback(() => recoverQueueEdit(workspace, agent), [workspace, agent]);
+  const editor = useQueueEdit(
+    queueEdits,
+    agent,
+    (message) => prepareQueueEdit(workspace, agent, message),
+    recoverEdit,
+    serverOnline,
+  );
+  const { draft, setDraft, preparing, queueEdit, focusRequest, startQueueEdit } = editor;
   const sending = normalSending || editor.sending;
   const attachments = useChatAttachments(editor);
   const conversation = conversations[agent.id];
@@ -129,8 +138,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   const latestMessage = latestReadableMessage(conversation?.messages ?? []);
   const readBoundary = latestMessage?.id;
   const readBoundaryStatus = latestMessage?.status;
-  const server = servers.find((server) => server.id === agent.serverId);
-  const serverOnline = server?.state === "online";
+
   const activePrompt = messages.findLast(
     (message) =>
       message.kind === "question" &&
@@ -238,11 +246,11 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
         try {
           await editor.sendQueueEdit(async () => {
             for (const file of attachments.items) uploaded.push((await uploadAttachment(agent.id, file)).id);
-            await saveQueueEdit(workspace, agent, queueEdit, body, uploaded);
+            await saveQueueEdit(queueEdit, body, uploaded);
           });
           setSendRetryVersion((version) => version + 1);
         } catch (error) {
-          await Promise.allSettled(uploaded.map((id) => discardAttachment(agent.id, id)));
+          // The host can own these drafts even when its response was lost. Retain them for retry.
           setSendRetryVersion((version) => version + 1);
           setSendError({
             agentId: agent.id,
@@ -444,6 +452,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
               foreground={foreground}
               muted={muted}
             />
+            {editor.error ? <Typography.Paragraph type="body-xs">{editor.error}</Typography.Paragraph> : null}
             {queueEdit ? (
               <View className="mx-4 flex-row items-center gap-2 px-2 py-1">
                 <View className="min-w-0 flex-1">
@@ -461,10 +470,18 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
                   size="sm"
                   isDisabled={sending}
                   onPress={() => {
-                    void discardQueueEdit(workspace, agent, queueEdit);
-                    finishQueueEdit();
-                    setSendError(null);
-                    setSendRetryVersion((version) => version + 1);
+                    void editor
+                      .sendQueueEdit(() => discardQueueEdit(queueEdit))
+                      .then(() => {
+                        setSendError(null);
+                        setSendRetryVersion((version) => version + 1);
+                      })
+                      .catch((error) =>
+                        setSendError({
+                          agentId: agent.id,
+                          message: userErrorMessage(error, "Could not cancel the edit. Try again."),
+                        }),
+                      );
                   }}
                 >
                   Cancel

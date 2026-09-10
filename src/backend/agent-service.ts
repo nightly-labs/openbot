@@ -32,6 +32,7 @@ import type {
   HostAnalyticsInput,
   ListRoutineRunsInput,
   QueuedMessageReceipt,
+  QueueEditInput,
   QueueSnapshot,
   ReorderQueueInput,
   RespondToApprovalInput,
@@ -969,6 +970,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   acknowledgeFailedTurn(agentId: string, turnId: string): void {
     this.#turn.acknowledgeFailedTurn(agentId, turnId);
+  }
+
+  async queueEdit(input: QueueEditInput) {
+    const edit = await this.#mailbox.queueEdit(input);
+    if (input.operation !== "read") this.#mailboxSync.emitQueue(input.agentId);
+    if (input.operation === "send") {
+      const snapshot = this.#conversation.snapshot(input.agentId);
+      if (snapshot) {
+        this.#mailboxSync.syncMailboxMessages(snapshot);
+        this.#conversation.emitConversation(snapshot, "queue.message-updated");
+      }
+      this.#drain.scheduleDrain(input.agentId);
+    }
+    return edit;
   }
 
   async takeQueuedMessage(agentId: string, deliveryId: string) {

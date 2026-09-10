@@ -43,6 +43,7 @@ import type {
   ProviderRuntimeSnapshot,
   ProviderRuntimeStatus,
   QueueDelivery,
+  QueueEditState,
   QueueSnapshot,
   RemoteDesktopSession,
   ReorderQueueInput,
@@ -297,6 +298,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     timers.add(timer);
   };
   const emptyQueue = (agentId: string): QueueSnapshot => ({ agentId, deliveries: [] });
+  const queueEdits = new Map<string, QueueEditState>();
   const queues = new Map<string, QueueSnapshot>(agents.map((agent) => [agent.id, emptyQueue(agent.id)]));
   const memories = new Map<string, AgentMemory[]>(Object.entries(clone(options.memories ?? {})));
   const routines = new Map<string, Routine[]>(Object.entries(clone(options.routines ?? {})));
@@ -1328,6 +1330,43 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       listQueue: async (agentId) => clone(queues.get(agentId) ?? emptyQueue(agentId)),
       acknowledgeFailedTurn: async () => undefined,
+      queueEdit: async (input) => {
+        const state = queueEdits.get(input.agentId);
+        if (input.operation === "read") return state ? clone(state) : null;
+        const queue = queues.get(input.agentId) ?? emptyQueue(input.agentId);
+        const delivery = queue.deliveries.find((item) => item.id === input.deliveryId);
+        if (!delivery) throw new Error("Queued message was not found.");
+        if (input.operation === "begin") {
+          if (state) return clone(state);
+          if (delivery.status !== "queued") throw new Error("Only queued messages can be edited.");
+          delivery.status = "cancelled";
+          const edit = {
+            deliveryId: delivery.id,
+            revision: 1,
+            text: delivery.text,
+            attachments: clone(delivery.attachments),
+            replyToMessageId: delivery.replyToMessageId,
+          };
+          queueEdits.set(input.agentId, edit);
+          emitAgentEvent({ type: "queue-changed", snapshot: queue });
+          return clone(edit);
+        }
+        if (!state || state.deliveryId !== delivery.id || state.revision !== input.revision)
+          throw new Error("This queue edit changed. Reopen it before saving.");
+        if (input.operation === "save") {
+          state.text = input.text;
+          state.revision += 1;
+          state.attachments = state.attachments.filter((file) => input.attachmentDraftIds.includes(file.id));
+          return clone(state);
+        }
+        if (input.operation === "send") {
+          delivery.text = input.text;
+          delivery.status = "queued";
+        }
+        queueEdits.delete(input.agentId);
+        emitAgentEvent({ type: "queue-changed", snapshot: queue });
+        return null;
+      },
       takeQueuedMessage: async (input) => {
         const queue = queues.get(input.agentId) ?? emptyQueue(input.agentId);
         const delivery = queue.deliveries.find((item) => item.id === input.deliveryId);

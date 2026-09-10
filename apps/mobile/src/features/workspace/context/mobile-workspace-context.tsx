@@ -3,6 +3,7 @@ import {
   type AgentSummary,
   type ConversationSnapshot,
   type CreateAgentInput,
+  decodeQueueEditState,
   isAgentMemory,
   isAgentModel,
   isAgentModelOption,
@@ -813,6 +814,23 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         await request("POST", TEAM_API_ROUTES.agent.duplicate(agentId), ignoreResponse, {
           operationId: Crypto.randomUUID(),
         });
+      },
+      queueEdit: async (input, serverId) => {
+        if (!serverCapabilities.current.get(serverId)?.includes("queue-edit")) {
+          if (input.operation === "read") return null;
+          throw new Error("Update the host to pause queued messages while editing.");
+        }
+        const edit = await request(
+          "POST",
+          TEAM_API_ROUTES.agent.queueEdit(input.agentId),
+          decodeQueueEditState,
+          input,
+          serverId,
+        );
+        if (input.operation === "begin") markQueueCancelled(input.agentId, input.deliveryId);
+        if (input.operation !== "read" && input.operation !== "save")
+          void loadConversation(input.agentId, serverId).catch(() => {});
+        return edit;
       },
       canTakeQueuedMessage: (serverId) => serverCapabilities.current.get(serverId)?.includes("queue-take") === true,
       takeQueuedMessage: async (input, serverId) => {

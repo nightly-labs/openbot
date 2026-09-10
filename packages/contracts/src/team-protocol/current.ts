@@ -12,6 +12,7 @@ export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
 export const TEAM_CURRENT_CAPABILITIES = [
   ...TEAM_PROTOCOL_V4_CAPABILITIES,
   "queue-take",
+  "queue-edit",
   "agent-profile-generation",
   "agent-analytics",
   "host-analytics",
@@ -73,4 +74,10 @@ export function decodeQueueDraft(value: unknown) {
     throw new Error("Invalid queued message draft.");
   }
   return { text: value.text, attachments: value.attachments };
+}
+
+export function isQueueEditRoute(method: string, path: string): boolean {
+  return (
+    method === "POST" && /^\/v1\/agents\/[^/]+\/queue\/edit$/u.test(new URL(path, "http://openbot.invalid").pathname)
+  );
 }

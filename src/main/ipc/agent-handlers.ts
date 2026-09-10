@@ -3,11 +3,13 @@ import {
   assertAnalyticsScope,
   assertHostAnalyticsScope,
   decodeAgentProfileDraft,
+  decodeQueueEditState,
   decodeSaveAgentProfileResult,
   hostAnalyticsQuery,
   parseAgentAnalyticsInput,
   parseGenerateAgentProfile,
   parseHostAnalyticsInput,
+  parseQueueEditInput,
   parseSaveAgentProfile,
 } from "@openbot/contracts/ipc";
 import { decodeQueueDraft } from "@openbot/contracts/team-protocol/current";
@@ -288,6 +290,29 @@ export function agentIpcHandlers({
               method: "POST",
               body: { turnId: parsed.turnId },
             }),
+        });
+      }),
+      queueEdit: payloadHandler(parseAgentRequest, (scoped) => {
+        const input = parseQueueEditInput(scoped.payload);
+        return routeToServer(scoped.serverId, {
+          local: () => service.queueEdit(input),
+          remote: (serverId) => {
+            if (
+              !remoteServers
+                .list()
+                .find((server) => server.id === serverId)
+                ?.compatibility?.capabilities.includes("queue-edit")
+            ) {
+              if (input.operation === "read") return Promise.resolve(null);
+              throw new Error("Update the host to pause queued messages while editing.");
+            }
+            return remoteServers.request(
+              serverId,
+              TEAM_API_ROUTES.agent.queueEdit(input.agentId),
+              decodeQueueEditState,
+              { method: "POST", body: input },
+            );
+          },
         });
       }),
       takeQueuedMessage: payloadHandler(parseAgentRequest, (scoped) => {
