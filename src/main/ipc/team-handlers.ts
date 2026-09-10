@@ -18,6 +18,7 @@ import {
   parseRemoteDesktopDisplay,
   parseReorderServers,
   parseSendDirectMessage,
+  parseSetServerMuted,
   parseSetTeamTyping,
   parseUpdateTeamMember,
 } from "./server-inputs";
@@ -38,6 +39,9 @@ export function teamIpcHandlers({
 }: TeamIpcDependencies): Pick<IpcGroupHandlers, "servers" | "host" | "remoteDesktop"> {
   return {
     servers: {
+      setMuted: payloadHandler(parseSetServerMuted, ({ serverId, muted }) =>
+        remoteServers.setMuted(serverId, muted).then((servers) => withLocalHostSummary(servers, host.getStatus())),
+      ),
       list: handler(() => withLocalHostSummary(remoteServers.list(), host.getStatus())),
       select: payloadHandler(stringPayload("serverId"), (serverId) =>
         remoteServers.select(serverId).then((servers) => withLocalHostSummary(servers, host.getStatus())),

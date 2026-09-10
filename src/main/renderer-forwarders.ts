@@ -21,21 +21,23 @@ import {
   LOCAL_SERVER_ID,
   type VoiceModelStatus,
 } from "@openbot/contracts/ipc";
+import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { BrowserWindow, Notification } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import { notificationForAgentEvent } from "./agent-notifications";
 import type { HostAnalytics } from "./analytics";
 import type { HostService } from "./host-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
+import { decodeAgentSummaries } from "./remote-agent-decoding";
 import type { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
 
 export interface RendererForwarderDependencies {
   getMainWindow: () => BrowserWindow | null;
-  getAgentService: () => AgentService | null;
+  getAgentService: () => Pick<AgentService, "listAgents"> | null;
   getHostService: () => HostService | null;
   getHostAnalytics: () => HostAnalytics | null;
-  getRemoteServerManager: () => RemoteServerManager | null;
+  getRemoteServerManager: () => Pick<RemoteServerManager, "list" | "request"> | null;
   showMainWindow: (window: BrowserWindow) => void;
 }
 
@@ -60,14 +62,29 @@ export function createRendererForwarders({
       IPC_CHANNELS.agentEvent,
       bufferedLive ? { serverId, event, bufferedLive } : { serverId, event },
     );
-    if (window.isFocused() || !Notification.isSupported()) return;
+    void notifyAgentEvent(serverId, event).catch(() => undefined);
+  }
 
-    const content = notificationForAgentEvent(event, getAgentService()?.listAgents() ?? []);
-    if (!content) return;
+  async function notifyAgentEvent(serverId: string, event: AgentEvent): Promise<void> {
+    if (event.type !== "turn-completed" && event.type !== "prompt" && event.type !== "approval") return;
+    if (event.type === "turn-completed" && event.status !== "completed") return;
+    const canNotify = () => {
+      const window = getMainWindow();
+      const server = getRemoteServerManager()
+        ?.list()
+        .find((candidate) => candidate.id === serverId);
+      return window && !window.isDestroyed() && !window.isFocused() && server && !server.notificationsMuted;
+    };
+    if (!canNotify() || !Notification.isSupported()) return;
+    const agents =
+      serverId === LOCAL_SERVER_ID
+        ? (getAgentService()?.listAgents() ?? [])
+        : ((await getRemoteServerManager()?.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)) ?? []);
+    const content = notificationForAgentEvent(event, agents);
+    if (!content || !canNotify()) return;
     const notification = new Notification(content);
     notification.on("click", () => {
-      // Re-read rather than reuse the local above: a notification can be clicked long after it was
-      // shown, by which time the window may have been closed and a new one built.
+      // Re-read the window because it can change after the notification is shown.
       const current = getMainWindow();
       if (!current || current.isDestroyed()) return;
       showMainWindow(current);

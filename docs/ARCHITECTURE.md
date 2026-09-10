@@ -590,3 +590,14 @@ with their released provider vocabulary. The host filters OpenCode agents, model
 sidebar references, and runtime events before encoding an older client's response. Requests for
 an OpenCode agent from those clients return 404. WebRTC keeps its v2 frame transport and selects
 the v4 application codec when the peer advertises the `opencode` capability.
+
+### Desktop server notifications
+
+Each desktop profile stores muted server IDs in `servers.json`. `RemoteServerStore` saves a
+mute change before publishing it. These preferences survive restart, re-login, and host-list
+reconciliation. The server context menu controls mute for local and remote servers.
+
+`renderer-forwarders.ts` continues to deliver live events for muted servers, but suppresses
+system notifications. Remote notification content uses the source server's agent list. Both
+server mute and per-agent notification settings apply. Unread state is unchanged. Mobile does
+not yet deliver system notifications; mute settings are not synchronized between devices.

@@ -7,6 +7,7 @@ describe("installed skills request source", () => {
     const server: ServerSummary = {
       id: "local",
       name: "OpenBot",
+      notificationsMuted: false,
       kind: "local",
       state: "online",
       apiUrl: null,
