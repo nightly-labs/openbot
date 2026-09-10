@@ -162,7 +162,9 @@ export function agentIpcHandlers({
       }),
       listChannels: payloadHandler(parseAgentRequest, (scoped) =>
         routeToServer(scoped.serverId, {
-          local: () => service.channels.store.list(host.channelActor().id),
+          // The reader here is the host user of this computer, so messages they wrote before they
+          // signed in are their own.
+          local: () => service.channels.store.list(host.channelActor().id, true),
           remote: (serverId) => remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries),
         }),
       ),
@@ -485,10 +487,7 @@ async function duplicateAgentLocally(
 ): Promise<DuplicateAgentResult> {
   const agent = await service.duplicateAgent(agentId);
   try {
-    const layout = await sidebarLayout.placeDuplicateAfter(agentId, agent.id, [
-      ...service.listAgents().map((candidate) => candidate.id),
-      agent.id,
-    ]);
+    const layout = await sidebarLayout.placeDuplicateAfter(agentId, agent.id, [...service.sidebarChatIds(), agent.id]);
     return service.commitAgentDuplication(agent.id, layout);
   } catch (error) {
     const rollbackResults = await Promise.allSettled([

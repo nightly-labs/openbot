@@ -169,8 +169,13 @@ describe("TeamApiServer agents", () => {
     const deleteAgent = vi.fn(async (agentId: string) => {
       agents = agents.filter((agent) => agent.id !== agentId);
     });
+    // A channel the user filed in the sidebar. The layout prunes every id outside the set it is
+    // given, so duplication must offer the channels as well as the agents.
+    const channelId = "channel-launch-room";
+    const chatIds = () => new Set([...agents.map((agent) => agent.id), channelId]);
     const agentService = createAgents({
       listAgents: () => agents,
+      sidebarChatIds: chatIds,
       committedAgentDuplication: () => committedDuplicate,
       duplicateAgent,
       commitAgentDuplication,
@@ -180,6 +185,8 @@ describe("TeamApiServer agents", () => {
       { type: "create", name: "Core", agentId: source.id },
       new Set([source.id]),
     );
+    const sectionId = section.sections[0]?.id ?? null;
+    await sidebarLayout.mutate({ type: "move-agent", agentId: channelId, sectionId, beforeAgentId: null }, chatIds());
     const { base } = await start({
       agents: agentService,
       sidebarLayout,
@@ -202,17 +209,24 @@ describe("TeamApiServer agents", () => {
     await expect(response.json()).resolves.toMatchObject({
       bot: { id: duplicate.id, threadId: null },
       layout: {
-        agentAssignments: { [source.id]: section.sections[0]?.id, [duplicate.id]: section.sections[0]?.id },
-        agentOrder: [source.id, duplicate.id],
+        agentAssignments: {
+          [source.id]: sectionId,
+          [duplicate.id]: sectionId,
+          // The channel keeps the section the user filed it in.
+          [channelId]: sectionId,
+        },
       },
     });
+    const placed = sidebarLayout.getSnapshot().agentOrder;
+    expect(placed.indexOf(duplicate.id)).toBe(placed.indexOf(source.id) + 1);
+    expect(placed).toContain(channelId);
     expect(duplicateAgent).toHaveBeenCalledWith(source.id, "7674b664-cd72-4cf9-88ed-6f2e189d551f");
-    expect(commitAgentDuplication).toHaveBeenCalledWith(duplicate.id, expect.objectContaining({ revision: 2 }));
+    expect(commitAgentDuplication).toHaveBeenCalledWith(duplicate.id, expect.objectContaining({ revision: 3 }));
     expect(deleteAgent).not.toHaveBeenCalled();
 
     const currentLayout = await sidebarLayout.mutate(
       { type: "create", name: "Later", agentId: duplicate.id },
-      new Set([source.id, duplicate.id]),
+      new Set([...chatIds(), duplicate.id]),
     );
 
     const retry = await fetch(`${base}/v1/agents/${source.id}/duplicate`, {

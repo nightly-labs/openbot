@@ -1,6 +1,6 @@
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { chatTagReferences, expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
-import { type DraftAttachment, SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
+import type { DraftAttachment } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { QuestionPromptBubble } from "../../components/QuestionPromptBubble";
 import {
@@ -33,11 +33,12 @@ import {
   UnreadMessagesDivider,
   unreadMessagesDividerIsVisible,
 } from "../conversation/UnreadMessages";
+import { useServers } from "../servers/servers-context";
 import { usePresence } from "../team/team-context";
 import { ChannelActivityIndicator, type ChannelWorker } from "./ChannelActivityIndicator";
 import { ChannelAvatar } from "./ChannelAvatar";
 import { ChannelEditor } from "./ChannelEditor";
-import { channelTimelineEntries, firstUnreadChannelMessageId } from "./channel-timeline";
+import { channelTimelineEntries, firstUnreadChannelMessageId, isOwnChannelAuthor } from "./channel-timeline";
 import { useChannels } from "./channels-context";
 
 export function ChannelConversation() {
@@ -45,15 +46,14 @@ export function ChannelConversation() {
   const { selectAgent } = useNavigation();
   const { centralAuth } = useAuth();
   const { currentTeamMember } = usePresence();
+  const { activeServer } = useServers();
   const isOwnMessage = (authorId: string) => {
     const auth = centralAuth();
-    // A message written before the reader signed in carries the signed-out id. It is the same
-    // person, so it stays their own message, the way its read cursor stays their read cursor.
-    return (
-      authorId === SIGNED_OUT_CHANNEL_MEMBER_ID ||
-      authorId === currentTeamMember()?.id ||
-      (auth.status === "signed_in" && authorId === `local-user:${auth.user.id}`)
-    );
+    return isOwnChannelAuthor(authorId, {
+      memberId: currentTeamMember()?.id ?? null,
+      accountUserId: auth.status === "signed_in" ? auth.user.id : null,
+      onOwnComputer: activeServer()?.kind === "local",
+    });
   };
   /**
    * Memories and routines live here rather than in `ChannelEditor`, because the routines view
