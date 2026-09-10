@@ -10,7 +10,7 @@ import {
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
   isAttachmentSummary,
 } from "@openbot/contracts/ipc";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MailboxStore } from "./mailbox-store";
 
 let root: string;
@@ -60,6 +60,68 @@ describe("MailboxStore", () => {
       "Only queued messages can be edited.",
     );
   });
+
+  it.each(["text", "attachments", "replacement"])(
+    "rejects a take when another client changes %s during attachment copying",
+    async (change) => {
+      const [file] = await store.prepareImportedAttachments(
+        [],
+        [{ name: "notes.txt", mimeType: "text/plain", bytes: Buffer.from("Notes") }],
+      );
+      const receipt = await store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Original",
+        draftIds: [file.id],
+      });
+      const id = receipt.deliveries[0].id;
+      const originalIds = store.getDelivery(id)?.managedAttachments.map((attachment) => attachment.id) ?? [];
+      let copied: (drafts: Awaited<ReturnType<MailboxStore["prepareAttachments"]>>) => void = () => {};
+      const copying = new Promise<Awaited<ReturnType<MailboxStore["prepareAttachments"]>>>((resolve) => {
+        copied = resolve;
+      });
+      let resume: () => void = () => {};
+      const resumed = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      const prepare = store.prepareAttachments.bind(store);
+      // Copy real files, then hold the response while another client commits an update.
+      const preparation = vi.spyOn(store, "prepareAttachments").mockImplementationOnce(async (paths) => {
+        const drafts = await prepare(paths);
+        copied(drafts);
+        await resumed;
+        return drafts;
+      });
+      const taking = store.takeQueuedMessage("chief", id);
+      const drafts = await copying;
+      const text = change === "text" ? "Updated by another client" : "Original";
+      const keepIds = change === "text" ? originalIds : [];
+      const replacements =
+        change === "replacement"
+          ? await store.prepareImportedAttachments(
+              [],
+              [{ name: "new.txt", mimeType: "text/plain", bytes: Buffer.from("New") }],
+            )
+          : [];
+      await store.updateQueuedMessage(
+        "chief",
+        id,
+        text,
+        keepIds,
+        replacements.map((file) => file.id),
+      );
+      const accepted = store.getDelivery(id)?.delivery;
+      const rejected = expect(taking).rejects.toThrow("Queued message changed while preparing the edit. Try again.");
+      resume();
+      await rejected;
+      preparation.mockRestore();
+      expect(store.getDelivery(id)?.delivery).toEqual(accepted);
+      for (const draft of drafts) await expect(store.resolveAttachment(draft.id)).resolves.toBeNull();
+      const retry = await store.takeQueuedMessage("chief", id);
+      expect(retry.text).toBe(text);
+      expect(retry.attachments.map((file) => file.name)).toEqual(accepted?.attachments.map((file) => file.name));
+    },
+  );
 
   it("keeps staged generated attachments out of unrelated mailbox writes", async () => {
     const sourcePath = join(root, "staged-screenshot.png");

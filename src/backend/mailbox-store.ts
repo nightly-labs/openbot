@@ -678,7 +678,16 @@ export class MailboxStore {
     }
     const drafts = await this.prepareAttachments(context.managedAttachments.map((file) => file.path));
     try {
-      // Recheck after copying files: the worker may have claimed the delivery meanwhile.
+      // Copying yields to other clients. Compare the content before the synchronous cancellation.
+      const current = this.getDelivery(deliveryId);
+      if (
+        current &&
+        (current.delivery.text !== context.delivery.text ||
+          current.managedAttachments.length !== context.managedAttachments.length ||
+          current.managedAttachments.some((file, index) => file.id !== context.managedAttachments[index]?.id))
+      ) {
+        throw new Error("Queued message changed while preparing the edit. Try again.");
+      }
       this.cancelNow(agentId, deliveryId);
     } catch (error) {
       await Promise.allSettled(drafts.map((draft) => this.discardDraft(draft.id)));
