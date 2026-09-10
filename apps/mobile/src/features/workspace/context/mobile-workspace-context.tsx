@@ -1,7 +1,6 @@
 import {
   type AgentEvent,
   type AgentSummary,
-  type ConversationSnapshot,
   type CreateAgentInput,
   isAgentMemory,
   isAgentModel,
@@ -31,7 +30,6 @@ import {
   type RemoteTeamHost,
   type RemoteWorkspacePreferences,
   readAgentAnalytics,
-  resyncRemoteConversations,
   watchRemoteDirectory,
 } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
@@ -60,7 +58,8 @@ import {
   type ServerLoadContext,
 } from "@/features/workspace/components/server-connection";
 import { type MobileAgentActivities, reduceAgentActivity } from "@/features/workspace/model/agent-activity";
-import { conversationMessageId, decodeConversation } from "@/features/workspace/model/conversation";
+import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
+import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
 import { applyServerRecovery, serverKind } from "@/features/workspace/model/server-status";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
@@ -141,10 +140,16 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const [activeServerId, setActiveServerId] = useState<string | null>(session.host?.hostId ?? null);
   const activeServerIdRef = useRef(activeServerId);
   activeServerIdRef.current = activeServerId;
-  const [conversations, setConversations] = useState<Record<string, ConversationSnapshot>>({});
+  const conversationStore = useMemo(
+    () =>
+      new MobileConversationStore((flush) => {
+        const frame = requestAnimationFrame(flush);
+        return () => cancelAnimationFrame(frame);
+      }),
+    [],
+  );
+  useEffect(() => () => conversationStore.dispose(), [conversationStore]);
   const [activityByServer, setActivityByServer] = useState<Record<string, MobileAgentActivities>>({});
-  const conversationsRef = useRef(conversations);
-  conversationsRef.current = conversations;
   const preferenceStore = useMemo(
     () =>
       createWorkspacePreferences(session.apiUrl, session.user.id, {
@@ -178,9 +183,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       for (const host of hosts) removedServers.current.delete(host.hostId);
       if (removed.length) {
         setAgents((current) => current.filter((agent) => available.has(agent.serverId)));
-        setConversations((current) =>
-          Object.fromEntries(Object.entries(current).filter(([id]) => !removedAgentIds.has(id))),
-        );
+        for (const id of removedAgentIds) conversationStore.remove(id);
         setUnreadAgentIds((current) => current.filter((id) => !removedAgentIds.has(id)));
         setActivityByServer((current) =>
           Object.fromEntries(Object.entries(current).filter(([id]) => available.has(id))),
@@ -208,7 +211,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       });
       setActiveServerId((current) => (hosts.some((host) => host.hostId === current) ? current : null));
     },
-    [session.host?.hostId, session.apiUrl, session.user.id, sessionScope, queryClient, readRefresh],
+    [session.host?.hostId, session.apiUrl, session.user.id, sessionScope, queryClient, readRefresh, conversationStore],
   );
 
   const directoryRefresh = useMemo(
@@ -301,16 +304,27 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       );
       if (!context.isCurrent()) return;
       context.stage = "conversations";
-      await resyncRemoteConversations({
-        agentIds: summaries.map((agent) => agent.id),
-        cached: conversationsRef.current,
-        load: (agentId) => client.request("GET", TEAM_API_ROUTES.agent.conversation(agentId), decodeConversation),
-        apply: (snapshot) => setConversations((current) => storeNewestSnapshot(current, snapshot)),
-        isCurrent: context.isCurrent,
-      });
+      const ordered = [...summaries].sort(
+        (a, b) => Number(conversationStore.isObserved(b.id)) - Number(conversationStore.isObserved(a.id)),
+      );
+      for (const agent of ordered) {
+        if (!context.isCurrent()) return;
+        if (!conversationStore.get(agent.id)) continue;
+        await conversationStore.loadLatest(
+          agent.id,
+          () =>
+            client.request(
+              "GET",
+              `${TEAM_API_ROUTES.agent.conversationPage(agent.id)}?limit=50`,
+              decodeConversationPage,
+            ),
+          context.isCurrent,
+          true,
+        );
+      }
       context.stage = "connection";
     },
-    [replaceServerAgents, preferenceStore, readRefresh],
+    [replaceServerAgents, preferenceStore, readRefresh, conversationStore],
   );
 
   const registerConnection = useCallback((hostId: string, handle: ServerConnectionHandle | null) => {
@@ -334,10 +348,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       setForeground(active);
       if (!active) {
         loadGeneration.current += 1;
+        conversationStore.cancelRequests();
+        conversationStore.flush();
       }
     });
     return () => subscription.remove();
-  }, []);
+  }, [conversationStore]);
 
   useEffect(() => {
     if (!foreground) return;
@@ -345,19 +361,42 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   }, [foreground, directoryRefresh]);
 
   const loadConversation = useCallback(
-    async (agentId: string, serverId = activeServerIdRef.current) => {
+    async (agentId: string, serverId = activeServerIdRef.current, refresh = false) => {
       const generation = loadGeneration.current;
-      const snapshot = await request(
-        "GET",
-        TEAM_API_ROUTES.agent.conversation(agentId),
-        decodeConversation,
-        undefined,
-        serverId,
+      return conversationStore.loadLatest(
+        agentId,
+        () =>
+          request(
+            "GET",
+            `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=50`,
+            decodeConversationPage,
+            undefined,
+            serverId,
+          ),
+        () => generation === loadGeneration.current && Boolean(serverId) && !removedServers.current.has(serverId ?? ""),
+        refresh,
       );
-      if (generation === loadGeneration.current) setConversations((current) => storeNewestSnapshot(current, snapshot));
-      return snapshot;
     },
-    [request],
+    [request, conversationStore],
+  );
+  const loadOlderMessages = useCallback(
+    async (agentId: string) => {
+      const generation = loadGeneration.current;
+      const serverId = activeServerIdRef.current;
+      await conversationStore.loadOlder(
+        agentId,
+        (cursor) =>
+          request(
+            "GET",
+            `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=50&before=${encodeURIComponent(cursor ?? "")}`,
+            decodeConversationPage,
+            undefined,
+            serverId,
+          ),
+        () => generation === loadGeneration.current && Boolean(serverId) && !removedServers.current.has(serverId ?? ""),
+      );
+    },
+    [request, conversationStore],
   );
 
   const refreshConversationReads = useCallback(
@@ -392,7 +431,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       if (
         event.type !== "conversation" ||
-        event.snapshot.revision >= (conversationsRef.current[event.snapshot.agentId]?.revision ?? 0)
+        event.snapshot.revision >= (conversationStore.get(event.snapshot.agentId)?.revision ?? 0)
       ) {
         setActivityByServer((current) => {
           const previous = current[serverId] ?? {};
@@ -417,50 +456,20 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
         knownIds.add(event.snapshot.agentId);
         serverAgentIds.current.set(serverId, knownIds);
-        setConversations((current) => storeNewestSnapshot(current, event.snapshot));
+        if (conversationStore.get(event.snapshot.agentId))
+          void loadConversation(event.snapshot.agentId, serverId, true).catch(() => undefined);
       } else if (event.type === "conversation-delta") {
-        setConversations((current) => {
-          const snapshot = current[event.agentId];
-          if (!snapshot || event.revision <= snapshot.revision) return current;
-          const messageIndex = snapshot.messages.findIndex((message) => message.id === event.messageId);
-          const messages = [...snapshot.messages];
-          if (messageIndex === -1) {
-            messages.push({
-              id: event.messageId,
-              turnId: event.turnId,
-              author: "assistant",
-              source: "assistant",
-              text: event.delta,
-              createdAt: event.createdAt,
-              status: "streaming",
-            });
-          } else {
-            const message = messages[messageIndex];
-            if (!message) return current;
-            messages[messageIndex] = { ...message, text: message.text + event.delta, status: "streaming" };
-          }
-          return {
-            ...current,
-            [event.agentId]: {
-              ...snapshot,
-              threadId: event.threadId,
-              activeTurnId: event.turnId,
-              revision: event.revision,
-              messages,
-            },
-          };
-        });
+        conversationStore.enqueue(event);
       } else if (event.type === "conversation-page") {
         const readState = event.page.readState;
         if (readState) {
           readRefresh.invalidate(serverId);
           setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, { [event.page.agentId]: readState }));
         } else void refreshConversationReads(serverId).catch(() => undefined);
-        if (conversationsRef.current[event.page.agentId])
-          void loadConversation(event.page.agentId, serverId).catch(() => undefined);
+        if (conversationStore.get(event.page.agentId)) conversationStore.applyPage(event.page);
       } else if (event.type === "conversation-invalidated" || event.type === "turn-completed") {
-        if (conversationsRef.current[event.agentId])
-          void loadConversation(event.agentId, serverId).catch(() => undefined);
+        if (conversationStore.get(event.agentId))
+          void loadConversation(event.agentId, serverId, true).catch(() => undefined);
       } else if (event.type === "team-identity") {
         setServers((current) =>
           current.map((server) => (server.id === serverId ? { ...server, name: event.serverName } : server)),
@@ -470,6 +479,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [
       loadConversation,
       replaceServerAgents,
+      conversationStore,
       refreshConversationReads,
       readRefresh,
       queryClient,
@@ -501,7 +511,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           const snapshot =
             visibleMessageId !== undefined
               ? null
-              : (conversationsRef.current[agentId] ?? (await loadConversation(agentId)));
+              : (conversationStore.get(agentId) ?? (await loadConversation(agentId)));
           if (generation !== loadGeneration.current) return;
           const throughMessageId = visibleMessageId !== undefined ? visibleMessageId : snapshot?.messages.at(-1)?.id;
           if (throughMessageId === undefined) return;
@@ -527,7 +537,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (readWrites.current.get(agentId) === write) readWrites.current.delete(agentId);
       });
     },
-    [request, refreshConversationReads, loadConversation, activeServerId, readRefresh],
+    [request, refreshConversationReads, loadConversation, activeServerId, readRefresh, conversationStore],
   );
 
   const updatePreferences = useCallback(
@@ -560,10 +570,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       hiddenAgents: agents.filter((agent) => agent.serverId === activeServer.id && hiddenAgentIds.includes(agent.id)),
       pinnedAgentIds,
       unreadAgentIds,
-      conversations,
+      conversationStore,
       activityByServer,
       selectServer: (id) => {
         loadGeneration.current += 1;
+        conversationStore.cancelRequests();
         setActiveServerId(id);
       },
       leaveServer: async (serverId) => {
@@ -589,9 +600,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           delete next[serverId];
           return next;
         });
-        setConversations((current) =>
-          Object.fromEntries(Object.entries(current).filter(([id]) => !removedIds.has(id))),
-        );
+        for (const id of removedIds) conversationStore.remove(id);
         updatePreferences(serverId, () => ({ hidden: [], pinned: [] }));
         setUnreadAgentIds((current) => current.filter((id) => !removedIds.has(id)));
       },
@@ -795,6 +804,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         });
       },
       loadConversation,
+      loadOlderMessages,
       uploadAttachment: async (agentId, input) => {
         const serverId = agents.find((candidate) => candidate.id === agentId)?.serverId;
         if (!serverId) throw new Error("The agent is unavailable.");
@@ -837,7 +847,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       },
       respondToPrompt: async (agentId, input) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
-        const snapshot = conversationsRef.current[agentId];
+        const snapshot = conversationStore.get(agentId);
         const message = snapshot?.messages.find(
           (item) =>
             item.turnId === snapshot.activeTurnId &&
@@ -898,11 +908,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     activeServerId,
     activityByServer,
     agents,
-    conversations,
+    conversationStore,
     directory,
     directoryRefresh,
     hiddenAgentIds,
     loadConversation,
+    loadOlderMessages,
     markAgentRead,
     pinnedAgentIds,
     refreshHosts,
@@ -1044,14 +1055,4 @@ function updateAgentPayload(input: UpdateAgentInput): TeamProtocolV2Json {
     ...(input.avatarSeed === undefined ? {} : { avatarSeed: input.avatarSeed }),
     ...(input.avatarHue === undefined ? {} : { avatarHue: input.avatarHue }),
   };
-}
-
-function storeNewestSnapshot(
-  conversations: Record<string, ConversationSnapshot>,
-  snapshot: ConversationSnapshot,
-): Record<string, ConversationSnapshot> {
-  const current = conversations[snapshot.agentId];
-  return current && current.revision > snapshot.revision
-    ? conversations
-    : { ...conversations, [snapshot.agentId]: snapshot };
 }

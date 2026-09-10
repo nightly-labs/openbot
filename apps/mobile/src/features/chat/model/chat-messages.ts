@@ -25,8 +25,12 @@ export interface PendingChatMessage {
   serverId: string | null;
 }
 
-export function indexChatMessages(messages: readonly ChatMessage[], aliases: ReadonlyMap<string, string>) {
-  const index = new Map(messages.map((message) => [message.id, message]));
+export function indexChatMessages(
+  messages: readonly ChatMessage[],
+  aliases: ReadonlyMap<string, string>,
+  references: readonly ChatMessage[] = [],
+) {
+  const index = new Map([...references, ...messages].map((message) => [message.id, message]));
   // Reply references use host IDs even when a delivered bubble keeps its local render key.
   for (const [hostId, localId] of aliases) {
     const message = index.get(localId);
@@ -50,6 +54,8 @@ export function presentChatMessages(
   if (pending && !messages.some((message) => message.id === pending.serverId)) result.push(pending.message);
   return result;
 }
+
+const projectedBubbles = new WeakMap<ConversationMessage, ChatMessage>();
 
 export function projectChatMessages(messages: ConversationMessage[]): ChatMessage[] {
   const result: ChatMessage[] = [];
@@ -76,15 +82,20 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
       }
       thinking.steps.push({ id: message.id, text: message.text });
     } else {
-      result.push({
-        id: message.id,
-        kind: "message",
-        author: message.author === "user" ? "user" : "agent",
-        body: message.exchange ? "" : message.text,
-        streaming: message.status === "streaming",
-        attachments: message.attachments,
-        replyToMessageId: message.replyToMessageId,
-      });
+      let bubble = projectedBubbles.get(message);
+      if (!bubble) {
+        bubble = {
+          id: message.id,
+          kind: "message",
+          author: message.author === "user" ? "user" : "agent",
+          body: message.exchange ? "" : message.text,
+          streaming: message.status === "streaming",
+          attachments: message.attachments,
+          replyToMessageId: message.replyToMessageId,
+        };
+        projectedBubbles.set(message, bubble);
+      }
+      result.push(bubble);
     }
   }
   return result;

@@ -5,7 +5,7 @@ import { router, useIsFocused } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ArrowDown } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AccessibilityInfo, AppState, Keyboard, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
@@ -79,7 +79,8 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   const historyRequestRef = useRef(0);
   const {
     agents,
-    conversations,
+    conversationStore,
+    loadOlderMessages,
     loadConversation,
     markAgentRead,
     servers,
@@ -88,9 +89,22 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     uploadAttachment,
     discardAttachment,
   } = useMobileWorkspace();
-  const conversation = conversations[agent.id];
+  const subscribeConversation = useCallback(
+    (notify: () => void) => conversationStore.subscribe(agent.id, notify),
+    [agent.id, conversationStore],
+  );
+  const getConversation = useCallback(() => conversationStore.get(agent.id), [agent.id, conversationStore]);
+  const conversation = useSyncExternalStore(subscribeConversation, getConversation);
+  const serverAgents = useMemo(
+    () => agents.filter((candidate) => candidate.serverId === agent.serverId),
+    [agents, agent.serverId],
+  );
   const activity = useAgentActivity(agent.id);
-  const projectedMessages = useMemo(() => projectChatMessages(conversation?.messages ?? []), [conversation]);
+  const projectedMessages = useMemo(() => projectChatMessages(conversation?.messages ?? []), [conversation?.messages]);
+  const referenceMessages = useMemo(
+    () => projectChatMessages(Object.values(conversation?.references ?? {})),
+    [conversation?.references],
+  );
   const messages = useMemo(
     () => presentChatMessages(projectedMessages, pendingMessage, messageAliases),
     [projectedMessages, pendingMessage, messageAliases],
@@ -285,7 +299,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
             onBack={handleLeaveConversation}
           />
           <ChatMessageList
-            agents={agents.filter((candidate) => candidate.serverId === agent.serverId)}
+            agents={serverAgents}
             agent={agent}
             motion={motion}
             sending={sending}
@@ -309,6 +323,13 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
             foreground={foreground}
             messages={messages}
             messageAliases={messageAliases}
+            referenceMessages={referenceMessages}
+            hasOlder={conversation?.pageInfo.hasOlder ?? false}
+            olderLoading={conversation?.olderLoading ?? false}
+            olderError={conversation?.olderError ?? false}
+            onLoadOlder={() => {
+              void loadOlderMessages(agent.id);
+            }}
             onReply={
               !questionForm.question
                 ? (message) => {

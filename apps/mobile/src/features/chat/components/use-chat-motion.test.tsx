@@ -123,3 +123,46 @@ it("keeps replies visible and does not scroll after keyboard dismissal, includin
   await flush();
   expect(motion.atLatest).toBe(false);
 });
+
+it("reveals a virtualized history and does not jump to the end when older messages load", async () => {
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    const id = ++native.nextFrame;
+    native.frames.set(id, callback);
+    return id;
+  });
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => native.frames.delete(id));
+  let motion: ChatMotion | undefined;
+  function Chat() {
+    const current = useChatMotion(100, 0, true, "user");
+    useLayoutEffect(() => {
+      motion = current;
+    });
+    return null;
+  }
+  async function flush() {
+    await act(() => {
+      while (native.frames.size) {
+        const frames = [...native.frames.values()];
+        native.frames.clear();
+        for (const frame of frames) frame(0);
+      }
+    });
+  }
+  await act(() => root.render(<Chat />));
+  if (!motion) throw new Error("Chat motion is not mounted");
+  motion.onViewportLayout(layout(800));
+  motion.onComposerLayout(layout(80));
+  motion.onTailStartLayout("user", layout(100, 600));
+  motion.onContentSizeChange(390, 1000);
+  motion.onContentInsetChange({ bottom: 400 });
+  await flush();
+  expect(motion.historyVisible).toBe(true);
+  native.scrollTo.mockClear();
+
+  motion.onTailStartLayout("user", layout(100, 2600));
+  motion.onContentSizeChange(390, 3000);
+  await flush();
+  expect(native.scrollTo).not.toHaveBeenCalled();
+  motion.scrollToLatest();
+  expect(native.scrollTo).toHaveBeenLastCalledWith({ y: 2600, animated: false });
+});
