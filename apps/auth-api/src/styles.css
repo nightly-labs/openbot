@@ -1027,24 +1027,20 @@ a {
     0 0;
   -webkit-background-clip: text;
   background-clip: text;
-}
-
-.landing-pricing-amount::before,
-.landing-pricing-amount::after {
-  content: attr(data-amount);
-  position: absolute;
-  inset: 0;
+  /* The rim is a bevel, not an outline. -webkit-text-stroke traces each glyph
+     contour on its own, so on the "$" it drew the stem's rectangle straight
+     across the S and the stem read as a pasted-on bar. drop-shadow works from
+     the rendered silhouette, where stem and S are already one shape. */
+  filter: drop-shadow(0 -1px 0 var(--openbot-price-rim)) drop-shadow(0 1px 0 var(--openbot-price-rim-under));
 }
 
 .landing-pricing-amount::before {
+  content: attr(data-amount);
+  position: absolute;
+  inset: 0;
   z-index: -1;
   color: var(--openbot-price-glow);
   filter: blur(clamp(24px, 4vw, 56px));
-}
-
-.landing-pricing-amount::after {
-  color: transparent;
-  -webkit-text-stroke: 1px var(--openbot-price-rim);
 }
 
 .landing-pricing-note {
