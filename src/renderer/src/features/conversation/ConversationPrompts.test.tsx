@@ -99,12 +99,12 @@ describe("BrowserTakeoverCard", () => {
 });
 
 describe("takeover chat forms", () => {
-  it.each(["click", "enter", "alternate", "website-validation", "choice", "multiple-forms"])(
+  it.each(["click", "enter", "website-validation", "choice", "multiple-forms"])(
     "submits with %s and clears values for the next step",
     async (method) => {
       installOpenbotStub();
       const login = browserFormPreview();
-      login.forms[0].requiresActionChoice = method === "choice" || method === "alternate";
+      login.forms[0].requiresActionChoice = method === "choice";
       if (method === "multiple-forms")
         login.forms.push({
           ...structuredClone(login.forms[0]),
@@ -142,30 +142,18 @@ describe("takeover chat forms", () => {
         method === "website-validation" ? "website-validates-this" : "user@example.com,other@example.com";
       await fireEvent.input(email, { target: { value: emailValue } });
       await fireEvent.input(screen.getByLabelText("Password (required)"), { target: { value: "private-password" } });
-      if (method === "choice") {
-        email.focus();
-        await userEvent.keyboard("{Enter}");
-        expect(window.openbot.browser.submitTakeoverForm).not.toHaveBeenCalled();
-      }
-      if (method === "choice" || method === "alternate") {
-        await fireEvent.change(screen.getByRole("combobox", { name: "Action" }), {
-          target: { value: method === "alternate" ? "alternate" : "submit" },
-        });
-      }
+      expect(screen.queryByRole("combobox", { name: "Action" })).not.toBeInTheDocument();
       if (method === "enter") {
         email.focus();
         await userEvent.keyboard("{Enter}");
-      } else
-        await fireEvent.click(
-          screen.getByRole("button", { name: method === "alternate" ? "Use password" : "Sign in" }),
-        );
+      } else await fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
       expect(await screen.findByRole("textbox", { name: "Code (required)" })).toHaveValue("");
       expect(sent).toEqual(
         expect.objectContaining({
           requestId: "request",
           revision: "preview-form",
           formId: "sign-in",
-          actionId: method === "alternate" ? "alternate" : "submit",
+          actionId: "submit",
           values: [
             { id: "email", value: emailValue },
             { id: "password", value: "private-password" },

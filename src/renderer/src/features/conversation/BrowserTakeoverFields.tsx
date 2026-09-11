@@ -14,18 +14,15 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
   const [state, setState] = createStore<{
     form: BrowserFormState | null;
     values: Record<string, FieldValue>;
-    actions: Record<string, string>;
     busy: boolean;
     error: string;
-  }>({ form: null, values: {}, actions: {}, busy: false, error: "" });
+  }>({ form: null, values: {}, busy: false, error: "" });
   let generation = 0;
   let pending = false;
   const key = (formId: string, fieldId: string) => `${formId}:${fieldId}`;
   const apply = (form: BrowserFormState) => {
     const values: Record<string, FieldValue> = {};
-    const actions: Record<string, string> = {};
     for (const entry of form.forms) {
-      actions[entry.id] = entry.requiresActionChoice ? "" : (entry.actions[0]?.id ?? "");
       for (const field of entry.fields) {
         values[key(entry.id, field.id)] =
           field.type === "select"
@@ -38,7 +35,6 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
     setState((draft) => {
       draft.form = form;
       draft.values = values;
-      draft.actions = actions;
     });
   };
   const read = async (request: BrowserFormRequest, current: number) => {
@@ -168,7 +164,7 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
             aria-label={form.label}
             onSubmit={(event) => {
               event.preventDefault();
-              const actionId = state.actions[form.id];
+              const actionId = form.actions[0]?.id;
               if (actionId) void submit(form.id, actionId);
             }}
           >
@@ -259,30 +255,9 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
                 );
               }}
             </For>
-            <Show when={form.requiresActionChoice}>
-              <Field htmlFor={`${state.form?.revision}-${form.id}-action`} label="Action">
-                <NativeSelect
-                  id={`${state.form?.revision}-${form.id}-action`}
-                  value={state.actions[form.id] ?? ""}
-                  disabled={state.busy}
-                  onChange={(event) =>
-                    setState((draft) => {
-                      draft.actions[form.id] = event.currentTarget.value;
-                    })
-                  }
-                >
-                  <option value="" disabled>
-                    Choose an action
-                  </option>
-                  <For each={form.actions}>{(action) => <option value={action.id}>{action.label}</option>}</For>
-                </NativeSelect>
-              </Field>
-            </Show>
             <div class="browser-takeover-form-actions">
-              <Button type="submit" size="sm" class="approval-button" disabled={state.busy || !state.actions[form.id]}>
-                {state.busy
-                  ? "Submitting…"
-                  : (form.actions.find((action) => action.id === state.actions[form.id])?.label ?? "Continue")}
+              <Button type="submit" size="sm" class="approval-button" disabled={state.busy || !form.actions.length}>
+                {state.busy ? "Submitting…" : (form.actions[0]?.label ?? "Continue")}
               </Button>
               <Show when={form.id === state.form?.forms.at(-1)?.id}>
                 <RefreshButton />

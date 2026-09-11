@@ -731,6 +731,14 @@ describe("OpenBot connected desktop shell", () => {
     });
 
     expect(await screen.findByRole("region", { name: "Browser takeover" })).toHaveTextContent("Action required");
+    emitAgentEvent?.({
+      type: "turn-completed",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-1",
+      status: "completed",
+    });
+    expect(await screen.findByRole("region", { name: "Browser takeover" })).toHaveTextContent("Action required");
     expect(screen.getByRole("heading", { name: "Complete the step on example.com" })).toBeVisible();
     expect(await screen.findByRole("img", { name: "Preview of Sign in" })).toBeVisible();
     expect(window.openbot.browser.activate).not.toHaveBeenCalledWith("tab-login");

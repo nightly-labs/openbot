@@ -1349,7 +1349,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   async respondToBrowserTakeover(input: RespondToBrowserTakeoverInput): Promise<void> {
-    await this.#attention.respondToBrowserTakeover(input);
+    const completed = await this.#attention.respondToBrowserTakeover(input);
+    if (
+      completed &&
+      this.#store.list().some((agent) => agent.id === completed.agentId && agent.threadId === completed.threadId)
+    ) {
+      await this.sendMessage({
+        agentId: completed.agentId,
+        text: "The browser step is complete. Continue the original task.",
+      });
+    }
   }
 
   async #handleServerRequest(client: AgentClient, request: AppServerRequest): Promise<void> {

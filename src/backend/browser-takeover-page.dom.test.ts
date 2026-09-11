@@ -100,7 +100,7 @@ describe("browser takeover page", () => {
     document.body.innerHTML = `<${container}><input aria-label="Email or phone"><input type="password" style="display:none"><button type="button">Forgot email?</button>${action}<button type="button">Create account</button></${container}>`;
     const state = read();
     expect(state.forms[0]?.fields.map((field) => field.label)).toEqual(["Email or phone"]);
-    expect(state.forms[0]?.requiresActionChoice).toBe(true);
+    expect(state.forms[0]?.actions[0].label).toBe("Next");
     expect(() =>
       decodeBrowserFormState({ ...state, forms: [{ ...state.forms[0], requiresActionChoice: "yes" }] }),
     ).toThrow();
@@ -122,7 +122,7 @@ describe("browser takeover page", () => {
       '<main><input aria-label="Email or phone"><button>Forgot email?</button><a href="https://help.example.com" target="_blank">Guest mode help</a><button>Next</button><button>Create account</button><footer><a href="/help">Help</a><button>Privacy</button></footer></main><button>Global navigation</button>';
     const state = read();
     expect(state.forms).toHaveLength(1);
-    expect(state.forms[0]?.actions.map((action) => action.label)).toEqual(["Forgot email?", "Next", "Create account"]);
+    expect(state.forms[0]?.actions.map((action) => action.label)).toEqual(["Next", "Forgot email?", "Create account"]);
   });
   it("opens a phone-number step from a page that only has a custom action", () => {
     document.body.innerHTML = '<div><div role="button" tabindex="0">Use phone number</div></div>';

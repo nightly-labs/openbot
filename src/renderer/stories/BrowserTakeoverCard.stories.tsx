@@ -149,7 +149,6 @@ export const PhoneNumberStep: Story = {
   ...PageActions,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.selectOptions(await canvas.findByRole("combobox", { name: "Action" }), "phone");
     await userEvent.click(canvas.getByRole("button", { name: "Log in with phone number" }));
     await canvas.findByRole("textbox", { name: "Phone number (required)" });
   },

@@ -662,7 +662,19 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     expect(events.filter((event) => event.type === "browser-takeover-requested")).toHaveLength(1);
     expect(control).toEqual(["begin:protected-tab"]);
 
+    client.emit("notification", {
+      method: "turn/completed",
+      params: { threadId: externalThreadId, turn: { id: started.turnId, status: "completed" } },
+    });
+    await waitFor(() => events.some((event) => event.type === "turn-completed" && event.turnId === started.turnId));
+    expect(() => activeService.assertBrowserTakeover(activeTakeover.request)).not.toThrow();
+    expect(control).toEqual(["begin:protected-tab"]);
+    expect(activeService.getRuntimeSnapshot().pendingBrowserTakeovers).toEqual([activeTakeover.request]);
     await service.respondToBrowserTakeover({ requestId: "takeover-call", decision: "complete" });
+    await waitFor(() => events.filter((event) => event.type === "turn-started").length === 2);
+    expect(client.requests.filter((request) => request.method === "turn/start").at(-1)).toMatchObject({
+      params: { threadId: externalThreadId },
+    });
     await waitFor(() => client.responses.length === 4);
     expect(openBotToolPayload(client.responses[3]?.result)).toEqual({
       status: "completed",
@@ -700,6 +712,34 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     expect(openBotToolPayload(client.responses[4]?.result)).toEqual({ status: "cancelled" });
     // Cancelling returns the tab as surely as completing does.
     expect(control).toEqual(["begin:protected-tab", "end:protected-tab", "begin:protected-tab", "end:protected-tab"]);
+
+    const resumed = events.findLast((event) => event.type === "turn-started");
+    if (resumed?.type !== "turn-started") throw new Error("Continuation did not start.");
+    client.emit("request", {
+      method: "item/tool/call",
+      id: "takeover-interrupted",
+      params: {
+        threadId: externalThreadId,
+        turnId: resumed.turnId,
+        callId: "takeover-interrupted",
+        namespace: "openbot_browser",
+        tool: "request_takeover",
+        arguments: { tabId: "protected-tab" },
+      },
+    });
+    await waitFor(() =>
+      events.some(
+        (event) => event.type === "browser-takeover-requested" && event.request.requestId === "takeover-interrupted",
+      ),
+    );
+    client.emit("notification", {
+      method: "turn/completed",
+      params: { threadId: externalThreadId, turn: { id: resumed.turnId, status: "interrupted" } },
+    });
+    await waitFor(() => client.responses.length === 6);
+    expect(openBotToolPayload(client.responses[5]?.result)).toEqual({ status: "cancelled" });
+    expect(activeService.getRuntimeSnapshot().pendingBrowserTakeovers).toEqual([]);
+    expect(control.at(-1)).toBe("end:protected-tab");
   });
   it("keeps legacy approvals interactive and clears pending approvals on shutdown", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();

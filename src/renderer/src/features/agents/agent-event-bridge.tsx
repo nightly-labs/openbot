@@ -184,6 +184,11 @@ export function AgentEventBridge() {
         });
         setPendingPrompts((current) => {
           const pending = current[event.agentId];
+          if (
+            pending?.type === "browser-takeover-requested" &&
+            (event.status === "completed" || pending.request.turnId !== event.turnId)
+          )
+            return current;
           const submittedRequestKey = submittedPromptRequests()[event.agentId];
           if (
             pending?.type === "prompt" &&

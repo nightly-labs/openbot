@@ -211,20 +211,23 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
       unsupported = true;
       continue;
     }
-    if (native)
-      actionDescriptions.sort((a, b) => {
-        const first = actions.get(a.id);
-        const second = actions.get(b.id);
-        const submits = (node: HTMLElement | undefined) =>
-          (node instanceof HTMLButtonElement || node instanceof HTMLInputElement) && node.type === "submit";
-        return Number(submits(second)) - Number(submits(first));
-      });
+    const advances = (action: { id: string; label: string }) => {
+      const node = actions.get(action.id);
+      if (native && (node instanceof HTMLButtonElement || node instanceof HTMLInputElement) && node.type === "submit")
+        return 2;
+      return /^(next|continue|submit|log\s*in|sign\s*in|verify|confirm|dalej|kontynuuj|zaloguj|potwierdź|wyślij)(?:\b|$)/i.test(
+        action.label,
+      )
+        ? 1
+        : 0;
+    };
+    actionDescriptions.sort((a, b) => advances(b) - advances(a));
     const id = `form-${formIndex}`;
     const description = {
       id,
       label: (form.getAttribute("aria-label") || `Form ${formIndex + 1}`).slice(0, 2000),
       fields,
-      requiresActionChoice: !native && actionDescriptions.length > 1,
+      requiresActionChoice: false,
       actions: actionDescriptions,
     };
     forms.push(description);

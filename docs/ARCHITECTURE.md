@@ -99,11 +99,13 @@ submission to the captured document, controls, and action. Values stay in tempor
 are sent directly to the website; they do not enter chat history or provider tool results. Named buttons, same-origin links, and elements with `role="button"` are available even when a step has no inputs.
 External links, downloads, footer and navigation actions are excluded. Page-wide action-only groups
 are excluded when a specific form is available.
-A page with several custom actions requires an explicit choice; Enter must not select an arbitrary action. Unsupported
-controls keep manual takeover available. After a valid submission, the next detected form or standalone one-time-code input stays in
+Each chat form has one submit button. Native submit controls take priority, followed by actions
+labelled to advance the step, such as Next or Continue. Unsupported controls keep manual takeover available. After a valid submission, the next detected form or standalone one-time-code input stays in
 the chat card. If no next input is detected, control returns to the agent to inspect the page result.
 Native validation runs in the browser; forms with validation overrides and controls outside native
-forms use the website’s own validation. Invalid fields keep the current takeover active. Remote clients retain the existing takeover protocol.
+forms use the website’s own validation. Invalid fields keep the current takeover active. A completed
+provider turn leaves the card active until the user resolves it; completion then queues continuation
+in the same thread. Interrupted turns cancel their takeover. Remote clients retain the existing takeover protocol.
 
 ## Provider CLI updates
 

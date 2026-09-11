@@ -66,6 +66,7 @@ interface PendingApproval {
 }
 
 interface PendingBrowserTakeover {
+  turnCompleted?: boolean;
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
@@ -129,7 +130,7 @@ export type RuntimeAttention = Pick<
  *
  * The three live together because they are one queue as far as the product is concerned — the
  * runtime snapshot budgets them against a single attention limit in that order, duplication refuses
- * while any of them is outstanding, and a turn ending clears all three at once. Each also owes the
+ * while any of them is outstanding. Browser takeover can outlive a completed turn. Each owes the
  * provider a response, so every path out of these maps either answers the request or cancels it;
  * an entry silently dropped is an agent stuck forever.
  */
@@ -276,11 +277,12 @@ export class AttentionRegistry {
     }
   }
 
-  async respondToBrowserTakeover(input: RespondToBrowserTakeoverInput): Promise<void> {
+  async respondToBrowserTakeover(input: RespondToBrowserTakeoverInput): Promise<BrowserTakeoverRequest | null> {
     const pending = this.#takeovers.get(input.requestId);
     if (!pending) throw new Error("This browser takeover is no longer active.");
     this.#routines.markRunningForTurn(pending.request.turnId);
     this.#resolveBrowserTakeover(input.requestId, pending, input.decision);
+    return pending.turnCompleted && input.decision === "complete" ? pending.request : null;
   }
 
   surfaceApproval(client: AgentClient, request: AppServerRequest, kind: AgentApprovalKind): void {
@@ -541,8 +543,8 @@ export class AttentionRegistry {
     });
   }
 
-  /** A turn ending expires its questions, drops its approvals and cancels its takeovers. */
-  clearForTurn(threadId: string, turnId: string): void {
+  /** Completed turns leave browser takeover with the user; interruption still cancels it. */
+  clearForTurn(threadId: string, turnId: string, completed = false): void {
     for (const [requestId, pending] of this.#prompts) {
       const pendingThreadId = getString(pending.params, "threadId");
       const pendingTurnId = getString(pending.params, "turnId");
@@ -560,7 +562,8 @@ export class AttentionRegistry {
     }
     for (const [requestId, pending] of this.#takeovers) {
       if (pending.params.threadId === threadId && pending.params.turnId === turnId) {
-        this.#resolveBrowserTakeover(requestId, pending, "cancel");
+        if (completed) pending.turnCompleted = true;
+        else this.#resolveBrowserTakeover(requestId, pending, "cancel");
       }
     }
   }
