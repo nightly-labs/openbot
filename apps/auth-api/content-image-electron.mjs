@@ -17,8 +17,18 @@ app.commandLine.appendSwitch("use-gl", "angle");
 app.commandLine.appendSwitch("use-angle", "swiftshader");
 app.commandLine.appendSwitch("enable-unsafe-swiftshader");
 
+// Chromium asks the desktop keyring for a password store while it starts. A
+// machine with no session bus has no keyring to answer, and the question can
+// wait long enough that the app never becomes ready. Nothing here stores a
+// password, so answer it with the plain store.
+app.commandLine.appendSwitch("password-store", "basic");
+
 // A build tool must not leave a process behind when its last window closes.
 app.on("window-all-closed", () => app.quit());
+
+// Printed before anything that can hang, so a build that sees this line and
+// nothing after it knows the process ran and stopped on the way to ready.
+console.log("content-images: Electron started.");
 
 try {
   await main();
