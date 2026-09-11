@@ -8,6 +8,7 @@ import { HeroDownloadSelector } from "./HeroDownloadSelector";
 import { LandingAppPreview } from "./LandingAppPreview";
 import { LandingFooter } from "./LandingFooter";
 import { LandingGlow } from "./LandingGlow";
+import { PricingSection } from "./PricingSection";
 
 export function LandingPage() {
   let hero: HTMLDivElement | undefined;
@@ -124,6 +125,7 @@ export function LandingPage() {
 
           <LandingAppPreview />
         </section>
+        <PricingSection />
         <DownloadSection />
       </main>
       <LandingFooter />
