@@ -375,27 +375,23 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("sends an action for selected agent text without clearing the composer draft", async () => {
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
     const answer = "The launch note needs a friendlier closing sentence.";
-    emitAgentEvent?.({
-      type: "conversation",
-      snapshot: {
-        agentId: "chief",
-        threadId: "thread-chief",
-        activeTurnId: null,
-        revision: 1,
-        messages: [
-          {
-            id: "assistant-selection",
-            author: "assistant",
-            text: answer,
-            createdAt: "2026-08-12T10:00:00.000Z",
-            status: "completed",
-          },
-        ],
-      },
+    vi.mocked(window.openbot.agent.readConversation).mockResolvedValueOnce({
+      agentId: "chief",
+      threadId: "thread-chief",
+      activeTurnId: null,
+      revision: 1,
+      messages: [
+        {
+          id: "assistant-selection",
+          author: "assistant",
+          text: answer,
+          createdAt: "2026-08-12T10:00:00.000Z",
+          status: "completed",
+        },
+      ],
     });
+    render(() => <App />);
 
     const message = await screen.findByText(answer);
     const composer = screen.getByRole("textbox", { name: "Message Chief" });
