@@ -1,4 +1,5 @@
-import { formatNewsDate, type NewsArticle, newsArticlePath } from "../../lib/news";
+import { Link } from "@tanstack/solid-router";
+import { formatNewsDate, type NewsArticle } from "../../lib/news";
 import { NewsGradient } from "./NewsGradient";
 
 export interface NewsCardProps {
@@ -14,10 +15,11 @@ export function NewsCard(props: NewsCardProps) {
   let root: HTMLAnchorElement | undefined;
 
   return (
-    <a
+    <Link
       ref={root}
       class="news-card"
-      href={newsArticlePath(props.article.slug)}
+      to="/news/$slug"
+      params={{ slug: props.article.slug }}
       style={{ "--news-card-index": props.index }}
     >
       <div class="news-card-art">
@@ -36,6 +38,6 @@ export function NewsCard(props: NewsCardProps) {
         {formatNewsDate(props.article.publishedAt)}
       </time>
       <h3 class="news-card-title">{props.article.title}</h3>
-    </a>
+    </Link>
   );
 }

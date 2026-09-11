@@ -1,8 +1,8 @@
 import { Dynamic } from "@solidjs/web";
+import { Link } from "@tanstack/solid-router";
 import { For, onSettled, Show } from "solid-js";
 import { NEWS_ARTICLE_BODIES } from "../../content/news";
 import { landingAnalytics } from "../../lib/analytics";
-import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { formatNewsDate, NEWS_ARTICLES, type NewsArticle } from "../../lib/news";
 import { createLandingReveal } from "../landing/createLandingReveal";
 import { LandingFooter } from "../landing/LandingFooter";
@@ -31,9 +31,9 @@ export function NewsArticlePage(props: NewsArticlePageProps) {
       <main class="news-main">
         <article class="news-container news-article-body">
           <header class="news-article-header" data-enter="news-copy">
-            <a class="news-article-back" href={OPENBOT_LINKS.news}>
+            <Link class="news-article-back" to="/news">
               All news
-            </a>
+            </Link>
             <h1 class="news-article-title">{props.article.title}</h1>
             <p class="news-article-standfirst">{props.article.description}</p>
             <p class="news-meta news-article-byline">

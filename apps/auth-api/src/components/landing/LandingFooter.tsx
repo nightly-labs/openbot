@@ -1,6 +1,7 @@
 import { AppLogo } from "@openbot/brand";
-import { For } from "solid-js";
-import { EXTERNAL_LINK_REL, FOOTER_COLUMNS, OPENBOT_LINKS } from "../../lib/landing-links";
+import { Link } from "@tanstack/solid-router";
+import { For, Show } from "solid-js";
+import { EXTERNAL_LINK_REL, FOOTER_COLUMNS, type FooterLink, OPENBOT_LINKS } from "../../lib/landing-links";
 import { createLandingReveal } from "./createLandingReveal";
 import { LandingIcon } from "./LandingIcon";
 
@@ -32,17 +33,17 @@ export function LandingFooter() {
       <div class="landing-footer-inner">
         <div class="landing-footer-grid">
           <div class="landing-footer-brand" data-revealed={revealState()}>
-            <a class="landing-footer-lockup" href="/" aria-label="OpenBot home">
+            <Link class="landing-footer-lockup" to="/" aria-label="OpenBot home">
               <AppLogo variant="production" class="landing-footer-logo" />
               <span>OpenBot</span>
-            </a>
+            </Link>
 
             <p class="landing-footer-description">{FOOTER_DESCRIPTION}</p>
 
-            <a class="landing-footer-cta" href={OPENBOT_LINKS.download}>
+            <Link class="landing-footer-cta" to="/" hash="download">
               <span>Download OpenBot</span>
               <LandingIcon name="download" />
-            </a>
+            </Link>
 
             <div class="landing-footer-socials">
               <For each={SOCIALS}>
@@ -73,13 +74,7 @@ export function LandingFooter() {
                     <For each={column.links}>
                       {(link) => (
                         <li>
-                          <a
-                            href={link.href}
-                            target={link.external ? "_blank" : undefined}
-                            rel={link.external ? EXTERNAL_LINK_REL : undefined}
-                          >
-                            {link.label}
-                          </a>
+                          <FooterNavLink link={link} />
                         </li>
                       )}
                     </For>
@@ -93,10 +88,10 @@ export function LandingFooter() {
         <div class="landing-footer-bottom" data-revealed={revealState()}>
           <p>&copy; {currentYear} OpenBot. All rights reserved.</p>
           <div class="landing-footer-meta">
-            <a href={OPENBOT_LINKS.download}>
+            <Link to="/" hash="download">
               <span class="landing-footer-availability" aria-hidden="true" />
               Available for macOS and Windows
-            </a>
+            </Link>
             <p class="landing-footer-made">
               Made with
               <LandingIcon name="heart" label="love" />
@@ -106,5 +101,31 @@ export function LandingFooter() {
         </div>
       </div>
     </footer>
+  );
+}
+
+// An entry that points inside the site is a route, and goes through the router so
+// the page is not fetched and parsed again. An external one stays a plain anchor.
+function FooterNavLink(props: { link: FooterLink }) {
+  const external = () => (props.link.external ? props.link : undefined);
+  const internal = () => (props.link.external ? undefined : props.link);
+
+  return (
+    <>
+      <Show when={external()}>
+        {(link) => (
+          <a href={link().href} target="_blank" rel={EXTERNAL_LINK_REL}>
+            {link().label}
+          </a>
+        )}
+      </Show>
+      <Show when={internal()}>
+        {(link) => (
+          <Link to={link().to} hash={link().hash}>
+            {link().label}
+          </Link>
+        )}
+      </Show>
+    </>
   );
 }

@@ -1,5 +1,6 @@
 import { cleanup, render, screen, within } from "@solidjs/testing-library";
-import { isNotFound } from "@tanstack/solid-router";
+import type { JSX } from "@solidjs/web";
+import { createRootRoute, createRoute, createRouter, isNotFound, RouterContextProvider } from "@tanstack/solid-router";
 import { afterEach, describe, expect, it } from "vitest";
 import { LandingPage } from "../src/components/landing/LandingPage";
 import { NewsArticlePage } from "../src/components/news/NewsArticlePage";
@@ -9,9 +10,35 @@ import { loadNewsArticle } from "../src/routes/news/$slug";
 
 afterEach(cleanup);
 
+/**
+ * The routes these pages link to. Not the generated tree: that one also carries the
+ * server handlers for the sitemap and the feed, which import `cloudflare:workers`
+ * and cannot load outside a Worker. Nothing is lost by declaring them here, because
+ * a component that names a route the real tree does not hold fails the type check.
+ */
+function createTestRouter() {
+  const rootRoute = createRootRoute();
+  rootRoute.addChildren([
+    createRoute({ getParentRoute: () => rootRoute, path: "/" }),
+    createRoute({ getParentRoute: () => rootRoute, path: "/news" }),
+    createRoute({ getParentRoute: () => rootRoute, path: "/news/$slug" }),
+  ]);
+  return createRouter({ routeTree: rootRoute });
+}
+
+/**
+ * Every link inside the site is a router link, and a router link asks the router for
+ * its href. Rendering one of these pages on its own leaves that context empty, and
+ * the page throws before it draws anything.
+ */
+function renderPage(page: () => JSX.Element) {
+  const router = createTestRouter();
+  return render(() => <RouterContextProvider router={router}>{page}</RouterContextProvider>);
+}
+
 describe("news index", () => {
   it("offers every published article as a link to its page", () => {
-    render(() => <NewsIndexPage />);
+    renderPage(() => <NewsIndexPage />);
 
     for (const article of NEWS_ARTICLES) {
       const links = screen.getAllByRole("link", { name: (name) => name.includes(article.title) });
@@ -22,7 +49,7 @@ describe("news index", () => {
 
 describe("landing header", () => {
   it("offers the news section", () => {
-    render(() => <LandingPage />);
+    renderPage(() => <LandingPage />);
 
     // Scoped to the header: the footer links to the same place, and the point of
     // this assertion is the entry point at the top of the page.
@@ -34,7 +61,7 @@ describe("landing header", () => {
 describe("news article page", () => {
   it("shows the article title, its summary and its prose", () => {
     for (const article of NEWS_ARTICLES) {
-      render(() => <NewsArticlePage article={article} />);
+      renderPage(() => <NewsArticlePage article={article} />);
 
       expect(screen.getByRole("heading", { level: 1, name: article.title })).toBeInTheDocument();
       expect(screen.getByText(article.description)).toBeInTheDocument();
@@ -52,7 +79,7 @@ describe("news article page", () => {
   it("links on to the other articles", () => {
     const article = NEWS_ARTICLES[0];
     if (!article) throw new Error("The registry must hold at least one article.");
-    render(() => <NewsArticlePage article={article} />);
+    renderPage(() => <NewsArticlePage article={article} />);
 
     for (const other of NEWS_ARTICLES.filter((entry) => entry.slug !== article.slug)) {
       const links = screen.getAllByRole("link", { name: (name) => name.includes(other.title) });

@@ -1,5 +1,6 @@
-import { formatNewsDate, type NewsArticle, newsArticlePath } from "../../lib/news";
-import { Button } from "../ui/button";
+import { Link } from "@tanstack/solid-router";
+import { formatNewsDate, type NewsArticle } from "../../lib/news";
+import { ButtonLink } from "../ui/button";
 import { NewsGradient } from "./NewsGradient";
 
 export interface NewsFeaturedProps {
@@ -14,11 +15,14 @@ export function NewsFeatured(props: NewsFeaturedProps) {
           {formatNewsDate(props.article.publishedAt)}
         </time>
         <h2 class="news-featured-title" id="news-featured-title">
-          <a href={newsArticlePath(props.article.slug)}>{props.article.title}</a>
+          <Link to="/news/$slug" params={{ slug: props.article.slug }}>
+            {props.article.title}
+          </Link>
         </h2>
         <p class="news-featured-description">{props.article.description}</p>
-        <Button
-          href={newsArticlePath(props.article.slug)}
+        <ButtonLink
+          to="/news/$slug"
+          params={{ slug: props.article.slug }}
           variant="primary"
           size="lg"
           icon="arrow-right"
@@ -26,7 +30,7 @@ export function NewsFeatured(props: NewsFeaturedProps) {
           aria-label={`Read more: ${props.article.title}`}
         >
           Read More
-        </Button>
+        </ButtonLink>
       </div>
 
       {/* Not a link itself, and it takes no pointer. The heading's link is stretched

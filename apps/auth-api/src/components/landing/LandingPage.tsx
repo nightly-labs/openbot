@@ -1,4 +1,5 @@
 import { AppLogo, PlatformLogo, ProviderLogo } from "@openbot/brand";
+import { Link } from "@tanstack/solid-router";
 import { onSettled } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
 import { EXTERNAL_LINK_REL, OPENBOT_LINKS } from "../../lib/landing-links";
@@ -32,9 +33,9 @@ export function LandingPage() {
         </a>
 
         <nav class="landing-navigation" aria-label="Primary navigation">
-          <a class="landing-header-link" href={OPENBOT_LINKS.news}>
+          <Link class="landing-header-link" to="/news">
             News
-          </a>
+          </Link>
           <Button
             href={OPENBOT_LINKS.contact}
             target="_blank"

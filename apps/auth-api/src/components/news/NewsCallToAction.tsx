@@ -1,6 +1,6 @@
 import { EXTERNAL_LINK_REL, OPENBOT_LINKS } from "../../lib/landing-links";
 import { createLandingReveal } from "../landing/createLandingReveal";
-import { Button } from "../ui/button";
+import { Button, ButtonLink } from "../ui/button";
 
 // The last block before the footer on a news page. A reader who reaches the end of
 // an article has nowhere left to go, so this is the one clear way on to the app.
@@ -29,9 +29,9 @@ export function NewsCallToAction() {
         computer.
       </p>
       <div class="news-cta-actions">
-        <Button href={OPENBOT_LINKS.downloadFromOtherPage} variant="primary" size="lg" icon="download">
+        <ButtonLink to="/" hash="download" variant="primary" size="lg" icon="download">
           Download OpenBot
-        </Button>
+        </ButtonLink>
         <Button
           href={OPENBOT_LINKS.contact}
           target="_blank"
