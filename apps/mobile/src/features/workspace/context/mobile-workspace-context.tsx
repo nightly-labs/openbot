@@ -58,6 +58,7 @@ import {
   type ServerLoadContext,
 } from "@/features/workspace/components/server-connection";
 import { type MobileAgentActivities, reduceAgentActivity } from "@/features/workspace/model/agent-activity";
+import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
@@ -904,6 +905,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         markAgentRead(agentId, null);
       },
       toggleAgentPin: (agentId) => {
+        if (!canToggleAgentPin(pinnedAgentIds, agentId)) return "error";
         if (pinnedAgentIds.includes(agentId)) {
           return updatePreferences(activeServer.id, (current) => ({
             ...current,
