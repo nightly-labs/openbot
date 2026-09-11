@@ -30,12 +30,16 @@ import { cx } from "../../lib/utils";
 // development it answers 404, and the CSS approximation underneath is a handful of
 // coloured blobs that look nothing like the shader's output.
 //
-// So the component draws its own. Before anything is hovered it mounts the shader
-// with the clock stopped, keeps the frame it produced as the still, and lets the
-// context go again. That picture is exact, it is the right shape because it was
+// So a card that can move draws its own. Before anything is hovered it mounts the
+// shader with the clock stopped, keeps the frame it produced as the still, and lets
+// the context go again. That picture is exact, it is the right shape because it was
 // drawn at the element's own size, and it costs one short-lived context per card.
 // The canvas is revealed only once it has drawn, and it fades in over that same
 // frame, so the handover is never a cut and never a cut to an empty rectangle.
+//
+// A card that cannot move — reduced motion, or a screen with no pointer to rest —
+// keeps the baked PNG. With no shader to hand over to there is no cut to avoid,
+// and drawing it again would spend a context and an image encode on every card.
 
 interface ArticleGradientBaseProps {
   /** The collection the article belongs to, which is half of its image path. */
@@ -217,14 +221,8 @@ export function ArticleGradient(props: ArticleGradientProps) {
   };
 
   onSettled(() => {
-    // The still must be the first frame whether or not the animation may run:
-    // it is what the reader looks at while the shader starts, and what they keep
-    // if it never does. Reduced motion is a reason not to move, not a reason to
-    // show a different picture.
-    if (!motionWelcome()) {
-      void primeStill();
-      return;
-    }
+    // Nothing will move, so the baked still is the whole picture.
+    if (!motionWelcome()) return;
 
     if (props.mode === "live") {
       // The still is painted first and the animation starts from it, so the
@@ -240,11 +238,8 @@ export function ArticleGradient(props: ArticleGradientProps) {
 
     // Hover only makes sense where a pointer can rest on something. A touch
     // screen reports a hover that never ends, which would leave a context alive
-    // for the rest of the session.
-    if (!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches) {
-      void primeStill();
-      return;
-    }
+    // for the rest of the session. Nothing will move here either.
+    if (!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches) return;
 
     const element = props.hoverTarget?.();
     if (!element) return;

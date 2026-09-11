@@ -2,14 +2,32 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/te
 import type { JSX } from "@solidjs/web";
 import { createRootRoute, createRoute, createRouter, isNotFound, RouterContextProvider } from "@tanstack/solid-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ArticleGradient } from "../src/components/content/ArticleGradient";
 import { ArticleClip, ArticleGif } from "../src/components/content/ArticleMedia";
 import { ArticlePage } from "../src/components/content/ArticlePage";
 import { CollectionIndexPage } from "../src/components/content/CollectionIndexPage";
 import { LandingPage } from "../src/components/landing/LandingPage";
+import { articleGradient } from "../src/lib/article-gradient";
 import { CONTENT_COLLECTIONS } from "../src/lib/content";
 import { articlePath, type CollectionArticle, type ContentCollection } from "../src/lib/content-collection";
 import { loadGuide } from "../src/routes/guides/$slug";
 import { loadNewsArticle } from "../src/routes/news/$slug";
+
+// The frame each shader opened on, in order. A card loads the shader library with
+// a dynamic import, to keep it out of the first bundle, so there is no seam to hand
+// it a fake. This wraps the real mount instead: it notes the frame, then builds the
+// mount as usual. The frame comes from the article title, so it names the card.
+const shaderOpeningFrames = vi.hoisted((): (number | undefined)[] => []);
+vi.mock(import("@paper-design/shaders"), async (importOriginal) => {
+  const shaders = await importOriginal();
+  class RecordingShaderMount extends shaders.ShaderMount {
+    constructor(...args: ConstructorParameters<typeof shaders.ShaderMount>) {
+      shaderOpeningFrames.push(args[5]);
+      super(...args);
+    }
+  }
+  return { ...shaders, ShaderMount: RecordingShaderMount };
+});
 
 afterEach(cleanup);
 
@@ -45,6 +63,28 @@ function firstArticle(collection: ContentCollection): CollectionArticle {
   const article = collection.articles[0];
   if (!article) throw new Error(`${collection.name} must hold at least one article.`);
   return article;
+}
+
+/**
+ * The reader's motion setting. Every other query answers no, which is also how a
+ * touch screen answers the hover query. Returns the queries asked, in order.
+ */
+function stubMotionPreference(reduced: boolean): string[] {
+  const asked: string[] = [];
+  vi.stubGlobal("matchMedia", (query: string) => {
+    asked.push(query);
+    return {
+      matches: reduced && query.includes("prefers-reduced-motion"),
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    };
+  });
+  return asked;
 }
 
 // Every collection gets the same treatment. A section that is added to the registry
@@ -138,19 +178,6 @@ describe("article media", () => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
-
-  function stubMotionPreference(reduced: boolean) {
-    vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: reduced && query.includes("prefers-reduced-motion"),
-      media: query,
-      onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-    }));
-  }
 
   // A clip plays only where it can be seen, so nothing at all happens until an
   // observer reports it on screen. This one reports that as soon as it is asked;
@@ -340,5 +367,54 @@ describe("article media", () => {
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Play animation" })).toBeInTheDocument());
     expect(play).not.toHaveBeenCalled();
+  });
+});
+
+// The artwork is a WebGL shader, and a browser keeps only a handful of contexts.
+// Where nothing may move the baked still is the whole picture, so a card must not
+// open a context only to draw that picture again.
+describe("article artwork", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("opens no WebGL context for a card that cannot move", async () => {
+    const collection = CONTENT_COLLECTIONS[0];
+    const [still, moving] = collection?.articles ?? [];
+    if (!collection || !still || !moving) throw new Error("This test needs a collection with two articles.");
+    const stillFrame = articleGradient(still.title).frame;
+    expect(articleGradient(moving.title).frame).not.toBe(stillFrame);
+    shaderOpeningFrames.length = 0;
+
+    // A reader who asked for less motion.
+    const asked = stubMotionPreference(true);
+    render(() => (
+      <ArticleGradient mode="live" collection={collection} slug={still.slug} title={still.title} shape="featured" />
+    ));
+    await waitFor(() => expect(asked).toContain("(prefers-reduced-motion: reduce)"));
+
+    // A touch screen, where a hover never ends.
+    stubMotionPreference(false);
+    render(() => (
+      <ArticleGradient
+        mode="hover"
+        hoverTarget={() => document.body}
+        collection={collection}
+        slug={still.slug}
+        title={still.title}
+        shape="card"
+      />
+    ));
+
+    // The one card here that may move. Cards draw their still one at a time, in
+    // the order they arrive, so when this one opens a shader the two above have
+    // already had their turn.
+    render(() => (
+      <ArticleGradient mode="live" collection={collection} slug={moving.slug} title={moving.title} shape="featured" />
+    ));
+
+    await waitFor(() => expect(shaderOpeningFrames.length).toBeGreaterThan(0));
+    expect(shaderOpeningFrames).not.toContain(stillFrame);
   });
 });
