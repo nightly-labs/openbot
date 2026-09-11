@@ -37,6 +37,7 @@ import {
   type RpcError,
   type ThreadItem,
 } from "./protocol";
+import { createDiagnosticStream } from "./stderr-diagnostics";
 
 interface ClientEvents {
   notification: [notification: AppServerNotification];
@@ -156,10 +157,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }),
       stream,
     );
-    child.stderr.on("data", (chunk: Buffer) => {
-      const message = redactText(chunk.toString("utf8").trim());
-      if (message) this.emit("diagnostic", message);
+    // One record at a time, never one chunk at a time: a chunk can end inside a JSON record, and a
+    // record read in halves keeps the credential in its second half.
+    const diagnostics = createDiagnosticStream({
+      redact: redactText,
+      emit: (message) => this.emit("diagnostic", message),
     });
+    child.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk.toString("utf8")));
+    child.once("close", () => diagnostics.flush());
     child.once("error", (error) => this.#fail(error, child));
     child.once("exit", (code, signal) => {
       const suffix = signal ? `signal ${signal}` : `code ${code ?? "unknown"}`;

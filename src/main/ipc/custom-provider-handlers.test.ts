@@ -30,14 +30,11 @@ describe("custom provider endpoint changes", () => {
     const releases = new Map<string, () => void>();
     const service: CustomProviderIpcDependencies["service"] = {
       // Held open, so the second delete has every chance to start inside the first one.
-      releaseCustomProviderModels: (id: string) =>
-        new Promise<void>((resolve) => {
-          steps.push(`release:${id}`);
-          releases.set(id, resolve);
+      removeCustomProvider: <T>(id: string, persist: () => Promise<T>) =>
+        new Promise<T>((resolve) => {
+          steps.push(`remove:${id}`);
+          releases.set(id, () => resolve(persist()));
         }),
-      noteCustomProviderRemoved: (id: string): void => {
-        steps.push(`noted:${id}`);
-      },
       noteCustomProviderSaved: (id: string): void => {
         steps.push(`saved:${id}`);
       },
@@ -61,7 +58,7 @@ describe("custom provider endpoint changes", () => {
     const second = remove?.(APP_FRAME, { id: "house" });
     await vi.waitFor(() => expect(releases.has("studio")).toBe(true));
     // The second change has not read anything yet, because the first one has not finished.
-    expect(steps).toEqual(["release:studio"]);
+    expect(steps).toEqual(["remove:studio"]);
 
     releases.get("studio")?.();
     await first;
@@ -69,13 +66,6 @@ describe("custom provider endpoint changes", () => {
     releases.get("house")?.();
     await second;
 
-    expect(steps).toEqual([
-      "release:studio",
-      "removed:studio",
-      "noted:studio",
-      "release:house",
-      "removed:house",
-      "noted:house",
-    ]);
+    expect(steps).toEqual(["remove:studio", "removed:studio", "remove:house", "removed:house"]);
   });
 });

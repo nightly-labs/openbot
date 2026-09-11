@@ -429,7 +429,7 @@ describe.sequential("AgentService: providers", () => {
     await store.getOrCreate("chief");
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" });
 
-    await service.releaseCustomProviderModels("lmstudio");
+    await service.removeCustomProvider("lmstudio", async () => undefined);
 
     // OpenCode declares no default model of its own, so the fallback has to be read from what it
     // lists. An empty model id is refused by `updateAgent`, and that refusal reached the user as a
@@ -459,14 +459,12 @@ describe.sequential("AgentService: providers", () => {
     await store.getOrCreate("chief");
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
 
-    await service.releaseCustomProviderModels("studio");
+    await service.removeCustomProvider("studio", async () => undefined);
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
       model: "house/router-llm",
     });
-    // The IPC handler reports the write, which is what makes the endpoint gone for good.
-    service.noteCustomProviderRemoved("studio");
 
-    await service.releaseCustomProviderModels("house");
+    await service.removeCustomProvider("house", async () => undefined);
 
     const chief = service.listAgents().find((agent) => agent.id === "chief");
     expect(chief?.model).not.toBe("studio/local-llm");
@@ -490,12 +488,14 @@ describe.sequential("AgentService: providers", () => {
     await store.getOrCreate("chief");
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
 
-    // Removing `studio` moves the agent, and then the file write fails, so the handler never reports
-    // the removal and `studio` is still an endpoint the user has.
-    await service.releaseCustomProviderModels("studio");
+    // Removing `studio` moves the agent, and then the file write fails, so `studio` is still an
+    // endpoint the user has, and still one the next removal may move agents onto.
+    await expect(
+      service.removeCustomProvider("studio", () => Promise.reject(new Error("The disk is full."))),
+    ).rejects.toThrow("The disk is full.");
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
 
-    await service.releaseCustomProviderModels("house");
+    await service.removeCustomProvider("house", async () => undefined);
 
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
       provider: "opencode",
@@ -520,7 +520,7 @@ describe.sequential("AgentService: providers", () => {
     await store.getOrCreate("chief");
     expect(service.listModels().map((model) => model.id)).toContain("studio/local-llm");
 
-    service.noteCustomProviderRemoved("studio");
+    await service.removeCustomProvider("studio", async () => undefined);
 
     expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
     expect(service.listModels().map((model) => model.id)).toContain("house/router-llm");
@@ -529,9 +529,69 @@ describe.sequential("AgentService: providers", () => {
     ).rejects.toThrow("The selected agent model is unavailable.");
 
     // Saved again under the same id, so both the list and the selection accept it once more.
-    service.noteCustomProviderSaved("studio");
+    service.noteCustomProviderSaved("studio", ["local-llm"]);
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ model: "studio/local-llm" });
+  });
+
+  // A removal runs a sweep and then a file write, and an agent update that landed between the two
+  // would leave one agent on the endpoint that the removal has already finished with.
+  it("refuses a model of an endpoint whose removal is still running", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider);
+      if (provider === "opencode") {
+        client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
+      }
+      return client;
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
+
+    // The write is held open, so the update below has every chance to run inside the removal.
+    const writes: (() => void)[] = [];
+    const removal = service.removeCustomProvider(
+      "studio",
+      () =>
+        new Promise<undefined>((resolve) => {
+          writes.push(() => resolve(undefined));
+        }),
+    );
+    await waitFor(() => writes.length === 1);
+    const selection = service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+    writes[0]?.();
+    await removal;
+
+    await expect(selection).rejects.toThrow("The selected agent model is unavailable.");
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ model: "house/router-llm" });
+  });
+
+  // An id saved again with a shorter model list is still the same id. The running CLI keeps reporting
+  // the models the save dropped, and they disappear at the next restart.
+  it("serves only the models the second save of an id defines", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider);
+      if (provider === "opencode") {
+        client.modelList = () => ({ data: [{ model: "studio/old-llm" }, { model: "studio/new-llm" }] });
+      }
+      return client;
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+
+    await service.removeCustomProvider("studio", async () => undefined);
+    service.noteCustomProviderSaved("studio", ["new-llm"]);
+
+    const listed = service.listModels().map((model) => model.id);
+    expect(listed).toContain("studio/new-llm");
+    expect(listed).not.toContain("studio/old-llm");
+    await expect(
+      service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/old-llm" }),
+    ).rejects.toThrow("The selected agent model is unavailable.");
   });
 
   // An id saved again is served again, whatever the CLI did with the removal before it.
@@ -550,11 +610,10 @@ describe.sequential("AgentService: providers", () => {
     await store.getOrCreate("chief");
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
 
-    await service.releaseCustomProviderModels("studio");
-    service.noteCustomProviderRemoved("studio");
-    service.noteCustomProviderSaved("studio");
+    await service.removeCustomProvider("studio", async () => undefined);
+    service.noteCustomProviderSaved("studio", ["local-llm"]);
 
-    await service.releaseCustomProviderModels("house");
+    await service.removeCustomProvider("house", async () => undefined);
 
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
       provider: "opencode",
@@ -584,7 +643,7 @@ describe.sequential("AgentService: providers", () => {
     await service.sendMessage({ agentId: "chief", text: "Keep working" });
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
-    await expect(service.releaseCustomProviderModels("lmstudio")).rejects.toThrow(
+    await expect(service.removeCustomProvider("lmstudio", async () => undefined)).rejects.toThrow(
       "Wait for the active turn and queue to finish before you remove this endpoint.",
     );
 

@@ -12,10 +12,7 @@ import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-gro
 export interface CustomProviderIpcDependencies {
   // Only the four endpoint-change methods, so the registrar's order of writes can be checked without
   // a running backend.
-  service: Pick<
-    AgentService,
-    "releaseCustomProviderModels" | "noteCustomProviderRemoved" | "noteCustomProviderSaved" | "reloadOpenCodeConfig"
-  >;
+  service: Pick<AgentService, "removeCustomProvider" | "noteCustomProviderSaved" | "reloadOpenCodeConfig">;
   customProviders: Pick<CustomProviderStore, "list" | "save" | "remove">;
 }
 
@@ -53,9 +50,12 @@ export function customProviderIpcHandlers({
         (input): Promise<CustomProviderResult> =>
           serialize(async () => {
             const providers = await customProviders.save(input);
-            // An id that was removed before is served again from this write on, so the backend stops
-            // treating its models as gone.
-            service.noteCustomProviderSaved(input.id);
+            // An id that was removed before serves the models of this write from now on -- and only
+            // those, because the running CLI may still list the ones this save left out.
+            service.noteCustomProviderSaved(
+              input.id,
+              input.models.map((model) => model.id),
+            );
             return { providers, restart: await service.reloadOpenCodeConfig() };
           }),
       ),
@@ -67,11 +67,10 @@ export function customProviderIpcHandlers({
         parseDeleteCustomProvider,
         ({ id }): Promise<CustomProviderResult> =>
           serialize(async () => {
-            await service.releaseCustomProviderModels(id);
-            const providers = await customProviders.remove(id);
-            // After the write, not before it: a removal that fails on disk leaves the endpoint saved and
-            // served, so its models must stay a valid fallback for the next removal.
-            service.noteCustomProviderRemoved(id);
+            // The backend owns this order: it excludes the endpoint, moves the agents off it, and
+            // runs the write as one change no agent update can interleave with. A write that throws
+            // gives the exclusion back, because the endpoint is then still saved and still served.
+            const providers = await service.removeCustomProvider(id, () => customProviders.remove(id));
             return { providers, restart: await service.reloadOpenCodeConfig() };
           }),
       ),
