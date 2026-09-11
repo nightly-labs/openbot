@@ -3,11 +3,21 @@ import type {
   BrowserControlAction,
   BrowserControlDetailAction,
   BrowserControlSession,
+  BrowserPreview,
   BrowserTab,
 } from "@openbot/contracts/ipc";
-import { createEffect, createSignal, For, Show } from "solid-js";
-import { PanelResizer, readPanelWidth, savePanelWidth } from "../../components/PanelResizer";
-import { Button, buttonVariants, CircleDot, Input, PictureInPicture2, Tabs, TriangleAlert } from "../../components/ui";
+import { Portal } from "@solidjs/web";
+import { createEffect, For, onSettled, Show } from "solid-js";
+import {
+  Button,
+  buttonVariants,
+  CircleDot,
+  Input,
+  Minimize2,
+  PictureInPicture2,
+  Tabs,
+  TriangleAlert,
+} from "../../components/ui";
 import type { AgentProfile } from "../../data";
 import {
   BrowserBackIcon,
@@ -18,9 +28,6 @@ import {
   PlusIcon,
 } from "./ConversationIcons";
 
-const BROWSER_PANEL_STORAGE_KEY = "openbot:browser-panel-width";
-const BROWSER_PANEL_MIN = 220;
-const BROWSER_PANEL_MAX = 1600;
 const BROWSER_ACTION_LABELS: Record<BrowserControlAction | BrowserControlDetailAction, string> = {
   open: "Opening a page…",
   "list-tabs": "Checking tabs…",
@@ -50,12 +57,12 @@ const BROWSER_ACTION_LABELS: Record<BrowserControlAction | BrowserControlDetailA
 };
 
 interface BrowserPanelProps {
+  open: boolean;
+  preview?: BrowserPreview | null;
   tabs: BrowserTab[];
   activeTab: BrowserTab | undefined;
   activeControl: BrowserControlSession | undefined;
   address: string;
-  defaultWidth: () => number;
-  maxWidth: () => number;
   controlForTab: (tab: BrowserTab) => BrowserControlSession | undefined;
   controllerForTab: (tab: BrowserTab) => AgentProfile | undefined;
   onAddressChange: (value: string) => void;
@@ -65,8 +72,8 @@ interface BrowserPanelProps {
   onReload: (tabId: string) => void;
   onActivateTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
-  onSurface: (element: HTMLDivElement) => void;
-  onWidthChange: (width: number) => void;
+  onSurface: (element: HTMLDivElement | undefined) => void;
+  onBack: () => void;
   onEnterPip: () => void;
 }
 
@@ -76,46 +83,36 @@ function diagnosticErrorLabel(count: number): string {
 
 export default function BrowserPanel(props: BrowserPanelProps) {
   const actingControl = () => (props.activeControl?.phase === "acting" ? props.activeControl : undefined);
-  const defaultPanelWidth = () =>
-    Math.round(Math.min(BROWSER_PANEL_MAX, Math.max(BROWSER_PANEL_MIN, props.defaultWidth())));
-  const storedPanelWidth = Number.parseFloat(window.localStorage.getItem(BROWSER_PANEL_STORAGE_KEY) ?? "");
-  let customPanelWidth = Number.isFinite(storedPanelWidth);
-  let savedCustomPanelWidth = customPanelWidth ? storedPanelWidth : null;
-  const [panelWidth, setPanelWidth] = createSignal(
-    readPanelWidth(BROWSER_PANEL_STORAGE_KEY, defaultPanelWidth(), BROWSER_PANEL_MIN, BROWSER_PANEL_MAX),
-  );
+  let hideButton: HTMLButtonElement | undefined;
+  let panel: HTMLElement | undefined;
+  let surfaceElement: HTMLDivElement | undefined;
   createEffect(
-    () => panelWidth(),
-    (width) => {
-      props.onWidthChange(width);
+    () => props.open,
+    (open) => {
+      props.onSurface(undefined);
+      if (!open) return;
+      let disposed = false;
+      onSettled(() => {
+        hideButton?.focus();
+        // Chromium is a native child view. Attach it only after the CSS panel settles.
+        const animations = panel?.getAnimations() ?? [];
+        const showSurface = () => {
+          if (!disposed) props.onSurface(surfaceElement);
+        };
+        if (animations.length === 0) showSurface();
+        else void Promise.all(animations.map((animation) => animation.finished)).then(showSurface, () => undefined);
+      });
+      return () => {
+        disposed = true;
+      };
     },
   );
 
-  const resizePanel = (width: number) => {
-    setPanelWidth(width);
-  };
-
-  const saveCustomPanelWidth = (width: number) => {
-    customPanelWidth = true;
-    savedCustomPanelWidth = width;
-    savePanelWidth(BROWSER_PANEL_STORAGE_KEY, width);
-  };
-
-  const resizeDefaultPanel = () => {
-    const preferredWidth =
-      customPanelWidth && savedCustomPanelWidth !== null ? savedCustomPanelWidth : defaultPanelWidth();
-    setPanelWidth(Math.round(Math.min(props.maxWidth(), Math.max(BROWSER_PANEL_MIN, preferredWidth))));
-  };
-
-  const resetPanelWidth = () => {
-    window.localStorage.removeItem(BROWSER_PANEL_STORAGE_KEY);
-    customPanelWidth = false;
-    savedCustomPanelWidth = null;
-    setPanelWidth(defaultPanelWidth());
-  };
-
   const surface = () => (
-    <div class="browser-surface" ref={props.onSurface}>
+    <div class="browser-surface" ref={(element) => (surfaceElement = element)}>
+      <Show when={props.preview}>
+        {(preview) => <img class="browser-motion-preview" src={preview().dataUrl} alt="" />}
+      </Show>
       <Show when={props.tabs.length === 0}>
         <div class="browser-empty-state">
           <strong>Open a page</strong>
@@ -147,29 +144,19 @@ export default function BrowserPanel(props: BrowserPanelProps) {
   return (
     <Tabs.Root
       as="aside"
-      id="browser-side-panel"
-      class={["browser-panel", { "browser-panel-controlled": Boolean(actingControl()) }]}
+      ref={(element) => (panel = element)}
+      hidden={!props.open}
+      aria-hidden={props.open ? undefined : "true"}
+      inert={!props.open}
+      id="browser-expanded-panel"
+      class={["browser-panel browser-panel-expanded", { "browser-panel-controlled": Boolean(actingControl()) }]}
       aria-label="Browser"
       value={props.activeTab?.id ?? "__empty"}
       onChange={props.onActivateTab}
       activationMode="automatic"
     >
-      <PanelResizer
-        class="right-panel-resizer"
-        label="Resize right panel"
-        controls="browser-side-panel"
-        direction="right"
-        value={panelWidth()}
-        defaultValue={defaultPanelWidth()}
-        min={BROWSER_PANEL_MIN}
-        max={props.maxWidth}
-        onResize={resizePanel}
-        onResizeEnd={saveCustomPanelWidth}
-        onParentResize={resizeDefaultPanel}
-        onReset={resetPanelWidth}
-      />
-      <header class="browser-panel-header">
-        <div class="browser-tabs">
+      <header class="browser-panel-header window-drag">
+        <div class="browser-tabs no-drag">
           <Tabs.List class="browser-tab-strip" aria-label="Browser tabs">
             <For each={props.tabs}>
               {(tab) => {
@@ -250,6 +237,21 @@ export default function BrowserPanel(props: BrowserPanelProps) {
           </Button>
         </div>
       </header>
+      <Portal>
+        <Show when={props.open}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            ref={(element) => (hideButton = element)}
+            class="no-drag browser-hide"
+            aria-label="Hide browser"
+            title="Hide browser"
+            onClick={props.onBack}
+          >
+            <Minimize2 aria-hidden="true" />
+          </Button>
+        </Show>
+      </Portal>
       <Tabs.Content forceMount value={props.activeTab?.id ?? "__empty"} class="browser-tab-panel">
         <div class="browser-toolbar">
           <Button

@@ -46,6 +46,7 @@ export { default as Megaphone } from "lucide-solid/icons/megaphone";
 export { default as MessageCircle } from "lucide-solid/icons/message-circle";
 export { default as MessageCircleQuestionMark } from "lucide-solid/icons/message-circle-question-mark";
 export { default as Mic } from "lucide-solid/icons/mic";
+export { default as Minimize2 } from "lucide-solid/icons/minimize-2";
 export { default as Monitor } from "lucide-solid/icons/monitor";
 export { default as MonitorSmartphone } from "lucide-solid/icons/monitor-smartphone";
 export { default as MousePointer2 } from "lucide-solid/icons/mouse-pointer-2";
