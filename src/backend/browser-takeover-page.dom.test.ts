@@ -35,6 +35,26 @@ beforeEach(() => {
 });
 
 describe("browser takeover page", () => {
+  it("keeps initially disabled submit actions and clicks only after the page enables them", () => {
+    const button = document.querySelector("button");
+    if (!button) throw new Error("Missing fixture button");
+    button.disabled = true;
+    const submit = vi.fn((event: Event) => event.preventDefault());
+    document.forms[0].addEventListener("submit", submit);
+    const values = [
+      { id: "field-0", value: "user@example.com" },
+      { id: "field-1", value: "private-password" },
+    ];
+    const state = read();
+    expect(state.forms[0]?.fields).toHaveLength(2);
+    expect(run(submission(state, values)).status).toBe("invalid");
+    expect(submit).not.toHaveBeenCalled();
+    document.forms[0].addEventListener("input", () => {
+      button.disabled = false;
+    });
+    run(submission(read(), values));
+    expect(submit).toHaveBeenCalledOnce();
+  });
   it("enters a standalone verification code without exposing it or accepting stale widgets", () => {
     document.body.innerHTML =
       '<div role="dialog"><input autocomplete="one-time-code" inputmode="numeric" maxlength="6"></div>';

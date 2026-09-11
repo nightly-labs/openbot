@@ -81,14 +81,14 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
         )
       )
         continue;
-      if (!visible(node) || node.matches(":disabled") || (node instanceof HTMLInputElement && node.type === "hidden"))
-        continue;
+      if (!visible(node) || (node instanceof HTMLInputElement && node.type === "hidden")) continue;
       const id = `field-${index}`;
       if ((node instanceof HTMLInputElement || node instanceof HTMLButtonElement) && node.type === "submit") {
         actions.set(id, node);
         actionDescriptions.push({ id, label: label(node) === "Field" ? "Submit" : label(node) });
         continue;
       }
+      if (node.matches(":disabled")) continue;
       if (node instanceof HTMLButtonElement) {
         // Auxiliary actions do not prevent filling and submitting the native form.
         unsupported = true;
@@ -335,7 +335,7 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     node.dispatchEvent(new Event("change", { bubbles: true }));
   }
   checkTargets();
-  if (!current.form.checkValidity()) return { ...state, status: "invalid" };
+  if (!current.form.checkValidity() || action.matches(":disabled")) return { ...state, status: "invalid" };
   checkTargets();
   action.click();
   return state;
