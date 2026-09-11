@@ -15,6 +15,7 @@ import type {
   AgentSummary,
   AttachmentDataInput,
   AvatarImageInput,
+  BrowserFormRequest,
   ChannelMemory,
   ChannelRoutine,
   ChannelRoutineRun,
@@ -1341,6 +1342,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async respondToApproval(input: RespondToApprovalInput): Promise<void> {
     await this.#attention.respondToApproval(input);
+  }
+
+  assertBrowserTakeover(input: BrowserFormRequest): void {
+    this.#attention.assertBrowserTakeover(input);
   }
 
   async respondToBrowserTakeover(input: RespondToBrowserTakeoverInput): Promise<void> {

@@ -49,6 +49,8 @@ export function ConversationTimeline() {
     agentActivitySpaceReserved,
     agentReady,
     attachmentAction,
+    setActiveRightPanel,
+    activateBrowserTab,
     browserTakeoverPreview,
     browserTakeoverResolution,
     browserTakeoverTab,
@@ -490,6 +492,12 @@ export function ConversationTimeline() {
             <Loading>
               <BrowserTakeoverCard
                 agentName={props.agent?.name ?? "the agent"}
+                formRequest={props.server?.kind === "local" ? props.browserTakeover : undefined}
+                onOpenBrowser={() => {
+                  const tab = browserTakeoverTab();
+                  if (tab) activateBrowserTab(tab.id);
+                  setActiveRightPanel("browser-expanded");
+                }}
                 tab={browserTakeoverTab()}
                 preview={browserTakeoverPreview().preview}
                 previewStatus={browserTakeoverPreview().status}

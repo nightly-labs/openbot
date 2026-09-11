@@ -610,6 +610,16 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       request: { requestId: "takeover-call", agentId: "chief", tabId: "protected-tab" },
     });
 
+    const activeTakeover = events.find((event) => event.type === "browser-takeover-requested");
+    if (activeTakeover?.type !== "browser-takeover-requested") throw new Error("Missing takeover");
+    const activeService = service;
+    expect(() => activeService.assertBrowserTakeover(activeTakeover.request)).not.toThrow();
+    for (const key of ["requestId", "agentId", "threadId", "tabId"]) {
+      expect(() => activeService.assertBrowserTakeover({ ...activeTakeover.request, [key]: "wrong" })).toThrow(
+        "no longer active",
+      );
+    }
+
     // While the user holds the tab, every reference the agent has is stale and the page is mid-login, so
     // its other browser tools are refused rather than queued.
     client.emit("request", {

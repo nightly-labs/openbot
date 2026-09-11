@@ -1,7 +1,19 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AgentApproval, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
+import type { AgentApproval, BrowserFormRequest, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { Badge, Button, Check, Input, LoaderCircle, Monitor, RadioGroup, Skeleton, X } from "../../components/ui";
+import {
+  Badge,
+  Button,
+  Check,
+  ExternalLink,
+  Input,
+  LoaderCircle,
+  Monitor,
+  RadioGroup,
+  Skeleton,
+  X,
+} from "../../components/ui";
+import { BrowserTakeoverFields } from "./BrowserTakeoverFields";
 
 export function ChoiceCard(props: {
   title: string;
@@ -159,6 +171,8 @@ export function ApprovalCard(props: {
 
 export function BrowserTakeoverCard(props: {
   agentName: string;
+  formRequest?: BrowserFormRequest;
+  onOpenBrowser?: () => void;
   tab: BrowserTab | undefined;
   preview: BrowserPreview | null;
   previewStatus: "idle" | "loading" | "ready" | "failed";
@@ -167,13 +181,14 @@ export function BrowserTakeoverCard(props: {
   onCancel: () => Promise<boolean>;
 }) {
   const [submitting, setSubmitting] = createSignal<"complete" | "cancel" | null>(null);
+  const [formBusy, setFormBusy] = createSignal(false);
   const pageDetails = createMemo(() => browserPageDetails(props.tab));
   const completed = () => props.decision === "complete";
   const cancelled = () => props.decision === "cancel";
   const accessibleLabel = () =>
     completed() ? "Browser takeover complete" : cancelled() ? "Browser takeover cancelled" : "Browser takeover";
   const submit = async (decision: "complete" | "cancel") => {
-    if (submitting() || props.decision) return;
+    if (submitting() || formBusy() || props.decision) return;
     setSubmitting(decision);
     const completed = await (decision === "complete" ? props.onComplete() : props.onCancel());
     if (!completed) setSubmitting(null);
@@ -184,7 +199,7 @@ export function BrowserTakeoverCard(props: {
       class="browser-takeover-card conversation-interaction-card"
       data-decision={props.decision ?? undefined}
       aria-label={accessibleLabel()}
-      aria-busy={submitting() ? "true" : undefined}
+      aria-busy={submitting() || formBusy() ? "true" : undefined}
     >
       <header class="browser-takeover-header conversation-interaction-header">
         <h2>
@@ -221,15 +236,35 @@ export function BrowserTakeoverCard(props: {
             ? `${props.agentName} is continuing.`
             : cancelled()
               ? "The browser step was cancelled."
-              : `Finish the sign-in, verification, or consent in the open browser. Then let ${props.agentName} continue.`}
+              : props.formRequest
+                ? "Complete the form below, or open the browser for other steps."
+                : `Finish the sign-in, verification, or consent in the open browser. Then let ${props.agentName} continue.`}
         </p>
       </div>
 
+      <Show when={!props.decision && props.formRequest}>
+        {(request) => <BrowserTakeoverFields request={request()} onBusy={setFormBusy} />}
+      </Show>
       <figure class="browser-takeover-preview">
         <figcaption class="browser-takeover-preview-bar">
           <Monitor aria-hidden="true" />
           <span title={pageDetails().title}>{pageDetails().title}</span>
-          <small title={pageDetails().host}>{pageDetails().host}</small>
+          <Show
+            when={!props.decision && props.onOpenBrowser}
+            fallback={<small title={pageDetails().host}>{pageDetails().host}</small>}
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Open browser"
+              title="Open browser"
+              disabled={Boolean(submitting()) || formBusy()}
+              onClick={() => props.onOpenBrowser?.()}
+            >
+              <ExternalLink aria-hidden="true" />
+            </Button>
+          </Show>
         </figcaption>
         <div class="browser-takeover-preview-viewport">
           <Show
@@ -270,7 +305,7 @@ export function BrowserTakeoverCard(props: {
             class="approval-button"
             loading={submitting() === "complete"}
             loadingLabel="Returning…"
-            disabled={Boolean(submitting())}
+            disabled={Boolean(submitting()) || formBusy()}
             onClick={() => void submit("complete")}
           >
             I’m done
@@ -282,7 +317,7 @@ export function BrowserTakeoverCard(props: {
             class="approval-button"
             loading={submitting() === "cancel"}
             loadingLabel="Cancelling…"
-            disabled={Boolean(submitting())}
+            disabled={Boolean(submitting()) || formBusy()}
             onClick={() => void submit("cancel")}
           >
             Cancel

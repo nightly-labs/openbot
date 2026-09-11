@@ -215,6 +215,8 @@ export const IPC_ENDPOINTS = {
     previewWorkspaceFile: request(IPC_CHANNELS.agentPreviewWorkspaceFile),
   },
   browser: {
+    readTakeoverForm: request(IPC_CHANNELS.browserReadTakeoverForm),
+    submitTakeoverForm: request(IPC_CHANNELS.browserSubmitTakeoverForm),
     open: request(IPC_CHANNELS.browserOpen),
     activate: request(IPC_CHANNELS.browserActivate),
     navigate: request(IPC_CHANNELS.browserNavigate),

@@ -667,6 +667,13 @@ export function ChannelConversation() {
                       {(request) => (
                         <BrowserTakeoverCard
                           agentName={name(member.agentId)}
+                          formRequest={activeServer()?.kind === "local" ? request() : undefined}
+                          onOpenBrowser={() => {
+                            void channels.perform(async () => {
+                              await window.openbot.browser.activate(request().tabId);
+                              await window.openbot.browser.openPictureInPicture();
+                            });
+                          }}
                           tab={browserTabs().find((tab) => tab.id === request().tabId)}
                           preview={null}
                           previewStatus="idle"

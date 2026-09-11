@@ -1,8 +1,10 @@
 import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
+import { onSettled } from "solid-js";
 import { fn, userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { BrowserTakeoverCard } from "../src/features/conversation/ConversationPrompts";
 import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
+import { createMockOpenBot } from "./mock-openbot";
 
 const tab: BrowserTab = {
   id: "tab-login",
@@ -78,4 +80,21 @@ export const Submitting: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "I’m done" }));
   },
+};
+
+export const ChatForm: Story = {
+  args: {
+    formRequest: { requestId: "preview", agentId: "chief", threadId: "thread-chief", tabId: "tab-login" },
+    onOpenBrowser: fn(),
+  },
+  decorators: [
+    (Story) => {
+      const previous = window.openbot;
+      window.openbot = createMockOpenBot().api;
+      onSettled(() => () => {
+        window.openbot = previous;
+      });
+      return <Story />;
+    },
+  ],
 };

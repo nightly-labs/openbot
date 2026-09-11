@@ -92,6 +92,14 @@ the `media-attachments` capability; released protocol adapters keep their existi
 Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
 it checks local file access.
 
+Local browser takeover forms use separate IPC methods. The main process validates the active
+request and tab ownership. The browser reads native form controls in an isolated world and binds
+submission to the captured document, controls, and action. Values stay in temporary UI state and
+are sent directly to the website; they do not enter chat history or provider tool results. Unsupported
+controls keep manual takeover available. After a valid submission, the next detected form or standalone one-time-code input stays in
+the chat card. If no next input is detected, control returns to the agent to inspect the page result.
+Invalid fields keep the current takeover active. Remote clients retain the existing takeover protocol.
+
 ## Provider CLI updates
 
 The runtime manager downloads and verifies the CLI version pinned by OpenBot. The provider runtime

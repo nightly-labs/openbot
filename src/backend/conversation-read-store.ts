@@ -161,7 +161,7 @@ export class ConversationReadStore {
       .prepare(
         `SELECT message_id FROM projection_thread_messages
          WHERE thread_id = ?
-         ORDER BY created_at DESC, ordinal DESC, message_id DESC
+         ORDER BY ordinal DESC, created_at DESC, message_id DESC
          LIMIT 1`,
       )
       .get(threadId);
@@ -187,8 +187,8 @@ export class ConversationReadStore {
     ) {
       throw new Error("The conversation read boundary is malformed.");
     }
-    const afterBoundary = boundary ? `AND (created_at, ordinal, message_id) > (?, ?, ?)` : "";
-    const parameters = boundary ? [threadId, boundary.created_at, boundary.ordinal, throughMessageId] : [threadId];
+    const afterBoundary = boundary ? `AND (ordinal, created_at, message_id) > (?, ?, ?)` : "";
+    const parameters = boundary ? [threadId, boundary.ordinal, boundary.created_at, throughMessageId] : [threadId];
     const unreadFilter = `author != 'user'
       AND COALESCE(item_type, '') != 'commentary'
       AND COALESCE(item_type, '') != 'agent_attachment'
@@ -205,7 +205,7 @@ export class ConversationReadStore {
       .prepare(
         `SELECT message_id FROM projection_thread_messages
          WHERE thread_id = ? ${afterBoundary} AND ${unreadFilter}
-         ORDER BY created_at, ordinal, message_id LIMIT 1`,
+         ORDER BY ordinal, created_at, message_id LIMIT 1`,
       )
       .get(...parameters);
     if (!isDynamicRecord(countRow) || !isNumber(countRow.unread_count)) {

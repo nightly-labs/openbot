@@ -14,7 +14,9 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it } from "vitest";
+import { ConversationReadStore } from "./conversation-read-store";
 import { OpenBotDatabase } from "./openbot-database";
+import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
 const roots: string[] = [];
 
@@ -23,6 +25,66 @@ afterEach(async () => {
 });
 
 describe("OpenBotDatabase", () => {
+  it("keeps queued turns in saved order across history pages and read boundaries", async () => {
+    const database = await createDatabase();
+    const agent = testAgent();
+    database.replaceAgents("queued-history", [agent], "agents.imported");
+    const messages: ConversationMessage[] = [0, 20, 10, 30].map((seconds, index) => ({
+      id: `message-${index}`,
+      turnId: `turn-${Math.floor(index / 2)}`,
+      author: index % 2 === 0 ? "user" : "assistant",
+      text: `Message ${index}`,
+      createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, seconds)).toISOString(),
+      status: "completed",
+    }));
+    const snapshot = { agentId: agent.id, threadId: agent.threadId, activeTurnId: null, revision: 0, messages };
+    database.persistConversation(snapshot, "conversation.queued-history");
+    const pagePlan = () =>
+      database.connection
+        .prepare(
+          "EXPLAIN QUERY PLAN SELECT message_json FROM projection_thread_messages WHERE thread_id = ? ORDER BY ordinal DESC, created_at DESC, message_id DESC LIMIT 2",
+        )
+        .all(agent.threadId)
+        .map((row) => row.detail);
+    expect(pagePlan().join(" ")).toContain("thread_messages_ordinal_order");
+    database.connection.exec(
+      "DROP INDEX thread_messages_ordinal_order; DELETE FROM schema_migrations WHERE version = 20",
+    );
+    migrateOpenBotDatabase(database.connection);
+    expect(pagePlan().join(" ")).toContain("thread_messages_ordinal_order");
+    expect(database.readConversation(agent.id, agent.threadId).messages.map((message) => message.id)).toEqual([
+      "message-0",
+      "message-1",
+      "message-2",
+      "message-3",
+    ]);
+    const latest = database.readConversationPage(agent.id, agent.threadId, { type: "latest" }, 2);
+    expect(latest.messages.map((message) => message.id)).toEqual(["message-2", "message-3"]);
+    if (!latest.pageInfo.olderCursor) throw new Error("Missing older cursor");
+    const older = database.readConversationPage(
+      agent.id,
+      agent.threadId,
+      { type: "before", cursor: latest.pageInfo.olderCursor },
+      2,
+    );
+    expect(older.messages.map((message) => message.id)).toEqual(["message-0", "message-1"]);
+    expect(older.pageInfo.hasOlder).toBe(false);
+    const around = database.readConversationPage(
+      agent.id,
+      agent.threadId,
+      { type: "around", messageId: "message-1" },
+      3,
+    );
+    expect(around.messages.map((message) => message.id)).toEqual(["message-0", "message-1", "message-2"]);
+    const reads = new ConversationReadStore(database);
+    reads.markRead("member", snapshot, "message-2");
+    expect(reads.readStateForThread("member", agent.threadId)).toMatchObject({
+      unreadCount: 1,
+      firstUnreadMessageId: "message-3",
+      throughMessageId: "message-2",
+    });
+    database.close();
+  });
   it("rolls back a failed channel migration and preserves agent history on retry", async () => {
     const database = await createDatabase();
     const agent = testAgent();
@@ -127,6 +189,7 @@ describe("OpenBotDatabase", () => {
       { version: 17 },
       { version: 18 },
       { version: 19 },
+      { version: 20 },
     ]);
     database.close();
   });
@@ -975,6 +1038,7 @@ describe("OpenBotDatabase", () => {
       { version: 17 },
       { version: 18 },
       { version: 19 },
+      { version: 20 },
     ]);
     expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     migrated.close();
@@ -1042,7 +1106,7 @@ describe("OpenBotDatabase", () => {
       ALTER TABLE projection_provider_sessions_v18 RENAME TO projection_provider_sessions;
       CREATE INDEX provider_sessions_thread
         ON projection_provider_sessions(thread_id, provider, state);
-      DELETE FROM schema_migrations WHERE version = 19;
+      DELETE FROM schema_migrations WHERE version >= 19;
       PRAGMA foreign_keys = ON;
     `);
     legacy.close();
@@ -1070,7 +1134,7 @@ describe("OpenBotDatabase", () => {
         .get(),
     ).toMatchObject({ sql: expect.stringContaining("'opencode'") });
     expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 19,
+      version: 20,
     });
     migrated.close();
   });
@@ -1126,6 +1190,7 @@ describe("OpenBotDatabase", () => {
       { version: 17 },
       { version: 18 },
       { version: 19 },
+      { version: 20 },
     ]);
     migrated.close();
   });
@@ -1203,6 +1268,7 @@ describe("OpenBotDatabase", () => {
       { version: 17 },
       { version: 18 },
       { version: 19 },
+      { version: 20 },
     ]);
     retried.close();
   });

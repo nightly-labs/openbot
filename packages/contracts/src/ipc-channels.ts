@@ -145,6 +145,8 @@ export const IPC_CHANNELS = {
   agentRespondToApproval: "agent:respond-to-approval",
   agentRespondToBrowserTakeover: "agent:respond-to-browser-takeover",
   agentEvent: "agent:event",
+  browserReadTakeoverForm: "browser:read-takeover-form",
+  browserSubmitTakeoverForm: "browser:submit-takeover-form",
   browserOpen: "browser:open",
   browserActivate: "browser:activate",
   browserNavigate: "browser:navigate",

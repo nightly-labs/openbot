@@ -64,7 +64,7 @@ export class ConversationQueries {
       this.#core.connection
         .prepare(
           `SELECT message_json FROM projection_thread_messages
-           WHERE thread_id = ? ORDER BY created_at, ordinal, message_id`,
+           WHERE thread_id = ? ORDER BY ordinal, created_at, message_id`,
         )
         .all(threadId),
     );
@@ -93,7 +93,7 @@ export class ConversationQueries {
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'commentary'
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'question_prompt'
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'agent_attachment'
-                   ORDER BY message.created_at DESC, message.ordinal DESC, message.message_id DESC
+                   ORDER BY message.ordinal DESC, message.created_at DESC, message.message_id DESC
                    LIMIT 1) AS latest_message_json
            FROM projection_threads thread
            WHERE thread.thread_id = ? AND thread.agent_id = ?`,
@@ -228,16 +228,16 @@ export class ConversationQueries {
         .prepare(
           `SELECT message_id FROM projection_thread_messages
            WHERE thread_id = ?
-             AND (created_at, ordinal, message_id) <= (?, ?, ?)
+             AND (ordinal, created_at, message_id) <= (?, ?, ?)
              ${conversationMarkerSqlFilter(
                options.excludeRoutineEvents === true,
                options.excludeRoutineRunEvents === true,
                options.excludeHostedSiteEvents === true,
              )}
-           ORDER BY created_at DESC, ordinal DESC, message_id DESC
+           ORDER BY ordinal DESC, created_at DESC, message_id DESC
            LIMIT 1`,
         )
-        .get(threadId, createdAt, ordinal, messageId),
+        .get(threadId, ordinal, createdAt, messageId),
     );
     return row ? requiredStringColumn(row, "message_id") : null;
   }
@@ -325,7 +325,7 @@ export class ConversationQueries {
             `SELECT ${columns} FROM projection_thread_messages
              WHERE thread_id = ?
              ${routineFilter}
-             ORDER BY created_at DESC, ordinal DESC, message_id DESC LIMIT ?`,
+             ORDER BY ordinal DESC, created_at DESC, message_id DESC LIMIT ?`,
           )
           .all(threadId, limit),
       ).reverse();
@@ -337,20 +337,20 @@ export class ConversationQueries {
           .prepare(
             `SELECT ${columns} FROM projection_thread_messages
              WHERE thread_id = ? AND (
-               created_at < ? OR
-               (created_at = ? AND ordinal < ?) OR
-               (created_at = ? AND ordinal = ? AND message_id < ?)
+               ordinal < ? OR
+               (ordinal = ? AND created_at < ?) OR
+               (ordinal = ? AND created_at = ? AND message_id < ?)
              )
              ${routineFilter}
-             ORDER BY created_at DESC, ordinal DESC, message_id DESC LIMIT ?`,
+             ORDER BY ordinal DESC, created_at DESC, message_id DESC LIMIT ?`,
           )
           .all(
             threadId,
-            cursor.createdAt,
-            cursor.createdAt,
+            cursor.ordinal,
             cursor.ordinal,
             cursor.createdAt,
             cursor.ordinal,
+            cursor.createdAt,
             cursor.messageId,
             limit,
           ),
@@ -373,20 +373,20 @@ export class ConversationQueries {
         .prepare(
           `SELECT ${columns} FROM projection_thread_messages
            WHERE thread_id = ? AND (
-             created_at < ? OR
-             (created_at = ? AND ordinal < ?) OR
-             (created_at = ? AND ordinal = ? AND message_id <= ?)
+             ordinal < ? OR
+             (ordinal = ? AND created_at < ?) OR
+             (ordinal = ? AND created_at = ? AND message_id <= ?)
            )
            ${routineFilter}
-           ORDER BY created_at DESC, ordinal DESC, message_id DESC LIMIT ?`,
+           ORDER BY ordinal DESC, created_at DESC, message_id DESC LIMIT ?`,
         )
         .all(
           threadId,
-          cursor.createdAt,
-          cursor.createdAt,
+          cursor.ordinal,
           cursor.ordinal,
           cursor.createdAt,
           cursor.ordinal,
+          cursor.createdAt,
           cursor.messageId,
           olderLimit + 1,
         ),
@@ -396,20 +396,20 @@ export class ConversationQueries {
         .prepare(
           `SELECT ${columns} FROM projection_thread_messages
            WHERE thread_id = ? AND (
-             created_at > ? OR
-             (created_at = ? AND ordinal > ?) OR
-             (created_at = ? AND ordinal = ? AND message_id > ?)
+             ordinal > ? OR
+             (ordinal = ? AND created_at > ?) OR
+             (ordinal = ? AND created_at = ? AND message_id > ?)
            )
            ${routineFilter}
-           ORDER BY created_at, ordinal, message_id LIMIT ?`,
+           ORDER BY ordinal, created_at, message_id LIMIT ?`,
         )
         .all(
           threadId,
-          cursor.createdAt,
-          cursor.createdAt,
+          cursor.ordinal,
           cursor.ordinal,
           cursor.createdAt,
           cursor.ordinal,
+          cursor.createdAt,
           cursor.messageId,
           limit - older.length,
         ),
@@ -434,20 +434,20 @@ export class ConversationQueries {
         .prepare(
           `SELECT 1 FROM projection_thread_messages
            WHERE thread_id = ? AND (
-             created_at < ? OR
-             (created_at = ? AND ordinal < ?) OR
-             (created_at = ? AND ordinal = ? AND message_id < ?)
+             ordinal < ? OR
+             (ordinal = ? AND created_at < ?) OR
+             (ordinal = ? AND created_at = ? AND message_id < ?)
            )
            ${routineFilter}
            LIMIT 1`,
         )
         .get(
           threadId,
-          cursor.createdAt,
-          cursor.createdAt,
+          cursor.ordinal,
           cursor.ordinal,
           cursor.createdAt,
           cursor.ordinal,
+          cursor.createdAt,
           cursor.messageId,
         ),
     );

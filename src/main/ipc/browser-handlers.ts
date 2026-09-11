@@ -2,6 +2,7 @@
 
 import type { BrowserDisplayState } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import type { AgentService } from "../../backend/agent-service";
 import type { BrowserHost } from "../../backend/browser-host";
 import type { BrowserPictureInPicture } from "../browser-picture-in-picture";
 import {
@@ -12,6 +13,7 @@ import {
 } from "../remote-device-decoding";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
+import { browserFormIpcHandlers } from "./browser-form-handlers";
 import { parseBrowserBounds, parseBrowserNavigate, parseBrowserOpen, parseVisibility } from "./browser-inputs";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
@@ -20,16 +22,19 @@ import { optionalPayload, stringPayload } from "./validation";
 export interface BrowserIpcDependencies {
   browserPictureInPicture: BrowserPictureInPicture;
   browser: BrowserHost;
+  service: AgentService;
   remoteServers: RemoteServerManager;
 }
 
 export function browserIpcHandlers({
   browserPictureInPicture,
   browser,
+  service,
   remoteServers,
 }: BrowserIpcDependencies): Pick<IpcGroupHandlers, "browser"> {
   return {
     browser: {
+      ...browserFormIpcHandlers({ browser, service, remoteServers }),
       open: payloadHandler(parseBrowserOpen, (parsed) =>
         routeToServer(remoteServers.activeServerId, {
           local: () =>

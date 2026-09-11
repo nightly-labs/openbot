@@ -22,6 +22,7 @@ import {
   type DynamicIslandPreference,
   type DynamicIslandPresentation,
   decodeAgentProfileDraft,
+  decodeBrowserFormState,
   decodeChannel,
   decodeChannelMemories,
   decodeChannelMemory,
@@ -950,6 +951,10 @@ const openbotApi: OpenBotDesktopApi = {
     },
   },
   browser: {
+    readTakeoverForm: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.browserReadTakeoverForm, input).then(decodeBrowserFormState),
+    submitTakeoverForm: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.browserSubmitTakeoverForm, input).then(decodeBrowserFormState),
     open: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserOpen, input),
     activate: (tabId) => ipcRenderer.invoke(IPC_CHANNELS.browserActivate, tabId),
     navigate: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserNavigate, input),

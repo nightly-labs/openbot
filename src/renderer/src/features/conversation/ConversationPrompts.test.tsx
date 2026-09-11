@@ -1,6 +1,9 @@
-import type { AgentApproval } from "@openbot/contracts/ipc";
+import type { AgentApproval, BrowserFormSubmission } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
+import { userEvent } from "storybook/test";
 import { describe, expect, it, vi } from "vitest";
+import { installOpenbotStub } from "../../app-test-harness";
+import { browserFormPreview } from "../../preview/browser-form-preview";
 import { ApprovalCard, BrowserTakeoverCard, ChoiceCard } from "./ConversationPrompts";
 
 describe("ChoiceCard", () => {
@@ -92,5 +95,79 @@ describe("BrowserTakeoverCard", () => {
     expect(send).toHaveBeenCalledTimes(1);
     response.resolve(false);
     await vi.waitFor(() => expect(button).toBeEnabled());
+  });
+});
+
+describe("takeover chat forms", () => {
+  it.each(["click", "enter", "alternate"])("submits with %s and clears values for the next step", async (method) => {
+    installOpenbotStub();
+    const login = browserFormPreview();
+    login.forms[0].fields[0].multiple = true;
+    login.forms[0].actions.push({ id: "alternate", label: "Use password" });
+    vi.mocked(window.openbot.browser.readTakeoverForm).mockResolvedValue(login);
+    const next = browserFormPreview();
+    next.revision = "code-step";
+    next.forms[0].fields = [{ ...next.forms[0].fields[0], id: "code", label: "Code", type: "text" }];
+    next.forms[0].actions = [{ id: "verify", label: "Verify" }];
+    let sent: BrowserFormSubmission | undefined;
+    vi.mocked(window.openbot.browser.submitTakeoverForm).mockImplementation(async (input) => {
+      sent = structuredClone(input);
+      return next;
+    });
+    render(() => (
+      <BrowserTakeoverCard
+        agentName="Chief"
+        tab={undefined}
+        preview={null}
+        previewStatus="failed"
+        formRequest={{ requestId: "request", agentId: "chief", threadId: "thread", tabId: "tab" }}
+        onComplete={async () => true}
+        onCancel={async () => true}
+      />
+    ));
+    const email = await screen.findByRole("textbox", { name: "Email (required)" });
+    await fireEvent.input(email, { target: { value: "user@example.com,other@example.com" } });
+    await fireEvent.input(screen.getByLabelText("Password (required)"), { target: { value: "private-password" } });
+    if (method === "enter") {
+      email.focus();
+      await userEvent.keyboard("{Enter}");
+    } else
+      await fireEvent.click(screen.getByRole("button", { name: method === "alternate" ? "Use password" : "Sign in" }));
+    expect(await screen.findByRole("textbox", { name: "Code (required)" })).toHaveValue("");
+    expect(sent).toEqual(
+      expect.objectContaining({
+        requestId: "request",
+        revision: "preview-form",
+        formId: "sign-in",
+        actionId: method === "alternate" ? "alternate" : "submit",
+        values: [
+          { id: "email", value: "user@example.com,other@example.com" },
+          { id: "password", value: "private-password" },
+        ],
+      }),
+    );
+    expect(window.openbot.agent.sendMessage).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Password (required)")).not.toBeInTheDocument();
+  });
+  it("keeps manual takeover available when form discovery fails", async () => {
+    installOpenbotStub();
+    vi.mocked(window.openbot.browser.readTakeoverForm).mockRejectedValue(new Error("secret from page"));
+    const open = vi.fn();
+    render(() => (
+      <BrowserTakeoverCard
+        agentName="Chief"
+        tab={undefined}
+        preview={null}
+        previewStatus="failed"
+        formRequest={{ requestId: "request", agentId: "chief", threadId: "thread", tabId: "tab" }}
+        onOpenBrowser={open}
+        onComplete={async () => true}
+        onCancel={async () => true}
+      />
+    ));
+    expect(await screen.findByRole("alert")).not.toHaveTextContent("secret from page");
+    await fireEvent.click(screen.getByRole("button", { name: "Open browser" }));
+    expect(open).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "I’m done" })).toBeEnabled();
   });
 });

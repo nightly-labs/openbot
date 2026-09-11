@@ -11,6 +11,7 @@ export * from "./ipc-app-auth";
 export * from "./ipc-approvals";
 export * from "./ipc-attachments";
 export * from "./ipc-browser";
+export * from "./ipc-browser-forms";
 export * from "./ipc-channel-memories";
 export * from "./ipc-channel-routines";
 export * from "./ipc-channels";

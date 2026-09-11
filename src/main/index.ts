@@ -316,7 +316,7 @@ function registerIpcHandlers({
     ...channelRoutineIpcHandlers({ service, remoteServers }),
     ...attachmentIpcHandlers({ service, mailbox, remoteServers, getMainWindow }),
     ...agentIpcHandlers({ service, sidebarLayout, host, remoteServers, skills }),
-    ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers }),
+    ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, service }),
   });
 }
 

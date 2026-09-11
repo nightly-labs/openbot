@@ -18,6 +18,15 @@ export default defineConfig({
     },
     projects: [
       {
+        extends: true,
+        test: {
+          name: "browser-dom",
+          environment: "jsdom",
+          include: ["src/backend/**/*.dom.test.ts"],
+          restoreMocks: true,
+        },
+      },
+      {
         esbuild: { jsx: "automatic" },
         resolve: { alias: { "@": fileURLToPath(new URL("./apps/mobile/src", import.meta.url)) } },
         test: {

@@ -2,9 +2,11 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import type { BrowserFormState } from "@openbot/contracts/ipc";
 import { BrowserWindow, type WebContents, webContents } from "electron";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserHost } from "./browser-host";
+import type { TakeoverPageCommand } from "./browser-takeover-page";
 
 vi.mock("electron", async () => {
   const { EventEmitter } = await import("node:events");
@@ -76,10 +78,18 @@ vi.mock("electron", async () => {
   };
 });
 
+const formEngine = vi.hoisted(() => ({
+  run: vi.fn<(command: TakeoverPageCommand, check: () => void) => Promise<BrowserFormState>>(),
+  wait: vi.fn<() => Promise<void>>(),
+}));
+
 vi.mock("./browser-cdp", () => ({
   BrowserCdpEngine: class {
     constructor(private readonly contents: WebContents) {}
     destroy() {}
+    invalidateReferences() {}
+    takeoverForm = formEngine.run;
+    waitFor = formEngine.wait;
     async setEnvironment() {}
     async navigate(url: string) {
       await this.contents.loadURL(url);
@@ -222,5 +232,69 @@ describe("browser tab capacity", () => {
     await host.close(tab.id);
     expect(host.getDisplayState()).toEqual({ tabs: [], activeTabId: null });
     expect(changed).toHaveBeenLastCalledWith([], null);
+  });
+});
+
+describe("local takeover forms", () => {
+  it("returns a valid submission to the agent even when the page needs another step and rejects reused revisions", async () => {
+    formEngine.run.mockImplementation(async (command, check) => {
+      check();
+      return {
+        revision: command.kind === "read" ? command.revision : command.input.revision,
+        origin: "https://example.com",
+        forms: [],
+        status: "manual",
+      };
+    });
+    formEngine.wait.mockResolvedValue();
+    const tab = await host.open("https://example.com", "thread", "agent");
+    await host.beginTakeover(tab.id);
+    const state = await host.readTakeoverForm(tab.id, () => undefined);
+    const input = {
+      requestId: "request",
+      agentId: "agent",
+      threadId: "thread",
+      tabId: tab.id,
+      revision: state.revision,
+      formId: "form-0",
+      actionId: "field-0",
+      values: [],
+    };
+    expect((await host.submitTakeoverForm(input, () => undefined)).status).toBe("complete");
+    await expect(host.submitTakeoverForm(input, () => undefined)).rejects.toThrow("The browser form changed");
+    host.endTakeover(tab.id);
+    await expect(host.readTakeoverForm(tab.id, () => undefined)).rejects.toThrow("no longer active");
+  });
+
+  it("keeps validation errors active and stops an expired request before dispatch", async () => {
+    formEngine.run.mockImplementation(async (command, check) => {
+      check();
+      return {
+        revision: command.kind === "read" ? command.revision : command.input.revision,
+        origin: "https://example.com",
+        forms: [],
+        status: command.kind === "submit" ? "invalid" : "ready",
+      };
+    });
+    formEngine.wait.mockResolvedValue();
+    const tab = await host.open("https://example.com", "thread", "agent");
+    await host.beginTakeover(tab.id);
+    const state = await host.readTakeoverForm(tab.id, () => undefined);
+    const input = {
+      requestId: "request",
+      agentId: "agent",
+      threadId: "thread",
+      tabId: tab.id,
+      revision: state.revision,
+      formId: "form-0",
+      actionId: "field-0",
+      values: [],
+    };
+    expect((await host.submitTakeoverForm(input, () => undefined)).status).toBe("invalid");
+    await expect(
+      host.readTakeoverForm(tab.id, () => {
+        throw new Error("Expired");
+      }),
+    ).rejects.toThrow("Expired");
   });
 });

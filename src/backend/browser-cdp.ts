@@ -9,8 +9,10 @@ import type {
   BrowserSnapshot,
   BrowserTarget,
 } from "@openbot/contracts/ipc";
+import { type BrowserFormState, decodeBrowserFormState } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { NativeImage, WebContents } from "electron";
+import { browserTakeoverPage, type TakeoverPageCommand } from "./browser-takeover-page";
 
 const ACTION_TIMEOUT_MS = 10_000;
 const WAIT_TIMEOUT_MS = 30_000;
@@ -812,6 +814,65 @@ export class BrowserCdpEngine {
     this.#lastSnapshot = null;
     this.#highlightSessionId = undefined;
     this.#uploadDocumentIds.clear();
+  }
+
+  async takeoverForm(command: TakeoverPageCommand, assertActive: () => void): Promise<BrowserFormState> {
+    return this.#lease(async (send) => {
+      const requests = new Set<string>();
+      let networkRevision = 0;
+      let failed = false;
+      const listener = (_event: Electron.Event, method: string, params: unknown) => {
+        if (!isDynamicRecord(params) || !isString(params.requestId)) return;
+        if (method === "Network.requestWillBeSent") {
+          requests.add(params.requestId);
+          networkRevision++;
+        } else if (method === "Network.loadingFinished" || method === "Network.loadingFailed") {
+          if (requests.delete(params.requestId)) {
+            networkRevision++;
+            failed ||= method === "Network.loadingFailed";
+          }
+        }
+      };
+      try {
+        if (command.kind === "submit") {
+          this.#contents.debugger.on("message", listener);
+          await send("Network.enable");
+        }
+        const contextId = await automationContextId(send, undefined, "openbot-browser-takeover");
+        assertActive();
+        const response = await send("Runtime.evaluate", {
+          expression: `(${browserTakeoverPage.toString()})(${JSON.stringify(command)})`,
+          contextId,
+          returnByValue: true,
+        });
+        // Never propagate page exceptions: validation messages and scripts can contain entered secrets.
+        if (response.exceptionDetails)
+          throw new Error("The browser form changed or could not be submitted. Refresh the form or open the browser.");
+        const result = decodeBrowserFormState(recordValue(response.result)?.value);
+        if (command.kind === "submit" && result.status !== "invalid") {
+          const deadline = Date.now() + ACTION_TIMEOUT_MS;
+          while (true) {
+            assertActive();
+            if (failed) throw new Error("Browser form processing could not be confirmed.");
+            const remaining = deadline - Date.now();
+            if (remaining <= 0) throw new Error("Browser form processing timed out.");
+            if (requests.size > 0 || this.#contents.isLoading()) {
+              await waitForPageSignal(this.#contents, Math.min(remaining, DOM_QUIET_MS));
+              continue;
+            }
+            const revision = networkRevision;
+            await waitForDomQuietAcrossTargets(send, this.#snapshotTargets(), remaining);
+            if (revision === networkRevision && requests.size === 0 && !this.#contents.isLoading()) break;
+          }
+        }
+        return result;
+      } finally {
+        if (command.kind === "submit") {
+          this.#contents.debugger.removeListener("message", listener);
+          await send("Network.disable").catch(() => undefined);
+        }
+      }
+    }, false);
   }
 
   async waitFor(
@@ -2372,15 +2433,15 @@ async function waitForDomQuietAcrossTargets(
   }
 }
 
-async function automationContextId(send: SendCommand, sessionId?: string): Promise<number> {
+async function automationContextId(
+  send: SendCommand,
+  sessionId?: string,
+  worldName = AUTOMATION_WORLD_NAME,
+): Promise<number> {
   const tree = await send("Page.getFrameTree", {}, sessionId);
   const frameId = frameTreeRootId(tree);
   if (!frameId) throw new Error("The browser automation world has no frame.");
-  const world = await send(
-    "Page.createIsolatedWorld",
-    { frameId, worldName: AUTOMATION_WORLD_NAME, grantUniveralAccess: false },
-    sessionId,
-  );
+  const world = await send("Page.createIsolatedWorld", { frameId, worldName, grantUniveralAccess: false }, sessionId);
   const contextId = numberValue(world.executionContextId);
   if (!contextId) throw new Error("The browser automation world is unavailable.");
   return contextId;

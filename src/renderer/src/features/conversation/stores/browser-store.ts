@@ -189,7 +189,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       };
     },
     ({ tabId, tabExists, activeTabId }) => {
-      if (!tabId || !tabExists) return;
+      if (!tabId || !tabExists || deps.props.server?.kind === "local") return;
       deps.panels.setActiveRightPanel("browser-expanded");
       if (activeTabId !== tabId) activateBrowserTab(tabId);
     },

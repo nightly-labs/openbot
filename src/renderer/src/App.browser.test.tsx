@@ -692,7 +692,7 @@ describe("OpenBot connected desktop shell", () => {
     resolveFirstOpen?.(loadingTab);
   });
 
-  it("reveals the requested browser tab and resumes the agent from the takeover card", async () => {
+  it("opens the requested browser tab only when asked and resumes from the takeover card", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     await confirmOnboardingModel();
@@ -733,6 +733,9 @@ describe("OpenBot connected desktop shell", () => {
     expect(await screen.findByRole("region", { name: "Browser takeover" })).toHaveTextContent("Action required");
     expect(screen.getByRole("heading", { name: "Complete the step on example.com" })).toBeVisible();
     expect(await screen.findByRole("img", { name: "Preview of Sign in" })).toBeVisible();
+    expect(window.openbot.browser.activate).not.toHaveBeenCalledWith("tab-login");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Open browser" })).toBeEnabled());
+    await fireEvent.click(screen.getByRole("button", { name: "Open browser" }));
     expect(await screen.findByRole("complementary", { name: "Browser" })).toBeVisible();
     await waitFor(() => expect(window.openbot.browser.activate).toHaveBeenCalledWith("tab-login"));
     expect(window.openbot.browser.capturePreview).toHaveBeenCalledTimes(1);
