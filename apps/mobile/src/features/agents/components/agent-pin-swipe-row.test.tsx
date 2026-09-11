@@ -21,7 +21,7 @@ const native = vi.hoisted(() => {
   };
   const springs: ((finished: boolean) => void)[] = [];
   const props: SwipeableProps = {};
-  return { handlers, springs, props, impact: vi.fn(), blocked: vi.fn() };
+  return { handlers, springs, props, impact: vi.fn(), notification: vi.fn(), blocked: vi.fn() };
 });
 
 // Replace only native event delivery and animation completion. The real gesture
@@ -91,7 +91,7 @@ vi.mock("react-native-gesture-handler/ReanimatedSwipeable", () => ({
   },
 }));
 vi.mock("@/features/servers/components/app-drawer-shell", () => ({ useAppDrawer: () => ({ openingGesture: {} }) }));
-vi.mock("@/shared/lib/haptics", () => ({ haptics: { impact: native.impact } }));
+vi.mock("@/shared/lib/haptics", () => ({ haptics: { impact: native.impact, notification: native.notification } }));
 vi.mock("react-native-worklets", () => ({
   scheduleOnRN: (fn: (value?: boolean) => void, value?: boolean) => fn(value),
 }));
@@ -148,13 +148,14 @@ afterEach(async () => {
   root = createRoot(container);
   native.springs = [];
   native.impact.mockClear();
+  native.notification.mockClear();
   native.blocked.mockClear();
 });
-async function renderRow() {
+async function renderRow(pinBlocked = false) {
   const onPin = vi.fn();
   await act(() =>
     root.render(
-      <AgentPinSwipeRow agentName="Ada" onPin={onPin}>
+      <AgentPinSwipeRow agentName="Ada" pinBlocked={pinBlocked} onPin={onPin}>
         <button type="button">Open chat with Ada</button>
       </AgentPinSwipeRow>,
     ),
@@ -291,4 +292,32 @@ it("closes the exposed action on tap and hides the action from accessibility whe
   expect(screen.queryByRole("button", { name: "Pin Ada" })).toBeNull();
   expect(screen.getByRole("button", { name: "Open chat with Ada" })).toBeTruthy();
   expect(onPin).not.toHaveBeenCalled();
+});
+
+it("closes the row after a blocked pin tap without pinning", async () => {
+  const onPin = await renderRow(true);
+  begin();
+  move(-88);
+  await release(-88);
+  await act(() => fireEvent.click(screen.getByRole("button", { name: "Pin Ada" })));
+  await interruptWithSwipe();
+  await finish();
+  expect(native.notification).toHaveBeenCalledExactlyOnceWith("warning");
+  expect(onPin).not.toHaveBeenCalled();
+  expect(screen.queryByRole("button", { name: "Pin Ada" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Open chat with Ada" })).toBeTruthy();
+});
+
+it("rejects a full swipe at capacity with one warning and no pin threshold haptic", async () => {
+  const onPin = await renderRow(true);
+  begin();
+  move(-150);
+  await release(-150);
+  await interruptWithSwipe();
+  await finish();
+  expect(native.notification).toHaveBeenCalledExactlyOnceWith("warning");
+  expect(native.impact).not.toHaveBeenCalled();
+  expect(onPin).not.toHaveBeenCalled();
+  expect(screen.queryByRole("button", { name: "Pin Ada" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Open chat with Ada" })).toBeTruthy();
 });
