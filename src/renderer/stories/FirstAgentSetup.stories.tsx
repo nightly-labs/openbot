@@ -75,7 +75,7 @@ export const Default: Story = {
   play: async ({ canvas, canvasElement }) => {
     const createButton = canvas.getByRole("button", { name: "Create agent" });
     await expect(canvas.getAllByRole("listitem")).toHaveLength(6);
-    await expect(createButton).toBeDisabled();
+    await expect(createButton).toBeEnabled();
     await expect(canvas.getByRole("textbox", { name: "Name" })).toHaveValue("New agent");
     await expect(canvas.getByRole("textbox", { name: "What should this agent help with?" })).toHaveValue("");
     await expect(canvas.getAllByRole("button", { name: /agent color$/ })).toHaveLength(9);

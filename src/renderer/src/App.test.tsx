@@ -18,7 +18,6 @@ import {
   testConversationPage,
   testServer,
 } from "./app-test-harness";
-import { createAgentInitialMessage } from "./features/agents/agent-initial-message";
 import { AGENT_SELECTION_STORAGE_KEY } from "./features/agents/agent-selection";
 import { useAgents } from "./features/agents/agents-context";
 import { useConversation } from "./features/conversation/conversation-context";
@@ -442,6 +441,36 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByRole("button", { name: "Create your first agent" })).toBeInTheDocument();
   });
 
+  it.each(["", "   "])("creates an additional agent with a blank purpose (%j)", async (purpose) => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await fireEvent.pointerDown(screen.getByRole("button", { name: "New agent or channel" }), { button: 0 });
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New agent" }), { button: 0 });
+    await screen.findByRole("heading", { name: "Create a new agent" });
+
+    const name = screen.getByRole("textbox", { name: "Name" });
+    const create = screen.getByRole("button", { name: "Create agent" });
+    await fireEvent.input(name, { target: { value: "   " } });
+    expect(create).toBeDisabled();
+    await fireEvent.input(name, { target: { value: "  Helper  " } });
+    await fireEvent.input(screen.getByRole("textbox", { name: "What should this agent help with?" }), {
+      target: { value: purpose },
+    });
+    expect(create).toBeEnabled();
+    await fireEvent.click(create);
+
+    await waitFor(() =>
+      expect(window.openbot.agent.createAgent).toHaveBeenCalledWith({
+        name: "Helper",
+        description: "General-purpose assistant",
+        initialMessage: "Greet me briefly.",
+        avatarSeed: expect.any(String),
+        avatarHue: null,
+      }),
+    );
+    expect(await screen.findByRole("heading", { name: "Helper" })).toBeInTheDocument();
+  });
+
   it("creates an agent from a suggestion with one complete backend input", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
@@ -470,7 +499,8 @@ describe("OpenBot connected desktop shell", () => {
       description: draft.purpose,
       avatarSeed: expect.any(String),
       avatarHue: 215,
-      initialMessage: createAgentInitialMessage(draft),
+      initialMessage:
+        "Your ongoing role is: Compare travel options and turn my rough ideas into practical, day-by-day itineraries.",
     });
     expect(window.openbot.agent.sendMessage).not.toHaveBeenCalled();
     expect(await screen.findByRole("heading", { name: "Trip Planner" })).toBeInTheDocument();
