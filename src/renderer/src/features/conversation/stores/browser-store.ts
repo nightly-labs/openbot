@@ -1,7 +1,7 @@
 import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
-import type { ConversationProps } from "../conversation-types";
+import type { ConversationProps, RightPanelMode } from "../conversation-types";
 
 export interface BrowserTakeoverPreviewState {
   status: "idle" | "loading" | "ready" | "failed";
@@ -25,8 +25,7 @@ export function canonicalBrowserUrl(url: string): string {
 }
 
 export interface BrowserPanels {
-  setActiveRightPanel: (mode: "none" | "browser" | "browser-pip" | "settings" | "file-preview") => void;
-  hideBrowserPanel: () => void;
+  setActiveRightPanel: (mode: RightPanelMode) => void;
   screenOpen: () => boolean;
 }
 
@@ -176,7 +175,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       if (deps.props.browserEnabled === false) return;
       const browserWasClosed = open && previousBrowserTabCount > 0 && count === 0;
       previousBrowserTabCount = count;
-      if (browserWasClosed) deps.panels.hideBrowserPanel();
+      if (browserWasClosed) deps.panels.setActiveRightPanel("browser");
     },
   );
 
@@ -191,7 +190,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     },
     ({ tabId, tabExists, activeTabId }) => {
       if (!tabId || !tabExists) return;
-      deps.panels.setActiveRightPanel("browser");
+      deps.panels.setActiveRightPanel("browser-expanded");
       if (activeTabId !== tabId) activateBrowserTab(tabId);
     },
   );

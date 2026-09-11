@@ -1,5 +1,5 @@
 import type { UpdateAgentInput } from "@openbot/contracts/ipc";
-import { createContext, createEffect, onCleanup, onSettled, untrack, useContext } from "solid-js";
+import { createContext, createEffect, createSignal, onCleanup, onSettled, untrack, useContext } from "solid-js";
 import { createScopeGuard } from "../../scope-lifetime";
 import { useConversationController } from "./conversation-controller-context";
 import { agentConversationKey, composerDraftKey } from "./conversation-keys";
@@ -189,7 +189,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setBrowserAddress,
     setBrowserAddressEditing,
     setComposerError,
-    panels: { setActiveRightPanel, hideBrowserPanel, screenOpen: () => screenOpen() },
+    panels: { setActiveRightPanel, screenOpen: () => screenOpen() },
   });
   const {
     browserInteractionAvailable,
@@ -211,8 +211,9 @@ export function createConversationViewScope(props: ConversationProps) {
     navigateBrowserTab,
   } = browser;
   const browserSidebarOpen = () => browserInteractionAvailable() && activeRightPanel() === "browser";
+  const browserExpandedOpen = () => browserInteractionAvailable() && activeRightPanel() === "browser-expanded";
   const browserPipOpen = () => browserInteractionAvailable() && activeRightPanel() === "browser-pip";
-  const screenOpen = () => browserSidebarOpen() || browserPipOpen();
+  const screenOpen = () => browserSidebarOpen() || browserExpandedOpen() || browserPipOpen();
   function showBrowserPanel() {
     setActiveRightPanel("browser");
     if (browserTabs().length === 0) void openBrowserAddress();
@@ -419,7 +420,7 @@ export function createConversationViewScope(props: ConversationProps) {
   let latestScrollSettleFrame: number | undefined;
   let currentUnreadCount = 0;
   let conversationPanel: HTMLElement | undefined;
-  let browserSurface: HTMLDivElement | undefined;
+  const [browserSurface, setBrowserSurface] = createSignal<HTMLDivElement>();
   let browserResizeObserver: ResizeObserver | undefined;
   let browserWindowResizeHandler: (() => void) | undefined;
   let browserVisibilityFrame: number | undefined;
@@ -479,7 +480,12 @@ export function createConversationViewScope(props: ConversationProps) {
       }
     });
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (browserExpandedOpen() && !props.globalOverlayOpen && !mediaPreview()) {
+        event.preventDefault();
+        setActiveRightPanel("browser");
+        return;
+      }
       if (chatSearchOpen()) {
         event.preventDefault();
         closeChatSearch();
@@ -735,14 +741,15 @@ export function createConversationViewScope(props: ConversationProps) {
   createEffect(
     () => ({
       agentId: props.agent?.id,
+      surface: browserSurface(),
       visible:
-        browserSidebarOpen() &&
+        browserExpandedOpen() &&
         !props.browserVisibilitySuspended &&
         !props.globalOverlayOpen &&
         !props.remoteDesktopVisible &&
         !mediaPreview(),
     }),
-    ({ agentId, visible }) => {
+    ({ agentId, visible, surface }) => {
       if (props.browserEnabled === false) return;
       const generation = ++browserVisibilityGeneration;
       if (browserVisibilityFrame !== undefined) cancelAnimationFrame(browserVisibilityFrame);
@@ -761,8 +768,8 @@ export function createConversationViewScope(props: ConversationProps) {
         if (
           generation !== browserVisibilityGeneration ||
           props.agent?.id !== agentId ||
-          !browserSidebarOpen() ||
-          !browserSurface
+          !browserExpandedOpen() ||
+          !surface?.isConnected
         ) {
           return;
         }
@@ -770,12 +777,12 @@ export function createConversationViewScope(props: ConversationProps) {
           if (
             generation !== browserVisibilityGeneration ||
             props.agent?.id !== agentId ||
-            !browserSidebarOpen() ||
-            !browserSurface
+            !browserExpandedOpen() ||
+            !surface?.isConnected
           ) {
             return;
           }
-          const bounds = browserSurface.getBoundingClientRect();
+          const bounds = surface.getBoundingClientRect();
           void window.openbot.browser.setVisible({
             visible: true,
             target: "main",
@@ -796,7 +803,7 @@ export function createConversationViewScope(props: ConversationProps) {
           });
         };
         browserResizeObserver = new ResizeObserver(scheduleBoundsSync);
-        browserResizeObserver.observe(browserSurface);
+        browserResizeObserver.observe(surface);
         if (conversationPanel) browserResizeObserver.observe(conversationPanel);
         browserWindowResizeHandler = scheduleBoundsSync;
         window.addEventListener("resize", browserWindowResizeHandler);
@@ -823,7 +830,7 @@ export function createConversationViewScope(props: ConversationProps) {
       saveBrowserPipBounds(event.bounds);
       return;
     }
-    setActiveRightPanel(event.type === "dock" ? "browser" : "none");
+    setActiveRightPanel(event.type === "dock" ? "browser-expanded" : "none");
   });
 
   onCleanup(() => {
@@ -872,7 +879,7 @@ export function createConversationViewScope(props: ConversationProps) {
     scrollResizeObserver?.observe(element);
   };
   const setBrowserSurfaceElement = (element: HTMLDivElement) => {
-    browserSurface = element;
+    setBrowserSurface(element);
   };
   const setImageAttachmentPickerElement = (element: HTMLInputElement) => {
     imageAttachmentPicker = element;
@@ -909,6 +916,7 @@ export function createConversationViewScope(props: ConversationProps) {
     attachmentBusy,
     browserAddress,
     browserSidebarOpen,
+    browserExpandedOpen,
     browserControlAgent,
     browserControlForTab,
     browserControllerForTab,

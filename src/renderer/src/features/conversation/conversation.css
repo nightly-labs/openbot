@@ -7807,3 +7807,111 @@ button.chat-action-target:active,
   font-size: var(--openbot-text-sm);
   font-weight: 500;
 }
+
+/* Browser cards use captured images; only the expanded view owns a live surface. */
+.browser-preview-sidebar[hidden] {
+  display: none;
+}
+
+.browser-preview-header {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  color: var(--openbot-text-secondary);
+}
+
+.browser-preview-header > span {
+  flex: 1;
+  font-size: var(--openbot-text-sm);
+}
+
+.browser-preview-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--openbot-space-2) var(--openbot-space-4) var(--openbot-space-4);
+}
+
+.browser-preview-card {
+  position: relative;
+  margin-bottom: var(--openbot-space-4);
+}
+
+.browser-preview-open {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  padding: 0;
+  color: var(--openbot-text-secondary);
+  font-weight: 400;
+}
+
+.browser-preview-image {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-surface);
+}
+
+.browser-preview-image img,
+.browser-preview-loading {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.browser-preview-title {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--openbot-text-sm);
+}
+
+.browser-preview-close {
+  position: absolute;
+  top: var(--openbot-space-2);
+  right: var(--openbot-space-2);
+  opacity: 0;
+}
+
+.browser-preview-card:hover .browser-preview-close,
+.browser-preview-card:focus-within .browser-preview-close {
+  opacity: 1;
+}
+
+.browser-panel-expanded {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  z-index: calc(var(--openbot-layer-dropdown) - 1);
+  border-left: 0;
+}
+
+.browser-panel-expanded .browser-panel-header {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  padding-inline: var(--openbot-space-2);
+}
+
+body:has(.app-frame-platform-darwin) .browser-panel-expanded .browser-panel-header {
+  padding-left: calc(var(--openbot-space-8) * 2 + var(--openbot-space-6));
+}
+
+.browser-return {
+  flex-shrink: 0;
+}
+
+.browser-panel-expanded .browser-tabs {
+  min-width: 0;
+  flex: 1;
+}

@@ -55,6 +55,37 @@ export class TestResizeObserver implements ResizeObserver {
   }
 }
 
+export class TestIntersectionObserver implements IntersectionObserver {
+  readonly root = null;
+  readonly rootMargin = "0px";
+  readonly thresholds = [0];
+  readonly scrollMargin = "0px";
+  constructor(private readonly callback: IntersectionObserverCallback) {}
+  observe(target: Element): void {
+    const bounds = target.getBoundingClientRect();
+    this.callback(
+      [
+        {
+          target,
+          isIntersecting: true,
+          intersectionRatio: 1,
+          time: 0,
+          boundingClientRect: bounds,
+          intersectionRect: bounds,
+          rootBounds: null,
+        },
+      ],
+      this,
+    );
+  }
+  disconnect(): void {}
+  unobserve(): void {}
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
+  }
+}
+
+globalThis.IntersectionObserver = TestIntersectionObserver;
 globalThis.ResizeObserver = TestResizeObserver;
 globalThis.scrollTo = () => undefined;
 

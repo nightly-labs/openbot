@@ -8,7 +8,8 @@ const BROWSER_PANEL_MAX = 1600;
 const CONVERSATION_PANEL_MIN = 96;
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
-import { Loading, lazy, Show } from "solid-js";
+import { Portal } from "@solidjs/web";
+import { createEffect, Loading, lazy, onSettled, Show } from "solid-js";
 
 /** @internal Stable HMR boundary for conversation panels. */
 export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButtonElement) => void }) {
@@ -21,6 +22,8 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
     browserControlForTab,
     browserControllerForTab,
     browserSidebarOpen,
+    browserExpandedOpen,
+    hideBrowserPanel,
     browserTabs,
     closeSidebarFilePreview,
     closeBrowserTab,
@@ -51,6 +54,23 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
     settingsReasoning,
     updateRuntimeSettings,
   } = useConversationViewScope();
+  let browserPreviewTrigger: HTMLButtonElement | undefined;
+  createEffect(
+    () => ({ expanded: browserExpandedOpen(), suspended: props.globalOverlayOpen || props.remoteDesktopVisible }),
+    ({ expanded, suspended }) => {
+      if (!expanded || suspended) return;
+      const frame = conversationPanelElement()?.closest<HTMLElement>(".app-frame");
+      if (!frame) return;
+      const wasInert = frame.inert;
+      frame.inert = true;
+      return () => {
+        frame.inert = wasInert;
+      };
+    },
+  );
+  createEffect(browserSidebarOpen, (open, previous) => {
+    if (open && previous === false) onSettled(() => browserPreviewTrigger?.focus());
+  });
   return (
     <>
       <Show when={filePreviewOpen() && sidebarFilePreview()}>
@@ -82,15 +102,13 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
         )}
       </Show>
 
-      <Show when={browserSidebarOpen()}>
-        <BrowserPanel
+      <Show when={browserSidebarOpen() || browserExpandedOpen()}>
+        <BrowserPreviewSidebar
           tabs={browserTabs()}
-          activeTab={activeBrowserTab()}
-          activeControl={activeBrowserControl()}
-          address={browserAddress()}
-          defaultWidth={() =>
-            (conversationPanelElement()?.clientWidth || window.innerWidth) * BROWSER_PANEL_DEFAULT_RATIO
-          }
+          hidden={browserExpandedOpen()}
+          suspended={props.browserVisibilitySuspended || props.globalOverlayOpen || props.remoteDesktopVisible}
+          contextKey={`${props.server?.id ?? "local"}:${props.agent?.id ?? ""}`}
+          defaultWidth={() => 320}
           maxWidth={() =>
             Math.min(
               BROWSER_PANEL_MAX,
@@ -100,19 +118,39 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
               ),
             )
           }
-          controlForTab={browserControlForTab}
-          controllerForTab={browserControllerForTab}
-          onAddressChange={setBrowserAddress}
-          onAddressEditingChange={setBrowserAddressEditing}
-          onOpenAddress={(address) => void openBrowserAddress(address)}
-          onNavigate={(tabId, direction) => void navigateBrowserTab(tabId, direction)}
-          onReload={(tabId) => void reloadBrowserTab(tabId)}
-          onActivateTab={activateBrowserTab}
-          onCloseTab={(tabId) => void closeBrowserTab(tabId)}
-          onSurface={setBrowserSurfaceElement}
           onWidthChange={setBrowserPanelWidth}
-          onEnterPip={showBrowserPip}
+          onOpenTab={(tabId, trigger) => {
+            browserPreviewTrigger = trigger;
+            if (activeBrowserTab()?.id !== tabId) activateBrowserTab(tabId);
+            setActiveRightPanel("browser-expanded");
+          }}
+          onCloseTab={(tabId) => void closeBrowserTab(tabId)}
+          onNewTab={() => void openBrowserAddress("https://www.google.com")}
+          onCollapse={hideBrowserPanel}
         />
+      </Show>
+
+      <Show when={browserExpandedOpen()}>
+        <Portal>
+          <BrowserPanel
+            tabs={browserTabs()}
+            activeTab={activeBrowserTab()}
+            activeControl={activeBrowserControl()}
+            address={browserAddress()}
+            controlForTab={browserControlForTab}
+            controllerForTab={browserControllerForTab}
+            onAddressChange={setBrowserAddress}
+            onAddressEditingChange={setBrowserAddressEditing}
+            onOpenAddress={(address) => void openBrowserAddress(address)}
+            onNavigate={(tabId, direction) => void navigateBrowserTab(tabId, direction)}
+            onReload={(tabId) => void reloadBrowserTab(tabId)}
+            onActivateTab={activateBrowserTab}
+            onCloseTab={(tabId) => void closeBrowserTab(tabId)}
+            onSurface={setBrowserSurfaceElement}
+            onBack={() => setActiveRightPanel("browser")}
+            onEnterPip={showBrowserPip}
+          />
+        </Portal>
       </Show>
 
       <Show when={settingsOpen() && props.agent}>
@@ -163,3 +201,5 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
 const AgentSettingsPanel = lazy(loadAgentSettingsPanel);
 const BrowserPanel = lazy(() => import("./BrowserPanel"));
 const FilePreviewPanel = lazy(() => import("./FilePreviewPanel"));
+
+const BrowserPreviewSidebar = lazy(() => import("./BrowserPreviewSidebar"));

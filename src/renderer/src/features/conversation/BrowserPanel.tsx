@@ -5,9 +5,17 @@ import type {
   BrowserControlSession,
   BrowserTab,
 } from "@openbot/contracts/ipc";
-import { createEffect, createSignal, For, Show } from "solid-js";
-import { PanelResizer, readPanelWidth, savePanelWidth } from "../../components/PanelResizer";
-import { Button, buttonVariants, CircleDot, Input, PictureInPicture2, Tabs, TriangleAlert } from "../../components/ui";
+import { For, onSettled, Show } from "solid-js";
+import {
+  ArrowLeft,
+  Button,
+  buttonVariants,
+  CircleDot,
+  Input,
+  PictureInPicture2,
+  Tabs,
+  TriangleAlert,
+} from "../../components/ui";
 import type { AgentProfile } from "../../data";
 import {
   BrowserBackIcon,
@@ -18,9 +26,6 @@ import {
   PlusIcon,
 } from "./ConversationIcons";
 
-const BROWSER_PANEL_STORAGE_KEY = "openbot:browser-panel-width";
-const BROWSER_PANEL_MIN = 220;
-const BROWSER_PANEL_MAX = 1600;
 const BROWSER_ACTION_LABELS: Record<BrowserControlAction | BrowserControlDetailAction, string> = {
   open: "Opening a page…",
   "list-tabs": "Checking tabs…",
@@ -54,8 +59,6 @@ interface BrowserPanelProps {
   activeTab: BrowserTab | undefined;
   activeControl: BrowserControlSession | undefined;
   address: string;
-  defaultWidth: () => number;
-  maxWidth: () => number;
   controlForTab: (tab: BrowserTab) => BrowserControlSession | undefined;
   controllerForTab: (tab: BrowserTab) => AgentProfile | undefined;
   onAddressChange: (value: string) => void;
@@ -66,7 +69,7 @@ interface BrowserPanelProps {
   onActivateTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onSurface: (element: HTMLDivElement) => void;
-  onWidthChange: (width: number) => void;
+  onBack: () => void;
   onEnterPip: () => void;
 }
 
@@ -76,43 +79,8 @@ function diagnosticErrorLabel(count: number): string {
 
 export default function BrowserPanel(props: BrowserPanelProps) {
   const actingControl = () => (props.activeControl?.phase === "acting" ? props.activeControl : undefined);
-  const defaultPanelWidth = () =>
-    Math.round(Math.min(BROWSER_PANEL_MAX, Math.max(BROWSER_PANEL_MIN, props.defaultWidth())));
-  const storedPanelWidth = Number.parseFloat(window.localStorage.getItem(BROWSER_PANEL_STORAGE_KEY) ?? "");
-  let customPanelWidth = Number.isFinite(storedPanelWidth);
-  let savedCustomPanelWidth = customPanelWidth ? storedPanelWidth : null;
-  const [panelWidth, setPanelWidth] = createSignal(
-    readPanelWidth(BROWSER_PANEL_STORAGE_KEY, defaultPanelWidth(), BROWSER_PANEL_MIN, BROWSER_PANEL_MAX),
-  );
-  createEffect(
-    () => panelWidth(),
-    (width) => {
-      props.onWidthChange(width);
-    },
-  );
-
-  const resizePanel = (width: number) => {
-    setPanelWidth(width);
-  };
-
-  const saveCustomPanelWidth = (width: number) => {
-    customPanelWidth = true;
-    savedCustomPanelWidth = width;
-    savePanelWidth(BROWSER_PANEL_STORAGE_KEY, width);
-  };
-
-  const resizeDefaultPanel = () => {
-    const preferredWidth =
-      customPanelWidth && savedCustomPanelWidth !== null ? savedCustomPanelWidth : defaultPanelWidth();
-    setPanelWidth(Math.round(Math.min(props.maxWidth(), Math.max(BROWSER_PANEL_MIN, preferredWidth))));
-  };
-
-  const resetPanelWidth = () => {
-    window.localStorage.removeItem(BROWSER_PANEL_STORAGE_KEY);
-    customPanelWidth = false;
-    savedCustomPanelWidth = null;
-    setPanelWidth(defaultPanelWidth());
-  };
+  let backButton: HTMLButtonElement | undefined;
+  onSettled(() => backButton?.focus());
 
   const surface = () => (
     <div class="browser-surface" ref={props.onSurface}>
@@ -147,29 +115,24 @@ export default function BrowserPanel(props: BrowserPanelProps) {
   return (
     <Tabs.Root
       as="aside"
-      id="browser-side-panel"
-      class={["browser-panel", { "browser-panel-controlled": Boolean(actingControl()) }]}
+      id="browser-expanded-panel"
+      class={["browser-panel browser-panel-expanded", { "browser-panel-controlled": Boolean(actingControl()) }]}
       aria-label="Browser"
       value={props.activeTab?.id ?? "__empty"}
       onChange={props.onActivateTab}
       activationMode="automatic"
     >
-      <PanelResizer
-        class="right-panel-resizer"
-        label="Resize right panel"
-        controls="browser-side-panel"
-        direction="right"
-        value={panelWidth()}
-        defaultValue={defaultPanelWidth()}
-        min={BROWSER_PANEL_MIN}
-        max={props.maxWidth}
-        onResize={resizePanel}
-        onResizeEnd={saveCustomPanelWidth}
-        onParentResize={resizeDefaultPanel}
-        onReset={resetPanelWidth}
-      />
-      <header class="browser-panel-header">
-        <div class="browser-tabs">
+      <header class="browser-panel-header window-drag">
+        <Button
+          ref={(element) => (backButton = element)}
+          variant="ghost"
+          size="sm"
+          class="no-drag browser-return"
+          onClick={props.onBack}
+        >
+          <ArrowLeft aria-hidden="true" /> Back to conversation
+        </Button>
+        <div class="browser-tabs no-drag">
           <Tabs.List class="browser-tab-strip" aria-label="Browser tabs">
             <For each={props.tabs}>
               {(tab) => {
