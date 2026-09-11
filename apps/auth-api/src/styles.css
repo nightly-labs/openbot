@@ -1791,6 +1791,27 @@ a {
   animation-delay: calc(var(--news-card-index, 0) * 80ms);
 }
 
+/* The block at the top of a news page is in the server's HTML and is already on
+   screen when the page loads, so it takes the header's `data-enter` route rather
+   than an observer: nothing has to arrive before it can play. The longhands below
+   the `[data-enter]` shorthand keep the fill and the attribute, and swap in the
+   same reveal the cards use, so one page has one motion. The artwork follows the
+   copy by a step, which is the order the block is read in. */
+[data-enter="news-copy"],
+[data-enter="news-art"] {
+  animation-name: landing-download-reveal;
+  animation-duration: 720ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-enter="news-copy"] {
+  animation-delay: 60ms;
+}
+
+[data-enter="news-art"] {
+  animation-delay: 160ms;
+}
+
 .news-article-body {
   max-width: 820px;
 }

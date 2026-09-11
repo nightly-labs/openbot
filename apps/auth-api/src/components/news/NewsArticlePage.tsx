@@ -30,7 +30,7 @@ export function NewsArticlePage(props: NewsArticlePageProps) {
 
       <main class="news-main">
         <article class="news-container news-article-body">
-          <header class="news-article-header">
+          <header class="news-article-header" data-enter="news-copy">
             <a class="news-article-back" href={OPENBOT_LINKS.news}>
               All news
             </a>
@@ -51,7 +51,7 @@ export function NewsArticlePage(props: NewsArticlePageProps) {
             </p>
           </header>
 
-          <div class="news-article-art">
+          <div class="news-article-art" data-enter="news-art">
             <NewsGradient slug={props.article.slug} title={props.article.title} mode="live" />
           </div>
 
