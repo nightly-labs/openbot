@@ -1030,8 +1030,11 @@ a {
   /* The rim is a bevel, not an outline. -webkit-text-stroke traces each glyph
      contour on its own, so on the "$" it drew the stem's rectangle straight
      across the S and the stem read as a pasted-on bar. drop-shadow works from
-     the rendered silhouette, where stem and S are already one shape. */
-  filter: drop-shadow(0 -1px 0 var(--openbot-price-rim)) drop-shadow(0 1px 0 var(--openbot-price-rim-under));
+     the rendered silhouette, where stem and S are already one shape. Held in a
+     variable because the entrance animates filter, and a keyframe that set
+     blur() alone would drop the bevel for the length of the entrance. */
+  --price-bevel: drop-shadow(0 -1px 0 var(--openbot-price-rim)) drop-shadow(0 1px 0 var(--openbot-price-rim-under));
+  filter: var(--price-bevel);
 }
 
 .landing-pricing-amount::before {
@@ -1062,13 +1065,17 @@ a {
 }
 
 .landing-pricing-note[data-revealed="true"] {
-  animation-delay: 120ms;
+  animation-delay: 320ms;
 }
 
+/* The figure does not use the shared card reveal: the light arriving is the
+   entrance. The band starts below the glyphs and rises into its resting
+   position, ending exactly where the sheen loop begins so the two join without
+   a jump. */
 .landing-pricing-amount[data-revealed="true"] {
   animation:
-    landing-download-reveal 760ms cubic-bezier(0.22, 1, 0.36, 1) backwards,
-    landing-price-sheen 14s ease-in-out 760ms infinite alternate;
+    landing-price-enter 1200ms cubic-bezier(0.22, 1, 0.36, 1) 60ms backwards,
+    landing-price-sheen 14s ease-in-out 1260ms infinite alternate;
 }
 
 .landing-footer {
@@ -1326,6 +1333,26 @@ a {
     opacity: 1;
     filter: blur(0.001px);
     transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes landing-price-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translate3d(0, 16px, 0);
+    filter: blur(16px) var(--price-bevel);
+    background-position:
+      0 0%,
+      0 0;
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translate3d(0, 0, 0);
+    filter: blur(0.001px) var(--price-bevel);
+    background-position:
+      0 42%,
+      0 0;
   }
 }
 
