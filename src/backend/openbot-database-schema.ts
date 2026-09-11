@@ -361,6 +361,11 @@ const ANALYTICS_DATE_INDEX_SQL = `
   CREATE INDEX IF NOT EXISTS agent_usage_activity_occurred ON agent_usage_activity(occurred_at);
 `;
 
+const CONVERSATION_ORDINAL_INDEX_SQL = `
+  CREATE INDEX IF NOT EXISTS thread_messages_ordinal_order
+    ON projection_thread_messages(thread_id, ordinal, created_at, message_id);
+`;
+
 const LATEST_SCHEMA_SQL =
   substituteOnce(
     substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL),
@@ -370,7 +375,8 @@ const LATEST_SCHEMA_SQL =
   ANALYTICS_SCHEMA_SQL +
   ANALYTICS_DATE_INDEX_SQL +
   CHANNEL_SCHEMA_SQL +
-  CHANNEL_SETTINGS_SCHEMA_SQL;
+  CHANNEL_SETTINGS_SCHEMA_SQL +
+  CONVERSATION_ORDINAL_INDEX_SQL;
 
 // Silence here would ship new installs a table the migrations never produce, so an edit to the baseline
 // that moves this declaration out from under the substitution has to be loud.
@@ -452,6 +458,7 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     disableForeignKeys: true,
     up: migrateChannelSettings,
   },
+  { version: 20, up: (db) => db.exec(CONVERSATION_ORDINAL_INDEX_SQL) },
 ];
 
 const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? BASELINE_SCHEMA_VERSION;

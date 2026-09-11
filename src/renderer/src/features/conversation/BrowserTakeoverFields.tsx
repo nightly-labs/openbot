@@ -163,7 +163,10 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
             aria-label={form.label}
             onSubmit={(event) => {
               event.preventDefault();
-              const action = form.actions[0];
+              const action =
+                event.submitter instanceof HTMLButtonElement
+                  ? form.actions.find((candidate) => candidate.id === event.submitter?.getAttribute("value"))
+                  : form.actions[0];
               if (action) void submit(form.id, action.id);
             }}
           >
@@ -256,15 +259,7 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
             <div class="browser-takeover-form-actions">
               <For each={form.actions}>
                 {(action) => (
-                  <Button
-                    type="button"
-                    size="sm"
-                    class="approval-button"
-                    disabled={state.busy}
-                    onClick={(event) => {
-                      if (event.currentTarget.form?.reportValidity()) void submit(form.id, action.id);
-                    }}
-                  >
+                  <Button type="submit" value={action.id} size="sm" class="approval-button" disabled={state.busy}>
                     {state.busy ? "Submitting…" : action.label}
                   </Button>
                 )}

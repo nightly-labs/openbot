@@ -1,5 +1,6 @@
 import type { AgentApproval, BrowserFormSubmission } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
+import { userEvent } from "storybook/test";
 import { describe, expect, it, vi } from "vitest";
 import { installOpenbotStub } from "../../app-test-harness";
 import { browserFormPreview } from "../../preview/browser-form-preview";
@@ -98,9 +99,11 @@ describe("BrowserTakeoverCard", () => {
 });
 
 describe("takeover chat forms", () => {
-  it("sends entered values directly to the browser and clears them for the next step", async () => {
+  it.each(["click", "enter", "alternate"])("submits with %s and clears values for the next step", async (method) => {
     installOpenbotStub();
-    vi.mocked(window.openbot.browser.readTakeoverForm).mockResolvedValue(browserFormPreview());
+    const login = browserFormPreview();
+    login.forms[0].actions.push({ id: "alternate", label: "Use password" });
+    vi.mocked(window.openbot.browser.readTakeoverForm).mockResolvedValue(login);
     const next = browserFormPreview();
     next.revision = "code-step";
     next.forms[0].fields = [{ ...next.forms[0].fields[0], id: "code", label: "Code", type: "text" }];
@@ -124,14 +127,18 @@ describe("takeover chat forms", () => {
     const email = await screen.findByRole("textbox", { name: "Email (required)" });
     await fireEvent.input(email, { target: { value: "user@example.com" } });
     await fireEvent.input(screen.getByLabelText("Password (required)"), { target: { value: "private-password" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    if (method === "enter") {
+      email.focus();
+      await userEvent.keyboard("{Enter}");
+    } else
+      await fireEvent.click(screen.getByRole("button", { name: method === "alternate" ? "Use password" : "Sign in" }));
     expect(await screen.findByRole("textbox", { name: "Code (required)" })).toHaveValue("");
     expect(sent).toEqual(
       expect.objectContaining({
         requestId: "request",
         revision: "preview-form",
         formId: "sign-in",
-        actionId: "submit",
+        actionId: method === "alternate" ? "alternate" : "submit",
         values: [
           { id: "email", value: "user@example.com" },
           { id: "password", value: "private-password" },

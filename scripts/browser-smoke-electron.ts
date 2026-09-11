@@ -20,6 +20,11 @@ interface PersistenceSnapshot {
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
+  if (url.pathname === "/form-settle") {
+    // Simulated request latency exceeds the DOM quiet interval while the form is hidden.
+    setTimeout(() => response.end("settled"), 750);
+    return;
+  }
   if (url.pathname === "/cached") {
     response.writeHead(200, {
       "content-type": "text/html; charset=utf-8",
@@ -2701,9 +2706,11 @@ async function runTakeoverForms(browser: BrowserHost, origin: string): Promise<v
   const { tab, contents } = await openTabWithContents(browser, origin, "form-thread", "form-agent");
   try {
     await contents.executeJavaScript(`document.body.innerHTML = '<form aria-label="Sign in"><label>Email<input name="email" type="email" required></label><label>Password<input name="password" type="password" required></label><button>Sign in</button></form>';
-      document.querySelector('form').addEventListener('submit', event => {
+      document.querySelector('form').addEventListener('submit', async event => {
         event.preventDefault();
         if (document.querySelector('input[type=password]').value !== 'smoke-secret') throw new Error('Incorrect form value');
+        document.body.innerHTML = '<main>Processing</main>';
+        await fetch('/form-settle');
         document.body.innerHTML = '<div role="dialog"><input autocomplete="one-time-code" inputmode="numeric" maxlength="6"></div>';
         document.querySelector('input').addEventListener('input', event => { if (event.target.value === "123456") document.body.innerHTML = '<main>Signed in</main>'; });
       }); true`);
