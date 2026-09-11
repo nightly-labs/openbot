@@ -144,7 +144,7 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
 
       <Show when={browserSidebarOpen() || browserExpandedOpen()}>
         <Portal>
-          <div class="browser-expanded-backdrop" hidden={!browserExpandedOpen()} aria-hidden="true" />
+          <div class="ui-dialog-overlay browser-expanded-backdrop" hidden={!browserExpandedOpen()} aria-hidden="true" />
           <BrowserPanel
             open={browserExpandedOpen()}
             preview={browserMotionPreview()?.tabId === activeBrowserTab()?.id ? browserMotionPreview()?.preview : null}

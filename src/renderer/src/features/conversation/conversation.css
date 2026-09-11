@@ -7892,7 +7892,6 @@ button.chat-action-target:active,
   position: fixed;
   inset: 0;
   z-index: calc(var(--openbot-layer-dropdown) - 2);
-  background: var(--openbot-dialog-overlay);
   opacity: 1;
   transition:
     opacity var(--openbot-duration-overlay) var(--openbot-ease-out),
@@ -7901,12 +7900,12 @@ button.chat-action-target:active,
 
 .browser-panel-expanded {
   position: fixed;
-  inset: 5%;
-  width: 90%;
-  height: 90%;
+  inset: 2.5%;
+  width: 95%;
+  height: 95%;
   z-index: calc(var(--openbot-layer-dropdown) - 1);
   border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
+  border-radius: var(--openbot-radius-xl);
   overflow: hidden;
   box-shadow: var(--openbot-shadow-overlay);
   opacity: 1;
