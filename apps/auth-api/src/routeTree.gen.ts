@@ -18,6 +18,9 @@ import { Route as DotwellKnownAppleAppSiteAssociationRouteImport } from './route
 import { Route as DotwellKnownJwksDotjsonRouteImport } from './routes/[.]well-known/jwks[.]json'
 import { Route as DownloadMacosRouteImport } from './routes/download/macos'
 import { Route as DownloadWindowsRouteImport } from './routes/download/windows'
+import { Route as GuidesIndexRouteImport } from './routes/guides/index'
+import { Route as GuidesSlugRouteImport } from './routes/guides/$slug'
+import { Route as GuidesRssDotxmlRouteImport } from './routes/guides/rss[.]xml'
 import { Route as HealthLiveRouteImport } from './routes/health/live'
 import { Route as HealthReadyRouteImport } from './routes/health/ready'
 import { Route as NewsIndexRouteImport } from './routes/news/index'
@@ -124,6 +127,21 @@ const DownloadMacosRoute = DownloadMacosRouteImport.update({
 const DownloadWindowsRoute = DownloadWindowsRouteImport.update({
   id: '/download/windows',
   path: '/download/windows',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuidesIndexRoute = GuidesIndexRouteImport.update({
+  id: '/guides/',
+  path: '/guides/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuidesSlugRoute = GuidesSlugRouteImport.update({
+  id: '/guides/$slug',
+  path: '/guides/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuidesRssDotxmlRoute = GuidesRssDotxmlRouteImport.update({
+  id: '/guides/rss.xml',
+  path: '/guides/rss.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HealthLiveRoute = HealthLiveRouteImport.update({
@@ -463,11 +481,14 @@ export interface FileRoutesByFullPath {
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
+  '/guides/$slug': typeof GuidesSlugRoute
+  '/guides/rss.xml': typeof GuidesRssDotxmlRoute
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/v1/me': typeof V1MeRouteWithChildren
+  '/guides/': typeof GuidesIndexRoute
   '/news/': typeof NewsIndexRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
@@ -535,11 +556,14 @@ export interface FileRoutesByTo {
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
+  '/guides/$slug': typeof GuidesSlugRoute
+  '/guides/rss.xml': typeof GuidesRssDotxmlRoute
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/v1/me': typeof V1MeRouteWithChildren
+  '/guides': typeof GuidesIndexRoute
   '/news': typeof NewsIndexRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
@@ -608,11 +632,14 @@ export interface FileRoutesById {
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
+  '/guides/$slug': typeof GuidesSlugRoute
+  '/guides/rss.xml': typeof GuidesRssDotxmlRoute
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/v1/me': typeof V1MeRouteWithChildren
+  '/guides/': typeof GuidesIndexRoute
   '/news/': typeof NewsIndexRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
@@ -682,11 +709,14 @@ export interface FileRouteTypes {
     | '/.well-known/jwks.json'
     | '/download/macos'
     | '/download/windows'
+    | '/guides/$slug'
+    | '/guides/rss.xml'
     | '/health/live'
     | '/health/ready'
     | '/news/$slug'
     | '/news/rss.xml'
     | '/v1/me'
+    | '/guides/'
     | '/news/'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
@@ -754,11 +784,14 @@ export interface FileRouteTypes {
     | '/.well-known/jwks.json'
     | '/download/macos'
     | '/download/windows'
+    | '/guides/$slug'
+    | '/guides/rss.xml'
     | '/health/live'
     | '/health/ready'
     | '/news/$slug'
     | '/news/rss.xml'
     | '/v1/me'
+    | '/guides'
     | '/news'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
@@ -826,11 +859,14 @@ export interface FileRouteTypes {
     | '/.well-known/jwks.json'
     | '/download/macos'
     | '/download/windows'
+    | '/guides/$slug'
+    | '/guides/rss.xml'
     | '/health/live'
     | '/health/ready'
     | '/news/$slug'
     | '/news/rss.xml'
     | '/v1/me'
+    | '/guides/'
     | '/news/'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
@@ -899,11 +935,14 @@ export interface RootRouteChildren {
   DotwellKnownJwksDotjsonRoute: typeof DotwellKnownJwksDotjsonRoute
   DownloadMacosRoute: typeof DownloadMacosRoute
   DownloadWindowsRoute: typeof DownloadWindowsRoute
+  GuidesSlugRoute: typeof GuidesSlugRoute
+  GuidesRssDotxmlRoute: typeof GuidesRssDotxmlRoute
   HealthLiveRoute: typeof HealthLiveRoute
   HealthReadyRoute: typeof HealthReadyRoute
   NewsSlugRoute: typeof NewsSlugRoute
   NewsRssDotxmlRoute: typeof NewsRssDotxmlRoute
   V1MeRoute: typeof V1MeRouteWithChildren
+  GuidesIndexRoute: typeof GuidesIndexRoute
   NewsIndexRoute: typeof NewsIndexRoute
   V1AuthLogoutRoute: typeof V1AuthLogoutRoute
   V1AvatarsUserIdRoute: typeof V1AvatarsUserIdRoute
@@ -1013,6 +1052,27 @@ declare module '@tanstack/solid-router' {
       path: '/download/windows'
       fullPath: '/download/windows'
       preLoaderRoute: typeof DownloadWindowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guides/': {
+      id: '/guides/'
+      path: '/guides'
+      fullPath: '/guides/'
+      preLoaderRoute: typeof GuidesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guides/$slug': {
+      id: '/guides/$slug'
+      path: '/guides/$slug'
+      fullPath: '/guides/$slug'
+      preLoaderRoute: typeof GuidesSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guides/rss.xml': {
+      id: '/guides/rss.xml'
+      path: '/guides/rss.xml'
+      fullPath: '/guides/rss.xml'
+      preLoaderRoute: typeof GuidesRssDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/health/live': {
@@ -1561,11 +1621,14 @@ const rootRouteChildren: RootRouteChildren = {
   DotwellKnownJwksDotjsonRoute: DotwellKnownJwksDotjsonRoute,
   DownloadMacosRoute: DownloadMacosRoute,
   DownloadWindowsRoute: DownloadWindowsRoute,
+  GuidesSlugRoute: GuidesSlugRoute,
+  GuidesRssDotxmlRoute: GuidesRssDotxmlRoute,
   HealthLiveRoute: HealthLiveRoute,
   HealthReadyRoute: HealthReadyRoute,
   NewsSlugRoute: NewsSlugRoute,
   NewsRssDotxmlRoute: NewsRssDotxmlRoute,
   V1MeRoute: V1MeRouteWithChildren,
+  GuidesIndexRoute: GuidesIndexRoute,
   NewsIndexRoute: NewsIndexRoute,
   V1AuthLogoutRoute: V1AuthLogoutRoute,
   V1AvatarsUserIdRoute: V1AvatarsUserIdRoute,

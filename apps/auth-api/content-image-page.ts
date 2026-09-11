@@ -1,17 +1,17 @@
 // Runs inside a throwaway Electron page during `vite build`. Bundled to a single
-// classic script by news-og-images.ts and injected with `executeJavaScript`, so
+// classic script by content-images.ts and injected with `executeJavaScript`, so
 // it must not rely on module loading, the network, or anything on the page.
 //
 // Workers have no WebGL, so the card artwork cannot be produced at request time.
 // This is the one place that turns the shared gradient description into pixels.
 
 import { getShaderColorFromString, meshGradientFragmentShader, ShaderMount } from "@paper-design/shaders";
-import type { NewsOgJob } from "./news-og-images";
-import { newsGradient, newsGradientUniforms } from "./src/lib/news-gradient";
+import type { ContentImageJob } from "./content-images";
+import { articleGradient, articleGradientUniforms } from "./src/lib/article-gradient";
 
 declare global {
   interface Window {
-    openBotNewsOg?: { render: (job: NewsOgJob) => Promise<string> };
+    openBotContentImage?: { render: (job: ContentImageJob) => Promise<string> };
   }
 }
 
@@ -19,18 +19,18 @@ declare global {
 const SCRIM_COLOR = "26, 26, 26";
 const TITLE_MAX_LINES = 3;
 
-window.openBotNewsOg = { render: renderNewsOgImage };
+window.openBotContentImage = { render: renderContentImage };
 
-async function renderNewsOgImage(job: NewsOgJob): Promise<string> {
+async function renderContentImage(job: ContentImageJob): Promise<string> {
   const host = document.createElement("div");
   host.style.cssText = `position:fixed;left:0;top:0;width:${job.width}px;height:${job.height}px;`;
   document.body.append(host);
 
-  const gradient = newsGradient(job.title);
+  const gradient = articleGradient(job.title);
   const mount = new ShaderMount(
     host,
     meshGradientFragmentShader,
-    newsGradientUniforms(gradient, getShaderColorFromString),
+    articleGradientUniforms(gradient, getShaderColorFromString),
     // Without this the colour buffer is undefined by the time toDataURL reads it,
     // which shows up as an image that is empty on some machines and correct on
     // others.
@@ -77,7 +77,7 @@ async function waitForCanvas(canvas: HTMLCanvasElement): Promise<void> {
   }
 }
 
-function drawTitle(context: CanvasRenderingContext2D, job: NewsOgJob): void {
+function drawTitle(context: CanvasRenderingContext2D, job: ContentImageJob): void {
   const { width, height } = job;
   const padding = Math.round(width * 0.06);
 
@@ -110,7 +110,7 @@ function drawTitle(context: CanvasRenderingContext2D, job: NewsOgJob): void {
   const eyebrowSize = Math.round(width * 0.017);
   context.font = `600 ${eyebrowSize}px ${fontFamily}`;
   context.fillStyle = "rgba(255, 255, 255, 0.62)";
-  context.fillText("OPENBOT · NEWS", padding, firstBaseline - lineHeight);
+  context.fillText(job.eyebrow, padding, firstBaseline - lineHeight);
 }
 
 /**

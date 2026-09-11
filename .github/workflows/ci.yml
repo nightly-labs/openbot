@@ -157,7 +157,7 @@ jobs:
         run: bun run api:build
         env:
           CLOUDFLARE_ENV: preview
-          OPENBOT_NEWS_OG: require
+          OPENBOT_CONTENT_IMAGES: require
 
       - name: Upload preview version
         id: deploy-preview
@@ -230,7 +230,7 @@ jobs:
       - name: Build production Worker
         run: bun run api:build
         env:
-          OPENBOT_NEWS_OG: require
+          OPENBOT_CONTENT_IMAGES: require
 
       - name: Apply production D1 migrations
         working-directory: apps/auth-api

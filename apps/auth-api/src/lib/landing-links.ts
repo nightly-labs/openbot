@@ -11,6 +11,7 @@ export const OPENBOT_LINKS = {
   /** The same anchor from a page that is not the landing page. */
   downloadFromOtherPage: "/#download",
   news: "/news",
+  guides: "/guides",
   releases: "https://github.com/NorbertBodziony/openbot/releases",
   repository: "https://github.com/NorbertBodziony/openbot",
   license: "https://github.com/NorbertBodziony/openbot/blob/main/LICENSE",
@@ -31,7 +32,12 @@ export const OPENBOT_LINKS = {
  */
 export type FooterLink =
   | { readonly label: string; readonly external: true; readonly href: string }
-  | { readonly label: string; readonly external: false; readonly to: "/" | "/news"; readonly hash?: string };
+  | {
+      readonly label: string;
+      readonly external: false;
+      readonly to: "/" | "/news" | "/guides";
+      readonly hash?: string;
+    };
 
 export interface FooterColumn {
   readonly title: string;
@@ -44,6 +50,7 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
     links: [
       { label: "Download", external: false, to: "/", hash: "download" },
       { label: "News", external: false, to: "/news" },
+      { label: "Guides", external: false, to: "/guides" },
       { label: "Releases", external: true, href: OPENBOT_LINKS.releases },
       { label: "Source code", external: true, href: OPENBOT_LINKS.repository },
       { label: "License", external: true, href: OPENBOT_LINKS.license },

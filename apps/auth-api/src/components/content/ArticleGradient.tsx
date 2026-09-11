@@ -1,7 +1,7 @@
 import type { ShaderMount } from "@paper-design/shaders";
 import { createMemo, createSignal, onSettled } from "solid-js";
-import { type NewsArtShape, newsCardImagePath } from "../../lib/news";
-import { newsGradient, newsGradientCss, newsGradientUniforms } from "../../lib/news-gradient";
+import { articleGradient, articleGradientCss, articleGradientUniforms } from "../../lib/article-gradient";
+import { articleArtPath, type ContentArtShape, type ContentCollection } from "../../lib/content-collection";
 import { cx } from "../../lib/utils";
 
 // Three layers, cheapest first: a CSS gradient that server-renders, the PNG baked
@@ -36,15 +36,17 @@ import { cx } from "../../lib/utils";
 // The canvas is revealed only once it has drawn, and it fades in over that same
 // frame, so the handover is never a cut and never a cut to an empty rectangle.
 
-interface NewsGradientBaseProps {
+interface ArticleGradientBaseProps {
+  /** The collection the article belongs to, which is half of its image path. */
+  collection: ContentCollection;
   slug: string;
   title: string;
   /** The frame this artwork fills, which decides the shape it is drawn at. */
-  shape: NewsArtShape;
+  shape: ContentArtShape;
   class?: string;
 }
 
-export type NewsGradientProps = NewsGradientBaseProps &
+export type ArticleGradientProps = ArticleGradientBaseProps &
   (
     | { mode: "live"; hoverTarget?: never }
     | {
@@ -70,10 +72,10 @@ const CANVAS_FRAME_BUDGET = 12;
 // however many articles are published.
 let primeQueue: Promise<void> = Promise.resolve();
 
-export function NewsGradient(props: NewsGradientProps) {
+export function ArticleGradient(props: ArticleGradientProps) {
   let host: HTMLDivElement | undefined;
   const [shaderReady, setShaderReady] = createSignal(false);
-  const gradient = createMemo(() => newsGradient(props.title));
+  const gradient = createMemo(() => articleGradient(props.title));
 
   // One mount at a time, and a generation counter so a dynamic import that
   // resolves after the pointer has already left never attaches an orphan context.
@@ -94,7 +96,7 @@ export function NewsGradient(props: NewsGradientProps) {
   const background = createMemo(() => {
     const captured = frozen();
     if (captured) return `url("${captured}")`;
-    return `url("${newsCardImagePath(props.slug, props.shape)}"), ${newsGradientCss(gradient())}`;
+    return `url("${articleArtPath(props.collection, props.slug, props.shape)}"), ${articleGradientCss(gradient())}`;
   });
 
   /**
@@ -144,7 +146,7 @@ export function NewsGradient(props: NewsGradientProps) {
       mount = new ShaderMount(
         host,
         meshGradientFragmentShader,
-        newsGradientUniforms(gradient(), getShaderColorFromString),
+        articleGradientUniforms(gradient(), getShaderColorFromString),
         // Without this the colour buffer is undefined by the time the frame is
         // read back, which shows up as a card that freezes to an empty rectangle
         // on some machines and to the right picture on others.
@@ -284,7 +286,7 @@ export function NewsGradient(props: NewsGradientProps) {
   return (
     <div
       ref={host}
-      class={cx("news-gradient", props.class)}
+      class={cx("post-gradient", props.class)}
       data-shader={shaderReady() ? "live" : "still"}
       style={{ "background-image": background() }}
       aria-hidden="true"

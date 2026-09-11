@@ -15,7 +15,7 @@ export default defineConfig({
       "test/landing-app-preview.test.tsx",
       "test/landing-glow.test.tsx",
       "test/landing-reveal.test.tsx",
-      "test/news.test.tsx",
+      "test/content.test.tsx",
     ],
   },
 });

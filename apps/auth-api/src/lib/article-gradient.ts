@@ -1,9 +1,9 @@
 // Every article's artwork is derived from its title and nothing else, so the card
-// on /news, the live shader that replaces it on hover, and the og:image baked at
+// on an index, the live shader that replaces it on hover, and the og:image baked at
 // build time all agree without anyone keeping three things in step. It also means
 // a published article keeps its colours forever: change the derivation and you
 // silently re-colour every social card already shared, which is why
-// test/news-metadata.test.ts pins the output for a fixed title.
+// test/content-metadata.test.ts pins the output for a fixed title.
 //
 // The hexes below are copies of brand tokens. A WebGL uniform needs a real colour,
 // not a var(), and this module is read by the build-time generator where no
@@ -34,7 +34,7 @@ const DIM = "#6a6a6a";
 /** `--openbot-bg-canvas`, the page behind the card */
 const CANVAS = "#1a1a1a";
 
-export const NEWS_GRADIENT_BRAND_HEXES = {
+export const ARTICLE_GRADIENT_BRAND_HEXES = {
   "--openbot-logo-production": LOGO_PRODUCTION,
   "--openbot-warning": LOGO_DEV,
   "--openbot-success": LOGO_PREVIEW,
@@ -92,7 +92,7 @@ const FAMILIES = [
   [GREEN_DEEP, LOGO_PREVIEW, CYAN, BLUE_DEEP, CANVAS],
 ] as const;
 
-export interface NewsGradient {
+export interface ArticleGradient {
   /** Up to `meshGradientMeta.maxColorCount` colours, as `#rrggbb`. */
   colors: readonly string[];
   /** Organic noise distortion, 0 to 1. */
@@ -135,7 +135,7 @@ function createDraw(seed: number): (range: number) => number {
   };
 }
 
-export function newsGradient(title: string): NewsGradient {
+export function articleGradient(title: string): ArticleGradient {
   const hash = hashTitle(title);
   const draw = createDraw(hash || 1);
   const family = FAMILIES[hash % FAMILIES.length] ?? FAMILIES[0];
@@ -163,8 +163,8 @@ function round(value: number): number {
  * browser component and the build-time generator both call this, which is what
  * makes the live shader and the baked image the same picture.
  */
-export function newsGradientUniforms(
-  gradient: NewsGradient,
+export function articleGradientUniforms(
+  gradient: ArticleGradient,
   toShaderColor: (hex: string) => number[],
 ): Record<string, number | number[] | number[][]> {
   return {
@@ -194,7 +194,7 @@ export function newsGradientUniforms(
  * decodes, and is what the card falls back to if the image is ever missing — so a
  * failed generation degrades to a duller card rather than an empty grey box.
  */
-export function newsGradientCss(gradient: NewsGradient): string {
+export function articleGradientCss(gradient: ArticleGradient): string {
   const [first, second, third, fourth] = gradient.colors;
   // The last entry of a family is always the page colour, so it is the base the
   // spots sit on rather than a spot of its own.

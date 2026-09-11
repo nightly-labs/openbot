@@ -19,20 +19,28 @@ interface LandingAnalyticsEvents {
 }
 
 type LandingEventName = keyof LandingAnalyticsEvents;
-type LandingPlacement = "header" | "hero" | "download_section" | "footer" | "news_index" | "news_article" | "other";
+type LandingPlacement =
+  | "header"
+  | "hero"
+  | "download_section"
+  | "footer"
+  | "content_index"
+  | "content_article"
+  | "other";
 
 const LANDING_PLACEMENTS = [
   "header",
   "hero",
   "download_section",
   "footer",
-  "news_index",
-  "news_article",
+  "content_index",
+  "content_article",
   "other",
 ] as const satisfies readonly LandingPlacement[];
 type LandingDestination =
   | "download_section"
   | "news"
+  | "guides"
   | "contact"
   | "repository"
   | "releases"
@@ -45,7 +53,7 @@ type LandingDestination =
   | "codex"
   | "claude";
 
-type LandingScreenPath = "/" | "/join" | "/news";
+type LandingScreenPath = "/" | "/join" | "/news" | "/guides";
 
 type OpenPanelClient = Pick<OpenPanel, "setGlobalProperties" | "track"> & {
   trackScreenView: (path: LandingScreenPath) => ReturnType<OpenPanelBase["track"]>;
@@ -66,6 +74,7 @@ const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [OPENBOT_LINKS.download, "download_section"],
   [OPENBOT_LINKS.downloadFromOtherPage, "download_section"],
   [OPENBOT_LINKS.news, "news"],
+  [OPENBOT_LINKS.guides, "guides"],
   [OPENBOT_LINKS.contact, "contact"],
   [OPENBOT_LINKS.repository, "repository"],
   [OPENBOT_LINKS.releases, "releases"],
@@ -335,8 +344,8 @@ function landingPlacement(link: HTMLAnchorElement): LandingPlacement {
   if (link.closest(".landing-footer")) return "footer";
   // Without these, every link inside an article body reports "other", which makes
   // the article pages indistinguishable from each other in the report.
-  if (link.closest(".news-index")) return "news_index";
-  if (link.closest(".news-article")) return "news_article";
+  if (link.closest(".post-index")) return "content_index";
+  if (link.closest(".post-article")) return "content_article";
   return "other";
 }
 

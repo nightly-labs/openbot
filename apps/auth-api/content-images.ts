@@ -1,4 +1,4 @@
-// Bakes the news artwork during `vite build`.
+// Bakes the article artwork of every collection during `vite build`.
 //
 // The card gradients come from a WebGL shader and a Cloudflare Worker has no
 // WebGL, so the images cannot be made at request time. They are not committed
@@ -17,8 +17,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import type { Plugin } from "vite";
-import { NEWS_ART_SHAPES, NEWS_ARTICLES, newsCardImagePath } from "./src/lib/news";
-import { newsGradient } from "./src/lib/news-gradient";
+import { articleGradient } from "./src/lib/article-gradient";
+import { CONTENT_COLLECTIONS } from "./src/lib/content";
+import { articleArtPath, CONTENT_ART_SHAPES, type ContentCollection } from "./src/lib/content-collection";
 
 const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
@@ -30,7 +31,7 @@ const GENERATOR_VERSION = 1;
 /** The social card. Fixed by Open Graph, which crops anything else. */
 const OG_WIDTH = 1200;
 const OG_HEIGHT = 630;
-/** The card artwork on /news. The title sits over it as real text, not pixels.
+/** The card artwork on an index. The title sits over it as real text, not pixels.
     One size per frame, at that frame's own aspect ratio, so the image a reader
     sees before the shader starts is the frame the shader opens on. */
 const CARD_SIZES = {
@@ -39,18 +40,20 @@ const CARD_SIZES = {
   article: { width: 1260, height: 540 },
 } as const;
 
-export interface NewsOgJob {
+export interface ContentImageJob {
   /** Path inside the client bundle, for example `news/og/some-article.png`. */
   fileName: string;
   slug: string;
   title: string;
+  /** The kicker drawn above the title. Ignored unless `withTitle`. */
+  eyebrow: string;
   width: number;
   height: number;
   /** Draw the title into the image. False for the card, which has live text over it. */
   withTitle: boolean;
 }
 
-export interface NewsOgImage {
+export interface ContentImage {
   fileName: string;
   data: Uint8Array;
 }
@@ -62,60 +65,66 @@ export interface NewsOgImage {
  * Unset — try, and fall back to the CSS gradient with a warning. This is the
  * developer's build; CI always states which one it wants.
  */
-type NewsOgMode = "require" | "skip" | "auto";
+type ContentImageMode = "require" | "skip" | "auto";
 
-export function newsOgImages(): Plugin {
+export function contentImages(): Plugin {
   return {
-    name: "openbot-news-og-images",
+    name: "openbot-content-images",
     apply: "build",
     async generateBundle() {
       if (this.environment.name !== "client") return;
 
-      const mode = readNewsOgMode(process.env.OPENBOT_NEWS_OG);
+      const mode = readContentImageMode(process.env.OPENBOT_CONTENT_IMAGES);
       if (mode === "skip") {
-        this.info("OPENBOT_NEWS_OG=skip: news artwork was not rendered.");
+        this.info("OPENBOT_CONTENT_IMAGES=skip: the article artwork was not rendered.");
         return;
       }
 
       try {
-        for (const image of await renderNewsImages()) {
+        for (const image of await renderContentImages()) {
           this.emitFile({ type: "asset", fileName: image.fileName, source: image.data });
         }
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
         if (mode === "require") {
-          throw new Error(`News artwork could not be rendered: ${reason}`);
+          throw new Error(`Article artwork could not be rendered: ${reason}`);
         }
         this.warn(
-          `News artwork could not be rendered, so the cards fall back to their CSS gradient: ${reason}\nSet OPENBOT_NEWS_OG=require to make this fail the build.`,
+          `Article artwork could not be rendered, so the cards fall back to their CSS gradient: ${reason}\nSet OPENBOT_CONTENT_IMAGES=require to make this fail the build.`,
         );
       }
     },
   };
 }
 
-export function readNewsOgMode(value: string | undefined): NewsOgMode {
+export function readContentImageMode(value: string | undefined): ContentImageMode {
   if (value === "require" || value === "skip") return value;
   if (value === undefined || value.trim() === "") return "auto";
-  throw new Error(`OPENBOT_NEWS_OG must be "require" or "skip", not ${JSON.stringify(value)}.`);
+  throw new Error(`OPENBOT_CONTENT_IMAGES must be "require" or "skip", not ${JSON.stringify(value)}.`);
 }
 
-export function newsOgJobs(): NewsOgJob[] {
-  return NEWS_ARTICLES.flatMap((article) => [
+export function contentImageJobs(): ContentImageJob[] {
+  return CONTENT_COLLECTIONS.flatMap(collectionJobs);
+}
+
+function collectionJobs(collection: ContentCollection): ContentImageJob[] {
+  return collection.articles.flatMap((article) => [
     {
-      fileName: `news/og/${article.slug}.png`,
+      fileName: `${collection.id}/og/${article.slug}.png`,
       slug: article.slug,
       title: article.title,
+      eyebrow: collection.imageEyebrow,
       width: OG_WIDTH,
       height: OG_HEIGHT,
       withTitle: true,
     },
-    ...NEWS_ART_SHAPES.map((shape) => ({
+    ...CONTENT_ART_SHAPES.map((shape) => ({
       // The one path builder, so the file written here and the file the page
       // asks for cannot drift apart. It is a URL, and a bundle name is relative.
-      fileName: newsCardImagePath(article.slug, shape).slice(1),
+      fileName: articleArtPath(collection, article.slug, shape).slice(1),
       slug: article.slug,
       title: article.title,
+      eyebrow: collection.imageEyebrow,
       width: CARD_SIZES[shape].width,
       height: CARD_SIZES[shape].height,
       withTitle: false,
@@ -128,8 +137,8 @@ export function newsOgJobs(): NewsOgJob[] {
  * itself, the size, the drawing code and the shader library version. A miss on
  * any of those renders again; a hit reuses bytes from a previous build.
  */
-function jobCacheKey(job: NewsOgJob): string {
-  const gradient = newsGradient(job.title);
+function jobCacheKey(job: ContentImageJob): string {
+  const gradient = articleGradient(job.title);
   const digest = createHash("sha256")
     .update(
       JSON.stringify({
@@ -151,16 +160,16 @@ function shadersVersion(): string {
   return manifest.dependencies?.["@paper-design/shaders"] ?? "unknown";
 }
 
-export async function renderNewsImages(): Promise<NewsOgImage[]> {
-  const jobs = newsOgJobs();
+export async function renderContentImages(): Promise<ContentImage[]> {
+  const jobs = contentImageJobs();
   if (jobs.length === 0) return [];
 
-  const cacheDirectory = path.join(appRoot, "node_modules", ".cache", "openbot-news-og");
+  const cacheDirectory = path.join(appRoot, "node_modules", ".cache", "openbot-content-images");
   await mkdir(cacheDirectory, { recursive: true });
 
   const cachePaths = new Map(jobs.map((job) => [job.fileName, path.join(cacheDirectory, `${jobCacheKey(job)}.png`)]));
-  const images: NewsOgImage[] = [];
-  const missing: NewsOgJob[] = [];
+  const images: ContentImage[] = [];
+  const missing: ContentImageJob[] = [];
 
   for (const job of jobs) {
     const cachePath = cachePaths.get(job.fileName);
@@ -189,9 +198,9 @@ async function readIfPresent(filePath: string): Promise<Uint8Array | undefined> 
   }
 }
 
-async function renderInElectron(jobs: NewsOgJob[]): Promise<NewsOgImage[]> {
+async function renderInElectron(jobs: ContentImageJob[]): Promise<ContentImage[]> {
   const electronBinary = resolveElectronBinary();
-  const workspace = await mkdtemp(path.join(tmpdir(), "openbot-news-og-"));
+  const workspace = await mkdtemp(path.join(tmpdir(), "openbot-content-images-"));
 
   try {
     const outputDirectory = path.join(workspace, "out");
@@ -211,7 +220,7 @@ async function renderInElectron(jobs: NewsOgJob[]): Promise<NewsOgImage[]> {
     const controlPath = path.join(workspace, "control.json");
     await writeFile(controlPath, JSON.stringify(control));
 
-    await runElectron(electronBinary, [path.join(appRoot, "news-og-electron.mjs"), controlPath]);
+    await runElectron(electronBinary, [path.join(appRoot, "content-image-electron.mjs"), controlPath]);
 
     return await Promise.all(
       jobs.map(async (job) => ({
@@ -246,7 +255,7 @@ async function bundlePageScript(workspace: string): Promise<string> {
   const outFile = path.join(workspace, "page.js");
   await execFileAsync("bun", [
     "build",
-    path.join(appRoot, "news-og-page.ts"),
+    path.join(appRoot, "content-image-page.ts"),
     "--target=browser",
     "--format=iife",
     "--minify",
@@ -291,7 +300,7 @@ function runElectron(binary: string, args: string[]): Promise<void> {
       child.kill("SIGKILL");
       reject(
         new Error(
-          `Electron produced no images within ${ELECTRON_TIMEOUT_MS / 1000} seconds. It usually means the machine has no display; run the build where a window server or xvfb is available, or set OPENBOT_NEWS_OG=skip.`,
+          `Electron produced no images within ${ELECTRON_TIMEOUT_MS / 1000} seconds. It usually means the machine has no display; run the build where a window server or xvfb is available, or set OPENBOT_CONTENT_IMAGES=skip.`,
         ),
       );
     }, ELECTRON_TIMEOUT_MS);

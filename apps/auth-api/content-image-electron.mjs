@@ -1,7 +1,7 @@
-// The Electron half of the news image generator. Plain JavaScript because
+// The Electron half of the article image generator. Plain JavaScript because
 // Electron runs this file directly and cannot read TypeScript.
 //
-// It opens one hidden window, injects the bundle that news-og-images.ts built,
+// It opens one hidden window, injects the bundle that content-images.ts built,
 // and asks it for one data URL per image. The page is `about:blank` with context
 // isolation on: the injected code runs in the isolated world, which shares the
 // DOM but nothing else, and no file is ever loaded into the page.
@@ -24,7 +24,7 @@ try {
   await main();
   app.exit(0);
 } catch (error) {
-  console.error(`news-og: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(`content-images: ${error instanceof Error ? error.message : String(error)}`);
   app.exit(1);
 }
 
@@ -57,7 +57,9 @@ async function main() {
     await window.webContents.executeJavaScript(control.bundle);
 
     for (const job of control.jobs) {
-      const dataUrl = await window.webContents.executeJavaScript(`window.openBotNewsOg.render(${JSON.stringify(job)})`);
+      const dataUrl = await window.webContents.executeJavaScript(
+        `window.openBotContentImage.render(${JSON.stringify(job)})`,
+      );
       await writeImage(path.join(control.outputDirectory, job.fileName), dataUrl);
     }
   } finally {
