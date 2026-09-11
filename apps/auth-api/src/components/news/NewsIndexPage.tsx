@@ -3,6 +3,7 @@ import { landingAnalytics } from "../../lib/analytics";
 import { NEWS_ARTICLES } from "../../lib/news";
 import { createLandingReveal } from "../landing/createLandingReveal";
 import { LandingFooter } from "../landing/LandingFooter";
+import { NewsCallToAction } from "./NewsCallToAction";
 import { NewsCard } from "./NewsCard";
 import { NewsFeatured } from "./NewsFeatured";
 import { NewsHeader } from "./NewsHeader";
@@ -49,6 +50,8 @@ export function NewsIndexPage() {
             </section>
           </Show>
         </div>
+
+        <NewsCallToAction />
       </main>
 
       <LandingFooter />

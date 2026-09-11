@@ -1933,10 +1933,51 @@ a {
   letter-spacing: -0.035em;
 }
 
-.news-article-cta {
+/* The closing block of a news page. Centred, because it is an end rather than
+   another row of the page, and separated by a rule so it reads as an offer and not
+   as the last article. The type scale is the download section's, so the two places
+   that ask the reader to take the app speak at the same size. */
+.news-cta {
+  margin-top: clamp(64px, 8vw, 104px);
+  padding-top: clamp(48px, 6vw, 80px);
+  border-top: 1px solid var(--openbot-border);
+  text-align: center;
+}
+
+.news-cta-title {
+  margin: 0;
+  font-size: clamp(34px, 4.6vw, 56px);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+.news-cta-description {
+  max-width: 580px;
+  margin: 20px auto 0;
+  color: var(--openbot-text-secondary);
+  font-size: clamp(16px, 1.8vw, 19px);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* Wraps rather than shrinks: two full-width buttons stacked read better on a
+   narrow screen than two that have been squeezed to fit one row. */
+.news-cta-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  margin-top: clamp(48px, 6vw, 72px);
+  gap: 14px;
+  margin-top: clamp(28px, 3.5vw, 40px);
+}
+
+.news-cta[data-revealed="false"] {
+  opacity: 0;
+}
+
+.news-cta[data-revealed="true"] {
+  animation: landing-download-reveal 760ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 @media (max-width: 1080px) {

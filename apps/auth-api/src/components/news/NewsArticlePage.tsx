@@ -6,7 +6,7 @@ import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { formatNewsDate, NEWS_ARTICLES, type NewsArticle } from "../../lib/news";
 import { createLandingReveal } from "../landing/createLandingReveal";
 import { LandingFooter } from "../landing/LandingFooter";
-import { Button } from "../ui/button";
+import { NewsCallToAction } from "./NewsCallToAction";
 import { NewsCard } from "./NewsCard";
 import { NewsGradient } from "./NewsGradient";
 import { NewsHeader } from "./NewsHeader";
@@ -76,11 +76,7 @@ export function NewsArticlePage(props: NewsArticlePageProps) {
           </section>
         </Show>
 
-        <div class="news-container news-article-cta">
-          <Button href={OPENBOT_LINKS.downloadFromOtherPage} variant="primary" size="lg" icon="download">
-            Download OpenBot
-          </Button>
-        </div>
+        <NewsCallToAction />
       </main>
 
       <LandingFooter />

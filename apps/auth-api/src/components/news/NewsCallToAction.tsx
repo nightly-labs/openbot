@@ -1,0 +1,45 @@
+import { EXTERNAL_LINK_REL, OPENBOT_LINKS } from "../../lib/landing-links";
+import { createLandingReveal } from "../landing/createLandingReveal";
+import { Button } from "../ui/button";
+
+// The last block before the footer on a news page. A reader who reaches the end of
+// an article has nowhere left to go, so this is the one clear way on to the app.
+// It borrows the landing page's type scale and its reveal rather than inventing a
+// second treatment, so the page ends in the voice the site opened in.
+export function NewsCallToAction() {
+  let section: HTMLElement | undefined;
+  const revealed = createLandingReveal(() => section);
+
+  return (
+    <section
+      ref={section}
+      class="news-container news-cta"
+      aria-labelledby="news-cta-title"
+      data-revealed={revealed() ? "true" : "false"}
+    >
+      <h2 class="news-cta-title" id="news-cta-title">
+        Meet your first teammate
+      </h2>
+      <p class="news-cta-description">
+        Run Codex, Claude, and Grok side by side, each with its own workspace and context. Your work stays on your
+        computer.
+      </p>
+      <div class="news-cta-actions">
+        <Button href={OPENBOT_LINKS.downloadFromOtherPage} variant="primary" size="lg" icon="download">
+          Download OpenBot
+        </Button>
+        <Button
+          href={OPENBOT_LINKS.contact}
+          target="_blank"
+          rel={EXTERNAL_LINK_REL}
+          variant="secondary"
+          size="lg"
+          icon="contact"
+          class="landing-button-glass"
+        >
+          Contact
+        </Button>
+      </div>
+    </section>
+  );
+}
