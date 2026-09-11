@@ -61,7 +61,7 @@ export const DialogSubmits: Story = {
     const body = within(document.body);
     await userEvent.click(body.getByRole("button", { name: "Submit" }));
     await expect(storyArgs.onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ providerId: "studio-local", apiKey: "story-placeholder-not-a-key" }),
+      expect.objectContaining({ id: "studio-local", apiKey: "story-placeholder-not-a-key" }),
     );
   },
 };
