@@ -99,11 +99,12 @@ describe("BrowserTakeoverCard", () => {
 });
 
 describe("takeover chat forms", () => {
-  it.each(["click", "enter", "alternate", "website-validation"])(
+  it.each(["click", "enter", "alternate", "website-validation", "choice"])(
     "submits with %s and clears values for the next step",
     async (method) => {
       installOpenbotStub();
       const login = browserFormPreview();
+      login.forms[0].requiresActionChoice = method === "choice";
       login.forms[0].fields[0].multiple = true;
       login.forms[0].actions.push({ id: "alternate", label: "Use password" });
       vi.mocked(window.openbot.browser.readTakeoverForm).mockResolvedValue(login);
@@ -132,6 +133,11 @@ describe("takeover chat forms", () => {
         method === "website-validation" ? "website-validates-this" : "user@example.com,other@example.com";
       await fireEvent.input(email, { target: { value: emailValue } });
       await fireEvent.input(screen.getByLabelText("Password (required)"), { target: { value: "private-password" } });
+      if (method === "choice") {
+        email.focus();
+        await userEvent.keyboard("{Enter}");
+        expect(window.openbot.browser.submitTakeoverForm).not.toHaveBeenCalled();
+      }
       if (method === "enter") {
         email.focus();
         await userEvent.keyboard("{Enter}");

@@ -2778,6 +2778,42 @@ async function runTakeoverForms(browser: BrowserHost, origin: string): Promise<v
       if (result.status !== "complete") throw new Error("Takeover did not run the website-managed action.");
       browser.endTakeover(tab.id);
     }
+    await contents.executeJavaScript(`document.body.innerHTML = '<div><div role="button" tabindex="0">Use phone number</div></div>';
+      document.querySelector('[role=button]').addEventListener('click', () => {
+        document.body.innerHTML = '<div><input type="tel" aria-label="Phone number"><div role="button" tabindex="0">Continue</div></div>';
+        document.querySelector('[role=button]').addEventListener('click', () => {
+          if (document.querySelector('input').value !== '123456789') throw new Error('Incorrect phone value');
+          document.body.innerHTML = '<main>Accepted</main>';
+        });
+      }); true`);
+    await browser.beginTakeover(tab.id);
+    const choice = await browser.readTakeoverForm(tab.id, () => undefined);
+    const options = choice.forms[0];
+    if (!options || options.fields.length !== 0) throw new Error("Takeover did not expose the action-only step.");
+    const phoneStep = await browser.submitTakeoverForm(
+      {
+        ...request,
+        revision: choice.revision,
+        formId: options.id,
+        actionId: options.actions[0].id,
+        values: [],
+      },
+      () => undefined,
+    );
+    const phoneForm = phoneStep.forms[0];
+    if (phoneForm?.fields[0]?.type !== "tel") throw new Error("Takeover did not retain the phone-number step.");
+    const accepted = await browser.submitTakeoverForm(
+      {
+        ...request,
+        revision: phoneStep.revision,
+        formId: phoneForm.id,
+        actionId: phoneForm.actions[0].id,
+        values: [{ id: phoneForm.fields[0].id, value: "123456789" }],
+      },
+      () => undefined,
+    );
+    if (accepted.status !== "complete") throw new Error("Takeover did not finish the custom phone-number flow.");
+    browser.endTakeover(tab.id);
     process.stdout.write("BrowserHost: takeover forms passed without opening the browser panel.\n");
   } finally {
     browser.endTakeover(tab.id);

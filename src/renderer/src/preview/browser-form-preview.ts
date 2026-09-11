@@ -22,6 +22,7 @@ export function browserFormPreview(): BrowserFormState {
       {
         id: "sign-in",
         label: "Sign in",
+        requiresActionChoice: false,
         fields: [field("email", "Email", "email"), field("password", "Password", "password")],
         actions: [{ id: "submit", label: "Sign in" }],
       },

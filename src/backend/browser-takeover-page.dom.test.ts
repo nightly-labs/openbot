@@ -92,15 +92,22 @@ describe("browser takeover page", () => {
     run(submission(read(), [{ id: "field-0", value: "" }]));
     expect(submit).toHaveBeenCalledOnce();
   });
-  it("submits the chosen action for fields without a native form", () => {
-    document.body.innerHTML =
-      '<main><input aria-label="Email or phone"><input type="password" style="display:none"><button type="button">Forgot email?</button><button type="button">Next</button><button type="button">Create account</button></main>';
+  it.each([
+    ["main", '<button type="button">Next</button>'],
+    ["div", '<div role="button" tabindex="0">Next<svg><title>arrow</title></svg></div>'],
+    ["div", '<a href="/next">Next</a>'],
+  ])("submits the chosen action without a native form: %s %s", (container, action) => {
+    document.body.innerHTML = `<${container}><input aria-label="Email or phone"><input type="password" style="display:none"><button type="button">Forgot email?</button>${action}<button type="button">Create account</button></${container}>`;
     const state = read();
     expect(state.forms[0]?.fields.map((field) => field.label)).toEqual(["Email or phone"]);
-    const next = vi.fn();
+    expect(state.forms[0]?.requiresActionChoice).toBe(true);
+    expect(() =>
+      decodeBrowserFormState({ ...state, forms: [{ ...state.forms[0], requiresActionChoice: "yes" }] }),
+    ).toThrow();
+    const next = vi.fn((event: Event) => event.preventDefault());
     const forgot = vi.fn();
     document.querySelectorAll("button")[0].addEventListener("click", forgot);
-    document.querySelectorAll("button")[1].addEventListener("click", next);
+    document.querySelectorAll("button, [role=button], a")[1].addEventListener("click", next);
     const command = submission(state, [{ id: "field-0", value: "example" }]);
     if (command.kind !== "submit") throw new Error("Expected submission");
     command.input.actionId = state.forms[0].actions.find((action) => action.label === "Next")?.id ?? "";
@@ -109,6 +116,38 @@ describe("browser takeover page", () => {
     expect(next).toHaveBeenCalledOnce();
     expect(forgot).not.toHaveBeenCalled();
     expect(() => run(command)).toThrow("The browser form changed");
+  });
+  it("opens a phone-number step from a page that only has a custom action", () => {
+    document.body.innerHTML = '<div><div role="button" tabindex="0">Use phone number</div></div>';
+    document.querySelector('[role="button"]')?.addEventListener("click", () => {
+      document.body.innerHTML =
+        '<div><input type="tel" aria-label="Phone number"><div role="button" tabindex="0">Continue</div></div>';
+    });
+    run(submission(read(), []));
+    const phone = read();
+    expect(phone.forms[0]?.fields).toMatchObject([{ type: "tel", label: "Phone number" }]);
+    const proceed = vi.fn();
+    document.querySelector('[role="button"]')?.addEventListener("click", proceed);
+    run(submission(phone, [{ id: phone.forms[0].fields[0].id, value: "123456789" }]));
+    expect(proceed).toHaveBeenCalledOnce();
+    expect(document.querySelector("input")?.value).toBe("123456789");
+  });
+  it("rejects changed link destinations and disabled custom actions", () => {
+    document.body.innerHTML =
+      '<a href="/first">Continue</a><div role="button" aria-disabled="true">Use phone number</div>';
+    const state = read();
+    const link = document.querySelector("a");
+    if (!link) throw new Error("Missing fixture link");
+    link.href = "/changed";
+    expect(() => run(submission(state, []))).toThrow("The browser form changed");
+    const fresh = read();
+    const command = submission(fresh, []);
+    if (command.kind !== "submit") throw new Error("Expected submission");
+    command.input.actionId = fresh.forms[0].actions[1].id;
+    const clicked = vi.fn();
+    document.querySelector('[role="button"]')?.addEventListener("click", clicked);
+    expect(run(command).status).toBe("invalid");
+    expect(clicked).not.toHaveBeenCalled();
   });
   it("keeps initially disabled submit actions and clicks only after the page enables them", () => {
     const button = document.querySelector("button");
@@ -157,7 +196,7 @@ describe("browser takeover page", () => {
       '<div role="dialog"><form><input type="email" name="email" placeholder="Your email" required><button type="button">Sign in with password</button><button type="submit">Continue</button></form></div>';
     const state = read();
     expect(state.forms[0]?.fields).toMatchObject([{ type: "email", label: "Your email" }]);
-    expect(state.forms[0]?.actions.map((action) => action.label)).toEqual(["Continue"]);
+    expect(state.forms[0]?.actions.map((action) => action.label)).toEqual(["Continue", "Sign in with password"]);
     const submit = vi.fn((event: Event) => event.preventDefault());
     const auxiliary = vi.fn();
     document.forms[0].addEventListener("submit", submit);

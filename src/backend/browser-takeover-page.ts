@@ -1,7 +1,7 @@
 import type { BrowserFormField, BrowserFormState, BrowserFormSubmission } from "@openbot/contracts/ipc";
 
 type Control = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-type Submitter = HTMLInputElement | HTMLButtonElement;
+type Submitter = HTMLElement;
 interface CapturedForm {
   form: HTMLElement;
   controls: Map<string, Control>;
@@ -28,6 +28,24 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     const style = getComputedStyle(node);
     return node.getClientRects().length > 0 && style.visibility !== "hidden" && style.display !== "none";
   };
+  const isControl = (node: Element): node is Control =>
+    node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement;
+  const isAction = (node: Element) =>
+    node instanceof HTMLElement &&
+    node.matches("button, a[href], [role=button], input[type=submit], input[type=button], input[type=reset]");
+  const actionTarget = (node: HTMLElement) =>
+    node instanceof HTMLButtonElement || node instanceof HTMLInputElement
+      ? [node.formAction, node.formMethod, node.formNoValidate]
+      : node instanceof HTMLAnchorElement
+        ? [node.href, node.target, node.download]
+        : [];
+  const scope = (node: Element) => node.closest<HTMLElement>("form, [role=form], [role=dialog], main") ?? document.body;
+  const actionText = (node: HTMLElement) => {
+    const copy = node.cloneNode(true);
+    if (!(copy instanceof HTMLElement)) return "";
+    for (const hidden of copy.querySelectorAll("svg, [aria-hidden=true]")) hidden.remove();
+    return copy.textContent;
+  };
   const label = (node: Control | Submitter) =>
     (
       node.getAttribute("aria-label") ||
@@ -36,11 +54,13 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
         ?.split(/\s+/)
         .map((id) => document.getElementById(id)?.textContent ?? "")
         .join(" ") ||
-      [...(node.labels ?? [])].map((entry) => entry.textContent).join(" ") ||
-      (node instanceof HTMLButtonElement ? node.textContent : "") ||
+      [...((isControl(node) || node instanceof HTMLButtonElement ? node.labels : null) ?? [])]
+        .map((entry) => entry.textContent)
+        .join(" ") ||
+      (isAction(node) ? actionText(node) : "") ||
       (node instanceof HTMLInputElement && node.type === "submit" ? node.value : "") ||
       node.getAttribute("placeholder") ||
-      node.name ||
+      node.getAttribute("name") ||
       "Field"
     )
       .trim()
@@ -60,7 +80,7 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
   unsupported ||= [...document.querySelectorAll("*")].some(
     (node) => node.shadowRoot !== null || node.localName.includes("-"),
   );
-  // Inputs without a native form, including custom login widgets, require manual takeover.
+  // Unsupported page elements retain manual takeover alongside the discovered controls.
   unsupported ||= [...document.querySelectorAll("input, textarea, select")].some(
     (node) =>
       (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement) &&
@@ -68,22 +88,18 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
       visible(node),
   );
   const roots = new Set<HTMLElement>(document.forms);
-  for (const node of document.querySelectorAll("input, textarea, select")) {
+  for (const node of document.querySelectorAll("input, textarea, select, button, a[href], [role=button]")) {
     if (
-      (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement) &&
-      !node.form &&
+      (isControl(node) || isAction(node)) &&
       visible(node) &&
-      !node.matches(':disabled, [type=hidden], [autocomplete="one-time-code"]')
-    ) {
-      const root = node.closest<HTMLElement>("[role=form], [role=dialog], main");
-      if (root) roots.add(root);
-    }
+      !node.matches(':disabled, [type=hidden], [autocomplete="one-time-code"]') &&
+      !(isControl(node) && node.form)
+    )
+      roots.add(scope(node));
   }
   const destination = (root: HTMLElement) => (root instanceof HTMLFormElement ? [root.action, root.method] : []);
   const belongs = (node: Control | Submitter, root: HTMLElement) =>
-    root instanceof HTMLFormElement
-      ? node.form === root
-      : !node.form && node.closest("[role=form], [role=dialog], main") === root;
+    (isControl(node) || node instanceof HTMLButtonElement) && node.form ? node.form === root : scope(node) === root;
   for (const [formIndex, form] of [...roots].entries()) {
     const native = form instanceof HTMLFormElement ? form : null;
     const prior = previous?.url === location.href ? previous.forms.get(`form-${formIndex}`) : undefined;
@@ -93,35 +109,27 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     const actions = new Map<string, Submitter>();
     const actionDescriptions: BrowserFormState["forms"][number]["actions"] = [];
     let invalid = false;
-    const elements = native ? [...native.elements] : [...form.querySelectorAll("input, textarea, select, button")];
+    let reusedValues = false;
+    const elements = [
+      ...new Set([
+        ...(native ? [...native.elements] : []),
+        ...form.querySelectorAll("input, textarea, select, button, a[href], [role=button]"),
+      ]),
+    ];
     for (const [index, node] of elements.entries()) {
-      if (
-        !(
-          node instanceof HTMLInputElement ||
-          node instanceof HTMLTextAreaElement ||
-          node instanceof HTMLSelectElement ||
-          node instanceof HTMLButtonElement
-        )
-      )
-        continue;
+      if (!(node instanceof HTMLElement) || !(isControl(node) || isAction(node))) continue;
       if (!belongs(node, form) || !visible(node) || (node instanceof HTMLInputElement && node.type === "hidden"))
         continue;
       const id = `field-${index}`;
-      if (
-        (node instanceof HTMLButtonElement || (node instanceof HTMLInputElement && node.type === "submit")) &&
-        (node.type === "submit" || !native)
-      ) {
-        if (!native && label(node) === "Field") continue;
+      if (isAction(node)) {
+        if (node.parentElement?.closest("button, a[href], [role=button]")) continue;
+        if (label(node) === "Field" && !(node instanceof HTMLButtonElement && node.type === "submit")) continue;
         actions.set(id, node);
         actionDescriptions.push({ id, label: label(node) === "Field" ? "Submit" : label(node) });
         continue;
       }
+      if (!isControl(node)) continue;
       if (node.matches(":disabled")) continue;
-      if (node instanceof HTMLButtonElement) {
-        // Auxiliary actions do not prevent filling and submitting the native form.
-        unsupported = true;
-        continue;
-      }
       if ((node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) && node.readOnly) continue;
       let type: BrowserFormField["type"];
       if (node instanceof HTMLTextAreaElement) type = "textarea";
@@ -152,15 +160,12 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
         }
       }
       // Existing text stays on the website; an empty chat draft must not erase it.
-      if (
-        !(node instanceof HTMLSelectElement) &&
-        type !== "checkbox" &&
-        type !== "radio" &&
-        node.value !== "" &&
-        retry?.controls.get(id) !== node
-      ) {
-        invalid = true;
-        continue;
+      if (!(node instanceof HTMLSelectElement) && type !== "checkbox" && type !== "radio" && node.value !== "") {
+        if (retry?.controls.get(id) !== node) {
+          invalid = true;
+          continue;
+        }
+        reusedValues = true;
       }
       controls.set(id, node);
       fields.push({
@@ -199,11 +204,20 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
       unsupported = true;
       continue;
     }
+    if (native)
+      actionDescriptions.sort((a, b) => {
+        const first = actions.get(a.id);
+        const second = actions.get(b.id);
+        const submits = (node: HTMLElement | undefined) =>
+          (node instanceof HTMLButtonElement || node instanceof HTMLInputElement) && node.type === "submit";
+        return Number(submits(second)) - Number(submits(first));
+      });
     const id = `form-${formIndex}`;
     const description = {
       id,
       label: (form.getAttribute("aria-label") || `Form ${formIndex + 1}`).slice(0, 2000),
       fields,
+      requiresActionChoice: !native && actionDescriptions.length > 1,
       actions: actionDescriptions,
     };
     forms.push(description);
@@ -222,9 +236,10 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
       optionValues: [...controls.values()].map((node) =>
         node instanceof HTMLSelectElement ? [...node.options].map((option) => option.value) : null,
       ),
-      submitters: [...actions.values()].map((action) => [action.formAction, action.formMethod, action.formNoValidate]),
+      submitters: [...actions.values()].map(actionTarget),
     });
     if (
+      reusedValues &&
       retry &&
       (retry.signature !== signature ||
         [...controls].some(([id, node]) => retry.controls.get(id) !== node) ||
@@ -234,7 +249,7 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
       unsupported = true;
       continue;
     }
-    captured.set(id, { form, controls, actions, signature, filled: retry?.filled });
+    captured.set(id, { form, controls, actions, signature, filled: reusedValues });
   }
   const state: BrowserFormState = {
     revision: command.kind === "read" ? command.revision : command.input.revision,
@@ -329,7 +344,12 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     throw new Error("The browser form changed. Refresh it before submitting.");
   const action = current.actions.get(input.actionId);
   const native = current.form instanceof HTMLFormElement ? current.form : null;
-  const validate = !!native && !native.noValidate && !action?.formNoValidate;
+  const validate =
+    !!native &&
+    !native.noValidate &&
+    (action instanceof HTMLButtonElement || action instanceof HTMLInputElement) &&
+    action.type === "submit" &&
+    !action.formNoValidate;
   const values = new Map(input.values.map((entry) => [entry.id, entry.value]));
   if (!action || values.size !== input.values.length || values.size !== current.controls.size)
     throw new Error("Invalid browser form submission.");
@@ -361,14 +381,7 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     )
       return { ...state, status: "invalid" };
   }
-  const target = () =>
-    JSON.stringify([
-      destination(current.form),
-      native?.noValidate,
-      action.formAction,
-      action.formMethod,
-      action.formNoValidate,
-    ]);
+  const target = () => JSON.stringify([destination(current.form), native?.noValidate, actionTarget(action)]);
   const originalTarget = target();
   const checkTargets = () => {
     if (
@@ -405,7 +418,8 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     node.dispatchEvent(new Event("change", { bubbles: true }));
   }
   checkTargets();
-  if ((validate && !native?.checkValidity()) || action.matches(":disabled")) return { ...state, status: "invalid" };
+  if ((validate && !native?.checkValidity()) || action.matches(":disabled, [aria-disabled=true]"))
+    return { ...state, status: "invalid" };
   checkTargets();
   action.click();
   return state;

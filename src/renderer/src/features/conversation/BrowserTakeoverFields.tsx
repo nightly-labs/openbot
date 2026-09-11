@@ -162,6 +162,10 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
             novalidate
             class="browser-takeover-form"
             aria-label={form.label}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && form.requiresActionChoice && event.target instanceof HTMLInputElement)
+                event.preventDefault();
+            }}
             onSubmit={(event) => {
               event.preventDefault();
               const action =

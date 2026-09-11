@@ -94,9 +94,10 @@ it checks local file access.
 
 Local browser takeover forms use separate IPC methods. The main process validates the active
 request and tab ownership. The browser reads native controls in forms or scoped page sections
-(main, dialog, or form landmarks) in an isolated world and binds
+(main, dialog, form landmarks, or the page body) in an isolated world and binds
 submission to the captured document, controls, and action. Values stay in temporary UI state and
-are sent directly to the website; they do not enter chat history or provider tool results. Unsupported
+are sent directly to the website; they do not enter chat history or provider tool results. Named buttons, links, and elements with `role="button"` are available even when a step has no inputs.
+A page with several custom actions requires an explicit choice; Enter must not select an arbitrary action. Unsupported
 controls keep manual takeover available. After a valid submission, the next detected form or standalone one-time-code input stays in
 the chat card. If no next input is detected, control returns to the agent to inspect the page result.
 Native validation runs in the browser; forms with validation overrides and controls outside native

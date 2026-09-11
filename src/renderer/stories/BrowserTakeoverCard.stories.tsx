@@ -3,6 +3,7 @@ import { onSettled } from "solid-js";
 import { fn, userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { BrowserTakeoverCard } from "../src/features/conversation/ConversationPrompts";
+import { browserFormPreview } from "../src/preview/browser-form-preview";
 import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
 import { createMockOpenBot } from "./mock-openbot";
 
@@ -97,4 +98,49 @@ export const ChatForm: Story = {
       return <Story />;
     },
   ],
+};
+
+export const PageActions: Story = {
+  args: { ...ChatForm.args, preview: null, previewStatus: "failed" },
+  decorators: [
+    (Story) => {
+      const previous = window.openbot;
+      const api = createMockOpenBot().api;
+      const state = browserFormPreview();
+      const field = state.forms[0].fields[0];
+      state.forms[0].fields = [];
+      state.forms[0].requiresActionChoice = true;
+      state.forms[0].actions = [
+        { id: "phone", label: "Log in with phone number" },
+        { id: "help", label: "Need help?" },
+      ];
+      api.browser.readTakeoverForm = async () => structuredClone(state);
+      api.browser.submitTakeoverForm = async () => ({
+        ...state,
+        revision: "phone-step",
+        forms: [
+          {
+            ...state.forms[0],
+            requiresActionChoice: false,
+            fields: [{ ...field, type: "tel", label: "Phone number" }],
+            actions: [{ id: "continue", label: "Continue" }],
+          },
+        ],
+      });
+      window.openbot = api;
+      onSettled(() => () => {
+        window.openbot = previous;
+      });
+      return <Story />;
+    },
+  ],
+};
+
+export const PhoneNumberStep: Story = {
+  ...PageActions,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Log in with phone number" }));
+    await canvas.findByRole("textbox", { name: "Phone number (required)" });
+  },
 };

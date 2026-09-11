@@ -40,7 +40,13 @@ export interface BrowserFormField {
 export interface BrowserFormState {
   revision: string;
   origin: string;
-  forms: { id: string; label: string; fields: BrowserFormField[]; actions: { id: string; label: string }[] }[];
+  forms: {
+    id: string;
+    label: string;
+    requiresActionChoice?: boolean;
+    fields: BrowserFormField[];
+    actions: { id: string; label: string }[];
+  }[];
   status: "ready" | "manual" | "invalid" | "complete";
 }
 export interface BrowserFormSubmission extends BrowserFormRequest {
@@ -159,6 +165,7 @@ function isForm(value: unknown): value is BrowserFormState["forms"][number] {
     isDynamicRecord(value) &&
     id(value.id) &&
     text(value.label) &&
+    (value.requiresActionChoice === undefined || typeof value.requiresActionChoice === "boolean") &&
     Array.isArray(value.fields) &&
     value.fields.length <= 100 &&
     value.fields.every(isField) &&
