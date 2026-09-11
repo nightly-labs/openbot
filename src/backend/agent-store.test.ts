@@ -561,41 +561,50 @@ describe("AgentStore", () => {
     });
   });
 
-  it("creates unique new agents at the top of the persistent list", async () => {
-    const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
-    temporaryRoots.push(root);
-    const userData = join(root, "user-data");
-    const store = new AgentStore(userData, join(root, "home"));
-    await store.initialize();
+  it.each(["", "   ", AGENT_PROFILE_INPUT.description])(
+    "creates unique agents with description %j at the top of the persistent list",
+    async (description) => {
+      const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
+      temporaryRoots.push(root);
+      const userData = join(root, "user-data");
+      const store = new AgentStore(userData, join(root, "home"));
+      await store.initialize();
 
-    const first = await store.createAgent({ ...AGENT_PROFILE_INPUT, name: "First Agent", avatarSeed: "setup:first" });
-    const second = await store.createAgent({
-      ...AGENT_PROFILE_INPUT,
-      name: "Second Agent",
-      avatarSeed: "setup:second",
-    });
+      const first = await store.createAgent({
+        ...AGENT_PROFILE_INPUT,
+        name: "First Agent",
+        avatarSeed: "setup:first",
+        description,
+      });
+      const second = await store.createAgent({
+        ...AGENT_PROFILE_INPUT,
+        name: "Second Agent",
+        avatarSeed: "setup:second",
+      });
 
-    expect(first.id).not.toBe(second.id);
-    expect(first.name).toBe("First Agent");
-    expect(second.name).toBe("Second Agent");
-    expect(first.title).toBe("");
-    expect(second.title).toBe("");
-    expect(
-      store
-        .list()
-        .slice(0, 2)
-        .map((agent) => agent.id),
-    ).toEqual([second.id, first.id]);
+      expect(first.id).not.toBe(second.id);
+      expect(first.name).toBe("First Agent");
+      expect(second.name).toBe("Second Agent");
+      expect(first.title).toBe("");
+      expect(second.title).toBe("");
+      expect(
+        store
+          .list()
+          .slice(0, 2)
+          .map((agent) => agent.id),
+      ).toEqual([second.id, first.id]);
 
-    const reloaded = new AgentStore(userData, join(root, "home"));
-    await reloaded.initialize();
-    expect(
-      reloaded
-        .list()
-        .slice(0, 2)
-        .map((agent) => agent.id),
-    ).toEqual([second.id, first.id]);
-  });
+      const reloaded = new AgentStore(userData, join(root, "home"));
+      await reloaded.initialize();
+      expect(reloaded.list().find((agent) => agent.id === first.id)?.description).toBe(description.trim());
+      expect(
+        reloaded
+          .list()
+          .slice(0, 2)
+          .map((agent) => agent.id),
+      ).toEqual([second.id, first.id]);
+    },
+  );
 
   it("duplicates the profile, avatar, workspace, and symbolic links into an independent agent", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-duplicate-"));
@@ -883,9 +892,9 @@ describe("AgentStore", () => {
     await store.initialize();
 
     await expect(store.createAgent({ ...AGENT_PROFILE_INPUT, name: " " })).rejects.toThrow("Agent name is required.");
-    await expect(store.createAgent({ ...AGENT_PROFILE_INPUT, description: " " })).rejects.toThrow(
-      "Agent description is required.",
-    );
+    await expect(
+      store.createAgent({ ...AGENT_PROFILE_INPUT, description: "x".repeat(INPUT_LIMITS.agentDescription + 1) }),
+    ).rejects.toThrow("Agent description is too long.");
     await expect(store.createAgent({ ...AGENT_PROFILE_INPUT, avatarSeed: "" })).rejects.toThrow("Invalid avatar seed.");
     expect(store.list()).toEqual([]);
   });

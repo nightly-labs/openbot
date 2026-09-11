@@ -363,9 +363,12 @@ export function agentCreate(value: DynamicRecord): CreateAgentInput {
   const avatarHue = value.avatarHue;
   if (!isAvatarSeed(value.avatarSeed)) throw new HttpError(400, "avatarSeed is invalid.");
   if (avatarHue !== null && !isAvatarHue(avatarHue)) throw new HttpError(400, "avatarHue is invalid.");
+  if (!isString(value.description) || value.description.length > INPUT_LIMITS.agentDescription) {
+    throw new HttpError(400, "description is invalid.");
+  }
   return {
     name: requiredCreateText(value.name, "name", INPUT_LIMITS.agentName),
-    description: requiredCreateText(value.description, "description", INPUT_LIMITS.agentDescription),
+    description: value.description,
     avatarSeed: value.avatarSeed,
     avatarHue,
     initialMessage: requiredCreateText(value.initialMessage, "initialMessage", INPUT_LIMITS.messageText),
