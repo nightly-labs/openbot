@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/solid-router";
-import { formatNewsDate, type NewsArticle } from "../../lib/news";
+import type { NewsArticle } from "../../lib/news";
 import { ButtonLink } from "../ui/button";
+import { NewsByline } from "./NewsByline";
 import { NewsGradient } from "./NewsGradient";
 
 export interface NewsFeaturedProps {
@@ -11,9 +12,7 @@ export function NewsFeatured(props: NewsFeaturedProps) {
   return (
     <section class="news-featured" aria-labelledby="news-featured-title">
       <div class="news-featured-copy" data-enter="news-copy">
-        <time class="news-meta" datetime={props.article.publishedAt}>
-          {formatNewsDate(props.article.publishedAt)}
-        </time>
+        <NewsByline article={props.article} />
         <h2 class="news-featured-title" id="news-featured-title">
           <Link to="/news/$slug" params={{ slug: props.article.slug }}>
             {props.article.title}

@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/solid-router";
-import { formatNewsDate, type NewsArticle } from "../../lib/news";
+import type { NewsArticle } from "../../lib/news";
+import { NewsByline } from "./NewsByline";
 import { NewsGradient } from "./NewsGradient";
 
 export interface NewsCardProps {
@@ -34,9 +35,7 @@ export function NewsCard(props: NewsCardProps) {
           {props.article.title}
         </span>
       </div>
-      <time class="news-meta" datetime={props.article.publishedAt}>
-        {formatNewsDate(props.article.publishedAt)}
-      </time>
+      <NewsByline article={props.article} class="news-card-byline" />
       <h3 class="news-card-title">{props.article.title}</h3>
     </Link>
   );
