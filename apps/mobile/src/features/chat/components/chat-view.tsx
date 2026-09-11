@@ -427,7 +427,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
               ) : null}
               <ConnectionStatus server={server} />
               {sendError?.agentId === agent.id ? (
-                <Typography.Paragraph accessibilityRole="alert" className="bg-background px-4 py-2 text-danger">
+                <Typography.Paragraph accessibilityRole="alert" className="bg-background px-4 py-2 text-danger-text">
                   {sendError.message}
                 </Typography.Paragraph>
               ) : null}

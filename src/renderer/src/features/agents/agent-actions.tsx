@@ -69,7 +69,7 @@ const AgentActions = createSimpleContext({
       try {
         const stored = await window.openbot.agent.createAgent({
           name: submitted.name.trim(),
-          description: submitted.purpose.trim(),
+          description: submitted.purpose.trim() || "General-purpose assistant",
           avatarSeed: submitted.avatarSeed,
           avatarHue: submitted.avatarHue,
           initialMessage: createAgentInitialMessage(submitted),

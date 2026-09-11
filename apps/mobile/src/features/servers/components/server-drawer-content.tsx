@@ -3,6 +3,7 @@ import type { Href } from "expo-router";
 import { Typography } from "heroui-native";
 import { Monitor, Plus, Server, Settings } from "lucide-react-native";
 import { Pressable, ScrollView, View, type ViewStyle } from "react-native";
+import { useCSSVariable } from "uniwind";
 
 import type { MobileSession } from "@/features/auth/api/mobile-auth";
 import { mobileUserName } from "@/features/auth/api/mobile-user-name";
@@ -41,6 +42,7 @@ export function ServerDrawerContent({
   const displayName = mobileUserName(session.user);
   const avatarUrl = session.user.avatarUrl ? new URL(session.user.avatarUrl, session.apiUrl).toString() : null;
   const mutedColor = String(muted);
+  const serverForeground = String(useCSSVariable("--openbot-text-on-light"));
 
   return (
     <>
@@ -88,7 +90,7 @@ export function ServerDrawerContent({
                 className="size-11 items-center justify-center rounded-[15px]"
                 style={{ backgroundColor: serverItem.accent, borderCurve: "continuous" }}
               >
-                <ServerIcon color="#100d12" size={21} strokeWidth={1.8} />
+                <ServerIcon color={serverForeground} size={21} strokeWidth={1.8} />
               </View>
               <View className="min-w-0 flex-1 gap-0.5">
                 <Typography.Paragraph weight={selected ? "bold" : "semibold"} numberOfLines={1}>

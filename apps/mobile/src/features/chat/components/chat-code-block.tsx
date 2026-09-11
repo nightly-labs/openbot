@@ -5,6 +5,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import { Check, Copy } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Alert, type ColorValue, ScrollView, useWindowDimensions, View } from "react-native";
+import { useCSSVariable } from "uniwind";
 import { type CodeToken, codeLanguage, highlightCode } from "../model/code-highlight";
 
 export function ChatCodeBlock({
@@ -17,14 +18,12 @@ export function ChatCodeBlock({
   selectable?: boolean;
 }) {
   const { fontScale } = useWindowDimensions();
-  const [foreground, muted, keyword, string, number, error] = useThemeColor([
-    "foreground",
-    "muted",
-    "link",
-    "success",
-    "warning",
-    "danger",
-  ]);
+  const [foreground, muted, keyword] = useThemeColor(["foreground", "muted", "link"]);
+  const [string, number, error] = useCSSVariable([
+    "--openbot-success-text",
+    "--openbot-warning-text",
+    "--openbot-danger-text",
+  ]).map(String);
   const [highlight, setHighlight] = useState<{ text: string; language?: string; tokens: CodeToken[] } | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   useEffect(() => {
@@ -67,7 +66,7 @@ export function ChatCodeBlock({
   return (
     <View className="overflow-hidden bg-control/50" style={{ borderRadius: 18, borderCurve: "continuous" }}>
       <View className="flex-row items-center justify-between gap-3 pl-3 pr-1 pt-1">
-        <Typography.Paragraph type="body-xs" className="shrink text-text-dim" numberOfLines={1}>
+        <Typography.Paragraph type="body-xs" className="shrink text-muted" numberOfLines={1}>
           {codeLanguage(language).label}
         </Typography.Paragraph>
         <Button

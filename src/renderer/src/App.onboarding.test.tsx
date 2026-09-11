@@ -476,9 +476,20 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
 
     expect(await screen.findByRole("heading", { name: "Create your first agent" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create agent" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Create agent" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
     expect(window.openbot.agent.createAgent).not.toHaveBeenCalled();
+    await fireEvent.click(screen.getByRole("button", { name: "Create agent" }));
+    await waitFor(() =>
+      expect(window.openbot.agent.createAgent).toHaveBeenCalledWith({
+        name: "New agent",
+        description: "General-purpose assistant",
+        initialMessage: "Greet me briefly.",
+        avatarSeed: expect.any(String),
+        avatarHue: null,
+      }),
+    );
+    expect(await screen.findByRole("heading", { name: "New agent" })).toBeInTheDocument();
   });
 
   it("guides signed-out users before enabling chat", async () => {

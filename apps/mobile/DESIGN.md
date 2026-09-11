@@ -93,6 +93,25 @@ to the content scroll view, not a larger sheet detent. Native dismissal remains 
 `systemMaterial` or another `headerBlurEffect` on these sheets, or put an opaque header color back
 on iOS. The native soft scroll edge handles the transition under the title.
 
+### Save and create actions
+
+Use `SheetSaveAction` for every form with an explicit save or create action. Put its checkmark
+on the right of the native header. Do not put a second Save/Create button in the content.
+
+- Hide the action until the draft differs from the saved values (or initial creation values).
+  Restore the initial values to hide it again. Keep validity separate from change detection.
+- Show a disabled checkmark for changed but invalid input or an unavailable host. Keep validation
+  and request errors in the form. A failed request keeps the draft and permits retry.
+- Disable the action and fields during the request, expose a pending accessibility label, and
+  prevent duplicate requests and dismissal. Hide the action after a successful save. A successful
+  create returns to the previous page after the draft guard is released.
+- Use a clear accessible action name, such as `Save name` or `Create agent`, even with an icon.
+  Preserve keyboard submission where the form supports it.
+- Standalone creation forms have a native close (`×`) action on the left. Nested pages keep the
+  native back button. Closing or going back must respect existing unsaved-change guards.
+- Keep `SheetScrollView` in charge of header clearance, safe areas, and keyboard behavior.
+  Do not add footer spacing for the header action.
+
 ### Scroll ownership
 
 Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. In particular:
@@ -134,7 +153,7 @@ maps them to utilities. Do not copy these hex values into components.
 | --- | --- | --- | --- |
 | Sheet background | `bg-sheet` | `#fcfcfc` | `#121212` |
 | Group background | `bg-grouped` | `#f2f2f2` | `#212121` |
-| Supporting text | `text-grouped-secondary` | `#858589` | `#96969b` |
+| Supporting text | `text-grouped-secondary` | `#69696e` | `#96969b` |
 | Inset separator | `bg-grouped-border` | `#dddddf` | `#333335` |
 | Group corners | `rounded-grouped` | 16 pt | 16 pt |
 
@@ -150,7 +169,7 @@ labels, uppercase section titles, decorative cards and tinted gray backgrounds. 
 can use `ProfileAvatar neutral`; agent colors still convey their own identities.
 
 Action rows use the same flat grouped surface as navigation rows. Sign-out and photo-removal
-rows do not have chevrons; destructive actions use `text-danger` instead of a filled red block.
+rows do not have chevrons; destructive actions use `text-danger-text` instead of a filled red block.
 Keep pending/disabled behavior and confirmation for sign-out. Do not add account deletion or other
 unsupported actions just because a visual reference shows them.
 
@@ -166,9 +185,9 @@ in smaller secondary text. Place the pencil immediately beside the visible name,
 sheet edge. Keep the name centered and constrain long names to the available width.
 
 Edit the name inline with the same mounted native input and typography in both states. Do not
-replace the label with a separate form that moves the surrounding content. Show Save only after
+replace the label with a separate form that moves the surrounding content. Show the header checkmark only after
 the name changes, disable it for invalid input or a pending request, and let Cancel restore the
-saved name. Reserve a compact action area so showing these controls does not shift the page.
+saved name. Reserve a compact Cancel area so editing does not shift the page.
 Group the identity, action area and Profile photo section together instead of applying the
 standard section gap on both sides of the reserved area. Keep the email close to the name.
 
@@ -190,6 +209,14 @@ build without the authorization required by `AGENTS.md`; inspecting an already r
 does not prove a changed screen was exercised.
 
 ## Theme and visual consistency
+
+Use `text-muted` for readable timestamps, reply references and code labels. Reserve dim colors
+for decoration or inactive controls. Status text on neutral surfaces uses `text-success-text`,
+`text-warning-text` or `text-danger-text`; `success`, `warning` and `danger` remain fill colors.
+The text colors must retain at least 4.5:1 contrast on the surfaces that use them in both modes.
+
+Fixed colors in camera overlays, QR codes, SVG alpha masks and agent artwork serve their
+respective media or identity roles. Do not replace these with foreground/background theme colors.
 
 - `packages/brand/src/tokens.css` is the single source of truth for OpenBot color, typography, radius, shadow, and motion tokens, shared with the desktop and web apps; `tokens-native.css` beside it carries the light and dark values for the tokens mobile themes. `global.css` imports both and declares none of its own — it maps them to Tailwind utilities and HeroUI semantic aliases.
 - Use HeroUI semantic variants and existing utility classes. Do not add raw colors, arbitrary radii, or one-off shadows to a screen when a token or component variant can express the intent.

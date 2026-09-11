@@ -9,7 +9,11 @@ export function ServerStatusLabel({ server, prefix = "" }: { server: MobileServe
       accessibilityLabel={`${server.name}: ${serverStatusLabel(server)}`}
       accessibilityLiveRegion="polite"
       className={
-        server.state === "online" ? "text-success" : server.state === "error" ? "text-danger" : "text-text-secondary"
+        server.state === "online"
+          ? "text-success-text"
+          : server.state === "error"
+            ? "text-danger-text"
+            : "text-text-secondary"
       }
     >
       {prefix}
