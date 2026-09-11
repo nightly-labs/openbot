@@ -41,7 +41,7 @@ interface AgentPinTransitionContextValue {
   registerAvatar: (agentId: string, location: AgentAvatarLocation, node: View | null) => void;
   notifyAvatarLayout: (agentId: string, location: AgentAvatarLocation) => void;
   startAgentNavigationAnimated: (agentId: string, source: AgentAvatarLocation) => void;
-  toggleAgentPinAnimated: (agentId: string) => void;
+  toggleAgentPinAnimated: (agentId: string, options?: { haptic: boolean }) => void;
   transition: AgentPinTransitionState | null;
 }
 
@@ -204,7 +204,7 @@ export function AgentPinTransitionProvider({ children }: PropsWithChildren) {
   );
 
   const toggleAgentPinAnimated = useCallback(
-    (agentId: string) => {
+    (agentId: string, options?: { haptic: boolean }) => {
       const agent = agents.find((item) => item.id === agentId);
       if (!agent || transitionRef.current) return;
 
@@ -216,7 +216,7 @@ export function AgentPinTransitionProvider({ children }: PropsWithChildren) {
 
       const commitWithoutMovement = () => {
         toggleAgentPin(agentId);
-        void haptics.selection();
+        if (options?.haptic !== false) void haptics.selection();
       };
 
       if (!sourceNode || !container) {
@@ -240,7 +240,7 @@ export function AgentPinTransitionProvider({ children }: PropsWithChildren) {
 
           requestAnimationFrame(() => {
             toggleAgentPin(agentId);
-            void haptics.selection();
+            if (options?.haptic !== false) void haptics.selection();
             fallbackTimerRef.current = setTimeout(finishTransition, 700);
           });
         });
