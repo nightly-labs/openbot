@@ -11,7 +11,7 @@ import {
   installOpenbotStub,
   testServer,
 } from "./app-test-harness";
-import { BrowserPreviewCard } from "./features/conversation/BrowserPreviewSidebar";
+import BrowserPreviewSidebar, { BrowserPreviewCard } from "./features/conversation/BrowserPreviewSidebar";
 import { TestIntersectionObserver, TestResizeObserver } from "./setupTests";
 
 describe("OpenBot connected desktop shell", () => {
@@ -78,6 +78,40 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith({ visible: false });
     expect(composer).toHaveTextContent("Keep this draft");
     expect(window.openbot.browser.close).not.toHaveBeenCalled();
+  });
+
+  it("keeps existing previews when a new tab is added", async () => {
+    const first: BrowserTab = {
+      id: "existing",
+      title: "Existing page",
+      url: "https://example.com",
+      loading: false,
+      ownerAgentId: "chief",
+      ownerThreadId: "thread-chief",
+    };
+    const [tabs, setTabs] = createSignal([first]);
+    const capture = vi.mocked(window.openbot.browser.capturePreview);
+    render(() => (
+      <BrowserPreviewSidebar
+        tabs={tabs()}
+        hidden={false}
+        suspended={false}
+        contextKey="local:chief"
+        defaultWidth={() => 320}
+        maxWidth={() => 600}
+        onWidthChange={() => undefined}
+        onOpenTab={() => undefined}
+        onCloseTab={() => undefined}
+        onCollapse={() => undefined}
+        onNewTab={() => setTabs([{ ...first }, { ...first, id: "new", title: "New page" }])}
+      />
+    ));
+    await screen.findByRole("img", { name: "Preview of Existing page" });
+    capture.mockClear();
+    await fireEvent.click(screen.getByRole("button", { name: "New browser tab" }));
+    await screen.findByRole("img", { name: "Preview of New page" });
+    expect(capture.mock.calls.map(([id]) => id)).toEqual(["new"]);
+    expect(screen.getByRole("img", { name: "Preview of Existing page" })).toBeInTheDocument();
   });
 
   it("refreshes preview images only while the card is visible and enabled", async () => {

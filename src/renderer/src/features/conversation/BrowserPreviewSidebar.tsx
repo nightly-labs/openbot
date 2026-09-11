@@ -1,5 +1,5 @@
 import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
-import { createEffect, createSignal, createStore, For, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show } from "solid-js";
 import { PanelResizer, readPanelWidth, savePanelWidth } from "../../components/PanelResizer";
 import { Button, ChevronRight, Monitor, Plus, Skeleton, X } from "../../components/ui";
 
@@ -145,48 +145,41 @@ export function BrowserPreviewCard(props: {
     };
   });
 
-  createEffect(
-    () => JSON.stringify([props.contextKey, props.tab.id, props.tab.url]),
-    () => setState(() => ({ preview: null, failed: false })),
+  const pageKey = createMemo(() => JSON.stringify([props.contextKey, props.tab.id, props.tab.url]));
+  const captureKey = createMemo(() =>
+    JSON.stringify([pageKey(), props.tab.loading, props.enabled && visible() && documentVisible()]),
   );
-  createEffect(
-    () => ({
-      context: props.contextKey,
-      id: props.tab.id,
-      url: props.tab.url,
-      loading: props.tab.loading,
-      enabled: props.enabled && visible() && documentVisible(),
-    }),
-    ({ id, enabled }) => {
-      if (!enabled) return;
-      let disposed = false;
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const refresh = () => {
-        if (disposed) return;
-        if (pending) {
-          void pending.then(refresh);
-          return;
-        }
-        pending = window.openbot.browser
-          .capturePreview(id)
-          .then((preview) => {
-            if (!disposed) setState(() => ({ preview, failed: false }));
-          })
-          .catch(() => {
-            if (!disposed) setState(() => ({ preview: null, failed: true }));
-          })
-          .finally(() => {
-            pending = undefined;
-            if (!disposed) timer = setTimeout(refresh, 3000);
-          });
-      };
-      refresh();
-      return () => {
-        disposed = true;
-        if (timer) clearTimeout(timer);
-      };
-    },
-  );
+  createEffect(pageKey, () => setState(() => ({ preview: null, failed: false })));
+  createEffect(captureKey, () => {
+    if (!props.enabled || !visible() || !documentVisible()) return;
+    const id = props.tab.id;
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => {
+      if (disposed) return;
+      if (pending) {
+        void pending.then(refresh);
+        return;
+      }
+      pending = window.openbot.browser
+        .capturePreview(id)
+        .then((preview) => {
+          if (!disposed) setState(() => ({ preview, failed: false }));
+        })
+        .catch(() => {
+          if (!disposed) setState(() => ({ preview: null, failed: true }));
+        })
+        .finally(() => {
+          pending = undefined;
+          if (!disposed) timer = setTimeout(refresh, 3000);
+        });
+    };
+    refresh();
+    return () => {
+      disposed = true;
+      if (timer) clearTimeout(timer);
+    };
+  });
 
   return (
     <div ref={(node) => (element = node)} class="browser-preview-card">
