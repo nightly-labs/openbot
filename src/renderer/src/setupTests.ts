@@ -90,6 +90,9 @@ globalThis.ResizeObserver = TestResizeObserver;
 globalThis.scrollTo = () => undefined;
 
 const htmlElement = globalThis.HTMLElement;
+if (htmlElement && !htmlElement.prototype.getAnimations) {
+  htmlElement.prototype.getAnimations = () => [];
+}
 if (htmlElement && !htmlElement.prototype.scrollIntoView) {
   htmlElement.prototype.scrollIntoView = () => undefined;
 }

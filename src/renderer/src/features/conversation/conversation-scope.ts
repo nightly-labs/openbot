@@ -744,6 +744,7 @@ export function createConversationViewScope(props: ConversationProps) {
       surface: browserSurface(),
       visible:
         browserExpandedOpen() &&
+        Boolean(browserSurface()) &&
         !props.browserVisibilitySuspended &&
         !props.globalOverlayOpen &&
         !props.remoteDesktopVisible &&
@@ -878,7 +879,7 @@ export function createConversationViewScope(props: ConversationProps) {
     agentActivitySlot = element;
     scrollResizeObserver?.observe(element);
   };
-  const setBrowserSurfaceElement = (element: HTMLDivElement) => {
+  const setBrowserSurfaceElement = (element: HTMLDivElement | undefined) => {
     setBrowserSurface(element);
   };
   const setImageAttachmentPickerElement = (element: HTMLInputElement) => {

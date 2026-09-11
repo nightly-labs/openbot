@@ -73,8 +73,9 @@ describe("OpenBot connected desktop shell", () => {
       tabs: tabs.map((tab) => ({ ...tab, title: `${tab.title} updated` })),
       activeTabId: "two",
     });
-    await fireEvent.click(screen.getByRole("button", { name: "Back to conversation" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Hide browser" }));
     await waitFor(() => expect(card).toHaveFocus());
+    expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith({ visible: false });
     expect(composer).toHaveTextContent("Keep this draft");
     expect(window.openbot.browser.close).not.toHaveBeenCalled();
   });

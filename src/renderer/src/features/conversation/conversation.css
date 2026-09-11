@@ -7888,12 +7888,76 @@ button.chat-action-target:active,
   opacity: 1;
 }
 
-.browser-panel-expanded {
+.browser-expanded-backdrop {
   position: fixed;
   inset: 0;
-  width: 100%;
+  z-index: calc(var(--openbot-layer-dropdown) - 2);
+  background: var(--openbot-dialog-overlay);
+  opacity: 1;
+  transition:
+    opacity var(--openbot-duration-overlay) var(--openbot-ease-out),
+    display var(--openbot-duration-overlay) allow-discrete;
+}
+
+.browser-panel-expanded {
+  position: fixed;
+  inset: 5%;
+  width: 90%;
+  height: 90%;
   z-index: calc(var(--openbot-layer-dropdown) - 1);
-  border-left: 0;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--openbot-shadow-overlay);
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity var(--openbot-duration-overlay) var(--openbot-ease-out),
+    transform var(--openbot-duration-overlay) var(--openbot-ease-out),
+    display var(--openbot-duration-overlay) allow-discrete;
+}
+
+.browser-panel-expanded[hidden],
+.browser-expanded-backdrop[hidden] {
+  display: none;
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: var(--openbot-duration-normal);
+}
+
+.browser-panel-expanded[hidden] {
+  transform: translateY(var(--openbot-space-2)) scale(0.96);
+}
+
+@starting-style {
+  .browser-panel-expanded {
+    opacity: 0;
+    transform: translateY(var(--openbot-space-2)) scale(0.96);
+  }
+  .browser-expanded-backdrop {
+    opacity: 0;
+  }
+}
+
+.browser-motion-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  pointer-events: none;
+}
+
+.browser-hide {
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .browser-panel-expanded,
+  .browser-expanded-backdrop {
+    transition: none;
+  }
 }
 
 .browser-panel-expanded .browser-panel-header {
@@ -7901,10 +7965,6 @@ button.chat-action-target:active,
   align-items: center;
   gap: var(--openbot-space-3);
   padding-inline: var(--openbot-space-2);
-}
-
-body:has(.app-frame-platform-darwin) .browser-panel-expanded .browser-panel-header {
-  padding-left: calc(var(--openbot-space-8) * 2 + var(--openbot-space-6));
 }
 
 .browser-return {

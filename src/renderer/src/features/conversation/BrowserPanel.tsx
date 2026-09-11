@@ -3,9 +3,10 @@ import type {
   BrowserControlAction,
   BrowserControlDetailAction,
   BrowserControlSession,
+  BrowserPreview,
   BrowserTab,
 } from "@openbot/contracts/ipc";
-import { For, onSettled, Show } from "solid-js";
+import { createEffect, For, onSettled, Show } from "solid-js";
 import {
   ArrowLeft,
   Button,
@@ -15,6 +16,7 @@ import {
   PictureInPicture2,
   Tabs,
   TriangleAlert,
+  X,
 } from "../../components/ui";
 import type { AgentProfile } from "../../data";
 import {
@@ -55,6 +57,8 @@ const BROWSER_ACTION_LABELS: Record<BrowserControlAction | BrowserControlDetailA
 };
 
 interface BrowserPanelProps {
+  open: boolean;
+  preview?: BrowserPreview | null;
   tabs: BrowserTab[];
   activeTab: BrowserTab | undefined;
   activeControl: BrowserControlSession | undefined;
@@ -68,7 +72,7 @@ interface BrowserPanelProps {
   onReload: (tabId: string) => void;
   onActivateTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
-  onSurface: (element: HTMLDivElement) => void;
+  onSurface: (element: HTMLDivElement | undefined) => void;
   onBack: () => void;
   onEnterPip: () => void;
 }
@@ -80,10 +84,35 @@ function diagnosticErrorLabel(count: number): string {
 export default function BrowserPanel(props: BrowserPanelProps) {
   const actingControl = () => (props.activeControl?.phase === "acting" ? props.activeControl : undefined);
   let backButton: HTMLButtonElement | undefined;
-  onSettled(() => backButton?.focus());
+  let panel: HTMLElement | undefined;
+  let surfaceElement: HTMLDivElement | undefined;
+  createEffect(
+    () => props.open,
+    (open) => {
+      props.onSurface(undefined);
+      if (!open) return;
+      let disposed = false;
+      onSettled(() => {
+        backButton?.focus();
+        // Chromium is a native child view. Attach it only after the CSS panel settles.
+        const animations = panel?.getAnimations() ?? [];
+        const showSurface = () => {
+          if (!disposed) props.onSurface(surfaceElement);
+        };
+        if (animations.length === 0) showSurface();
+        else void Promise.all(animations.map((animation) => animation.finished)).then(showSurface, () => undefined);
+      });
+      return () => {
+        disposed = true;
+      };
+    },
+  );
 
   const surface = () => (
-    <div class="browser-surface" ref={props.onSurface}>
+    <div class="browser-surface" ref={(element) => (surfaceElement = element)}>
+      <Show when={props.preview}>
+        {(preview) => <img class="browser-motion-preview" src={preview().dataUrl} alt="" />}
+      </Show>
       <Show when={props.tabs.length === 0}>
         <div class="browser-empty-state">
           <strong>Open a page</strong>
@@ -115,6 +144,10 @@ export default function BrowserPanel(props: BrowserPanelProps) {
   return (
     <Tabs.Root
       as="aside"
+      ref={(element) => (panel = element)}
+      hidden={!props.open}
+      aria-hidden={props.open ? undefined : "true"}
+      inert={!props.open}
       id="browser-expanded-panel"
       class={["browser-panel browser-panel-expanded", { "browser-panel-controlled": Boolean(actingControl()) }]}
       aria-label="Browser"
@@ -212,6 +245,16 @@ export default function BrowserPanel(props: BrowserPanelProps) {
             <PlusIcon />
           </Button>
         </div>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          class="no-drag browser-hide"
+          aria-label="Hide browser"
+          title="Hide browser"
+          onClick={props.onBack}
+        >
+          <X aria-hidden="true" />
+        </Button>
       </header>
       <Tabs.Content forceMount value={props.activeTab?.id ?? "__empty"} class="browser-tab-panel">
         <div class="browser-toolbar">

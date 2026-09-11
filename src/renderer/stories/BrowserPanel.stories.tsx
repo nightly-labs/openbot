@@ -27,6 +27,7 @@ const meta = {
   title: "Conversation/BrowserPanel",
   component: BrowserPanel,
   args: {
+    open: true,
     tabs: [tab],
     activeTab: tab,
     activeControl: undefined,

@@ -15,7 +15,7 @@ interface BrowserPreviewSidebarProps {
   defaultWidth: () => number;
   maxWidth: () => number;
   onWidthChange: (width: number) => void;
-  onOpenTab: (tabId: string, trigger: HTMLButtonElement) => void;
+  onOpenTab: (tabId: string, trigger: HTMLButtonElement, preview: BrowserPreview | null) => void;
   onCloseTab: (tabId: string) => void;
   onNewTab: () => void;
   onCollapse: () => void;
@@ -121,7 +121,7 @@ export function BrowserPreviewCard(props: {
   tab: BrowserTab;
   contextKey: string;
   enabled: boolean;
-  onOpen: (tabId: string, trigger: HTMLButtonElement) => void;
+  onOpen: (tabId: string, trigger: HTMLButtonElement, preview: BrowserPreview | null) => void;
   onClose: (tabId: string) => void;
 }) {
   const [state, setState] = createStore<{ preview: BrowserPreview | null; failed: boolean }>({
@@ -194,7 +194,7 @@ export function BrowserPreviewCard(props: {
         variant="ghost"
         class="browser-preview-open"
         aria-label={`Open ${title()}`}
-        onClick={(event) => props.onOpen(props.tab.id, event.currentTarget)}
+        onClick={(event) => props.onOpen(props.tab.id, event.currentTarget, state.preview)}
       >
         <span class="browser-preview-image">
           <Show

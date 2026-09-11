@@ -8,8 +8,9 @@ const BROWSER_PANEL_MAX = 1600;
 const CONVERSATION_PANEL_MIN = 96;
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
+import type { BrowserPreview } from "@openbot/contracts/ipc";
 import { Portal } from "@solidjs/web";
-import { createEffect, Loading, lazy, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, Loading, lazy, onSettled, Show } from "solid-js";
 
 /** @internal Stable HMR boundary for conversation panels. */
 export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButtonElement) => void }) {
@@ -54,6 +55,16 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
     settingsReasoning,
     updateRuntimeSettings,
   } = useConversationViewScope();
+  const [browserMotionPreview, setBrowserMotionPreview] = createSignal<{
+    tabId: string;
+    preview: BrowserPreview | null;
+  } | null>(null);
+  createEffect(
+    () => JSON.stringify([props.server?.id, props.agent?.id]),
+    () => {
+      setBrowserMotionPreview(null);
+    },
+  );
   let browserPreviewTrigger: HTMLButtonElement | undefined;
   createEffect(
     () => ({ expanded: browserExpandedOpen(), suspended: props.globalOverlayOpen || props.remoteDesktopVisible }),
@@ -119,7 +130,8 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
             )
           }
           onWidthChange={setBrowserPanelWidth}
-          onOpenTab={(tabId, trigger) => {
+          onOpenTab={(tabId, trigger, preview) => {
+            setBrowserMotionPreview({ tabId, preview });
             browserPreviewTrigger = trigger;
             if (activeBrowserTab()?.id !== tabId) activateBrowserTab(tabId);
             setActiveRightPanel("browser-expanded");
@@ -130,9 +142,12 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
         />
       </Show>
 
-      <Show when={browserExpandedOpen()}>
+      <Show when={browserSidebarOpen() || browserExpandedOpen()}>
         <Portal>
+          <div class="browser-expanded-backdrop" hidden={!browserExpandedOpen()} aria-hidden="true" />
           <BrowserPanel
+            open={browserExpandedOpen()}
+            preview={browserMotionPreview()?.tabId === activeBrowserTab()?.id ? browserMotionPreview()?.preview : null}
             tabs={browserTabs()}
             activeTab={activeBrowserTab()}
             activeControl={activeBrowserControl()}
