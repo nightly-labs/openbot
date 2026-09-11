@@ -19,8 +19,10 @@ describe("redactText", () => {
     );
   });
 
-  it("redacts a bare JSON key in a payload too malformed to reparse", () => {
-    expect(redactText('{"key":"pk_live_abcdefgh1234","truncated')).toBe('{"key":"[redacted]","truncated');
+  // A record that the line cuts off is dropped whole, because the rules cannot promise to match every
+  // key a provider writes. What is lost is a fragment that was already unreadable.
+  it("drops a payload too malformed to reparse", () => {
+    expect(redactText('{"key":"pk_live_abcdefgh1234","truncated')).toBe("[redacted-unscanned]");
   });
 
   it("redacts a serialized payload no matter how long it is", () => {
@@ -110,6 +112,14 @@ describe("redactText", () => {
     );
   });
 
+  // `AcpAgentClient.start()` redacts each stderr chunk on its own, and a chunk ends wherever the pipe
+  // filled up, so a record can arrive with no closing brace. No rule matches a header name the user
+  // invented, so an unclosed record is dropped rather than passed on.
+  it("drops a payload that the line cuts off", () => {
+    expect(redactText('ERROR {"headers":{"X-Tenant":"tenant-secret"')).toBe("ERROR [redacted-unscanned]");
+    expect(redactText('{"apiKey":"abcdef123456')).toBe("[redacted-unscanned]");
+  });
+
   // A payload that parses is written back as JSON, so its spacing is the serializer's. The text
   // around it is untouched: only the run itself is read as data.
   // A line can hold more payloads than the bound allows, and the regex rules match no header name,
@@ -125,8 +135,9 @@ describe("redactText", () => {
   it("bounds the work a line of open braces can cause", () => {
     const braces = "{".repeat(65_536);
     const started = performance.now();
-    // Sixteen braces are read, and the unreadable rest of the line is dropped rather than shown.
-    expect(redactText(braces)).toBe(`${"{".repeat(16)}[redacted-unscanned]`);
+    // A brace followed by a brace opens what looks like a record, and the run never closes, so the
+    // whole line is dropped on the first read instead of once per brace.
+    expect(redactText(braces)).toBe("[redacted-unscanned]");
     expect(performance.now() - started).toBeLessThan(1_000);
   });
 

@@ -126,6 +126,12 @@ function redactEmbeddedJson(value: string): string {
     }
     scans += 1;
     const end = findBalancedEnd(value, start);
+    if (end < 0 && startsLikeJson(value, start)) {
+      // A payload that never closes, because a caller redacts each stderr chunk on its own and a
+      // chunk ends wherever the pipe filled up. `ERROR {"headers":{"X-Tenant":"…` carries the
+      // credential with no closing brace to parse, so the run is dropped rather than passed on.
+      return `${result + value.slice(index, start)}${UNSCANNED}`;
+    }
     const parsed = end < 0 ? null : parseRedacted(value.slice(start, end));
     if (parsed === null) {
       result += value.slice(index, start + 1);
@@ -144,6 +150,22 @@ function parseRedacted(candidate: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Whether the bracket at `start` opens what a serializer wrote, rather than a brace in prose.
+ *
+ * `{ and the run never closes` is a sentence; `{"headers":…` is a record. Only the second is worth
+ * dropping when it does not close, because prose loses nothing by staying and a record can hold a
+ * credential under a header name no rule can predict.
+ */
+function startsLikeJson(value: string, start: number): boolean {
+  for (let index = start + 1; index < value.length; index += 1) {
+    const char = value[index];
+    if (char === " " || char === "\t" || char === "\n" || char === "\r") continue;
+    return char === '"' || char === "{" || char === "[";
+  }
+  return false;
 }
 
 function findPayloadStart(value: string, from: number): number {

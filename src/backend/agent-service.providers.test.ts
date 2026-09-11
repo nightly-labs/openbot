@@ -503,6 +503,37 @@ describe.sequential("AgentService: providers", () => {
     });
   });
 
+  // The catalogue is what the renderer shows and what `updateAgent` validates against. A removal
+  // during a turn skips the restart, so the running CLI keeps listing the endpoint; nothing may offer
+  // it after the file that defines it is gone.
+  it("hides a removed endpoint's models from the catalogue and from selection", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider);
+      if (provider === "opencode") {
+        client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
+      }
+      return client;
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    expect(service.listModels().map((model) => model.id)).toContain("studio/local-llm");
+
+    service.noteCustomProviderRemoved("studio");
+
+    expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
+    expect(service.listModels().map((model) => model.id)).toContain("house/router-llm");
+    await expect(
+      service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }),
+    ).rejects.toThrow("The selected agent model is unavailable.");
+
+    // Saved again under the same id, so both the list and the selection accept it once more.
+    service.noteCustomProviderSaved("studio");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ model: "studio/local-llm" });
+  });
+
   // An id saved again is served again, whatever the CLI did with the removal before it.
   it("offers an endpoint's models again after the id is saved a second time", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);

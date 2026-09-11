@@ -426,9 +426,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       agents: () => this.listAgents(),
       generate: async (lead, prompt) => {
         await this.#providers.ensureProvider(lead.provider);
-        const model = this.#providers
-          .listModels()
-          .find((item) => item.provider === lead.provider && item.id === lead.model);
+        const model = this.#availableModels().find((item) => item.provider === lead.provider && item.id === lead.model);
         if (!model) throw new Error("The channel lead model is unavailable.");
         const client = this.#providers.createProfileClient(lead.provider);
         this.#profileClients.add(client);
@@ -736,7 +734,25 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   listModels(): AgentModelOption[] {
-    return this.#providers.listModels();
+    return this.#availableModels();
+  }
+
+  /**
+   * The catalogue every caller may choose from: what the connected providers report, less the models
+   * of an endpoint whose removal is written.
+   *
+   * The two lists differ only while OpenCode keeps running with an old configuration, which is what
+   * a removal during a turn leaves behind. The CLI still lists the endpoint, so the raw catalogue
+   * would let the renderer show it, `updateAgent` accept it, and a new agent start on it, all after
+   * the file that defines it is gone. `alsoExcluded` names an endpoint whose removal is in progress
+   * and therefore not recorded yet.
+   */
+  #availableModels(alsoExcluded?: string): AgentModelOption[] {
+    const excluded = alsoExcluded
+      ? new Set(this.#releasedCustomProviders).add(alsoExcluded)
+      : this.#releasedCustomProviders;
+    if (excluded.size === 0) return this.#providers.listModels();
+    return this.#providers.listModels().filter((option) => !isCustomProviderModelId(option.id, excluded));
   }
 
   async generateProfile(input: GenerateAgentProfileInput, sections: SidebarSection[]): Promise<AgentProfileDraft> {
@@ -746,7 +762,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (this.#profileClients.size >= 3) throw new Error("Profile generation is busy. Try again shortly.");
     const provider = agent?.provider ?? this.#providers.preferredProvider();
     await this.ensureProvider(provider);
-    const models = this.#providers.listModels();
+    const models = this.#availableModels();
     const model = agent
       ? models.find((candidate) => candidate.id === agent.model && candidate.provider === provider)
       : this.#startingModel(provider, models);
@@ -806,7 +822,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // provider lands on a new agent -- and with it the model setup chose, which is how a custom
       // endpoint becomes the default: it is a model of the CLI that runs it, never a provider.
       if (preferredProvider !== agent.provider) {
-        const preferredModel = this.#startingModel(preferredProvider, this.#providers.listModels());
+        const preferredModel = this.#startingModel(preferredProvider, this.#availableModels());
         if (!preferredModel) throw new Error(`${providerLabel(preferredProvider)} has no available model.`);
         agent = await this.#store.updateAgent({
           agentId: agent.id,
@@ -873,9 +889,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#conversation.requireKnownAgent(input.agentId);
     const previous = this.#store.list().find((agent) => agent.id === input.agentId);
     const requestedModel = input.model
-      ? this.#providers
-          .listModels()
-          .find((model) => model.id === input.model && (!input.provider || model.provider === input.provider))
+      ? this.#availableModels().find(
+          (model) => model.id === input.model && (!input.provider || model.provider === input.provider),
+        )
       : undefined;
     if (input.model && !requestedModel) throw new Error("The selected agent model is unavailable.");
     const requestedProvider = input.provider ?? requestedModel?.provider ?? previous?.provider;
@@ -1091,6 +1107,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    */
   noteCustomProviderRemoved(providerId: string): void {
     this.#releasedCustomProviders.add(providerId);
+    this.#emitModelsChanged();
   }
 
   /**
@@ -1101,8 +1118,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * `restarted` for a replacement that failed to come up, and clearing the exclusions on that word
    * would offer the models of a deleted endpoint to the next removal.
    */
+  /**
+   * Tells the renderer to read the catalogue again. The model list reaches it by pull, refreshed on a
+   * status event, and an exclusion changes what that pull answers while no provider state moves.
+   */
+  #emitModelsChanged(): void {
+    this.#emit({ type: "status", status: this.getStatus() });
+  }
+
   noteCustomProviderSaved(providerId: string): void {
     this.#releasedCustomProviders.delete(providerId);
+    this.#emitModelsChanged();
   }
 
   /**
@@ -1130,7 +1156,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // the fallback is chosen from the live list with the endpoint being removed taken out of it.
     // The built-in default provider comes second, because an agent left on a model the CLI no longer
     // serves cannot answer, and a provider switch keeps its workspace, thread and identity.
-    const remaining = this.#providers.listModels().filter((option) => !isCustomProviderModelId(option.id, owned));
+    const remaining = this.#availableModels(providerId);
     const fallback =
       this.#startingModel("opencode", remaining) ?? this.#startingModel(DEFAULT_AGENT_PROVIDER, remaining);
     // Nothing is listed, so there is no model to move to. The removal still goes ahead: refusing it
