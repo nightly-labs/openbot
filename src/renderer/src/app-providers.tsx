@@ -16,6 +16,7 @@ import {
 } from "./features/conversation/conversation-controller";
 import { ConversationControllerProvider } from "./features/conversation/conversation-controller-context";
 import { DirectMessagesProvider } from "./features/conversation/direct-messages-context";
+import { CustomMcpProvider } from "./features/custom-mcp/custom-mcp-context";
 import { CustomProvidersProvider } from "./features/custom-providers/custom-providers-context";
 import { DynamicIslandBridge } from "./features/dynamic-island/dynamic-island-bridge";
 import { DynamicIslandProvider } from "./features/dynamic-island/dynamic-island-context";
@@ -88,28 +89,30 @@ export function AppProviders(props: ParentProps<AppProps>): JSX.Element {
             <LayoutProvider>
               <UpdatesProvider>
                 <CustomProvidersProvider>
-                  <ServersProvider>
-                    <DynamicIslandProvider>
-                      <ServerSettingsProvider>
-                        <RemoteDesktopProvider>
-                          <ServerSwitchProvider>
-                            <AnsweredPromptsProvider>
-                              <UiErrorsProvider>
-                                <UsageProvider>
-                                  <AgentReadTrackingProvider>
-                                    <AppBootstrap />
-                                    <ServerScopeBoundary stableConversation={stableConversation}>
-                                      {props.children}
-                                    </ServerScopeBoundary>
-                                  </AgentReadTrackingProvider>
-                                </UsageProvider>
-                              </UiErrorsProvider>
-                            </AnsweredPromptsProvider>
-                          </ServerSwitchProvider>
-                        </RemoteDesktopProvider>
-                      </ServerSettingsProvider>
-                    </DynamicIslandProvider>
-                  </ServersProvider>
+                  <CustomMcpProvider>
+                    <ServersProvider>
+                      <DynamicIslandProvider>
+                        <ServerSettingsProvider>
+                          <RemoteDesktopProvider>
+                            <ServerSwitchProvider>
+                              <AnsweredPromptsProvider>
+                                <UiErrorsProvider>
+                                  <UsageProvider>
+                                    <AgentReadTrackingProvider>
+                                      <AppBootstrap />
+                                      <ServerScopeBoundary stableConversation={stableConversation}>
+                                        {props.children}
+                                      </ServerScopeBoundary>
+                                    </AgentReadTrackingProvider>
+                                  </UsageProvider>
+                                </UiErrorsProvider>
+                              </AnsweredPromptsProvider>
+                            </ServerSwitchProvider>
+                          </RemoteDesktopProvider>
+                        </ServerSettingsProvider>
+                      </DynamicIslandProvider>
+                    </ServersProvider>
+                  </CustomMcpProvider>
                 </CustomProvidersProvider>
               </UpdatesProvider>
             </LayoutProvider>

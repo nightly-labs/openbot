@@ -215,7 +215,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       null,
       null,
       null,
-      { apiKey: () => storedKey, customProviders: () => [] },
+      { apiKey: () => storedKey, customProviders: () => [], customMcpServers: () => [], mcpFullAccess: () => false },
     );
     await service.initialize();
     return service
@@ -284,7 +284,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       null,
       null,
       null,
-      { apiKey: () => storedKey, customProviders: () => [] },
+      { apiKey: () => storedKey, customProviders: () => [], customMcpServers: () => [], mcpFullAccess: () => false },
     );
     await service.initialize();
 
@@ -1206,7 +1206,7 @@ describe.sequential("ProviderRuntime: custom provider reload", () => {
       null,
       null,
       null,
-      { apiKey: () => null, customProviders: () => endpoints },
+      { apiKey: () => null, customProviders: () => endpoints, customMcpServers: () => [], mcpFullAccess: () => false },
     );
     return { service, store };
   }

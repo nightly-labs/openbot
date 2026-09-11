@@ -1,7 +1,8 @@
-import type { CentralAuthUser } from "@openbot/contracts/ipc";
+import type { AgentModelId, AgentProviderId, CentralAuthUser } from "@openbot/contracts/ipc";
 import { createMemo, Loading, Show } from "solid-js";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
+import { useCustomMcp } from "./features/custom-mcp/custom-mcp-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
@@ -209,7 +210,8 @@ function AppSettings(props: AccountProps) {
   const platform = usePlatform();
   const auth = useAuth();
   const updates = useUpdates();
-  const { agentStatus } = useAgents();
+  const { agentStatus, agentList, modelOptions, updateAgent } = useAgents();
+  const { setupState, saveSetup } = useSetup();
   const { activeServer } = useServers();
   const { appSettingsOpen, setAppSettingsOpen, generalSettings, updateGeneralSettings, appSettingsRestoreTarget } =
     useSettings();
@@ -224,6 +226,7 @@ function AppSettings(props: AccountProps) {
     openProviderInstallGuide,
   } = useProviders();
   const { customProviders, saveCustomProvider, deleteCustomProvider } = useCustomProviders();
+  const { customMcpServers, saveCustomMcp, deleteCustomMcp, mcpFullAccess, setMcpFullAccess } = useCustomMcp();
   /** Provider downloads are the local machine's business, never a remote host's. */
   const localProviderDownloads = createMemo(
     () => activeServer()?.kind === "local" && providerRuntimeDownloadsAvailable(),
@@ -235,6 +238,39 @@ function AppSettings(props: AccountProps) {
    * would hide this feature on a build without them.
    */
   const localCustomProviders = createMemo(() => activeServer()?.kind === "local");
+  const globalModel = createMemo(() => {
+    const setup = setupState();
+    const preferred = setup?.preferredModel;
+    if (preferred && setup?.preferredProvider) {
+      return { provider: setup.preferredProvider, model: preferred };
+    }
+    const first = agentList()[0];
+    return first ? { provider: first.provider, model: first.model } : null;
+  });
+
+  async function applyGlobalModel(model: AgentModelId, provider: AgentProviderId): Promise<void> {
+    const option = modelOptions().find((candidate) => candidate.provider === provider && candidate.id === model);
+    if (!option) throw new Error("The selected model is unavailable.");
+    await saveSetup(provider, model);
+    const failures: string[] = [];
+    for (const agent of agentList()) {
+      if (agent.provider === provider && agent.model === model) continue;
+      try {
+        await updateAgent(agent.id, {
+          provider,
+          model,
+          reasoningEffort: option.supportedReasoningEfforts.includes(agent.reasoningEffort)
+            ? agent.reasoningEffort
+            : option.defaultReasoningEffort,
+        });
+      } catch {
+        failures.push(agent.name);
+      }
+    }
+    if (failures.length > 0) {
+      throw new Error(`Could not change ${failures.join(", ")}. Finish their current work, then try again.`);
+    }
+  }
 
   return (
     <Loading>
@@ -265,6 +301,14 @@ function AppSettings(props: AccountProps) {
         customProviders={localCustomProviders() ? customProviders() : undefined}
         onAddCustomProvider={localCustomProviders() ? saveCustomProvider : undefined}
         onDeleteCustomProvider={localCustomProviders() ? deleteCustomProvider : undefined}
+        customMcpServers={localCustomProviders() ? customMcpServers() : undefined}
+        onAddCustomMcp={localCustomProviders() ? saveCustomMcp : undefined}
+        onDeleteCustomMcp={localCustomProviders() ? deleteCustomMcp : undefined}
+        mcpFullAccess={localCustomProviders() ? mcpFullAccess() : undefined}
+        onSetMcpFullAccess={localCustomProviders() ? setMcpFullAccess : undefined}
+        globalModel={localCustomProviders() ? globalModel() : undefined}
+        modelOptions={localCustomProviders() ? modelOptions() : undefined}
+        onApplyGlobalModel={localCustomProviders() ? applyGlobalModel : undefined}
         providerKeys={localProviderDownloads() ? providerKeyApi : undefined}
         hostedSitesApi={window.openbot.hostedSites}
         restoreFocusTarget={appSettingsRestoreTarget()}

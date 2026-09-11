@@ -15,6 +15,9 @@ import {
   type ConversationReadState,
   type ConversationSearchPage,
   type ConversationWithReadState,
+  type CustomMcpFullAccessPreference,
+  type CustomMcpResult,
+  type CustomMcpSummary,
   type CustomProviderResult,
   type CustomProviderSummary,
   type DraftAttachment,
@@ -53,6 +56,9 @@ import {
   isConversationMessage,
   isConversationReadState,
   isConversationWithReadState,
+  isCustomMcpFullAccessPreference,
+  isCustomMcpResult,
+  isCustomMcpSummary,
   isCustomProviderResult,
   isCustomProviderSummary,
   isDynamicIslandAction,
@@ -267,6 +273,23 @@ function decodeCustomProviders(value: unknown): CustomProviderSummary[] {
 
 function decodeCustomProviderResult(value: unknown): CustomProviderResult {
   if (!isCustomProviderResult(value)) throw new Error("Invalid custom provider response.");
+  return value;
+}
+
+function decodeCustomMcpServers(value: unknown): CustomMcpSummary[] {
+  if (!Array.isArray(value) || !value.every(isCustomMcpSummary)) {
+    throw new Error("Invalid custom MCP list response.");
+  }
+  return value;
+}
+
+function decodeCustomMcpResult(value: unknown): CustomMcpResult {
+  if (!isCustomMcpResult(value)) throw new Error("Invalid custom MCP response.");
+  return value;
+}
+
+function decodeCustomMcpFullAccess(value: unknown): CustomMcpFullAccessPreference {
+  if (!isCustomMcpFullAccessPreference(value)) throw new Error("Invalid MCP access preference.");
   return value;
 }
 
@@ -861,6 +884,14 @@ const openbotApi: OpenBotDesktopApi = {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.customProvidersList).then(decodeCustomProviders),
     save: (input) => ipcRenderer.invoke(IPC_CHANNELS.customProvidersSave, input).then(decodeCustomProviderResult),
     delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.customProvidersDelete, input).then(decodeCustomProviderResult),
+  },
+  customMcp: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.customMcpList).then(decodeCustomMcpServers),
+    save: (input) => ipcRenderer.invoke(IPC_CHANNELS.customMcpSave, input).then(decodeCustomMcpResult),
+    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.customMcpDelete, input).then(decodeCustomMcpResult),
+    getFullAccess: () => ipcRenderer.invoke(IPC_CHANNELS.customMcpGetFullAccess).then(decodeCustomMcpFullAccess),
+    setFullAccess: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.customMcpSetFullAccess, input).then(decodeCustomMcpFullAccess),
   },
   marketplaceAgents: {
     list: (query) =>

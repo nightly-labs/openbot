@@ -102,6 +102,13 @@ export const IPC_ENDPOINTS = {
     save: request(IPC_CHANNELS.customProvidersSave),
     delete: request(IPC_CHANNELS.customProvidersDelete),
   },
+  customMcp: {
+    list: request(IPC_CHANNELS.customMcpList),
+    save: request(IPC_CHANNELS.customMcpSave),
+    delete: request(IPC_CHANNELS.customMcpDelete),
+    getFullAccess: request(IPC_CHANNELS.customMcpGetFullAccess),
+    setFullAccess: request(IPC_CHANNELS.customMcpSetFullAccess),
+  },
   hostedSites: {
     list: request(IPC_CHANNELS.hostedSitesList),
     chooseDirectory: request(IPC_CHANNELS.hostedSitesChooseDirectory),

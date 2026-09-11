@@ -19,6 +19,8 @@ import {
   isAvatarSeed,
   isConversationMessage,
   isConversationWithReadState,
+  isCustomMcpResult,
+  isCustomMcpSummary,
   isCustomProviderResult,
   isCustomProviderSummary,
   isDynamicIslandAction,
@@ -866,5 +868,31 @@ describe("renderer-to-main boundary guards", () => {
     expect(isCustomProviderResult({ providers: [{ ...summary, apiKey: "sk-live" }], restart: "restarted" })).toBe(
       false,
     );
+  });
+
+  it("rejects a custom MCP summary that carries env, headers or arguments", () => {
+    const stdio = {
+      id: "notes",
+      name: "Notes",
+      transport: "stdio",
+      command: "npx",
+      hasSecrets: true,
+    };
+    const http = {
+      id: "linear",
+      name: "Linear",
+      transport: "http",
+      url: "https://mcp.linear.app/mcp",
+      hasSecrets: false,
+    };
+    expect(isCustomMcpSummary(stdio)).toBe(true);
+    expect(isCustomMcpSummary(http)).toBe(true);
+    expect(isCustomMcpSummary({ ...stdio, env: [{ name: "TOKEN", value: "secret" }] })).toBe(false);
+    expect(isCustomMcpSummary({ ...stdio, args: ["-y", "@example/notes"] })).toBe(false);
+    expect(isCustomMcpSummary({ ...http, headers: [{ name: "Authorization", value: "Bearer x" }] })).toBe(false);
+    expect(isCustomMcpSummary({ ...stdio, id: "openbot" })).toBe(false);
+    expect(isCustomMcpSummary({ ...stdio, id: "openbot_browser" })).toBe(false);
+    expect(isCustomMcpResult({ servers: [stdio, http] })).toBe(true);
+    expect(isCustomMcpResult({ servers: [{ ...stdio, env: [] }] })).toBe(false);
   });
 });

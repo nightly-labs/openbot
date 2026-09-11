@@ -86,6 +86,14 @@ import type {
   SetMessageReactionInput,
 } from "./ipc-conversations";
 import type {
+  CustomMcpFullAccessPreference,
+  CustomMcpResult,
+  CustomMcpSummary,
+  DeleteCustomMcpInput,
+  SaveCustomMcpInput,
+  SetCustomMcpFullAccessInput,
+} from "./ipc-custom-mcp";
+import type {
   CustomProviderResult,
   CustomProviderSummary,
   DeleteCustomProviderInput,
@@ -431,6 +439,19 @@ export interface CustomProvidersDesktopApi {
   delete: (input: DeleteCustomProviderInput) => Promise<CustomProviderResult>;
 }
 
+/**
+ * The user's own MCP servers. `save` and `delete` both answer with the whole list, so the renderer
+ * replaces its snapshot in one write. There is no provider restart: agents pick a server up on
+ * their next task.
+ */
+export interface CustomMcpDesktopApi {
+  list: () => Promise<CustomMcpSummary[]>;
+  save: (input: SaveCustomMcpInput) => Promise<CustomMcpResult>;
+  delete: (input: DeleteCustomMcpInput) => Promise<CustomMcpResult>;
+  getFullAccess: () => Promise<CustomMcpFullAccessPreference>;
+  setFullAccess: (input: SetCustomMcpFullAccessInput) => Promise<CustomMcpFullAccessPreference>;
+}
+
 export interface OpenBotDesktopApi {
   getAppInfo: () => Promise<AppInfo>;
   getSetupState: () => Promise<AppSetupState>;
@@ -467,6 +488,7 @@ export interface OpenBotDesktopApi {
   voice: VoiceDesktopApi;
   skills: SkillsDesktopApi;
   customProviders: CustomProvidersDesktopApi;
+  customMcp: CustomMcpDesktopApi;
   hostedSites: HostedSitesDesktopApi;
   marketplaceAgents: MarketplaceAgentsDesktopApi;
   auth: CentralAuthDesktopApi;

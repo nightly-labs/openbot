@@ -39,6 +39,14 @@ export function promptQuestions(params: unknown): AgentPromptQuestion[] {
     }));
 }
 
+/** Empty-schema access prompts can be granted for any server when full MCP access is on. */
+export function mcpElicitationAutoAccept(params: unknown, fullAccess: boolean): boolean {
+  if (!fullAccess) return false;
+  const requestedSchema = getRecord(params, "requestedSchema");
+  const properties = getRecord(requestedSchema, "properties");
+  return Boolean(requestedSchema && properties && Object.keys(properties).length === 0);
+}
+
 export function mcpElicitationQuestion(params: unknown): AgentPromptQuestion | null {
   const serverName = getString(params, "serverName");
   const mode = getString(params, "mode") ?? "form";

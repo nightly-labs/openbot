@@ -880,4 +880,65 @@ describe("SettingsModal", () => {
     await fireEvent.click(openCode);
     expect(custom).not.toBeChecked();
   });
+
+  it("saves a custom MCP command and lists it", async () => {
+    const onAddCustomMcp = vi.fn(async () => undefined);
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={{ name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" }}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={vi.fn(async () => undefined)}
+        account={account}
+        onUpdateAccountName={vi.fn(async () => undefined)}
+        onUpdateAccountAvatar={vi.fn(async () => undefined)}
+        customMcpServers={[]}
+        onAddCustomMcp={onAddCustomMcp}
+      />
+    ));
+
+    await fireEvent.click(screen.getByRole("button", { name: "Add custom MCP server" }));
+    await fireEvent.input(await screen.findByLabelText(/^Server ID/u), { target: { value: "notes" } });
+    await fireEvent.input(screen.getByLabelText(/^Display name/u), { target: { value: "Notes" } });
+    await fireEvent.input(screen.getByLabelText(/^Command/u), { target: { value: "npx" } });
+    await fireEvent.input(screen.getByLabelText(/^Arguments/u), { target: { value: "-y\n@example/notes" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => expect(onAddCustomMcp).toHaveBeenCalledTimes(1));
+    expect(onAddCustomMcp).toHaveBeenCalledWith({
+      id: "notes",
+      name: "Notes",
+      transport: "stdio",
+      command: "npx",
+      args: ["-y", "@example/notes"],
+      env: [],
+    });
+  });
+
+  it("turns on full MCP access from Settings", async () => {
+    const onSetMcpFullAccess = vi.fn(async () => undefined);
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={{ name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" }}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={vi.fn(async () => undefined)}
+        account={account}
+        onUpdateAccountName={vi.fn(async () => undefined)}
+        onUpdateAccountAvatar={vi.fn(async () => undefined)}
+        onAddCustomMcp={vi.fn(async () => undefined)}
+        onSetMcpFullAccess={onSetMcpFullAccess}
+        mcpFullAccess={false}
+      />
+    ));
+
+    await fireEvent.click(screen.getByRole("switch", { name: "Full MCP access" }));
+    await waitFor(() => expect(onSetMcpFullAccess).toHaveBeenCalledWith(true));
+  });
 });

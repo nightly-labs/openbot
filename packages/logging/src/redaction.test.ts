@@ -177,6 +177,15 @@ describe("redactValue", () => {
     });
   });
 
+  it("redacts every value under an env object, the way a custom MCP server is described", () => {
+    expect(redactValue({ env: { NOTES_TOKEN: "secret-token" } })).toEqual({
+      env: { NOTES_TOKEN: "[redacted]" },
+    });
+    expect(redactValue({ env: [{ name: "NOTES_TOKEN", value: "secret-token" }] })).toEqual({
+      env: [{ name: "[redacted]", value: "[redacted]" }],
+    });
+  });
+
   it("leaves a headers count and the word in prose alone", () => {
     expect(redactValue({ headers: 3, note: "two headers were rejected" })).toEqual({
       headers: 3,

@@ -61,11 +61,11 @@ const SECRET_KEY = new RegExp(`^(?:${SECRET_LABEL}|keys?)$`, "iu");
 const JSON_BARE_KEY = /("keys?"\s*:\s*)(\[redacted\]|"[^"]*"|'[^']*'|[^\s,;)}\]]+)/giu;
 
 // A credential sits under `X-Api-Token` as often as under `apiKey`, and a header name is chosen by
-// whoever owns the endpoint, so no label list can cover one. Below a `headers` object every string
-// is treated as the credential it might be - including the names in a `{ name, value }` list, which
-// is the shape a custom provider is described in. Only an object matches: `headers: "none"` in prose
-// is not a key-value pair.
-const HEADER_KEY = /^headers$/iu;
+// whoever owns the endpoint, so no label list can cover one. Below a `headers` or `env` object every
+// string is treated as the credential it might be - including the names in a `{ name, value }` list,
+// which is the shape a custom provider or a custom MCP server is described in. Only an object
+// matches: `headers: "none"` in prose is not a key-value pair.
+const HEADER_KEY = /^(headers|env)$/iu;
 
 const MAX_PARAM_LENGTH = 2_000;
 

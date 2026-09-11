@@ -24,6 +24,7 @@ import type {
   ConversationMessage,
   ConversationSnapshot,
   CreateTeamInviteInput,
+  CustomMcpSummary,
   CustomProviderSummary,
   DirectConversationSnapshot,
   DirectMessage,
@@ -140,6 +141,7 @@ export interface MockOpenBotOptions {
   memories?: Record<string, AgentMemory[]>;
   routines?: Record<string, Routine[]>;
   customProviders?: CustomProviderSummary[];
+  customMcpServers?: CustomMcpSummary[];
 }
 
 /**
@@ -275,6 +277,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const installedSkills = new Map(Object.entries(clone(STORY_INSTALLED_SKILLS)));
   let hostedSites = clone(STORY_HOSTED_SITES);
   // The same two endpoints the model-picker stories invent, so preview shows one list everywhere.
+  let customMcpServers = clone(options.customMcpServers ?? []);
+  let customMcpFullAccess = false;
   let customProviders = clone(
     options.customProviders ?? [
       {
@@ -858,6 +862,42 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         customProviders = customProviders.filter((provider) => provider.id !== id);
         emitAgentEvent({ type: "status", status: clone(agentStatus) });
         return { providers: clone(customProviders), restart: "restarted" };
+      },
+    },
+    customMcp: {
+      list: async () => clone(customMcpServers),
+      save: async (input) => {
+        if (customMcpServers.some((server) => server.id === input.id)) {
+          throw new Error("An MCP server with this ID is already saved. Remove it first, or use another ID.");
+        }
+        customMcpServers = [
+          ...customMcpServers,
+          input.transport === "stdio"
+            ? {
+                id: input.id,
+                name: input.name,
+                transport: "stdio",
+                command: input.command,
+                hasSecrets: input.env.length > 0,
+              }
+            : {
+                id: input.id,
+                name: input.name,
+                transport: "http",
+                url: input.url,
+                hasSecrets: input.headers.length > 0,
+              },
+        ];
+        return { servers: clone(customMcpServers) };
+      },
+      delete: async ({ id }) => {
+        customMcpServers = customMcpServers.filter((server) => server.id !== id);
+        return { servers: clone(customMcpServers) };
+      },
+      getFullAccess: async () => ({ enabled: customMcpFullAccess }),
+      setFullAccess: async ({ enabled }) => {
+        customMcpFullAccess = enabled;
+        return { enabled: customMcpFullAccess };
       },
     },
     marketplaceAgents: {

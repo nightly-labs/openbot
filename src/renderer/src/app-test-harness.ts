@@ -936,6 +936,13 @@ export function installOpenbotStub(): void {
         save: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
         delete: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
       },
+      customMcp: {
+        list: vi.fn().mockResolvedValue([]),
+        save: vi.fn().mockResolvedValue({ servers: [] }),
+        delete: vi.fn().mockResolvedValue({ servers: [] }),
+        getFullAccess: vi.fn().mockResolvedValue({ enabled: false }),
+        setFullAccess: vi.fn().mockResolvedValue({ enabled: false }),
+      },
     },
   });
 }

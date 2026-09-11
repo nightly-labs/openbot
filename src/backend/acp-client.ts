@@ -22,6 +22,7 @@ import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runt
 import { redactText } from "@openbot/logging";
 import type { AgentProvider } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
+import { type CustomMcpSource, toAcpMcpServers } from "./custom-mcp";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
 import {
   type AccountRateLimitsReadResult,
@@ -104,6 +105,13 @@ export interface AcpProviderOptions {
   servesModel?(modelId: string): boolean;
   authenticate?(connection: ClientSideConnection, initialization: InitializeResponse): Promise<void>;
   readRateLimits?(connection: ClientSideConnection): Promise<AccountRateLimitsReadResult>;
+  /**
+   * Extra MCP servers the user named. Skipped during profile generation. Read at session start so
+   * a server saved after this client was built still reaches the next thread.
+   */
+  userMcpServers?: CustomMcpSource;
+  /** Auto-allow MCP tool permission prompts. Read per request so a Settings change applies immediately. */
+  mcpFullAccess?: () => boolean;
 }
 
 export class AcpAgentClient extends EventEmitter<ClientEvents> {
@@ -354,6 +362,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     try {
       const connection = this.#requireConnection();
       const additionalDirectories = getArray(params, "runtimeWorkspaceRoots").filter(isString);
+      const userServers = this.options.profileGeneration ? [] : toAcpMcpServers(this.options.userMcpServers?.() ?? []);
+      const mcpServers = [...mcp.servers, ...userServers];
       let id: string;
       let configOptions: SessionConfigOption[];
       let currentModelId: string | null;
@@ -362,13 +372,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           sessionId: requestedThreadId,
           cwd,
           additionalDirectories,
-          mcpServers: mcp.servers,
+          mcpServers,
         });
         id = requestedThreadId;
         configOptions = response.configOptions ?? [];
         currentModelId = currentModelFromSessionSetup(response);
       } else {
-        const response = await connection.newSession({ cwd, additionalDirectories, mcpServers: mcp.servers });
+        const response = await connection.newSession({ cwd, additionalDirectories, mcpServers });
         id = response.sessionId;
         configOptions = response.configOptions ?? [];
         currentModelId = currentModelFromSessionSetup(response);
@@ -652,14 +662,22 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   async #requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
     if (this.options.profileGeneration) return { outcome: { outcome: "cancelled" } };
-    const thread = this.#threads.get(params.sessionId);
-    const turnId = thread?.activeTurn?.id ?? randomUUID();
     const kind =
       params.toolCall.kind === "execute"
         ? "command"
         : ["edit", "delete", "move"].includes(params.toolCall.kind ?? "")
           ? "file-change"
           : "permissions";
+    if (kind === "permissions" && this.options.mcpFullAccess?.()) {
+      const option =
+        params.options.find((candidate) => candidate.kind === "allow_always") ??
+        bestPermissionOption(params.options, true);
+      return option
+        ? { outcome: { outcome: "selected", optionId: option.optionId } }
+        : { outcome: { outcome: "cancelled" } };
+    }
+    const thread = this.#threads.get(params.sessionId);
+    const turnId = thread?.activeTurn?.id ?? randomUUID();
     const requestedPermissions = kind === "permissions" ? { [params.toolCall.kind ?? "file-system"]: true } : null;
     const result = await this.#callServerRequest(
       `item/${kind === "command" ? "commandExecution" : kind === "file-change" ? "fileChange" : "permissions"}/requestApproval`,

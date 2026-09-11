@@ -1,13 +1,21 @@
 import type {
+  AgentModelId,
+  AgentModelOption,
   AgentProviderId,
+  AgentStatus,
   AppInfo,
+  CustomMcpSummary,
   CustomProviderRestart,
   CustomProviderSummary,
+  ProviderRuntimeStatus,
+  SaveCustomMcpInput,
   SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
-import { createSignal, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
+import { ProviderModelPicker } from "../../components/ProviderModelPicker";
 import { ProviderPicker } from "../../components/ProviderPicker";
 import {
+  Button,
   Item,
   ItemActions,
   ItemContent,
@@ -22,7 +30,10 @@ import {
   SettingsSection,
   SwitchField,
   Text,
+  Trash2,
 } from "../../components/ui";
+import { errorMessage } from "../../error-message";
+import { CustomMcpDialog } from "../custom-mcp/CustomMcpDialog";
 import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "../custom-providers/CustomProviderListDialog";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
@@ -53,11 +64,30 @@ interface SettingsGeneralTabProps {
   customProviders?: readonly CustomProviderSummary[];
   /** Without it the rows are listed but not removable, which is what a story without the callback shows. */
   onDeleteCustomProvider?: (id: string) => Promise<CustomProviderRestart>;
+  onAddCustomMcp?: (value: SaveCustomMcpInput) => Promise<void>;
+  customMcpServers?: readonly CustomMcpSummary[];
+  onDeleteCustomMcp?: (id: string) => Promise<void>;
+  mcpFullAccess?: boolean;
+  onSetMcpFullAccess?: (enabled: boolean) => Promise<void>;
+  globalModel?: { provider: AgentProviderId; model: AgentModelId } | null;
+  modelOptions?: readonly AgentModelOption[];
+  agentStatus?: AgentStatus;
+  onApplyGlobalModel?: (model: AgentModelId, provider: AgentProviderId) => Promise<void>;
+  providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
 }
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const customProviders = () => props.customProviders ?? [];
+  const customMcpServers = () => props.customMcpServers ?? [];
+  const [mcpOpen, setMcpOpen] = createSignal(false);
+  const [mcpSaving, setMcpSaving] = createSignal(false);
+  const [mcpSubmitError, setMcpSubmitError] = createSignal<string | null>(null);
+  const [mcpRemoving, setMcpRemoving] = createSignal<string | null>(null);
+  const [mcpNote, setMcpNote] = createSignal<string | null>(null);
+  const [mcpAccessBusy, setMcpAccessBusy] = createSignal(false);
+  const [globalModelBusy, setGlobalModelBusy] = createSignal(false);
+  const [globalModelNote, setGlobalModelNote] = createSignal<string | null>(null);
   /**
    * Which row holds the check here. Nothing stores it: the whole Settings picker is local state
    * today, so this row matches its neighbours and no more. Do not wire it to a saved default without
@@ -73,6 +103,59 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
       }
     },
   });
+
+  async function submitCustomMcp(value: SaveCustomMcpInput): Promise<void> {
+    setMcpSaving(true);
+    setMcpSubmitError(null);
+    setMcpNote(null);
+    try {
+      await props.onAddCustomMcp?.(value);
+      setMcpOpen(false);
+      setMcpNote("Saved. Agents pick this server up on their next task.");
+    } catch (error) {
+      setMcpSubmitError(errorMessage(error, "OpenBot could not save this MCP server."));
+    } finally {
+      setMcpSaving(false);
+    }
+  }
+
+  async function applyGlobalModel(model: AgentModelId, provider: AgentProviderId): Promise<void> {
+    setGlobalModelBusy(true);
+    setGlobalModelNote(null);
+    try {
+      await props.onApplyGlobalModel?.(model, provider);
+      setGlobalModelNote("Applied to every agent. Agents pick it up on their next task.");
+    } catch (error) {
+      setGlobalModelNote(errorMessage(error, "OpenBot could not change every agent's model."));
+    } finally {
+      setGlobalModelBusy(false);
+    }
+  }
+
+  async function setMcpFullAccess(enabled: boolean): Promise<void> {
+    setMcpAccessBusy(true);
+    try {
+      await props.onSetMcpFullAccess?.(enabled);
+    } catch (error) {
+      setMcpNote(errorMessage(error, "OpenBot could not change MCP access."));
+    } finally {
+      setMcpAccessBusy(false);
+    }
+  }
+
+  async function removeCustomMcp(server: CustomMcpSummary): Promise<void> {
+    if (!window.confirm(`Remove ${server.name}? Agents lose its tools on their next task.`)) return;
+    setMcpRemoving(server.id);
+    setMcpNote(null);
+    try {
+      await props.onDeleteCustomMcp?.(server.id);
+      setMcpNote(`Removed ${server.name}.`);
+    } catch (error) {
+      setMcpNote(errorMessage(error, `OpenBot could not remove ${server.name}.`));
+    } finally {
+      setMcpRemoving(null);
+    }
+  }
 
   return (
     <>
@@ -127,6 +210,131 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
           />
         </Show>
       </SettingsSection>
+
+      <Show
+        when={
+          props.onApplyGlobalModel && props.agentStatus && (props.modelOptions?.length ?? 0) > 0
+            ? { status: props.agentStatus, models: props.modelOptions ?? [] }
+            : null
+        }
+      >
+        {(ctx) => (
+          <SettingsSection title="Global model">
+            <ItemGroup class="settings-modal-card">
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>Every agent</ItemTitle>
+                  <ItemDescription>
+                    Change the model for every agent on this computer, and for agents you create next.
+                  </ItemDescription>
+                </ItemContent>
+              </Item>
+              <div class="settings-modal-row">
+                <ProviderModelPicker
+                  provider={props.globalModel?.provider ?? ctx().models[0]?.provider ?? "codex"}
+                  value={props.globalModel?.model ?? ctx().models[0]?.id ?? ""}
+                  modelOptions={[...ctx().models]}
+                  agentStatus={ctx().status}
+                  runtimeStatuses={props.providerRuntimeStatuses}
+                  customProviders={customProviders()}
+                  disabled={globalModelBusy()}
+                  onChange={(model, provider) => void applyGlobalModel(model, provider)}
+                  onDownloadProvider={props.onDownloadProvider}
+                  onCancelProviderDownload={props.onCancelProviderDownload}
+                  onConnectProvider={props.onConnectProvider}
+                />
+              </div>
+            </ItemGroup>
+            <Show when={globalModelNote()}>
+              {(message) => (
+                <Text tone="muted" variant="caption" role="status">
+                  {message()}
+                </Text>
+              )}
+            </Show>
+          </SettingsSection>
+        )}
+      </Show>
+
+      <Show when={props.onAddCustomMcp}>
+        <SettingsSection title="MCP servers">
+          <ItemGroup class="settings-modal-card">
+            <Show when={props.onSetMcpFullAccess}>
+              <SwitchField
+                checked={props.mcpFullAccess === true}
+                onChange={(checked) => void setMcpFullAccess(checked)}
+                disabled={mcpAccessBusy()}
+                label="Full MCP access"
+                description="Allow MCP servers to run without asking. Commands and file changes still wait for you."
+              />
+            </Show>
+            <Item class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>Custom MCP</ItemTitle>
+                <ItemDescription>
+                  Give agents tools from a local command or an HTTP server. They pick a saved server up on their next
+                  task.
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-label="Add custom MCP server"
+                  onClick={() => {
+                    setMcpSubmitError(null);
+                    setMcpOpen(true);
+                  }}
+                >
+                  Add
+                </Button>
+              </ItemActions>
+            </Item>
+            <For each={customMcpServers()}>
+              {(server) => (
+                <Item class="settings-modal-row">
+                  <ItemContent>
+                    <ItemTitle>{server.name}</ItemTitle>
+                    <ItemDescription>{server.transport === "stdio" ? server.command : server.url}</ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <Show when={props.onDeleteCustomMcp}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Remove ${server.name}`}
+                        loading={mcpRemoving() === server.id}
+                        loadingLabel="Removing…"
+                        disabled={mcpRemoving() !== null}
+                        onClick={() => void removeCustomMcp(server)}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </Show>
+                  </ItemActions>
+                </Item>
+              )}
+            </For>
+          </ItemGroup>
+          <Show when={mcpNote()}>
+            {(message) => (
+              <Text tone="muted" variant="caption" role="status">
+                {message()}
+              </Text>
+            )}
+          </Show>
+          <CustomMcpDialog
+            open={mcpOpen()}
+            busy={mcpSaving()}
+            submitError={mcpSubmitError()}
+            takenServerIds={customMcpServers().map((server) => server.id)}
+            onSubmit={(value) => void submitCustomMcp(value)}
+            onCancel={() => setMcpOpen(false)}
+          />
+        </SettingsSection>
+      </Show>
 
       <SettingsSection title="App behavior">
         <ItemGroup class="settings-modal-card">

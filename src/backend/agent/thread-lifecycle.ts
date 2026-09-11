@@ -6,6 +6,7 @@ import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { BROWSER_DYNAMIC_TOOLS } from "../browser-tools";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
+import { type CustomMcpSource, toCodexMcpServers } from "../custom-mcp";
 import type { MailboxStore } from "../mailbox-store";
 import { OPENBOT_DYNAMIC_TOOLS } from "../openbot-tools";
 import { decodeRecordResponse, decodeThreadResponse, getString, type ResponseDecoder } from "../protocol";
@@ -28,6 +29,7 @@ export interface ThreadLifecycleOptions {
   memories: AgentMemories;
   compaction: ContextCompaction;
   hooks: ThreadLifecycleHooks;
+  customMcpServers?: CustomMcpSource;
 }
 
 /**
@@ -47,6 +49,7 @@ export class ThreadLifecycle {
   readonly #memories: AgentMemories;
   readonly #compaction: ContextCompaction;
   readonly #hooks: ThreadLifecycleHooks;
+  readonly #customMcpServers: CustomMcpSource;
   readonly #pendingHandoffs = new Map<string, string>();
   readonly #pendingRuntimeRefreshes = new Set<string>();
 
@@ -57,6 +60,7 @@ export class ThreadLifecycle {
     this.#memories = options.memories;
     this.#compaction = options.compaction;
     this.#hooks = options.hooks;
+    this.#customMcpServers = options.customMcpServers ?? (() => []);
   }
 
   refreshAgentRuntime(agentId: string): void {
@@ -159,6 +163,9 @@ export class ThreadLifecycle {
         ephemeral: false,
         serviceName: "openbot",
         dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS],
+        ...(client.provider === "codex"
+          ? { config: { mcp_servers: toCodexMcpServers(this.#customMcpServers()) } }
+          : {}),
       },
       decodeThreadResponse,
     );

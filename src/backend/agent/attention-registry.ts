@@ -34,6 +34,7 @@ import {
   browserTakeoverResult,
   commandText,
   dynamicPromptResult,
+  mcpElicitationAutoAccept,
   mcpElicitationQuestion,
   mcpElicitationResult,
   promptQuestions,
@@ -116,6 +117,7 @@ export interface AttentionRegistryOptions {
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
   emitRuntimeSnapshot(): void;
+  mcpFullAccess?: () => boolean;
 }
 
 export type RuntimeAttention = Pick<
@@ -141,6 +143,7 @@ export class AttentionRegistry {
   readonly #emit: (event: AgentEvent) => void;
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #emitRuntimeSnapshot: () => void;
+  readonly #mcpFullAccess: () => boolean;
   readonly #prompts = new Map<RequestId, PendingPrompt>();
   readonly #approvals = new Map<RequestId, PendingApproval>();
   readonly #takeovers = new Map<RequestId, PendingBrowserTakeover>();
@@ -153,6 +156,7 @@ export class AttentionRegistry {
     this.#emit = options.emit;
     this.#emitError = options.emitError;
     this.#emitRuntimeSnapshot = options.emitRuntimeSnapshot;
+    this.#mcpFullAccess = options.mcpFullAccess ?? (() => false);
   }
 
   hasAttentionFor(agentId: string): boolean {
@@ -487,6 +491,10 @@ export class AttentionRegistry {
   }
 
   surfaceMcpElicitation(client: AgentClient, request: AppServerRequest): void {
+    if (mcpElicitationAutoAccept(request.params, this.#mcpFullAccess())) {
+      client.respond(request.id, { action: "accept", content: {}, _meta: { persist: "always" } });
+      return;
+    }
     const threadId = getString(request.params, "threadId");
     const turnId = getString(request.params, "turnId");
     const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;

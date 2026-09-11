@@ -51,6 +51,7 @@ import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
 import { ComputerUseMacSetupService } from "./computer-use-mac-setup";
 import { ComputerUseMacSetupWindowController } from "./computer-use-mac-setup-window";
+import { CustomMcpStore } from "./custom-mcp-store";
 import { CustomProviderStore } from "./custom-provider-store";
 import {
   applyDevelopmentRemoteAccount,
@@ -109,6 +110,7 @@ const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
 const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential-v1.json";
 const REMOTE_DESKTOP_RUNTIME_SECRET_FILE = "openbot-remote-desktop-runtime-v1.json";
 const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
+const CUSTOM_MCP_FILE = "openbot-custom-mcp-v1.json";
 const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
 
 /**
@@ -171,6 +173,7 @@ export interface ApplicationServices {
   skills: SkillMarketplaceService;
   hostedSites: HostedSiteDesktopService;
   customProviders: CustomProviderStore;
+  customMcp: CustomMcpStore;
   marketplaceAgents: AgentMarketplaceService;
   voice: VoiceTranscriptionService;
   dynamicIsland: DynamicIslandWindowController;
@@ -365,6 +368,18 @@ export async function createApplicationServices({
   // Before the service, which reads the endpoints at its first provider spawn. A file this build
   // cannot read leaves the list empty and every write refused; it does not stop the app.
   await customProviders.load();
+  const customMcp = new CustomMcpStore({
+    path: join(app.getPath("userData"), CUSTOM_MCP_FILE),
+    cipher: {
+      canPersist: () => safeStorage.isEncryptionAvailable(),
+      encrypt: (value) => {
+        if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
+        return safeStorage.encryptString(value);
+      },
+      decrypt: (value) => safeStorage.decryptString(value),
+    },
+  });
+  await customMcp.load();
   /*
    * Loaded before the service, not on first use: a provider spawn reads its key synchronously, so
    * the decrypted map has to already exist by the time any client is built. A machine with no
@@ -401,6 +416,8 @@ export async function createApplicationServices({
       // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
       // spawned provider process. The IPC handlers are given `list()`.
       customProviders: () => customProviders.configs(),
+      customMcpServers: () => customMcp.configs(),
+      mcpFullAccess: () => customMcp.fullAccess(),
     },
   );
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
@@ -662,6 +679,7 @@ export async function createApplicationServices({
     skills,
     hostedSites,
     customProviders,
+    customMcp,
     marketplaceAgents,
     voice,
     dynamicIsland,
