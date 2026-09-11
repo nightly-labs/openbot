@@ -89,7 +89,8 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
         continue;
       }
       if (node instanceof HTMLButtonElement) {
-        invalid = true;
+        // Auxiliary actions do not prevent filling and submitting the native form.
+        unsupported = true;
         continue;
       }
       if ((node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) && node.readOnly) continue;

@@ -35,6 +35,20 @@ beforeEach(() => {
 });
 
 describe("browser takeover page", () => {
+  it("submits a login form in a dialog with an auxiliary login action", () => {
+    document.body.innerHTML =
+      '<div role="dialog"><form><input type="email" name="email" placeholder="Your email" required><button type="button">Sign in with password</button><button type="submit">Continue</button></form></div>';
+    const state = read();
+    expect(state.forms[0]?.fields).toMatchObject([{ type: "email", label: "Your email" }]);
+    expect(state.forms[0]?.actions.map((action) => action.label)).toEqual(["Continue"]);
+    const submit = vi.fn((event: Event) => event.preventDefault());
+    const auxiliary = vi.fn();
+    document.forms[0].addEventListener("submit", submit);
+    document.querySelector('button[type="button"]')?.addEventListener("click", auxiliary);
+    run(submission(state, [{ id: "field-0", value: "user@example.com" }]));
+    expect(submit).toHaveBeenCalledOnce();
+    expect(auxiliary).not.toHaveBeenCalled();
+  });
   it("submits directly to the page without returning entered secrets", () => {
     const state = read();
     const submit = vi.fn((event: Event) => event.preventDefault());
