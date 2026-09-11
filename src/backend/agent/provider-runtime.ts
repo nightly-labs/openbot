@@ -108,10 +108,15 @@ export interface ProviderHooks {
   /**
    * Runs once a new client for this provider is the one the app uses, with the catalogue it reported
    * already read. A client that failed to start, or one dropped for a client that was there before,
-   * never reaches this: what the caller hears is that the process now answering is the process that
-   * read the files as they are on disk.
+   * never reaches this: what the caller hears is that the process now answering read the files as
+   * they were at `configRevision`, which is what `captureConfigRevision` answered when it spawned.
    */
-  onProviderActivated(provider: AgentProvider): void;
+  onProviderActivated(provider: AgentProvider, configRevision: number): void;
+  /**
+   * The configuration a process spawning now reads. A CLI reads the endpoint files once, at spawn,
+   * so a change made while it starts is not in the process that arrives.
+   */
+  captureConfigRevision(): number;
 }
 
 /**
@@ -298,6 +303,8 @@ export class ProviderRuntime implements ProviderPort {
   readonly #bundledExecutables: BundledProviderExecutables;
   readonly #credentials: ProviderClientContext;
   readonly #clients = new Map<AgentProvider, AgentClient>();
+  /** What each client's process read when it spawned, which decides what its catalogue may confirm. */
+  readonly #configRevisions = new WeakMap<AgentClient, number>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
   /**
    * Who owns each provider's binary, as the last resolution found it.
@@ -923,7 +930,7 @@ export class ProviderRuntime implements ProviderPort {
             capabilities: { chat: "ready", browser: "ready", computerUse },
             message: null,
           });
-          this.#hooks.onProviderActivated(provider);
+          this.#hooks.onProviderActivated(provider, this.#configRevisions.get(client) ?? 0);
         } catch (error) {
           if (previousClient) this.#clients.set(provider, previousClient);
           else this.#clients.delete(provider);
@@ -1374,7 +1381,8 @@ export class ProviderRuntime implements ProviderPort {
         codexClient ? this.#probeComputerUse(codexClient) : Promise.resolve("unavailable" as const),
       ]);
       for (const provider of activated) {
-        if (this.#clients.has(provider)) this.#hooks.onProviderActivated(provider);
+        const client = this.#clients.get(provider);
+        if (client) this.#hooks.onProviderActivated(provider, this.#configRevisions.get(client) ?? 0);
       }
       if (codexClient === this.#clients.get("codex")) {
         this.#setStatus({
@@ -1392,6 +1400,8 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   #bindClient(client: AgentClient): void {
+    // Taken before `start()`, which is where the CLI reads the endpoint files.
+    this.#configRevisions.set(client, this.#hooks.captureConfigRevision());
     this.#hooks.bindClient(client);
     client.on("diagnostic", (message) => {
       if (!/error|failed|warning/i.test(message)) return;

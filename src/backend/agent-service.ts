@@ -146,14 +146,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #profileClients = new Set<AgentClient>();
   readonly #deletingAgents = new Set<string>();
   /**
-   * Endpoints the running CLI may still list although the saved file no longer defines them that
-   * way, because a restart it refused or failed leaves its catalogue as it was. The value is the
-   * model ids still served for that endpoint: empty while it is removed, and the ids of the last
-   * save when the same id is saved again. An id saved a second time with a different model list
-   * keeps the models it dropped out of the catalogue, because the old CLI still reports them and an
-   * agent that picked one would fail at the next restart.
+   * Endpoints the running CLI may still list although the saved file no longer defines them, because
+   * a restart it refused or failed leaves its catalogue as it was. The value is `#endpointRevision`
+   * as it stood when the exclusion was taken, so a process that spawned before that number read the
+   * old files and its catalogue says nothing about this endpoint.
    */
-  readonly #releasedCustomProviders = new Map<string, ReadonlySet<string>>();
+  readonly #releasedCustomProviders = new Map<string, number>();
+  /**
+   * Counts the endpoint changes, which puts an exclusion and a spawn in order. A CLI reads the files
+   * once, at spawn, so a removal made while a process starts is not in the process that arrives.
+   */
+  #endpointRevision = 0;
   /**
    * One endpoint change or one agent update at a time. A removal excludes the endpoint, moves the
    * agents off it and then writes the file; an agent update that ran between those steps could put
@@ -312,8 +315,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               // it away. Only its own guard reports the turn the CLI is running.
               (this.#conversation.workingSnapshot(agent.id) != null || !this.#compaction.mayDrain(agent.id)),
           ),
-        onProviderActivated: (provider) => {
-          if (provider === "opencode") this.#clearReleasedCustomProviders();
+        captureConfigRevision: () => this.#endpointRevision,
+        onProviderActivated: (provider, configRevision) => {
+          if (provider === "opencode") this.#clearReleasedCustomProviders(configRevision);
         },
         onProviderResumed: (provider) => {
           for (const agent of this.#store.list()) {
@@ -768,8 +772,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #servesModel(modelId: string): boolean {
     const separator = modelId.indexOf("/");
     if (separator <= 0) return true;
-    const served = this.#releasedCustomProviders.get(modelId.slice(0, separator));
-    return !served || served.has(modelId.slice(separator + 1));
+    return !this.#releasedCustomProviders.has(modelId.slice(0, separator));
   }
 
   async generateProfile(input: GenerateAgentProfileInput, sections: SidebarSection[]): Promise<AgentProfileDraft> {
@@ -1140,13 +1143,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   removeCustomProvider<T>(providerId: string, persist: () => Promise<T>): Promise<T> {
     return this.#runEndpointExclusive(async () => {
       const previous = this.#releasedCustomProviders.get(providerId);
-      this.#releasedCustomProviders.set(providerId, new Set());
+      this.#endpointRevision += 1;
+      this.#releasedCustomProviders.set(providerId, this.#endpointRevision);
       this.#emitModelsChanged();
       try {
         await this.#releaseCustomProviderModels();
         return await persist();
       } catch (error) {
-        if (previous) this.#releasedCustomProviders.set(providerId, previous);
+        if (previous !== undefined) this.#releasedCustomProviders.set(providerId, previous);
         else this.#releasedCustomProviders.delete(providerId);
         this.#emitModelsChanged();
         throw error;
@@ -1163,10 +1167,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * an id saved a second time may name another server, and the old process would take the message to
    * the one the user has just replaced.
    */
-  #clearReleasedCustomProviders(): void {
-    if (this.#releasedCustomProviders.size === 0) return;
-    this.#releasedCustomProviders.clear();
-    this.#emitModelsChanged();
+  #clearReleasedCustomProviders(configRevision: number): void {
+    let changed = false;
+    for (const [providerId, revision] of this.#releasedCustomProviders) {
+      // A removal made while this process started is not in the files it read, so its catalogue is
+      // the one from before the removal and the endpoint stays out.
+      if (revision > configRevision) continue;
+      this.#releasedCustomProviders.delete(providerId);
+      changed = true;
+    }
+    if (changed) this.#emitModelsChanged();
   }
 
   /**

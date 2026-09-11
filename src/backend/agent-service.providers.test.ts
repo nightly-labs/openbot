@@ -668,6 +668,56 @@ describe.sequential("AgentService: providers", () => {
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ model: "studio/local-llm" });
   });
 
+  it("keeps an endpoint removed while a process starts out of that process", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    let opencodeClients = 0;
+    // Holds the second process at `initialize`, which is the window between the spawn, where the CLI
+    // reads the endpoint files, and the catalogue it answers with.
+    let signalStarted: () => void = () => undefined;
+    let releaseStart: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => {
+      signalStarted = resolve;
+    });
+    const held = new Promise<void>((resolve) => {
+      releaseStart = resolve;
+    });
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      if (provider !== "opencode") return new FakeAgentClient(provider);
+      opencodeClients += 1;
+      const holdThisClient = opencodeClients === 2;
+      const client = new FakeAgentClient(provider, undefined, true, true, {}, async (method) => {
+        if (method !== "initialize" || !holdThisClient) return;
+        signalStarted();
+        await held;
+      });
+      client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
+      return client;
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+
+    // The restart spawns the second process and then waits for it. Its process read the files with
+    // the endpoint still on them.
+    const restart = service.reloadOpenCodeConfig();
+    await started;
+    await service.removeCustomProvider("studio", async () => undefined);
+    releaseStart();
+    expect(await restart).toBe("restarted");
+
+    // The process that arrived says nothing about a removal made after it read the files, so the id
+    // stays out and no message can reach the server it named.
+    expect(service.listModels().map((model) => model.id)).toContain("house/router-llm");
+    expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
+    await expect(
+      service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }),
+    ).rejects.toThrow("The selected agent model is unavailable.");
+
+    // A process that spawned after the removal read the files as they are, so its catalogue counts.
+    expect(await service.reloadOpenCodeConfig()).toBe("restarted");
+    expect(service.listModels().map((model) => model.id)).toContain("studio/local-llm");
+  });
+
   // An id saved again is served again, whatever the CLI did with the removal before it.
   it("offers an endpoint's models again after the id is saved a second time", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
