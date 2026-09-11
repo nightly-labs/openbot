@@ -47,6 +47,45 @@ bun run mobile:ios
 bun run mobile:android
 ```
 
+Choose an iOS command:
+
+| Repository root | `apps/mobile` | Integration |
+| --- | --- | --- |
+| `bun mobile:ios` | `bun ios` | No RocketSim installation required |
+| `bun mobile:ios:rocketsim` | `bun ios:rocketsim` | Start RocketSim and enable Connect |
+
+Both commands apply the iOS config plugins without clearing the native directory,
+then build and launch the app with Expo. Expo arguments such as `--device` and
+`--port` pass through. The RocketSim command requires the app in `/Applications`
+or `~/Applications`, or `ROCKETSIM_APP_PATH` set to its `.app` directory. If it is
+missing, the command stops with setup instructions. The standard command does not
+look for RocketSim, even if `ROCKETSIM_APP_PATH` or the old `OPENBOT_ROCKETSIM`
+variable is set.
+
+The local launcher enables RocketSim Connect in the local native project. The config plugin
+loads it before React Native starts, only in Debug builds on the iOS Simulator.
+It does not copy the framework into the app. Release builds and physical devices
+cannot load it. A normal prebuild without the launcher removes the hook, as does
+`bun ios`. Switching back to the standard command removes the previous Connect
+hook before building. It does not close the RocketSim Mac app. The installed Debug
+simulator app built with `ios:rocketsim` can also reconnect
+when opened from its icon while RocketSim is running.
+
+In RocketSim, select a camera source and allow camera access when macOS asks.
+Allow local network access if requested. Camera and Network Monitor need Connect;
+network speed control also needs RocketSim Pro and approval of the Network Extension
+in RocketSim's Networking window. These OS approvals require user interaction.
+Network Monitor does not establish that WebRTC DataChannel traffic is visible.
+See [RocketSim Connect setup](https://www.rocketsim.app/docs/getting-started/setting-up-rocketsim-connect/).
+
+Verified with RocketSim 16.4.6 (332), Expo SDK 57, and the iOS 26.5 iPhone 17 Pro
+simulator: the app builds, starts Metro, and loads the Connect framework. Camera
+startup then hit an uncaught exception inside RocketSim's `AVCaptureSession rs_stopRunning`:
+`stopRunning may not be called between calls to beginConfiguration and commitConfiguration`.
+Camera operation is therefore not verified with this combination. Use
+`bun ios` if this occurs. The CLI also rejects network speed
+control with `pro_required` when RocketSim Pro is unavailable.
+
 For an Expo Go device outside the computer's trusted local network context, start Metro with a secure
 tunnel:
 
