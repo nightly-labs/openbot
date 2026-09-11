@@ -141,6 +141,60 @@ describe.sequential("GrokAgentClient", () => {
     }
   });
 
+  it("explains rejected OpenCode credentials and permits retry in the same session", async () => {
+    process.env.OPENBOT_FAKE_GROK_MODE = "opencode-auth-error";
+    client = new AcpAgentClient({ executable, version: "1.18.30" }, 5_000, {
+      provider: "opencode",
+      argv: ["acp"],
+      env: {},
+      signInMessage: "Connect OpenCode.",
+    });
+    const notifications: AppServerNotification[] = [];
+    client.on("notification", (event) => notifications.push(event));
+    client.start();
+    const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
+    for (const text of ["Try", "Retry"]) {
+      await client.request("turn/start", { threadId: thread.id, input: [{ type: "text", text }] }, decodeTurnResponse);
+      await waitFor(
+        () => notifications.filter((event) => event.method === "turn/completed").length === (text === "Try" ? 1 : 2),
+      );
+    }
+    expect(notifications.filter((event) => event.method === "error").map((event) => event.params)).toEqual([
+      expect.objectContaining({
+        message:
+          "OpenCode rejected the selected model's credentials. Update or remove the OpenCode Zen key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\nRequestError: Internal error: Invalid API key.",
+      }),
+    ]);
+    const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
+    expect(history.thread.turns?.map((turn) => turn.status)).toEqual(["failed", "completed"]);
+  });
+
+  it.each(["grok", "opencode"] as const)("keeps %s tool names when completion updates omit them", async (provider) => {
+    process.env.OPENBOT_FAKE_GROK_MODE = "end_turn";
+    client = new AcpAgentClient({ executable, version: "1.18.30" }, 5_000, {
+      provider,
+      argv: ["acp"],
+      env: {},
+      signInMessage: "Connect the provider.",
+    });
+    const notifications: AppServerNotification[] = [];
+    client.on("notification", (event) => notifications.push(event));
+    client.start();
+    const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
+    await client.request(
+      "turn/start",
+      { threadId: thread.id, input: [{ type: "text", text: "Inspect" }] },
+      decodeTurnResponse,
+    );
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+    const tools = notifications.flatMap((event) => {
+      if (event.method !== "item/completed" || !isDynamicRecord(event.params) || !isDynamicRecord(event.params.item))
+        return [];
+      return event.params.item.type === "toolCall" ? [event.params.item.name] : [];
+    });
+    expect(tools).toEqual(["Read files", "Check results"]);
+  });
+
   it("starts profile generation with no built-in tools and denies approval requests", async () => {
     client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000, true);
     const requests: AppServerRequest[] = [];
@@ -338,6 +392,9 @@ describe.sequential("GrokAgentClient", () => {
         decodeThreadResponse,
       );
       const threadId = started.thread.id;
+      const imagePath = join(root, "input.png");
+      const imageData = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9X8AAAAASUVORK5CYII=";
+      await writeFile(imagePath, Buffer.from(imageData, "base64"));
       const turn = await client.request(
         "turn/start",
         {
@@ -345,7 +402,10 @@ describe.sequential("GrokAgentClient", () => {
           model: "grok-fast",
           effort: "xhigh",
           clientUserMessageId: "turn-1",
-          input: [{ type: "text", text: "Build it" }],
+          input: [
+            { type: "text", text: "Build it" },
+            { type: "localImage", path: imagePath },
+          ],
         },
         decodeTurnResponse,
       );
@@ -415,6 +475,12 @@ describe.sequential("GrokAgentClient", () => {
       );
 
       const log = await readLog();
+      expect(log).toContainEqual(
+        expect.objectContaining({
+          method: "session/prompt",
+          images: [{ type: "image", data: imageData, mimeType: "image/png", uri: imagePath }],
+        }),
+      );
       if (provider === "grok")
         expect(log).toContainEqual(expect.objectContaining({ method: "authenticate", methodId: "cached_token" }));
       expect(log).toEqual(
@@ -827,6 +893,10 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   if (message.method === "session/prompt") {
     if (mode.startsWith("opencode-")) {
       promptCounter += 1;
+      if (mode === "opencode-auth-error" && promptCounter === 1) {
+        write({ id: message.id, error: { code: -32603, message: "Internal error: Invalid API key." } });
+        return;
+      }
       const update = promptCounter > 1
         ? { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Reply after retry." } }
         : mode === "opencode-tools"
@@ -858,7 +928,7 @@ createInterface({ input: process.stdin }).on("line", (line) => {
       return;
     }
     promptCounter += 1;
-    log({ method: message.method, promptCounter, text: message.params.prompt.filter((block) => block.type === "text").map((block) => block.text).join("\n") });
+    log({ method: message.method, promptCounter, text: message.params.prompt.filter((block) => block.type === "text").map((block) => block.text).join("\n"), images: message.params.prompt.filter((block) => block.type === "image") });
     if (promptCounter === 1) {
       pendingPrompt = { id: message.id, sessionId: message.params.sessionId };
       write({

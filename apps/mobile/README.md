@@ -254,6 +254,84 @@ bunx eas-cli@latest build --profile development --platform android
 
 Cloud builds require the final `ios.bundleIdentifier` and `android.package` values in `app.json`. Store submission also requires Apple Developer and Google Play Console credentials.
 
+### Local TestFlight build
+
+On a Mac with Xcode, CocoaPods, Fastlane, and this project's Node and Bun versions installed,
+sign in to Expo with `bunx eas-cli@latest login` from `apps/mobile`. An active Apple Developer
+membership is required for signing and TestFlight distribution.
+
+From the repository root, run:
+
+```bash
+bun run mobile:ios:build:local
+```
+
+From `apps/mobile`, the equivalent command is `bun run ios:build:local`.
+This runs EAS Build locally with the `production` profile and writes
+`/private/tmp/openbot-testflight.ipa`. Each successful build replaces that output file.
+The profile uses remote build numbers and increments the build number automatically.
+EAS CLI prompts for signing credentials when needed.
+
+The build loads `Plain text` and `Sensitive` variables from the EAS `production` environment.
+Variables with `Secret` visibility must be supplied in the local environment.
+See [OpenPanel configuration](#openpanel-product-analytics) for the required analytics variables.
+
+To upload, open Apple's Transporter app, sign in, add the `.ipa`, and select **Deliver**.
+After Apple processes the build, select it in App Store Connect under **TestFlight** and assign
+it to a tester group. Upload is manual; the command does not run EAS Submit.
+
+### GitHub Actions TestFlight release
+
+The `Release iOS to TestFlight` workflow builds the selected `main` commit on a GitHub-hosted
+`macos-26` runner with Xcode 26.6. Expo SDK 57 requires Xcode 26.4 or newer; the desktop release's
+`macos-14` runner is not suitable. EAS CLI 24.1.2 runs with `--local --non-interactive`, so compilation
+uses GitHub Actions compute. Fastlane uploads directly to Apple without EAS Submit.
+
+One-time setup:
+
+1. In GitHub repository settings, create the `release-ios` environment. Under deployment branches
+   and tags, select only the `main` branch.
+2. Add environment secrets `EXPO_TOKEN`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_PRIVATE_KEY`.
+   The Expo token needs access to the OpenBot project. The Apple secrets are the Key ID, Issuer ID,
+   and full `.p8` contents of an App Store Connect team API key with the App Manager role.
+3. Keep the iOS distribution certificate and provisioning profile configured in EAS. CI downloads
+   these existing credentials. If they expire or need repair, update them interactively through
+   EAS before retrying; the upload API key is not passed to the build step.
+4. Keep the OpenPanel variables in EAS `production` with `Plain text` or `Sensitive` visibility.
+   `Secret` variables are unavailable to this local build. Do not copy these values into source.
+5. Ensure App Store Connect has the app `run.openbot.mobile` and the intended TestFlight group.
+
+After this workflow is merged into `main`, authenticate GitHub CLI with `gh auth login`, then run
+from the repository root:
+
+```bash
+bun run mobile:ios:release:testflight
+```
+
+From `apps/mobile`, run `bun run ios:release:testflight`.
+
+This dispatches a release of remote `main`, including no local or uncommitted changes. The command
+returns after dispatch; follow the run in GitHub Actions under **Release iOS to TestFlight**.
+You can also select **Run workflow** on `main` in GitHub. The workflow does not run on pushes,
+pull requests, or desktop release tags. Concurrent iOS releases are serialized; GitHub can replace
+an older pending run with a newer request, so avoid dispatching the same release repeatedly.
+
+The workflow checks source before building. EAS increments the remote iOS build number; a failed
+build can consume a number. The marketing version stays in `app.json` and is not changed by dispatch.
+The signed `.ipa` is saved as a GitHub Actions artifact for seven days before upload. If upload
+fails, download that artifact and retry with Transporter to avoid rebuilding. Re-running the full
+workflow creates a new build number.
+
+A successful workflow means Apple accepted the upload. Fastlane does not wait for Apple processing
+or assign tester groups. Configure automatic distribution for an internal group in App Store Connect,
+or assign the processed build manually. External testing can require Beta App Review. This workflow
+does not submit the app for public App Store release.
+
+The workflow uses the runner's installed Fastlane and CocoaPods and prints their versions. Update
+the selected Xcode and EAS CLI versions when upgrading Expo. GitHub Actions usage and limits apply.
+See [local EAS builds](https://docs.expo.dev/build-reference/local-builds/) and
+[Fastlane TestFlight upload](https://docs.fastlane.tools/actions/upload_to_testflight/).
+
 ## OpenPanel product analytics
 
 The app uses the official [`@openpanel/react-native` SDK](https://openpanel.dev/docs/sdks/react-native)

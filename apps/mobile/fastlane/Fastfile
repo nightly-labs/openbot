@@ -1,0 +1,24 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Upload the signed IPA to TestFlight without EAS Submit"
+  lane :beta do
+    ipa = ENV.fetch("IPA_PATH")
+    UI.user_error!("IPA_PATH must point to an existing .ipa file") unless File.file?(ipa) && File.extname(ipa) == ".ipa"
+
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_content: ENV.fetch("ASC_PRIVATE_KEY"),
+      in_house: false
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      ipa: ipa,
+      app_identifier: "run.openbot.mobile",
+      skip_waiting_for_build_processing: true,
+      distribute_external: false
+    )
+  end
+end

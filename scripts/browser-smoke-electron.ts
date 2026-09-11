@@ -225,9 +225,12 @@ void main().catch((error) => {
 
 async function main(): Promise<void> {
   const scenario = process.argv.find((argument) => argument.startsWith("--scenario="))?.slice("--scenario=".length);
-  if (scenario !== undefined && !["controls", "tool-boundary", "evaluation", "wait-deadlines"].includes(scenario)) {
+  if (
+    scenario !== undefined &&
+    !["background", "controls", "tool-boundary", "evaluation", "wait-deadlines"].includes(scenario)
+  ) {
     throw new Error(
-      `Unknown browser smoke scenario: ${scenario}. Use controls, tool-boundary, evaluation, or wait-deadlines.`,
+      `Unknown browser smoke scenario: ${scenario}. Use background, controls, tool-boundary, evaluation, or wait-deadlines.`,
     );
   }
   const googleLive = process.argv.includes("--google-live");
@@ -278,10 +281,13 @@ async function main(): Promise<void> {
       recordingMaxConcurrent: 1,
       recordingMaxAggregateBytes: 100 * 1024 * 1024,
     });
+    if (!scenario || scenario === "background") await runBackgroundScenario(browser, origin);
     await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
     if (scenario) {
       try {
-        if (scenario === "tool-boundary") {
+        if (scenario === "background") {
+          // The scenario runs before the browser panel is first shown.
+        } else if (scenario === "tool-boundary") {
           await runToolBoundaryScenario(browser, origin);
         } else {
           const { tab, contents } = await openTabWithContents(browser, `${origin}/v2`, "smoke-thread", "smoke-bot");
@@ -1798,6 +1804,33 @@ async function main(): Promise<void> {
     if (server.listening) server.close();
     if (!configuredRoot) await rm(temporaryRoot, { recursive: true, force: true });
     app.quit();
+  }
+}
+
+async function runBackgroundScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const tab = await browser.open(origin, "smoke-thread", "smoke-bot");
+  const other = await browser.open(`${origin}/child`, "other-thread", "other-agent");
+  const failures: string[] = [];
+  try {
+    // Neither page has been displayed. A different agent now owns the active tab.
+    await browser.screenshot(tab.id).catch((error) => failures.push(`capture: ${String(error)}`));
+    try {
+      const first = await browser.snapshot(tab.id);
+      const input = first.elements.find((element) => element.name === "Task");
+      if (!input) throw new Error("Background page did not expose Task.");
+      const typed = await browser.act(tab.id, first.revision, { type: "type", ref: input.ref, text: "background" });
+      const save = typed.elements.find((element) => element.name === "Save");
+      if (!save) throw new Error("Background page did not expose Save.");
+      const clicked = await browser.act(tab.id, typed.revision, { type: "click", ref: save.ref });
+      if (!clicked.text.includes("background|input:true|click:true"))
+        throw new Error("Background input was not native.");
+    } catch (error) {
+      failures.push(`input: ${String(error)}`);
+    }
+    if (failures.length) throw new Error(`Background browser failed: ${failures.join("; ")}`);
+  } finally {
+    await browser.close(tab.id);
+    await browser.close(other.id);
   }
 }
 
