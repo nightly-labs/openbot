@@ -1,5 +1,5 @@
-import type { AgentModelOption } from "@openbot/contracts/ipc";
-import { isFreeOpencodeModelName } from "@openbot/contracts/ipc";
+import type { AgentModelOption, CustomProviderSummary } from "@openbot/contracts/ipc";
+import { isCustomProviderModelId, isFreeOpencodeModelName } from "@openbot/contracts/ipc";
 
 export interface PickerModel {
   id: string;
@@ -12,6 +12,17 @@ export interface PickerModel {
 export interface PickerModelGroup {
   name: string;
   models: PickerModel[];
+}
+
+/**
+ * Anything the provider names Free first, then the rest.
+ *
+ * There is no "runs on this computer" tier: a custom endpoint is keyed by a name the user types, so
+ * the id says nothing about where the model runs. A remote host named `ollama` would earn the label
+ * and a loopback endpoint named anything else would not, and the label is a privacy claim.
+ */
+function modelTier(model: PickerModel): 0 | 1 {
+  return model.free ? 0 : 1;
 }
 
 /** OpenCode exposes reasoning variants as model IDs. Keep those IDs at the selection boundary. */
@@ -46,15 +57,30 @@ export function pickerModels(options: AgentModelOption[]): PickerModel[] {
     });
 }
 
+/**
+ * One group per service, ordered by the best tier it holds. Keying the group by tier as well as by
+ * service printed the same service twice - "OpenCode Zen" once for its free models and again for
+ * its paid ones - so the tier now decides order and the row badge carries the pricing.
+ */
 export function groupPickerModels(models: PickerModel[], search: string): PickerModelGroup[] {
   const query = search.trim().toLowerCase();
   const groups = new Map<string, PickerModelGroup>();
-  for (const model of [...models].sort((a, b) => Number(b.free) - Number(a.free))) {
+  const tiers = new Map<string, number>();
+  for (const model of models) {
     if (!`${model.service} ${model.name}`.toLowerCase().includes(query)) continue;
-    const key = `${model.free}/${model.service}`;
-    const group = groups.get(key) ?? { name: model.service, models: [] };
+    const group = groups.get(model.service) ?? { name: model.service, models: [] };
     group.models.push(model);
-    groups.set(key, group);
+    groups.set(model.service, group);
+    tiers.set(model.service, Math.min(tiers.get(model.service) ?? modelTier(model), modelTier(model)));
   }
-  return [...groups.values()];
+  for (const group of groups.values()) group.models.sort((left, right) => modelTier(left) - modelTier(right));
+  return [...groups.values()].sort((left, right) => (tiers.get(left.name) ?? 0) - (tiers.get(right.name) ?? 0));
+}
+
+export function customProviderIds(providers: readonly CustomProviderSummary[]): ReadonlySet<string> {
+  return new Set(providers.map((provider) => provider.id));
+}
+
+export function isCustomModel(model: AgentModelOption, customIds: ReadonlySet<string>): boolean {
+  return model.provider === "opencode" && isCustomProviderModelId(model.id, customIds);
 }

@@ -86,6 +86,12 @@ import type {
   SetMessageReactionInput,
 } from "./ipc-conversations";
 import type {
+  CustomProviderResult,
+  CustomProviderSummary,
+  DeleteCustomProviderInput,
+  SaveCustomProviderInput,
+} from "./ipc-custom-providers";
+import type {
   DynamicIslandAction,
   DynamicIslandGeometry,
   DynamicIslandPreference,
@@ -414,6 +420,17 @@ export interface HostedSitesDesktopApi {
   delete: (input: DeleteHostedSiteInput) => Promise<void>;
 }
 
+/**
+ * The user's own model endpoints. `save` and `delete` both answer with the whole list plus how the
+ * provider restart went, so the renderer replaces its snapshot in one write and can say honestly
+ * whether the models are on their way.
+ */
+export interface CustomProvidersDesktopApi {
+  list: () => Promise<CustomProviderSummary[]>;
+  save: (input: SaveCustomProviderInput) => Promise<CustomProviderResult>;
+  delete: (input: DeleteCustomProviderInput) => Promise<CustomProviderResult>;
+}
+
 export interface OpenBotDesktopApi {
   getAppInfo: () => Promise<AppInfo>;
   getSetupState: () => Promise<AppSetupState>;
@@ -449,6 +466,7 @@ export interface OpenBotDesktopApi {
   openUrl: (url: string) => Promise<void>;
   voice: VoiceDesktopApi;
   skills: SkillsDesktopApi;
+  customProviders: CustomProvidersDesktopApi;
   hostedSites: HostedSitesDesktopApi;
   marketplaceAgents: MarketplaceAgentsDesktopApi;
   auth: CentralAuthDesktopApi;

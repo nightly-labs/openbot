@@ -28,6 +28,7 @@
 @import "./features/servers/server-settings-modal.css";
 @import "./features/settings/skills-marketplace.css";
 @import "./features/provider-updates/provider-updates.css";
+@import "./features/custom-providers/custom-providers.css";
 
 :root {
   color-scheme: dark;

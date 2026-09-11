@@ -3,8 +3,10 @@ import type {
   AgentStatus,
   AvatarImageInput,
   CentralAuthUser,
+  CustomProviderRestart,
   HostedSitesDesktopApi,
   MobileConnectedDevice,
+  SaveCustomProviderInput,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
@@ -19,6 +21,20 @@ const account: CentralAuthUser = {
   email: "norbert@example.com",
   name: "Norbert",
   avatarUrl: null,
+};
+
+/**
+ * A custom endpoint runs inside OpenCode, so the AI providers section offers one only while that CLI
+ * can answer. Its own sign-in does not matter: the endpoint brings its own key.
+ */
+const openCodeReadyStatus: AgentStatus = {
+  phase: "ready",
+  cliVersion: "1.3.13",
+  auth: { kind: "chatgpt", email: "norbert@example.com" },
+  providers: [{ id: "opencode", state: "available", version: "1.3.13", message: null, cliSource: "system" }],
+  capabilities: { chat: "ready", browser: "ready", computerUse: "unavailable" },
+  message: null,
+  fullAccess: true,
 };
 
 const idleUpdateStatus: UpdateStatus = {
@@ -721,5 +737,147 @@ describe("SettingsModal", () => {
     );
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.getByText("No connected devices")).toBeInTheDocument();
+  });
+
+  // The endpoint the user typed carries an API key, so a failed save must not throw the form away:
+  // the previous version closed the dialog before the call and dropped the promise, which made a
+  // refused endpoint look like a saved one.
+  it("keeps the custom endpoint form open when the save fails, and closes it when the next one works", async () => {
+    const onAddCustomProvider = vi
+      .fn<(value: SaveCustomProviderInput) => Promise<CustomProviderRestart>>()
+      .mockRejectedValueOnce(new Error("Studio Local refused the API key."))
+      .mockResolvedValue("restarted");
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={{ name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" }}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={vi.fn(async () => undefined)}
+        account={account}
+        onUpdateAccountName={vi.fn(async () => undefined)}
+        onUpdateAccountAvatar={vi.fn(async () => undefined)}
+        agentStatus={openCodeReadyStatus}
+        customProviders={[]}
+        onAddCustomProvider={onAddCustomProvider}
+      />
+    ));
+
+    await fireEvent.click(screen.getByRole("button", { name: "Add custom provider" }));
+    // A required field appends an aria-hidden asterisk to its label, so its name is not an exact match.
+    await fireEvent.input(await screen.findByLabelText(/^Provider ID/u), { target: { value: "studio-local" } });
+    await fireEvent.input(screen.getByLabelText(/^Display name/u), { target: { value: "Studio Local" } });
+    await fireEvent.input(screen.getByLabelText(/^Base URL/u), { target: { value: "http://127.0.0.1:11434/v1" } });
+    await fireEvent.input(screen.getByLabelText("Model 1 ID"), { target: { value: "glm-5-air" } });
+    await fireEvent.input(screen.getByLabelText("Model 1 display name"), { target: { value: "GLM 5 Air" } });
+    await fireEvent.input(screen.getByLabelText("API key"), { target: { value: "sk-test-key" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(await screen.findByText("Studio Local refused the API key.")).toBeInTheDocument();
+    // Still open, still holding the endpoint: the user retries rather than types it again.
+    expect(screen.getByLabelText(/^Provider ID/u)).toHaveValue("studio-local");
+    await waitFor(() => expect(onAddCustomProvider).toHaveBeenCalledTimes(1));
+    expect(onAddCustomProvider).toHaveBeenCalledWith({
+      id: "studio-local",
+      name: "Studio Local",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      apiKey: "sk-test-key",
+      models: [{ id: "glm-5-air", name: "GLM 5 Air" }],
+      headers: [],
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await waitFor(() => expect(screen.queryByLabelText(/^Provider ID/u)).not.toBeInTheDocument());
+    expect(screen.getByRole("status")).toHaveTextContent("Saved. OpenBot is loading the models.");
+  });
+
+  // A removal discards the key and drops the models, and neither is undoable, so the callback must
+  // run only after the user answers the question.
+  it("removes a custom endpoint only after the confirmation is accepted", async () => {
+    const onDeleteCustomProvider = vi.fn<(id: string) => Promise<CustomProviderRestart>>(async () => "restarted");
+    vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValue(true);
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={{ name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" }}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={vi.fn(async () => undefined)}
+        account={account}
+        onUpdateAccountName={vi.fn(async () => undefined)}
+        onUpdateAccountAvatar={vi.fn(async () => undefined)}
+        agentStatus={openCodeReadyStatus}
+        customProviders={[
+          {
+            id: "studio-local",
+            name: "Studio Local",
+            baseUrl: "http://127.0.0.1:11434/v1",
+            hasApiKey: true,
+            models: [],
+          },
+        ]}
+        onAddCustomProvider={vi.fn(async () => "restarted" as const)}
+        onDeleteCustomProvider={onDeleteCustomProvider}
+      />
+    ));
+
+    // The endpoints are listed in a dialog now, which the count on the Custom provider row opens.
+    await fireEvent.click(screen.getByRole("button", { name: "Manage 1 endpoint" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Delete Studio Local" }));
+    expect(window.confirm).toHaveBeenCalledWith(
+      "Remove Studio Local? Its API key is discarded, its models disappear from the picker, and any agent using one falls back to a default model.",
+    );
+    expect(onDeleteCustomProvider).not.toHaveBeenCalled();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Delete Studio Local" }));
+    await waitFor(() => expect(onDeleteCustomProvider).toHaveBeenCalledWith("studio-local"));
+    // The outcome is read inside the dialog, which stays open: the section behind it is hidden.
+    expect(await screen.findByRole("status")).toHaveTextContent("Removed. OpenBot is loading the models.");
+  });
+
+  // The custom row is one of the AI providers, so it takes the check mark like its neighbours and
+  // the provider that serves it gives it up. Nothing stores the choice yet; this is the row's state.
+  it("gives the custom provider row the check mark, and takes it from the provider rows", async () => {
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={{ name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" }}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={vi.fn(async () => undefined)}
+        account={account}
+        onUpdateAccountName={vi.fn(async () => undefined)}
+        onUpdateAccountAvatar={vi.fn(async () => undefined)}
+        agentStatus={openCodeReadyStatus}
+        customProviders={[
+          {
+            id: "studio-local",
+            name: "Studio Local",
+            baseUrl: "http://127.0.0.1:11434/v1",
+            hasApiKey: true,
+            models: [],
+          },
+        ]}
+        onAddCustomProvider={vi.fn(async () => "restarted" as const)}
+      />
+    ));
+
+    const custom = await screen.findByRole("radio", { name: /Custom provider/ });
+    const openCode = screen.getByRole("radio", { name: /OpenCode/ });
+    await fireEvent.click(openCode);
+    expect(openCode).toBeChecked();
+
+    await fireEvent.click(custom);
+    expect(custom).toBeChecked();
+    expect(openCode).not.toBeChecked();
+
+    await fireEvent.click(openCode);
+    expect(custom).not.toBeChecked();
   });
 });

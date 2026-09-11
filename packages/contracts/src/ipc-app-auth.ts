@@ -1,4 +1,5 @@
 import type { ManagedProviderId } from "./agent-providers";
+import type { AgentModelId } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
 import type { AvatarImageInput } from "./ipc-agents";
 import type { AccountSession, MobileConnectedDevice, MobileConnectTicket } from "./mobile-connect";
@@ -99,10 +100,17 @@ export interface ExportResult {
 export interface AppSetupState {
   completed: boolean;
   preferredProvider: AgentProviderId | null;
+  /**
+   * The model setup chose beside the provider, and `null` when the user took the provider's own
+   * default. A new agent starts on it while that provider still lists it, which is how a custom
+   * endpoint becomes the default: the provider is the CLI that runs it, and only the model names it.
+   */
+  preferredModel: AgentModelId | null;
 }
 
 export interface SaveSetupInput {
   preferredProvider: AgentProviderId;
+  preferredModel: AgentModelId | null;
 }
 
 export interface AnalyticsPreference {

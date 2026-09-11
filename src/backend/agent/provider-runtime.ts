@@ -1,14 +1,17 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AccountUsage,
   AgentEvent,
+  AgentModelId,
   AgentModelOption,
   AgentProviderStatus,
   AgentStatus,
   AgentSummary,
+  CustomProviderRestart,
 } from "@openbot/contracts/ipc";
 import { agentProviderDescriptor, isFreeOpencodeModelName, isReasoningEffort } from "@openbot/contracts/ipc";
-import { redactText } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import {
@@ -18,6 +21,7 @@ import {
   type CodexCliInfo,
   resolveCodexCli,
 } from "./../cli";
+import { openCodeSignInMessage } from "./../opencode-config";
 import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
@@ -46,7 +50,26 @@ import {
 } from "./provider-status";
 import { providerForAgent, providerLabel } from "./thread-items";
 
+const logger = createOpenBotLogger("provider-runtime");
+
 const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
+
+/**
+ * Whether a provider diagnostic is about an MCP server rather than about the agent's work.
+ *
+ * A CLI writes its MCP subsystem's failures to the same stderr as its own. OpenCode reads the user's
+ * MCP list from their own files, so OpenBot neither owns those servers nor can act on them, and a
+ * server that does not start leaves the turn running with fewer tools. Two of them arrive on every
+ * restart, because a server spawns per session and OpenBot opens a short session to read the model
+ * list. That belongs in the log, not in an error the user is asked to read.
+ *
+ * OpenBot's own bridge servers carry its name, and stay visible: a failure there is a failure of
+ * this app.
+ */
+export function isMcpSubsystemDiagnostic(message: string): boolean {
+  if (/openbot/i.test(message)) return false;
+  return /\b(mcp|rmcp)\b/i.test(message);
+}
 
 interface PendingCodexLogin {
   client: AgentClient;
@@ -82,6 +105,18 @@ export interface ProviderHooks {
   isProviderBusy(provider: AgentProvider): boolean;
   /** Runs after a CLI replacement, so deliveries held back during it are delivered. */
   onProviderResumed(provider: AgentProvider): void;
+  /**
+   * Runs once a new client for this provider is the one the app uses, with the catalogue it reported
+   * already read. A client that failed to start, or one dropped for a client that was there before,
+   * never reaches this: what the caller hears is that the process now answering read the files as
+   * they were at `configRevision`, which is what `captureConfigRevision` answered when it spawned.
+   */
+  onProviderActivated(provider: AgentProvider, configRevision: number): void;
+  /**
+   * The configuration a process spawning now reads. A CLI reads the endpoint files once, at spawn,
+   * so a change made while it starts is not in the process that arrives.
+   */
+  captureConfigRevision(): number;
 }
 
 /**
@@ -126,6 +161,15 @@ const INITIAL_STATUS: AgentStatus = {
 const SUPPRESSED_MODEL_IDS: ReadonlyMap<AgentProvider, ReadonlySet<string>> = new Map([
   ["codex", new Set(["gpt-reserve", "gpt-5.5", "gpt-5.4-mini", "codex-auto-review"])],
 ]);
+
+/**
+ * A model name the contract guards accept. `isAgentModelOption` bounds the name, and both the IPC
+ * and the Team API list decoders reject the whole array when one option fails, so a name that is one
+ * character too long does not shorten a label - it empties the model picker.
+ */
+function modelDisplayName(name: string): string {
+  return name.slice(0, INPUT_LIMITS.modelName);
+}
 
 /**
  * Model families a CLI advertises because OpenBot supplied a key, which that key does not buy.
@@ -259,6 +303,8 @@ export class ProviderRuntime implements ProviderPort {
   readonly #bundledExecutables: BundledProviderExecutables;
   readonly #credentials: ProviderClientContext;
   readonly #clients = new Map<AgentProvider, AgentClient>();
+  /** What each client's process read when it spawned, which decides what its catalogue may confirm. */
+  readonly #configRevisions = new WeakMap<AgentClient, number>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
   /**
    * Who owns each provider's binary, as the last resolution found it.
@@ -279,6 +325,12 @@ export class ProviderRuntime implements ProviderPort {
   readonly #cliLogins = new Map<AgentProvider, PendingCliLogin>();
   #providerActivation = Promise.resolve();
   #preferredProvider: AgentProvider;
+  /**
+   * The model setup chose beside the preferred provider, or `null` for that provider's own default.
+   * It is a preference, not a promise: the provider lists its own models, so a model that is gone
+   * is ignored by the callers that read it.
+   */
+  #preferredModel: AgentModelId | null;
   #restartAttempts = 0;
   #restartTimer: NodeJS.Timeout | null = null;
   #models = structuredClone(FALLBACK_MODELS);
@@ -290,6 +342,7 @@ export class ProviderRuntime implements ProviderPort {
     emitError: (code: string, error: unknown, agentId?: string) => void;
     requestTimeoutMs: number;
     preferredProvider: AgentProvider;
+    preferredModel?: AgentModelId | null;
     clientFactory: AgentClientFactory | null;
     bundledExecutables: BundledProviderExecutables;
     credentials: ProviderClientContext;
@@ -300,6 +353,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#emitError = options.emitError;
     this.#requestTimeoutMs = options.requestTimeoutMs;
     this.#preferredProvider = options.preferredProvider;
+    this.#preferredModel = options.preferredModel ?? null;
     this.#clientFactory = options.clientFactory;
     this.#bundledExecutables = { ...options.bundledExecutables };
     this.#credentials = options.credentials;
@@ -364,6 +418,10 @@ export class ProviderRuntime implements ProviderPort {
     return this.#preferredProvider;
   }
 
+  preferredModel(): AgentModelId | null {
+    return this.#preferredModel;
+  }
+
   /**
    * Without a scope this is the account-wide reading the dock polls, and it broadcasts.
    * Scoped to one agent it answers for that agent's own model and stays quiet: the reply goes to
@@ -385,8 +443,11 @@ export class ProviderRuntime implements ProviderPort {
     );
   }
 
-  async setPreferredProvider(provider: AgentProvider, initialized: boolean): Promise<void> {
+  async setPreferredProvider(provider: AgentProvider, initialized: boolean, model: AgentModelId | null): Promise<void> {
     this.#preferredProvider = provider;
+    // The two travel together: a provider chosen without a model means that provider's default, so
+    // the model of an earlier choice must not survive the new one.
+    this.#preferredModel = model;
     if (!initialized) return;
     await this.ensureProvider(provider).catch(() => undefined);
     const account = this.#accounts.get(provider);
@@ -469,6 +530,50 @@ export class ProviderRuntime implements ProviderPort {
           return this.#reprobeProvider(provider);
       }
     });
+  }
+
+  /**
+   * The custom-endpoint wording, when there is a custom endpoint to talk about.
+   *
+   * OpenCode answers "not signed in" for a refused key or an unreachable base URL exactly as it does
+   * for a missing account, so once an endpoint exists the default advice - run `opencode auth login`
+   * - sends the user to the wrong fix. Returns null when the usual message is still right, so every
+   * caller keeps its own default.
+   */
+  #customProviderSignInMessage(provider: AgentProvider): string | null {
+    const count = provider === "opencode" ? this.#credentials.customProviders().length : 0;
+    return count > 0 ? openCodeSignInMessage(count) : null;
+  }
+
+  /**
+   * Replaces the OpenCode process so a changed custom-provider config reaches it.
+   *
+   * `connectProvider` cannot do this: it returns early for a provider that is already connected, so
+   * it never respawns a running OpenCode. This reuses the rest of that path unchanged - re-resolve
+   * the CLI, build a fresh client, swap it in, refresh the model catalogue - and threads survive it,
+   * because a provider session id lives in `projection_provider_sessions` and is resumed.
+   *
+   * One `opencode acp` process serves every OpenCode agent, so a respawn is felt account-wide. That
+   * is why a turn in progress wins: the config is only read at spawn, so skipping costs nothing
+   * durable, and the next connect or app start picks the endpoint up.
+   *
+   * It reports how the respawn went and never throws, because the caller has already written the
+   * endpoint to disk: a throw here would read to the user as a save that failed. A respawn that
+   * fails - an endpoint OpenCode refuses at spawn - is reported the way every other connection
+   * failure is, as an error state and a message on the provider's own status.
+   */
+  async reloadOpenCodeConfig(): Promise<CustomProviderRestart> {
+    if (!this.#clients.has("opencode")) return "not-running";
+    if (this.#hooks.isProviderBusy("opencode")) return "skipped-busy";
+    try {
+      await this.#runProviderConnectionCommand("opencode", () => this.#reprobeProvider("opencode"));
+    } catch {
+      // `#reprobeProvider` has already set the failure status and emitted it. It also throws for a
+      // turn that started after the check above, which is the same answer: the config waits for the
+      // next spawn.
+      return this.#hooks.isProviderBusy("opencode") ? "skipped-busy" : "restarted";
+    }
+    return "restarted";
   }
 
   /**
@@ -756,7 +861,12 @@ export class ProviderRuntime implements ProviderPort {
       );
       client.notify("initialized");
       const account = await client.request("account/read", { refreshToken: true }, decodeAccountReadResult);
-      if (!account.account) throw new Error(`${providerLabel(provider)} did not return an authenticated account.`);
+      if (!account.account) {
+        throw new Error(
+          this.#customProviderSignInMessage(provider) ??
+            `${providerLabel(provider)} did not return an authenticated account.`,
+        );
+      }
       driver.validateAccount(account.account);
       return { client, account: account.account };
     } catch (error) {
@@ -787,7 +897,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#cli.set(provider, cli);
         this.#accounts.set(provider, account);
         try {
-          await this.#refreshModelCatalog();
+          const freshCatalogs = await this.#refreshModelCatalog();
           if (isCurrent && !isCurrent()) {
             if (previousClient) this.#clients.set(provider, previousClient);
             else this.#clients.delete(provider);
@@ -820,6 +930,12 @@ export class ProviderRuntime implements ProviderPort {
             capabilities: { chat: "ready", browser: "ready", computerUse },
             message: null,
           });
+          // Only with a catalogue this client itself reported. Discovery that failed leaves the
+          // models from before it, and those still describe the process that ran then, so they are
+          // no proof that an endpoint removed since is gone from the process answering now.
+          if (freshCatalogs.has(provider)) {
+            this.#hooks.onProviderActivated(provider, this.#configRevisions.get(client) ?? 0);
+          }
         } catch (error) {
           if (previousClient) this.#clients.set(provider, previousClient);
           else this.#clients.delete(provider);
@@ -1157,6 +1273,11 @@ export class ProviderRuntime implements ProviderPort {
           },
     );
 
+    /**
+     * The providers this connect started itself. A client that was already running read the endpoint
+     * files as they were then, so it says nothing about the files as they are now.
+     */
+    const activated: AgentProvider[] = [];
     const results = await Promise.all(
       requestedProviders.map(async (provider): Promise<string | null> => {
         if (this.#clients.has(provider)) return null;
@@ -1181,7 +1302,8 @@ export class ProviderRuntime implements ProviderPort {
           client.notify("initialized");
           const account = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult, 5_000);
           if (!account.account) {
-            const message = agentProviderDescriptor(provider).signInMessage;
+            const message =
+              this.#customProviderSignInMessage(provider) ?? agentProviderDescriptor(provider).signInMessage;
             await client.stop().catch(() => undefined);
             this.#setStatus({
               providers: updateProviderStatus(this.#status.providers, provider, {
@@ -1197,6 +1319,7 @@ export class ProviderRuntime implements ProviderPort {
           this.#cli.set(provider, cli);
           this.#clients.set(provider, client);
           this.#accounts.set(provider, account.account);
+          activated.push(provider);
           this.#setStatus({
             providers: updateProviderStatus(this.#status.providers, provider, {
               state: "available",
@@ -1258,10 +1381,18 @@ export class ProviderRuntime implements ProviderPort {
     });
     const refreshRuntime = async (): Promise<void> => {
       const codexClient = this.#clients.get("codex");
-      const [, computerUse] = await Promise.all([
+      const [freshCatalogs, computerUse] = await Promise.all([
         this.#refreshModelCatalog(),
         codexClient ? this.#probeComputerUse(codexClient) : Promise.resolve("unavailable" as const),
       ]);
+      for (const provider of activated) {
+        const client = this.#clients.get(provider);
+        // The same condition as the other activation site: a stale catalogue proves nothing about
+        // the endpoints the process now answering was given.
+        if (client && freshCatalogs.has(provider)) {
+          this.#hooks.onProviderActivated(provider, this.#configRevisions.get(client) ?? 0);
+        }
+      }
       if (codexClient === this.#clients.get("codex")) {
         this.#setStatus({
           capabilities: { ...this.#status.capabilities, computerUse },
@@ -1278,11 +1409,16 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   #bindClient(client: AgentClient): void {
+    // Taken before `start()`, which is where the CLI reads the endpoint files.
+    this.#configRevisions.set(client, this.#hooks.captureConfigRevision());
     this.#hooks.bindClient(client);
     client.on("diagnostic", (message) => {
-      if (/error|failed|warning/i.test(message)) {
-        this.#emitError(`${client.provider}_diagnostic`, message);
+      if (!/error|failed|warning/i.test(message)) return;
+      if (isMcpSubsystemDiagnostic(message)) {
+        logger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });
+        return;
       }
+      this.#emitError(`${client.provider}_diagnostic`, message);
     });
     client.once("exit", (error) => this.#handleExit(client, error));
   }
@@ -1343,13 +1479,20 @@ export class ProviderRuntime implements ProviderPort {
     }, delayMs);
   }
 
-  async #refreshModelCatalog(): Promise<void> {
-    const discovered = (
-      await Promise.all(
-        BUILT_IN_PROVIDER_DRIVERS.map(async ({ id: provider }): Promise<AgentModelOption[]> => {
+  /**
+   * Reads the catalogue of every connected CLI, and answers which providers replied with a fresh one.
+   *
+   * A provider that has no client, or whose `model/list` failed or timed out, keeps the models it
+   * already had. That is the right catalogue to keep answering with, but it is not proof of what the
+   * process now running serves, so its id is absent from the set and no caller may treat it as proof.
+   */
+  async #refreshModelCatalog(): Promise<Set<AgentProvider>> {
+    const discovered = await Promise.all(
+      BUILT_IN_PROVIDER_DRIVERS.map(
+        async ({ id: provider }): Promise<{ provider: AgentProvider; models: AgentModelOption[]; fresh: boolean }> => {
           const previous = this.#models.filter((model) => model.provider === provider);
           const client = this.#clients.get(provider);
-          if (!client) return previous;
+          if (!client) return { provider, models: previous, fresh: false };
           const suppressed = SUPPRESSED_MODEL_IDS.get(provider) ?? new Set<string>();
           // Read once per pass, not per model: a stored key cannot change inside one refresh, and
           // the prefix is unusable only because OpenBot is what put that key in the environment.
@@ -1400,11 +1543,17 @@ export class ProviderRuntime implements ProviderPort {
                 // The name the provider CLI gives, whole: a model is easier to recognise as
                 // `GPT-5.6 Sol` than as `Sol`, and its own CLI names it that way.
                 // Claude Code is the exception, and `claudeModelName` says why.
-                name:
+                // Clamped, because a name over the limit is not a long name downstream: it fails
+                // `isAgentModelOption`, and the IPC and Team API list decoders fail closed on the
+                // whole array, so one over-long name empties the picker. OpenCode is the CLI that
+                // reaches it - it names a custom model `"<provider name>/<model name>"`, and 80 plus
+                // 160 characters passes 160 - but the clamp protects every CLI.
+                name: modelDisplayName(
                   (client.provider === "claude" ? claudeModelName(server.model) : null) ||
-                  server.displayName?.trim() ||
-                  fallback?.name ||
-                  server.model,
+                    server.displayName?.trim() ||
+                    fallback?.name ||
+                    server.model,
+                ),
                 description:
                   fallback?.description ?? `${providerLabel(client.provider)} model discovered from the local CLI.`,
                 defaultReasoningEffort: isReasoningEffort(server?.defaultReasoningEffort)
@@ -1416,16 +1565,17 @@ export class ProviderRuntime implements ProviderPort {
               });
             }
             const rank = PREFERRED_MODEL_ORDER.get(client.provider);
-            if (!rank) return models;
+            if (!rank) return { provider, models, fresh: true };
             // Sort is stable, so the CLI's own order still decides inside one tier.
-            return [...models].sort((left, right) => rank(left) - rank(right));
+            return { provider, models: [...models].sort((left, right) => rank(left) - rank(right)), fresh: true };
           } catch {
-            return previous;
+            return { provider, models: previous, fresh: false };
           }
-        }),
-      )
-    ).flat();
-    this.#models = discovered;
+        },
+      ),
+    );
+    this.#models = discovered.flatMap((entry) => entry.models);
+    return new Set(discovered.filter((entry) => entry.fresh).map((entry) => entry.provider));
   }
 
   async #probeComputerUse(client: AgentClient): Promise<"ready" | "setup-required" | "unavailable"> {

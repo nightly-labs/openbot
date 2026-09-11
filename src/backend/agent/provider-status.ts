@@ -1,5 +1,6 @@
 import type { ChildProcess } from "node:child_process";
 import type { AgentProviderStatus } from "@openbot/contracts/ipc";
+import { redactText } from "@openbot/logging";
 import type { AgentProvider } from "../agent-client";
 import { CodexCliError } from "../cli";
 
@@ -29,7 +30,10 @@ export function providerFailureStatus(
   error: unknown,
   version: string | null | undefined,
 ): Omit<AgentProviderStatus, "id"> {
-  const message = error instanceof Error ? error.message : String(error);
+  // Redacted, because this message reaches the renderer and every log with it, and a provider CLI
+  // quotes what it was given: an OpenCode failure can carry the API key or a header value of a
+  // custom endpoint. The fixed strings below need no redaction, but the CLI's own text does.
+  const message = redactText(error instanceof Error ? error.message : String(error));
   if (error instanceof CodexCliError) {
     if (provider === "codex" || provider === "claude") {
       const label = provider === "codex" ? "ChatGPT" : "Claude";

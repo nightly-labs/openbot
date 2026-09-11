@@ -12,6 +12,7 @@ import {
   type RpcError,
   type RpcMessage,
 } from "./protocol";
+import { createDiagnosticStream } from "./stderr-diagnostics";
 
 interface PendingRequest {
   resolve: (value: unknown) => void;
@@ -79,10 +80,14 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       }
     });
 
-    child.stderr.on("data", (chunk: Buffer) => {
-      const diagnostic = chunk.toString("utf8").trim();
-      if (diagnostic) this.emit("diagnostic", redactDiagnostic(diagnostic));
+    // Whole records only. A chunk ends wherever the pipe filled up, and half a record is neither
+    // readable nor reliably redactable.
+    const diagnostics = createDiagnosticStream({
+      redact: redactDiagnostic,
+      emit: (message) => this.emit("diagnostic", message),
     });
+    child.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk.toString("utf8")));
+    child.once("close", () => diagnostics.flush());
 
     child.once("error", (error) => this.#fail(error, child));
     child.once("exit", (code, signal) => {

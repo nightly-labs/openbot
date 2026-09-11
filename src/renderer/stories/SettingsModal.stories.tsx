@@ -2,6 +2,8 @@ import type {
   AgentStatus,
   AvatarImageInput,
   CentralAuthUser,
+  CustomProviderRestart,
+  CustomProviderSummary,
   MobileConnectedDevice,
   ProviderRuntimeSnapshot,
   UpdateStatus,
@@ -73,6 +75,31 @@ const providerUpdateAgentStatus: AgentStatus = {
     message: null,
   })),
 };
+/** OpenCode installed with no account of its own: enough to run an endpoint that brings its own key. */
+const openCodeInstalledAgentStatus: AgentStatus = {
+  ...providerUpdateAgentStatus,
+  providers: [
+    ...(providerUpdateAgentStatus.providers ?? []),
+    { id: "opencode", state: "sign-in-required", version: "1.18.27", message: null },
+  ],
+};
+/** Two saved endpoints: one with a key of its own, one on this computer that asks for none. */
+const STORY_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
+  {
+    id: "studio-local",
+    name: "Studio Local",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    hasApiKey: false,
+    models: [{ id: "qwen3-coder:30b", name: "Qwen3 Coder 30B" }],
+  },
+  {
+    id: "house-router",
+    name: "House Router",
+    baseUrl: "https://models.example.com/v1",
+    hasApiKey: true,
+    models: [{ id: "gpt-oss-120b", name: "GPT OSS 120B" }],
+  },
+];
 const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   codex: { phase: "ready", progress: 100, message: null, version: "0.149.1" },
   claude: { phase: "ready", progress: 100, message: null, version: "2.1.246", availableVersion: "2.1.250" },
@@ -88,6 +115,9 @@ function SettingsModalStory(props: {
   providerUpdate?: boolean;
   providerUpdateFailure?: boolean;
   simulateMobileConnection?: boolean;
+  openCodeInstalled?: boolean;
+  customProviderList?: boolean;
+  customProviderSaveFails?: boolean;
 }) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot({
@@ -121,6 +151,20 @@ function SettingsModalStory(props: {
   onCleanup(() => {
     if (mobileConnectionTimer !== undefined) window.clearTimeout(mobileConnectionTimer);
   });
+
+  const [customProviders, setCustomProviders] = createSignal<CustomProviderSummary[]>(
+    props.customProviderList ? [...STORY_CUSTOM_PROVIDERS] : [],
+  );
+
+  async function addCustomProvider(): Promise<CustomProviderRestart> {
+    if (props.customProviderSaveFails) throw new Error("House Router refused the API key.");
+    return "restarted";
+  }
+
+  async function deleteCustomProvider(id: string): Promise<CustomProviderRestart> {
+    setCustomProviders((current) => current.filter((provider) => provider.id !== id));
+    return "restarted";
+  }
 
   async function updateAccountAvatar(image: AvatarImageInput | null): Promise<void> {
     const avatarUrl = image
@@ -198,7 +242,13 @@ function SettingsModalStory(props: {
           }}
           onUpdateAction={runUpdateAction}
           agentStatus={
-            props.providerUpdate ? providerUpdateAgentStatus : props.providerDownloads ? providerAgentStatus : undefined
+            props.providerUpdate
+              ? providerUpdateAgentStatus
+              : props.providerDownloads
+                ? providerAgentStatus
+                : props.openCodeInstalled
+                  ? openCodeInstalledAgentStatus
+                  : undefined
           }
           providerRuntimeStatuses={
             props.providerUpdate
@@ -216,6 +266,9 @@ function SettingsModalStory(props: {
             props.providerUpdate ? runtimes.cancelProviderRuntimeDownload : props.providerDownloads ? fn() : undefined
           }
           onConnectProvider={props.providerDownloads || props.providerUpdate ? fn() : undefined}
+          onAddCustomProvider={addCustomProvider}
+          onDeleteCustomProvider={deleteCustomProvider}
+          customProviders={customProviders()}
         />
       </main>
       <Toaster />
@@ -270,6 +323,61 @@ type Story = StoryObj<typeof meta>;
 
 export const Open: Story = {
   render: () => <SettingsModalStory initialOpen />,
+};
+
+/** The row that adds a self-described endpoint. OpenCode is installed, so the row offers Add. */
+export const AddCustomProvider: Story = {
+  render: () => <SettingsModalStory initialOpen openCodeInstalled />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("button", { name: "Add custom provider" }));
+    await expect(body.findByRole("heading", { name: "Custom provider" })).resolves.toBeTruthy();
+  },
+};
+
+/**
+ * The saved endpoints, and the removal that discards a key. They are listed in a dialog the count on
+ * the Custom provider row opens, so the AI providers section keeps its rows of fixed height.
+ */
+export const CustomProviderList: Story = {
+  render: () => <SettingsModalStory initialOpen openCodeInstalled customProviderList />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("button", { name: "Manage 2 endpoints" }));
+    await expect(body.findByRole("button", { name: "Delete Studio Local" })).resolves.toBeTruthy();
+    // The removal asks first. Storybook has no dialog to answer, so the answer is given here.
+    const previousConfirm = window.confirm;
+    window.confirm = () => true;
+    try {
+      await userEvent.click(body.getByRole("button", { name: "Delete House Router" }));
+      await waitFor(() => expect(body.queryByRole("button", { name: "Delete House Router" })).toBeNull());
+      await expect(body.getByRole("button", { name: "Delete Studio Local" })).toBeVisible();
+      // The last endpoint leaves the dialog on its empty state rather than closing under the hand.
+      await userEvent.click(body.getByRole("button", { name: "Delete Studio Local" }));
+      await expect(body.findByText("No custom endpoints yet.")).resolves.toBeTruthy();
+    } finally {
+      window.confirm = previousConfirm;
+    }
+  },
+};
+
+/** The endpoint is refused, so the form stays with the values, including the key the user typed. */
+export const CustomProviderSaveFails: Story = {
+  render: () => <SettingsModalStory initialOpen openCodeInstalled customProviderSaveFails />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("button", { name: "Add custom provider" }));
+    // A required field appends an aria-hidden asterisk to its label, so its name is not an exact match.
+    await userEvent.type(await body.findByLabelText(/^Provider ID/), "house-router");
+    await userEvent.type(body.getByLabelText(/^Display name/), "House Router");
+    await userEvent.type(body.getByLabelText(/^Base URL/), "https://models.example.com/v1");
+    await userEvent.type(body.getByLabelText("Model 1 ID"), "glm-5-air");
+    await userEvent.type(body.getByLabelText("Model 1 display name"), "GLM 5 Air");
+    await userEvent.click(body.getByRole("button", { name: "Submit" }));
+
+    await expect(body.findByText("House Router refused the API key.")).resolves.toBeTruthy();
+    await expect(body.getByLabelText(/^Provider ID/)).toHaveValue("house-router");
+  },
 };
 
 export const Narrow: Story = {
