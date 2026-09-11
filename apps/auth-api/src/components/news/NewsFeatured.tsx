@@ -29,9 +29,10 @@ export function NewsFeatured(props: NewsFeaturedProps) {
         </Button>
       </div>
 
-      {/* Not a link itself. The heading's link is stretched over the whole block by
-          CSS, so the artwork — the biggest target on the page — goes to the article
-          without a screen reader hearing the same destination three times. */}
+      {/* Not a link itself, and it takes no pointer. The heading's link is stretched
+          over the whole block by CSS and passes under this frame, so the artwork —
+          the biggest target on the page — goes to the article without a screen
+          reader hearing the same destination three times. */}
       <div class="news-featured-art" data-enter="news-art">
         <NewsGradient slug={props.article.slug} title={props.article.title} mode="live" shape="featured" />
         <span class="news-featured-art-title" aria-hidden="true">

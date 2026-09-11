@@ -1674,6 +1674,12 @@ a {
   place-items: center;
   overflow: hidden;
   border: 1px solid var(--openbot-border-strong);
+  /* The artwork is decoration, and it is the largest thing on a card. It takes no
+     pointer, so a click on it reaches the link that covers the block: on the
+     featured article that link is a stretched pseudo-element, and it cannot paint
+     over this frame because the entry animation leaves a transform on the copy
+     column, which traps the z-index inside a stacking context of its own. */
+  pointer-events: none;
 }
 
 .news-featured-art {
@@ -1794,14 +1800,22 @@ a {
 /* The block at the top of a news page is in the server's HTML and is already on
    screen when the page loads, so it takes the header's `data-enter` route rather
    than an observer: nothing has to arrive before it can play. The longhands below
-   the `[data-enter]` shorthand keep the fill and the attribute, and swap in the
-   same reveal the cards use, so one page has one motion. The artwork follows the
-   copy by a step, which is the order the block is read in. */
+   the `[data-enter]` shorthand swap in the same reveal the cards use, so one page
+   has one motion. The artwork follows the copy by a step, which is the order the
+   block is read in.
+
+   `backwards`, not the shorthand's `both`, and it is what the cards already use.
+   The reveal ends on `blur(0.001px)`, and a filter that is held makes the element
+   a containing block for anything absolutely positioned inside it. Held on the
+   copy column, that shrinks the featured article's stretched link to the width of
+   the copy, and the artwork beside it stops being clickable. The last frame is
+   the resting state anyway, so there is nothing for the fill to hold. */
 [data-enter="news-copy"],
 [data-enter="news-art"] {
   animation-name: landing-download-reveal;
   animation-duration: 720ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: backwards;
 }
 
 [data-enter="news-copy"] {
@@ -2004,6 +2018,7 @@ a {
 }
 
 @media (hover: hover) and (pointer: fine) {
+  .news-featured,
   .news-card {
     cursor: pointer;
   }

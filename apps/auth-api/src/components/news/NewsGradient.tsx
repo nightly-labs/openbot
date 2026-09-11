@@ -36,22 +36,28 @@ import { cx } from "../../lib/utils";
 // The canvas is revealed only once it has drawn, and it fades in over that same
 // frame, so the handover is never a cut and never a cut to an empty rectangle.
 
-export type NewsGradientMode = "live" | "hover";
-
-export interface NewsGradientProps {
+interface NewsGradientBaseProps {
   slug: string;
   title: string;
-  mode: NewsGradientMode;
   /** The frame this artwork fills, which decides the shape it is drawn at. */
   shape: NewsArtShape;
-  /**
-   * The element a pointer must be over for a `hover` gradient to run. Give it the
-   * whole card, so the artwork reacts to the date and the title under it as well.
-   * Defaults to the artwork alone.
-   */
-  hoverTarget?: () => HTMLElement | undefined;
   class?: string;
 }
+
+export type NewsGradientProps = NewsGradientBaseProps &
+  (
+    | { mode: "live"; hoverTarget?: never }
+    | {
+        mode: "hover";
+        /**
+         * The element a pointer must be over for the gradient to run. Required,
+         * and never the artwork: the artwork takes no pointer, so that the link
+         * covering the card stays clickable. Give this the whole card, so the
+         * artwork also reacts to the date and the title under it.
+         */
+        hoverTarget: () => HTMLElement | undefined;
+      }
+  );
 
 const ANIMATION_SPEED = 0.6;
 
@@ -237,7 +243,7 @@ export function NewsGradient(props: NewsGradientProps) {
       return;
     }
 
-    const element = props.hoverTarget?.() ?? host;
+    const element = props.hoverTarget?.();
     if (!element) return;
 
     // Paint the first frame now and let the context go again, so a card at rest
