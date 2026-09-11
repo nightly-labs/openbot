@@ -158,6 +158,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    */
   #endpointRevision = 0;
   /**
+   * The newest revision whose file write finished, which is the newest a spawning process can read.
+   * A removal is excluded before its write, so a process that starts during the write reads the old
+   * file and must not be taken as proof that the endpoint is gone.
+   */
+  #committedEndpointRevision = 0;
+  /**
    * One endpoint change or one agent update at a time. A removal excludes the endpoint, moves the
    * agents off it and then writes the file; an agent update that ran between those steps could put
    * an agent back onto the endpoint after the sweep and before the write, and the removal would not
@@ -315,7 +321,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               // it away. Only its own guard reports the turn the CLI is running.
               (this.#conversation.workingSnapshot(agent.id) != null || !this.#compaction.mayDrain(agent.id)),
           ),
-        captureConfigRevision: () => this.#endpointRevision,
+        captureConfigRevision: () => this.#committedEndpointRevision,
         onProviderActivated: (provider, configRevision) => {
           if (provider === "opencode") this.#clearReleasedCustomProviders(configRevision);
         },
@@ -1144,11 +1150,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#runEndpointExclusive(async () => {
       const previous = this.#releasedCustomProviders.get(providerId);
       this.#endpointRevision += 1;
-      this.#releasedCustomProviders.set(providerId, this.#endpointRevision);
+      const revision = this.#endpointRevision;
+      this.#releasedCustomProviders.set(providerId, revision);
       this.#emitModelsChanged();
       try {
         await this.#releaseCustomProviderModels();
-        return await persist();
+        const persisted = await persist();
+        // Only now is the removal on disk, so only now can a process read it. Removals run one at a
+        // time on the chain, so this number never goes back.
+        this.#committedEndpointRevision = revision;
+        return persisted;
       } catch (error) {
         if (previous !== undefined) this.#releasedCustomProviders.set(providerId, previous);
         else this.#releasedCustomProviders.delete(providerId);

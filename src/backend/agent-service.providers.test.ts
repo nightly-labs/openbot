@@ -718,6 +718,82 @@ describe.sequential("AgentService: providers", () => {
     expect(service.listModels().map((model) => model.id)).toContain("studio/local-llm");
   });
 
+  it("keeps an endpoint out while its removal is still being written", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider);
+      if (provider === "opencode") {
+        client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
+      }
+      return client;
+    });
+    await service.initialize();
+
+    // The file write is held, so the saved endpoints are still the ones a process spawning now reads.
+    let releaseWrite: () => void = () => undefined;
+    const written = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    const removal = service.removeCustomProvider("studio", () => written);
+    // The removal runs on the endpoint chain, so the exclusion arrives on a later tick.
+    await waitFor(() => !service?.listModels().some((model) => model.id === "studio/local-llm"));
+
+    // This process reads the file as it still is, so its catalogue does not confirm the removal.
+    expect(await service.reloadOpenCodeConfig()).toBe("restarted");
+    expect(service.listModels().map((model) => model.id)).toContain("house/router-llm");
+    expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
+
+    releaseWrite();
+    await removal;
+
+    // The removal is on disk now, so the next process reads it and its catalogue counts.
+    expect(await service.reloadOpenCodeConfig()).toBe("restarted");
+    expect(service.listModels().map((model) => model.id)).toContain("studio/local-llm");
+  });
+
+  it("fails a delivery whose endpoint is removed while the thread is prepared", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    // No Codex CLI, so no fallback exists and the removal goes ahead while the agent is busy.
+    process.env.OPENBOT_CODEX_PATH = join(root, "absent-codex");
+    const { store, mailbox } = stores(root);
+    const opencodeMethods: string[] = [];
+    let signalPreparing: () => void = () => undefined;
+    const preparing = new Promise<void>((resolve) => {
+      signalPreparing = resolve;
+    });
+    let releasePreparing: () => void = () => undefined;
+    const prepared = new Promise<void>((resolve) => {
+      releasePreparing = resolve;
+    });
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider, undefined, true, true, {}, async (method) => {
+        if (provider === "opencode") opencodeMethods.push(method);
+        // Holds the delivery between the check it passes and the request that starts the turn.
+        if (method !== "thread/start") return;
+        signalPreparing();
+        await prepared;
+      });
+      if (provider === "opencode") client.modelList = () => ({ data: [{ model: "lmstudio/local-llm" }] });
+      return client;
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" });
+
+    await service.sendMessage({ agentId: "chief", text: "Keep working" });
+    await preparing;
+    await service.removeCustomProvider("lmstudio", async () => undefined);
+    releasePreparing();
+
+    await waitFor(() => service?.listQueue("chief").deliveries.some((delivery) => delivery.status === "failed"));
+    expect(service.listQueue("chief").deliveries.at(-1)?.error).toBe(
+      "The endpoint this agent used was removed. Choose another model for it.",
+    );
+    // Nothing reached the process that still answers on the removed endpoint.
+    expect(opencodeMethods).not.toContain("turn/start");
+  });
+
   // An id saved again is served again, whatever the CLI did with the removal before it.
   it("offers an endpoint's models again after the id is saved a second time", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);

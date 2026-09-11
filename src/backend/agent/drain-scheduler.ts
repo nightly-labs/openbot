@@ -15,6 +15,9 @@ import type { RoutineScheduler } from "./routine-scheduler";
 import { isMissingProviderSessionError, isRequestTimeout, providerForAgent } from "./thread-items";
 import type { ThreadLifecycle } from "./thread-lifecycle";
 
+/** Shown to the user when a delivery names a model of an endpoint that was taken out. */
+const REMOVED_ENDPOINT_MESSAGE = "The endpoint this agent used was removed. Choose another model for it.";
+
 export interface DrainHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
   isStopping(): boolean;
@@ -192,13 +195,14 @@ export class DrainScheduler {
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
       await this.#mailbox.verifyDeliveryAttachments(delivery.id);
       const agent = await this.#store.getOrCreate(delivery.recipientAgentId);
-      if (!this.#hooks.servesModel(agent.model)) {
-        // The endpoint was removed while this agent was busy, so no other model could be given to it
-        // then. The old process would still answer on the removed endpoint, with the credentials it
-        // started with, until it restarts. Thrown rather than failed here: the catch below also ends
-        // the channel assignment, and an assignment left active holds back every other agent.
-        throw new Error("The endpoint this agent used was removed. Choose another model for it.");
-      }
+      // The endpoint was removed while this agent was busy, so no other model could be given to it
+      // then. The old process would still answer on the removed endpoint, with the credentials it
+      // started with, until it restarts. Thrown rather than failed here: the catch below also ends
+      // the channel assignment, and an assignment left active holds back every other agent.
+      const requireServedModel = () => {
+        if (!this.#hooks.servesModel(agent.model)) throw new Error(REMOVED_ENDPOINT_MESSAGE);
+      };
+      requireServedModel();
       this.#threads.applyPendingRuntimeRefresh(agent);
       await this.#providers.ensureProvider(providerForAgent(agent));
       const client = this.#providers.requireReadyClient(providerForAgent(agent));
@@ -317,8 +321,12 @@ export class DrainScheduler {
       }
       this.#conversation.emitConversation(snapshot);
 
-      const startTurn = (providerThreadId: string) =>
-        this.#threads.requestWithArchivedThreadRecovery(
+      const startTurn = (providerThreadId: string) => {
+        // Read again here, not only above: the provider, the thread and the channel are prepared in
+        // between, and an endpoint removed during that wait finds the process still running. The
+        // retry below calls this as well, so the recovered thread is checked too.
+        requireServedModel();
+        return this.#threads.requestWithArchivedThreadRecovery(
           agent,
           client,
           "turn/start",
@@ -335,6 +343,7 @@ export class DrainScheduler {
           },
           decodeTurnResponse,
         );
+      };
       let response: Awaited<ReturnType<typeof startTurn>>;
       try {
         response = await startTurn(threadId);
