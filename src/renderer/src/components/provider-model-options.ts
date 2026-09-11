@@ -6,7 +6,6 @@ export interface PickerModel {
   name: string;
   service: string;
   free: boolean;
-  local: boolean;
   variants: { id: string; name: string }[];
 }
 
@@ -16,18 +15,14 @@ export interface PickerModelGroup {
 }
 
 /**
- * OpenCode names a custom provider by its config key, so a locally served model arrives as
- * `ollama/…` or `lmstudio/…` with no field saying the weights never leave the computer. These are
- * the runtime keys OpenCode documents for a local endpoint; anything else stays unlabelled rather
- * than guessing that a private host is local.
+ * Anything the provider names Free first, then the rest.
+ *
+ * There is no "runs on this computer" tier: a custom endpoint is keyed by a name the user types, so
+ * the id says nothing about where the model runs. A remote host named `ollama` would earn the label
+ * and a loopback endpoint named anything else would not, and the label is a privacy claim.
  */
-const LOCAL_SERVICE_PATTERN = /^(ollama|lmstudio|lm-studio|llamacpp|llama-cpp|vllm|local)\//i;
-
-/** Local first, then anything the provider names Free, then the rest. */
-function modelTier(model: PickerModel): 0 | 1 | 2 {
-  if (model.local) return 0;
-  if (model.free) return 1;
-  return 2;
+function modelTier(model: PickerModel): 0 | 1 {
+  return model.free ? 0 : 1;
 }
 
 /** OpenCode exposes reasoning variants as model IDs. Keep those IDs at the selection boundary. */
@@ -57,7 +52,6 @@ export function pickerModels(options: AgentModelOption[]): PickerModel[] {
         // Only label models explicitly named Free by the provider; unknown pricing stays unlabelled.
         // Shared with the catalog order, so the badge and the default agree on what is free.
         free: model.provider === "opencode" && isFreeOpencodeModelName(name),
-        local: model.provider === "opencode" && LOCAL_SERVICE_PATTERN.test(model.id),
         variants: variants.has(model.id) ? [{ id: model.id, name: "Default" }, ...(variants.get(model.id) ?? [])] : [],
       };
     });

@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { SaveCustomProviderInput } from "@openbot/contracts/ipc";
@@ -169,6 +169,21 @@ describe("CustomProviderStore", () => {
     expect(raw.includes("studio-local")).toBe(false);
 
     expect(await store.remove("studio-local")).toHaveLength(1);
+  });
+
+  it("keeps the endpoint listed when the removal cannot be written, and removes it on a retry", async () => {
+    const store = await loaded();
+    await store.save(input());
+    // A directory this process cannot write to is the durable failure the user meets as a full or
+    // read-only disk: the file keeps the endpoint, so the list in memory must keep it too.
+    await chmod(dirname(path), 0o500);
+
+    await expect(store.remove("studio-local")).rejects.toThrow();
+
+    expect(store.list()).toHaveLength(1);
+    await chmod(dirname(path), 0o700);
+    expect(await store.remove("studio-local")).toEqual([]);
+    expect((await readFile(path, "utf8")).includes("studio-local")).toBe(false);
   });
 
   it("leaves no temporary file behind", async () => {

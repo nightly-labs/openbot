@@ -1085,6 +1085,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * The caller runs this *before* the endpoint is removed and OpenCode restarts, so no agent is left
    * naming a model the fresh catalogue does not list. A new pick is already safe: `updateAgent`
    * refuses a model that no connected provider reports.
+   *
+   * Throws while an affected agent is busy, which stops the removal: the move goes through
+   * `updateAgent`, and a provider switch there is refused during a turn or a queued delivery. The
+   * check runs over all of them first, so a refusal moves no agent at all.
    */
   async releaseCustomProviderModels(providerId: string): Promise<void> {
     const owned = new Set([providerId]);
@@ -1102,15 +1106,30 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // Nothing is listed, so there is no model to move to. The removal still goes ahead: refusing it
     // would trap the user on an endpoint that may be the reason no model is listed.
     if (!fallback) return;
+    if (fallback.provider !== "opencode" && affected.some((agent) => this.#hasWorkInFlight(agent))) {
+      throw new Error("Wait for the active turn and queue to finish before you remove this endpoint.");
+    }
     for (const agent of affected) {
-      await this.#store.updateAgent({
+      await this.updateAgent({
         agentId: agent.id,
         provider: fallback.provider,
         model: fallback.id,
         reasoningEffort: fallback.defaultReasoningEffort,
       });
     }
-    this.#emit({ type: "agents-changed", agents: this.listAgents() });
+  }
+
+  /**
+   * Whether a turn is running for this agent or a delivery is still queued for it. Read from the
+   * live snapshot first, then from the stored conversation, because an agent whose thread is not
+   * loaded keeps its active turn in the database.
+   */
+  #hasWorkInFlight(agent: AgentSummary): boolean {
+    if (this.#mailbox.hasUnfinishedDelivery(agent.id)) return true;
+    const active =
+      this.#conversation.workingSnapshot(agent.id)?.activeTurnId ??
+      (agent.threadId ? this.#store.database.readConversation(agent.id, agent.threadId).activeTurnId : null);
+    return Boolean(active);
   }
 
   async stop(): Promise<void> {

@@ -136,7 +136,7 @@ export class CustomProviderStore {
     // Refused only for an endpoint that has something to protect. A keyless local endpoint still
     // saves on a computer with no keychain, which is the common case for one.
     if (secret && !this.#cipher.canPersist()) throw new Error(NO_SECURE_STORAGE_MESSAGE);
-    this.#entries = [
+    const entries = [
       ...this.#entries,
       {
         stored: {
@@ -149,7 +149,8 @@ export class CustomProviderStore {
         secret,
       },
     ];
-    await this.#persist();
+    await this.#persist(entries);
+    this.#entries = entries;
     return this.list();
   }
 
@@ -158,8 +159,8 @@ export class CustomProviderStore {
     if (this.#readOnly) throw new Error(READ_ONLY_MESSAGE);
     const remaining = this.#entries.filter((entry) => entry.stored.id !== id);
     if (remaining.length === this.#entries.length) return this.list();
+    await this.#persist(remaining);
     this.#entries = remaining;
-    await this.#persist();
     return this.list();
   }
 
@@ -179,10 +180,15 @@ export class CustomProviderStore {
     }
   }
 
-  async #persist(): Promise<void> {
+  /**
+   * Writes the list the caller proposes. The caller publishes it to `#entries` only after this
+   * resolves: a failed write must leave the in-memory list as it was, so a retry sees the same
+   * state the file holds and does not report a removal the disk never took.
+   */
+  async #persist(entries: readonly Entry[]): Promise<void> {
     // The stored half only: every entry keeps the ciphertext it arrived with, so an untouched
     // endpoint is never decrypted and encrypted again.
-    const providers = this.#entries.map((entry) => entry.stored);
+    const providers = entries.map((entry) => entry.stored);
     const operation = this.#writeChain.then(async () => {
       await mkdir(dirname(this.#path), { recursive: true, mode: 0o700 });
       const temporary = `${this.#path}.${randomUUID()}.tmp`;

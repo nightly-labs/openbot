@@ -2520,13 +2520,6 @@
   line-height: 15px;
 }
 
-/* A local model answers without leaving the computer, which is a different kind of fact from a
-   price. It earns the accent the rest of the picker reserves for the active choice. */
-.provider-model-option-name small.provider-model-local {
-  background: var(--openbot-accent-soft);
-  color: var(--openbot-accent-text);
-}
-
 .provider-model-check {
   width: 15px;
   height: 15px;

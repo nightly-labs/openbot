@@ -440,6 +440,40 @@ describe.sequential("AgentService: providers", () => {
     });
   });
 
+  it("refuses to release a busy agent when the only model left belongs to another provider", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      // The turn never finishes, so the agent stays busy for the whole test.
+      const client = new FakeAgentClient(provider, "", false);
+      // Every OpenCode model comes from the endpoint being removed, so the fallback has to change
+      // provider, and that is the switch which must not happen under a running turn.
+      if (provider === "opencode") client.modelList = () => ({ data: [{ model: "lmstudio/local-llm" }] });
+      clients.set(provider, client);
+      return client;
+    });
+    await service.initialize();
+    await service.ensureProvider("codex");
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.sendMessage({ agentId: "chief", text: "Keep working" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+
+    await expect(service.releaseCustomProviderModels("lmstudio")).rejects.toThrow(
+      "Wait for the active turn and queue to finish before you remove this endpoint.",
+    );
+
+    // The endpoint stays saved because the caller stops on the refusal, so the agent must still name
+    // its model: a switch here would leave the running OpenCode process unowned and stoppable.
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
+      provider: "opencode",
+      model: "lmstudio/local-llm",
+    });
+  });
+
   it("derives live progress from the provider-neutral turn and tool lifecycle", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);

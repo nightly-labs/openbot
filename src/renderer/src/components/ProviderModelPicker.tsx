@@ -434,9 +434,6 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               >
                                 <span class="provider-model-option-name">
                                   <span>{displayModelName(model.name, model.id)}</span>
-                                  <Show when={model.local}>
-                                    <small class="provider-model-local">Local</small>
-                                  </Show>
                                   <Show when={model.free}>
                                     <small>Free</small>
                                   </Show>
