@@ -8,7 +8,11 @@ import { Button } from "../ui/button";
 // second treatment, so the page ends in the voice the site opened in.
 export function NewsCallToAction() {
   let section: HTMLElement | undefined;
-  const revealed = createLandingReveal(() => section);
+  // No inset margin: the default holds a block back until it has climbed 40% of the
+  // viewport, which reads as late here because the footer sits directly below and the
+  // reader is on their way to it. Without the inset the block is already in place by
+  // the time it is looked at.
+  const revealed = createLandingReveal(() => section, { rootMargin: "0px" });
 
   return (
     <section
