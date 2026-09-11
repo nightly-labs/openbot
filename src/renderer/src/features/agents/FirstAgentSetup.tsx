@@ -146,7 +146,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
   const [canScrollSuggestionsBack, setCanScrollSuggestionsBack] = createSignal(false);
   const [canScrollSuggestionsForward, setCanScrollSuggestionsForward] = createSignal(false);
   const [draggingSuggestions, setDraggingSuggestions] = createSignal(false);
-  const canSubmit = () => Boolean(props.value.name.trim() && props.value.purpose.trim()) && !props.submitting;
+  const canSubmit = () => Boolean(props.value.name.trim()) && !props.submitting;
   const displayName = () => props.value.name.trim() || "New agent";
 
   function updateSuggestionFades(): void {
@@ -399,7 +399,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                 onValueChange={(name) => updateDraft({ name })}
               />
             </Field>
-            <Field label="What should this agent help with?" required>
+            <Field label="What should this agent help with?">
               <Textarea
                 value={props.value.purpose}
                 rows={2}
