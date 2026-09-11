@@ -93,6 +93,28 @@ describe("redactText", () => {
     const uuid = "agent-3fa85f64-5717-4562-b3fc-2c963f66afa6";
     expect(redactText(`loaded ${uuid}`)).toBe(`loaded ${uuid}`);
   });
+  // A provider writes one stderr line that holds both prose and a payload, and that line reaches the
+  // renderer through `redactText`. The payload has to be read as a payload even with a prefix.
+  it("redacts a payload embedded in a longer line", () => {
+    expect(redactText('ERROR request failed: {"headers":{"X-Tenant":"tenant-secret"}}')).toBe(
+      'ERROR request failed: {"headers":{"X-Tenant":"[redacted]"}}',
+    );
+    expect(redactText('sent {"apiKey":"abcdef123456"} and got {"headers":{"A":"b"}} back')).toBe(
+      'sent {"apiKey":"[redacted]"} and got {"headers":{"A":"[redacted]"}} back',
+    );
+  });
+
+  it("leaves prose with an unbalanced brace alone", () => {
+    expect(redactText("two headers were rejected { and the run never closes")).toBe(
+      "two headers were rejected { and the run never closes",
+    );
+  });
+
+  // A payload that parses is written back as JSON, so its spacing is the serializer's. The text
+  // around it is untouched: only the run itself is read as data.
+  it("keeps the text around an embedded payload", () => {
+    expect(redactText("read [1, 2, 3] items")).toBe("read [1,2,3] items");
+  });
 });
 
 describe("redactValue", () => {

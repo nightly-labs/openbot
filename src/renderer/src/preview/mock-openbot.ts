@@ -283,8 +283,20 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   // The same two endpoints the model-picker stories invent, so preview shows one list everywhere.
   let customProviders = clone(
     options.customProviders ?? [
-      { id: "studio-local", name: "Studio Local", baseUrl: "http://127.0.0.1:11434/v1", hasApiKey: false },
-      { id: "house-router", name: "House Router", baseUrl: "https://models.example.com/v1", hasApiKey: true },
+      {
+        id: "studio-local",
+        name: "Studio Local",
+        baseUrl: "http://127.0.0.1:11434/v1",
+        hasApiKey: false,
+        models: MOCK_CUSTOM_PROVIDER_MODELS["studio-local"] ?? [],
+      },
+      {
+        id: "house-router",
+        name: "House Router",
+        baseUrl: "https://models.example.com/v1",
+        hasApiKey: true,
+        models: MOCK_CUSTOM_PROVIDER_MODELS["house-router"] ?? [],
+      },
     ],
   );
   let marketplaceAgentSubmissions = clone(STORY_AGENT_SUBMISSIONS);
@@ -835,7 +847,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         MOCK_CUSTOM_PROVIDER_MODELS[input.id] = input.models.map((model) => ({ id: model.id, name: model.name }));
         customProviders = [
           ...customProviders,
-          { id: input.id, name: input.name, baseUrl: input.baseUrl, hasApiKey: input.apiKey !== null },
+          {
+            id: input.id,
+            name: input.name,
+            baseUrl: input.baseUrl,
+            hasApiKey: input.apiKey !== null,
+            models: input.models.map((model) => ({ id: model.id, name: model.name })),
+          },
         ];
         emitAgentEvent({ type: "status", status: clone(agentStatus) });
         return { providers: clone(customProviders), restart: "restarted" };

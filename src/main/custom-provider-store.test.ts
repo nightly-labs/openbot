@@ -58,7 +58,13 @@ describe("CustomProviderStore", () => {
 
     const reopened = await loaded();
     expect(reopened.list()).toEqual([
-      { id: "studio-local", name: "Studio Local", baseUrl: "http://127.0.0.1:11434/v1", hasApiKey: true },
+      {
+        id: "studio-local",
+        name: "Studio Local",
+        baseUrl: "http://127.0.0.1:11434/v1",
+        hasApiKey: true,
+        models: [{ id: "qwen3-coder:30b", name: "Qwen3 Coder 30B" }],
+      },
     ]);
     expect(reopened.configs()).toEqual([
       {
@@ -91,7 +97,7 @@ describe("CustomProviderStore", () => {
     await store.save(input());
     // Not `toEqual` on the whole object: this asserts that no fifth field can appear, whatever it
     // is named. `apiKey` and `headers` are the two that must never be here.
-    expect(Object.keys(store.list()[0] ?? {}).sort()).toEqual(["baseUrl", "hasApiKey", "id", "name"]);
+    expect(Object.keys(store.list()[0] ?? {}).sort()).toEqual(["baseUrl", "hasApiKey", "id", "models", "name"]);
   });
 
   it("refuses a credential when the computer has no secure storage", async () => {
@@ -105,7 +111,13 @@ describe("CustomProviderStore", () => {
     const store = await loaded(testCipher({ canPersist: () => false }));
     await store.save(input({ apiKey: null, headers: [] }));
     expect(store.list()).toEqual([
-      { id: "studio-local", name: "Studio Local", baseUrl: "http://127.0.0.1:11434/v1", hasApiKey: false },
+      {
+        id: "studio-local",
+        name: "Studio Local",
+        baseUrl: "http://127.0.0.1:11434/v1",
+        hasApiKey: false,
+        models: [{ id: "qwen3-coder:30b", name: "Qwen3 Coder 30B" }],
+      },
     ]);
   });
 
@@ -121,7 +133,13 @@ describe("CustomProviderStore", () => {
       }),
     );
     expect(foreign.list()).toEqual([
-      { id: "studio-local", name: "Studio Local", baseUrl: "http://127.0.0.1:11434/v1", hasApiKey: false },
+      {
+        id: "studio-local",
+        name: "Studio Local",
+        baseUrl: "http://127.0.0.1:11434/v1",
+        hasApiKey: false,
+        models: [{ id: "qwen3-coder:30b", name: "Qwen3 Coder 30B" }],
+      },
     ]);
     // The endpoint is still offered, without the credentials it can no longer supply, so the user
     // can see which one it is and add it again.
@@ -184,6 +202,33 @@ describe("CustomProviderStore", () => {
     await chmod(dirname(path), 0o700);
     expect(await store.remove("studio-local")).toEqual([]);
     expect((await readFile(path, "utf8")).includes("studio-local")).toBe(false);
+  });
+
+  // Two IPC calls can be in flight together, and neither handler holds a lock. A change that reads
+  // the list before the other one writes would drop an endpoint, or bring a removed one back.
+  it("keeps both endpoints when two saves run together", async () => {
+    const store = await loaded();
+
+    await Promise.all([store.save(input()), store.save(input({ id: "house-router", name: "House Router" }))]);
+
+    expect(
+      store
+        .list()
+        .map((provider) => provider.id)
+        .sort(),
+    ).toEqual(["house-router", "studio-local"]);
+    expect(JSON.parse(await readFile(path, "utf8")).providers).toHaveLength(2);
+  });
+
+  it("removes both endpoints when two removals run together", async () => {
+    const store = await loaded();
+    await store.save(input());
+    await store.save(input({ id: "house-router", name: "House Router" }));
+
+    await Promise.all([store.remove("studio-local"), store.remove("house-router")]);
+
+    expect(store.list()).toEqual([]);
+    expect(JSON.parse(await readFile(path, "utf8")).providers).toEqual([]);
   });
 
   it("leaves no temporary file behind", async () => {

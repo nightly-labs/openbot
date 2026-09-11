@@ -812,7 +812,13 @@ describe("SettingsModal", () => {
         onUpdateAccountAvatar={vi.fn(async () => undefined)}
         agentStatus={openCodeReadyStatus}
         customProviders={[
-          { id: "studio-local", name: "Studio Local", baseUrl: "http://127.0.0.1:11434/v1", hasApiKey: true },
+          {
+            id: "studio-local",
+            name: "Studio Local",
+            baseUrl: "http://127.0.0.1:11434/v1",
+            hasApiKey: true,
+            models: [],
+          },
         ]}
         onAddCustomProvider={vi.fn(async () => "restarted" as const)}
         onDeleteCustomProvider={onDeleteCustomProvider}
@@ -850,7 +856,13 @@ describe("SettingsModal", () => {
         onUpdateAccountAvatar={vi.fn(async () => undefined)}
         agentStatus={openCodeReadyStatus}
         customProviders={[
-          { id: "studio-local", name: "Studio Local", baseUrl: "http://127.0.0.1:11434/v1", hasApiKey: true },
+          {
+            id: "studio-local",
+            name: "Studio Local",
+            baseUrl: "http://127.0.0.1:11434/v1",
+            hasApiKey: true,
+            models: [],
+          },
         ]}
         onAddCustomProvider={vi.fn(async () => "restarted" as const)}
       />

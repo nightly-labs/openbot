@@ -118,7 +118,7 @@ describe("OnboardingFlow", () => {
     const onAddCustomProvider = vi.fn(async (value: SaveCustomProviderInput): Promise<CustomProviderRestart> => {
       setCustomProviders((current) => [
         ...current,
-        { id: value.id, name: value.name, baseUrl: value.baseUrl, hasApiKey: false },
+        { id: value.id, name: value.name, baseUrl: value.baseUrl, hasApiKey: false, models: value.models },
       ]);
       return "restarted";
     });
@@ -166,12 +166,18 @@ describe("OnboardingFlow", () => {
     // A second endpoint stays behind, so the custom row keeps the choice and only the model of the
     // removed endpoint can explain an empty model in setup.
     const [customProviders, setCustomProviders] = createSignal<CustomProviderSummary[]>([
-      { id: "house-router", name: "House Router", baseUrl: "https://models.example.com/v1", hasApiKey: true },
+      {
+        id: "house-router",
+        name: "House Router",
+        baseUrl: "https://models.example.com/v1",
+        hasApiKey: true,
+        models: [{ id: "gpt-oss-120b", name: "GPT OSS 120B" }],
+      },
     ]);
     const onAddCustomProvider = vi.fn(async (value: SaveCustomProviderInput): Promise<CustomProviderRestart> => {
       setCustomProviders((current) => [
         ...current,
-        { id: value.id, name: value.name, baseUrl: value.baseUrl, hasApiKey: false },
+        { id: value.id, name: value.name, baseUrl: value.baseUrl, hasApiKey: false, models: value.models },
       ]);
       return "restarted";
     });
@@ -211,7 +217,45 @@ describe("OnboardingFlow", () => {
     await fireEvent.click(view.getByRole("button", { name: "Next" }));
     await fireEvent.click(view.getByRole("button", { name: "Next" }));
     await fireEvent.click(view.getByRole("button", { name: "Open OpenBot" }));
-    await waitFor(() => expect(onSave).toHaveBeenCalledWith("opencode", null));
+    // The removed endpoint's model is gone from setup; the endpoint still saved supplies the model
+    // instead, because the custom row is still the choice and a choice with no model would start the
+    // first agent on a hosted one.
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith("opencode", "house-router/gpt-oss-120b"));
+  });
+
+  // An endpoint saved in an earlier run is the common case: the user restarts, opens onboarding and
+  // selects Custom without touching the dialog. Nothing in this component has seen its models, so
+  // the model has to come from the list main sends.
+  it("records a model of an endpoint saved before this screen opened", async () => {
+    activeMock = createMockOpenBot();
+    window.openbot = activeMock.api;
+    const onSave = vi.fn(async (_provider: AgentProviderId) => undefined);
+    const view = render(() => (
+      <OnboardingFlow
+        state={{ completed: false, preferredProvider: null, preferredModel: null }}
+        agentStatus={AGENT_STATUS_WITH_OPENCODE}
+        platform="darwin"
+        onSave={onSave}
+        onAddCustomProvider={async () => "restarted"}
+        customProviders={[
+          {
+            id: "house-router",
+            name: "House Router",
+            baseUrl: "https://models.example.com/v1",
+            hasApiKey: true,
+            models: [{ id: "gpt-oss-120b", name: "GPT OSS 120B" }],
+          },
+        ]}
+      />
+    ));
+
+    const providers = view.getByRole("radiogroup", { name: "Default provider" });
+    await fireEvent.click(within(providers).getByRole("radio", { name: /Custom provider/ }));
+    await fireEvent.click(view.getByRole("button", { name: "Next" }));
+    await fireEvent.click(view.getByRole("button", { name: "Next" }));
+    await fireEvent.click(view.getByRole("button", { name: "Open OpenBot" }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith("opencode", "house-router/gpt-oss-120b"));
   });
 
   it("keeps provider downloads independent and blocks Next until the selected provider connects", async () => {

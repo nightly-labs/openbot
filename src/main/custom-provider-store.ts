@@ -101,13 +101,15 @@ export class CustomProviderStore {
     this.#entries = file.providers.map((stored) => ({ stored, secret: this.#openSecret(stored.secret) }));
   }
 
-  /** What the renderer is allowed to know. Four fields, none of which can hold a credential. */
+  /** What the renderer is allowed to know. Five fields, none of which can hold a credential. */
   list(): CustomProviderSummary[] {
     return this.#entries.map(({ stored, secret }) => ({
       id: stored.id,
       name: stored.name,
       baseUrl: stored.baseUrl,
       hasApiKey: Boolean(secret?.apiKey),
+      // Copied, not shared: the renderer's list must not alias the stored entry.
+      models: stored.models.map((model) => ({ id: model.id, name: model.name })),
     }));
   }
 
@@ -129,38 +131,57 @@ export class CustomProviderStore {
    * second save under the same name would silently discard the key the user is not retyping.
    */
   async save(input: SaveCustomProviderInput): Promise<CustomProviderSummary[]> {
-    if (this.#readOnly) throw new Error(READ_ONLY_MESSAGE);
-    if (this.#entries.some((entry) => entry.stored.id === input.id)) throw new Error(DUPLICATE_MESSAGE);
-    const secret: ProviderSecret | null =
-      input.apiKey || input.headers.length > 0 ? { apiKey: input.apiKey || null, headers: input.headers } : null;
-    // Refused only for an endpoint that has something to protect. A keyless local endpoint still
-    // saves on a computer with no keychain, which is the common case for one.
-    if (secret && !this.#cipher.canPersist()) throw new Error(NO_SECURE_STORAGE_MESSAGE);
-    const entries = [
-      ...this.#entries,
-      {
-        stored: {
-          id: input.id,
-          name: input.name,
-          baseUrl: input.baseUrl,
-          models: input.models.map((model) => ({ id: model.id, name: model.name })),
-          secret: secret ? this.#cipher.encrypt(JSON.stringify(secret)).toString("base64") : null,
+    return this.#mutate(() => {
+      if (this.#entries.some((entry) => entry.stored.id === input.id)) throw new Error(DUPLICATE_MESSAGE);
+      const secret: ProviderSecret | null =
+        input.apiKey || input.headers.length > 0 ? { apiKey: input.apiKey || null, headers: input.headers } : null;
+      // Refused only for an endpoint that has something to protect. A keyless local endpoint still
+      // saves on a computer with no keychain, which is the common case for one.
+      if (secret && !this.#cipher.canPersist()) throw new Error(NO_SECURE_STORAGE_MESSAGE);
+      return [
+        ...this.#entries,
+        {
+          stored: {
+            id: input.id,
+            name: input.name,
+            baseUrl: input.baseUrl,
+            models: input.models.map((model) => ({ id: model.id, name: model.name })),
+            secret: secret ? this.#cipher.encrypt(JSON.stringify(secret)).toString("base64") : null,
+          },
+          secret,
         },
-        secret,
-      },
-    ];
-    await this.#persist(entries);
-    this.#entries = entries;
-    return this.list();
+      ];
+    });
   }
 
   /** Removes one endpoint and its credentials. An id that is not saved writes nothing. */
   async remove(id: string): Promise<CustomProviderSummary[]> {
+    return this.#mutate(() => {
+      const remaining = this.#entries.filter((entry) => entry.stored.id !== id);
+      return remaining.length === this.#entries.length ? null : remaining;
+    });
+  }
+
+  /**
+   * One endpoint change, start to end, with no other change between its read and its write.
+   *
+   * `build` reads `#entries` and returns the list that replaces it, or null for "nothing to do".
+   * Serializing the file write alone was not enough: two saves that ran together both read the list
+   * before either wrote, so the second one dropped the first endpoint, and two removals restored the
+   * endpoint the other had taken out. The list is published only after the durable write, so a
+   * failed write leaves the caller with exactly what the file still holds.
+   */
+  async #mutate(build: () => Entry[] | null): Promise<CustomProviderSummary[]> {
     if (this.#readOnly) throw new Error(READ_ONLY_MESSAGE);
-    const remaining = this.#entries.filter((entry) => entry.stored.id !== id);
-    if (remaining.length === this.#entries.length) return this.list();
-    await this.#persist(remaining);
-    this.#entries = remaining;
+    const operation = this.#writeChain.then(async () => {
+      if (this.#readOnly) throw new Error(READ_ONLY_MESSAGE);
+      const entries = build();
+      if (!entries) return;
+      await this.#persist(entries);
+      this.#entries = entries;
+    });
+    this.#writeChain = operation.catch(() => undefined);
+    await operation;
     return this.list();
   }
 
@@ -180,30 +201,22 @@ export class CustomProviderStore {
     }
   }
 
-  /**
-   * Writes the list the caller proposes. The caller publishes it to `#entries` only after this
-   * resolves: a failed write must leave the in-memory list as it was, so a retry sees the same
-   * state the file holds and does not report a removal the disk never took.
-   */
+  /** The file write itself. Called inside `#mutate`, which owns the order of the whole change. */
   async #persist(entries: readonly Entry[]): Promise<void> {
     // The stored half only: every entry keeps the ciphertext it arrived with, so an untouched
     // endpoint is never decrypted and encrypted again.
     const providers = entries.map((entry) => entry.stored);
-    const operation = this.#writeChain.then(async () => {
-      await mkdir(dirname(this.#path), { recursive: true, mode: 0o700 });
-      const temporary = `${this.#path}.${randomUUID()}.tmp`;
-      try {
-        await writeFile(temporary, `${JSON.stringify({ version: 1, providers })}\n`, {
-          encoding: "utf8",
-          mode: 0o600,
-        });
-        await rename(temporary, this.#path);
-      } finally {
-        await rm(temporary, { force: true });
-      }
-    });
-    this.#writeChain = operation.catch(() => undefined);
-    await operation;
+    await mkdir(dirname(this.#path), { recursive: true, mode: 0o700 });
+    const temporary = `${this.#path}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporary, `${JSON.stringify({ version: 1, providers })}\n`, {
+        encoding: "utf8",
+        mode: 0o600,
+      });
+      await rename(temporary, this.#path);
+    } finally {
+      await rm(temporary, { force: true });
+    }
   }
 }
 

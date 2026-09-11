@@ -175,8 +175,20 @@ const openCodeStatus = {
 };
 
 const customProviders = [
-  { id: "studio-local", name: "Studio Local", baseUrl: "http://127.0.0.1:11434/v1", hasApiKey: false },
-  { id: "house-router", name: "House Router", baseUrl: "https://models.example.com/v1", hasApiKey: true },
+  {
+    id: "studio-local",
+    name: "Studio Local",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    hasApiKey: false,
+    models: [{ id: "qwen3-coder:30b", name: "Qwen3 Coder 30B" }],
+  },
+  {
+    id: "house-router",
+    name: "House Router",
+    baseUrl: "https://models.example.com/v1",
+    hasApiKey: true,
+    models: [{ id: "gpt-oss-120b", name: "GPT OSS 120B" }],
+  },
 ];
 
 /** Nothing configured: the Custom tab is the one entry point, so it must not be a dead end. */

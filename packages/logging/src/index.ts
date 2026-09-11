@@ -77,6 +77,10 @@ const UNSERIALIZABLE = "[unserializable]";
 export function redactText(value: string): string {
   const reparsed = redactSerializedJson(value);
   if (reparsed !== null) return reparsed;
+  return applyTextRules(redactEmbeddedJson(value));
+}
+
+function applyTextRules(value: string): string {
   return value
     .replace(AUTH_HEADER_SECRET, "$1[redacted]")
     .replace(BEARER_SECRET, "[redacted]")
@@ -84,6 +88,80 @@ export function redactText(value: string): string {
     .replace(JSON_BARE_KEY, redactAssignedValue)
     .replace(KNOWN_SECRET_PREFIXES, "[redacted]")
     .replace(EMAIL, "[redacted-email]");
+}
+
+// How many balanced runs one line may be searched through. A log line carries one payload, or a few;
+// the bound keeps a line of braces from costing more than the line is worth.
+const MAX_EMBEDDED_PAYLOADS = 16;
+
+/**
+ * A payload that sits inside a longer line, rather than being the whole of it.
+ *
+ * A provider writes `ERROR request failed: {"headers":{"X-Tenant":"…"}}` on one stderr line, so the
+ * text does not parse as JSON and the key rules above never see the header. Every balanced `{…}` or
+ * `[…]` run that does parse is replaced by its redacted form, which gives an embedded payload the
+ * same treatment as a structured param: `headers` values go, secret-named keys go, prose stays.
+ */
+function redactEmbeddedJson(value: string): string {
+  let result = "";
+  let index = 0;
+  let payloads = 0;
+  while (index < value.length && payloads < MAX_EMBEDDED_PAYLOADS) {
+    const start = findPayloadStart(value, index);
+    if (start < 0) break;
+    const end = findBalancedEnd(value, start);
+    const parsed = end < 0 ? null : parseRedacted(value.slice(start, end));
+    if (parsed === null) {
+      result += value.slice(index, start + 1);
+      index = start + 1;
+      continue;
+    }
+    payloads += 1;
+    result += value.slice(index, start) + parsed;
+    index = end;
+  }
+  return result + value.slice(index);
+}
+
+function parseRedacted(candidate: string): string | null {
+  try {
+    return JSON.stringify(convertValue(JSON.parse(candidate), new Set<object>())) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function findPayloadStart(value: string, from: number): number {
+  for (let index = from; index < value.length; index += 1) {
+    const char = value[index];
+    if (char === "{" || char === "[") return index;
+  }
+  return -1;
+}
+
+// The index one past the run that closes the bracket at `start`, or -1 when nothing closes it. Text
+// inside a JSON string is skipped, so a brace in a header value cannot end the run early.
+function findBalancedEnd(value: string, start: number): number {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < value.length; index += 1) {
+    const char = value[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === "{" || char === "[") depth += 1;
+    else if (char === "}" || char === "]") {
+      depth -= 1;
+      if (depth === 0) return index + 1;
+      if (depth < 0) return -1;
+    }
+  }
+  return -1;
 }
 
 function redactAssignedValue(_match: string, label: string, value: string): string {

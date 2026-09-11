@@ -255,7 +255,13 @@ const args: Parameters<typeof OnboardingFlow>[0] = {
   // not a variant of the step.
   onAddCustomProvider: fn(async () => "restarted" as const),
   customProviders: [
-    { id: "studio-local", name: "Studio Local", baseUrl: "http://127.0.0.1:11434/v1", hasApiKey: false },
+    {
+      id: "studio-local",
+      name: "Studio Local",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      hasApiKey: false,
+      models: [{ id: "qwen3-coder:30b", name: "Qwen3 Coder 30B" }],
+    },
   ],
 };
 

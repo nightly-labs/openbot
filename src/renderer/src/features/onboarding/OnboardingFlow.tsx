@@ -148,6 +148,23 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     },
   });
 
+  /**
+   * A model of an endpoint saved before this screen opened.
+   *
+   * Without it the custom choice would reach setup with no model, and a new agent would start on the
+   * first model the catalog lists - a hosted one, because free models come first. The endpoint the
+   * user selected would then be unused, which is the opposite of what the row says. OpenCode names a
+   * custom model `<endpoint id>/<model id>`, so the id is composed rather than looked up in a list
+   * the CLI has not published yet.
+   */
+  function firstSavedCustomModel(): AgentModelId | null {
+    for (const provider of props.customProviders ?? []) {
+      const [model] = provider.models;
+      if (model) return `${provider.id}/${model.id}`;
+    }
+    return null;
+  }
+
   /** OpenCode runs every custom endpoint, so choosing them chooses that provider along with them. */
   function selectCustomProvider(): void {
     setProviderSelectedByUser(true);
@@ -348,7 +365,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     setError("");
     try {
       // A built-in provider keeps its own default model, so only the custom row sends one.
-      await props.onSave(provider, customSelected() ? customModel() : null);
+      await props.onSave(provider, customSelected() ? (customModel() ?? firstSavedCustomModel()) : null);
     } catch (cause) {
       setError(errorMessage(cause, "OpenBot could not finish setup."));
       setSaving(false);

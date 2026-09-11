@@ -377,6 +377,9 @@ describe("OpenBot connected desktop shell", () => {
   it("sends an action for selected agent text without clearing the composer draft", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
+    // The heading renders before the conversation subscribes, so an emit here can reach nobody and
+    // the message under test never arrives. The binding is undefined until a listener exists.
+    await waitFor(() => expect(emitAgentEvent).toBeDefined());
     const answer = "The launch note needs a friendlier closing sentence.";
     emitAgentEvent?.({
       type: "conversation",

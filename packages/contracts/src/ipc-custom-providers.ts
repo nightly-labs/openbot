@@ -64,6 +64,12 @@ export interface CustomProviderSummary {
   name: string;
   baseUrl: string;
   hasApiKey: boolean;
+  /**
+   * The models the user listed for this endpoint, which is how the renderer names one before the
+   * CLI has listed it: onboarding must record a custom model for a custom choice, and the endpoint
+   * may have been saved in an earlier run. A model id and its label are not credentials.
+   */
+  models: CustomProviderModel[];
 }
 
 /**
@@ -101,7 +107,18 @@ export function isCustomProviderSummary(value: unknown): value is CustomProvider
     isCustomProviderId(value.id) &&
     isBoundedString(value.name, INPUT_LIMITS.agentName) &&
     isBoundedString(value.baseUrl, CUSTOM_PROVIDER_LIMITS.baseUrl) &&
-    typeof value.hasApiKey === "boolean"
+    typeof value.hasApiKey === "boolean" &&
+    Array.isArray(value.models) &&
+    value.models.length <= CUSTOM_PROVIDER_LIMITS.models &&
+    value.models.every(isCustomProviderModel)
+  );
+}
+
+function isCustomProviderModel(value: unknown): value is CustomProviderModel {
+  return (
+    isDynamicRecord(value) &&
+    isBoundedString(value.id, INPUT_LIMITS.identifier) &&
+    isBoundedString(value.name, INPUT_LIMITS.modelName)
   );
 }
 
