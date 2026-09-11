@@ -133,4 +133,4 @@ export interface SidebarFilePreview {
   preview: FilePreview;
 }
 
-export type RightPanelMode = "none" | "browser" | "browser-pip" | "settings" | "file-preview";
+export type RightPanelMode = "none" | "browser" | "browser-expanded" | "browser-pip" | "settings" | "file-preview";

@@ -1390,6 +1390,8 @@ export class BrowserHost {
     } else {
       this.#mountView(tab.view, targetWindow);
     }
+    // Native views are not clipped by the renderer. Match --openbot-radius-xl.
+    tab.view.setBorderRadius(this.#target === "picture-in-picture" ? 0 : 20);
     tab.view.setBounds(this.#bounds);
     tab.view.setVisible(true);
     tab.view.webContents.invalidate();
