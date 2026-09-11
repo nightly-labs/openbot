@@ -10,7 +10,7 @@ import type {
   BrowserTarget,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import type { WebContents } from "electron";
+import type { NativeImage, WebContents } from "electron";
 
 const ACTION_TIMEOUT_MS = 10_000;
 const WAIT_TIMEOUT_MS = 30_000;
@@ -764,6 +764,28 @@ export class BrowserCdpEngine {
       if (!this.#retainDebugger) this.#detachOwnedDebugger();
       throw error;
     }
+  }
+
+  async screenshot(): Promise<NativeImage> {
+    return this.#lease(async (send) => {
+      const fill = !this.#environment || this.#environment.viewport.mode === "fill";
+      if (fill) {
+        // A hidden fill-mode view needs an explicit viewport to paint a capture surface.
+        const metrics = await send("Page.getLayoutMetrics");
+        const viewport = recordValue(metrics.cssLayoutViewport);
+        await send("Emulation.setDeviceMetricsOverride", {
+          width: numberValue(viewport?.clientWidth),
+          height: numberValue(viewport?.clientHeight),
+          deviceScaleFactor: 1,
+          mobile: false,
+        });
+      }
+      try {
+        return await this.#contents.capturePage();
+      } finally {
+        if (fill) await send("Emulation.clearDeviceMetricsOverride");
+      }
+    });
   }
 
   async navigate(url: string): Promise<void> {

@@ -531,15 +531,27 @@ export class BrowserHost {
   }
 
   async screenshot(tabId: string): Promise<string> {
-    return this.#enqueue(tabId, async (tab) => {
-      const image = await withTimeout(tab.view.webContents.capturePage(), 10_000, "Browser screenshot timed out.");
+    return this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
+      const image = await this.#boundEngineOperation(
+        tab,
+        tab.engine.screenshot(),
+        10_000,
+        "Browser screenshot timed out.",
+        keepQueueBlocked,
+      );
       return boundedCaptureDataUrl(image);
     });
   }
 
   async capturePreview(tabId: string): Promise<BrowserPreview> {
-    return this.#enqueue(tabId, async (tab) => {
-      const image = await withTimeout(tab.view.webContents.capturePage(), 10_000, "Browser preview timed out.");
+    return this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
+      const image = await this.#boundEngineOperation(
+        tab,
+        tab.engine.screenshot(),
+        10_000,
+        "Browser preview timed out.",
+        keepQueueBlocked,
+      );
       const size = image.getSize();
       if (size.width <= 0 || size.height <= 0) throw new Error("Browser preview is empty.");
 
@@ -603,10 +615,12 @@ export class BrowserHost {
             const result = await this.#readSnapshot(tab, tab.revision + 1, keepQueueBlocked);
             const includeImage = mode === "always" || (mode === "auto" && result.recommendImage);
             if (!includeImage) return { result, imageUrl: null };
-            const image = await withTimeout(
-              tab.view.webContents.capturePage(),
+            const image = await this.#boundEngineOperation(
+              tab,
+              tab.engine.screenshot(),
               10_000,
               "Browser screenshot timed out.",
+              keepQueueBlocked,
             );
             return { result, imageUrl: boundedCaptureDataUrl(image) };
           });
@@ -1412,10 +1426,12 @@ export class BrowserHost {
       window.contentView.addChildView(view);
       return;
     }
-    view.setVisible(false);
     if (currentWindow && !currentWindow.isDestroyed()) currentWindow.contentView.removeChildView(view);
-    view.setBounds({ x: 0, y: 0, width: 1200, height: 800 });
     window.contentView.addChildView(view);
+    // Initialize the native viewport before hiding a tab that has never been shown.
+    view.setVisible(true);
+    view.setBounds({ x: 0, y: 0, width: 1200, height: 800 });
+    view.setVisible(false);
     this.#mountedViews.set(view, window);
   }
 
