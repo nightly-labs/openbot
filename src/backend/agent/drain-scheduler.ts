@@ -69,6 +69,12 @@ export class DrainScheduler {
   readonly #channels: ChannelService | undefined;
   readonly #drainingAgents = new Set<string>();
   /**
+   * The model each agent's running turn was started with, by turn id. The agent record can be moved
+   * to another model while that turn runs, but the CLI keeps the session it opened, so this is the
+   * endpoint a message steered into the turn would reach.
+   */
+  readonly #turnModels = new Map<string, { turnId: string; model: string }>();
+  /**
    * How many deliveries are on their way to a turn, per provider.
    *
    * A delivery is claimed before its first await and released when it has an active turn or has
@@ -361,6 +367,7 @@ export class DrainScheduler {
       }
       await this.#mailbox.markRunning(delivery.id, response.turn.id);
       confirmedTurnId = response.turn.id;
+      this.#turnModels.set(agent.id, { turnId: response.turn.id, model: agent.model });
       this.#channels?.accepted(delivery.id, threadId, response.turn.id);
       const currentDelivery = this.#mailbox.getDelivery(delivery.id)?.delivery;
       if (currentDelivery?.status === "running" && currentDelivery.turnId === response.turn.id) {
@@ -396,6 +403,12 @@ export class DrainScheduler {
     } finally {
       for (const provider of claimed) this.#startingDeliveries.set(provider, this.#starting(provider) - 1);
     }
+  }
+
+  /** The model this turn runs on, or `null` when this agent's running turn is not the one asked for. */
+  modelForTurn(agentId: string, turnId: string): string | null {
+    const running = this.#turnModels.get(agentId);
+    return running?.turnId === turnId ? running.model : null;
   }
 
   /** True while a delivery for this provider is between its first await and its turn. */

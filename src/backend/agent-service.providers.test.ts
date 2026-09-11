@@ -833,6 +833,46 @@ describe.sequential("AgentService: providers", () => {
     expect(service.listQueue("chief").deliveries.find((delivery) => delivery.id === queued.id)?.status).toBe("queued");
   });
 
+  it("refuses to steer although the removal already moved the agent to another model", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      // The turn stays active, which is what holds back the restart of the CLI.
+      const client = new FakeAgentClient(provider, "OPENCODE_DONE", false);
+      if (provider === "opencode") {
+        client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
+      }
+      clients.set(provider, client);
+      return client;
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+
+    await service.sendMessage({ agentId: "chief", text: "Start this turn" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const active = events.find((event) => event.type === "turn-started");
+    if (active?.type !== "turn-started") throw new Error("Turn did not start.");
+    await service.sendMessage({ agentId: "chief", text: "Add this to the active turn" });
+    const queued = service.listQueue("chief").deliveries.find((delivery) => delivery.status === "queued");
+    if (!queued) throw new Error("Queued delivery was not created.");
+
+    // The other endpoint is a fallback, so the removal moves the agent record onto it at once.
+    await service.removeCustomProvider("studio", async () => undefined);
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ model: "house/router-llm" });
+
+    // The turn the message would join still runs on the session the CLI opened for the removed
+    // endpoint, so the model the agent names now says nothing about where the message arrives.
+    await expect(
+      service.steerQueuedMessage({ agentId: "chief", deliveryId: queued.id, expectedTurnId: active.turnId }),
+    ).rejects.toThrow("The endpoint this agent used was removed. Choose another model for it.");
+    expect(clients.get("opencode")?.requests.some((request) => request.method === "turn/steer")).toBe(false);
+    expect(service.listQueue("chief").deliveries.find((delivery) => delivery.id === queued.id)?.status).toBe("queued");
+  });
+
   // An id saved again is served again, whatever the CLI did with the removal before it.
   it("offers an endpoint's models again after the id is saved a second time", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);

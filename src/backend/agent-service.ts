@@ -1434,10 +1434,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async steerQueuedMessage(input: SteerQueuedMessageInput): Promise<void> {
     const agent = await this.#store.getOrCreate(input.agentId);
-    // Steering carries a new message into the turn that is running, on the session the CLI holds, so
-    // it reaches the removed endpoint with the credentials that process started with. A restart
-    // waits for the turn, which is why the exclusion is what has to answer here.
-    if (!this.#servesModel(agent.model)) throw new Error(REMOVED_ENDPOINT_MESSAGE);
     const client = this.#providers.requireReadyClient(providerForAgent(agent));
     const session = this.#store.activeProviderSession(agent.id);
     const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
@@ -1452,6 +1448,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     }
 
     const turnId = snapshot.activeTurnId;
+    // Steering carries a new message into the turn that is running, on the session the CLI opened,
+    // so it reaches the endpoint that turn started on. The agent record may already name another
+    // model, because a removal moves it, while the CLI keeps that session until it restarts, and
+    // the restart waits for the turn. So the turn's own model is what the exclusion is read for.
+    if (!this.#servesModel(this.#drain.modelForTurn(agent.id, turnId) ?? agent.model)) {
+      throw new Error(REMOVED_ENDPOINT_MESSAGE);
+    }
     await this.#mailbox.markSteering(input.deliveryId, turnId);
     this.#mailboxSync.emitQueue(agent.id);
     try {
