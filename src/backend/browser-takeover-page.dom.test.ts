@@ -40,6 +40,22 @@ describe("browser takeover page", () => {
     expect(read()).toMatchObject({ forms: [], status: "manual" });
     expect(document.querySelector("textarea")?.value).toBe("Saved address");
   });
+  it("keeps submitted fields available after website validation fails", () => {
+    document.body.innerHTML = '<form><input pattern="[0-9]+"><button>Send</button></form>';
+    const state = read();
+    const invalid = submission(state, [{ id: "field-0", value: "letters" }]);
+    expect(run(invalid).status).toBe("invalid");
+    expect(() => run(invalid)).toThrow("The browser form changed");
+    const retry = run({ kind: "read", revision: "revision-2" });
+    expect(retry.forms[0]?.fields).toHaveLength(1);
+    expect(JSON.stringify(retry)).not.toContain("letters");
+    const submit = vi.fn((event: Event) => event.preventDefault());
+    document.forms[0].addEventListener("submit", submit);
+    run(submission(retry, [{ id: "field-0", value: "123" }]));
+    expect(submit).toHaveBeenCalledOnce();
+    document.forms[0].action = "https://other.example.com";
+    expect(read()).toMatchObject({ forms: [], status: "manual" });
+  });
   it("retains multiple-email input semantics", () => {
     document.body.innerHTML = '<form><input type="email" multiple><button>Send</button></form>';
     const state = read();

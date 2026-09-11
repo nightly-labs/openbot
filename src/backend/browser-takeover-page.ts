@@ -7,6 +7,7 @@ interface CapturedForm {
   controls: Map<string, Control>;
   actions: Map<string, Submitter>;
   signature: string;
+  filled?: boolean;
 }
 interface PageCapture {
   revision: string;
@@ -44,6 +45,7 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     )
       .trim()
       .slice(0, 2000);
+  const previous = window.__openbotTakeoverForm;
   const forms: BrowserFormState["forms"] = [];
   const captured = new Map<string, CapturedForm>();
   let unsupported = [
@@ -66,6 +68,8 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
       visible(node),
   );
   for (const [formIndex, form] of [...document.forms].entries()) {
+    const prior = previous?.url === location.href ? previous.forms.get(`form-${formIndex}`) : undefined;
+    const retry = prior?.filled && prior.form === form ? prior : undefined;
     const fields: BrowserFormField[] = [];
     const controls = new Map<string, Control>();
     const actions = new Map<string, Submitter>();
@@ -124,7 +128,13 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
         }
       }
       // Existing text stays on the website; an empty chat draft must not erase it.
-      if (!(node instanceof HTMLSelectElement) && type !== "checkbox" && type !== "radio" && node.value !== "") {
+      if (
+        !(node instanceof HTMLSelectElement) &&
+        type !== "checkbox" &&
+        type !== "radio" &&
+        node.value !== "" &&
+        retry?.controls.get(id) !== node
+      ) {
         invalid = true;
         continue;
       }
@@ -192,7 +202,17 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
       ),
       submitters: [...actions.values()].map((action) => [action.formAction, action.formMethod]),
     });
-    captured.set(id, { form, controls, actions, signature });
+    if (
+      retry &&
+      (retry.signature !== signature ||
+        [...controls].some(([id, node]) => retry.controls.get(id) !== node) ||
+        [...actions].some(([id, node]) => retry.actions.get(id) !== node))
+    ) {
+      forms.pop();
+      unsupported = true;
+      continue;
+    }
+    captured.set(id, { form, controls, actions, signature, filled: retry?.filled });
   }
   const state: BrowserFormState = {
     revision: command.kind === "read" ? command.revision : command.input.revision,
@@ -241,7 +261,6 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     return state;
   }
   const { input } = command;
-  const previous = window.__openbotTakeoverForm;
   if (input.formId === "one-time-code") {
     if (
       !code ||
@@ -325,7 +344,8 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     }
   };
   // Consume before dispatch: a double click or retry cannot submit this revision twice.
-  delete window.__openbotTakeoverForm;
+  previous.revision = "";
+  prior.filled = true;
   for (const [id, node] of current.controls) {
     checkTargets();
     const value = values.get(id);
