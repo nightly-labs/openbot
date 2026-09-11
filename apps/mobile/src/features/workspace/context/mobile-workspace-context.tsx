@@ -58,7 +58,7 @@ import {
   type ServerLoadContext,
 } from "@/features/workspace/components/server-connection";
 import { type MobileAgentActivities, reduceAgentActivity } from "@/features/workspace/model/agent-activity";
-import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
+import { canToggleAgentPin, reconcileAgentPins } from "@/features/workspace/model/agent-pins";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
@@ -267,15 +267,24 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [],
   );
 
-  const replaceServerAgents = useCallback((serverId: string, summaries: RemoteAgent[]) => {
-    const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
-    for (const agent of summaries) knownIds.add(agent.id);
-    serverAgentIds.current.set(serverId, knownIds);
-    setAgents((current) => [
-      ...current.filter((agent) => agent.serverId !== serverId),
-      ...summaries.map((agent) => projectAgent(serverId, agent)),
-    ]);
-  }, []);
+  const replaceServerAgents = useCallback(
+    (serverId: string, summaries: RemoteAgent[]) => {
+      try {
+        const saved = reconcileAgentPins(preferenceStore, serverId, summaries);
+        setPreferences((current) => ({ ...current, [serverId]: saved }));
+      } catch {
+        Alert.alert("Could not save chat preferences", "Your previous preferences have been kept. Please try again.");
+      }
+      const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
+      for (const agent of summaries) knownIds.add(agent.id);
+      serverAgentIds.current.set(serverId, knownIds);
+      setAgents((current) => [
+        ...current.filter((agent) => agent.serverId !== serverId),
+        ...summaries.map((agent) => projectAgent(serverId, agent)),
+      ]);
+    },
+    [preferenceStore],
+  );
 
   const loadServer = useCallback(
     async (serverId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext) => {
