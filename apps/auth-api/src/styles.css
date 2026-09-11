@@ -1625,12 +1625,6 @@ a {
   column-gap: 7px;
 }
 
-/* The name is what the eye should land on, so it is a step brighter than the date
-   and the dot beside it. Two weights of the same grey, no colour. */
-.news-byline-author {
-  color: var(--openbot-text-muted);
-}
-
 .news-featured {
   position: relative;
   display: grid;

@@ -14,10 +14,8 @@ export function NewsByline(props: NewsBylineProps) {
   return (
     <span class={cx("news-meta news-byline", props.class)}>
       <time datetime={props.article.publishedAt}>{formatNewsDate(props.article.publishedAt)}</time>
-      <span class="news-byline-separator" aria-hidden="true">
-        ·
-      </span>
-      <span class="news-byline-author">{props.article.author}</span>
+      <span aria-hidden="true">·</span>
+      <span>{props.article.author}</span>
     </span>
   );
 }
