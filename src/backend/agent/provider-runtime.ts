@@ -105,6 +105,13 @@ export interface ProviderHooks {
   isProviderBusy(provider: AgentProvider): boolean;
   /** Runs after a CLI replacement, so deliveries held back during it are delivered. */
   onProviderResumed(provider: AgentProvider): void;
+  /**
+   * Runs once a new client for this provider is the one the app uses, with the catalogue it reported
+   * already read. A client that failed to start, or one dropped for a client that was there before,
+   * never reaches this: what the caller hears is that the process now answering is the process that
+   * read the files as they are on disk.
+   */
+  onProviderActivated(provider: AgentProvider): void;
 }
 
 /**
@@ -916,6 +923,7 @@ export class ProviderRuntime implements ProviderPort {
             capabilities: { chat: "ready", browser: "ready", computerUse },
             message: null,
           });
+          this.#hooks.onProviderActivated(provider);
         } catch (error) {
           if (previousClient) this.#clients.set(provider, previousClient);
           else this.#clients.delete(provider);
@@ -1359,6 +1367,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#refreshModelCatalog(),
         codexClient ? this.#probeComputerUse(codexClient) : Promise.resolve("unavailable" as const),
       ]);
+      for (const provider of this.#clients.keys()) this.#hooks.onProviderActivated(provider);
       if (codexClient === this.#clients.get("codex")) {
         this.#setStatus({
           capabilities: { ...this.#status.capabilities, computerUse },

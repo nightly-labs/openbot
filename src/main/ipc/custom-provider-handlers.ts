@@ -12,7 +12,7 @@ import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-gro
 export interface CustomProviderIpcDependencies {
   // Only the four endpoint-change methods, so the registrar's order of writes can be checked without
   // a running backend.
-  service: Pick<AgentService, "removeCustomProvider" | "noteCustomProviderSaved" | "reloadOpenCodeConfig">;
+  service: Pick<AgentService, "removeCustomProvider" | "reloadOpenCodeConfig">;
   customProviders: Pick<CustomProviderStore, "list" | "save" | "remove">;
 }
 
@@ -50,17 +50,10 @@ export function customProviderIpcHandlers({
         (input): Promise<CustomProviderResult> =>
           serialize(async () => {
             const providers = await customProviders.save(input);
-            const restart = await service.reloadOpenCodeConfig();
-            // An id that was removed before serves the models of this write from now on -- and only
-            // those, because the running CLI may still list the ones this save left out. The restart
-            // comes first: a CLI that kept running kept this endpoint as it was before the save, and
-            // the backend needs to hear that before it offers the id again.
-            service.noteCustomProviderSaved(
-              input.id,
-              input.models.map((model) => model.id),
-              restart,
-            );
-            return { providers, restart };
+            // An id removed before this write is served again only once a new process has read the
+            // file, which the backend hears from the provider runtime. A restart that is skipped or
+            // that fails leaves the CLI answering on the endpoint as it was, so the id stays out.
+            return { providers, restart: await service.reloadOpenCodeConfig() };
           }),
       ),
       /**

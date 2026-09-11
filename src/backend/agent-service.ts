@@ -279,7 +279,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       hooks: {
         bindClient: (client) => {
-          if (client.provider === "opencode") this.#clearReleasedCustomProviders();
           client.on("notification", (notification) => this.#turn.handleNotification(notification, client));
           client.on("request", (request) => void this.#handleServerRequest(client, request));
         },
@@ -313,6 +312,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               // it away. Only its own guard reports the turn the CLI is running.
               (this.#conversation.workingSnapshot(agent.id) != null || !this.#compaction.mayDrain(agent.id)),
           ),
+        onProviderActivated: (provider) => {
+          if (provider === "opencode") this.#clearReleasedCustomProviders();
+        },
         onProviderResumed: (provider) => {
           for (const agent of this.#store.list()) {
             if (providerForAgent(agent) === provider) this.#drain.scheduleDrain(agent.id);
@@ -1153,25 +1155,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
-   * The endpoint exists again, with the models this save defines. An id can be saved a second time
-   * after it was removed, and from that write on the models it lists are a valid choice again -- but
-   * only those. A save that replaces `studio/old` with `studio/new` while a busy CLI keeps the old
-   * catalogue would otherwise make `studio/old` selectable, and it disappears at the next restart.
+   * A fresh OpenCode process is the one the app uses now, and it read the endpoint files as they are,
+   * so what it lists is the truth and nothing has to be masked any more.
    *
-   * `skipped-busy` says the process that is running still holds this endpoint as it was: the address
-   * and the key of the save before this one. The same id may now name a different server, so serving
-   * it again here would send the next message to the endpoint the user has just replaced. It stays
-   * excluded until a new process reads the file, which is where `#clearReleasedCustomProviders` runs.
-   */
-  noteCustomProviderSaved(providerId: string, modelIds: readonly string[], restart: CustomProviderRestart): void {
-    if (!this.#releasedCustomProviders.has(providerId) || restart === "skipped-busy") return;
-    this.#releasedCustomProviders.set(providerId, new Set(modelIds));
-    this.#emitModelsChanged();
-  }
-
-  /**
-   * A fresh OpenCode process read the endpoint files as they are now, so what it lists is the truth
-   * and nothing has to be masked any more.
+   * Only a client that reached `onProviderActivated` gets here. A restart that fails leaves the old
+   * process answering, on the endpoints it started with, and every id removed since then stays out:
+   * an id saved a second time may name another server, and the old process would take the message to
+   * the one the user has just replaced.
    */
   #clearReleasedCustomProviders(): void {
     if (this.#releasedCustomProviders.size === 0) return;
