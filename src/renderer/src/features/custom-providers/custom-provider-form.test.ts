@@ -44,6 +44,17 @@ describe("validateCustomProvider", () => {
     expect(validateCustomProvider(draft({ baseUrl: "https://api.example.com/v1" })).baseUrl).toBeUndefined();
   });
 
+  // Only the key and the headers are encrypted, so a credential in the URL would be stored and shown
+  // as plain text.
+  it("refuses a base URL that carries a username or a password", () => {
+    expect(validateCustomProvider(draft({ baseUrl: "https://user:password@api.example.com/v1" })).baseUrl).toBe(
+      "Put the credential in a header, not in the URL.",
+    );
+    expect(validateCustomProvider(draft({ baseUrl: "https://user@api.example.com/v1" })).baseUrl).toBe(
+      "Put the credential in a header, not in the URL.",
+    );
+  });
+
   it("requires at least one model and rejects a duplicate model ID", () => {
     expect(validateCustomProvider(draft({ models: [{ id: "", name: "" }] })).models).toBeTruthy();
     const duplicate = validateCustomProvider(

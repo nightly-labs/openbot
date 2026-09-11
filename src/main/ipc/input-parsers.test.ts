@@ -774,6 +774,17 @@ describe("custom provider input parsing", () => {
     );
   });
 
+  // The base URL is stored outside the encrypted secret and is read back to the renderer, so a
+  // credential in it would be kept and shown as plain text.
+  it("rejects a base URL that carries a username or a password", () => {
+    expect(() =>
+      parseSaveCustomProvider({ ...endpoint, baseUrl: "https://user:password@example.com/v1" }),
+    ).toThrowError("The base URL must hold no username or password. Put the credential in a header.");
+    expect(() => parseSaveCustomProvider({ ...endpoint, baseUrl: "https://user@example.com/v1" })).toThrowError(
+      "The base URL must hold no username or password. Put the credential in a header.",
+    );
+  });
+
   it("rejects an over-limit name, URL or key", () => {
     expect(() => parseSaveCustomProvider({ ...endpoint, name: "n".repeat(INPUT_LIMITS.agentName + 1) })).toThrowError(
       "Display name is too long.",

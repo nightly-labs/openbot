@@ -38,6 +38,13 @@ function parseBaseUrl(value: unknown): string {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("The base URL must start with http:// or https://.");
   }
+  // `https://user:password@host/v1` is a credential in a field that is not a credential field: the
+  // base URL is stored outside the encrypted secret and is read back to the renderer for the
+  // endpoint list, so it would be kept and shown as plain text, on a computer with no secure storage
+  // as well. The key field and the headers are the two places a credential may go.
+  if (url.username || url.password) {
+    throw new Error("The base URL must hold no username or password. Put the credential in a header.");
+  }
   return text;
 }
 

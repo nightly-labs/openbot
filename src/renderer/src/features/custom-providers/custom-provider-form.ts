@@ -170,6 +170,9 @@ function baseUrlError(baseUrl: string): string | undefined {
   // computer, which has no certificate. Anything else - `file:`, `ws:`, `javascript:` - is not an
   // endpoint OpenCode can call.
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "Use an http:// or https:// URL.";
+  // A credential in the URL is stored and listed as plain text, because only the key and the headers
+  // are encrypted. The user is told where it belongs instead.
+  if (parsed.username || parsed.password) return "Put the credential in a header, not in the URL.";
   return undefined;
 }
 
