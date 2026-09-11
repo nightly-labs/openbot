@@ -117,6 +117,13 @@ describe("browser takeover page", () => {
     expect(forgot).not.toHaveBeenCalled();
     expect(() => run(command)).toThrow("The browser form changed");
   });
+  it("keeps the active login controls without help links or page navigation", () => {
+    document.body.innerHTML =
+      '<main><input aria-label="Email or phone"><button>Forgot email?</button><a href="https://help.example.com" target="_blank">Guest mode help</a><button>Next</button><button>Create account</button><footer><a href="/help">Help</a><button>Privacy</button></footer></main><button>Global navigation</button>';
+    const state = read();
+    expect(state.forms).toHaveLength(1);
+    expect(state.forms[0]?.actions.map((action) => action.label)).toEqual(["Forgot email?", "Next", "Create account"]);
+  });
   it("opens a phone-number step from a page that only has a custom action", () => {
     document.body.innerHTML = '<div><div role="button" tabindex="0">Use phone number</div></div>';
     document.querySelector('[role="button"]')?.addEventListener("click", () => {

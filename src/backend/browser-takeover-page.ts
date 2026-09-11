@@ -30,9 +30,16 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
   };
   const isControl = (node: Element): node is Control =>
     node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement;
-  const isAction = (node: Element) =>
-    node instanceof HTMLElement &&
-    node.matches("button, a[href], [role=button], input[type=submit], input[type=button], input[type=reset]");
+  const isAction = (node: Element) => {
+    if (!(node instanceof HTMLElement) || node.closest("footer, nav, [role=contentinfo], [role=navigation]"))
+      return false;
+    if (
+      node instanceof HTMLAnchorElement &&
+      (node.target === "_blank" || node.hasAttribute("download") || node.origin !== location.origin)
+    )
+      return false;
+    return node.matches("button, a[href], [role=button], input[type=submit], input[type=button], input[type=reset]");
+  };
   const actionTarget = (node: HTMLElement) =>
     node instanceof HTMLButtonElement || node instanceof HTMLInputElement
       ? [node.formAction, node.formMethod, node.formNoValidate]
@@ -250,6 +257,17 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
       continue;
     }
     captured.set(id, { form, controls, actions, signature, filled: reusedValues });
+  }
+  // Page-wide navigation is not another form when a specific form is already available.
+  if (captured.size > 1) {
+    const pageActions = [...captured].find(([, entry]) => entry.form === document.body && entry.controls.size === 0);
+    if (pageActions) {
+      captured.delete(pageActions[0]);
+      forms.splice(
+        forms.findIndex((form) => form.id === pageActions[0]),
+        1,
+      );
+    }
   }
   const state: BrowserFormState = {
     revision: command.kind === "read" ? command.revision : command.input.revision,

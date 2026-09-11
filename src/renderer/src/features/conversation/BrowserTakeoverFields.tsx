@@ -270,7 +270,9 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
                   </Button>
                 )}
               </For>
-              <RefreshButton />
+              <Show when={form.id === state.form?.forms.at(-1)?.id}>
+                <RefreshButton />
+              </Show>
             </div>
           </form>
         )}

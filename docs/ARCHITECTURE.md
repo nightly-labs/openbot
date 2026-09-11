@@ -96,7 +96,9 @@ Local browser takeover forms use separate IPC methods. The main process validate
 request and tab ownership. The browser reads native controls in forms or scoped page sections
 (main, dialog, form landmarks, or the page body) in an isolated world and binds
 submission to the captured document, controls, and action. Values stay in temporary UI state and
-are sent directly to the website; they do not enter chat history or provider tool results. Named buttons, links, and elements with `role="button"` are available even when a step has no inputs.
+are sent directly to the website; they do not enter chat history or provider tool results. Named buttons, same-origin links, and elements with `role="button"` are available even when a step has no inputs.
+External links, downloads, footer and navigation actions are excluded. Page-wide action-only groups
+are excluded when a specific form is available.
 A page with several custom actions requires an explicit choice; Enter must not select an arbitrary action. Unsupported
 controls keep manual takeover available. After a valid submission, the next detected form or standalone one-time-code input stays in
 the chat card. If no next input is detected, control returns to the agent to inspect the page result.
