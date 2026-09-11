@@ -43,14 +43,30 @@ const Setup = createSimpleContext({
     });
 
     /**
-     * `preferredModel` defaults to the provider's own default, because the review screens choose a
-     * provider alone. Only the first-run flow can name a model: it is where a custom endpoint is
-     * described, and that endpoint is reachable as a model of the CLI that runs it.
+     * The model a save keeps when the caller names none. A review screen and the join-a-server flow
+     * choose a provider alone, and a model belongs to the provider that serves it, so the saved
+     * model survives only while the provider is unchanged.
      */
-    async function saveSetup(preferredProvider: AgentProviderId, preferredModel: AgentModelId | null = null) {
+    function keptModel(preferredProvider: AgentProviderId): AgentModelId | null {
+      const previous = setupState();
+      if (!previous || previous.preferredProvider !== preferredProvider) return null;
+      return previous.preferredModel ?? null;
+    }
+
+    /**
+     * `preferredModel` is optional, because the review screens choose a provider alone. Only the
+     * first-run flow can name a model: it is where a custom endpoint is described, and that endpoint
+     * is reachable as a model of the CLI that runs it. An omitted model keeps the saved one, so a
+     * review of the permissions does not move the agents off a chosen local endpoint. A caller that
+     * gives `null` clears the model on purpose.
+     */
+    async function saveSetup(preferredProvider: AgentProviderId, preferredModel?: AgentModelId | null) {
       const wasCompleted = setupState()?.completed === true;
       const analytics = desktopAnalytics.scope();
-      const state = await window.openbot.saveSetup({ preferredProvider, preferredModel });
+      const state = await window.openbot.saveSetup({
+        preferredProvider,
+        preferredModel: preferredModel === undefined ? keptModel(preferredProvider) : preferredModel,
+      });
       flush(() => {
         setSetupState(state);
         setPermissionsOpen(false);
