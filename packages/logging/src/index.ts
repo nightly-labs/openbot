@@ -90,9 +90,15 @@ function applyTextRules(value: string): string {
     .replace(EMAIL, "[redacted-email]");
 }
 
-// How many balanced runs one line may be searched through. A log line carries one payload, or a few;
-// the bound keeps a line of braces from costing more than the line is worth.
-const MAX_EMBEDDED_PAYLOADS = 16;
+/**
+ * How many runs one line may be *tried*, whether or not they parse.
+ *
+ * Counting only the successes would not bound anything: `"{".repeat(65536)` gives a failed attempt
+ * at every position, each scanning the rest of the line, and this function is synchronous on the
+ * path that carries provider stderr. Past the bound the rest of the line keeps the regex rules,
+ * which is the treatment all text had before this scan existed.
+ */
+const MAX_EMBEDDED_SCANS = 16;
 
 /**
  * A payload that sits inside a longer line, rather than being the whole of it.
@@ -105,10 +111,11 @@ const MAX_EMBEDDED_PAYLOADS = 16;
 function redactEmbeddedJson(value: string): string {
   let result = "";
   let index = 0;
-  let payloads = 0;
-  while (index < value.length && payloads < MAX_EMBEDDED_PAYLOADS) {
+  let scans = 0;
+  while (index < value.length && scans < MAX_EMBEDDED_SCANS) {
     const start = findPayloadStart(value, index);
     if (start < 0) break;
+    scans += 1;
     const end = findBalancedEnd(value, start);
     const parsed = end < 0 ? null : parseRedacted(value.slice(start, end));
     if (parsed === null) {
@@ -116,7 +123,6 @@ function redactEmbeddedJson(value: string): string {
       index = start + 1;
       continue;
     }
-    payloads += 1;
     result += value.slice(index, start) + parsed;
     index = end;
   }

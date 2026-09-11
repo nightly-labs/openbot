@@ -440,6 +440,37 @@ describe.sequential("AgentService: providers", () => {
     });
   });
 
+  // The catalogue is the running CLI's answer, and a removal during a turn does not restart it. The
+  // models of an endpoint already removed are therefore still listed, and must not be chosen.
+  it("never falls back onto an endpoint removed earlier in the same OpenCode process", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider);
+      // Two endpoints and no OpenCode model of its own, so the fallback for one removal is the other
+      // endpoint, and the fallback for the second removal must leave OpenCode altogether.
+      if (provider === "opencode") {
+        client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
+      }
+      return client;
+    });
+    await service.initialize();
+    await service.ensureProvider("codex");
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+
+    await service.releaseCustomProviderModels("studio");
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
+      model: "house/router-llm",
+    });
+
+    await service.releaseCustomProviderModels("house");
+
+    const chief = service.listAgents().find((agent) => agent.id === "chief");
+    expect(chief?.model).not.toBe("studio/local-llm");
+    expect(chief?.provider).toBe("codex");
+  });
+
   it("refuses to release a busy agent when the only model left belongs to another provider", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
     const { store, mailbox } = stores(root);

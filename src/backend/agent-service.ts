@@ -150,6 +150,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #profileSave: ProfileSave;
   readonly #profileClients = new Set<AgentClient>();
   readonly #deletingAgents = new Set<string>();
+  /**
+   * Endpoints removed since the last OpenCode restart. The running CLI still lists their models, so
+   * they must not be offered as the fallback for the next removal. See `releaseCustomProviderModels`.
+   */
+  readonly #releasedCustomProviders = new Set<string>();
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
   readonly #browser: AgentBrowserHost;
@@ -1074,9 +1079,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.updateProviderCli(provider, install);
   }
 
-  /** Restarts OpenCode so a saved or removed endpoint reaches it. Reports why, if it did not. */
-  reloadOpenCodeConfig(): Promise<CustomProviderRestart> {
-    return this.#providers.reloadOpenCodeConfig();
+  /**
+   * Restarts OpenCode so a saved or removed endpoint reaches it. Reports why, if it did not.
+   *
+   * A restart is the moment the catalogue stops listing a removed endpoint's models, so it is also
+   * the moment the record of removed endpoints below can be dropped.
+   */
+  async reloadOpenCodeConfig(): Promise<CustomProviderRestart> {
+    const restart = await this.#providers.reloadOpenCodeConfig();
+    if (restart === "restarted") this.#releasedCustomProviders.clear();
+    return restart;
   }
 
   /**
@@ -1091,7 +1103,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * check runs over all of them first, so a refusal moves no agent at all.
    */
   async releaseCustomProviderModels(providerId: string): Promise<void> {
-    const owned = new Set([providerId]);
+    // Every endpoint removed since the last restart, not only this one. A removal during a turn
+    // leaves the running CLI's catalogue as it was, so the models of an endpoint already taken out
+    // are still listed, and choosing one here would move agents onto an endpoint that is gone.
+    this.#releasedCustomProviders.add(providerId);
+    const owned = new Set(this.#releasedCustomProviders);
     const affected = this.#store
       .list()
       .filter((agent) => providerForAgent(agent) === "opencode" && isCustomProviderModelId(agent.model, owned));

@@ -112,6 +112,15 @@ describe("redactText", () => {
 
   // A payload that parses is written back as JSON, so its spacing is the serializer's. The text
   // around it is untouched: only the run itself is read as data.
+  // The scan is synchronous and runs on provider stderr, so a line of open braces must not cost one
+  // full pass per brace. Every attempt counts against the bound, not only the ones that parse.
+  it("bounds the work a line of open braces can cause", () => {
+    const braces = "{".repeat(65_536);
+    const started = performance.now();
+    expect(redactText(braces)).toBe(braces);
+    expect(performance.now() - started).toBeLessThan(1_000);
+  });
+
   it("keeps the text around an embedded payload", () => {
     expect(redactText("read [1, 2, 3] items")).toBe("read [1,2,3] items");
   });
