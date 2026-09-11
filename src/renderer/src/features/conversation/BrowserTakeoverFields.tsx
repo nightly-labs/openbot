@@ -241,6 +241,7 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
                         <Input
                           id={controlId()}
                           type={field.type}
+                          multiple={field.multiple}
                           value={text()}
                           required={field.required}
                           min={field.min || undefined}

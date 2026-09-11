@@ -123,6 +123,11 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
             continue;
         }
       }
+      // Existing text stays on the website; an empty chat draft must not erase it.
+      if (!(node instanceof HTMLSelectElement) && type !== "checkbox" && type !== "radio" && node.value !== "") {
+        invalid = true;
+        continue;
+      }
       controls.set(id, node);
       fields.push({
         id,
@@ -142,7 +147,7 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
               }))
             : [],
         checked: node instanceof HTMLInputElement && node.checked,
-        multiple: node instanceof HTMLSelectElement && node.multiple,
+        multiple: (node instanceof HTMLSelectElement || node instanceof HTMLInputElement) && node.multiple,
         min: node instanceof HTMLInputElement ? node.min.slice(0, 100) : "",
         max: node instanceof HTMLInputElement ? node.max.slice(0, 100) : "",
         step: node instanceof HTMLInputElement ? node.step.slice(0, 100) : "",

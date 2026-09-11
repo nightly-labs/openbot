@@ -102,6 +102,7 @@ describe("takeover chat forms", () => {
   it.each(["click", "enter", "alternate"])("submits with %s and clears values for the next step", async (method) => {
     installOpenbotStub();
     const login = browserFormPreview();
+    login.forms[0].fields[0].multiple = true;
     login.forms[0].actions.push({ id: "alternate", label: "Use password" });
     vi.mocked(window.openbot.browser.readTakeoverForm).mockResolvedValue(login);
     const next = browserFormPreview();
@@ -125,7 +126,7 @@ describe("takeover chat forms", () => {
       />
     ));
     const email = await screen.findByRole("textbox", { name: "Email (required)" });
-    await fireEvent.input(email, { target: { value: "user@example.com" } });
+    await fireEvent.input(email, { target: { value: "user@example.com,other@example.com" } });
     await fireEvent.input(screen.getByLabelText("Password (required)"), { target: { value: "private-password" } });
     if (method === "enter") {
       email.focus();
@@ -140,7 +141,7 @@ describe("takeover chat forms", () => {
         formId: "sign-in",
         actionId: method === "alternate" ? "alternate" : "submit",
         values: [
-          { id: "email", value: "user@example.com" },
+          { id: "email", value: "user@example.com,other@example.com" },
           { id: "password", value: "private-password" },
         ],
       }),

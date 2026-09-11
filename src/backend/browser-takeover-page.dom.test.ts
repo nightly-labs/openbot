@@ -35,6 +35,20 @@ beforeEach(() => {
 });
 
 describe("browser takeover page", () => {
+  it("keeps existing text values on the website through manual takeover", () => {
+    document.body.innerHTML = '<form><input name="name"><textarea>Saved address</textarea><button>Save</button></form>';
+    expect(read()).toMatchObject({ forms: [], status: "manual" });
+    expect(document.querySelector("textarea")?.value).toBe("Saved address");
+  });
+  it("retains multiple-email input semantics", () => {
+    document.body.innerHTML = '<form><input type="email" multiple><button>Send</button></form>';
+    const state = read();
+    expect(state.forms[0]?.fields[0].multiple).toBe(true);
+    const submit = vi.fn((event: Event) => event.preventDefault());
+    document.forms[0].addEventListener("submit", submit);
+    run(submission(state, [{ id: "field-0", value: "a@example.com,b@example.com" }]));
+    expect(submit).toHaveBeenCalledOnce();
+  });
   it.each([
     "<form novalidate><input required><button>Save</button></form>",
     "<form><input required><button formnovalidate>Save draft</button></form>",
@@ -56,6 +70,7 @@ describe("browser takeover page", () => {
     expect(state.forms[0]?.fields).toHaveLength(2);
     expect(run(submission(state, values)).status).toBe("invalid");
     expect(submit).not.toHaveBeenCalled();
+    document.forms[0].reset();
     document.forms[0].addEventListener("input", () => {
       button.disabled = false;
     });
