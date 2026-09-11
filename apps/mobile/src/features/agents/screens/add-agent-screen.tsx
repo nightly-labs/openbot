@@ -27,7 +27,7 @@ export function AddAgentScreen() {
   const [finished, setFinished] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const valid = name.trim().length > 0 && description.trim().length > 0;
+  const valid = name.trim().length > 0;
 
   const dirty = Boolean(
     name.trim() || description.trim() || avatarSeed !== initialAvatarSeed.current || avatarHue !== null,
@@ -52,7 +52,7 @@ export function AddAgentScreen() {
       await createAgent({
         name: name.trim(),
         description: description.trim(),
-        initialMessage: `Your ongoing role is: ${description.trim()}`,
+        initialMessage: description.trim() ? `Your ongoing role is: ${description.trim()}` : "Greet me briefly.",
         avatarSeed,
         avatarHue,
       });
@@ -126,7 +126,7 @@ export function AddAgentScreen() {
 
       {dirty && !valid ? (
         <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          Enter a name and instructions for this agent.
+          Enter a name for this agent.
         </Typography.Paragraph>
       ) : null}
       {error ? (

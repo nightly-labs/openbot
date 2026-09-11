@@ -904,7 +904,7 @@ it("creates an agent from changed valid input and blocks duplicate submission an
   await act(() => root.render(<AddAgentScreen />));
   expect(screen.queryByRole("button", { name: "Create agent" })).toBeNull();
   await edit("Name", "Explorer");
-  expect(screen.getByRole("button", { name: "Create agent" })).toHaveProperty("disabled", true);
+  expect(screen.getByRole("button", { name: "Create agent" })).toHaveProperty("disabled", false);
   await edit("Name", "");
   expect(screen.queryByRole("button", { name: "Create agent" })).toBeNull();
   await edit("Name", " Explorer ");
@@ -924,6 +924,20 @@ it("creates an agent from changed valid input and blocks duplicate submission an
   await act(() => response.resolve());
   expect(mocks.blocked).toBe(false);
   expect(mocks.dispatch).toHaveBeenCalledWith({ type: "GO_BACK" });
+});
+
+it.each(["", "   "])("creates an agent with a greeting when instructions are %j", async (instructions) => {
+  await act(() => root.render(<AddAgentScreen />));
+  await edit("What should this agent help with?", instructions);
+  await edit("Name", " Explorer ");
+  await click("Create agent");
+  expect(workspace.createAgent).toHaveBeenCalledExactlyOnceWith({
+    name: "Explorer",
+    description: "",
+    initialMessage: "Greet me briefly.",
+    avatarSeed: "mobile:newagentseed",
+    avatarHue: null,
+  });
 });
 
 it("keeps a failed create draft for retry and confirms close", async () => {
