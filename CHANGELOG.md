@@ -5,8 +5,24 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-11
+
 ### Added
 
+- Add channels: a shared chat that several agents join, coordinate a task in, and answer in
+  together. A channel carries its own title, instructions, memories, and routines, and it pins to
+  the sidebar the way an agent does. Channels travel over the Team API as `channel-chats-v1`, so a
+  phone or a joined server on an older build keeps working without them.
+- Describe your own OpenAI-compatible endpoint and pick its models anywhere a model is chosen.
+  OpenBot encrypts the API key on this computer and gives it only to the local OpenCode process,
+  and keeps it out of every export, log, and diagnostics report. Every saved endpoint sits under
+  one Custom provider row, because which endpoint an agent uses is a model choice rather than a
+  provider choice.
+- Preview open browser tabs in a sidebar, and expand one into a full-width panel.
+- Mute desktop notifications for one server without muting the others.
+- Switch servers with numbered keyboard shortcuts.
+- Count the new messages on the chat scroll button, so a thread that moved while you read tells you
+  how far behind you are.
 - Download and pin the OpenCode CLI, like the other three providers. The Install button that sent
   you to the OpenCode website is gone.
 - Use OpenCode's free models with no account and no sign-in. A new OpenCode agent answers as soon
@@ -14,6 +30,14 @@ All notable changes to OpenBot will be documented here. The project follows
 - Add an optional OpenCode Zen key in Settings for the paid OpenCode Zen models. OpenBot encrypts
   the key on this computer, gives it only to the local OpenCode CLI, and keeps it out of every
   export, log, and diagnostics report.
+- On mobile: open an agent's information and edit it in a sheet, reply to a message and use the
+  message actions, send attachments from files or the camera, and pin an agent with a full swipe
+  that a screen reader can also do.
+- **On mobile, OpenBot now sends product analytics, and the setting starts on.** Turn it off in
+  Settings at any time; events wait until you sign in and are dropped if you refuse. Nothing on the
+  desktop app changed, and chats, files, and commands are never sent. `PRIVACY.md` describes what
+  an event carries.
+- Choose whether mobile gives haptic feedback.
 
 ### Changed
 
@@ -26,6 +50,28 @@ All notable changes to OpenBot will be documented here. The project follows
   signed in to before its own, so a new agent picked a model behind one of those sign-ins and its
   first message could fail with "Token refresh failed: 401" while the free models sat further down
   the list. No model that bills is ever the default now.
+- Create an agent without instructions. The field was required for no reason a user could act on.
+- Give every agent interaction card one shape across the app.
+- Load mobile chat history as you scroll, instead of holding a whole thread in memory.
+- Move the mobile save actions into the native sheet headers, and show pinned agents in a grid with
+  a stated capacity.
+- Raise the text contrast of the mobile theme.
+
+### Fixed
+
+- Show OpenCode tool activity again, and stop hiding browser actions.
+- Keep channel reads, signed-out authorship, and sidebar order correct.
+- Preserve Claude history answers, and render a resolved question as resolved.
+- Let a remote agent avatar download over WebRTC. A paired phone asked a Team API v2 host for an
+  avatar with no request body, and the host refused the route.
+- Accept a custom avatar file an agent names in a prompt.
+- Mute embedded browser tabs by default, and stop counting another agent's tabs against your tab
+  limit.
+- Show local dates on older chat messages and older sidebar chats.
+- Remove the size label from the embedded browser.
+- Make the desktop agent purpose optional, as the form already implied.
+- Recover a mobile session and a server connection after the app loses one, and put the mobile chat
+  keyboard back where it belongs after it is dismissed.
 
 ## [0.7.0] - 2026-09-09
 
