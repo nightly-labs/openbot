@@ -32,6 +32,9 @@ export function LandingPage() {
         </a>
 
         <nav class="landing-navigation" aria-label="Primary navigation">
+          <a class="landing-header-link" href={OPENBOT_LINKS.news}>
+            News
+          </a>
           <Button
             href={OPENBOT_LINKS.contact}
             target="_blank"
@@ -42,18 +45,6 @@ export function LandingPage() {
             class="landing-header-contact"
           >
             Contact
-          </Button>
-          <Button
-            href={OPENBOT_LINKS.repository}
-            target="_blank"
-            rel={EXTERNAL_LINK_REL}
-            variant="secondary"
-            size="sm"
-            icon="github"
-            class="landing-button-glass landing-header-github"
-            aria-label="Open OpenBot on GitHub"
-          >
-            <span class="landing-header-github-label">GitHub</span>
           </Button>
           <Button href={OPENBOT_LINKS.download} variant="primary" size="sm" icon="download">
             Download

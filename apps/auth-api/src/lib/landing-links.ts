@@ -8,6 +8,9 @@ export const OPENBOT_DOWNLOAD_LINKS = {
 export const OPENBOT_LINKS = {
   contact: "https://x.com/OpenBot_",
   download: "#download",
+  /** The same anchor from a page that is not the landing page. */
+  downloadFromOtherPage: "/#download",
+  news: "/news",
   releases: "https://github.com/NorbertBodziony/openbot/releases",
   repository: "https://github.com/NorbertBodziony/openbot",
   license: "https://github.com/NorbertBodziony/openbot/blob/main/LICENSE",
@@ -25,6 +28,7 @@ export const FOOTER_COLUMNS = [
     title: "Product",
     links: [
       { label: "Download", href: OPENBOT_LINKS.download, external: false },
+      { label: "News", href: OPENBOT_LINKS.news, external: false },
       { label: "Releases", href: OPENBOT_LINKS.releases, external: true },
       { label: "Source code", href: OPENBOT_LINKS.repository, external: true },
       { label: "License", href: OPENBOT_LINKS.license, external: true },

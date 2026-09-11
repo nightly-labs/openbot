@@ -27,6 +27,7 @@
     "@openbot/brand": "workspace:*",
     "@openbot/contracts": "workspace:*",
     "@openpanel/web": "catalog:",
+    "@paper-design/shaders": "0.0.80",
     "@solidjs/signals": "catalog:",
     "@solidjs/web": "catalog:",
     "@tanstack/solid-router": "2.0.0-rc.0",

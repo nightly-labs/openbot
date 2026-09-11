@@ -1,3 +1,4 @@
+import interLatinFont from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
 import type { JSX } from "@solidjs/web";
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/solid-router";
 import "@openbot/brand/logo.css";
@@ -6,7 +7,7 @@ import { PageError } from "../components/landing/PageError";
 import { OPENBOT_SECURITY_HEADERS, openBotRootHead } from "../lib/site-metadata";
 
 export const Route = createRootRoute({
-  head: openBotRootHead,
+  head: () => openBotRootHead(interLatinFont),
   headers: () => OPENBOT_SECURITY_HEADERS,
   component: RootComponent,
   shellComponent: RootDocument,

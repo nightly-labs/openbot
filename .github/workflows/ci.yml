@@ -150,10 +150,14 @@ jobs:
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
 
+      - name: Install a virtual display
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y xvfb
+
       - name: Build isolated preview
         run: bun run api:build
         env:
           CLOUDFLARE_ENV: preview
+          OPENBOT_NEWS_OG: require
 
       - name: Upload preview version
         id: deploy-preview
@@ -220,8 +224,13 @@ jobs:
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
 
+      - name: Install a virtual display
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y xvfb
+
       - name: Build production Worker
         run: bun run api:build
+        env:
+          OPENBOT_NEWS_OG: require
 
       - name: Apply production D1 migrations
         working-directory: apps/auth-api
