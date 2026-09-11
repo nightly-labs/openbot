@@ -81,7 +81,7 @@ export function contentImages(): Plugin {
       }
 
       try {
-        for (const image of await renderContentImages()) {
+        for (const image of await renderContentImages((line) => this.info(line))) {
           this.emitFile({ type: "asset", fileName: image.fileName, source: image.data });
         }
       } catch (error) {
@@ -160,7 +160,7 @@ function shadersVersion(): string {
   return manifest.dependencies?.["@paper-design/shaders"] ?? "unknown";
 }
 
-export async function renderContentImages(): Promise<ContentImage[]> {
+export async function renderContentImages(report: (line: string) => void = () => {}): Promise<ContentImage[]> {
   const jobs = contentImageJobs();
   if (jobs.length === 0) return [];
 
@@ -180,7 +180,8 @@ export async function renderContentImages(): Promise<ContentImage[]> {
 
   if (missing.length === 0) return images;
 
-  const rendered = await renderInElectron(missing);
+  report(`Drawing ${missing.length} of ${jobs.length} article images; the rest come from the cache.`);
+  const rendered = await renderInElectron(missing, report);
   for (const image of rendered) {
     const cachePath = cachePaths.get(image.fileName);
     if (cachePath) await writeFile(cachePath, image.data);
@@ -198,7 +199,7 @@ async function readIfPresent(filePath: string): Promise<Uint8Array | undefined> 
   }
 }
 
-async function renderInElectron(jobs: ContentImageJob[]): Promise<ContentImage[]> {
+async function renderInElectron(jobs: ContentImageJob[], report: (line: string) => void): Promise<ContentImage[]> {
   const electronBinary = resolveElectronBinary();
   const workspace = await mkdtemp(path.join(tmpdir(), "openbot-content-images-"));
 
@@ -220,7 +221,7 @@ async function renderInElectron(jobs: ContentImageJob[]): Promise<ContentImage[]
     const controlPath = path.join(workspace, "control.json");
     await writeFile(controlPath, JSON.stringify(control));
 
-    await runElectron(electronBinary, [path.join(appRoot, "content-image-electron.mjs"), controlPath]);
+    await runElectron(electronBinary, [path.join(appRoot, "content-image-electron.mjs"), controlPath], report);
 
     return await Promise.all(
       jobs.map(async (job) => ({
@@ -280,30 +281,45 @@ async function buildFontScript(): Promise<string> {
 }
 
 /**
- * A machine with no window server never reaches `app.whenReady()`, and Electron
- * then waits without printing anything. Without this the whole build waits with
- * it, so a build agent burns its entire time budget on a step that will never
- * finish. Fail instead, and say what to do about it.
+ * How long the build waits for the next line from the renderer, not for the
+ * whole run. A machine with no window server never reaches `app.whenReady()` and
+ * then waits without printing anything, which would otherwise burn the agent's
+ * entire time budget on a step that can never finish. A whole-run limit cannot
+ * tell that apart from a full set of images drawn slowly on a software
+ * rasteriser, and the renderer reports each image as it lands.
  */
-const ELECTRON_TIMEOUT_MS = 120_000;
+const ELECTRON_SILENCE_MS = 90_000;
 
-function runElectron(binary: string, args: string[]): Promise<void> {
+function runElectron(binary: string, args: string[], report: (line: string) => void): Promise<void> {
   const { command, commandArgs } = withVirtualDisplay(binary, args);
 
   return new Promise((resolve, reject) => {
     const child = spawn(command, commandArgs, {
-      stdio: ["ignore", "inherit", "inherit"],
+      stdio: ["ignore", "pipe", "inherit"],
       env: electronEnvironment(),
     });
 
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(
-        new Error(
-          `Electron produced no images within ${ELECTRON_TIMEOUT_MS / 1000} seconds. It usually means the machine has no display; run the build where a window server or xvfb is available, or set OPENBOT_CONTENT_IMAGES=skip.`,
-        ),
-      );
-    }, ELECTRON_TIMEOUT_MS);
+    let timer: NodeJS.Timeout;
+    const waitForProgress = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        child.kill("SIGKILL");
+        reject(
+          new Error(
+            `Electron drew nothing for ${ELECTRON_SILENCE_MS / 1000} seconds. It usually means the machine has no display; run the build where a window server or xvfb is available, or set OPENBOT_CONTENT_IMAGES=skip.`,
+          ),
+        );
+      }, ELECTRON_SILENCE_MS);
+    };
+    waitForProgress();
+
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      waitForProgress();
+      for (const line of chunk.split("\n")) {
+        if (line.trim()) report(line.trim());
+      }
+    });
 
     child.on("error", (error) => {
       clearTimeout(timer);

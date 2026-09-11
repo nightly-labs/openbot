@@ -153,44 +153,76 @@ describe("article media", () => {
   }
 
   // A clip plays only where it can be seen, so nothing at all happens until an
-  // observer reports it on screen. This one reports that as soon as it is asked.
+  // observer reports it on screen. This one reports that as soon as it is asked,
+  // and the returned `scrollAway` reports the opposite for everything observed.
   function stubOnScreen() {
+    const watchers = new Set<{
+      report: IntersectionObserverCallback;
+      targets: Set<Element>;
+      self: IntersectionObserver;
+    }>();
+
     class OnScreenObserver implements IntersectionObserver {
       readonly root = null;
       readonly rootMargin = "0px";
       readonly scrollMargin = "0px";
       readonly thresholds: readonly number[] = [0];
       private readonly report: IntersectionObserverCallback;
+      private readonly targets = new Set<Element>();
 
       constructor(callback: IntersectionObserverCallback) {
         this.report = callback;
+        watchers.add({ report: callback, targets: this.targets, self: this });
       }
 
       observe(target: Element) {
-        const rect = new DOMRectReadOnly(0, 0, 100, 100);
-        this.report(
-          [
-            {
-              boundingClientRect: rect,
-              intersectionRatio: 1,
-              intersectionRect: rect,
-              isIntersecting: true,
-              rootBounds: rect,
-              target,
-              time: 0,
-            },
-          ],
-          this,
-        );
+        this.targets.add(target);
+        this.report([entry(target, true)], this);
       }
 
-      unobserve() {}
-      disconnect() {}
+      unobserve(target: Element) {
+        this.targets.delete(target);
+      }
+      disconnect() {
+        this.targets.clear();
+      }
       takeRecords(): IntersectionObserverEntry[] {
         return [];
       }
     }
+
+    function entry(target: Element, isIntersecting: boolean): IntersectionObserverEntry {
+      const rect = new DOMRectReadOnly(0, 0, 100, 100);
+      return {
+        boundingClientRect: rect,
+        intersectionRatio: isIntersecting ? 1 : 0,
+        intersectionRect: rect,
+        isIntersecting,
+        rootBounds: rect,
+        target,
+        time: 0,
+      };
+    }
+
     vi.stubGlobal("IntersectionObserver", OnScreenObserver);
+
+    return {
+      scrollAway() {
+        for (const watcher of watchers) {
+          for (const target of watcher.targets) watcher.report([entry(target, false)], watcher.self);
+        }
+      },
+    };
+  }
+
+  /** The clip the browser was asked to play, which is the point of the test. */
+  function spyOnPlay() {
+    let played: HTMLMediaElement | undefined;
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(function (this: HTMLMediaElement) {
+      played = this;
+      return Promise.resolve();
+    });
+    return { play, playedMedia: () => played };
   }
 
   function renderGif() {
@@ -225,20 +257,41 @@ describe("article media", () => {
     expect(screen.getByRole("img", { name: GIF.alt })).toHaveAttribute("src", GIF.still);
   });
 
-  it("plays a clip once it is on screen", async () => {
+  it("plays the clip it was given once it is on screen", async () => {
     stubMotionPreference(false);
     stubOnScreen();
-    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    const { play, playedMedia } = spyOnPlay();
 
     renderClip();
 
     await waitFor(() => expect(play).toHaveBeenCalled());
+    // Which clip started matters as much as that one did: a figure with no
+    // source of its own would otherwise pass this test.
+    expect(playedMedia()).toHaveAttribute("src", CLIP.src);
+    expect(screen.getByRole("img", { name: CLIP.label })).toBeInTheDocument();
+  });
+
+  it("stops a clip that has been scrolled away from", async () => {
+    stubMotionPreference(false);
+    const viewport = stubOnScreen();
+    const { play } = spyOnPlay();
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    // jsdom never really plays anything, so the clip would report itself as
+    // already stopped and there would be nothing to stop.
+    vi.spyOn(HTMLMediaElement.prototype, "paused", "get").mockReturnValue(false);
+
+    renderClip();
+    await waitFor(() => expect(play).toHaveBeenCalled());
+
+    viewport.scrollAway();
+
+    await waitFor(() => expect(pause).toHaveBeenCalled());
   });
 
   it("does not start a clip for a reader who asked for less motion", async () => {
     stubMotionPreference(true);
     stubOnScreen();
-    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    const { play } = spyOnPlay();
 
     renderClip();
 

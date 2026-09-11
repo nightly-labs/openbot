@@ -52,14 +52,24 @@ export function ArticlePage(props: ArticlePageProps) {
             </p>
           </header>
 
+          {/*
+            Keyed, because a link to a related article stays on this route and
+            only changes the parameter. The gradient draws from the title it was
+            built with and keeps the frame it captured, so a reused one would
+            leave the reader looking at the previous article's artwork.
+          */}
           <div class="post-article-art" data-enter="post-art">
-            <ArticleGradient
-              collection={props.collection}
-              slug={props.article.slug}
-              title={props.article.title}
-              mode="live"
-              shape="article"
-            />
+            <Show when={props.article.slug} keyed>
+              {(slug) => (
+                <ArticleGradient
+                  collection={props.collection}
+                  slug={slug}
+                  title={props.article.title}
+                  mode="live"
+                  shape="article"
+                />
+              )}
+            </Show>
           </div>
 
           <div class="post-prose" data-enter="post-prose">

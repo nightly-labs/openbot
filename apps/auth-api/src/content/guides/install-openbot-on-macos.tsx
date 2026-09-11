@@ -7,15 +7,15 @@ export function InstallOpenBotOnMacos() {
   return (
     <>
       <p>
-        OpenBot is a desktop app. There is no account to make first and nothing to configure before it opens: the
-        install is a download, a drag, and one permission dialog.
+        OpenBot is a desktop app. The install itself is a download and a drag; the first launch then asks you to sign
+        in, to pick the provider you want your agents to use, and to allow two macOS permissions.
       </p>
 
-      <h2>Pick the right build</h2>
+      <h2>Check that your Mac can run it</h2>
       <p>
-        Two builds are published for macOS, one for Apple silicon and one for Intel. If you are unsure which machine you
-        have, open the Apple menu and choose About This Mac; anything that says M1 or later is Apple silicon. The
-        download page picks for you when it can, so in most cases you can take the button it offers.
+        OpenBot is built for Apple silicon and needs macOS 13 Ventura or later. There is no Intel build, and an Intel
+        Mac cannot open this one. To check, open the Apple menu and choose About This Mac: a chip named M1 or later is
+        Apple silicon. One macOS build is published, so the download page has nothing to choose between.
       </p>
 
       <h2>Move it to Applications</h2>
@@ -35,21 +35,32 @@ export function InstallOpenBotOnMacos() {
 
       <h2>The first launch</h2>
       <p>
-        macOS checks the signature the first time you open the app, which takes a few seconds and happens once. After
-        that OpenBot asks for access to the folder you want your first agent to work in. That folder is the only part of
-        your disk it can read, and you can change it later.
+        macOS checks the signature the first time you open the app, which takes a few seconds and happens once. OpenBot
+        then signs you in with a one-time code sent to your email, asks which AI provider to use, and shows the two
+        macOS permissions that Computer Use needs: Screen Recording, so it can see app windows, and Accessibility, so it
+        can click and type in them. Each one opens System Settings at the right pane.
       </p>
 
       <ArticleImage
         src={firstLaunch}
         width={1600}
         height={1000}
-        alt="OpenBot on first launch. A sheet asks which folder the first agent may work in, with the path ~/Projects/website in the field and a Choose Folder button beside Cancel."
-        caption="The folder named here is the whole of the app's reach into your disk."
+        alt="The OpenBot first-launch window, headed OpenBot might control your computer. Screen Recording and Accessibility each have a line saying what they are for and an Open Settings button, above Back and Next."
+        caption="These two permissions are about controlling the screen, not about your files."
       />
+
+      <h2>What an agent may touch</h2>
       <p>
-        You are done. Nothing has been sent anywhere: the database it just created is on your disk, and it stays there
-        until you connect a provider and ask for something.
+        Be clear about this before you hand over a task. Each agent gets a folder of its own under ~/OpenBot, which is
+        where it starts and where it keeps its work, but that folder is not a fence. An agent runs with full access: it
+        can read and change files elsewhere on the computer, run programs and use the network, in the same way as a
+        command-line tool you start yourself. Give an agent a task you would be willing to run yourself, and keep
+        backups.
+      </p>
+
+      <p>
+        Your work stays on this computer. The account holds who you are and which teams you belong to; the chats, the
+        files and the commands live in a database on your disk.
       </p>
     </>
   );

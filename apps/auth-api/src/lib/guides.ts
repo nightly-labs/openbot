@@ -25,7 +25,7 @@ export const GUIDES_COLLECTION: ContentCollection = {
       slug: "install-openbot-on-macos",
       title: "Install OpenBot on macOS",
       description:
-        "Download the build for your chip, move it to Applications, and get past the first-run checks. About five minutes, most of it waiting.",
+        "Download the Apple silicon build, move it to Applications, and get past the first-run checks. About five minutes, most of it waiting.",
       publishedAt: "2026-09-02",
       author: NEWS_AUTHOR,
     },

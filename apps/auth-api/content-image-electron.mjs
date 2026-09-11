@@ -34,6 +34,7 @@ async function main() {
   const control = JSON.parse(await readFile(controlPath, "utf8"));
 
   await app.whenReady();
+  console.log(`content-images: the renderer is ready, ${control.jobs.length} images to draw.`);
 
   const window = new BrowserWindow({
     show: false,
@@ -56,11 +57,17 @@ async function main() {
     await window.webContents.executeJavaScript(control.fontScript);
     await window.webContents.executeJavaScript(control.bundle);
 
+    // One line per image. The build watches this: a long render and a stuck one
+    // look the same from outside, and the only difference is whether anything
+    // still arrives.
+    let done = 0;
     for (const job of control.jobs) {
       const dataUrl = await window.webContents.executeJavaScript(
         `window.openBotContentImage.render(${JSON.stringify(job)})`,
       );
       await writeImage(path.join(control.outputDirectory, job.fileName), dataUrl);
+      done += 1;
+      console.log(`content-images: ${done}/${control.jobs.length} ${job.fileName}`);
     }
   } finally {
     window.destroy();
