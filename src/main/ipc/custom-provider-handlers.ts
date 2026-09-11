@@ -28,6 +28,9 @@ export function customProviderIpcHandlers({
        */
       save: payloadHandler(parseSaveCustomProvider, async (input): Promise<CustomProviderResult> => {
         const providers = await customProviders.save(input);
+        // An id that was removed before is served again from this write on, so the backend stops
+        // treating its models as gone.
+        service.noteCustomProviderSaved(input.id);
         return { providers, restart: await service.reloadOpenCodeConfig() };
       }),
       /**
@@ -37,6 +40,9 @@ export function customProviderIpcHandlers({
       delete: payloadHandler(parseDeleteCustomProvider, async ({ id }): Promise<CustomProviderResult> => {
         await service.releaseCustomProviderModels(id);
         const providers = await customProviders.remove(id);
+        // After the write, not before it: a removal that fails on disk leaves the endpoint saved and
+        // served, so its models must stay a valid fallback for the next removal.
+        service.noteCustomProviderRemoved(id);
         return { providers, restart: await service.reloadOpenCodeConfig() };
       }),
     },

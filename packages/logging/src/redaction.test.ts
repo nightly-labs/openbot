@@ -112,12 +112,21 @@ describe("redactText", () => {
 
   // A payload that parses is written back as JSON, so its spacing is the serializer's. The text
   // around it is untouched: only the run itself is read as data.
+  // A line can hold more payloads than the bound allows, and the regex rules match no header name,
+  // so what was not read must not be shown.
+  it("drops the rest of a line whose payloads pass the scan bound", () => {
+    const redacted = redactText(`${"{} ".repeat(16)}{"headers":{"X-Tenant":"tenant-secret"}}`);
+    expect(redacted).not.toContain("tenant-secret");
+    expect(redacted).toContain("[redacted-unscanned]");
+  });
+
   // The scan is synchronous and runs on provider stderr, so a line of open braces must not cost one
   // full pass per brace. Every attempt counts against the bound, not only the ones that parse.
   it("bounds the work a line of open braces can cause", () => {
     const braces = "{".repeat(65_536);
     const started = performance.now();
-    expect(redactText(braces)).toBe(braces);
+    // Sixteen braces are read, and the unreadable rest of the line is dropped rather than shown.
+    expect(redactText(braces)).toBe(`${"{".repeat(16)}[redacted-unscanned]`);
     expect(performance.now() - started).toBeLessThan(1_000);
   });
 

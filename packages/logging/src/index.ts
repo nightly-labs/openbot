@@ -95,10 +95,13 @@ function applyTextRules(value: string): string {
  *
  * Counting only the successes would not bound anything: `"{".repeat(65536)` gives a failed attempt
  * at every position, each scanning the rest of the line, and this function is synchronous on the
- * path that carries provider stderr. Past the bound the rest of the line keeps the regex rules,
- * which is the treatment all text had before this scan existed.
+ * path that carries provider stderr. Past the bound the rest of the line is
+ * dropped rather than shown unread, because the regex rules match no header name.
  */
 const MAX_EMBEDDED_SCANS = 16;
+
+/** What is left of a line whose payloads went past the scan bound. */
+const UNSCANNED = "[redacted-unscanned]";
 
 /**
  * A payload that sits inside a longer line, rather than being the whole of it.
@@ -112,9 +115,15 @@ function redactEmbeddedJson(value: string): string {
   let result = "";
   let index = 0;
   let scans = 0;
-  while (index < value.length && scans < MAX_EMBEDDED_SCANS) {
+  while (index < value.length) {
     const start = findPayloadStart(value, index);
     if (start < 0) break;
+    if (scans >= MAX_EMBEDDED_SCANS) {
+      // The bound was reached with a payload still ahead. The tail cannot be read, so it cannot be
+      // shown either: text before the bound is kept, and everything from the unread payload on is
+      // dropped. A truncated line is a smaller loss than a credential that survived the limit.
+      return `${result + value.slice(index, start)}${UNSCANNED}`;
+    }
     scans += 1;
     const end = findBalancedEnd(value, start);
     const parsed = end < 0 ? null : parseRedacted(value.slice(start, end));

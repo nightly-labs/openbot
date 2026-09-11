@@ -151,8 +151,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #profileClients = new Set<AgentClient>();
   readonly #deletingAgents = new Set<string>();
   /**
-   * Endpoints removed since the last OpenCode restart. The running CLI still lists their models, so
-   * they must not be offered as the fallback for the next removal. See `releaseCustomProviderModels`.
+   * Endpoints whose removal is written but which the running CLI may still list, because a restart
+   * it refused or failed leaves its catalogue as it was. They must not be offered as the fallback
+   * for the next removal. See `releaseCustomProviderModels`.
    */
   readonly #releasedCustomProviders = new Set<string>();
   readonly #store: AgentStore;
@@ -1079,16 +1080,29 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.updateProviderCli(provider, install);
   }
 
+  /** Restarts OpenCode so a saved or removed endpoint reaches it. Reports why, if it did not. */
+  reloadOpenCodeConfig(): Promise<CustomProviderRestart> {
+    return this.#providers.reloadOpenCodeConfig();
+  }
+
   /**
-   * Restarts OpenCode so a saved or removed endpoint reaches it. Reports why, if it did not.
-   *
-   * A restart is the moment the catalogue stops listing a removed endpoint's models, so it is also
-   * the moment the record of removed endpoints below can be dropped.
+   * The endpoint is gone from disk. Told by the caller that writes the file, after the write, so a
+   * removal that fails leaves the endpoint selectable: it is still saved and still served.
    */
-  async reloadOpenCodeConfig(): Promise<CustomProviderRestart> {
-    const restart = await this.#providers.reloadOpenCodeConfig();
-    if (restart === "restarted") this.#releasedCustomProviders.clear();
-    return restart;
+  noteCustomProviderRemoved(providerId: string): void {
+    this.#releasedCustomProviders.add(providerId);
+  }
+
+  /**
+   * The endpoint exists again. An id can be saved a second time after it was removed, and from that
+   * write on its models are a valid choice, so the exclusion has to go.
+   *
+   * This is why nothing here is keyed on a restart outcome. `reloadOpenCodeConfig` reports
+   * `restarted` for a replacement that failed to come up, and clearing the exclusions on that word
+   * would offer the models of a deleted endpoint to the next removal.
+   */
+  noteCustomProviderSaved(providerId: string): void {
+    this.#releasedCustomProviders.delete(providerId);
   }
 
   /**
@@ -1103,11 +1117,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * check runs over all of them first, so a refusal moves no agent at all.
    */
   async releaseCustomProviderModels(providerId: string): Promise<void> {
-    // Every endpoint removed since the last restart, not only this one. A removal during a turn
-    // leaves the running CLI's catalogue as it was, so the models of an endpoint already taken out
-    // are still listed, and choosing one here would move agents onto an endpoint that is gone.
-    this.#releasedCustomProviders.add(providerId);
-    const owned = new Set(this.#releasedCustomProviders);
+    // Every endpoint already removed, not only this one. A removal during a turn leaves the running
+    // CLI's catalogue as it was, so the models of an endpoint already taken out are still listed,
+    // and choosing one here would move agents onto an endpoint that is gone. This id joins them
+    // only through `noteCustomProviderRemoved`, once its own removal is written.
+    const owned = new Set(this.#releasedCustomProviders).add(providerId);
     const affected = this.#store
       .list()
       .filter((agent) => providerForAgent(agent) === "opencode" && isCustomProviderModelId(agent.model, owned));

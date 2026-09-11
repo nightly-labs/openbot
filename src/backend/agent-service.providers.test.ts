@@ -463,12 +463,72 @@ describe.sequential("AgentService: providers", () => {
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
       model: "house/router-llm",
     });
+    // The IPC handler reports the write, which is what makes the endpoint gone for good.
+    service.noteCustomProviderRemoved("studio");
 
     await service.releaseCustomProviderModels("house");
 
     const chief = service.listAgents().find((agent) => agent.id === "chief");
     expect(chief?.model).not.toBe("studio/local-llm");
     expect(chief?.provider).toBe("codex");
+  });
+
+  // A removal that fails on disk leaves the endpoint saved and served by the running CLI, so the
+  // next removal may still move agents onto it.
+  it("keeps an endpoint selectable when its own removal was never written", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider);
+      if (provider === "opencode") {
+        client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
+      }
+      return client;
+    });
+    await service.initialize();
+    await service.ensureProvider("codex");
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+
+    // Removing `studio` moves the agent, and then the file write fails, so the handler never reports
+    // the removal and `studio` is still an endpoint the user has.
+    await service.releaseCustomProviderModels("studio");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+
+    await service.releaseCustomProviderModels("house");
+
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
+      provider: "opencode",
+      model: "studio/local-llm",
+    });
+  });
+
+  // An id saved again is served again, whatever the CLI did with the removal before it.
+  it("offers an endpoint's models again after the id is saved a second time", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider);
+      if (provider === "opencode") {
+        client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
+      }
+      return client;
+    });
+    await service.initialize();
+    await service.ensureProvider("codex");
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
+
+    await service.releaseCustomProviderModels("studio");
+    service.noteCustomProviderRemoved("studio");
+    service.noteCustomProviderSaved("studio");
+
+    await service.releaseCustomProviderModels("house");
+
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
+      provider: "opencode",
+      model: "studio/local-llm",
+    });
   });
 
   it("refuses to release a busy agent when the only model left belongs to another provider", async () => {
