@@ -99,6 +99,8 @@
     "mobile:android": "bun run --cwd apps/mobile android",
     "mobile:ios": "bun run --cwd apps/mobile ios",
     "mobile:ios:rocketsim": "bun run --cwd apps/mobile ios:rocketsim",
+    "mobile:ios:build:local": "bun run --cwd apps/mobile ios:build:local",
+    "mobile:ios:release:testflight": "bun run --cwd apps/mobile ios:release:testflight",
     "mobile:lint": "bun run --cwd apps/mobile lint",
     "mobile:typecheck": "bun run typecheck:mobile",
     "mobile:doctor": "bun run --cwd apps/mobile doctor",

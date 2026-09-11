@@ -91,6 +91,8 @@
     "android": "expo run:android",
     "ios": "bun ../../scripts/mobile-ios.ts",
     "ios:rocketsim": "bun ../../scripts/mobile-ios.ts --rocketsim",
+    "ios:build:local": "bunx eas-cli@latest build --platform ios --profile production --local --output /private/tmp/openbot-testflight.ipa",
+    "ios:release:testflight": "gh workflow run release-ios.yml --ref main",
     "lint": "biome check --max-diagnostics=none src",
     "codegen": "expo customize tsconfig.json && uniwind generate-artifacts --css ./global.css --dts ./src/uniwind-types.d.ts",
     "typecheck": "bun run codegen && tsc --noEmit",
