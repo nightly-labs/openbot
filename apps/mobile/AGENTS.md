@@ -46,6 +46,10 @@ Follow [DESIGN.md — Sheets](./DESIGN.md#sheets) and inspect the current route 
 - Reuse `SettingsContent`/`SettingsSection`/`SettingsRow` for settings and `SheetFormField` for
   fields. Use HeroUI `Typography` for content and native Expo UI for platform controls.
   Keep groups flat, separators inset, and chevrons for navigation rather than destructive actions.
+- Save and create actions use `SheetSaveAction`: a checkmark on the right of the native header,
+  visible only for changed input or a pending save. Keep invalid drafts visible with a disabled
+  action. Do not add a Save/Create button in sheet content. Standalone creation forms have a
+  close (`×`) action on the left; nested pages keep native back navigation and draft guards.
 - Do not add a redundant Done/close button to a dismissible sheet. Add explicit actions only when
   the flow requires them, such as Save or Cancel for unsaved work.
 - Follow [DESIGN.md — Profile and About](./DESIGN.md#profile-and-about) for these settings pages:

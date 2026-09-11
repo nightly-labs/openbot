@@ -83,16 +83,16 @@ export function MemoryEditor({
         onChangeText={(value) => setEditedText(value === (memory?.text ?? "") ? undefined : value)}
       />
       <SheetSaveAction
-        canSave={!disabled && Boolean(text.trim()) && dirty}
+        dirty={dirty}
+        canSave={!disabled && Boolean(text.trim())}
         pending={action.pending}
-        saved={savedText !== null && !dirty}
-        onSavedHidden={!memory ? () => setFinished(true) : undefined}
         onSave={() =>
           void action.run(
             () => workspace.saveAgentMemory(agent.id, text.trim(), agent.serverId, memory?.id),
             () => {
               setSavedText(text.trim());
               if (memory) setEditedText(undefined);
+              else setFinished(true);
             },
           )
         }
@@ -169,6 +169,7 @@ export function RoutineEditor({
   const setInstruction = (instruction: string) => setEdits((current) => ({ ...current, instruction }));
   const setSchedule = (schedule: RoutineSchedule) => setEdits((current) => ({ ...current, schedule }));
   const [timezone, setTimezone] = useState(routine?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const initialTimezone = useRef(timezone);
   const draft = JSON.stringify({ name, instruction, schedule, timezone });
   const nameChanged = name.trim() !== (routine?.name ?? "");
   const instructionChanged = instruction.trim() !== (routine?.instruction ?? "");
@@ -178,7 +179,12 @@ export function RoutineEditor({
     ? nameChanged || instructionChanged || scheduleChanged
     : draft !==
       (savedDraft ??
-        JSON.stringify({ name: "", instruction: "", schedule: { kind: "daily", time: "09:00" }, timezone }));
+        JSON.stringify({
+          name: "",
+          instruction: "",
+          schedule: { kind: "daily", time: "09:00" },
+          timezone: initialTimezone.current,
+        }));
   useRecordDraftGuard(dirty && !finished, action.pending);
   useEffect(() => {
     if (finished) router.back();
@@ -352,14 +358,14 @@ export function RoutineEditor({
         <SheetFormField label="Time zone" value={timezone} editable={!disabled} onChangeText={setTimezone} />
       ) : null}
       <SheetSaveAction
-        canSave={!disabled && dirty && Boolean(name.trim() && instruction.trim() && timezone.trim()) && validTime}
+        dirty={dirty}
+        canSave={!disabled && Boolean(name.trim() && instruction.trim() && timezone.trim()) && validTime}
         pending={action.pending}
-        saved={savedDraft !== null && !dirty}
-        onSavedHidden={!routine ? () => setFinished(true) : undefined}
         onSave={() =>
           void action.run(save, () => {
             setSavedDraft(draft);
             if (routine) setEdits({});
+            else setFinished(true);
           })
         }
       />
