@@ -129,6 +129,19 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
       draft.values[key(formId, field.id)] = value;
     });
   };
+  const RefreshButton = () => (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      disabled={state.busy}
+      onClick={() => {
+        if (!pending) void read(props.request, ++generation);
+      }}
+    >
+      Refresh form
+    </Button>
+  );
   return (
     <div class="browser-takeover-fields" aria-busy={state.busy ? "true" : "false"}>
       <p>Enter the details here to send them directly to the website.</p>
@@ -239,7 +252,7 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
                 );
               }}
             </For>
-            <div class="browser-takeover-actions">
+            <div class="browser-takeover-form-actions">
               <For each={form.actions}>
                 {(action) => (
                   <Button
@@ -253,22 +266,14 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
                   </Button>
                 )}
               </For>
+              <RefreshButton />
             </div>
           </form>
         )}
       </For>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        class="browser-takeover-refresh"
-        disabled={state.busy}
-        onClick={() => {
-          if (!pending) void read(props.request, ++generation);
-        }}
-      >
-        Refresh form
-      </Button>
+      <Show when={!state.form?.forms.length}>
+        <RefreshButton />
+      </Show>
     </div>
   );
 }

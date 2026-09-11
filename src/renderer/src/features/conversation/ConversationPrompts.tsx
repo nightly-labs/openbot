@@ -1,7 +1,18 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentApproval, BrowserFormRequest, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { Badge, Button, Check, Input, LoaderCircle, Monitor, RadioGroup, Skeleton, X } from "../../components/ui";
+import {
+  Badge,
+  Button,
+  Check,
+  ExternalLink,
+  Input,
+  LoaderCircle,
+  Monitor,
+  RadioGroup,
+  Skeleton,
+  X,
+} from "../../components/ui";
 import { BrowserTakeoverFields } from "./BrowserTakeoverFields";
 
 export function ChoiceCard(props: {
@@ -238,7 +249,22 @@ export function BrowserTakeoverCard(props: {
         <figcaption class="browser-takeover-preview-bar">
           <Monitor aria-hidden="true" />
           <span title={pageDetails().title}>{pageDetails().title}</span>
-          <small title={pageDetails().host}>{pageDetails().host}</small>
+          <Show
+            when={!props.decision && props.onOpenBrowser}
+            fallback={<small title={pageDetails().host}>{pageDetails().host}</small>}
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Open browser"
+              title="Open browser"
+              disabled={Boolean(submitting()) || formBusy()}
+              onClick={() => props.onOpenBrowser?.()}
+            >
+              <ExternalLink aria-hidden="true" />
+            </Button>
+          </Show>
         </figcaption>
         <div class="browser-takeover-preview-viewport">
           <Show
@@ -272,16 +298,6 @@ export function BrowserTakeoverCard(props: {
 
       <Show when={!props.decision}>
         <footer class="browser-takeover-actions">
-          <Show when={props.onOpenBrowser}>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={Boolean(submitting()) || formBusy()}
-              onClick={() => props.onOpenBrowser?.()}
-            >
-              Open browser
-            </Button>
-          </Show>
           <Button
             variant="default"
             size="sm"

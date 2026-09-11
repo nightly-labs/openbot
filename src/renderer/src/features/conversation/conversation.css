@@ -8017,6 +8017,9 @@ body:has(.browser-panel-expanded) .app-frame {
   line-height: var(--openbot-leading-md);
 }
 
-.browser-takeover-refresh {
-  justify-self: start;
+.browser-takeover-form-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-2);
 }
