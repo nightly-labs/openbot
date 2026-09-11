@@ -70,7 +70,7 @@ export function ServerSettingsScreen() {
               ])
             }
           >
-            <Typography.Paragraph type="body-sm" className="text-danger">
+            <Typography.Paragraph type="body-sm" className="text-danger-text">
               Leave server
             </Typography.Paragraph>
           </SettingsRow>

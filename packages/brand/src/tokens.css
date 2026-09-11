@@ -122,6 +122,10 @@
      0.180 is the usable step, and lightness is held at the old 0.756 so contrast on
      the canvas is unchanged at 8.5:1 and no text legibility moves. */
   --openbot-success: #31cf76;
+  /* Status text sits on neutral surfaces; status fills have separate contrast needs. */
+  --openbot-success-text: #31cf76;
+  --openbot-warning-text: #ff9412;
+  --openbot-danger-text: #ff6069;
   --openbot-success-soft: rgba(49, 207, 118, 0.12);
   --openbot-success-wash: rgba(49, 207, 118, 0.045);
   /* Both warning marks in the reference measure hue 33 at full saturation (#ff9917 on

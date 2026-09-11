@@ -134,7 +134,7 @@ maps them to utilities. Do not copy these hex values into components.
 | --- | --- | --- | --- |
 | Sheet background | `bg-sheet` | `#fcfcfc` | `#121212` |
 | Group background | `bg-grouped` | `#f2f2f2` | `#212121` |
-| Supporting text | `text-grouped-secondary` | `#858589` | `#96969b` |
+| Supporting text | `text-grouped-secondary` | `#69696e` | `#96969b` |
 | Inset separator | `bg-grouped-border` | `#dddddf` | `#333335` |
 | Group corners | `rounded-grouped` | 16 pt | 16 pt |
 
@@ -150,7 +150,7 @@ labels, uppercase section titles, decorative cards and tinted gray backgrounds. 
 can use `ProfileAvatar neutral`; agent colors still convey their own identities.
 
 Action rows use the same flat grouped surface as navigation rows. Sign-out and photo-removal
-rows do not have chevrons; destructive actions use `text-danger` instead of a filled red block.
+rows do not have chevrons; destructive actions use `text-danger-text` instead of a filled red block.
 Keep pending/disabled behavior and confirmation for sign-out. Do not add account deletion or other
 unsupported actions just because a visual reference shows them.
 
@@ -190,6 +190,14 @@ build without the authorization required by `AGENTS.md`; inspecting an already r
 does not prove a changed screen was exercised.
 
 ## Theme and visual consistency
+
+Use `text-muted` for readable timestamps, reply references and code labels. Reserve dim colors
+for decoration or inactive controls. Status text on neutral surfaces uses `text-success-text`,
+`text-warning-text` or `text-danger-text`; `success`, `warning` and `danger` remain fill colors.
+The text colors must retain at least 4.5:1 contrast on the surfaces that use them in both modes.
+
+Fixed colors in camera overlays, QR codes, SVG alpha masks and agent artwork serve their
+respective media or identity roles. Do not replace these with foreground/background theme colors.
 
 - `packages/brand/src/tokens.css` is the single source of truth for OpenBot color, typography, radius, shadow, and motion tokens, shared with the desktop and web apps; `tokens-native.css` beside it carries the light and dark values for the tokens mobile themes. `global.css` imports both and declares none of its own — it maps them to Tailwind utilities and HeroUI semantic aliases.
 - Use HeroUI semantic variants and existing utility classes. Do not add raw colors, arbitrary radii, or one-off shadows to a screen when a token or component variant can express the intent.

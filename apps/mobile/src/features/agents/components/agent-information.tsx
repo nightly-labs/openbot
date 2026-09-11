@@ -123,7 +123,7 @@ export function AgentInformation({
                 maxLength={10}
               />
               {rangeError ? (
-                <Typography.Paragraph accessibilityRole="alert" className="text-danger">
+                <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
                   {rangeError}
                 </Typography.Paragraph>
               ) : null}

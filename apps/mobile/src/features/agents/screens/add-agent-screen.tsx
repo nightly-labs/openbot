@@ -81,7 +81,7 @@ export function AddAgentScreen() {
       />
 
       {error ? (
-        <Typography.Paragraph align="center" className="text-danger">
+        <Typography.Paragraph align="center" className="text-danger-text">
           {error}
         </Typography.Paragraph>
       ) : null}

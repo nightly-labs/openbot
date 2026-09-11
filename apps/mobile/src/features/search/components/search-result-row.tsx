@@ -42,7 +42,7 @@ export function MobileSearchResultRow({ result }: { result: MobileSearchResult }
           <Typography.Paragraph className="min-w-0 flex-1" weight="semibold" numberOfLines={1}>
             {result.title}
           </Typography.Paragraph>
-          <Typography.Paragraph type="body-xs" className="text-text-dim">
+          <Typography.Paragraph type="body-xs" className="text-muted">
             {result.updatedLabel}
           </Typography.Paragraph>
         </View>

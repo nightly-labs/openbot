@@ -147,7 +147,7 @@ export function AgentListRow({
                   <Typography.Paragraph className="min-w-0 flex-1" weight="semibold" numberOfLines={1}>
                     {agent.name}
                   </Typography.Paragraph>
-                  <Typography.Paragraph type="body-xs" className="text-text-dim">
+                  <Typography.Paragraph type="body-xs" className="text-muted">
                     {agent.updatedLabel}
                   </Typography.Paragraph>
                 </View>
