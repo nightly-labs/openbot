@@ -731,6 +731,12 @@ export function installOpenbotStub(): void {
         onScopedEvent: vi.fn(scopedAgentEventBridge.subscribe),
       },
       browser: {
+        readTakeoverForm: vi
+          .fn()
+          .mockResolvedValue({ revision: "test", origin: "https://example.com", forms: [], status: "manual" }),
+        submitTakeoverForm: vi
+          .fn()
+          .mockResolvedValue({ revision: "test", origin: "https://example.com", forms: [], status: "complete" }),
         open: vi.fn().mockResolvedValue(undefined),
         activate: vi.fn().mockResolvedValue(undefined),
         navigate: vi.fn().mockResolvedValue(undefined),

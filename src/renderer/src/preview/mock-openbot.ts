@@ -74,6 +74,7 @@ import {
   SIDEBAR_UNASSIGNED_SECTION_ID,
 } from "@openbot/contracts/ipc";
 import browserTakeoverPreviewUrl from "../../stories/assets/browser-takeover-preview.svg";
+import { browserFormPreview } from "./browser-form-preview";
 import {
   STORY_AGENT_STATUS,
   STORY_AGENT_SUBMISSIONS,
@@ -1407,6 +1408,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     browser: {
+      readTakeoverForm: async () => browserFormPreview(),
+      submitTakeoverForm: async (input) => {
+        emitAgentEvent({ type: "browser-takeover-resolved", requestId: input.requestId, agentId: input.agentId });
+        return { revision: "preview-complete", origin: "https://accounts.example.com", forms: [], status: "complete" };
+      },
       open: async (input: BrowserOpenInput) => {
         const tab: BrowserTab = {
           id: `browser-tab-${browserTabs.length + 1}`,

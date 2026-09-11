@@ -261,6 +261,21 @@ export class AttentionRegistry {
     return [...this.#takeovers.values()].some((pending) => pending.request.agentId === agentId);
   }
 
+  assertBrowserTakeover(input: { requestId: string | number; agentId: string; threadId: string; tabId: string }): void {
+    const pending = this.#takeovers.get(input.requestId);
+    const tab = this.#browser.listTabs().find((entry) => entry.id === input.tabId);
+    if (
+      !pending ||
+      pending.request.agentId !== input.agentId ||
+      pending.request.threadId !== input.threadId ||
+      pending.request.tabId !== input.tabId ||
+      tab?.ownerAgentId !== input.agentId ||
+      tab.ownerThreadId !== input.threadId
+    ) {
+      throw new Error("This browser takeover is no longer active.");
+    }
+  }
+
   async respondToBrowserTakeover(input: RespondToBrowserTakeoverInput): Promise<void> {
     const pending = this.#takeovers.get(input.requestId);
     if (!pending) throw new Error("This browser takeover is no longer active.");

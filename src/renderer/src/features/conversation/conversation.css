@@ -8003,3 +8003,20 @@ body:has(.browser-panel-expanded) .app-frame {
   min-width: 0;
   flex: 1;
 }
+
+.browser-takeover-fields,
+.browser-takeover-form {
+  display: grid;
+  gap: var(--openbot-space-3);
+}
+
+.browser-takeover-fields > p {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-md);
+}
+
+.browser-takeover-refresh {
+  justify-self: start;
+}

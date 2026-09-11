@@ -226,6 +226,10 @@ Network traffic can also occur when:
 - an installed build checks GitHub Releases for updates;
 - a user opens an explicitly labeled external support or setup link.
 
+When you fill a browser takeover form in a local desktop chat, OpenBot sends those values directly
+to the website in its embedded browser. These values are temporary and are not added to chat history,
+provider tool results, logs, or analytics. The website handles submitted data under its own policy.
+
 Account usage shown in OpenBot is requested through the local Codex App Server. OpenBot does not send
 that usage to its maintainer.
 

@@ -57,6 +57,7 @@ import type {
   BrowserTab,
   BrowserVisibilityInput,
 } from "./ipc-browser";
+import type { BrowserFormRequest, BrowserFormState, BrowserFormSubmission } from "./ipc-browser-forms";
 import type {
   ChannelMemory,
   CreateChannelMemoryInput,
@@ -257,6 +258,8 @@ export interface MarketplaceAgentsDesktopApi {
 }
 
 export interface BrowserDesktopApi {
+  readTakeoverForm: (input: BrowserFormRequest) => Promise<BrowserFormState>;
+  submitTakeoverForm: (input: BrowserFormSubmission) => Promise<BrowserFormState>;
   open: (input: BrowserOpenInput) => Promise<BrowserTab>;
   activate: (tabId: string) => Promise<void>;
   navigate: (input: BrowserNavigateInput) => Promise<void>;

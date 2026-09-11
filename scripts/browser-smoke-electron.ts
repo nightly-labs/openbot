@@ -227,10 +227,10 @@ async function main(): Promise<void> {
   const scenario = process.argv.find((argument) => argument.startsWith("--scenario="))?.slice("--scenario=".length);
   if (
     scenario !== undefined &&
-    !["background", "controls", "tool-boundary", "evaluation", "wait-deadlines"].includes(scenario)
+    !["background", "controls", "tool-boundary", "evaluation", "wait-deadlines", "takeover-forms"].includes(scenario)
   ) {
     throw new Error(
-      `Unknown browser smoke scenario: ${scenario}. Use background, controls, tool-boundary, evaluation, or wait-deadlines.`,
+      `Unknown browser smoke scenario: ${scenario}. Use background, controls, tool-boundary, evaluation, wait-deadlines, or takeover-forms.`,
     );
   }
   const googleLive = process.argv.includes("--google-live");
@@ -282,10 +282,11 @@ async function main(): Promise<void> {
       recordingMaxAggregateBytes: 100 * 1024 * 1024,
     });
     if (!scenario || scenario === "background") await runBackgroundScenario(browser, origin);
+    if (!scenario || scenario === "takeover-forms") await runTakeoverForms(browser, origin);
     await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
     if (scenario) {
       try {
-        if (scenario === "background") {
+        if (scenario === "background" || scenario === "takeover-forms") {
           // The scenario runs before the browser panel is first shown.
         } else if (scenario === "tool-boundary") {
           await runToolBoundaryScenario(browser, origin);
@@ -2694,4 +2695,58 @@ async function waitForValue<T>(check: () => T | undefined): Promise<T> {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   throw new Error("Timed out waiting for a browser state change.");
+}
+
+async function runTakeoverForms(browser: BrowserHost, origin: string): Promise<void> {
+  const { tab, contents } = await openTabWithContents(browser, origin, "form-thread", "form-agent");
+  try {
+    await contents.executeJavaScript(`document.body.innerHTML = '<form aria-label="Sign in"><label>Email<input name="email" type="email" required></label><label>Password<input name="password" type="password" required></label><button>Sign in</button></form>';
+      document.querySelector('form').addEventListener('submit', event => {
+        event.preventDefault();
+        if (document.querySelector('input[type=password]').value !== 'smoke-secret') throw new Error('Incorrect form value');
+        document.body.innerHTML = '<form aria-label="Verification"><label>Code<input name="code" required></label><button>Verify</button></form>';
+        document.querySelector('form').addEventListener('submit', event => { event.preventDefault(); document.body.innerHTML = '<main>Signed in</main>'; });
+      }); true`);
+    await browser.beginTakeover(tab.id);
+    const request = { requestId: "smoke", agentId: "form-agent", threadId: "form-thread", tabId: tab.id };
+    const first = await browser.readTakeoverForm(tab.id, () => undefined);
+    const form = first.forms[0];
+    if (form?.fields.length !== 2) throw new Error("Takeover did not expose the login form.");
+    const next = await browser.submitTakeoverForm(
+      {
+        ...request,
+        revision: first.revision,
+        formId: form.id,
+        actionId: form.actions[0].id,
+        values: form.fields.map((field) => ({
+          id: field.id,
+          value: field.type === "password" ? "smoke-secret" : "user@example.com",
+        })),
+      },
+      () => undefined,
+    );
+    const verification = next.forms[0];
+    if (verification?.fields[0].label !== "Code" || next.status === "complete")
+      throw new Error("Takeover did not retain the verification step.");
+    if (JSON.stringify(next).includes("smoke-secret")) throw new Error("Takeover returned entered credentials.");
+    const complete = await browser.submitTakeoverForm(
+      {
+        ...request,
+        revision: next.revision,
+        formId: verification.id,
+        actionId: verification.actions[0].id,
+        values: [{ id: verification.fields[0].id, value: "123456" }],
+      },
+      () => undefined,
+    );
+    if (complete.status !== "complete") throw new Error("Takeover did not detect the completed form.");
+    browser.endTakeover(tab.id);
+    const snapshot = await browser.snapshot(tab.id);
+    if (!snapshot.text.includes("Signed in") || JSON.stringify(snapshot).includes("smoke-secret"))
+      throw new Error("Agent did not receive a clean page after takeover.");
+    process.stdout.write("BrowserHost: takeover forms passed without opening the browser panel.\n");
+  } finally {
+    browser.endTakeover(tab.id);
+    await browser.close(tab.id);
+  }
 }

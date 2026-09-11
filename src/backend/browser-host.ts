@@ -10,6 +10,8 @@ import type {
   BrowserControlSession,
   BrowserControlState,
   BrowserEnvironment,
+  BrowserFormState,
+  BrowserFormSubmission,
   BrowserImageMode,
   BrowserJsonValue,
   BrowserNavigationDirection,
@@ -140,6 +142,7 @@ export class BrowserHost {
   #pictureInPictureOverlayView: WebContentsView | null = null;
   #target: BrowserViewTarget = "main";
   readonly #mountedViews = new Map<WebContentsView, BrowserWindow>();
+  readonly #takeoverFormRevisions = new Map<string, string>();
   readonly #takeoverTabIds = new Set<string>();
   #persistQueue: Promise<void> = Promise.resolve();
   #destroyPromise: Promise<void> | null = null;
@@ -380,6 +383,7 @@ export class BrowserHost {
     const closedIndex = tabIds.indexOf(tabId);
     this.#unmountView(tab.view);
     this.#tabs.delete(tabId);
+    this.#takeoverFormRevisions.delete(tabId);
     this.#takeoverTabIds.delete(tabId);
 
     if (this.#activeTabId === tabId) {
@@ -417,6 +421,7 @@ export class BrowserHost {
       await this.#enqueue(tabId, () => this.#recorder.discard(tabId, "tab-closed"));
     } catch (error) {
       tab.diagnostics.clearDiagnostics();
+      this.#takeoverFormRevisions.delete(tabId);
       this.#takeoverTabIds.delete(tabId);
       throw error;
     }
@@ -428,8 +433,78 @@ export class BrowserHost {
       tab.engine.invalidateReferences();
       tab.diagnostics.clearDiagnostics();
     }
+    this.#takeoverFormRevisions.delete(tabId);
     this.#takeoverTabIds.delete(tabId);
     this.#emitChanged();
+  }
+
+  async readTakeoverForm(tabId: string, assertActive: () => void): Promise<BrowserFormState> {
+    return this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
+      const check = () => {
+        assertActive();
+        if (!this.#takeoverTabIds.has(tabId)) throw new Error("This browser takeover is no longer active.");
+      };
+      check();
+      const revision = randomUUID();
+      const state = await this.#boundEngineOperation(
+        tab,
+        tab.engine.takeoverForm({ kind: "read", revision }, check),
+        10_000,
+        "Browser form timed out.",
+        keepQueueBlocked,
+      );
+      check();
+      this.#takeoverFormRevisions.set(tabId, revision);
+      return state;
+    });
+  }
+
+  async submitTakeoverForm(input: BrowserFormSubmission, assertActive: () => void): Promise<BrowserFormState> {
+    return this.#enqueue(input.tabId, async (tab, keepQueueBlocked) => {
+      const check = () => {
+        assertActive();
+        if (!this.#takeoverTabIds.has(input.tabId)) throw new Error("This browser takeover is no longer active.");
+      };
+      check();
+      if (this.#takeoverFormRevisions.get(input.tabId) !== input.revision)
+        throw new Error("The browser form changed. Refresh it before submitting.");
+      this.#takeoverFormRevisions.delete(input.tabId);
+      try {
+        const submitted = await this.#boundEngineOperation(
+          tab,
+          tab.engine.takeoverForm({ kind: "submit", input }, check),
+          10_000,
+          "Browser form timed out.",
+          keepQueueBlocked,
+        );
+        await this.#boundEngineOperation(
+          tab,
+          tab.engine.waitFor({ state: "dom-quiet" }, 10_000),
+          10_000,
+          "Browser form timed out.",
+          keepQueueBlocked,
+        );
+        check();
+        const revision = randomUUID();
+        const next = await this.#boundEngineOperation(
+          tab,
+          tab.engine.takeoverForm({ kind: "read", revision }, check),
+          10_000,
+          "Browser form timed out.",
+          keepQueueBlocked,
+        );
+        check();
+        this.#takeoverFormRevisions.set(input.tabId, revision);
+        if (submitted.status === "invalid") return { ...next, status: "invalid" };
+        if (next.status === "ready" && next.forms.length === 0 && !tab.view.webContents.isLoading())
+          return { ...next, status: "complete" };
+        return next;
+      } catch {
+        throw new Error(
+          "The browser form could not be submitted. Refresh the form or open the browser to check the result.",
+        );
+      }
+    });
   }
 
   async setVisible(input: BrowserVisibilityInput): Promise<void> {

@@ -1,3 +1,4 @@
+import { parseBrowserFormRequest, parseBrowserFormSubmission } from "@openbot/contracts/ipc";
 // @vitest-environment node
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -730,4 +731,28 @@ it("validates the server mute request", () => {
   ]) {
     expect(() => parseSetServerMuted(input)).toThrow();
   }
+});
+
+describe("browser form inputs", () => {
+  const request = { requestId: "request", agentId: "agent", threadId: "thread", tabId: "tab" };
+  it("keeps scoped input data and rejects malformed submissions without echoing values", () => {
+    expect(parseBrowserFormRequest(request)).toEqual(request);
+    const input = {
+      ...request,
+      revision: "revision",
+      formId: "form",
+      actionId: "action",
+      values: [{ id: "field", value: "secret" }],
+    };
+    expect(parseBrowserFormSubmission(input)).toEqual(input);
+    expect(() =>
+      parseBrowserFormSubmission({ ...input, values: [{ id: "field", value: { password: "secret" } }] }),
+    ).toThrowError("Invalid browser form submission.");
+    expect(() => parseBrowserFormRequest({ ...request, requestId: Number.NaN })).toThrowError(
+      "Invalid browser form request.",
+    );
+    expect(() =>
+      parseBrowserFormSubmission({ ...input, values: [{ id: "field", value: "x".repeat(16001) }] }),
+    ).toThrowError("Invalid browser form submission.");
+  });
 });
