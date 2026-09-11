@@ -312,9 +312,19 @@ function runElectron(binary: string, args: string[]): Promise<void> {
     child.on("close", (code) => {
       clearTimeout(timer);
       if (code === 0) resolve();
-      else reject(new Error(`Electron exited with code ${code}.`));
+      else reject(new Error(`Electron exited with code ${code}.${electronExitHint(code)}`));
     });
   });
+}
+
+/**
+ * Chromium aborts on a signal when it cannot build its sandbox. A Linux machine
+ * hits this because an install as a normal user cannot give `chrome-sandbox` the
+ * owner and mode the helper requires.
+ */
+function electronExitHint(code: number | null) {
+  if (code !== 128 + 5 && code !== 128 + 6) return "";
+  return " Chromium stopped on a signal, which usually means it could not start its sandbox. On Linux, give `node_modules/electron/dist/chrome-sandbox` the owner root and mode 4755.";
 }
 
 /**
