@@ -14,6 +14,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it } from "vitest";
+import { ConversationReadStore } from "./conversation-read-store";
 import { OpenBotDatabase } from "./openbot-database";
 
 const roots: string[] = [];
@@ -23,6 +24,53 @@ afterEach(async () => {
 });
 
 describe("OpenBotDatabase", () => {
+  it("keeps queued turns in saved order across history pages and read boundaries", async () => {
+    const database = await createDatabase();
+    const agent = testAgent();
+    database.replaceAgents("queued-history", [agent], "agents.imported");
+    const messages: ConversationMessage[] = [0, 20, 10, 30].map((seconds, index) => ({
+      id: `message-${index}`,
+      turnId: `turn-${Math.floor(index / 2)}`,
+      author: index % 2 === 0 ? "user" : "assistant",
+      text: `Message ${index}`,
+      createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, seconds)).toISOString(),
+      status: "completed",
+    }));
+    const snapshot = { agentId: agent.id, threadId: agent.threadId, activeTurnId: null, revision: 0, messages };
+    database.persistConversation(snapshot, "conversation.queued-history");
+    expect(database.readConversation(agent.id, agent.threadId).messages.map((message) => message.id)).toEqual([
+      "message-0",
+      "message-1",
+      "message-2",
+      "message-3",
+    ]);
+    const latest = database.readConversationPage(agent.id, agent.threadId, { type: "latest" }, 2);
+    expect(latest.messages.map((message) => message.id)).toEqual(["message-2", "message-3"]);
+    if (!latest.pageInfo.olderCursor) throw new Error("Missing older cursor");
+    const older = database.readConversationPage(
+      agent.id,
+      agent.threadId,
+      { type: "before", cursor: latest.pageInfo.olderCursor },
+      2,
+    );
+    expect(older.messages.map((message) => message.id)).toEqual(["message-0", "message-1"]);
+    expect(older.pageInfo.hasOlder).toBe(false);
+    const around = database.readConversationPage(
+      agent.id,
+      agent.threadId,
+      { type: "around", messageId: "message-1" },
+      3,
+    );
+    expect(around.messages.map((message) => message.id)).toEqual(["message-0", "message-1", "message-2"]);
+    const reads = new ConversationReadStore(database);
+    reads.markRead("member", snapshot, "message-2");
+    expect(reads.readStateForThread("member", agent.threadId)).toMatchObject({
+      unreadCount: 1,
+      firstUnreadMessageId: "message-3",
+      throughMessageId: "message-2",
+    });
+    database.close();
+  });
   it("rolls back a failed channel migration and preserves agent history on retry", async () => {
     const database = await createDatabase();
     const agent = testAgent();
