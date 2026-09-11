@@ -2,6 +2,7 @@ import {
   type AgentAnalytics,
   type AgentMemory,
   analyticsRange,
+  type CreateAgentInput,
   emptyAnalyticsTotals,
   type Routine,
   type UpdateAgentInput,
@@ -17,7 +18,10 @@ import { ChatHeader } from "../../chat/components/chat-header";
 import { saveAgentRecord } from "../../workspace/model/save-agent-record";
 import type { MobileAgent, MobileServer } from "../../workspace/model/workspace-types";
 import { useAgentContextMenu } from "../components/agent-context-menu";
+import { AddAgentScreen } from "./add-agent-screen";
 import { EditAgentScreen } from "./edit-agent-screen";
+
+vi.mock("expo-crypto", () => ({ randomUUID: () => "new-agent-seed" }));
 
 vi.mock("expo-secure-store", () => ({}));
 
@@ -61,6 +65,7 @@ const workspace = {
   activityByServer: {},
   pinnedAgentIds: [],
   unreadAgentIds: [],
+  createAgent: vi.fn(async (_input: CreateAgentInput) => {}),
   updateAgent: vi.fn(async (input: UpdateAgentInput, _serverId?: string) => {
     workspace.agents = [{ ...workspace.agents[0], ...input }];
   }),
@@ -337,6 +342,7 @@ beforeEach(() => {
   workspace.agents = [{ ...original }];
   workspace.servers = [{ ...host }];
   workspace.activeServer = host;
+  workspace.createAgent.mockReset().mockResolvedValue();
   workspace.updateAgent.mockClear();
   workspace.saveAgentMemory.mockClear();
   workspace.deleteAgentMemory.mockClear();
@@ -406,7 +412,7 @@ it("saves name and instructions on the original host and shows them after reopen
     },
     "host-one",
   );
-  expect(screen.getByRole("button", { name: "Saved" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
   await act(() => root.unmount());
   root = createRoot(container);
   await renderSheet();
@@ -418,13 +424,13 @@ it("saves name and instructions on the original host and shows them after reopen
 it("validates input, retains failed edits, and confirms cancellation", async () => {
   await renderSheet();
   await edit("Name", " ");
-  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Save changes" })).toHaveProperty("disabled", true);
   await edit("Name", "New name");
   workspace.updateAgent.mockRejectedValueOnce(new Error("Save failed"));
   await click("Save changes");
   expect(screen.getByRole("textbox", { name: "Name" })).toHaveProperty("value", "New name");
   expect(mocks.blocked).toBe(true);
-  await click("Cancel");
+  await act(() => mocks.leave());
   const choices = mocks.alert.mock.calls[0]?.[2];
   expect(choices).toEqual([
     { text: "Keep editing", style: "cancel" },
@@ -443,7 +449,7 @@ it("keeps edits through host loss and accepts desktop changes in untouched field
   await renderSheet();
   expect(screen.getByRole("textbox", { name: "Name" })).toHaveProperty("value", "My draft");
   expect(screen.getByRole("textbox", { name: "Instructions" })).toHaveProperty("value", "Desktop update");
-  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Save changes" })).toHaveProperty("disabled", true);
   workspace.servers = [host];
   await renderSheet();
   await click("Save changes");
@@ -497,7 +503,7 @@ it("prevents duplicate saves and dismissal while a save is pending", async () =>
   expect(mocks.dispatch).not.toHaveBeenCalled();
   expect(workspace.updateAgent).toHaveBeenCalledTimes(1);
   await act(async () => finish());
-  expect(screen.getByRole("button", { name: "Saved" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
 });
 
 it("shows host memories, routine status, and usage on separate pages", async () => {
@@ -641,12 +647,12 @@ it("saves a supported model and reasoning level on the original host", async () 
   );
 });
 
-it("shows saved feedback in the header after saving", async () => {
+it("hides the header action after saving", async () => {
   await renderSheet("appearance");
   expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
   await click("Agent face 2", "radio");
   await click("Save changes");
-  expect(screen.getByRole("button", { name: "Saved" })).toHaveProperty("disabled", true);
+  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
 });
 
 it("changes provider together with a compatible model and reasoning", async () => {
@@ -723,7 +729,7 @@ it("creates, edits, and deletes a memory on its host", async () => {
   workspace.servers = [{ ...host, state: "offline" }];
   await renderSheet("memory");
   expect(screen.getByRole("textbox", { name: "Memory" })).toHaveProperty("value", "Changed note");
-  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Save changes" })).toHaveProperty("disabled", true);
   expect(mocks.blocked).toBe(true);
   workspace.servers = [{ ...host }];
   workspace.loadAgentMemories.mockRejectedValueOnce(new Error("Refresh failed"));
@@ -731,7 +737,7 @@ it("creates, edits, and deletes a memory on its host", async () => {
   await waitFor(() => expect(screen.getByText("Could not refresh memory.")).toBeTruthy());
   expect(screen.getByRole("textbox", { name: "Memory" })).toHaveProperty("value", "Changed note");
   await click("Retry memory");
-  await waitFor(() => expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Save changes" })).toHaveProperty("disabled", false));
   workspace.saveAgentMemory.mockImplementationOnce(() =>
     saveAgentRecord(client, ["agent-info", "test", "user", 1, host.id, original.id, "memories"], async () => ({
       ...memory,
@@ -878,24 +884,61 @@ it("keeps a failed memory draft available for retry", async () => {
   expect(workspace.saveAgentMemory).toHaveBeenCalledTimes(2);
 });
 
-it("hides the saved header action after feedback and exposes the next save", async () => {
-  vi.useFakeTimers();
+it("shows the save action only for changed input and blocks invalid or pending saves", async () => {
   const save = vi.fn();
-  const hidden = vi.fn();
-  try {
-    await act(() =>
-      root.render(<SheetSaveAction canSave={false} pending={false} saved onSave={save} onSavedHidden={hidden} />),
-    );
-    expect(screen.getByRole("button", { name: "Saved" })).toHaveProperty("disabled", true);
-    await act(() => vi.runOnlyPendingTimers());
-    expect(screen.queryByRole("button", { name: "Saved" })).toBeNull();
-    expect(hidden).toHaveBeenCalledTimes(1);
-    await act(() => root.render(<SheetSaveAction canSave pending={false} saved={false} onSave={save} />));
-    await click("Save changes");
-    expect(save).toHaveBeenCalledTimes(1);
-  } finally {
-    vi.useRealTimers();
-  }
+  await act(() => root.render(<SheetSaveAction dirty={false} canSave pending={false} onSave={save} />));
+  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  await act(() => root.render(<SheetSaveAction dirty canSave={false} pending={false} onSave={save} />));
+  await click("Save changes");
+  expect(save).not.toHaveBeenCalled();
+  await act(() => root.render(<SheetSaveAction dirty canSave pending onSave={save} />));
+  expect(screen.getByRole("button", { name: "Saving…" })).toHaveProperty("disabled", true);
+  await act(() => root.render(<SheetSaveAction dirty canSave pending={false} onSave={save} />));
+  await click("Save changes");
+  expect(save).toHaveBeenCalledTimes(1);
+});
+
+it("creates an agent from changed valid input and blocks duplicate submission and closing while pending", async () => {
+  const response = Promise.withResolvers<void>();
+  workspace.createAgent.mockReturnValueOnce(response.promise);
+  await act(() => root.render(<AddAgentScreen />));
+  expect(screen.queryByRole("button", { name: "Create agent" })).toBeNull();
+  await edit("Name", "Explorer");
+  expect(screen.getByRole("button", { name: "Create agent" })).toHaveProperty("disabled", true);
+  await edit("Name", "");
+  expect(screen.queryByRole("button", { name: "Create agent" })).toBeNull();
+  await edit("Name", " Explorer ");
+  await edit("What should this agent help with?", " Plan trips ");
+  await click("Create agent");
+  await click("Creating…");
+  await click("Close");
+  await act(() => mocks.leave());
+  expect(workspace.createAgent).toHaveBeenCalledExactlyOnceWith({
+    name: "Explorer",
+    description: "Plan trips",
+    initialMessage: "Your ongoing role is: Plan trips",
+    avatarSeed: "mobile:newagentseed",
+    avatarHue: null,
+  });
+  expect(mocks.dispatch).not.toHaveBeenCalled();
+  await act(() => response.resolve());
+  expect(mocks.blocked).toBe(false);
+  expect(mocks.dispatch).toHaveBeenCalledWith({ type: "GO_BACK" });
+});
+
+it("keeps a failed create draft for retry and confirms close", async () => {
+  workspace.createAgent.mockRejectedValueOnce(new Error("Create failed"));
+  await act(() => root.render(<AddAgentScreen />));
+  await edit("Name", "Explorer");
+  await edit("What should this agent help with?", "Plan trips");
+  await click("Create agent");
+  expect(screen.getByRole("textbox", { name: "Name" })).toHaveProperty("value", "Explorer");
+  expect(screen.getByRole("button", { name: "Create agent" })).toHaveProperty("disabled", false);
+  await click("Close");
+  expect(mocks.alert).toHaveBeenCalled();
+  expect(mocks.dispatch).not.toHaveBeenCalled();
+  await click("Create agent");
+  expect(workspace.createAgent).toHaveBeenCalledTimes(2);
 });
 
 it("saves the selected monthly day and wall-clock time", async () => {
@@ -945,4 +988,13 @@ it("keeps an acknowledged memory save when an older read completes on the same h
   await read;
   expect(client.getQueryData(key)).toEqual([saved]);
   expect(client.getQueryData(otherHostKey)).toEqual([memory]);
+});
+
+it("shows an incomplete routine change and hides it when the time zone is restored", async () => {
+  const initialTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  await renderSheet("routine");
+  await edit("Time zone", initialTimezone === "UTC" ? "Europe/Warsaw" : "UTC");
+  expect(screen.getByRole("button", { name: "Save changes" })).toHaveProperty("disabled", true);
+  await edit("Time zone", initialTimezone);
+  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
 });

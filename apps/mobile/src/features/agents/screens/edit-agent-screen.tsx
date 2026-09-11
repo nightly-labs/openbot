@@ -3,7 +3,7 @@ import type { UpdateAgentInput } from "@openbot/contracts/ipc";
 import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
-import { Button, Typography } from "heroui-native";
+import { Typography } from "heroui-native";
 import { useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
@@ -52,14 +52,13 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
   const [saving, setSaving] = useState(false);
   const pending = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
   const name = edits.name ?? agent.name;
   const description = edits.description ?? agent.description;
   const avatarSeed = edits.avatarSeed ?? agent.avatarSeed;
   const avatarHue = edits.avatarHue === undefined ? agent.avatarHue : edits.avatarHue;
   const dirty =
-    name !== agent.name ||
-    description !== agent.description ||
+    name.trim() !== agent.name ||
+    description.trim() !== agent.description ||
     avatarSeed !== agent.avatarSeed ||
     avatarHue !== agent.avatarHue ||
     (edits.provider !== undefined && edits.provider !== agent.provider) ||
@@ -81,7 +80,6 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
 
   function change(value: AgentEdits) {
     setEdits((current) => ({ ...current, ...value }));
-    setSaved(false);
     setError(null);
   }
 
@@ -105,7 +103,6 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
         agent.serverId,
       );
       setEdits({});
-      setSaved(true);
     } catch (cause) {
       setError(errorMessage(cause, "OpenBot could not update this agent."));
     } finally {
@@ -205,17 +202,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
         </Typography.Paragraph>
       ) : null}
       {page === "info" || page === "appearance" || page === "runtime" ? (
-        <SheetSaveAction
-          canSave={valid && dirty && available}
-          pending={saving}
-          saved={saved && !dirty}
-          onSave={() => void submit()}
-        />
-      ) : null}
-      {dirty && page !== "appearance" ? (
-        <Button variant="ghost" isDisabled={saving} onPress={() => router.back()}>
-          <Button.Label>Cancel</Button.Label>
-        </Button>
+        <SheetSaveAction dirty={dirty} canSave={valid && available} pending={saving} onSave={() => void submit()} />
       ) : null}
       {page === "info" ? (
         <>
