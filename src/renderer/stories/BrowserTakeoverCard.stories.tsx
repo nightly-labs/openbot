@@ -91,7 +91,16 @@ export const ChatForm: Story = {
   decorators: [
     (Story) => {
       const previous = window.openbot;
-      window.openbot = createMockOpenBot().api;
+      const api = createMockOpenBot().api;
+      api.browser.readTakeoverForm = async () => {
+        const state = browserFormPreview();
+        state.forms[0].actions.push(
+          { id: "recover", label: "Forgot password?" },
+          { id: "create", label: "Create new account" },
+        );
+        return state;
+      };
+      window.openbot = api;
       onSettled(() => () => {
         window.openbot = previous;
       });
@@ -140,7 +149,8 @@ export const PhoneNumberStep: Story = {
   ...PageActions,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(await canvas.findByRole("button", { name: "Log in with phone number" }));
+    await userEvent.selectOptions(await canvas.findByRole("combobox", { name: "Action" }), "phone");
+    await userEvent.click(canvas.getByRole("button", { name: "Log in with phone number" }));
     await canvas.findByRole("textbox", { name: "Phone number (required)" });
   },
 };

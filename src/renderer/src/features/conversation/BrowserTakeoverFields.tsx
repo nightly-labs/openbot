@@ -14,15 +14,18 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
   const [state, setState] = createStore<{
     form: BrowserFormState | null;
     values: Record<string, FieldValue>;
+    actions: Record<string, string>;
     busy: boolean;
     error: string;
-  }>({ form: null, values: {}, busy: false, error: "" });
+  }>({ form: null, values: {}, actions: {}, busy: false, error: "" });
   let generation = 0;
   let pending = false;
   const key = (formId: string, fieldId: string) => `${formId}:${fieldId}`;
   const apply = (form: BrowserFormState) => {
     const values: Record<string, FieldValue> = {};
+    const actions: Record<string, string> = {};
     for (const entry of form.forms) {
+      actions[entry.id] = entry.requiresActionChoice ? "" : (entry.actions[0]?.id ?? "");
       for (const field of entry.fields) {
         values[key(entry.id, field.id)] =
           field.type === "select"
@@ -35,6 +38,7 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
     setState((draft) => {
       draft.form = form;
       draft.values = values;
+      draft.actions = actions;
     });
   };
   const read = async (request: BrowserFormRequest, current: number) => {
@@ -162,17 +166,10 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
             novalidate
             class="browser-takeover-form"
             aria-label={form.label}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && form.requiresActionChoice && event.target instanceof HTMLInputElement)
-                event.preventDefault();
-            }}
             onSubmit={(event) => {
               event.preventDefault();
-              const action =
-                event.submitter instanceof HTMLButtonElement
-                  ? form.actions.find((candidate) => candidate.id === event.submitter?.getAttribute("value"))
-                  : form.actions[0];
-              if (action) void submit(form.id, action.id);
+              const actionId = state.actions[form.id];
+              if (actionId) void submit(form.id, actionId);
             }}
           >
             <For each={form.fields}>
@@ -262,14 +259,31 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
                 );
               }}
             </For>
+            <Show when={form.requiresActionChoice}>
+              <Field htmlFor={`${state.form?.revision}-${form.id}-action`} label="Action">
+                <NativeSelect
+                  id={`${state.form?.revision}-${form.id}-action`}
+                  value={state.actions[form.id] ?? ""}
+                  disabled={state.busy}
+                  onChange={(event) =>
+                    setState((draft) => {
+                      draft.actions[form.id] = event.currentTarget.value;
+                    })
+                  }
+                >
+                  <option value="" disabled>
+                    Choose an action
+                  </option>
+                  <For each={form.actions}>{(action) => <option value={action.id}>{action.label}</option>}</For>
+                </NativeSelect>
+              </Field>
+            </Show>
             <div class="browser-takeover-form-actions">
-              <For each={form.actions}>
-                {(action) => (
-                  <Button type="submit" value={action.id} size="sm" class="approval-button" disabled={state.busy}>
-                    {state.busy ? "Submitting…" : action.label}
-                  </Button>
-                )}
-              </For>
+              <Button type="submit" size="sm" class="approval-button" disabled={state.busy || !state.actions[form.id]}>
+                {state.busy
+                  ? "Submitting…"
+                  : (form.actions.find((action) => action.id === state.actions[form.id])?.label ?? "Continue")}
+              </Button>
               <Show when={form.id === state.form?.forms.at(-1)?.id}>
                 <RefreshButton />
               </Show>

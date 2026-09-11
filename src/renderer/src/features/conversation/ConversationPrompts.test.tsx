@@ -104,7 +104,7 @@ describe("takeover chat forms", () => {
     async (method) => {
       installOpenbotStub();
       const login = browserFormPreview();
-      login.forms[0].requiresActionChoice = method === "choice";
+      login.forms[0].requiresActionChoice = method === "choice" || method === "alternate";
       if (method === "multiple-forms")
         login.forms.push({
           ...structuredClone(login.forms[0]),
@@ -137,6 +137,7 @@ describe("takeover chat forms", () => {
       ));
       const email = await screen.findByRole("textbox", { name: "Email (required)" });
       expect(screen.getAllByRole("button", { name: "Refresh form" })).toHaveLength(1);
+      expect(screen.queryByRole("button", { name: "Use password" })).not.toBeInTheDocument();
       const emailValue =
         method === "website-validation" ? "website-validates-this" : "user@example.com,other@example.com";
       await fireEvent.input(email, { target: { value: emailValue } });
@@ -145,6 +146,11 @@ describe("takeover chat forms", () => {
         email.focus();
         await userEvent.keyboard("{Enter}");
         expect(window.openbot.browser.submitTakeoverForm).not.toHaveBeenCalled();
+      }
+      if (method === "choice" || method === "alternate") {
+        await fireEvent.change(screen.getByRole("combobox", { name: "Action" }), {
+          target: { value: method === "alternate" ? "alternate" : "submit" },
+        });
       }
       if (method === "enter") {
         email.focus();
