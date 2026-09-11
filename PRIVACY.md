@@ -290,6 +290,13 @@ only to the local OpenCode process. No screen, log, data export, or diagnostics 
 the data export lists it under `scope.excludes`. OpenBot does not copy OpenCode credentials or
 upload its session files. OpenCode manages its own login and resume state.
 
+A custom MCP server is optional. OpenBot encrypts its environment variables and HTTP headers with
+the operating system's secret storage, writes them to a file that only your user account can read,
+and gives them only to the local Codex, Claude, Grok, or OpenCode process on the next agent task.
+The command, URL, and display name stay in that file in plaintext so a lost keychain still lists the
+servers. No screen, log, data export, or diagnostics report contains the secrets. The data export
+lists them under `scope.excludes`.
+
 ## Shared desktop channels
 
 Channel names, purposes, participating agents, linked conversation references, messages, tasks,

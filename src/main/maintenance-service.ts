@@ -55,6 +55,7 @@ export async function exportOpenBotData(
           "Codex credentials",
           "OpenCode Zen key",
           "custom provider API keys",
+          "custom MCP environment variables and headers",
           "browser cookies",
           "agent workspace files",
         ],

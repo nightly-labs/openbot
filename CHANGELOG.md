@@ -5,6 +5,16 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Add a custom MCP server in Settings: a local command or an HTTP URL. OpenBot encrypts environment
+  variables and headers on this computer, keeps them out of every export, log, and diagnostics
+  report, and gives them to Codex, Claude, Grok, and OpenCode on the agent's next task.
+- Turn on full MCP access in Settings so MCP servers run without a prompt. Commands and file changes
+  still wait for you.
+- Change every agent's model from Settings with one Global model picker. New agents start on that
+  model too.
+
 ## [0.8.0] - 2026-09-11
 
 ### Added

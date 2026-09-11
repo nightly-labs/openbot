@@ -18,6 +18,7 @@ import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from
 import type { AgentProvider } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import type { ClaudeCliInfo } from "./cli";
+import { type CustomMcpSource, toClaudeMcpServers } from "./custom-mcp";
 import { OPENBOT_TOOL_DEFINITIONS } from "./openbot-tools";
 import {
   type AccountRateLimitsReadResult,
@@ -124,6 +125,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #pendingServerRequests = new Map<RequestId, PendingServerRequest>();
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
   readonly #modelSdkValues = new Map<string, string>();
+  readonly #userMcpServers: CustomMcpSource;
+  readonly #mcpFullAccess: () => boolean;
   #running = false;
 
   constructor(
@@ -131,12 +134,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     createQuery: QueryFactory = query,
     readSessionMessages: SessionHistoryReader = getSessionMessages,
     requestTimeoutMs = 30_000,
+    userMcpServers: CustomMcpSource = () => [],
+    mcpFullAccess: () => boolean = () => false,
   ) {
     super();
     this.#cli = cli;
     this.#createQuery = createQuery;
     this.#readSessionMessages = readSessionMessages;
     this.#requestTimeoutMs = requestTimeoutMs;
+    this.#userMcpServers = userMcpServers;
+    this.#mcpFullAccess = mcpFullAccess;
   }
 
   get running(): boolean {
@@ -374,7 +381,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       }
       return this.#requestUserInput(threadId, toolInput, options.toolUseID ?? randomUUID());
     };
-    const mcpServers = config.profileGeneration ? {} : this.#createOpenBotServers(threadId);
+    const mcpServers = config.profileGeneration
+      ? {}
+      : { ...this.#createOpenBotServers(threadId), ...toClaudeMcpServers(this.#userMcpServers()) };
     const claudeQuery = this.#createQuery({
       prompt: input,
       options: {
@@ -390,7 +399,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         },
         ...(config.profileGeneration ? { tools: [] } : {}),
         settingSources: config.profileGeneration ? [] : ["user", "project", "local"],
-        permissionMode: "default",
+        permissionMode: this.#mcpFullAccess() ? "bypassPermissions" : "default",
         includePartialMessages: true,
         persistSession: config.persistSession,
         additionalDirectories: config.additionalDirectories,

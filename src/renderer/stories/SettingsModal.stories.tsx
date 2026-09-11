@@ -269,6 +269,11 @@ function SettingsModalStory(props: {
           onAddCustomProvider={addCustomProvider}
           onDeleteCustomProvider={deleteCustomProvider}
           customProviders={customProviders()}
+          onAddCustomMcp={async () => undefined}
+          onDeleteCustomMcp={async () => undefined}
+          customMcpServers={[]}
+          mcpFullAccess={false}
+          onSetMcpFullAccess={async () => undefined}
         />
       </main>
       <Toaster />

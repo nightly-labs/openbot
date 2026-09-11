@@ -1,0 +1,131 @@
+.custom-mcp-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--openbot-layer-dialog);
+  display: grid;
+  place-items: center;
+  padding: var(--openbot-space-6);
+}
+
+.custom-mcp-dialog {
+  display: flex;
+  width: min(460px, 100%);
+  max-height: calc(100dvh - 48px);
+  flex-direction: column;
+  overflow: hidden;
+  outline: 0;
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-sidebar);
+  color: var(--openbot-text-primary);
+}
+
+.custom-mcp-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  border-bottom: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-4);
+}
+
+.custom-mcp-mark {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
+}
+
+.custom-mcp-title {
+  min-width: 0;
+  flex: 1;
+}
+
+.custom-mcp-close {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-block-start: calc(var(--openbot-space-2) * -1);
+  margin-inline-end: calc(var(--openbot-space-2) * -1);
+  color: var(--openbot-text-muted);
+}
+
+.custom-mcp-body {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.custom-mcp-form {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  overflow-y: auto;
+  padding: var(--openbot-space-4);
+}
+
+.custom-mcp-transport {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.custom-mcp-transport-options {
+  display: flex;
+  gap: var(--openbot-space-2);
+  margin-block-start: var(--openbot-space-2);
+}
+
+.custom-mcp-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+}
+
+.custom-mcp-rows-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+}
+
+.custom-mcp-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
+}
+
+.custom-mcp-row-inputs {
+  display: grid;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.custom-mcp-row-error,
+.custom-mcp-submit-error {
+  display: block;
+}
+
+.custom-mcp-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border-top: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-4);
+}
+
+.custom-mcp-actions .ui-button-variant-default {
+  width: 100%;
+}
+
+.custom-mcp-rows > .ui-button svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}

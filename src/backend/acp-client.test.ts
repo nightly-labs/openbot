@@ -161,6 +161,8 @@ function startOpencode(
   const context = {
     apiKey,
     customProviders: options.customProviders ?? (() => []),
+    customMcpServers: () => [],
+    mcpFullAccess: () => false,
     servesModel: options.servesModel,
   };
   const client = options.profile

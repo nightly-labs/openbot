@@ -2,10 +2,17 @@ import type { ClientSideConnection, InitializeResponse } from "@agentclientproto
 import { type DynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import { AcpAgentClient } from "./acp-client";
 import type { GrokCliInfo } from "./cli";
+import type { CustomMcpSource } from "./custom-mcp";
 import { type AccountRateLimitsReadResult, getRecord, getString } from "./protocol";
 
 export class GrokAgentClient extends AcpAgentClient {
-  constructor(cli: GrokCliInfo, requestTimeoutMs = 30_000, profileGeneration = false) {
+  constructor(
+    cli: GrokCliInfo,
+    requestTimeoutMs = 30_000,
+    profileGeneration = false,
+    userMcpServers?: CustomMcpSource,
+    mcpFullAccess?: () => boolean,
+  ) {
     super(cli, requestTimeoutMs, {
       provider: "grok",
       profileGeneration,
@@ -19,6 +26,8 @@ export class GrokAgentClient extends AcpAgentClient {
       signInMessage: "Run `grok login` or set XAI_API_KEY to use Grok.",
       authenticate,
       readRateLimits: async (connection) => grokRateLimits(await connection.extMethod("_x.ai/billing", {})),
+      userMcpServers,
+      mcpFullAccess,
     });
   }
 }

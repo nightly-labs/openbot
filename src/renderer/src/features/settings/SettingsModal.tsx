@@ -1,16 +1,20 @@
 import type {
   AccountSession,
+  AgentModelId,
+  AgentModelOption,
   AgentProviderId,
   AgentStatus,
   AppInfo,
   AvatarImageInput,
   CentralAuthUser,
+  CustomMcpSummary,
   CustomProviderRestart,
   CustomProviderSummary,
   HostedSitesDesktopApi,
   MobileConnectedDevice,
   MobileConnectTicket,
   ProviderRuntimeStatus,
+  SaveCustomMcpInput,
   SaveCustomProviderInput,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
@@ -70,6 +74,14 @@ export interface SettingsModalProps {
   onAddCustomProvider?: (value: SaveCustomProviderInput) => Promise<CustomProviderRestart>;
   customProviders?: readonly CustomProviderSummary[];
   onDeleteCustomProvider?: (id: string) => Promise<CustomProviderRestart>;
+  onAddCustomMcp?: (value: SaveCustomMcpInput) => Promise<void>;
+  customMcpServers?: readonly CustomMcpSummary[];
+  onDeleteCustomMcp?: (id: string) => Promise<void>;
+  mcpFullAccess?: boolean;
+  onSetMcpFullAccess?: (enabled: boolean) => Promise<void>;
+  globalModel?: { provider: AgentProviderId; model: AgentModelId } | null;
+  modelOptions?: readonly AgentModelOption[];
+  onApplyGlobalModel?: (model: AgentModelId, provider: AgentProviderId) => Promise<void>;
   /**
    * Reads and writes the optional provider keys. Absent while the active server is not this
    * computer, which is also what takes the row's sign-in button away.
@@ -237,6 +249,16 @@ export function SettingsModal(props: SettingsModalProps) {
             onAddCustomProvider={props.onAddCustomProvider}
             customProviders={props.customProviders}
             onDeleteCustomProvider={props.onDeleteCustomProvider}
+            onAddCustomMcp={props.onAddCustomMcp}
+            customMcpServers={props.customMcpServers}
+            onDeleteCustomMcp={props.onDeleteCustomMcp}
+            mcpFullAccess={props.mcpFullAccess}
+            onSetMcpFullAccess={props.onSetMcpFullAccess}
+            globalModel={props.globalModel}
+            modelOptions={props.modelOptions}
+            agentStatus={props.agentStatus}
+            providerRuntimeStatuses={props.providerRuntimeStatuses}
+            onApplyGlobalModel={props.onApplyGlobalModel}
             onSignInProvider={props.providerKeys ? openProviderKeyDialog : undefined}
           />
         </Tabs.Content>
