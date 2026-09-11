@@ -1,3 +1,8 @@
+import { ArticleVideo } from "../../components/content/ArticleMedia";
+import pickTheTimes from "./media/schedule-a-routine/pick-the-times.mp4";
+import pickTheTimesCaptions from "./media/schedule-a-routine/pick-the-times.vtt?url";
+import pickTheTimesPoster from "./media/schedule-a-routine/pick-the-times-poster.webp";
+
 export function ScheduleARoutine() {
   return (
     <>
@@ -17,6 +22,16 @@ export function ScheduleARoutine() {
         Choose the times from when you will read the result, not from when the work could be done. A summary that lands
         at three in the morning and is read at nine is a summary that was written too early.
       </p>
+
+      <ArticleVideo
+        src={pickTheTimes}
+        poster={pickTheTimesPoster}
+        captions={pickTheTimesCaptions}
+        width={1280}
+        height={720}
+        label="A day shown as one line from midnight to midnight, with a routine set to run at nine in the morning and again at five in the afternoon."
+        caption="Two times on one day. The second one exists so the answer is waiting when you stop working."
+      />
 
       <h2>Keep it small</h2>
       <p>

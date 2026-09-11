@@ -2104,6 +2104,66 @@ a {
   font-size: 0.9em;
 }
 
+.post-prose pre {
+  margin: 0 0 24px;
+  padding: 16px 18px;
+  overflow-x: auto;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* A run of code inside a block is already in the block's own face and on the
+   block's own background. Left with the inline treatment, every line of a command
+   carried a second box around it. */
+.post-prose pre code {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.post-prose kbd {
+  padding: 2px 7px;
+  border: 1px solid var(--openbot-border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: 0.85em;
+}
+
+.post-prose hr {
+  margin: 40px 0;
+  border: 0;
+  border-top: 1px solid var(--openbot-border-strong);
+}
+
+.post-prose table {
+  width: 100%;
+  margin: 0 0 24px;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.post-prose th,
+.post-prose td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--openbot-border-strong);
+  text-align: left;
+  vertical-align: top;
+}
+
+.post-prose th {
+  color: var(--openbot-text-primary);
+  font-weight: 600;
+}
+
 .post-prose blockquote {
   margin: 24px 0;
   padding-left: 18px;
@@ -2113,6 +2173,90 @@ a {
 
 .post-prose > :last-child {
   margin-bottom: 0;
+}
+
+/* Media in an article. The components in `ArticleMedia.tsx` write this markup, but
+   the two rules below are also the floor for anything an author writes by hand: a
+   picture wider than the column has to stay inside it, or a phone scrolls sideways
+   for the length of the article. */
+.post-prose img,
+.post-prose video {
+  max-width: 100%;
+  height: auto;
+}
+
+.post-figure {
+  /* The figure's own margin, not a paragraph's. Both edges are set, because a
+     figure can open an article and a paragraph's bottom margin cannot be relied on
+     to be there above it. */
+  margin: 32px 0;
+}
+
+.post-figure picture {
+  display: block;
+}
+
+.post-media-frame {
+  position: relative;
+}
+
+.post-media {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-card);
+  /* The frame is filled before the file arrives, so what the reader sees in that
+     moment is the shape the picture will take rather than a hole in the page. The
+     space itself comes from the width and height the component writes. */
+  background: var(--openbot-bg-surface);
+}
+
+.post-figure-caption {
+  margin-top: 12px;
+  color: var(--openbot-text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* The control that stops a moving picture. It sits on the picture rather than
+   under it, because the thing it stops is what the reader is looking at, and it is
+   opaque so that it stays readable over any frame. */
+.post-media-toggle {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px 7px 11px;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-overlay);
+  color: var(--openbot-text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--openbot-duration-normal) ease;
+}
+
+.post-media-toggle:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--openbot-accent-strong);
+}
+
+.post-media-toggle-icon {
+  width: 9px;
+  height: 11px;
+  background: currentcolor;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.post-media-toggle[data-state="playing"] .post-media-toggle-icon {
+  background: linear-gradient(to right, currentcolor 0 3px, transparent 3px 6px, currentcolor 6px);
+  clip-path: none;
 }
 
 .post-more {
@@ -2267,6 +2411,10 @@ a {
     color: var(--openbot-text-primary);
   }
 
+  .post-media-toggle:hover {
+    background: var(--openbot-bg-surface-raised);
+  }
+
   .post-featured-title a:hover {
     color: var(--openbot-text-secondary);
   }
@@ -2297,7 +2445,8 @@ a {
 
   .post-card-art,
   .post-card-art-title,
-  .post-featured-art-title {
+  .post-featured-art-title,
+  .post-media-toggle {
     transition: none;
     transform: none;
   }

@@ -1,7 +1,8 @@
-import { cleanup, render, screen, within } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import type { JSX } from "@solidjs/web";
 import { createRootRoute, createRoute, createRouter, isNotFound, RouterContextProvider } from "@tanstack/solid-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ArticleClip, ArticleGif } from "../src/components/content/ArticleMedia";
 import { ArticlePage } from "../src/components/content/ArticlePage";
 import { CollectionIndexPage } from "../src/components/content/CollectionIndexPage";
 import { LandingPage } from "../src/components/landing/LandingPage";
@@ -123,5 +124,125 @@ describe.each([
       thrown = error;
     }
     expect(isNotFound(thrown)).toBe(true);
+  });
+});
+
+// Anything in an article that moves starts from the reader's setting and can be
+// stopped by hand. Neither part is in the markup a body writes — the body only
+// names a file — so both are checked here, on the two components that move.
+describe("article media", () => {
+  const GIF = { src: "/loop.gif", still: "/loop-still.webp", alt: "An agent answers a question" };
+  const CLIP = { src: "/clip.mp4", poster: "/clip-poster.webp", label: "An icon dragged into a folder" };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function stubMotionPreference(reduced: boolean) {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: reduced && query.includes("prefers-reduced-motion"),
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }));
+  }
+
+  // A clip plays only where it can be seen, so nothing at all happens until an
+  // observer reports it on screen. This one reports that as soon as it is asked.
+  function stubOnScreen() {
+    class OnScreenObserver implements IntersectionObserver {
+      readonly root = null;
+      readonly rootMargin = "0px";
+      readonly scrollMargin = "0px";
+      readonly thresholds: readonly number[] = [0];
+      private readonly report: IntersectionObserverCallback;
+
+      constructor(callback: IntersectionObserverCallback) {
+        this.report = callback;
+      }
+
+      observe(target: Element) {
+        const rect = new DOMRectReadOnly(0, 0, 100, 100);
+        this.report(
+          [
+            {
+              boundingClientRect: rect,
+              intersectionRatio: 1,
+              intersectionRect: rect,
+              isIntersecting: true,
+              rootBounds: rect,
+              target,
+              time: 0,
+            },
+          ],
+          this,
+        );
+      }
+
+      unobserve() {}
+      disconnect() {}
+      takeRecords(): IntersectionObserverEntry[] {
+        return [];
+      }
+    }
+    vi.stubGlobal("IntersectionObserver", OnScreenObserver);
+  }
+
+  function renderGif() {
+    return render(() => <ArticleGif src={GIF.src} still={GIF.still} alt={GIF.alt} width={800} height={500} />);
+  }
+
+  function renderClip() {
+    return render(() => (
+      <ArticleClip src={CLIP.src} poster={CLIP.poster} label={CLIP.label} width={1280} height={720} />
+    ));
+  }
+
+  it("stops an animated image when the reader asks for it to stop", async () => {
+    stubMotionPreference(false);
+    renderGif();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Pause animation" })).toBeInTheDocument());
+    expect(screen.getByRole("img", { name: GIF.alt })).toHaveAttribute("src", GIF.src);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Pause animation" }));
+
+    // The still is a second file, because a GIF cannot be stopped where it stands.
+    expect(screen.getByRole("img", { name: GIF.alt })).toHaveAttribute("src", GIF.still);
+    expect(screen.getByRole("button", { name: "Play animation" })).toBeInTheDocument();
+  });
+
+  it("leaves an animated image at rest for a reader who asked for less motion", async () => {
+    stubMotionPreference(true);
+    renderGif();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Play animation" })).toBeInTheDocument());
+    expect(screen.getByRole("img", { name: GIF.alt })).toHaveAttribute("src", GIF.still);
+  });
+
+  it("plays a clip once it is on screen", async () => {
+    stubMotionPreference(false);
+    stubOnScreen();
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+
+    renderClip();
+
+    await waitFor(() => expect(play).toHaveBeenCalled());
+  });
+
+  it("does not start a clip for a reader who asked for less motion", async () => {
+    stubMotionPreference(true);
+    stubOnScreen();
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+
+    renderClip();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Play animation" })).toBeInTheDocument());
+    expect(play).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,7 @@ import type { ShaderMount } from "@paper-design/shaders";
 import { createMemo, createSignal, onSettled } from "solid-js";
 import { articleGradient, articleGradientCss, articleGradientUniforms } from "../../lib/article-gradient";
 import { articleArtPath, type ContentArtShape, type ContentCollection } from "../../lib/content-collection";
+import { motionWelcome } from "../../lib/motion";
 import { cx } from "../../lib/utils";
 
 // Three layers, cheapest first: a CSS gradient that server-renders, the PNG baked
@@ -220,7 +221,7 @@ export function ArticleGradient(props: ArticleGradientProps) {
     // it is what the reader looks at while the shader starts, and what they keep
     // if it never does. Reduced motion is a reason not to move, not a reason to
     // show a different picture.
-    if (!animationWelcome()) {
+    if (!motionWelcome()) {
       void primeStill();
       return;
     }
@@ -298,8 +299,4 @@ function nextAnimationFrame(): Promise<void> {
   return new Promise((resolve) => {
     requestAnimationFrame(() => resolve());
   });
-}
-
-function animationWelcome(): boolean {
-  return !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 }

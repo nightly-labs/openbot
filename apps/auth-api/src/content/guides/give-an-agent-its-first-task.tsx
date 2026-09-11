@@ -1,3 +1,7 @@
+import { ArticleGif } from "../../components/content/ArticleMedia";
+import firstReply from "./media/give-an-agent-its-first-task/first-reply.gif";
+import firstReplyStill from "./media/give-an-agent-its-first-task/first-reply-still.webp";
+
 export function GiveAnAgentItsFirstTask() {
   return (
     <>
@@ -22,6 +26,15 @@ export function GiveAnAgentItsFirstTask() {
         Watch what it does rather than only what it says. The activity list shows every file it reads and every command
         it runs, which is the part worth reading on a first run.
       </p>
+
+      <ArticleGif
+        src={firstReply}
+        still={firstReplyStill}
+        width={800}
+        height={500}
+        alt="An agent answers a question about failing tests, a few words at a time, and names one cause shared by two of them."
+        caption="The answer arrives as it is written, in the thread that keeps it."
+      />
 
       <h2>Then keep going in the same thread</h2>
       <p>
