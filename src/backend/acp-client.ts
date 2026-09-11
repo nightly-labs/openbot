@@ -96,6 +96,12 @@ export interface AcpProviderOptions {
    */
   extraEnv?: () => Record<string, string>;
   signInMessage: string;
+  /**
+   * Whether the model this turn runs on may still be used. Read here, after every wait this client
+   * makes for the model configuration and the prompt images, because the endpoint can be removed
+   * while those run and this process would still answer on it.
+   */
+  servesModel?(modelId: string): boolean;
   authenticate?(connection: ClientSideConnection, initialization: InitializeResponse): Promise<void>;
   readRateLimits?(connection: ClientSideConnection): Promise<AccountRateLimitsReadResult>;
 }
@@ -452,6 +458,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         text: `<openbot-developer-instructions>\n${thread.developerInstructions}\n</openbot-developer-instructions>`,
       });
     }
+    this.#requireServedModel(thread);
     if (steer) {
       void this.#requireConnection()
         .prompt({ sessionId: thread.id, prompt: blocks })
@@ -479,6 +486,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
     turn.task = this.#consumePrompt(thread, turn, blocks);
     return { turn: { id: turn.id, status: "inProgress" } };
+  }
+
+  /** Refuses a prompt whose endpoint was taken out while this turn was prepared. */
+  #requireServedModel(thread: AcpThread): void {
+    const model = thread.currentModelId;
+    if (!model || !this.options.servesModel) return;
+    if (!this.options.servesModel(model)) {
+      throw new Error("The endpoint this agent used was removed. Choose another model for it.");
+    }
   }
 
   async #consumePrompt(thread: AcpThread, turn: AcpTurn, prompt: ContentBlock[]): Promise<void> {

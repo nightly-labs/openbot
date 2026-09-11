@@ -338,7 +338,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       preferredModel,
       clientFactory,
       bundledExecutables,
-      credentials,
+      // The exclusion travels with the credentials, so the client that holds a session on a removed
+      // endpoint can refuse the prompt itself, after the waits every caller above it makes.
+      credentials: { ...credentials, servesModel: (modelId) => this.#servesModel(modelId) },
     });
     this.#compaction = new ContextCompaction({
       store,

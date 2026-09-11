@@ -15,6 +15,7 @@
 import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentClient } from "./agent-client";
 import type { OpencodeCliInfo } from "./cli";
@@ -70,6 +71,12 @@ function handle(message) {
     write({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: 1, agentCapabilities: {} } });
     return;
   }
+  if (message.method === "session/prompt") {
+    const promptLog = process.env.OPENBOT_FAKE_ACP_PROMPT_LOG;
+    if (promptLog) fs.appendFileSync(promptLog, JSON.stringify(message.params) + NL);
+    write({ jsonrpc: "2.0", id: message.id, result: { stopReason: "end_turn" } });
+    return;
+  }
   if (message.method === "session/new") {
     if (process.env.OPENBOT_FAKE_ACP_REJECT_KEY === "1") {
       write({ jsonrpc: "2.0", id: message.id, error: { code: -32000, message: "Invalid api key." } });
@@ -99,6 +106,8 @@ function handle(message) {
 interface FakeOpencode {
   cli: OpencodeCliInfo;
   envLog: string;
+  promptLog: string;
+  readPrompts: () => Promise<string[]>;
   readSpawnEnvironments: () => Promise<
     Array<{
       argv: string[];
@@ -115,9 +124,15 @@ async function createFakeOpencodeAgent(source?: "system" | "managed"): Promise<F
   await writeFile(executable, FAKE_AGENT);
   await chmod(executable, 0o755);
   const envLog = join(directory, "spawn-env.ndjson");
+  const promptLog = join(directory, "prompts.ndjson");
   return {
     cli: { executable, version: "1.18.30", ...(source ? { source } : {}) },
     envLog,
+    promptLog,
+    readPrompts: async () => {
+      const source = await readFile(promptLog, "utf8").catch(() => "");
+      return source.split("\n").filter((line) => line.trim());
+    },
     readSpawnEnvironments: async () => {
       const source = await readFile(envLog, "utf8").catch(() => "");
       return source
@@ -137,11 +152,17 @@ function startOpencode(
     customProviders?: () => CustomProviderConfig[];
     /** The one-shot client that generates a profile, which must stay unable to act. */
     profile?: boolean;
+    /** Read at every prompt, so a test can remove an endpoint while a turn is prepared. */
+    servesModel?: (modelId: string) => boolean;
   } = {},
 ): AgentClient {
   vi.stubEnv("OPENBOT_FAKE_ACP_ENV_LOG", envLog);
   const driver = requireProviderDriver("opencode");
-  const context = { apiKey, customProviders: options.customProviders ?? (() => []) };
+  const context = {
+    apiKey,
+    customProviders: options.customProviders ?? (() => []),
+    servesModel: options.servesModel,
+  };
   const client = options.profile
     ? (driver.createProfileClient?.(cli, 10_000, context) ?? driver.createClient(cli, 10_000, context))
     : driver.createClient(cli, 10_000, context);
@@ -298,5 +319,33 @@ describe("OpenCode ACP environment", () => {
     await expect(client.request("initialize", {}, decodeRecordResponse)).rejects.toThrow(
       "ACP CLI did not advertise any ACP models. OpenBot will not guess a fallback model.",
     );
+  });
+
+  it("refuses the prompt when the endpoint was removed while the turn was prepared", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    vi.stubEnv("OPENBOT_FAKE_ACP_PROMPT_LOG", fake.promptLog);
+    // The endpoint is still saved while the thread is opened, and gone when the prompt would leave.
+    let served = true;
+    const client = startOpencode(fake.cli, () => null, fake.envLog, { servesModel: () => served });
+    await client.request("initialize", {}, decodeRecordResponse);
+    const thread = await client.request(
+      "thread/start",
+      { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()] },
+      decodeRecordResponse,
+    );
+    const threadId = isDynamicRecord(thread.thread) ? thread.thread.id : null;
+    if (typeof threadId !== "string") throw new Error("The fake agent opened no thread.");
+
+    served = false;
+    await expect(
+      client.request(
+        "turn/start",
+        { threadId, clientUserMessageId: "delivery-1", input: [{ type: "inputText", text: "Keep working" }] },
+        decodeRecordResponse,
+      ),
+    ).rejects.toThrow("The endpoint this agent used was removed. Choose another model for it.");
+
+    // Nothing reached the process, which still holds the session it opened on that endpoint.
+    expect(await fake.readPrompts()).toEqual([]);
   });
 });

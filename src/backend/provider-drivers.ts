@@ -64,6 +64,12 @@ export type ProviderSignIn =
 export interface ProviderClientContext {
   apiKey(provider: AgentProviderId): string | null;
   readonly customProviders: CustomProviderSource;
+  /**
+   * Whether this model may still be used. A removed endpoint stays in the running process, with the
+   * credentials it started with, until that process restarts, and the restart waits for the work in
+   * flight. Read at the last moment before a prompt leaves, because everything above it awaits.
+   */
+  servesModel?(modelId: string): boolean;
 }
 
 /** Nothing stored and no endpoint, for tests and for call sites that predate the credential store. */
@@ -150,6 +156,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         env: {},
         extraEnv: () => ({ ...opencodeEnv(cli, context), ...openCodeConfigEnv({}, context.customProviders) }),
         signInMessage: openCodeSignInMessage(context.customProviders().length),
+        servesModel: context.servesModel,
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
