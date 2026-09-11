@@ -15,6 +15,7 @@ import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
 type ScanState = { status: "idle" } | { status: "connecting" } | { status: "error"; message: string };
+const QR_SCANNER_SETTINGS: CameraViewProps["barcodeScannerSettings"] = { barcodeTypes: ["qr"] };
 
 function ScannerStatus({ scanState, onRetry }: { scanState: ScanState; onRetry: () => void }) {
   const [foreground, accent] = useThemeColor(["foreground", "accent"]);
@@ -77,7 +78,7 @@ function ScannerCamera({
       <CameraView
         style={StyleSheet.absoluteFill}
         facing="back"
-        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+        barcodeScannerSettings={QR_SCANNER_SETTINGS}
         onBarcodeScanned={onBarcodeScanned}
         onMountError={onMountError}
         onCameraReady={() => {
@@ -262,7 +263,9 @@ export function QrScanner({
               setScanState({ status: "error", message: "Could not start the camera. Try again." });
               onPreviewReady?.();
             }}
-            onBarcodeScanned={scanEnabled && scanState.status === "idle" ? ({ data }) => void connect(data) : undefined}
+            // Expo enables native scanning from the presence of this callback.
+            // Keep it enabled from startup; connect guards opening and pending scans.
+            onBarcodeScanned={({ data }) => void connect(data)}
           />
         ) : null}
 

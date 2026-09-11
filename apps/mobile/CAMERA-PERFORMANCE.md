@@ -15,6 +15,14 @@ opening only after Expo Camera reports `onCameraReady`. Keep the same camera
 mounted during motion. The QR scanner does not add a separate preview fade to
 this opening. Chat animates opacity and translation around its live camera.
 
+Keep the QR detector enabled from camera startup. In Expo Camera 57, the presence
+of `onBarcodeScanned` controls `barcodeScannerEnabled`. Adding the callback after
+opening causes the iOS implementation to add capture outputs with
+`beginConfiguration` / `commitConfiguration` on the active session. This is a
+possible source of a brief preview stall. Keep QR settings constant and ignore
+scan results in application code until opening completes, or while a scan is
+locked. Do not toggle native detection at those transitions.
+
 This moves camera startup before the transition. It can add a delay between the
 tap and the start of motion; it does not make camera hardware start faster. No
 camera is kept running before the user requests it. Permission controls and
@@ -37,6 +45,8 @@ The existing scanner and chat camera tests cover camera preparation before openi
 scanning, close, camera switching, capture errors, and late capture results.
 Scanner tests also cover background/resume and permission states. The new startup
 checks fail when the panel opens before camera readiness.
+They also check that native detection is enabled during preparation while early
+scan results cannot start pairing. Both checks fail when their guards are removed.
 
 No device performance measurements have been collected for this change. Test on
 the slowest supported iPhone and Android phone with a release build, after explicit

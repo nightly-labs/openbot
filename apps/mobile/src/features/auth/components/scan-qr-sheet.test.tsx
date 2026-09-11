@@ -144,10 +144,13 @@ async function finishMotion() {
 
 describe("scanner sheet lifecycle", () => {
   it("prepares the camera before opening and stops before closing", async () => {
-    const { onClose } = await renderSheet();
+    const onScan = vi.fn(async () => {});
+    const { onClose } = await renderSheet(onScan);
     expect(screen.getByRole("img", { name: "Camera preview" })).toBeTruthy();
     expect(native.motionStarted).not.toHaveBeenCalled();
-    expect(native.camera.scan).toBeUndefined();
+    expect(native.camera.scan).toBeTypeOf("function");
+    await act(() => native.camera.scan?.({ data: "code-during-opening" }));
+    expect(onScan).not.toHaveBeenCalled();
     await finishMotion();
     expect(screen.getByRole("img", { name: "Camera preview" })).toBeTruthy();
     expect(native.camera.scan).toBeTypeOf("function");
