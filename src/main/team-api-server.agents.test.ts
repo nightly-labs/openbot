@@ -19,6 +19,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentStore } from "../backend/agent-store";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
 import { addRemotePreviewUrls } from "./remote-server-urls";
+import { agentCreate } from "./team-api/request-helpers";
 import {
   createAgents,
   createTeamApiFixture,
@@ -31,6 +32,44 @@ import {
 afterEach(stopTeamApiFixtures);
 
 describe("TeamApiServer agents", () => {
+  it.each(["", "   ", "Plan trips"])("creates an agent through the API with description %j", async (description) => {
+    const { root, start, signIn } = await createTeamApiFixture("agent-create", { configure: true });
+    const store = new AgentStore(join(root, "agents"), join(root, "home"));
+    await store.initialize();
+    const { base } = await start({
+      agents: createAgents({ createAgent: (input) => store.createAgent(input) }),
+    });
+    const token = await signIn();
+    const input = {
+      name: "Explorer",
+      description,
+      initialMessage: "Greet me briefly.",
+      avatarSeed: "mobile:newagentseed",
+      avatarHue: null,
+    };
+    const created = await jsonRequest<AgentSummary>(base, "/v1/agents", { token, body: input });
+    expect(store.list()).toEqual([
+      expect.objectContaining({ id: created.id, name: input.name, description: description.trim() }),
+    ]);
+  });
+
+  it.each([
+    { label: "missing", description: undefined },
+    { label: "null", description: null },
+    { label: "number", description: 42 },
+    { label: "too long", description: "x".repeat(INPUT_LIMITS.agentDescription + 1) },
+  ])("rejects a $label description during agent creation", ({ description }) => {
+    expect(() =>
+      agentCreate({
+        name: "Explorer",
+        description,
+        initialMessage: "Greet me briefly.",
+        avatarSeed: "mobile:newagentseed",
+        avatarHue: null,
+      }),
+    ).toThrow("description is invalid.");
+  });
+
   it("downloads uploaded and replaced avatars through a WebRTC request and removes them", async () => {
     const { root, start, signIn } = await createTeamApiFixture("agent-avatar", { configure: true });
     const store = new AgentStore(join(root, "agents"), join(root, "home"));

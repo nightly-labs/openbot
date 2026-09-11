@@ -243,7 +243,7 @@ export class AgentStore {
       throw new Error(`A host can have up to ${INPUT_LIMITS.agents} agents.`);
     }
     const name = requiredText(input.name, "Agent name", INPUT_LIMITS.agentName);
-    const description = requiredText(input.description, "Agent description", INPUT_LIMITS.agentDescription);
+    const description = limitedText(input.description, "Agent description", INPUT_LIMITS.agentDescription);
     if (!isAvatarSeed(input.avatarSeed)) throw new Error("Invalid avatar seed.");
     if (input.avatarHue !== null && !isAvatarHue(input.avatarHue)) throw new Error("Invalid avatar hue.");
     const record = this.#createRecord(`agent-${randomUUID()}`, name, "", description);
