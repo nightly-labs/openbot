@@ -897,7 +897,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#cli.set(provider, cli);
         this.#accounts.set(provider, account);
         try {
-          await this.#refreshModelCatalog();
+          const freshCatalogs = await this.#refreshModelCatalog();
           if (isCurrent && !isCurrent()) {
             if (previousClient) this.#clients.set(provider, previousClient);
             else this.#clients.delete(provider);
@@ -930,7 +930,12 @@ export class ProviderRuntime implements ProviderPort {
             capabilities: { chat: "ready", browser: "ready", computerUse },
             message: null,
           });
-          this.#hooks.onProviderActivated(provider, this.#configRevisions.get(client) ?? 0);
+          // Only with a catalogue this client itself reported. Discovery that failed leaves the
+          // models from before it, and those still describe the process that ran then, so they are
+          // no proof that an endpoint removed since is gone from the process answering now.
+          if (freshCatalogs.has(provider)) {
+            this.#hooks.onProviderActivated(provider, this.#configRevisions.get(client) ?? 0);
+          }
         } catch (error) {
           if (previousClient) this.#clients.set(provider, previousClient);
           else this.#clients.delete(provider);
@@ -1376,13 +1381,17 @@ export class ProviderRuntime implements ProviderPort {
     });
     const refreshRuntime = async (): Promise<void> => {
       const codexClient = this.#clients.get("codex");
-      const [, computerUse] = await Promise.all([
+      const [freshCatalogs, computerUse] = await Promise.all([
         this.#refreshModelCatalog(),
         codexClient ? this.#probeComputerUse(codexClient) : Promise.resolve("unavailable" as const),
       ]);
       for (const provider of activated) {
         const client = this.#clients.get(provider);
-        if (client) this.#hooks.onProviderActivated(provider, this.#configRevisions.get(client) ?? 0);
+        // The same condition as the other activation site: a stale catalogue proves nothing about
+        // the endpoints the process now answering was given.
+        if (client && freshCatalogs.has(provider)) {
+          this.#hooks.onProviderActivated(provider, this.#configRevisions.get(client) ?? 0);
+        }
       }
       if (codexClient === this.#clients.get("codex")) {
         this.#setStatus({
@@ -1470,13 +1479,20 @@ export class ProviderRuntime implements ProviderPort {
     }, delayMs);
   }
 
-  async #refreshModelCatalog(): Promise<void> {
-    const discovered = (
-      await Promise.all(
-        BUILT_IN_PROVIDER_DRIVERS.map(async ({ id: provider }): Promise<AgentModelOption[]> => {
+  /**
+   * Reads the catalogue of every connected CLI, and answers which providers replied with a fresh one.
+   *
+   * A provider that has no client, or whose `model/list` failed or timed out, keeps the models it
+   * already had. That is the right catalogue to keep answering with, but it is not proof of what the
+   * process now running serves, so its id is absent from the set and no caller may treat it as proof.
+   */
+  async #refreshModelCatalog(): Promise<Set<AgentProvider>> {
+    const discovered = await Promise.all(
+      BUILT_IN_PROVIDER_DRIVERS.map(
+        async ({ id: provider }): Promise<{ provider: AgentProvider; models: AgentModelOption[]; fresh: boolean }> => {
           const previous = this.#models.filter((model) => model.provider === provider);
           const client = this.#clients.get(provider);
-          if (!client) return previous;
+          if (!client) return { provider, models: previous, fresh: false };
           const suppressed = SUPPRESSED_MODEL_IDS.get(provider) ?? new Set<string>();
           // Read once per pass, not per model: a stored key cannot change inside one refresh, and
           // the prefix is unusable only because OpenBot is what put that key in the environment.
@@ -1549,16 +1565,17 @@ export class ProviderRuntime implements ProviderPort {
               });
             }
             const rank = PREFERRED_MODEL_ORDER.get(client.provider);
-            if (!rank) return models;
+            if (!rank) return { provider, models, fresh: true };
             // Sort is stable, so the CLI's own order still decides inside one tier.
-            return [...models].sort((left, right) => rank(left) - rank(right));
+            return { provider, models: [...models].sort((left, right) => rank(left) - rank(right)), fresh: true };
           } catch {
-            return previous;
+            return { provider, models: previous, fresh: false };
           }
-        }),
-      )
-    ).flat();
-    this.#models = discovered;
+        },
+      ),
+    );
+    this.#models = discovered.flatMap((entry) => entry.models);
+    return new Set(discovered.filter((entry) => entry.fresh).map((entry) => entry.provider));
   }
 
   async #probeComputerUse(client: AgentClient): Promise<"ready" | "setup-required" | "unavailable"> {

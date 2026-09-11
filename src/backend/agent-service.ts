@@ -1149,6 +1149,46 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
+   * Saves one endpoint: the exclusion of the id being saved and `persist`, which is the caller's file
+   * write, as one change nothing else can interleave with.
+   *
+   * The id is excluded although it is being added. The process answering now was spawned before this
+   * write, and an id this app has never saved can still exist in OpenCode's own configuration and in
+   * its live catalogue. Without the exclusion the picker reads those models as the saved endpoint's,
+   * while every prompt still goes to the old process, at the URL and with the credentials it started
+   * with. The exclusion is given back only when a process that read this write reports its own
+   * catalogue, so a restart that is skipped for a busy CLI, or one that fails, leaves it in place.
+   *
+   * No agent is moved off the id, unlike a removal: the endpoint is arriving, not going away, and a
+   * fresh process usually serves it within seconds. Until then its models are refused at delivery,
+   * which is the safe answer while two different servers could answer to one id.
+   */
+  saveCustomProvider<T>(providerId: string, persist: () => Promise<T>): Promise<T> {
+    return this.#runEndpointExclusive(async () => {
+      const previous = this.#releasedCustomProviders.get(providerId);
+      this.#endpointRevision += 1;
+      const revision = this.#endpointRevision;
+      this.#releasedCustomProviders.set(providerId, revision);
+      this.#emitModelsChanged();
+      // The same reason as a removal: a profile or channel client is a process of its own, holding
+      // the endpoints it was spawned with, and no restart of the main client reaches it.
+      this.#stopProfileClients();
+      try {
+        const persisted = await persist();
+        // Only now can a spawning process read the saved endpoint.
+        this.#committedEndpointRevision = revision;
+        return persisted;
+      } catch (error) {
+        // Nothing was written, so the id is served exactly as it was before this call.
+        if (previous !== undefined) this.#releasedCustomProviders.set(providerId, previous);
+        else this.#releasedCustomProviders.delete(providerId);
+        this.#emitModelsChanged();
+        throw error;
+      }
+    });
+  }
+
+  /**
    * Removes one endpoint: the exclusion, the agents that were on it, and `persist`, which is the
    * caller's file write, as one change nothing else can interleave with.
    *

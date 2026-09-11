@@ -35,6 +35,10 @@ describe("custom provider endpoint changes", () => {
           steps.push(`remove:${id}`);
           releases.set(id, () => resolve(persist()));
         }),
+      saveCustomProvider: <T>(id: string, persist: () => Promise<T>) => {
+        steps.push(`save:${id}`);
+        return persist();
+      },
       reloadOpenCodeConfig: async () => "restarted",
     };
     const customProviders: CustomProviderIpcDependencies["customProviders"] = {

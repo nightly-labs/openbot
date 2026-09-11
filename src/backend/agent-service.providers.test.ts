@@ -922,6 +922,59 @@ describe.sequential("AgentService: providers", () => {
     releaseProfile();
   });
 
+  // The models of a removed endpoint must not come back because the replacement said nothing about
+  // them. A kept catalogue describes the process that reported it, which is the one already gone.
+  it("keeps a removed endpoint out when the replacement cannot list its models", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    let opencodeClients = 0;
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider);
+      if (provider === "opencode") {
+        opencodeClients += 1;
+        const failsDiscovery = opencodeClients === 2;
+        client.modelList = () => {
+          if (failsDiscovery) throw new Error("Model discovery failed.");
+          return { data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] };
+        };
+      }
+      return client;
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
+
+    await service.removeCustomProvider("studio", async () => undefined);
+    await service.reloadOpenCodeConfig();
+
+    expect(service.listModels().some((model) => model.id === "studio/local-llm")).toBe(false);
+  });
+
+  // An id this app never saved can already exist in OpenCode's own configuration. Until a process
+  // that read the save answers, those models belong to the old URL, not to the endpoint just saved.
+  it("keeps a saved id out until a process that read the save answers", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider);
+      if (provider === "opencode") {
+        client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
+      }
+      return client;
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
+
+    await service.saveCustomProvider("studio", async () => undefined);
+
+    expect(service.listModels().some((model) => model.id === "studio/local-llm")).toBe(false);
+
+    await service.reloadOpenCodeConfig();
+
+    expect(service.listModels().some((model) => model.id === "studio/local-llm")).toBe(true);
+  });
+
   // An id saved again is served again, whatever the CLI did with the removal before it.
   it("offers an endpoint's models again after the id is saved a second time", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);

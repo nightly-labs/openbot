@@ -12,7 +12,7 @@ import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-gro
 export interface CustomProviderIpcDependencies {
   // Only the four endpoint-change methods, so the registrar's order of writes can be checked without
   // a running backend.
-  service: Pick<AgentService, "removeCustomProvider" | "reloadOpenCodeConfig">;
+  service: Pick<AgentService, "saveCustomProvider" | "removeCustomProvider" | "reloadOpenCodeConfig">;
   customProviders: Pick<CustomProviderStore, "list" | "save" | "remove">;
 }
 
@@ -49,10 +49,12 @@ export function customProviderIpcHandlers({
         parseSaveCustomProvider,
         (input): Promise<CustomProviderResult> =>
           serialize(async () => {
-            const providers = await customProviders.save(input);
-            // An id removed before this write is served again only once a new process has read the
-            // file, which the backend hears from the provider runtime. A restart that is skipped or
-            // that fails leaves the CLI answering on the endpoint as it was, so the id stays out.
+            // The backend owns this order as well: it excludes the id being saved, then runs the
+            // write. The id is served again only once a new process has read the file, which the
+            // backend hears from the provider runtime. A restart that is skipped or that fails
+            // leaves the CLI answering on the endpoints as they were, so the id stays out -- whether
+            // it was removed before this write or already named models in that process's catalogue.
+            const providers = await service.saveCustomProvider(input.id, () => customProviders.save(input));
             return { providers, restart: await service.reloadOpenCodeConfig() };
           }),
       ),
