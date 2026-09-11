@@ -24,6 +24,7 @@ export function useAgentPinSwipe(openingGesture: PanGesture, onPin: (withHaptic:
   const feedbackPlayed = useSharedValue(false);
   const committing = useSharedValue(false);
   const [revealed, setRevealed] = useState(false);
+  const [pinPending, setPinPending] = useState(false);
 
   const close = useCallback(() => swipeable.current?.close(), []);
   const restore = useCallback(() => {
@@ -36,6 +37,7 @@ export function useAgentPinSwipe(openingGesture: PanGesture, onPin: (withHaptic:
       if (pendingPin.current !== null) return;
       pendingPin.current = withHaptic;
       committing.set(true);
+      setPinPending(true);
       swipeable.current?.close();
     },
     [committing],
@@ -53,6 +55,7 @@ export function useAgentPinSwipe(openingGesture: PanGesture, onPin: (withHaptic:
     const withHaptic = pendingPin.current;
     pendingPin.current = null;
     committing.set(false);
+    setPinPending(false);
     if (withHaptic !== null) onPin(withHaptic);
   };
 
@@ -116,5 +119,5 @@ export function useAgentPinSwipe(openingGesture: PanGesture, onPin: (withHaptic:
     [active, armed, committing, feedbackPlayed, openingGesture, origin, pin, restOffset, restore, start],
   );
 
-  return { close, gesture, onClose, onWillClose, onWillOpen, pin, revealed, swipeable };
+  return { close, gesture, onClose, onWillClose, onWillOpen, pin, pinPending, revealed, swipeable };
 }

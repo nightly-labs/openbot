@@ -74,6 +74,7 @@ export function AgentPinSwipeRow({
     <GestureDetector gesture={swipe.gesture}>
       <ReanimatedSwipeable
         ref={swipe.swipeable}
+        enabled={!swipe.pinPending}
         containerStyle={{ backgroundColor: background, overflow: "hidden" }}
         childrenContainerStyle={{ backgroundColor: background }}
         friction={1}

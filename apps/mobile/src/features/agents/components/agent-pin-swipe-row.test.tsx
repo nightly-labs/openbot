@@ -180,6 +180,15 @@ async function release(x: number, success = true, opens = true) {
     native.handlers.finalize(motion(x), success);
   });
 }
+// An enabled native pan can cancel the close spring before its completion.
+// The observer failing does not stop Swipeable's separate movement gesture.
+async function interruptWithSwipe() {
+  await act(() => {
+    if (native.props.enabled === false) return;
+    native.springs = [];
+    native.props.onSwipeableWillOpen?.(SwipeDirection.LEFT);
+  });
+}
 async function finish() {
   await act(() =>
     native.springs.splice(0).forEach((done) => {
@@ -205,6 +214,7 @@ it("reveals without pinning, then arms on a further drag and pins only after rel
   move(-70);
   expect(native.impact).toHaveBeenCalledOnce();
   await release(-70);
+  await interruptWithSwipe();
   await finish();
   expect(onPin).toHaveBeenCalledExactlyOnceWith(false);
 });
@@ -255,7 +265,7 @@ it("lets the drawer and vertical scroll win on closed rows, but closes exposed r
   expect(manager.activate).toHaveBeenCalledTimes(2);
   expect(native.blocked).toHaveBeenCalled();
 });
-it("supports tapping Pin and rejects repeat activation during the return animation", async () => {
+it("keeps a pending pin closing through repeat taps and swipes, then accepts swipes again", async () => {
   const onPin = await renderRow();
   begin();
   move(-88);
@@ -264,8 +274,11 @@ it("supports tapping Pin and rejects repeat activation during the return animati
     fireEvent.click(screen.getByRole("button", { name: "Pin Ada" }));
     fireEvent.click(screen.getByRole("button", { name: "Pin Ada" }));
   });
+  await interruptWithSwipe();
   await finish();
   expect(onPin).toHaveBeenCalledExactlyOnceWith(true);
+  await interruptWithSwipe();
+  expect(screen.getByRole("button", { name: "Close pin action for Ada" })).toBeTruthy();
 });
 
 it("closes the exposed action on tap and hides the action from accessibility when closed", async () => {
