@@ -27,6 +27,17 @@ describe("stderr diagnostics", () => {
     expect(messages).toEqual(['ERROR request failed: {"headers":{"X-Tenant":"[redacted]"}}']);
   });
 
+  it("keeps a record whole when its payload runs over several lines", () => {
+    const { messages, stream } = collect();
+    // The CLI pretty-prints its payload, so the newline inside it ends no record. Read line by line,
+    // `{"X-Tenant":"tenant-secret"}` arrives without the `headers` name that redacts what is under
+    // it, and the credential is emitted and shown.
+    stream.push('ERROR {"headers":\n{"X-Tenant":"tenant-secret"},"message":"request failed"}\nplain line\n');
+
+    expect(messages).toEqual(['ERROR {"headers":{"X-Tenant":"[redacted]"},"message":"request failed"}', "plain line"]);
+    expect(messages.join("\n")).not.toContain("tenant-secret");
+  });
+
   it("emits every complete record in one chunk and holds the rest", () => {
     const { messages, stream } = collect();
     stream.push('first line\nsecond line\n{"apiKey":"abcdef123456"');

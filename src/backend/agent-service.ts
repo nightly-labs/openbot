@@ -530,6 +530,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         isStopping: () => this.#stopping,
+        servesModel: (model) => this.#servesModel(model),
       },
     });
     this.#browser.onControlChanged((state) => {

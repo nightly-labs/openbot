@@ -496,6 +496,14 @@ describe.sequential("AgentService: providers", () => {
       provider: "opencode",
       model: "lmstudio/local-llm",
     });
+
+    // The running OpenCode process still serves the removed endpoint, with the credentials it
+    // started with, so a later message must not reach it.
+    await service.sendMessage({ agentId: "chief", text: "Keep working" });
+    await waitFor(() => service?.listQueue("chief").deliveries.some((delivery) => delivery.status === "failed"));
+    expect(service.listQueue("chief").deliveries.at(-1)?.error).toBe(
+      "The endpoint this agent used was removed. Choose another model for it.",
+    );
   });
 
   // A removal that fails on disk leaves the endpoint saved and served by the running CLI, so the

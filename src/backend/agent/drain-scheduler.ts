@@ -18,6 +18,12 @@ import type { ThreadLifecycle } from "./thread-lifecycle";
 export interface DrainHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
   isStopping(): boolean;
+  /**
+   * Whether the catalogue still serves this model. A removed endpoint's models stay in the running
+   * OpenCode process until it restarts, and the restart waits for a busy agent, so this is what
+   * keeps a delivery off an endpoint the user has taken out.
+   */
+  servesModel(model: string): boolean;
 }
 
 export interface DrainSchedulerOptions {
@@ -186,6 +192,18 @@ export class DrainScheduler {
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
       await this.#mailbox.verifyDeliveryAttachments(delivery.id);
       const agent = await this.#store.getOrCreate(delivery.recipientAgentId);
+      if (!this.#hooks.servesModel(agent.model)) {
+        // The endpoint was removed while this agent was busy, so no other model could be given to it
+        // then. The old process would still answer on the removed endpoint, with the credentials it
+        // started with, until it restarts.
+        await this.#mailbox.markTerminal(
+          delivery.id,
+          "failed",
+          "The endpoint this agent used was removed. Choose another model for it.",
+        );
+        this.#mailboxSync.emitQueue(agent.id);
+        return;
+      }
       this.#threads.applyPendingRuntimeRefresh(agent);
       await this.#providers.ensureProvider(providerForAgent(agent));
       const client = this.#providers.requireReadyClient(providerForAgent(agent));

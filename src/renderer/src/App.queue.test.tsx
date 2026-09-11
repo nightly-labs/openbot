@@ -375,8 +375,6 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("sends an action for selected agent text without clearing the composer draft", async () => {
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
     const answer = "The launch note needs a friendlier closing sentence.";
     const snapshot: ConversationSnapshot = {
       agentId: "chief",
@@ -393,13 +391,16 @@ describe("OpenBot connected desktop shell", () => {
         },
       ],
     };
-    // The heading renders before this thread subscribes, and the moment it does is not observable
-    // from here: `emitAgentEvent` is bound by the first subscriber of any kind. The snapshot is sent
-    // again until it lands, which changes nothing when it already has -- the revision is the same.
-    const message = await waitFor(() => {
-      emitAgentEvent?.({ type: "conversation", snapshot });
-      return screen.getByText(answer);
-    });
+    // The message arrives through the read the chat itself makes, not through an event. An event
+    // has to reach a subscriber that is not there yet when the heading renders, and the moment it
+    // subscribes is not observable from here; the read is awaited by the chat that asked for it.
+    vi.mocked(window.openbot.agent.readConversation).mockImplementation(
+      async (agentId): Promise<ConversationSnapshot> =>
+        agentId === "chief" ? snapshot : { agentId, threadId: null, activeTurnId: null, revision: 0, messages: [] },
+    );
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    const message = await screen.findByText(answer);
     const composer = screen.getByRole("textbox", { name: "Message Chief" });
     composer.textContent = "Keep this draft";
     await fireEvent.input(composer);
