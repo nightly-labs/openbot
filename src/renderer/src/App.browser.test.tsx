@@ -137,9 +137,11 @@ describe("OpenBot connected desktop shell", () => {
     ));
     flush();
     await vi.advanceTimersByTimeAsync(0);
+    expect(capture).toHaveBeenCalledWith("preview");
     capture.mockClear();
     await vi.advanceTimersByTimeAsync(3000);
     expect(capture).toHaveBeenCalledTimes(1);
+    expect(capture).toHaveBeenLastCalledWith("preview");
     setEnabled(false);
     flush();
     await vi.advanceTimersByTimeAsync(6000);
@@ -148,10 +150,12 @@ describe("OpenBot connected desktop shell", () => {
     flush();
     await vi.advanceTimersByTimeAsync(0);
     expect(capture).toHaveBeenCalledTimes(2);
+    expect(capture).toHaveBeenLastCalledWith("preview");
     setTab((current) => ({ ...current, url: "https://example.com/new" }));
     flush();
     await vi.advanceTimersByTimeAsync(0);
     expect(capture).toHaveBeenCalledTimes(3);
+    expect(capture).toHaveBeenLastCalledWith("preview");
     view.unmount();
     await vi.advanceTimersByTimeAsync(6000);
     expect(capture).toHaveBeenCalledTimes(3);
