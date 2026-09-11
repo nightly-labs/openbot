@@ -30,6 +30,7 @@
       "permissions": ["android.permission.CAMERA"]
     },
     "plugins": [
+      "./plugins/with-rocketsim",
       "expo-router",
       [
         "expo-splash-screen",
