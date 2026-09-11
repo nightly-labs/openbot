@@ -40,6 +40,22 @@ describe("browser takeover page", () => {
     expect(read()).toMatchObject({ forms: [], status: "manual" });
     expect(document.querySelector("textarea")?.value).toBe("Saved address");
   });
+  it.each([
+    ['<input type="password" minlength="3">', "ab"],
+    ['<input maxlength="3">', "abcd"],
+    ['<textarea minlength="3"></textarea>', "ab"],
+    ['<textarea maxlength="3"></textarea>', "abcd"],
+  ])("checks native text length limits before writing values: %s", (control, value) => {
+    document.body.innerHTML = `<form>${control}<button>Send</button></form>`;
+    const submit = vi.fn((event: Event) => event.preventDefault());
+    document.forms[0].addEventListener("submit", submit);
+    const state = read();
+    expect(run(submission(state, [{ id: "field-0", value }])).status).toBe("invalid");
+    expect(document.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea")?.value).toBe("");
+    expect(submit).not.toHaveBeenCalled();
+    run(submission(state, [{ id: "field-0", value: "abc" }]));
+    expect(submit).toHaveBeenCalledOnce();
+  });
   it("keeps submitted fields available after website validation fails", () => {
     document.body.innerHTML = '<form><input pattern="[0-9]+"><button>Send</button></form>';
     const state = read();

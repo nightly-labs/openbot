@@ -328,6 +328,14 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     } else if (node instanceof HTMLInputElement && (node.type === "checkbox" || node.type === "radio")) {
       if (typeof value !== "boolean") throw new Error("Invalid browser form selection.");
     } else if (typeof value !== "string") throw new Error("Invalid browser form value.");
+    else if (
+      (node instanceof HTMLTextAreaElement ||
+        (node instanceof HTMLInputElement &&
+          ["text", "search", "url", "tel", "email", "password"].includes(node.type))) &&
+      ((node.maxLength >= 0 && value.length > node.maxLength) ||
+        (value.length > 0 && node.minLength > 0 && value.length < node.minLength))
+    )
+      return { ...state, status: "invalid" };
   }
   const destination = JSON.stringify([current.form.action, current.form.method, action.formAction, action.formMethod]);
   const checkTargets = () => {
