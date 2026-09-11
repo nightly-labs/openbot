@@ -15,14 +15,18 @@ import { extractJsonObject, StructuredOutputError } from "../structured-output";
 
 const GENERATION_TIMEOUT_MS = 120_000;
 
+/** Shown when the endpoints changed under a generation that had not yet spawned its process. */
+const CANCELLED_MESSAGE = "The custom endpoints changed while this was generating. Try again.";
+
 /** Owns a disposable provider session; no durable agent, tools, workspace or conversation is involved. */
 export async function generateProfile(
   client: AgentClient,
   model: AgentModelOption,
   input: GenerateAgentProfileInput,
   sections: SidebarSection[],
+  cancelled?: () => boolean,
 ): Promise<AgentProfileDraft> {
-  const result = await generateTextWithoutTools(client, model, profilePrompt(input, sections));
+  const result = await generateTextWithoutTools(client, model, profilePrompt(input, sections), cancelled);
   let parsed: DynamicRecord;
   try {
     parsed = extractJsonObject(result);
@@ -41,6 +45,12 @@ export async function generateTextWithoutTools(
   client: AgentClient,
   model: AgentModelOption,
   prompt: string,
+  /**
+   * Whether this generation must not go on. Stopping the client is not enough on its own: a client
+   * stopped before it holds a process has nothing to stop, and `start()` below clears that stop and
+   * spawns the process with the configuration as it was. So the generation itself is ended here.
+   */
+  cancelled: () => boolean = () => false,
 ): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "openbot-profile-"));
   let timer: NodeJS.Timeout | undefined;
@@ -69,6 +79,9 @@ export async function generateTextWithoutTools(
   // Observe rejection during initialization too; the owning await below still reports it.
   void completion.catch(() => undefined);
   try {
+    // Read after the temporary directory is made and before anything is spawned: that await is the
+    // window in which an endpoint change finds a client with no process to stop.
+    if (cancelled()) throw new Error(CANCELLED_MESSAGE);
     client.start();
     await client.request(
       "initialize",

@@ -143,7 +143,11 @@ export interface ResolvedSharedFile {
 export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly channels: ChannelService;
   readonly #profileSave: ProfileSave;
-  readonly #profileClients = new Set<AgentClient>();
+  /**
+   * Every disposable client that is generating, with the record that ends its generation. A client
+   * alone is not enough to stop the work: it may not hold a process yet.
+   */
+  readonly #profileClients = new Map<AgentClient, { cancelled: boolean }>();
   readonly #deletingAgents = new Set<string>();
   /**
    * Endpoints the running CLI may still list although the saved file no longer defines them, because
@@ -449,12 +453,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const model = this.#availableModels().find((item) => item.provider === lead.provider && item.id === lead.model);
         if (!model) throw new Error("The channel lead model is unavailable.");
         const client = this.#providers.createProfileClient(lead.provider);
-        this.#profileClients.add(client);
+        const generation = { cancelled: false };
+        this.#profileClients.set(client, generation);
         try {
           return await generateTextWithoutTools(
             client,
             { ...model, defaultReasoningEffort: lead.reasoningEffort },
             prompt,
+            () => generation.cancelled,
           );
         } finally {
           this.#profileClients.delete(client);
@@ -783,10 +789,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return !this.#releasedCustomProviders.has(modelId.slice(0, separator));
   }
 
-  /** Ends every disposable client that may hold a session on an endpoint the user has taken out. */
+  /** Ends every disposable generation that may reach an endpoint the user has taken out. */
   #stopProfileClients(): void {
-    for (const client of this.#profileClients) {
+    for (const [client, generation] of this.#profileClients) {
       if (client.provider !== "opencode") continue;
+      // The generation is cancelled as well as the client stopped. A generation still preparing its
+      // workspace holds no process, so the stop reaches nothing, and its own `start()` would then
+      // spawn the process with the endpoints as they were before this change.
+      generation.cancelled = true;
       void client.stop().catch(() => undefined);
     }
   }
@@ -806,9 +816,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (this.#stopping) throw new Error("OpenBot is shutting down.");
     if (this.#profileClients.size >= 3) throw new Error("Profile generation is busy. Try again shortly.");
     const client = this.#providers.createProfileClient(provider);
-    this.#profileClients.add(client);
+    const generation = { cancelled: false };
+    this.#profileClients.set(client, generation);
     try {
-      return await generateProfile(client, model, input, sections);
+      return await generateProfile(client, model, input, sections, () => generation.cancelled);
     } finally {
       this.#profileClients.delete(client);
     }
@@ -1334,7 +1345,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#attention.clearPrompts();
     this.#attention.clearBrowserTakeovers();
     this.#attention.clearApprovals();
-    const clients = [...this.#providers.dispose(), ...this.#profileClients];
+    const clients = [...this.#providers.dispose(), ...this.#profileClients.keys()];
     this.#profileClients.clear();
     for (const [agentId, snapshot] of this.#conversation.activeSnapshots()) {
       if (!snapshot.activeTurnId) continue;
