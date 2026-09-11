@@ -142,22 +142,15 @@ export interface MockOpenBotOptions {
 }
 
 /**
- * What the OpenCode CLI would report for the seeded endpoints. Preview composes these into
- * `listModels()` instead of putting them in `STORY_MODELS`, which several stories read directly as
- * their whole catalogue.
+ * What the OpenCode CLI would report for one endpoint, read from the endpoint itself. Preview
+ * composes these into `listModels()` instead of putting them in `STORY_MODELS`, which several
+ * stories read directly as their whole catalogue.
+ *
+ * OpenCode names a custom model `<provider name>/<model name>` and ids it
+ * `<provider id>/<model id>`.
  */
-const MOCK_CUSTOM_PROVIDER_MODELS: Record<string, { id: string; name: string }[]> = {
-  "studio-local": [
-    { id: "qwen3-coder:30b", name: "Qwen3 Coder 30B" },
-    { id: "gpt-oss:120b", name: "GPT-OSS 120B" },
-  ],
-  "house-router": [{ id: "glm-5-air", name: "GLM-5 Air" }],
-};
-
-/** OpenCode names a custom model `<provider name>/<model name>` and ids it `<provider id>/<model id>`. */
 function mockCustomProviderModels(provider: CustomProviderSummary): AgentModelOption[] {
-  const entries = MOCK_CUSTOM_PROVIDER_MODELS[provider.id] ?? [{ id: "default", name: "Default" }];
-  return entries.map((model) => ({
+  return provider.models.map((model) => ({
     provider: "opencode",
     id: composedCustomModelId(provider.id, model.id),
     name: `${provider.name}/${model.name}`,
@@ -288,14 +281,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         name: "Studio Local",
         baseUrl: "http://127.0.0.1:11434/v1",
         hasApiKey: false,
-        models: MOCK_CUSTOM_PROVIDER_MODELS["studio-local"] ?? [],
+        models: [
+          { id: "qwen3-coder:30b", name: "Qwen3 Coder 30B" },
+          { id: "gpt-oss:120b", name: "GPT-OSS 120B" },
+        ],
       },
       {
         id: "house-router",
         name: "House Router",
         baseUrl: "https://models.example.com/v1",
         hasApiKey: true,
-        models: MOCK_CUSTOM_PROVIDER_MODELS["house-router"] ?? [],
+        models: [{ id: "glm-5-air", name: "GLM-5 Air" }],
       },
     ],
   );
@@ -844,7 +840,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (customProviders.some((provider) => provider.id === input.id)) {
           throw new Error("An endpoint with this provider ID is already saved. Remove it first, or use another ID.");
         }
-        MOCK_CUSTOM_PROVIDER_MODELS[input.id] = input.models.map((model) => ({ id: model.id, name: model.name }));
         customProviders = [
           ...customProviders,
           {

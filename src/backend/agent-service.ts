@@ -1198,8 +1198,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // The built-in default provider comes second, because an agent left on a model the CLI no longer
     // serves cannot answer, and a provider switch keeps its workspace, thread and identity.
     const remaining = this.#availableModels();
+    // The built-in default is offered only while it is usable: `#applyAgentUpdate` connects the
+    // provider it moves an agent to, and a Codex that is not installed or not signed in throws
+    // there. That would trap a user who runs custom endpoints only, because the last endpoint could
+    // never be removed while an agent still names one of its models.
     const fallback =
-      this.#startingModel("opencode", remaining) ?? this.#startingModel(DEFAULT_AGENT_PROVIDER, remaining);
+      this.#startingModel("opencode", remaining) ??
+      (this.#providerAvailable(DEFAULT_AGENT_PROVIDER) ? this.#startingModel(DEFAULT_AGENT_PROVIDER, remaining) : null);
     // Nothing is listed, so there is no model to move to. The removal still goes ahead: refusing it
     // would trap the user on an endpoint that may be the reason no model is listed.
     if (!fallback) return;
@@ -1215,6 +1220,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         reasoningEffort: fallback.defaultReasoningEffort,
       });
     }
+  }
+
+  /** Whether this provider reports a CLI that is installed, current, and signed in. */
+  #providerAvailable(provider: AgentProvider): boolean {
+    return (
+      this.getStatus().providers?.some((candidate) => candidate.id === provider && candidate.state === "available") ??
+      false
+    );
   }
 
   /**

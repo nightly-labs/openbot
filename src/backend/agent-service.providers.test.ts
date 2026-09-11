@@ -471,6 +471,33 @@ describe.sequential("AgentService: providers", () => {
     expect(chief?.provider).toBe("codex");
   });
 
+  // A user who runs custom endpoints only has no other provider to move to. The removal must still
+  // go through, or the last endpoint can never be taken out.
+  it("removes the last endpoint when the built-in provider cannot be reached", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    // No Codex CLI, so the built-in fallback reports `not-installed` and connecting to it throws.
+    process.env.OPENBOT_CODEX_PATH = join(root, "absent-codex");
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider);
+      // Every OpenCode model belongs to the endpoint being removed, so there is nothing to move to.
+      if (provider === "opencode") client.modelList = () => ({ data: [{ model: "lmstudio/local-llm" }] });
+      return client;
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" });
+
+    await service.removeCustomProvider("lmstudio", async () => undefined);
+
+    // The agent keeps its model: the endpoint is gone, and the next OpenCode start decides what it
+    // can still serve. A refusal here would trap the user on an endpoint they asked to remove.
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
+      provider: "opencode",
+      model: "lmstudio/local-llm",
+    });
+  });
+
   // A removal that fails on disk leaves the endpoint saved and served by the running CLI, so the
   // next removal may still move agents onto it.
   it("keeps an endpoint selectable when its own removal was never written", async () => {
