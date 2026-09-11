@@ -7,6 +7,7 @@ import { ChatCameraPanel } from "./chat-camera-panel";
 const native = vi.hoisted(() => ({
   capture: vi.fn(),
   ready: () => {},
+  finishMotion: () => {},
 }));
 vi.mock("expo-camera", () => ({
   CameraView: ({ ref, onCameraReady }: { ref: Ref<object>; onCameraReady: () => void }) => {
@@ -33,9 +34,15 @@ vi.mock("react-native-reanimated", () => ({
   },
   useSharedValue: (initial: number) => useRef({ get: () => initial, set: () => {} }).current,
   useAnimatedStyle: () => ({}),
-  withTiming: (target: number) => target,
+  useReducedMotion: () => false,
+  cancelAnimation: () => {},
+  withSpring: (target: number, _config: object, done?: (finished: boolean) => void) => {
+    if (done) native.finishMotion = () => done(true);
+    return target;
+  },
   ReduceMotion: { System: "system" },
 }));
+vi.mock("react-native-worklets", () => ({ scheduleOnRN: (callback: () => void) => callback() }));
 vi.mock("lucide-react-native", () => ({ ChevronLeft: () => null, SwitchCamera: () => null }));
 vi.mock("heroui-native", () => ({
   Button: ({
@@ -93,6 +100,8 @@ it("waits for the switched camera before capture and closes without a photo", as
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Take photo", hidden: true })));
   expect(native.capture).not.toHaveBeenCalled();
   act(() => fireEvent.click(screen.getByRole("button", { name: "Close camera" })));
+  expect(onClose).not.toHaveBeenCalled();
+  act(() => native.finishMotion());
   expect(onClose).toHaveBeenCalledOnce();
   expect(onPhoto).not.toHaveBeenCalled();
 });

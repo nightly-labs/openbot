@@ -13,7 +13,12 @@ camera startup or native layout work.
 Mount the camera at the requested preview size while the panel is hidden. Start
 opening only after Expo Camera reports `onCameraReady`. Keep the same camera
 mounted during motion. The QR scanner does not add a separate preview fade to
-this opening. Chat animates opacity and translation around its live camera.
+this opening. Chat expands its panel from the measured attachment button bounds
+with Reanimated translation, scale, and opacity. The preview keeps fixed layout
+dimensions during motion. A 300 ms spring without overshoot drives opening and
+closing; close releases the camera after motion completes. If button measurement
+is unavailable, the panel uses a short rise and scale instead. Reduced motion
+omits translation and scale. Skia and WebGPU are not needed for this effect.
 
 Keep the QR detector enabled from camera startup. In Expo Camera 57, the presence
 of `onBarcodeScanned` controls `barcodeScannerEnabled`. Adding the callback after
@@ -65,3 +70,6 @@ event, not a measurement of the first displayed frame.
 Also check close during opening, reduced motion, denied permissions, camera
 switching, background/resume, and light/dark appearance. Native interruption and
 recovery, thermal load, and battery use remain part of the broader issue work.
+For the chat morph, also check opening from the attachment menu with the keyboard
+shown and hidden, and closing halfway through opening. Compare the source point
+and final panel bounds on devices with different safe-area insets.
