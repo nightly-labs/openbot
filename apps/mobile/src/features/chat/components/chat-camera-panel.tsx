@@ -3,7 +3,7 @@ import { Button, Typography } from "heroui-native";
 import { ChevronLeft, SwitchCamera } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { BackHandler, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
-import Animated, { FadeInUp, ReduceMotion } from "react-native-reanimated";
+import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // The requested camera is a floating panel inside chat, not a navigation sheet.
@@ -19,6 +19,15 @@ export function ChatCameraPanel({
   const mounted = useRef(true);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
+  const [opened, setOpened] = useState(false);
+  const progress = useSharedValue(0);
+  const panelStyle = useAnimatedStyle(() => ({
+    opacity: progress.get(),
+    transform: [{ translateY: -25 * (1 - progress.get()) }],
+  }));
+  useEffect(() => {
+    if (opened) progress.set(withTiming(1, { duration: 200, reduceMotion: ReduceMotion.System }));
+  }, [opened, progress]);
   const [facing, setFacing] = useState<CameraType>("back");
   const [error, setError] = useState<string | null>(null);
   const { width, height } = useWindowDimensions();
@@ -69,13 +78,18 @@ export function ChatCameraPanel({
         }}
       />
       <Animated.View
-        entering={FadeInUp.duration(200).reduceMotion(ReduceMotion.System)}
+        pointerEvents={opened ? "auto" : "none"}
+        accessibilityElementsHidden={!opened}
+        importantForAccessibility={opened ? "auto" : "no-hide-descendants"}
         className="absolute self-center overflow-hidden rounded-[32px] bg-control"
-        style={{
-          bottom: Math.max(insets.bottom, 12),
-          width: Math.min(440, width - 24),
-          height: Math.min(height * 0.58, height - insets.top - insets.bottom - 24),
-        }}
+        style={[
+          panelStyle,
+          {
+            bottom: Math.max(insets.bottom, 12),
+            width: Math.min(440, width - 24),
+            height: Math.min(height * 0.58, height - insets.top - insets.bottom - 24),
+          },
+        ]}
       >
         <CameraView
           key={facing}
@@ -83,9 +97,13 @@ export function ChatCameraPanel({
           style={StyleSheet.absoluteFill}
           facing={facing}
           mode="picture"
-          onCameraReady={() => setReady(true)}
+          onCameraReady={() => {
+            setReady(true);
+            setOpened(true);
+          }}
           onMountError={() => {
             setReady(false);
+            setOpened(true);
             setError("Could not start the camera. Close it and try again.");
           }}
         />

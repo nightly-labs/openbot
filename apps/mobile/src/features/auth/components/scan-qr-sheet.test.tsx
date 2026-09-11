@@ -8,6 +8,7 @@ const native = vi.hoisted(() => {
   const camera: { ready?: () => void; scan?: (event: { data: string }) => void } = {};
   return {
     finishMotion: () => {},
+    motionStarted: vi.fn(),
     back: new Set<() => boolean>(),
     appState: new Set<(state: string) => void>(),
     permission: { granted: true, canAskAgain: true },
@@ -49,6 +50,7 @@ vi.mock("react-native-reanimated", () => ({
   useAnimatedStyle: () => ({}),
   withTiming: (target: number) => target,
   withSpring: (_target: number, _config: { duration: number }, done: (finished: boolean) => void) => {
+    native.motionStarted();
     native.finishMotion = () => done(true);
     return 0;
   },
@@ -110,6 +112,7 @@ const container = document.createElement("div");
 document.body.append(container);
 let root = createRoot(container);
 beforeEach(() => {
+  native.motionStarted.mockClear();
   native.permission = { granted: true, canAskAgain: true };
   native.requestPermission.mockClear();
   native.openSettings.mockClear();
@@ -135,13 +138,15 @@ async function renderSheet(onScan: (data: string) => Promise<void> = async () =>
 }
 
 async function finishMotion() {
+  await act(() => native.camera.ready?.());
   await act(() => native.finishMotion());
 }
 
 describe("scanner sheet lifecycle", () => {
-  it("warms the camera during opening, enables scanning on completion and stops before closing", async () => {
+  it("prepares the camera before opening and stops before closing", async () => {
     const { onClose } = await renderSheet();
     expect(screen.getByRole("img", { name: "Camera preview" })).toBeTruthy();
+    expect(native.motionStarted).not.toHaveBeenCalled();
     expect(native.camera.scan).toBeUndefined();
     await finishMotion();
     expect(screen.getByRole("img", { name: "Camera preview" })).toBeTruthy();
