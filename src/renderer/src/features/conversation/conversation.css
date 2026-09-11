@@ -818,7 +818,7 @@
 .browser-tab-strip {
   display: flex;
   min-width: 0;
-  flex: 1;
+  flex: 0 1 auto;
   align-items: flex-end;
   gap: 3px;
   overflow-x: auto;
