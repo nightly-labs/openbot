@@ -1,9 +1,8 @@
-import * as Haptics from "expo-haptics";
 import { useNavigation, useRoute } from "expo-router/react-navigation";
 import { type ComponentProps, createContext, useContext, useEffect, useRef } from "react";
 import { Pressable } from "react-native";
 import type { createChatNavigationGate } from "@/features/agents/model/chat-navigation-gate";
-import { isIOS } from "@/shared/lib/platform";
+import { haptics } from "@/shared/lib/haptics";
 
 export const ChatNavigationGateContext = createContext<ReturnType<typeof createChatNavigationGate> | null>(null);
 
@@ -26,7 +25,7 @@ export function ChatLinkPressable({ onPress, ...props }: ComponentProps<typeof P
       {...props}
       onPress={(event) => {
         if (event.defaultPrevented) return;
-        if (isIOS) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+        void haptics.impact("soft");
         event.persist();
         const navigate = () => {
           if (mounted.current) onPress?.(event);

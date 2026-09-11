@@ -3,6 +3,12 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  channelEvent,
+  channelRequest,
+  channelResponse,
+  isChannelRoute,
+} from "@openbot/contracts/team-protocol/channels-v1";
 import { supportsTeamSemanticTags, TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
 import { encodeTeamProtocolV1ClientEvent } from "@openbot/contracts/team-protocol/v1";
 import {
@@ -437,15 +443,18 @@ export class TeamWebRtcHostPeer {
             : input.body === null
               ? undefined
               : JSON.stringify(
-                  (peerCapabilities.has("opencode")
-                    ? decodeTeamProtocolV4WebRtcHttpRequest
-                    : decodeTeamProtocolV3WebRtcHttpRequest)(input.method, input.path, input.body, {
+                  (isChannelRoute(input.path)
+                    ? channelRequestForMethod
+                    : peerCapabilities.has("opencode")
+                      ? decodeTeamProtocolV4WebRtcHttpRequest
+                      : decodeTeamProtocolV3WebRtcHttpRequest)(input.method, input.path, input.body, {
                     preserveSemanticTags,
                   }),
                 ),
     });
     const contentType = response.headers.get("content-type") ?? "";
-    const body = response.status === 204 ? {} : contentType.includes("json") ? await response.json() : null;
+    const isFile = response.headers.get("content-disposition")?.startsWith("attachment;") ?? false;
+    const body = response.status === 204 ? {} : contentType.includes("json") && !isFile ? await response.json() : null;
     if (!response.ok) {
       const record = isDynamicRecord(body) ? body : null;
       throw new GatewayError(
@@ -454,7 +463,7 @@ export class TeamWebRtcHostPeer {
         isString(record?.error) ? record.error : `The host returned ${response.status}.`,
       );
     }
-    if (response.status !== 204 && !contentType.includes("json")) {
+    if (response.status !== 204 && (isFile || !contentType.includes("json"))) {
       const bytes = new Uint8Array(await response.arrayBuffer());
       const disposition = response.headers.get("content-disposition") ?? "";
       const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/iu)?.[1];
@@ -472,9 +481,11 @@ export class TeamWebRtcHostPeer {
     }
     return {
       status: response.status,
-      body: (peerCapabilities.has("opencode")
-        ? encodeTeamProtocolV4WebRtcHttpResponse
-        : encodeTeamProtocolV3WebRtcHttpResponse)(input.method, input.path, response.status, body, {
+      body: (isChannelRoute(input.path)
+        ? channelResponseForMethod
+        : peerCapabilities.has("opencode")
+          ? encodeTeamProtocolV4WebRtcHttpResponse
+          : encodeTeamProtocolV3WebRtcHttpResponse)(input.method, input.path, response.status, body, {
         preserveSemanticTags,
       }),
     };
@@ -496,14 +507,27 @@ export class TeamWebRtcHostPeer {
       if (binary || !this.#peerId) return;
       let frame: string;
       try {
+        // `channels-changed` is outside the frozen v1 vocabulary, so the base event adapter
+        // rejects it and the catch below would drop it without a trace: a remote client would
+        // stop seeing incoming messages and task updates until its next refresh. The optional
+        // protocol validates and envelopes its own event, exactly as the request path does.
+        const event = JSON.parse(data.toString());
+        const channel = channelEvent(event);
         frame = encodeTeamProtocolV2Frame(
-          (this.#peerCapabilities.has("opencode") ? createTeamProtocolV4Event : createTeamProtocolV2Event)(
-            this.#nextEventSequence,
-            JSON.parse(data.toString()),
-            {
-              preserveSemanticTags: supportsTeamSemanticTags(this.#peerCapabilities),
-            },
-          ),
+          channel
+            ? decodeTeamProtocolV2EventFrame({
+                version: 2,
+                type: "event",
+                sequence: this.#nextEventSequence,
+                payload: channel,
+              })
+            : (this.#peerCapabilities.has("opencode") ? createTeamProtocolV4Event : createTeamProtocolV2Event)(
+                this.#nextEventSequence,
+                event,
+                {
+                  preserveSemanticTags: supportsTeamSemanticTags(this.#peerCapabilities),
+                },
+              ),
         );
       } catch {
         return;
@@ -760,4 +784,11 @@ class GatewayError extends Error {
   ) {
     super(message);
   }
+}
+
+function channelRequestForMethod(_method: string, path: string, value: unknown) {
+  return channelRequest(path, value);
+}
+function channelResponseForMethod(_method: string, path: string, status: number, value: unknown) {
+  return channelResponse(path, status, value);
 }

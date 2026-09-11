@@ -24,6 +24,15 @@ import {
   type DynamicIslandPreference,
   type DynamicIslandPresentation,
   decodeAgentProfileDraft,
+  decodeChannel,
+  decodeChannelMemories,
+  decodeChannelMemory,
+  decodeChannelPage,
+  decodeChannelRoutine,
+  decodeChannelRoutineRun,
+  decodeChannelRoutineRuns,
+  decodeChannelRoutines,
+  decodeChannelSummaries,
   decodeOptionalAgentAnalytics,
   decodeOptionalHostAnalytics,
   decodeSaveAgentProfileResult,
@@ -35,6 +44,7 @@ import {
   isAccountUsage,
   isAgentMemory,
   isAgentModelOption,
+  isAgentProvider,
   isAgentStatus,
   isAgentSummary,
   isAttachmentSummary,
@@ -63,6 +73,7 @@ import {
   type MarketplaceSkillDetail,
   type MarketplaceSkillPage,
   type OpenBotDesktopApi,
+  type ProviderApiKeyState,
   type QueuedMessageReceipt,
   type QueueSnapshot,
   type ScopedAgentEvent,
@@ -312,6 +323,18 @@ function decodeFilePreview(value: unknown): FilePreview {
     previewKind: preview.previewKind,
     bytes: preview.bytes,
   };
+}
+
+/** A reply carrying nothing but the provider and a status, so an unexpected field cannot slip in. */
+function decodeProviderApiKeyState(value: unknown): ProviderApiKeyState {
+  if (
+    !isDynamicRecord(value) ||
+    !isAgentProvider(value.provider) ||
+    !isOneOf(["missing", "saved", "unreadable"] as const, value.status)
+  ) {
+    throw new Error("Invalid provider key state response.");
+  }
+  return { provider: value.provider, status: value.status };
 }
 
 function decodeAgentStatusFromMain(value: unknown): AgentStatus {
@@ -764,6 +787,14 @@ const openbotApi: OpenBotDesktopApi = {
   updateProviderCli: (provider) =>
     ipcRenderer.invoke(IPC_CHANNELS.updateProviderCli, provider).then(decodeAgentStatusFromMain),
   refreshAgentProviders: () => ipcRenderer.invoke(IPC_CHANNELS.refreshAgentProviders),
+  // Both decoded for the same reason as `updateProviderCli`: the caller saved or removed a key and
+  // reads the provider's new state out of the reply.
+  setProviderApiKey: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.setProviderApiKey, input).then(decodeAgentStatusFromMain),
+  clearProviderApiKey: (provider) =>
+    ipcRenderer.invoke(IPC_CHANNELS.clearProviderApiKey, provider).then(decodeAgentStatusFromMain),
+  getProviderApiKeyState: (provider) =>
+    ipcRenderer.invoke(IPC_CHANNELS.getProviderApiKeyState, provider).then(decodeProviderApiKeyState),
   providerRuntimes: {
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.providerRuntimesGetStatus).then(decodeProviderRuntimeSnapshot),
     download: (provider) =>
@@ -859,6 +890,10 @@ const openbotApi: OpenBotDesktopApi = {
         : invokeAgentForServer(serverId, IPC_CHANNELS.agentList, null, decodeAgents),
     listInstalledSkills: (agentId) =>
       invokeAgent(IPC_CHANNELS.agentListInstalledSkills, agentId, decodeInstalledSkillsFromMain),
+    listChannels: () => invokeAgent(IPC_CHANNELS.agentListChannels, null, decodeChannelSummaries),
+    readChannel: (input) => invokeAgent(IPC_CHANNELS.agentReadChannel, input, decodeChannelPage),
+    channelCommand: (input) => invokeAgent(IPC_CHANNELS.agentChannelCommand, input, decodeChannel),
+    deleteChannel: (channelId) => invokeAgent(IPC_CHANNELS.agentDeleteChannel, channelId, decodeVoid),
     getSidebarLayout: () => invokeAgent(IPC_CHANNELS.agentGetSidebarLayout, null, decodeSidebarLayout),
     mutateSidebarLayout: (action) => invokeAgent(IPC_CHANNELS.agentMutateSidebarLayout, action, decodeSidebarLayout),
     generateProfile: (input) => invokeAgent(IPC_CHANNELS.agentGenerateProfile, input, decodeAgentProfileDraft),
@@ -879,6 +914,20 @@ const openbotApi: OpenBotDesktopApi = {
     deleteRoutine: (input) => invokeAgent(IPC_CHANNELS.agentDeleteRoutine, input, decodeVoid),
     testRoutine: (input) => invokeAgent(IPC_CHANNELS.agentTestRoutine, input, decodeRoutineRun),
     listRoutineRuns: (input) => invokeAgent(IPC_CHANNELS.agentListRoutineRuns, input, decodeRoutineRuns),
+    listChannelMemories: (channelId) =>
+      invokeAgent(IPC_CHANNELS.agentListChannelMemories, channelId, decodeChannelMemories),
+    createChannelMemory: (input) => invokeAgent(IPC_CHANNELS.agentCreateChannelMemory, input, decodeChannelMemory),
+    updateChannelMemory: (input) => invokeAgent(IPC_CHANNELS.agentUpdateChannelMemory, input, decodeChannelMemory),
+    deleteChannelMemory: (input) => invokeAgent(IPC_CHANNELS.agentDeleteChannelMemory, input, decodeVoid),
+    clearChannelMemories: (channelId) => invokeAgent(IPC_CHANNELS.agentClearChannelMemories, channelId, decodeVoid),
+    listChannelRoutines: (channelId) =>
+      invokeAgent(IPC_CHANNELS.agentListChannelRoutines, channelId, decodeChannelRoutines),
+    createChannelRoutine: (input) => invokeAgent(IPC_CHANNELS.agentCreateChannelRoutine, input, decodeChannelRoutine),
+    updateChannelRoutine: (input) => invokeAgent(IPC_CHANNELS.agentUpdateChannelRoutine, input, decodeChannelRoutine),
+    deleteChannelRoutine: (input) => invokeAgent(IPC_CHANNELS.agentDeleteChannelRoutine, input, decodeVoid),
+    testChannelRoutine: (input) => invokeAgent(IPC_CHANNELS.agentTestChannelRoutine, input, decodeChannelRoutineRun),
+    listChannelRoutineRuns: (input) =>
+      invokeAgent(IPC_CHANNELS.agentListChannelRoutineRuns, input, decodeChannelRoutineRuns),
     readConversation: (agentId) => invokeAgent(IPC_CHANNELS.agentReadConversation, agentId, decodeConversation),
     readConversationPage: (input, serverId = selectedServerId) =>
       invokeAgentForServer(serverId, IPC_CHANNELS.agentReadConversationPage, input, decodeConversationPageFromMain),
@@ -974,6 +1023,7 @@ const openbotApi: OpenBotDesktopApi = {
     list: async () => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversList)),
     select: async (serverId) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversSelect, serverId)),
     reorder: async (input) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversReorder, input)),
+    setMuted: async (input) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversSetMuted, input)),
     join: async (input) => {
       const server = await ipcRenderer.invoke(IPC_CHANNELS.serversJoin, input);
       selectedServerId = server.id;

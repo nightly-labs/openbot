@@ -14,6 +14,7 @@ export type ChatMessage =
       author: "agent" | "user";
       body: string;
       streaming: boolean;
+      replyToMessageId?: string | null;
       attachments?: AttachmentSummary[];
     }
   | { id: string; kind: "thinking"; turnId: string | undefined; steps: { id: string; text: string }[] };
@@ -22,6 +23,20 @@ export interface PendingChatMessage {
   message: Extract<ChatMessage, { kind: "message" }>;
   baseline: Set<string>;
   serverId: string | null;
+}
+
+export function indexChatMessages(
+  messages: readonly ChatMessage[],
+  aliases: ReadonlyMap<string, string>,
+  references: readonly ChatMessage[] = [],
+) {
+  const index = new Map([...references, ...messages].map((message) => [message.id, message]));
+  // Reply references use host IDs even when a delivered bubble keeps its local render key.
+  for (const [hostId, localId] of aliases) {
+    const message = index.get(localId);
+    if (message) index.set(hostId, message);
+  }
+  return index;
 }
 
 export function presentChatMessages(
@@ -33,12 +48,16 @@ export function presentChatMessages(
   // which could incorrectly merge another member's identical message.
   const visible =
     pending && !pending.serverId ? messages.filter((message) => pending.baseline.has(message.id)) : messages;
-  const result = visible.map((message) =>
-    aliases.has(message.id) ? { ...message, id: aliases.get(message.id) ?? message.id } : message,
-  );
+  const result = visible.map((message) => {
+    // Keep the local image mounted until the caller caches the final attachment IDs.
+    if (pending?.serverId === message.id) return pending.message;
+    return aliases.has(message.id) ? { ...message, id: aliases.get(message.id) ?? message.id } : message;
+  });
   if (pending && !messages.some((message) => message.id === pending.serverId)) result.push(pending.message);
   return result;
 }
+
+const projectedBubbles = new WeakMap<ConversationMessage, ChatMessage>();
 
 export function projectChatMessages(messages: ConversationMessage[]): ChatMessage[] {
   const result: ChatMessage[] = [];
@@ -65,14 +84,20 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
       }
       thinking.steps.push({ id: message.id, text: message.text });
     } else {
-      result.push({
-        id: message.id,
-        kind: "message",
-        author: message.author === "user" ? "user" : "agent",
-        body: message.exchange ? "" : message.text,
-        streaming: message.status === "streaming",
-        attachments: message.attachments,
-      });
+      let bubble = projectedBubbles.get(message);
+      if (!bubble) {
+        bubble = {
+          id: message.id,
+          kind: "message",
+          author: message.author === "user" ? "user" : "agent",
+          body: message.exchange ? "" : message.text,
+          streaming: message.status === "streaming",
+          attachments: message.attachments,
+          replyToMessageId: message.replyToMessageId,
+        };
+        projectedBubbles.set(message, bubble);
+      }
+      result.push(bubble);
     }
   }
   return result;

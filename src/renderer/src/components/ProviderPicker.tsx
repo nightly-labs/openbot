@@ -359,8 +359,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       )}
                     </Show>
                     {/* Beside the runtime action, never instead of it: an offered update must not take
-                    Connect or Reconnect away from a provider that is ready to use as it is. It sits
-                    last so the emphasized action is the one at the edge of the row. */}
+                      Connect or Reconnect away from a provider that is ready to use as it is. It sits
+                      last so the emphasized action is the one at the edge of the row. */}
                     <Show when={updatable() && props.onUpdateProvider}>
                       <Button
                         type="button"
@@ -379,7 +379,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         !runtimeStatus() &&
                         agentProviderDescriptor(option().id).installGuideLink !== null &&
                         state() === "not-installed" &&
-                        (option().id === "opencode" || !props.onConnectProvider) &&
+                        !props.onConnectProvider &&
                         props.onInstallProvider
                       }
                     >
@@ -412,13 +412,18 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         {providerActionLabel(state(), connecting())}
                       </Button>
                     </Show>
+                    {/* Claude's sign-in is a browser round trip it only needs while signed out.
+                      OpenCode's is a pasted key that unlocks the paid catalog, so its button stays on
+                      a row that already works -- and stays beside Connect instead of replacing it. */}
                     <Show
                       when={
-                        !runtimeStatus() &&
-                        option().id === "claude" &&
-                        state() === "sign-in-required" &&
-                        !props.onConnectProvider &&
-                        props.onSignInProvider
+                        props.onSignInProvider &&
+                        (option().id === "opencode"
+                          ? !runtimeStatus() || runtimeStatus()?.phase === "ready"
+                          : option().id === "claude" &&
+                            !runtimeStatus() &&
+                            state() === "sign-in-required" &&
+                            !props.onConnectProvider)
                       }
                     >
                       <Button

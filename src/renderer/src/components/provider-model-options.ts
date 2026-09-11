@@ -1,5 +1,5 @@
 import type { AgentModelOption, CustomProviderSummary } from "@openbot/contracts/ipc";
-import { isCustomProviderModelId } from "@openbot/contracts/ipc";
+import { isCustomProviderModelId, isFreeOpencodeModelName } from "@openbot/contracts/ipc";
 
 export interface PickerModel {
   id: string;
@@ -55,7 +55,8 @@ export function pickerModels(options: AgentModelOption[]): PickerModel[] {
         name,
         service: separator < 0 ? "" : model.name.slice(0, separator),
         // Only label models explicitly named Free by the provider; unknown pricing stays unlabelled.
-        free: model.provider === "opencode" && /\bfree$/i.test(name),
+        // Shared with the catalog order, so the badge and the default agree on what is free.
+        free: model.provider === "opencode" && isFreeOpencodeModelName(name),
         local: model.provider === "opencode" && LOCAL_SERVICE_PATTERN.test(model.id),
         variants: variants.has(model.id) ? [{ id: model.id, name: "Default" }, ...(variants.get(model.id) ?? [])] : [],
       };

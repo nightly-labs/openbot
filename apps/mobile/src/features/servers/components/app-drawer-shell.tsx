@@ -1,5 +1,4 @@
 import { BlurView } from "expo-blur";
-import * as Haptics from "expo-haptics";
 import { type Href, router, usePathname } from "expo-router";
 import { useThemeColor } from "heroui-native/hooks";
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -14,11 +13,10 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
-
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { ServerDrawerContent } from "@/features/servers/components/server-drawer-content";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
-import { isIOS } from "@/shared/lib/platform";
+import { haptics } from "@/shared/lib/haptics";
 
 interface AppDrawerContextValue {
   openDrawer: () => void;
@@ -36,7 +34,7 @@ const DRAWER_SPRING = {
 } as const;
 
 function triggerDrawerHaptic(): void {
-  if (isIOS) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  void haptics.impact();
 }
 
 export function AppDrawerShell({ children }: PropsWithChildren) {

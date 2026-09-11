@@ -7,6 +7,7 @@ import { STORY_SERVERS } from "./fixtures";
 const args: Parameters<typeof ServerRail>[0] = {
   servers: STORY_SERVERS,
   onSelect: fn(),
+  onSetMuted: fn(),
   onReorder: fn(),
   onAdd: fn(),
   onOpenSettings: fn(),
@@ -57,6 +58,7 @@ function InteractiveServerRail(props: Parameters<typeof ServerRail>[0]) {
         ]);
         props.onReorder(serverIds);
       }}
+      onSetMuted={props.onSetMuted}
       onAdd={props.onAdd}
       onOpenSettings={props.onOpenSettings}
       onOpenUsage={props.onOpenUsage}
@@ -286,4 +288,8 @@ export const RemoteSelected: Story = {
     await expect(getComputedStyle(remoteMarker).height).toBe("26px");
     await expect(canvas.queryByRole("button", { name: /Remote Mac|Show screen/i })).not.toBeInTheDocument();
   },
+};
+
+export const Muted: Story = {
+  args: { servers: STORY_SERVERS.map((server) => ({ ...server, notificationsMuted: server.kind === "remote" })) },
 };

@@ -2,8 +2,9 @@ import { analyticsRange, parseAnalyticsRange } from "@openbot/contracts/ipc";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
-import { type PropsWithChildren, useState } from "react";
+import { type PropsWithChildren, useEffect, useState } from "react";
 import { View } from "react-native";
+import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
@@ -20,6 +21,9 @@ export function AgentInformation({
   available: boolean;
   section: "usage" | "memories" | "routines" | "memory" | "routine";
 }) {
+  useEffect(() => {
+    if (section === "usage") mobileAnalytics.track("usage_viewed", {});
+  }, [section]);
   const { recordId } = useLocalSearchParams<{ recordId?: string }>();
   const workspace = useMobileWorkspace();
   const { session, sessionScope } = useMobileSession();

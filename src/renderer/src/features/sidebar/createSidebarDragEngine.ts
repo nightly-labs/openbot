@@ -13,10 +13,10 @@
 import type { TeamPresenceMember } from "@openbot/contracts/ipc";
 import { createBoundedDragPreview } from "../../components/createBoundedDragPreview";
 import type { createScrollFades } from "../../components/createScrollFades";
-import type { AgentProfile } from "../../data";
-import { clearSidebarDragDecorations, createSidebarAgentDragCard, measureSidebarDragSlots } from "./sidebar-drag-dom";
+
+import { clearSidebarDragDecorations, createSidebarChatDragCard, measureSidebarDragSlots } from "./sidebar-drag-dom";
 import {
-  type AgentDragSlot,
+  type ChatDragSlot,
   type DragOffset,
   type DragSlot,
   type PersonDragSlot,
@@ -35,46 +35,49 @@ import {
   sidebarDropTargetsEqual,
 } from "./sidebar-drag-model";
 import type { SidebarPinnedItem } from "./sidebar-pins";
-import type { SidebarProps } from "./sidebar-types";
+import type { SidebarChatItem, SidebarProps } from "./sidebar-types";
 import type { SidebarDragWriters } from "./stores/drag-state-store";
 
 export interface SidebarDragEngineDeps {
-  agentPinnedItems: () => SidebarPinnedItem[];
-  assignedSectionId: (agentId: string) => string;
+  chatPinnedItems: () => SidebarPinnedItem[];
+  assignedSectionId: (chatId: string) => string;
   commitSidebarDrop: (source: SidebarDragSource, target: SidebarDropTarget | null) => void;
   /** Read on the resolve path, so it is a predicate over the pin count - never a read of the source. */
   canPinDraggedItem: () => boolean;
   dragState: SidebarDragWriters;
-  filteredAgentsBySection: () => Map<string, AgentProfile[]>;
+  filteredChatsBySection: () => Map<string, SidebarChatItem[]>;
   filteredPeople: () => TeamPresenceMember[];
   getAgentList: () => HTMLElement | undefined;
+  /** Which kind of chat an id names, or null when it names none: only a known chat can be pinned. */
+  chatKind: (chatId: string) => "agent" | "channel" | null;
   props: SidebarProps;
   scrollFades: ReturnType<typeof createScrollFades>;
-  sectionAcceptsAgent: (sectionId: string) => boolean;
+  sectionAcceptsChat: (sectionId: string) => boolean;
   visiblePinnedKeys: () => string[];
   visibleSectionIds: () => string[];
 }
 
 export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
   const {
-    agentPinnedItems,
     assignedSectionId,
     canPinDraggedItem,
+    chatKind,
+    chatPinnedItems,
     commitSidebarDrop,
     dragState,
-    filteredAgentsBySection,
+    filteredChatsBySection,
     filteredPeople,
     scrollFades,
-    sectionAcceptsAgent,
+    sectionAcceptsChat,
     visiblePinnedKeys,
     visibleSectionIds,
   } = deps;
 
   let pinnedDragSlots: DragSlot[] = [];
 
-  let agentDragSlots = new Map<string, AgentDragSlot>();
+  let chatDragSlots = new Map<string, ChatDragSlot>();
 
-  let agentDragStartScrollTop = 0;
+  let chatDragStartScrollTop = 0;
 
   let sectionDragSlots = new Map<string, SectionDragSlot>();
 
@@ -114,7 +117,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     dragState.resetDrag();
     clearSidebarDragDecorations(deps.getAgentList());
     for (const slot of personDragSlots.values()) slot.element.classList.remove("sidebar-person-item-dragging");
-    agentDragSlots.clear();
+    chatDragSlots.clear();
     personDragSlots.clear();
     sectionDragSlots.clear();
     pinnedDragSlots = [];
@@ -135,17 +138,17 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
    */
   function measureSidebarDragTargets(): void {
     sectionDragSlots = new Map();
-    agentDragSlots = new Map();
+    chatDragSlots = new Map();
     personDragSlots = new Map();
     pinnedDragSlots = [];
     const list = deps.getAgentList();
     const startScrollTop = list?.scrollTop ?? 0;
     sectionDragStartScrollTop = startScrollTop;
-    agentDragStartScrollTop = startScrollTop;
+    chatDragStartScrollTop = startScrollTop;
     if (!list) return;
     const measurement = measureSidebarDragSlots(list, assignedSectionId);
     sectionDragSlots = measurement.sections;
-    agentDragSlots = measurement.agents;
+    chatDragSlots = measurement.chats;
     personDragSlots = measurement.people;
     pinnedDragSlots = measurement.pinned;
     dragGeometry = measurement.geometry;
@@ -180,21 +183,22 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     window.addEventListener("blur", stopSidebarDragging, { once: true });
   }
 
-  function startAgentDragging(event: DragEvent & { currentTarget: HTMLElement }, agent: AgentProfile): void {
+  /** One drag for both row kinds: `chatId` is an agent id or a channel id. */
+  function startChatDragging(event: DragEvent & { currentTarget: HTMLElement }, chatId: string): void {
     if (deps.props.compact) return;
     startNativeItemDragging(event, {
       className: "sidebar-agent-drag-preview",
-      createPreview: createSidebarAgentDragCard,
-      data: `openbot-agent:${agent.id}`,
+      createPreview: createSidebarChatDragCard,
+      data: `openbot-chat:${chatId}`,
       previewSize: { height: 94, width: 72 },
-      source: { kind: "agent", id: agent.id, origin: "section" },
+      source: { kind: "chat", id: chatId, origin: "section" },
     });
   }
 
   function startPersonDragging(event: DragEvent & { currentTarget: HTMLElement }, member: TeamPresenceMember): void {
     startNativeItemDragging(event, {
       className: "sidebar-person-drag-preview",
-      createPreview: createSidebarAgentDragCard,
+      createPreview: createSidebarChatDragCard,
       data: `openbot-person:${member.id}`,
       previewSize: { height: 94, width: 72 },
       source: { kind: "person", id: member.id, origin: "people" },
@@ -219,13 +223,13 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
   function sidebarDragWorld(session: SidebarDragSession): SidebarDragWorld {
     const scrollTop = deps.getAgentList()?.scrollTop ?? 0;
     return {
-      agentScrollDelta: scrollTop - agentDragStartScrollTop,
-      agentSlots: agentDragSlots,
+      chatScrollDelta: scrollTop - chatDragStartScrollTop,
+      chatSlots: chatDragSlots,
       canPinDraggedItem,
       geometry: dragGeometry,
       personSlots: personDragSlots,
       pinnedSlots: pinnedDragSlots,
-      sectionAcceptsAgent,
+      sectionAcceptsChat,
       sectionScrollDelta: scrollTop - sectionDragStartScrollTop,
       sectionSlots: sectionDragSlots,
       session,
@@ -253,7 +257,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     if (!source || !target) return {};
     switch (target.kind) {
       case "pinned": {
-        if (source.kind !== "agent" || source.origin !== "pinned" || !target.key) return {};
+        if (source.kind !== "pinned" || !target.key) return {};
         const keys = visiblePinnedKeys();
         return reorderOffsets(
           keys,
@@ -263,21 +267,21 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
           "x-and-y",
         );
       }
-      case "agent": {
-        if (source.kind !== "agent" || source.origin !== "section") return {};
-        const sourceSlot = agentDragSlots.get(source.id);
-        const targetSlot = agentDragSlots.get(target.target.agentId);
-        // An agent only pushes its own neighbours: aimed at another section it is a move, not a reorder.
+      case "chat": {
+        if (source.kind !== "chat") return {};
+        const sourceSlot = chatDragSlots.get(source.id);
+        const targetSlot = chatDragSlots.get(target.target.chatId);
+        // A chat only pushes its own neighbours: aimed at another section it is a move, not a reorder.
         if (!sourceSlot || !targetSlot || sourceSlot.sectionId !== targetSlot.sectionId) return {};
-        const agentIds = (filteredAgentsBySection().get(sourceSlot.sectionId) ?? []).map((agent) => agent.id);
+        const chatIds = (filteredChatsBySection().get(sourceSlot.sectionId) ?? []).map((item) => item.id);
         return reorderOffsets(
-          agentIds,
+          chatIds,
           source.id,
           {
-            id: target.target.agentId,
-            placement: placementForSwap(agentIds, source.id, target.target.agentId),
+            id: target.target.chatId,
+            placement: placementForSwap(chatIds, source.id, target.target.chatId),
           },
-          (agentId) => agentDragSlots.get(agentId),
+          (chatId) => chatDragSlots.get(chatId),
           "y",
         );
       }
@@ -370,9 +374,9 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     if (!dragSession) return;
     if (
       !dragState.emptyPinnedDropVisible() &&
-      agentPinnedItems().length === 0 &&
-      dragSession.source.kind === "agent" &&
-      dragSession.source.origin === "section"
+      chatPinnedItems().length === 0 &&
+      dragSession.source.kind === "chat" &&
+      chatKind(dragSession.source.id) !== null
     ) {
       const activeSession = dragSession;
       dragState.setEmptyPinnedDropVisible(true);
@@ -404,12 +408,11 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     stopSidebarDragging();
   }
 
-  function endAgentDragging(event: DragEvent): void {
+  function endChatDragging(event: DragEvent): void {
     const session = dragSession;
     const canCommitAnimatedPin =
       dragState.emptyPinnedDropVisible() &&
-      session?.source.kind === "agent" &&
-      session.source.origin === "section" &&
+      session?.source.kind === "chat" &&
       dragTarget?.kind === "pinned" &&
       (event.clientX !== 0 || event.clientY !== 0) &&
       pointInRect({ clientX: event.clientX, clientY: event.clientY }, dragGeometry.list);
@@ -429,10 +432,10 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
 
   return {
     dropSidebarNativeDrag,
-    endAgentDragging,
+    endChatDragging,
     handleListDragLeave,
     sidebarClickIsSuppressed,
-    startAgentDragging,
+    startChatDragging,
     startNativeItemDragging,
     startPersonDragging,
     startSectionDragging,

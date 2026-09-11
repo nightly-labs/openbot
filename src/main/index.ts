@@ -19,6 +19,8 @@ import { agentIpcHandlers } from "./ipc/agent-handlers";
 import { appIpcHandlers } from "./ipc/app-handlers";
 import { attachmentIpcHandlers } from "./ipc/attachment-handlers";
 import { browserIpcHandlers } from "./ipc/browser-handlers";
+import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
+import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
 import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
 import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
 import { registerIpcGroups } from "./ipc/define-ipc-group";
@@ -247,6 +249,7 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
 function registerIpcHandlers({
   service,
   providerRuntimes,
+  providerCredentials,
   mailbox,
   browser,
   browserPictureInPicture,
@@ -291,7 +294,7 @@ function registerIpcHandlers({
     }),
     ...dynamicIslandIpcHandlers({ dynamicIsland }),
     ...computerUseIpcHandlers({ computerUseMacSetup }),
-    ...providerIpcHandlers({ service, providerRuntimes }),
+    ...providerIpcHandlers({ service, providerRuntimes, credentials: providerCredentials }),
     ...voiceIpcHandlers({ voice }),
     ...accountIpcHandlers({ centralAuth, host }),
     ...skillIpcHandlers({ skills, getMainWindow }),
@@ -312,6 +315,8 @@ function registerIpcHandlers({
     }),
     ...memoryIpcHandlers({ service, remoteServers }),
     ...routineIpcHandlers({ service, remoteServers }),
+    ...channelMemoryIpcHandlers({ service, remoteServers }),
+    ...channelRoutineIpcHandlers({ service, remoteServers }),
     ...attachmentIpcHandlers({ service, mailbox, remoteServers, getMainWindow }),
     ...agentIpcHandlers({ service, sidebarLayout, host, remoteServers, skills }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers }),

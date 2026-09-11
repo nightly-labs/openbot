@@ -83,6 +83,7 @@ const initialRuntimeStatuses = (): Record<ManagedProviderId, ProviderRuntimeStat
   codex: { phase: "not-downloaded", progress: null, message: null, version: null },
   claude: { phase: "not-downloaded", progress: null, message: null, version: null },
   grok: { phase: "not-downloaded", progress: null, message: null, version: null },
+  opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
 });
 
 function MockedOnboardingFlow(props: { args: Parameters<typeof OnboardingFlow>[0]; permissions?: boolean }) {

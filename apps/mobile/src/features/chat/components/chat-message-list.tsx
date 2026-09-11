@@ -1,8 +1,9 @@
 import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
-import { X } from "lucide-react-native";
-import { Pressable, View, type ViewStyle } from "react-native";
-import { KeyboardChatScrollView } from "react-native-keyboard-controller";
+import { CornerUpRight, X } from "lucide-react-native";
+import { createContext, forwardRef, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { AccessibilityInfo, type CellRendererProps, FlatList, Pressable, View, type ViewStyle } from "react-native";
+import { KeyboardChatScrollView, type KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import Animated, {
   Easing,
   FadeIn,
@@ -11,18 +12,56 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
 } from "react-native-reanimated";
+import { useCSSVariable } from "uniwind";
 import { BloubAvatar, getBloubAvatarColor } from "@/features/agents/components/bloub-avatar";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
 import type { ChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
-import type { ChatMessage } from "@/features/chat/model/chat-messages";
+import { type ChatMessage, indexChatMessages } from "@/features/chat/model/chat-messages";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import type { ChatBubbleMessage } from "../context/message-actions-context";
+import { mentionDraft } from "../model/chat-mentions";
+import { ChatAttachmentView } from "./chat-attachment";
+import { ChatMessageGesture } from "./chat-message-gesture";
 import { StreamingTailText, StreamRevealProvider } from "./streaming-tail-text";
 import { ThinkingTextGradient } from "./thinking-text-gradient";
+
+type VisibleMessage = Exclude<ChatMessage, { kind: "thinking" }>;
+const TailLayoutContext = createContext<{ id: string | null; motion: ChatMotion } | null>(null);
+
+function MessageCell({ children, item, onLayout, onFocusCapture, style }: CellRendererProps<VisibleMessage>) {
+  const tail = useContext(TailLayoutContext);
+  const nativeProps = { style, onFocusCapture };
+  return (
+    <View
+      {...nativeProps}
+      onLayout={(event) => {
+        onLayout?.(event);
+        if (item.id === tail?.id) tail.motion.onTailStartLayout(item.id, event);
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+const ChatScrollView = forwardRef<Animated.ScrollView, KeyboardChatScrollViewProps & { motion: ChatMotion }>(
+  function ChatScrollView({ motion, ...props }, ref) {
+    const setRef = useCallback(
+      (instance: Animated.ScrollView | null) => {
+        motion.setScrollRef(instance);
+        if (typeof ref === "function") ref(instance);
+        else if (ref) ref.current = instance;
+      },
+      [motion.setScrollRef, ref],
+    );
+    return <KeyboardChatScrollView {...props} ref={setRef} />;
+  },
+);
 
 const STARTER_OPTIONS = [
   { id: "plan", label: "Plan the next steps", detail: "Turn a goal into a clear plan" },
@@ -50,6 +89,12 @@ interface ChatMessageListProps {
   foreground: ViewStyle["backgroundColor"];
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
   messages: ChatMessage[];
+  messageAliases: ReadonlyMap<string, string>;
+  referenceMessages: ChatMessage[];
+  hasOlder: boolean;
+  olderLoading: boolean;
+  olderError: boolean;
+  onLoadOlder: () => void;
   muted: ViewStyle["backgroundColor"];
   raised: ViewStyle["backgroundColor"];
   showStarter: boolean;
@@ -57,6 +102,8 @@ interface ChatMessageListProps {
   onDismissStarter: () => void;
   onSelectStarter: (value: string) => void;
   onRetryHistory: () => void;
+  onReply?: (message: ChatBubbleMessage) => void;
+  onOpenActions: (message: ChatBubbleMessage) => void;
 }
 
 export function ChatMessageList({
@@ -73,6 +120,12 @@ export function ChatMessageList({
   foreground,
   historyState,
   messages,
+  messageAliases,
+  referenceMessages,
+  hasOlder,
+  olderLoading,
+  olderError,
+  onLoadOlder,
   muted,
   raised,
   showStarter,
@@ -80,8 +133,27 @@ export function ChatMessageList({
   onDismissStarter,
   onSelectStarter,
   onRetryHistory,
+  onReply,
+  onOpenActions,
 }: ChatMessageListProps) {
   const isFocused = useIsFocused();
+  const messagesById = useMemo(
+    () => indexChatMessages(messages, messageAliases, referenceMessages),
+    [messages, messageAliases, referenceMessages],
+  );
+  const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isScreenReaderEnabled().then((enabled) => {
+      if (active) setScreenReaderEnabled(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener("screenReaderChanged", setScreenReaderEnabled);
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
+  const replyColor = String(useCSSVariable("--openbot-text-dim"));
   const reducedMotion = useReducedMotion();
   const animateMessages = isFocused && canSend && appActive;
   const arrivals = useMessageArrivals(agent.id, messages, animateMessages && historyState === "ready");
@@ -123,82 +195,131 @@ export function ChatMessageList({
     return { backgroundColor: `rgb(${r}, ${g}, ${b})` };
   });
 
-  const visibleMessages = messages.filter((message) => message.kind !== "thinking");
-  const groups: { id: string; user?: (typeof visibleMessages)[number]; replies: typeof visibleMessages }[] = [];
-  for (const message of visibleMessages) {
-    if (message.kind === "message" && message.author === "user") {
-      groups.push({ id: message.id, user: message, replies: [] });
-    } else {
-      if (groups.length === 0) groups.push({ id: "preamble", replies: [] });
-      groups[groups.length - 1].replies.push(message);
-    }
-  }
-  const renderMessage = (message: (typeof visibleMessages)[number], isTailUser: boolean, isFirstUser: boolean) =>
-    message.kind === "exchange" ? (
-      <View key={message.id} className="flex-row flex-wrap items-center justify-center gap-2 py-2">
-        <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-          {message.exchange.direction === "outgoing" ? "Messaged" : "Message from"}
-        </Typography.Paragraph>
-        {(message.exchange.direction === "incoming"
-          ? [message.exchange.senderAgentId]
-          : message.exchange.recipientAgentIds
-        ).map((id) => {
-          const participant = agents.find((candidate) => candidate.id === id);
-          return (
-            <View key={id} className="flex-row items-center gap-1">
-              {participant ? (
-                <BloubAvatar agentId={id} hue={participant.avatarHue} seed={participant.avatarSeed} size={22} />
-              ) : null}
-              <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-                {participant?.name ?? "Unknown agent"}
-              </Typography.Paragraph>
-            </View>
-          );
-        })}
-      </View>
-    ) : message.kind === "question" ? (
-      <ChatQuestionPrompt
-        key={message.id}
-        prompt={message.prompt}
-        controller={message.id === questionForm.messageId ? questionForm : undefined}
-        canSend={canSend}
-      />
-    ) : (
-      <Animated.View
-        key={message.id}
-        onLayout={isTailUser ? motion.onUserLayout : undefined}
-        entering={
-          arrivals.has(message.id) && !isFirstUser
-            ? message.author === "user"
-              ? USER_MESSAGE_ENTRANCE
-              : AGENT_MESSAGE_ENTRANCE
-            : undefined
-        }
-        className={`max-w-[88%] rounded-[30px] px-4 py-3 ${message.author === "user" ? "self-end" : "self-start bg-control/60"}`}
-        style={[
-          { borderCurve: "circular" },
-          message.author === "user" ? userBubbleStyle : undefined,
-          isFirstUser ? motion.firstMessageStyle : undefined,
-        ]}
-      >
-        {message.attachments?.map((attachment) => (
-          <Typography.Paragraph
-            key={attachment.id}
-            type="body-sm"
-            style={{ color: message.author === "user" ? "#0a0a0c" : foreground }}
-          >
-            {attachment.name}
+  const visibleMessages = useMemo(() => messages.filter((message) => message.kind !== "thinking"), [messages]);
+  const tailIndex = visibleMessages.findLastIndex((message) => message.kind === "message" && message.author === "user");
+  const tailId = visibleMessages[tailIndex]?.id ?? null;
+  const listRef = useRef<FlatList<VisibleMessage>>(null);
+  const tailLayout = useMemo(() => ({ id: tailId, motion }), [tailId, motion]);
+  const seekLatest = useCallback(() => {
+    if (!motion.historyVisible && visibleMessages.length) listRef.current?.scrollToEnd({ animated: false });
+  }, [motion.historyVisible, visibleMessages.length]);
+  useEffect(() => {
+    if (tailId && motion.needsSendPosition() && !motion.atLatest) listRef.current?.scrollToEnd({ animated: false });
+  }, [tailId, motion.needsSendPosition, motion.atLatest]);
+  const renderMessage = (message: (typeof visibleMessages)[number], isTailUser: boolean, isFirstUser: boolean) => {
+    const rendered =
+      message.kind === "exchange" ? (
+        <View key={message.id} className="flex-row flex-wrap items-center justify-center gap-2 py-2">
+          <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+            {message.exchange.direction === "outgoing" ? "Messaged" : "Message from"}
           </Typography.Paragraph>
-        ))}
-        <ChatMarkdown
-          agents={agents}
-          body={message.body}
-          color={message.author === "user" ? "#0a0a0c" : foreground}
-          streaming={message.author === "agent" && message.streaming}
-          animationEnabled={animateMessages && arrivals.has(message.id) && motion.responseVisible}
+          {(message.exchange.direction === "incoming"
+            ? [message.exchange.senderAgentId]
+            : message.exchange.recipientAgentIds
+          ).map((id) => {
+            const participant = agents.find((candidate) => candidate.id === id);
+            return (
+              <View key={id} className="flex-row items-center gap-1">
+                {participant ? (
+                  <BloubAvatar agentId={id} hue={participant.avatarHue} seed={participant.avatarSeed} size={22} />
+                ) : null}
+                <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+                  {participant?.name ?? "Unknown agent"}
+                </Typography.Paragraph>
+              </View>
+            );
+          })}
+        </View>
+      ) : message.kind === "question" ? (
+        <ChatQuestionPrompt
+          key={message.id}
+          prompt={message.prompt}
+          controller={message.id === questionForm.messageId ? questionForm : undefined}
+          canSend={canSend}
         />
-      </Animated.View>
+      ) : (
+        <Animated.View
+          key={message.id}
+          entering={
+            arrivals.has(message.id) && !isFirstUser
+              ? message.author === "user"
+                ? USER_MESSAGE_ENTRANCE
+                : AGENT_MESSAGE_ENTRANCE
+              : undefined
+          }
+          className={
+            message.author === "user"
+              ? "max-w-full items-end self-end gap-2"
+              : "max-w-full items-start self-start gap-2"
+          }
+          style={[{ borderCurve: "circular" }, isFirstUser ? motion.firstMessageStyle : undefined]}
+        >
+          {message.attachments?.map((attachment) => (
+            <ChatAttachmentView
+              key={attachment.id}
+              attachment={attachment}
+              serverId={agent.serverId}
+              alignment={message.author === "user" ? "right" : "left"}
+            />
+          ))}
+          {message.body.trim() ? (
+            <Animated.View
+              className={
+                message.author === "user"
+                  ? `self-end rounded-[30px] px-4 py-3 ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
+                  : "max-w-full self-start rounded-[30px] bg-control/60 px-4 py-3"
+              }
+              style={[{ borderCurve: "circular" }, message.author === "user" ? userBubbleStyle : undefined]}
+            >
+              <ChatMarkdown
+                agents={agents}
+                body={message.body}
+                selectable={message.author === "user"}
+                color={message.author === "user" ? "#0a0a0c" : foreground}
+                streaming={message.author === "agent" && message.streaming}
+                animationEnabled={animateMessages && arrivals.has(message.id) && motion.responseVisible}
+              />
+            </Animated.View>
+          ) : null}
+        </Animated.View>
+      );
+    if (message.kind !== "message") return rendered;
+    if (message.author === "agent") {
+      return (
+        <ChatMessageGesture
+          key={message.id}
+          screenReaderEnabled={screenReaderEnabled}
+          onReply={onReply ? () => onReply(message) : undefined}
+          onOpenActions={() => onOpenActions(message)}
+        >
+          {rendered}
+        </ChatMessageGesture>
+      );
+    }
+    const source = message.replyToMessageId ? messagesById.get(message.replyToMessageId) : undefined;
+    return (
+      <View
+        key={message.id}
+        className={message.attachments?.length ? "max-w-full self-end gap-1" : "max-w-[88%] self-end gap-1"}
+        onLayout={isTailUser ? motion.onUserLayout : undefined}
+      >
+        {message.replyToMessageId ? (
+          <View className="flex-row items-center gap-1 self-end">
+            <CornerUpRight size={14} color={replyColor} />
+            <Typography.Paragraph
+              type="body-xs"
+              numberOfLines={1}
+              className="shrink text-text-dim"
+              accessibilityLabel={`Reply to: ${source?.kind === "message" ? mentionDraft(source.body).text || "Attachment" : "Message unavailable"}`}
+            >
+              {source?.kind === "message" ? mentionDraft(source.body).text || "Attachment" : "Message unavailable"}
+            </Typography.Paragraph>
+          </View>
+        ) : null}
+        {rendered}
+      </View>
     );
+  };
   const renderActivity = () =>
     activity || sending ? (
       <View
@@ -246,138 +367,166 @@ export function ChatMessageList({
       accessibilityElementsHidden={historyState === "ready" && !motion.historyVisible}
       importantForAccessibility={historyState !== "ready" || motion.historyVisible ? "auto" : "no-hide-descendants"}
     >
-      <KeyboardChatScrollView
-        ref={motion.setScrollRef}
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          gap: 10,
-          paddingHorizontal: 16,
-          paddingTop: topInset + 84,
-        }}
-        contentInsetAdjustmentBehavior="never"
-        automaticallyAdjustKeyboardInsets={false}
-        keyboardLiftBehavior="whenAtEnd"
-        offset={keyboardOffset}
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
-        // RN Fabric otherwise ignores drags that start in the contentInset area.
-        applyWorkaroundForContentInsetHitTestBug
-        alwaysBounceVertical
-        blankSpace={motion.blankSpace}
-        extraContentPadding={motion.composerHeight}
-        onContentInsetChange={motion.onContentInsetChange}
-        onContentSizeChange={motion.onContentSizeChange}
-        onLayout={motion.onViewportLayout}
-        onScroll={motion.onScroll}
-        onScrollBeginDrag={motion.cancelSend}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-      >
-        {historyState === "connecting" || historyState === "loading" ? (
-          <View
-            className="flex-1"
-            accessible
-            accessibilityLabel={historyState === "connecting" ? "Connecting to server" : "Loading chat history"}
-            accessibilityState={{ busy: true }}
-          />
-        ) : historyState !== "ready" ? (
-          <View className="flex-1 items-center justify-center gap-2">
-            <Typography.Paragraph align="center" className="text-text-secondary">
-              {historyState === "waiting" ? "Waiting for connection" : "Could not load chat history"}
-            </Typography.Paragraph>
-            {historyState === "waiting" ? (
-              <Typography.Paragraph type="body-xs" align="center" className="text-text-dim">
-                Your chat history will load when the server reconnects.
-              </Typography.Paragraph>
-            ) : null}
-            {historyState === "error" ? (
-              <Button variant="tertiary" onPress={onRetryHistory}>
-                <Button.Label>Try again</Button.Label>
-              </Button>
-            ) : null}
-          </View>
-        ) : null}
-
-        {groups.map((group, index) => {
-          const last = index === groups.length - 1;
-          return (
-            <View
-              key={group.id}
-              style={{ gap: 10 }}
-              onLayout={last && group.user ? (event) => motion.onTailLayout(group.id, event) : undefined}
+      <TailLayoutContext.Provider value={tailLayout}>
+        <FlatList
+          ref={listRef}
+          data={visibleMessages}
+          keyExtractor={(message) => message.id}
+          CellRendererComponent={MessageCell}
+          initialNumToRender={50}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          removeClippedSubviews={false}
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          onStartReached={() => {
+            if (motion.historyVisible && canSend && hasOlder && !olderLoading && !olderError) onLoadOlder();
+          }}
+          onStartReachedThreshold={0.5}
+          renderItem={({ item, index }) => (
+            <Animated.View
+              style={[{ paddingBottom: 10 }, index > tailIndex ? motion.responseStyle : undefined]}
+              accessibilityElementsHidden={index > tailIndex && !motion.responseVisible}
+              importantForAccessibility={index > tailIndex && !motion.responseVisible ? "no-hide-descendants" : "auto"}
             >
-              {group.user ? renderMessage(group.user, last, index === 0) : null}
-              <Animated.View
-                style={[{ gap: 10 }, last ? motion.responseStyle : undefined]}
-                accessibilityElementsHidden={last && !motion.responseVisible}
-                importantForAccessibility={last && !motion.responseVisible ? "no-hide-descendants" : "auto"}
-              >
-                {group.replies.map((message) => renderMessage(message, false, false))}
-                {last ? renderActivity() : null}
-              </Animated.View>
-            </View>
-          );
-        })}
-        {groups.length === 0 ? renderActivity() : null}
-
-        {showStarter ? (
-          <View
-            className="gap-4 rounded-[26px] p-4"
-            style={{ backgroundColor: fieldBackground, borderCurve: "continuous" }}
-          >
-            <View className="flex-row items-start gap-3">
-              <View className="min-w-0 flex-1 gap-1">
-                <Typography.Heading type="h4">What should we work on first?</Typography.Heading>
-                <Typography.Paragraph className="text-text-secondary">
-                  Pick one, or type your own — we can change course anytime.
-                </Typography.Paragraph>
-              </View>
-              <Pressable
-                accessibilityLabel="Dismiss suggestions"
-                accessibilityRole="button"
-                hitSlop={8}
-                onPress={onDismissStarter}
-              >
-                <X color={String(muted)} size={21} strokeWidth={1.8} />
-              </Pressable>
-            </View>
-
-            <View className="overflow-hidden rounded-[18px]" style={{ backgroundColor: raised }}>
-              {STARTER_OPTIONS.map((option, index) => (
-                <Pressable
-                  key={option.id}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: !canSend }}
-                  disabled={!canSend}
-                  className="flex-row gap-3 px-3 py-3"
-                  style={({ pressed }) => ({
-                    borderBottomColor: index < STARTER_OPTIONS.length - 1 ? String(muted) : "transparent",
-                    borderBottomWidth: index < STARTER_OPTIONS.length - 1 ? 0.5 : 0,
-                    opacity: !canSend ? 0.45 : pressed ? 0.55 : 1,
-                  })}
-                  onPress={() => onSelectStarter(option.label)}
+              {renderMessage(item, index === tailIndex, index === 0 && !hasOlder)}
+            </Animated.View>
+          )}
+          renderScrollComponent={(props) => (
+            <ChatScrollView
+              {...props}
+              motion={motion}
+              automaticallyAdjustKeyboardInsets={false}
+              keyboardLiftBehavior="whenAtEnd"
+              offset={keyboardOffset}
+              applyWorkaroundForContentInsetHitTestBug
+              blankSpace={motion.blankSpace}
+              extraContentPadding={motion.composerHeight}
+              onContentInsetChange={motion.onContentInsetChange}
+            />
+          )}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: topInset + 84 }}
+          contentInsetAdjustmentBehavior="never"
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          alwaysBounceVertical
+          onContentSizeChange={(width, height) => {
+            motion.onContentSizeChange(width, height);
+            seekLatest();
+          }}
+          onLayout={(event) => {
+            motion.onViewportLayout(event);
+            seekLatest();
+          }}
+          onScroll={motion.onScroll}
+          onScrollBeginDrag={motion.cancelSend}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <>
+              {hasOlder ? (
+                <View className="items-center pb-3">
+                  <Button variant="tertiary" isDisabled={!canSend || olderLoading} onPress={onLoadOlder}>
+                    <Button.Label>
+                      {olderLoading
+                        ? "Loading older messages…"
+                        : olderError
+                          ? "Try loading older messages again"
+                          : "Load older messages"}
+                    </Button.Label>
+                  </Button>
+                </View>
+              ) : null}
+              {historyState === "connecting" || historyState === "loading" ? (
+                <View
+                  className="flex-1"
+                  accessible
+                  accessibilityLabel={historyState === "connecting" ? "Connecting to server" : "Loading chat history"}
+                  accessibilityState={{ busy: true }}
+                />
+              ) : historyState !== "ready" ? (
+                <View className="flex-1 items-center justify-center gap-2">
+                  <Typography.Paragraph align="center" className="text-text-secondary">
+                    {historyState === "waiting" ? "Waiting for connection" : "Could not load chat history"}
+                  </Typography.Paragraph>
+                  {historyState === "waiting" ? (
+                    <Typography.Paragraph type="body-xs" align="center" className="text-text-dim">
+                      Your chat history will load when the server reconnects.
+                    </Typography.Paragraph>
+                  ) : null}
+                  {historyState === "error" ? (
+                    <Button variant="tertiary" onPress={onRetryHistory}>
+                      <Button.Label>Try again</Button.Label>
+                    </Button>
+                  ) : null}
+                </View>
+              ) : null}
+            </>
+          }
+          ListFooterComponent={
+            <>
+              <Animated.View style={motion.responseStyle}>{renderActivity()}</Animated.View>
+              {showStarter ? (
+                <View
+                  className="gap-4 rounded-[26px] p-4"
+                  style={{ backgroundColor: fieldBackground, borderCurve: "continuous" }}
                 >
-                  <View className="size-7 items-center justify-center rounded-lg bg-control">
-                    <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                      {String.fromCharCode(65 + index)}
-                    </Typography.Paragraph>
+                  <View className="flex-row items-start gap-3">
+                    <View className="min-w-0 flex-1 gap-1">
+                      <Typography.Heading type="h4">What should we work on first?</Typography.Heading>
+                      <Typography.Paragraph className="text-text-secondary">
+                        Pick one, or type your own — we can change course anytime.
+                      </Typography.Paragraph>
+                    </View>
+                    <Pressable
+                      accessibilityLabel="Dismiss suggestions"
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={onDismissStarter}
+                    >
+                      <X color={String(muted)} size={21} strokeWidth={1.8} />
+                    </Pressable>
                   </View>
-                  <View className="min-w-0 flex-1">
-                    <Typography.Paragraph weight="medium">{option.label}</Typography.Paragraph>
-                    <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                      {option.detail}
-                    </Typography.Paragraph>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
 
-            <Typography.Paragraph type="body-xs" className="text-text-secondary">
-              Or answer in the chat below
-            </Typography.Paragraph>
-          </View>
-        ) : null}
-      </KeyboardChatScrollView>
+                  <View className="overflow-hidden rounded-[18px]" style={{ backgroundColor: raised }}>
+                    {STARTER_OPTIONS.map((option, index) => (
+                      <Pressable
+                        key={option.id}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: !canSend }}
+                        disabled={!canSend}
+                        className="flex-row gap-3 px-3 py-3"
+                        style={({ pressed }) => ({
+                          borderBottomColor: index < STARTER_OPTIONS.length - 1 ? String(muted) : "transparent",
+                          borderBottomWidth: index < STARTER_OPTIONS.length - 1 ? 0.5 : 0,
+                          opacity: !canSend ? 0.45 : pressed ? 0.55 : 1,
+                        })}
+                        onPress={() => onSelectStarter(option.label)}
+                      >
+                        <View className="size-7 items-center justify-center rounded-lg bg-control">
+                          <Typography.Paragraph type="body-xs" className="text-text-secondary">
+                            {String.fromCharCode(65 + index)}
+                          </Typography.Paragraph>
+                        </View>
+                        <View className="min-w-0 flex-1">
+                          <Typography.Paragraph weight="medium">{option.label}</Typography.Paragraph>
+                          <Typography.Paragraph type="body-xs" className="text-text-secondary">
+                            {option.detail}
+                          </Typography.Paragraph>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+
+                  <Typography.Paragraph type="body-xs" className="text-text-secondary">
+                    Or answer in the chat below
+                  </Typography.Paragraph>
+                </View>
+              ) : null}
+            </>
+          }
+        />
+      </TailLayoutContext.Provider>
     </Animated.View>
   );
 }

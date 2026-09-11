@@ -263,7 +263,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   list(): ServerSummary[] {
     return remoteServerSummaries(this.#store.servers, this.#store.activeServerId, (serverId) =>
       this.#connections.statusFor(serverId),
-    );
+    ).map((server) => ({ ...server, notificationsMuted: this.#store.isMuted(server.id) }));
   }
 
   async syncRemoteHosts(): Promise<ServerSummary[]> {
@@ -318,6 +318,12 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       () => undefined,
     );
     return operation;
+  }
+
+  async setMuted(serverId: string, muted: boolean): Promise<ServerSummary[]> {
+    await this.#store.setMuted(serverId, muted);
+    this.#emitChanged();
+    return this.list();
   }
 
   async reorder(serverIds: string[]): Promise<ServerSummary[]> {

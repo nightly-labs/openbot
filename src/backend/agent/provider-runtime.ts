@@ -10,7 +10,7 @@ import type {
   AgentSummary,
   CustomProviderRestart,
 } from "@openbot/contracts/ipc";
-import { agentProviderDescriptor, isReasoningEffort } from "@openbot/contracts/ipc";
+import { agentProviderDescriptor, isFreeOpencodeModelName, isReasoningEffort } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -21,7 +21,7 @@ import {
   type CodexCliInfo,
   resolveCodexCli,
 } from "./../cli";
-import { type CustomProviderSource, openCodeSignInMessage } from "./../opencode-config";
+import { openCodeSignInMessage } from "./../opencode-config";
 import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
@@ -123,8 +123,9 @@ const INITIAL_STATUS: AgentStatus = {
  * Models a provider CLI lists that an OpenBot agent is not meant to run. `codex-auto-review` and
  * `gpt-reserve` are Codex picks for its own use -- a review pass and spare capacity -- and
  * `gpt-5.5` and `gpt-5.4-mini` are older models this product does not offer. Everything else the
- * CLI reports reaches the picker, the models it marks hidden included, so this list is the only
- * thing that keeps a model out and adding to it is a product decision, not a guess about a flag.
+ * CLI reports reaches the picker, the models it marks hidden included, so this list and
+ * CREDENTIAL_ONLY_MODEL_PREFIXES below are the only things that keep a model out, and adding to
+ * either is a product decision, not a guess about a flag.
  */
 const SUPPRESSED_MODEL_IDS: ReadonlyMap<AgentProvider, ReadonlySet<string>> = new Map([
   ["codex", new Set(["gpt-reserve", "gpt-5.5", "gpt-5.4-mini", "codex-auto-review"])],
@@ -138,6 +139,45 @@ const SUPPRESSED_MODEL_IDS: ReadonlyMap<AgentProvider, ReadonlySet<string>> = ne
 function modelDisplayName(name: string): string {
   return name.slice(0, INPUT_LIMITS.modelName);
 }
+
+/**
+ * Model families a CLI advertises because OpenBot supplied a key, which that key does not buy.
+ *
+ * OpenCode reports OpenCode Zen and OpenCode Go as one catalog although they are two products on
+ * two endpoints -- `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1` -- and one `OPENCODE_API_KEY`
+ * turns both on. A Zen key from `opencode.ai/auth` does not buy Go, so a stored key adds about two
+ * dozen `opencode-go/` models that answer every prompt with "Invalid API key.".
+ *
+ * The prefix is dropped only while OpenBot is the one supplying the key. With no key stored, a Go
+ * model can only come from the user's own OpenCode sign-in, and that one does buy it.
+ */
+const CREDENTIAL_ONLY_MODEL_PREFIXES: ReadonlyMap<AgentProvider, string> = new Map([["opencode", "opencode-go/"]]);
+
+/**
+ * Which OpenCode model a new agent runs, as the tier its catalog leads with.
+ *
+ * A provider with no `defaultProviderModel` falls back to the first model of its catalog, so list
+ * position is the default. OpenCode reports the third-party services the user signed in to before
+ * its own, so that fallback used to land on `openai/gpt-5.3-codex-spark` and the agent's first
+ * message failed with "Token refresh failed: 401" although the free models needed no account.
+ *
+ * The order is free first, Muse ahead of the rest of the free tier, so nobody is billed for a model
+ * they did not choose. Below the free tier come OpenCode's own paid models -- OpenBot supplies the
+ * key for those and can say why one failed -- and last the models behind a separate sign-in, whose
+ * token OpenBot can neither see nor refresh. That tail matters only for a catalog with no free tier
+ * at all; it is the difference between a bad default and an unusable one.
+ */
+function opencodeModelRank(model: AgentModelOption): 0 | 1 | 2 | 3 {
+  // Names, not ids, because the price is a naming convention and `isFreeOpencodeModelName` is what
+  // the picker badges a model with. An id reaches here as the name anyway when the CLI sends no
+  // display name, and both spellings carry the same two words.
+  if (isFreeOpencodeModelName(model.name)) return /\bmuse\b/i.test(model.name) ? 0 : 1;
+  return model.id.toLowerCase().startsWith("opencode/") ? 2 : 3;
+}
+
+const PREFERRED_MODEL_ORDER: ReadonlyMap<AgentProvider, (model: AgentModelOption) => number> = new Map([
+  ["opencode", opencodeModelRank],
+]);
 
 /**
  * The product name of a Claude model, from its id, or `null` for an id that does not read as one.
@@ -229,8 +269,8 @@ export class ProviderRuntime implements ProviderPort {
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #requestTimeoutMs: number;
   readonly #clientFactory: AgentClientFactory | null;
-  readonly #customProviders: CustomProviderSource;
   readonly #bundledExecutables: BundledProviderExecutables;
+  readonly #credentials: ProviderClientContext;
   readonly #clients = new Map<AgentProvider, AgentClient>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
   /**
@@ -272,7 +312,7 @@ export class ProviderRuntime implements ProviderPort {
     preferredModel?: AgentModelId | null;
     clientFactory: AgentClientFactory | null;
     bundledExecutables: BundledProviderExecutables;
-    customProviders?: CustomProviderSource;
+    credentials: ProviderClientContext;
   }) {
     this.#conversation = options.conversation;
     this.#hooks = options.hooks;
@@ -283,16 +323,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#preferredModel = options.preferredModel ?? null;
     this.#clientFactory = options.clientFactory;
     this.#bundledExecutables = { ...options.bundledExecutables };
-    this.#customProviders = options.customProviders ?? (() => []);
-  }
-
-  /**
-   * What a driver needs to build a client. `#clientFactory` takes its place in tests, which is why
-   * the custom-provider config is proven at the driver boundary in `provider-drivers.test.ts`: a
-   * fake client never reads it.
-   */
-  get #clientContext(): ProviderClientContext {
-    return { customProviders: this.#customProviders };
+    this.#credentials = options.credentials;
   }
 
   /**
@@ -346,10 +377,8 @@ export class ProviderRuntime implements ProviderPort {
       throw new Error("Connect the selected provider before generating a profile.");
     if (this.#clientFactory) return this.#clientFactory(provider, cli);
     const driver = requireProviderDriver(provider);
-    if (driver.createProfileClient) {
-      return driver.createProfileClient(cli, this.#requestTimeoutMs, this.#clientContext);
-    }
-    return driver.createClient(cli, this.#requestTimeoutMs, this.#clientContext);
+    if (driver.createProfileClient) return driver.createProfileClient(cli, this.#requestTimeoutMs, this.#credentials);
+    return driver.createClient(cli, this.#requestTimeoutMs, this.#credentials);
   }
 
   preferredProvider(): AgentProvider {
@@ -479,7 +508,7 @@ export class ProviderRuntime implements ProviderPort {
    * caller keeps its own default.
    */
   #customProviderSignInMessage(provider: AgentProvider): string | null {
-    const count = provider === "opencode" ? this.#customProviders().length : 0;
+    const count = provider === "opencode" ? this.#credentials.customProviders().length : 0;
     return count > 0 ? openCodeSignInMessage(count) : null;
   }
 
@@ -512,6 +541,36 @@ export class ProviderRuntime implements ProviderPort {
       return this.#hooks.isProviderBusy("opencode") ? "skipped-busy" : "restarted";
     }
     return "restarted";
+  }
+
+  /**
+   * Changes a provider's stored credential and restarts the provider on it, as one step.
+   *
+   * A CLI reads its credential when it spawns, so a new key only takes effect in a new process.
+   * The change runs inside the provider's serialized connection command, after any start or refresh
+   * already queued for it, and before the restart. A provider that is working on a turn keeps both
+   * its process and its old credential, and the caller hears why. `#replacingCli` holds new
+   * deliveries from the busy check to the restart, so no turn can start on the old process in
+   * between. Success means that a new process runs with the new credential.
+   */
+  async changeProviderCredential(provider: AgentProvider, change: () => Promise<void>): Promise<AgentStatus> {
+    return this.#runProviderConnectionCommand(provider, async () => {
+      await this.#providerStarts.get(provider);
+      if (this.#hooks.isProviderBusy(provider)) {
+        throw new Error(
+          `The ${providerLabel(provider)} CLI is working on a turn. Wait for it to finish, then try again.`,
+        );
+      }
+      this.#replacingCli.add(provider);
+      try {
+        await change();
+      } catch (error) {
+        this.#replacingCli.delete(provider);
+        this.#hooks.onProviderResumed(provider);
+        throw error;
+      }
+      return this.#reprobeProvider(provider);
+    });
   }
 
   /** Keeps this provider idle until its managed runtime is installed and activated. */
@@ -755,7 +814,7 @@ export class ProviderRuntime implements ProviderPort {
     const driver = requireProviderDriver(provider);
     const client = this.#clientFactory
       ? this.#clientFactory(provider, cli)
-      : driver.createClient(cli, this.#requestTimeoutMs, this.#clientContext);
+      : driver.createClient(cli, this.#requestTimeoutMs, this.#credentials);
     this.#bindClient(client);
     client.start();
     try {
@@ -1185,7 +1244,7 @@ export class ProviderRuntime implements ProviderPort {
           cli = await this.#resolveProviderCli(provider);
           client = this.#clientFactory
             ? this.#clientFactory(provider, cli)
-            : driver.createClient(cli, this.#requestTimeoutMs, this.#clientContext);
+            : driver.createClient(cli, this.#requestTimeoutMs, this.#credentials);
           this.#bindClient(client);
           client.start();
           await client.request(
@@ -1370,6 +1429,11 @@ export class ProviderRuntime implements ProviderPort {
           const client = this.#clients.get(provider);
           if (!client) return previous;
           const suppressed = SUPPRESSED_MODEL_IDS.get(provider) ?? new Set<string>();
+          // Read once per pass, not per model: a stored key cannot change inside one refresh, and
+          // the prefix is unusable only because OpenBot is what put that key in the environment.
+          const unusablePrefix = this.#credentials.apiKey(provider)
+            ? CREDENTIAL_ONLY_MODEL_PREFIXES.get(provider)
+            : undefined;
           try {
             const serverModels = new Map<string, ModelListResponse["data"][number]>();
             const cursors = new Set<string>();
@@ -1392,6 +1456,7 @@ export class ProviderRuntime implements ProviderPort {
                 // id would fail the contract guard downstream and take the whole list with it.
                 const id = item.model?.trim();
                 if (!id || suppressed.has(id.toLowerCase())) continue;
+                if (unusablePrefix && id.toLowerCase().startsWith(unusablePrefix)) continue;
                 serverModels.set(id, { ...item, model: id });
               }
               cursor = client.provider === "codex" ? response.nextCursor : undefined;
@@ -1434,7 +1499,10 @@ export class ProviderRuntime implements ProviderPort {
                   : (fallback?.supportedReasoningEfforts ?? ["medium"]),
               });
             }
-            return models;
+            const rank = PREFERRED_MODEL_ORDER.get(client.provider);
+            if (!rank) return models;
+            // Sort is stable, so the CLI's own order still decides inside one tier.
+            return [...models].sort((left, right) => rank(left) - rank(right));
           } catch {
             return previous;
           }

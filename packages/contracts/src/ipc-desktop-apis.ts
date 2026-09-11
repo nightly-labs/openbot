@@ -58,6 +58,22 @@ import type {
   BrowserVisibilityInput,
 } from "./ipc-browser";
 import type {
+  ChannelMemory,
+  CreateChannelMemoryInput,
+  DeleteChannelMemoryInput,
+  UpdateChannelMemoryInput,
+} from "./ipc-channel-memories";
+import type {
+  ChannelRoutine,
+  ChannelRoutineRun,
+  CreateChannelRoutineInput,
+  DeleteChannelRoutineInput,
+  ListChannelRoutineRunsInput,
+  TestChannelRoutineInput,
+  UpdateChannelRoutineInput,
+} from "./ipc-channel-routines";
+import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
+import type {
   ConversationPage,
   ConversationReadState,
   ConversationSearchPage,
@@ -166,6 +182,10 @@ import type {
 import type { VoiceModelStatus, VoiceTranscriptionInput, VoiceTranscriptionResult } from "./ipc-voice";
 
 export interface AgentDesktopApi {
+  listChannels: () => Promise<ChannelSummary[]>;
+  readChannel: (input: ChannelReadInput) => Promise<ChannelPage>;
+  channelCommand: (input: ChannelCommand) => Promise<Channel>;
+  deleteChannel: (channelId: string) => Promise<void>;
   getStatus: () => Promise<AgentStatus>;
   getAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
   getHostAnalytics: (input: HostAnalyticsInput, serverId: string) => Promise<HostAnalytics | null>;
@@ -193,6 +213,17 @@ export interface AgentDesktopApi {
   deleteRoutine: (input: DeleteRoutineInput) => Promise<void>;
   testRoutine: (input: TestRoutineInput) => Promise<RoutineRun>;
   listRoutineRuns: (input: ListRoutineRunsInput) => Promise<RoutineRun[]>;
+  listChannelMemories: (channelId: string) => Promise<ChannelMemory[]>;
+  createChannelMemory: (input: CreateChannelMemoryInput) => Promise<ChannelMemory>;
+  updateChannelMemory: (input: UpdateChannelMemoryInput) => Promise<ChannelMemory>;
+  deleteChannelMemory: (input: DeleteChannelMemoryInput) => Promise<void>;
+  clearChannelMemories: (channelId: string) => Promise<void>;
+  listChannelRoutines: (channelId: string) => Promise<ChannelRoutine[]>;
+  createChannelRoutine: (input: CreateChannelRoutineInput) => Promise<ChannelRoutine>;
+  updateChannelRoutine: (input: UpdateChannelRoutineInput) => Promise<ChannelRoutine>;
+  deleteChannelRoutine: (input: DeleteChannelRoutineInput) => Promise<void>;
+  testChannelRoutine: (input: TestChannelRoutineInput) => Promise<ChannelRoutineRun>;
+  listChannelRoutineRuns: (input: ListChannelRoutineRunsInput) => Promise<ChannelRoutineRun[]>;
   readConversation: (agentId: string) => Promise<ConversationWithReadState>;
   readConversationPage: (input: ReadConversationPageInput, serverId?: string) => Promise<ConversationPage>;
   searchConversationMessages: (input: SearchConversationMessagesInput) => Promise<ConversationSearchPage>;
@@ -260,6 +291,23 @@ export interface UpdateDesktopApi {
   onEvent: (listener: (status: UpdateStatus) => void) => () => void;
 }
 
+export interface SetProviderApiKeyInput {
+  provider: AgentProviderId;
+  key: string;
+}
+
+/**
+ * Whether a key is stored. `unreadable` is a key file OpenBot could not decrypt or parse: the
+ * provider then runs with no key, and the file stays on disk until the user replaces or removes it.
+ */
+export type ProviderApiKeyStatus = "missing" | "saved" | "unreadable";
+
+/** What the renderer may know about a stored key: its status. Never the key. */
+export interface ProviderApiKeyState {
+  provider: AgentProviderId;
+  status: ProviderApiKeyStatus;
+}
+
 export interface ProviderRuntimesDesktopApi {
   getStatus: () => Promise<ProviderRuntimeSnapshot>;
   download: (provider: AgentProviderId) => Promise<ProviderRuntimeSnapshot>;
@@ -287,6 +335,7 @@ export interface DynamicIslandDesktopApi {
 }
 
 export interface ServersDesktopApi {
+  setMuted: (input: { serverId: string; muted: boolean }) => Promise<ServerSummary[]>;
   list: () => Promise<ServerSummary[]>;
   select: (serverId: string) => Promise<ServerSummary[]>;
   reorder: (input: ReorderServersInput) => Promise<ServerSummary[]>;
@@ -403,6 +452,16 @@ export interface OpenBotDesktopApi {
    * OpenBot pins for the runtime it manages.
    */
   updateProviderCli: (provider: AgentProviderId) => Promise<AgentStatus>;
+  /**
+   * Stores the optional API key a provider's paid catalog needs, and reconnects the provider.
+   *
+   * The key only ever travels towards main. There is no getter for it, and
+   * `getProviderApiKeyState` answers with a status, because a renderer that can read a key back
+   * puts it in every crash report, export and screenshot that follows.
+   */
+  setProviderApiKey: (input: SetProviderApiKeyInput) => Promise<AgentStatus>;
+  clearProviderApiKey: (provider: AgentProviderId) => Promise<AgentStatus>;
+  getProviderApiKeyState: (provider: AgentProviderId) => Promise<ProviderApiKeyState>;
   providerRuntimes: ProviderRuntimesDesktopApi;
   openUrl: (url: string) => Promise<void>;
   voice: VoiceDesktopApi;

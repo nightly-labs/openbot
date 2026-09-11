@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { useWindowDimensions, View } from "react-native";
 import Animated, { FadeIn, ReduceMotion } from "react-native-reanimated";
 
+import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { redeemMobileConnectUrl } from "@/features/auth/api/mobile-auth";
 import { AppLogo } from "@/features/auth/components/app-logo";
 import { PixelBlastBackground } from "@/features/auth/components/pixel-blast-background";
@@ -89,7 +90,13 @@ export function SignInScreen() {
           origin={origin}
           viewport={viewport}
           onClose={closeScanner}
-          onScan={async (data) => connect(await redeemMobileConnectUrl(data))}
+          onScan={async (data) =>
+            connect(
+              await mobileAnalytics.operation("mobile_pairing_action", { action: "redeem" }, () =>
+                redeemMobileConnectUrl(data),
+              ),
+            )
+          }
         />
       ) : null}
     </View>

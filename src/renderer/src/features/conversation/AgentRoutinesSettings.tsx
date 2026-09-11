@@ -1,14 +1,15 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { Routine, RoutineRun, RoutineSchedule } from "@openbot/contracts/ipc";
-import { createEffect, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
+import type { RoutineFields, RoutineRunFields, RoutineSchedule } from "@openbot/contracts/ipc";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
 import { createScrollFades } from "../../components/createScrollFades";
+import { SettingsBackIcon, SettingsForwardIcon } from "../../components/SettingsPanel";
 import { Button, CirclePause, Clock3, Dialog, Input, Plus, Switch, Textarea } from "../../components/ui";
 import { errorMessage } from "../../error-message";
-import { BackIcon, SettingsForwardIcon } from "./ConversationIcons";
 import { RoutineRunHistory } from "./RoutineRunHistory";
 import { RoutineScheduleEditor } from "./RoutineScheduleEditor";
 import { defaultRoutineSchedule, routineScheduleSummary } from "./routine-schedule-ui";
+import type { RoutinesPort } from "./routines-port";
 
 export interface RoutineSelectionRequest {
   routineId: string;
@@ -19,7 +20,7 @@ export interface RoutineSelectionRequest {
 type PendingRoutineExit =
   | "list"
   | "close"
-  | { kind: "routine-selection"; routine: Routine | null; routineName: string }
+  | { kind: "routine-selection"; routine: RoutineFields | null; routineName: string }
   | { kind: "conversation-message"; messageId: string };
 
 interface RoutineDraft {
@@ -31,7 +32,8 @@ interface RoutineDraft {
 }
 
 interface AgentRoutinesSettingsProps {
-  agentId: string;
+  /** Names the owner and owns every call. A channel passes `channelRoutinesPort` here. */
+  port: RoutinesPort;
   onCountChange: (count: number) => void;
   onBack?: () => void;
   onClose?: () => void;
@@ -41,9 +43,9 @@ interface AgentRoutinesSettingsProps {
 }
 
 export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
-  const [routines, setRoutines] = createSignal<Routine[]>([]);
+  const [routines, setRoutines] = createSignal<RoutineFields[]>([]);
   const [draft, setDraft] = createSignal<RoutineDraft | null>(null);
-  const [runs, setRuns] = createSignal<RoutineRun[]>([]);
+  const [runs, setRuns] = createSignal<RoutineRunFields[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [routinesLoaded, setRoutinesLoaded] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
@@ -60,7 +62,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
 
   async function loadRoutines(): Promise<void> {
     try {
-      const next = await window.openbot.agent.listRoutines(props.agentId);
+      const next = await props.port.list();
       setRoutines(next);
       setRoutinesLoaded(true);
       props.onCountChange(next.length);
@@ -76,30 +78,24 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
 
   async function loadRuns(routineId: string): Promise<void> {
     try {
-      setRuns(
-        await window.openbot.agent.listRoutineRuns({
-          agentId: props.agentId,
-          routineId,
-          limit: 10,
-        }),
-      );
+      setRuns(await props.port.listRuns(routineId, 10));
     } catch (caught) {
       setError(errorMessage(caught, "Could not load run history."));
     }
   }
 
-  onSettled(() => {
-    const unsubscribe = window.openbot.agent.onEvent((event) => {
-      if (event.type !== "routines-changed" || event.agentId !== props.agentId) return;
-      void loadRoutines();
-      const routineId = draft()?.id;
-      if (routineId) void loadRuns(routineId);
-    });
-    return unsubscribe;
-  });
+  createEffect(
+    () => props.port,
+    (port) =>
+      port.subscribe(() => {
+        void loadRoutines();
+        const routineId = draft()?.id;
+        if (routineId) void loadRuns(routineId);
+      }),
+  );
 
   createEffect(
-    () => props.agentId,
+    () => props.port.ownerId,
     () => {
       closeEditor();
       setLoading(true);
@@ -132,7 +128,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     },
   );
 
-  function openRoutine(routine: Routine): void {
+  function openRoutine(routine: RoutineFields): void {
     setConfirmDelete(false);
     setScheduleExpanded(false);
     setError(null);
@@ -175,7 +171,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     setPendingExit(null);
   }
 
-  function requestRoutineSelection(request: RoutineSelectionRequest, routine: Routine | null): void {
+  function requestRoutineSelection(request: RoutineSelectionRequest, routine: RoutineFields | null): void {
     const current = draft();
     if (routine && current?.id === routine.id) {
       if (!dirty()) openRoutine(routine);
@@ -250,23 +246,14 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     const action = current.id ? "update" : "create";
     const analytics = desktopAnalytics.scope();
     try {
-      const saved = current.id
-        ? await window.openbot.agent.updateRoutine({
-            agentId: props.agentId,
-            routineId: current.id,
-            name: current.name.trim(),
-            instruction: current.instruction.trim(),
-            active: current.active,
-            schedule: current.schedule,
-          })
-        : await window.openbot.agent.createRoutine({
-            agentId: props.agentId,
-            name: current.name.trim(),
-            instruction: current.instruction.trim(),
-            active: current.active,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-            schedule: current.schedule,
-          });
+      const saved = await props.port.save({
+        routineId: current.id,
+        name: current.name.trim(),
+        instruction: current.instruction.trim(),
+        active: current.active,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        schedule: current.schedule,
+      });
       setRoutines((items) => {
         const next = [saved, ...items.filter((routine) => routine.id !== saved.id)];
         props.onCountChange(next.length);
@@ -293,10 +280,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     const startedAt = performance.now();
     const analytics = desktopAnalytics.scope();
     try {
-      await window.openbot.agent.deleteRoutine({
-        agentId: props.agentId,
-        routineId: current.id,
-      });
+      await props.port.remove(current.id);
       setRoutines((items) => {
         const next = items.filter((routine) => routine.id !== current.id);
         props.onCountChange(next.length);
@@ -318,10 +302,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     const startedAt = performance.now();
     const analytics = desktopAnalytics.scope();
     try {
-      await window.openbot.agent.testRoutine({
-        agentId: props.agentId,
-        routineId: current.id,
-      });
+      await props.port.test(current.id);
       trackRoutineAction(analytics, "test", current.schedule, startedAt, "succeeded");
       await loadRuns(current.id);
     } catch (caught) {
@@ -334,16 +315,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
 
   return (
     <div class="agent-routines-settings">
-      <header class="agent-settings-header agent-routines-header">
+      <header class="settings-panel-header agent-routines-header">
         <Button
           variant="ghost"
           type="button"
-          class="agent-settings-nav-button"
+          class="settings-panel-nav-button"
           aria-label={draft() ? "Back to Routines" : "Back to settings"}
           disabled={Boolean(draft() && saving())}
           onClick={() => (draft() ? requestExit("list") : props.onBack?.())}
         >
-          <BackIcon />
+          <SettingsBackIcon />
         </Button>
         <div class="agent-routines-heading">
           <h2>{draft() ? "Routine" : "Routines"}</h2>
@@ -354,7 +335,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
             <Button
               variant="ghost"
               type="button"
-              class="agent-settings-nav-button"
+              class="settings-panel-nav-button"
               aria-label="Close details"
               disabled={saving()}
               onClick={() => requestExit("close")}
@@ -366,7 +347,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
           <Button
             variant="ghost"
             type="button"
-            class="agent-settings-nav-button"
+            class="settings-panel-nav-button"
             aria-label="Create Routine"
             onClick={createDraft}
           >
@@ -474,7 +455,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                 </div>
               </div>
 
-              <label class="agent-settings-field">
+              <label class="settings-field">
                 <span>Name</span>
                 <Input
                   value={current().name}
@@ -483,11 +464,11 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                   onValueChange={(name) => changeDraft((value) => ({ ...value, name }))}
                 />
               </label>
-              <label class="agent-settings-field agent-routine-instruction-field">
+              <label class="settings-field agent-routine-instruction-field">
                 <span>Instruction</span>
                 <Textarea
                   value={current().instruction}
-                  placeholder="Describe what this agent should do."
+                  placeholder={`Describe what this ${props.port.ownerNoun} should do.`}
                   maxlength={INPUT_LIMITS.routineInstruction}
                   onValueChange={(instruction) => changeDraft((value) => ({ ...value, instruction }))}
                 />

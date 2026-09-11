@@ -1,0 +1,241 @@
+/*
+ * The right-hand settings panel, shared by the agent chat and the channel chat.
+ *
+ * These rules were the agent panel's alone, under an `agent-` prefix. That prefix is why the
+ * channel panel became a second copy of them instead of a second user of them, so the shared part
+ * moved here under neutral names. What stays in `conversation.css` is what only an agent has: the
+ * avatar picker, the runtime section and the notification row.
+ */
+
+.settings-panel {
+  /*
+   * The step between one block of settings and the next: the fields, the link group, the agent's
+   * runtime card, the channel's member list. It is declared here, on the panel both surfaces open,
+   * because a section that stands further from the link group in one panel than in the other is
+   * exactly the drift this file exists to stop.
+   */
+  --settings-panel-section-gap: 25px;
+
+  position: absolute;
+  z-index: 15;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  width: var(--settings-panel-width, 296px);
+  flex-direction: column;
+  border-left: 1px solid var(--openbot-border);
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+  animation: settings-panel-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.settings-panel-header {
+  display: grid;
+  height: 39px;
+  flex: 0 0 auto;
+  grid-template-columns: 32px 1fr 32px;
+  align-items: center;
+  border-bottom: 1px solid var(--openbot-border);
+  padding: 0 10px;
+}
+
+.settings-panel-header h2 {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.settings-panel-nav-button {
+  position: relative;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-sm);
+  padding: 0;
+  background: transparent;
+  color: var(--openbot-text-secondary);
+  transition:
+    background-color var(--openbot-duration-hover) ease,
+    color var(--openbot-duration-hover) ease,
+    transform var(--openbot-duration-fast) ease;
+}
+
+.settings-panel-nav-button::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.settings-panel-nav-button > svg {
+  width: 16px;
+  height: 16px;
+  /* The weight is left to .ui-glyph-20 on the icons themselves, as in .message-action-button. */
+}
+
+.settings-panel-nav-button:hover {
+  background: var(--openbot-hover);
+  color: var(--openbot-text-primary);
+}
+
+/* The chevron reads a hair right of centre in its box, so it is nudged back onto the axis. */
+.settings-back-icon {
+  transform: translateX(-0.5px);
+}
+
+.settings-panel-content {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 15px 28px;
+}
+
+.settings-field {
+  display: block;
+  margin: 0 0 17px;
+}
+
+.settings-field > span {
+  display: block;
+  margin: 0 0 6px 8px;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  line-height: 18px;
+}
+
+.settings-field input,
+.settings-field textarea,
+.settings-field select {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-md);
+  outline: 0;
+  background: var(--openbot-shadow-popover-ambient);
+  padding: 10px 11px;
+  color: var(--openbot-text-primary);
+  caret-color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  line-height: 19px;
+  transition:
+    border-color var(--openbot-duration-hover) ease,
+    background var(--openbot-duration-hover) ease;
+}
+
+.settings-field input,
+.settings-field select {
+  height: 38px;
+}
+
+.settings-field select {
+  appearance: none;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--openbot-text-secondary) 50%),
+    linear-gradient(135deg, var(--openbot-text-secondary) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) 16px,
+    calc(100% - 11px) 16px;
+  background-repeat: no-repeat;
+  background-size:
+    5px 5px,
+    5px 5px;
+  padding-right: 32px;
+}
+
+.settings-field select option {
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-primary);
+}
+
+.settings-field textarea {
+  field-sizing: content;
+  min-height: 88px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.settings-field input::placeholder,
+.settings-field textarea::placeholder {
+  color: var(--openbot-text-muted);
+}
+
+.settings-field input:focus,
+.settings-field textarea:focus,
+.settings-field select:focus {
+  border-color: var(--openbot-text-muted);
+  background: var(--openbot-shadow-popover-ambient);
+}
+
+.settings-field input:focus-visible,
+.settings-field textarea:focus-visible,
+.settings-field select:focus-visible {
+  outline: none;
+}
+
+.settings-link-group {
+  display: grid;
+  width: 100%;
+  margin: 7px 0 22px;
+  border-top: 1px solid var(--openbot-border);
+  border-bottom: 1px solid var(--openbot-border);
+}
+
+.settings-link {
+  width: 100%;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 var(--openbot-space-1);
+  text-align: left;
+  transition: none;
+}
+
+.settings-link + .settings-link {
+  border-top: 1px solid var(--openbot-border);
+}
+
+.settings-link-label {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.settings-link-value {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-link-value svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settings-link-group .settings-link:hover {
+    background: var(--openbot-hover);
+    color: var(--openbot-text-primary);
+  }
+
+  .settings-link:hover .settings-link-value {
+    color: var(--openbot-text-secondary);
+  }
+}

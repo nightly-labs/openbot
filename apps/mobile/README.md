@@ -10,7 +10,19 @@ React Native app built with Expo SDK 57, Expo Router, TypeScript 7, Biome, and B
 
 ## Development
 
-Expo Router 57.0.17 is patched in `patches/expo-router@57.0.17.patch` to apply zoom dismissal
+The repository uses Bun’s hoisted linker so native Expo modules resolve to one installation.
+The root `postinstall` runs `bun run --cwd apps/mobile setup:skia` after dependency installation.
+Skia 2.6.2 needs this step to copy its packaged native libraries before CocoaPods runs;
+EAS and local installs use the same setup.
+
+EAS profiles pin Bun 1.4.0 to match the root `packageManager`. Use the same Bun version
+locally: dependency paths and package patch metadata affect the runtime fingerprint.
+After switching from the isolated linker to the hoisted linker, move the old
+`apps/mobile/node_modules` directory out of the app and run `bun install --frozen-lockfile`
+from the repository root. A normal install can retain old workspace symlinks and cause
+the local fingerprint to differ from the clean EAS installation.
+
+Expo Router 57.0.20 is patched in `patches/expo-router@57.0.20.patch` to apply zoom dismissal
 bounds when its enabler registers after the chat mounts. This keeps the avatar-to-header zoom
 interactive from the left edge without enabling dismissal from the middle of the chat.
 The same patch keeps navigation queue snapshots immutable so React observes every navigation
@@ -35,6 +47,45 @@ bun run mobile:ios
 bun run mobile:android
 ```
 
+Choose an iOS command:
+
+| Repository root | `apps/mobile` | Integration |
+| --- | --- | --- |
+| `bun mobile:ios` | `bun ios` | No RocketSim installation required |
+| `bun mobile:ios:rocketsim` | `bun ios:rocketsim` | Start RocketSim and enable Connect |
+
+Both commands apply the iOS config plugins without clearing the native directory,
+then build and launch the app with Expo. Expo arguments such as `--device` and
+`--port` pass through. The RocketSim command requires the app in `/Applications`
+or `~/Applications`, or `ROCKETSIM_APP_PATH` set to its `.app` directory. If it is
+missing, the command stops with setup instructions. The standard command does not
+look for RocketSim, even if `ROCKETSIM_APP_PATH` or the old `OPENBOT_ROCKETSIM`
+variable is set.
+
+The local launcher enables RocketSim Connect in the local native project. The config plugin
+loads it before React Native starts, only in Debug builds on the iOS Simulator.
+It does not copy the framework into the app. Release builds and physical devices
+cannot load it. A normal prebuild without the launcher removes the hook, as does
+`bun ios`. Switching back to the standard command removes the previous Connect
+hook before building. It does not close the RocketSim Mac app. The installed Debug
+simulator app built with `ios:rocketsim` can also reconnect
+when opened from its icon while RocketSim is running.
+
+In RocketSim, select a camera source and allow camera access when macOS asks.
+Allow local network access if requested. Camera and Network Monitor need Connect;
+network speed control also needs RocketSim Pro and approval of the Network Extension
+in RocketSim's Networking window. These OS approvals require user interaction.
+Network Monitor does not establish that WebRTC DataChannel traffic is visible.
+See [RocketSim Connect setup](https://www.rocketsim.app/docs/getting-started/setting-up-rocketsim-connect/).
+
+Verified with RocketSim 16.4.6 (332), Expo SDK 57, and the iOS 26.5 iPhone 17 Pro
+simulator: the app builds, starts Metro, and loads the Connect framework. Camera
+startup then hit an uncaught exception inside RocketSim's `AVCaptureSession rs_stopRunning`:
+`stopRunning may not be called between calls to beginConfiguration and commitConfiguration`.
+Camera operation is therefore not verified with this combination. Use
+`bun ios` if this occurs. The CLI also rejects network speed
+control with `pro_required` when RocketSim Pro is unavailable.
+
 For an Expo Go device outside the computer's trusted local network context, start Metro with a secure
 tunnel:
 
@@ -47,7 +98,7 @@ The native UI does not depend on a native WebRTC module. A hidden Expo DOM compo
 events to React Native. This keeps the production transport identical while remaining testable in
 Expo Go without a development build.
 
-Remote connection recovery makes up to five attempts, waiting 10 seconds after each failure. After
+Remote connection recovery starts the first attempt immediately, then waits 10 seconds after each failure. After
 five failures it waits two minutes before starting a new series. The agent list shows `Reconnecting`
 beside the server-list button in the header, with a smaller attempt counter and retry countdown below.
 The status disappears once connected. Chat shows a compact, centered `Reconnecting · x/5 · m:ss`
@@ -57,8 +108,13 @@ The composer and status track interactive keyboard dismissal through `KeyboardSt
 `KeyboardChatScrollView` uses the same native keyboard frames for message insets and scrolling.
 There is no additional `KeyboardAvoidingView` or keyboard-event timer in the chat. The status disappears
 after reconnecting. Countdown ticks are local UI
-updates, not requests. Backgrounding suspends retries; returning respects any remaining wait and
-starts at most one attempt if its deadline has passed. A successful connection resets the counter. Dead
+updates, not requests. Backgrounding suspends retries. Returning reuses the existing peer and reloads
+workspace data silently. A healthy connection stays online and usable during this check; returning
+does not show `Reconnecting` or disable sending. These reads use the existing WebRTC connection,
+without creating an account session or ticket. The required compatibility read has a three-second deadline; a silent peer is closed
+and its first replacement starts immediately. RTC disconnections keep their five-second recovery grace
+period. A previous failed connection attempt keeps its retry deadline across app switches. A successful
+connection resets the counter. Dead
 WebRTC peers are discarded and authenticated again. Recovery reloads cached conversations as well
 as agents and unread counts, including after an event-buffer reset. An interruption of Signal alone
 can resume sooner while the authenticated WebRTC connection is still healthy, without a new ticket.
@@ -107,6 +163,14 @@ successful join or require reusing the one-use invitation.
 After Mobile Connect has enabled publishing, restarting the development desktop restores its
 WebRTC host as well as its local HTTP API. A local-only `online` status is not enough for mobile
 connections. The separate development test client never auto-publishes.
+
+Account validation and the server directory share the same refresh policy, with one controller per
+endpoint and account. They refresh when 15 minutes have passed since the last successful response,
+including on foreground return. Failed requests retry after one minute while foregrounded. Pending
+requests are shared; an invalidation during a request causes one follow-up after success. Background
+entry stops timers, and iOS system overlays do not restart them. Ordinary RTC failures do not reload
+the directory. Session revocation and membership actions still refresh it. A stored session is shown
+while startup validation runs; an invalid credential clears that login, while network failures retain it.
 
 ## Source structure
 
@@ -189,3 +253,105 @@ bunx eas-cli@latest build --profile development --platform android
 ```
 
 Cloud builds require the final `ios.bundleIdentifier` and `android.package` values in `app.json`. Store submission also requires Apple Developer and Google Play Console credentials.
+
+## OpenPanel product analytics
+
+The app uses the official [`@openpanel/react-native` SDK](https://openpanel.dev/docs/sdks/react-native)
+and `expo-application`, following the [React Native guide](https://openpanel.dev/guides/react-native-analytics).
+The endpoint is fixed to `https://analytics.openbot.run/api`. No analytics credentials are committed.
+
+### Production configuration
+
+1. In the self-hosted OpenPanel dashboard, open the existing **Openbot** project used by desktop and the website.
+   Do not create or select a separate **Openbot Mobile** project.
+   Create a separate client for OpenBot Mobile with **write** access only. Copy its Client ID and
+   Client Secret. Do not use an organization/root client or a client with read access.
+2. In the Expo dashboard, open the **openbot** project → **Environment variables**, select the
+   **production** environment, and add:
+
+   | Variable | Value |
+   | --- | --- |
+   | `EXPO_PUBLIC_OPENPANEL_CLIENT_ID` | The mobile client's Client ID |
+   | `EXPO_PUBLIC_OPENPANEL_CLIENT_SECRET` | The mobile client's write-only Client Secret |
+   | `EXPO_PUBLIC_APP_ENV` | `production` |
+
+   The production build profile also sets `EXPO_PUBLIC_APP_ENV=production`. Development and preview
+   profiles set their own environment and never send events. Set the variable in the EAS environment
+   too, so production OTA updates use the same gate. Keep the credentials out of development/preview.
+3. Generate the next production native build through the usual approved release process. The new
+   `expo-application` native dependency requires a new binary; do not send this change as an OTA
+   update to a binary that lacks it. Build and deployment are separate operations, not part of setup.
+4. In that build, leave **Settings → General → Privacy → Share product analytics** enabled.
+   Before pairing, events stay in memory and do not appear in OpenPanel. Pair the phone.
+   OpenPanel's Real-time view should then show `mobile_app_opened` and pairing events with
+   `surface=mobile`, the account ID, and the email on its profile. Open a conversation and send
+   a message. Confirm connection and message events, then disable the setting and confirm that new actions do not send events. Repeat on iOS and Android.
+
+React Native requires a Client Secret according to OpenPanel's native SDK guide. In this direct
+native integration it is an **embedded write credential**, not a confidential server secret.
+Expo's `EXPO_PUBLIC_` values are visible in the shipped bundle. Use only a dedicated write client;
+never embed a key for Export, Insights, Manage, or an OpenBot account/session. EAS visibility can hide
+values in its UI but does not hide them in the app. See [OpenPanel client access levels](https://openpanel.dev/docs/api/authentication)
+and [Expo environment variables](https://docs.expo.dev/guides/environment-variables/).
+
+For a local production configuration, put the same variables in the ignored
+`apps/mobile/.env.local`. Ordinary development mode still disables analytics. A missing Client ID,
+missing Client Secret, non-production environment, or web runtime disables the client without
+blocking the app. Tests replace native modules and the HTTP transport; they do not contact OpenPanel.
+
+SDK 1.4.1 declares old peer ranges (`expo-application` 5–7 and `expo-constants` 14–18).
+Expo SDK 57 uses the SDK number for these package versions. Keep the Expo-compatible versions
+installed by `expo install`; do not downgrade them to silence that peer warning. Native verification
+of both platforms is required before release.
+
+### Event catalog
+
+Every event has `surface=mobile`, `platform=ios|android`, `environment=production`,
+`event_schema_version=1`, `app_version` and `build_number`. Operation outcomes use `result` and,
+where available, `duration_ms`. Failure codes are fixed categories, never raw error text.
+
+| Event | Meaning |
+| --- | --- |
+| `mobile_app_opened` | Cold start or return from background, with `signed_in`; iOS inactive overlays do not count as a new visit |
+| `mobile_pairing_action` | Sign-in scanner opened, camera permission result, QR redemption result, scanner cancelled |
+| `mobile_connection_action` | Initial connection attempt, reconnection attempt, or connection lost; result, duration and bounded loading stage |
+| `conversation_opened` | One visible-visit outcome and time to readable conversation, including cached/offline reads; failures when no readable conversation is available |
+| `message_send` | Host receipt or failure, attachment count, reply flag, provider/model/reasoning metadata when known |
+| `agent_input_action` | Submission of a structured prompt answer; no answer contents |
+| `attachment_action` | Local file selection, upload, removal; result, count and coarse size bucket when known |
+| `agent_action` | Create, update, duplicate or delete |
+| `routine_action` | Create, update or delete, including enabling/disabling through update |
+| `memory_action` | Create, update or delete |
+| `search_action` | One summary when a search screen closes after using a query/filter; final result count, no query |
+| `team_action` | Select, join or leave a server |
+| `conversation_action` | Pin/unpin or hide/unhide, including preference-save failures |
+| `usage_viewed` | Open the agent Usage section |
+| `account_sign_out` | Sign-out result under the initiating account |
+
+Use a mobile activation funnel from open → successful QR redemption → successful connection →
+conversation load or message send. Measure signed-in D1/D7 retention by OpenBot account ID. Eligible
+pre-session events join that account after sign-in. Unclaimed and expired attempts are not sent, so
+this funnel does not measure all abandoned pairing attempts.
+A message receipt means the host accepted the message, not that the agent finished its work.
+Connection retries are separate attempts; countdown ticks and background suspension are not failures.
+
+The app does not emit host `system_turn_*` events again. Host lifecycle remains attributed to the
+host owner and does not identify which client started the work. Analytics does not change Team API.
+
+The local phone-wide preference is loaded before SDK creation. If it cannot be read, collection
+stays off. Opt-out clears pending events and blocks later sends; it cannot retract a request already
+sent. Account changes reset identity in order, and late results from an old account are discarded.
+There is no persistent offline analytics queue. Transport failures can lose events, and collection
+never blocks product actions. Session replay, automatic screen capture, route IDs, QR values, tokens,
+file names, contents, URLs and raw errors are excluded. The SDK's Android referrer and path metadata
+are removed again at the final send filter. Account ID and normalized email identify the profile;
+email is not an event property. The phone preference is independent of desktop/host analytics.
+
+Pre-session events stay in memory for at most 30 minutes from the first buffered event, with a
+limit of 100 events (the oldest is removed when full). Session creation sends eligible events once,
+with their original timestamps, after identifying the account. Reconnects do not replay them.
+Opt-out and process exit discard the buffer. Sign-out ends the previous account's operation scopes;
+new signed-out activity can be claimed by the next sign-in. There is no disk queue.
+Existing anonymous events already sent by older builds are not reassigned by this fix.
+If mobile credentials belong to another project, replace both production variables with credentials
+for a write-only client in **Openbot**, then ship a build or compatible update with those values.

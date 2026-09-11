@@ -1,0 +1,100 @@
+/*
+ * The OpenCode Zen key dialog. It opens on top of the settings modal, so its layer is one above
+ * the shared dialog layer rather than the same one -- both portals are children of `body`, and
+ * relying on insertion order alone would break the first time a caller mounts it from elsewhere.
+ */
+
+.opencode-key-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--openbot-layer-dialog) + 1);
+  display: grid;
+  place-items: center;
+  padding: var(--openbot-space-6);
+  animation: opencode-key-backdrop-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
+}
+
+.opencode-key-dialog {
+  width: min(420px, 100%);
+  max-height: calc(100dvh - var(--openbot-space-6) * 2);
+  overflow-y: auto;
+  outline: 0;
+  border-radius: var(--openbot-radius-xl);
+  background: var(--openbot-bg-control);
+  padding: var(--openbot-space-8);
+  color: var(--openbot-text-primary);
+  animation: opencode-key-dialog-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
+}
+
+.opencode-key-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  text-align: center;
+}
+
+.opencode-key-logo {
+  width: calc(var(--openbot-space-8) + var(--openbot-space-2));
+  height: calc(var(--openbot-space-8) + var(--openbot-space-2));
+}
+
+.opencode-key-title {
+  margin: 0;
+  font-size: var(--openbot-text-xl);
+  line-height: var(--openbot-leading-xl);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-tight);
+}
+
+.opencode-key-description {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.opencode-key-saved {
+  display: block;
+  margin-top: var(--openbot-space-6);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-hover);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.opencode-key-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  margin: var(--openbot-space-6) 0 0;
+}
+
+.opencode-key-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--openbot-space-2);
+}
+
+.opencode-key-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--openbot-space-2);
+  margin-top: var(--openbot-space-6);
+  border-top: 1px solid var(--openbot-border);
+  padding-top: var(--openbot-space-4);
+}
+
+@keyframes opencode-key-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes opencode-key-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}

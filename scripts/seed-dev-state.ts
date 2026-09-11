@@ -4,12 +4,24 @@ import { homedir } from "node:os";
 import { dirname, join, parse, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
-import type { AgentSummary, AttachmentSummary, ConversationMessage, Routine } from "@openbot/contracts/ipc";
+import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import type {
+  AgentSummary,
+  AttachmentSummary,
+  ChannelMessage,
+  ChannelTask,
+  ConversationMessage,
+  Routine,
+} from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
+import { agentNamesById, displayMessageReferences } from "../src/backend/agent/delivery-content";
 import { AgentMemoryStore } from "../src/backend/agent-memory-store";
 import { AgentRoutineStore } from "../src/backend/agent-routine-store";
 import { AgentStore } from "../src/backend/agent-store";
+import { ChannelMemoryStore } from "../src/backend/channel-memory-store";
+import { ChannelRoutineStore } from "../src/backend/channel-routine-store";
+import { ChannelStore } from "../src/backend/channel-store";
 import { sortConversationMessages } from "../src/backend/conversation-snapshots";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
@@ -27,7 +39,16 @@ const TEAM_FILE = "openbot-team-server-v2.json";
 const LEGACY_TEAM_FILE = "openbot-team-server-v1.json";
 const SETUP_FILE = "openbot-setup-v2.json";
 const SEED_VERSION = 1;
-const SEEDED_AT = "2026-08-21T10:00:00.000Z";
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+const CHANNEL_LAUNCH_ROOM = "channel-launch-room";
+const CHANNEL_BETA_FEEDBACK = "channel-beta-feedback";
+/**
+ * The reader id `HostService.channelActor` uses while no account is signed in. The signed-in reader
+ * adopts these cursors through `ChannelStore.adoptReads`, so the seeded read state follows it.
+ */
+const LOCAL_MEMBER_ID = "local";
 const SEED_AGENT_MODEL = "gpt-5.6-luna";
 const SEED_AGENT_REASONING_EFFORT = "low";
 const GENERATED_DIRECTORY_PATTERN =
@@ -68,12 +89,18 @@ export interface DevelopmentSeedSummary {
   memories: number;
   routines: number;
   routineRuns: number;
+  channels: number;
+  channelMessages: number;
+  channelTasks: number;
+  channelMemories: number;
+  channelRoutines: number;
+  channelRoutineRuns: number;
 }
 
 const SEED_SUMMARY = {
   agents: 4,
   conversations: 4,
-  attachments: 4,
+  attachments: 5,
   teamMembers: 4,
   activeInvites: 1,
   sessions: 4,
@@ -82,6 +109,12 @@ const SEED_SUMMARY = {
   memories: 7,
   routines: 5,
   routineRuns: 3,
+  channels: 2,
+  channelMessages: 12,
+  channelTasks: 5,
+  channelMemories: 3,
+  channelRoutines: 2,
+  channelRoutineRuns: 2,
 } as const;
 
 const AGENTS = [
@@ -93,7 +126,6 @@ const AGENTS = [
     model: SEED_AGENT_MODEL,
     reasoningEffort: SEED_AGENT_REASONING_EFFORT,
     avatarHue: 245,
-    preview: "The launch plan is ready with owners, evidence, and next actions.",
   },
   {
     id: "research",
@@ -103,7 +135,6 @@ const AGENTS = [
     model: SEED_AGENT_MODEL,
     reasoningEffort: SEED_AGENT_REASONING_EFFORT,
     avatarHue: 185,
-    preview: "The source review and evidence map are complete.",
   },
   {
     id: "builder",
@@ -113,7 +144,6 @@ const AGENTS = [
     model: SEED_AGENT_MODEL,
     reasoningEffort: SEED_AGENT_REASONING_EFFORT,
     avatarHue: 30,
-    preview: "The implementation checklist includes tests and rollback steps.",
   },
   {
     id: "launch",
@@ -123,7 +153,6 @@ const AGENTS = [
     model: SEED_AGENT_MODEL,
     reasoningEffort: SEED_AGENT_REASONING_EFFORT,
     avatarHue: 320,
-    preview: "The launch brief is ready for final review.",
   },
 ] as const;
 
@@ -209,16 +238,18 @@ async function buildSeedProfile(
   const mailbox = new MailboxStore(profilePath, agentStore.sharedRoot, agentStore.database);
   await mailbox.initialize();
 
+  const clock = createSeedClock();
   try {
     const agents = await seedAgents(agentStore);
     const attachments = await seedAttachments(mailbox, agents, transferDirectories);
     seedMemories(agentStore);
-    await seedRoutines(agentStore, mailbox);
+    await seedRoutines(agentStore, mailbox, clock);
     await seedAgentExchanges(mailbox);
-    await seedConversations(agentStore, mailbox, agents, attachments);
-    await seedTeam(profilePath, agentStore);
+    await seedConversations(agentStore, mailbox, agents, attachments, clock);
+    await seedChannels(agentStore, mailbox, agents, clock, transferDirectories);
+    await seedTeam(profilePath, agentStore, clock);
     await writeSetupState(join(profilePath, SETUP_FILE), { preferredProvider: "codex", preferredModel: null });
-    await writeSeedManifest(profilePath, transferDirectories);
+    await writeSeedManifest(profilePath, clock, transferDirectories);
   } finally {
     agentStore.database.close();
   }
@@ -277,10 +308,10 @@ function seedMemories(agentStore: AgentStore): void {
   }
 }
 
-async function seedRoutines(agentStore: AgentStore, mailbox: MailboxStore): Promise<void> {
+async function seedRoutines(agentStore: AgentStore, mailbox: MailboxStore, clock: SeedClock): Promise<void> {
   const routines = new AgentRoutineStore(agentStore.database);
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  const now = new Date();
+  const timezone = seedTimezone();
+  const now = clock.now;
   const morningBrief = routines.create(
     {
       agentId: "chief",
@@ -292,7 +323,7 @@ async function seedRoutines(agentStore: AgentStore, mailbox: MailboxStore): Prom
     },
     now,
   );
-  routines.create(
+  const fridayReview = routines.create(
     {
       agentId: "chief",
       name: "Friday launch review",
@@ -337,14 +368,17 @@ async function seedRoutines(agentStore: AgentStore, mailbox: MailboxStore): Prom
     now,
   );
 
-  await seedRoutineRun(routines, mailbox, morningBrief, "scheduled", hoursBefore(now, 26), "succeeded");
-  await seedRoutineRun(routines, mailbox, morningBrief, "manual", hoursBefore(now, 2), "succeeded");
+  // Each run holds its own `scheduledFor`, but the request it delivers carries the mailbox clock,
+  // which is the moment the seed runs. So two runs of one routine would render as one instruction
+  // repeated at one time. Two routines keep the scheduled and the manual run apart in the thread.
+  await seedRoutineRun(routines, mailbox, morningBrief, "scheduled", clock.at(26 * HOUR), "succeeded");
+  await seedRoutineRun(routines, mailbox, fridayReview, "manual", clock.at(2 * HOUR), "succeeded");
   await seedRoutineRun(
     routines,
     mailbox,
     sourceCheck,
     "scheduled",
-    hoursBefore(now, 25),
+    clock.at(25 * HOUR),
     "failed",
     "One source was temporarily unavailable.",
   );
@@ -381,10 +415,6 @@ async function seedRoutineRun(
   routines.updateRunStatus(run.id, status, error);
 }
 
-function hoursBefore(date: Date, hours: number): string {
-  return new Date(date.getTime() - hours * 60 * 60 * 1_000).toISOString();
-}
-
 async function seedAgents(agentStore: AgentStore): Promise<Map<string, AgentSummary>> {
   const agents = new Map<string, AgentSummary>();
   for (const fixture of AGENTS) {
@@ -400,7 +430,6 @@ async function seedAgents(agentStore: AgentStore): Promise<Map<string, AgentSumm
       avatarHue: fixture.avatarHue,
     });
     await agentStore.ensureThreadId(fixture.id);
-    await agentStore.updatePreview(fixture.id, fixture.preview);
     agents.set(fixture.id, agentStore.list().find((candidate) => candidate.id === fixture.id) ?? agent);
   }
   return agents;
@@ -458,14 +487,19 @@ async function seedConversations(
   mailbox: MailboxStore,
   agents: Map<string, AgentSummary>,
   attachments: Record<"brief" | "metrics" | "evidence" | "image", AttachmentSummary>,
+  clock: SeedClock,
 ): Promise<void> {
+  const message = (id: string, author: ConversationMessage["author"], text: string, ago: number): ConversationMessage =>
+    conversationMessage(clock, id, author, text, ago);
+  const mention = (agentId: string): string => mentionAgent(agents, agentId);
+  const file = (attachment: AttachmentSummary): string => serializeAttachmentReference(attachment.name, attachment.id);
   const conversations: Record<string, ConversationMessage[]> = {
     chief: [
       message(
         "chief-user-plan",
         "user",
-        "Prepare the launch plan, tag @Research, and keep every decision traceable.",
-        0,
+        `Prepare the launch plan, tag ${mention("research")}, and keep every decision traceable.`,
+        26 * HOUR,
       ),
       {
         ...message(
@@ -474,14 +508,14 @@ async function seedConversations(
           [
             "## Launch plan",
             "",
-            "I asked @Research to verify the evidence. The working documents are",
-            `${serializeAttachmentReference(attachments.brief.name, attachments.brief.id)} and ${serializeAttachmentReference(attachments.metrics.name, attachments.metrics.id)}.`,
+            `I asked ${mention("research")} to verify the evidence. The working documents are`,
+            `${file(attachments.brief)} and ${file(attachments.metrics)}.`,
             "",
             "| Workstream | Owner | Status |",
             "| --- | --- | --- |",
-            "| Product QA | @Builder | Ready |",
-            "| Evidence | @Research | In review |",
-            "| Release | @Launch | Ready |",
+            `| Product QA | ${mention("builder")} | Ready |`,
+            `| Evidence | ${mention("research")} | In review |`,
+            `| Release | ${mention("launch")} | Ready |`,
             "",
             "Next: review the [OpenBot documentation](https://openbot.run/docs), then run:",
             "",
@@ -489,25 +523,24 @@ async function seedConversations(
             "bun run check",
             "```",
           ].join("\n"),
-          1,
+          26 * HOUR - 4 * MINUTE,
         ),
         turnId: "dev-seed-turn-chief-plan",
         attachments: [attachments.brief, attachments.metrics],
       },
       {
-        ...message("chief-user-reply", "user", "Looks good. Add a final rollback owner.", 2),
+        ...message("chief-user-rollback", "user", "Who owns the rollback if the release note is wrong?", 25 * HOUR),
         replyToMessageId: "chief-assistant-plan",
       },
+      message(
+        "chief-assistant-rollback",
+        "assistant",
+        `${mention("builder")} owns the rollback. The steps are in the implementation checklist, and ${mention("launch")} holds publication until they pass.`,
+        25 * HOUR - 3 * MINUTE,
+      ),
+      message("chief-user-image", "user", "Generate a banner concept for the launch post.", 6 * HOUR),
       {
-        ...message("chief-assistant-failed", "assistant", "I could not load one external source.", 3),
-        status: "failed",
-      },
-      {
-        ...message("chief-assistant-interrupted", "assistant", "The long audit stopped when the app restarted.", 4),
-        status: "interrupted",
-      },
-      {
-        ...message("chief-image-completed", "assistant", "", 5),
+        ...message("chief-image-completed", "assistant", "", 6 * HOUR - 2 * MINUTE),
         itemType: "image_generation",
         attachments: [attachments.image],
         imageGeneration: {
@@ -516,8 +549,9 @@ async function seedConversations(
           aspectRatio: "square",
         },
       },
+      message("chief-user-image-variant", "user", "Try a wide variant of the same concept.", 5 * HOUR),
       {
-        ...message("chief-image-failed", "assistant", "", 6),
+        ...message("chief-image-failed", "assistant", "", 5 * HOUR - MINUTE),
         status: "failed",
         itemType: "image_generation",
         imageGeneration: {
@@ -527,43 +561,90 @@ async function seedConversations(
           error: "The image service was temporarily unavailable.",
         },
       },
+      message("chief-user-sources", "user", "Re-check the external sources in the brief before I share it.", 3 * HOUR),
+      {
+        ...message("chief-assistant-failed", "assistant", "I could not load one external source.", 3 * HOUR - MINUTE),
+        status: "failed",
+      },
+      message("chief-user-audit", "user", "Run the full launch audit and stop if anything is unclear.", 95 * MINUTE),
+      {
+        ...message(
+          "chief-assistant-interrupted",
+          "assistant",
+          "The long audit stopped when the app restarted.",
+          92 * MINUTE,
+        ),
+        status: "interrupted",
+      },
     ],
     research: [
-      message("research-user", "user", "Check the claims and return a compact evidence map.", 10),
+      message("research-user", "user", "Check the launch claims and return a compact evidence map.", 27 * HOUR),
       {
         ...message(
           "research-assistant",
           "assistant",
-          `Seven of eight claims are verified. One claim still needs a primary source. See ${serializeAttachmentReference(attachments.evidence.name, attachments.evidence.id)}.`,
-          11,
+          `Seven of eight claims are verified. One claim still needs a primary source. See ${file(attachments.evidence)}.`,
+          27 * HOUR - 5 * MINUTE,
         ),
         turnId: "dev-seed-turn-research-evidence",
         attachments: [attachments.evidence],
       },
+      message(
+        "research-user-open-claim",
+        "user",
+        "Which claim is still open, and what would close it?",
+        3 * HOUR + 30 * MINUTE,
+      ),
+      message(
+        "research-assistant-open-claim",
+        "assistant",
+        "The retention claim is open. Only a vendor blog supports it. A primary source, or a measurement from our own data, would close it.",
+        3 * HOUR + 28 * MINUTE,
+      ),
     ],
     builder: [
-      message("builder-user", "user", "Turn the launch plan into a safe implementation checklist.", 20),
+      message("builder-user", "user", "Turn the launch plan into a safe implementation checklist.", 25 * HOUR),
       message(
         "builder-assistant",
         "assistant",
         "### Implementation checklist\n\n1. Run typecheck.\n2. Run Biome.\n3. Test the dev app.\n4. Record the rollback step.\n\n```ts\nconst ready = checks.every(Boolean);\n```",
-        21,
+        25 * HOUR - 10 * MINUTE,
+      ),
+      message("builder-user-rollback", "user", "Add the rollback step to the checklist and keep the order.", 4 * HOUR),
+      message(
+        "builder-assistant-rollback",
+        "assistant",
+        "The rollback step is now step five: revert the release tag, then republish the previous note. The order of the checks is unchanged.",
+        4 * HOUR - 2 * MINUTE,
       ),
     ],
     launch: [
-      message("launch-user", "user", "Prepare the final release message and asset review.", 30),
+      message("launch-user", "user", "Prepare the final release message and asset review.", 23 * HOUR),
       {
         ...message(
           "launch-assistant",
           "assistant",
-          `The release package is ready. Review ${serializeAttachmentReference(attachments.image.name, attachments.image.id)} before publication.`,
-          31,
+          `The release package is ready. Review ${file(attachments.image)} before publication.`,
+          23 * HOUR - 5 * MINUTE,
         ),
         attachments: [attachments.image],
       },
+      message(
+        "launch-user-hold",
+        "user",
+        `Hold publication until ${mention("research")} closes the open claim.`,
+        2 * HOUR,
+      ),
+      message(
+        "launch-assistant-hold",
+        "assistant",
+        "Publication is on hold. The release note keeps the verified claims only, and I publish after the open claim is closed.",
+        2 * HOUR - 3 * MINUTE,
+      ),
     ],
   };
 
+  const agentNames = agentNamesById([...agents.values()]);
   for (const [agentId, messages] of Object.entries(conversations)) {
     const agent = requireAgent(agents, agentId);
     const persistedMessages = [...messages, ...mailbox.conversationMessages(agentId)];
@@ -574,6 +655,15 @@ async function seedConversations(
       { seedVersion: SEED_VERSION },
       `dev-seed:conversation:${agentId}`,
     );
+    // The app writes the preview from the user's last request with its references expanded
+    // (`agent-service.ts`), never from a reply. A hand-written line contradicts the transcript
+    // beside it as soon as the transcript changes.
+    const request = [...messages].reverse().find((entry) => entry.author === "user" && entry.text.trim());
+    if (request)
+      await agentStore.updatePreview(
+        agentId,
+        displayMessageReferences(request.text, request.attachments ?? [], agentNames),
+      );
   }
   await mailbox.setReaction("chief", "chief-assistant-plan", { kind: "user" }, "🎉");
   await mailbox.setReaction("research", "research-assistant", { kind: "user" }, "✅");
@@ -606,7 +696,391 @@ async function seedAgentExchanges(mailbox: MailboxStore): Promise<void> {
   await mailbox.markTerminal(failedDelivery.id, "failed", "The primary source was not available.");
 }
 
-async function seedTeam(profilePath: string, agentStore: AgentStore): Promise<void> {
+/**
+ * The two channels the app cannot show without them: a working room with a delegated run, and one
+ * archived room behind the sidebar toggle. No seeded task is `queued` and no seeded routine run is
+ * open, so the channel service recovers this state at startup without starting a provider turn.
+ */
+async function seedChannels(
+  agentStore: AgentStore,
+  mailbox: MailboxStore,
+  agents: Map<string, AgentSummary>,
+  clock: SeedClock,
+  transferDirectories: string[],
+): Promise<void> {
+  const store = new ChannelStore(agentStore.database);
+  await seedLaunchRoom(store, mailbox, agents, clock, transferDirectories);
+  seedBetaFeedbackChannel(store, agents, clock);
+}
+
+async function seedLaunchRoom(
+  store: ChannelStore,
+  mailbox: MailboxStore,
+  agents: Map<string, AgentSummary>,
+  clock: SeedClock,
+  transferDirectories: string[],
+): Promise<void> {
+  const channelId = CHANNEL_LAUNCH_ROOM;
+  const created = store.update(
+    {
+      ...store.create(channelId, {
+        name: "Launch room",
+        title: "Ship OpenBot 1.0",
+        instructions:
+          "Keep every decision traceable. Name the owner and the evidence in each result, and leave an unverified claim out.",
+        members: [{ agentId: "chief" }, { agentId: "research" }, { agentId: "builder" }, { agentId: "launch" }],
+        leadAgentId: "chief",
+      }),
+      createdAt: clock.at(3 * DAY),
+    },
+    {},
+    "dev-seed:channel-launch-room",
+  );
+  // The execution threads come first: a file an agent generates in a channel belongs to the shared
+  // transcript, so it has to be owned by the channel thread rather than by the agent's own chat.
+  for (const agentId of ["chief", "research", "builder"]) store.context(channelId, agentId);
+  const launchThread = store.context(channelId, "launch").threadId;
+  const draft = await mailbox.storeGeneratedAttachment({
+    name: "release-note-draft.md",
+    mimeType: "text/markdown",
+    bytes: bytes(
+      [
+        "# OpenBot 1.0 release note (draft)",
+        "",
+        "## What is new",
+        "- Channels: several agents share one chat and one task list.",
+        "- Routines: a schedule can start work in a channel.",
+        "",
+        "## Evidence",
+        "- Cold start: 1.9 s on the release benchmark. Owner: Builder.",
+        "- Search: 120 ms median on the release benchmark. Owner: Builder.",
+        "",
+        "## Open",
+        "- The retention claim has no primary source. It stays out of this note.",
+        "",
+      ].join("\n"),
+    ),
+    ownerAgentId: "launch",
+    ownerThreadId: launchThread,
+  });
+  transferDirectories.push(`generated/${draft.id}`);
+
+  // The routine exists before the message it fired: the author id of a routine request carries the
+  // routine id, the way `ChannelService` writes it for a `request` command.
+  const routines = new ChannelRoutineStore(store.database);
+  const timezone = seedTimezone();
+  const standup = routines.create(
+    {
+      channelId,
+      name: "Daily launch standup",
+      instruction: "Post the launch standup: progress since yesterday, blockers, and the next decision.",
+      active: true,
+      timezone,
+      schedule: { kind: "weekdays", time: "09:15" },
+    },
+    clock.now,
+  );
+  routines.create(
+    {
+      channelId,
+      name: "Weekly launch retro",
+      instruction: "Collect what changed this week, what slipped, and one improvement for the next release.",
+      active: false,
+      timezone,
+      schedule: { kind: "weekly", weekday: 5, time: "16:30" },
+    },
+    clock.now,
+  );
+
+  const requestReleaseNote = "channel-launch-request-release-note";
+  const requestStandup = "channel-launch-request-standup";
+  const requestRollback = "channel-launch-request-rollback";
+  const taskReleaseNote = "channel-launch-task-release-note";
+  const taskEvidence = "channel-launch-task-evidence";
+  const taskStandup = "channel-launch-task-standup";
+  const taskRollback = "channel-launch-task-rollback";
+  const releaseNoteText =
+    "Draft the release note for OpenBot 1.0. Keep the evidence with every claim and name an owner for each section.";
+  const evidenceText = "Verify the two performance claims in the draft and name a primary source for each.";
+  const rollbackText = `Add the rollback owner to the release note. ${mentionAgent(agents, "builder")} should confirm the steps.`;
+  const message = (input: SeedChannelMessage): ChannelMessage => channelMessage(channelId, clock, input);
+  const agentAuthor = (agentId: string): ChannelMessage["author"] => ({
+    kind: "agent",
+    id: agentId,
+    name: requireAgent(agents, agentId).name,
+  });
+
+  const messages: ChannelMessage[] = [
+    message({
+      id: requestReleaseNote,
+      taskId: taskReleaseNote,
+      author: { kind: "member", id: LOCAL_MEMBER_ID, name: "You" },
+      text: releaseNoteText,
+      ago: 2 * DAY,
+    }),
+    message({
+      id: "channel-launch-dispatch-release-note",
+      taskId: taskReleaseNote,
+      author: agentAuthor("chief"),
+      text: "Assigned to Launch.",
+      ago: 2 * DAY - 2 * MINUTE,
+    }),
+    message({
+      id: "channel-launch-handoff-evidence",
+      taskId: taskReleaseNote,
+      author: agentAuthor("launch"),
+      text: `Research: ${evidenceText}`,
+      replyToMessageId: requestReleaseNote,
+      ago: 2 * DAY - 6 * MINUTE,
+    }),
+    message({
+      id: "channel-launch-result-evidence",
+      taskId: taskEvidence,
+      author: agentAuthor("research"),
+      text: "Both performance claims match the release benchmark. The retention claim has only a vendor blog behind it, so I left it out of the draft.",
+      turnId: "dev-seed-turn-channel-evidence",
+      ago: 2 * DAY - 42 * MINUTE,
+    }),
+    message({
+      id: "channel-launch-result-release-note",
+      taskId: taskReleaseNote,
+      author: agentAuthor("launch"),
+      text: `The draft is ready: ${serializeAttachmentReference(draft.name, draft.id)}. It cites the two verified claims and names an owner for each section.`,
+      turnId: "dev-seed-turn-channel-release-note",
+      attachments: [draft],
+      ago: 2 * DAY - 55 * MINUTE,
+    }),
+    message({
+      id: requestStandup,
+      taskId: taskStandup,
+      author: { kind: "member", id: `routine:${standup.id}`, name: standup.name },
+      text: standup.instruction,
+      ago: 26 * HOUR,
+    }),
+    message({
+      id: "channel-launch-result-standup",
+      taskId: taskStandup,
+      author: agentAuthor("chief"),
+      text: "Progress: the release note draft is ready. Blocker: the retention claim has no primary source. Next decision: publish without the claim, or wait for the source.",
+      turnId: "dev-seed-turn-channel-standup",
+      ago: 26 * HOUR - 4 * MINUTE,
+    }),
+    message({
+      id: requestRollback,
+      taskId: taskRollback,
+      author: { kind: "member", id: LOCAL_MEMBER_ID, name: "You" },
+      text: rollbackText,
+      ago: 3 * HOUR,
+    }),
+    message({
+      id: "channel-launch-dispatch-rollback",
+      taskId: taskRollback,
+      author: agentAuthor("chief"),
+      text: "Assigned to Builder.",
+      ago: 3 * HOUR - 2 * MINUTE,
+    }),
+  ];
+  const tasks: ChannelTask[] = [
+    channelTask(channelId, {
+      id: taskReleaseNote,
+      ownerAgentId: "launch",
+      requestMessageId: requestReleaseNote,
+      instruction: releaseNoteText,
+      state: "completed",
+      dependencies: [taskEvidence],
+      assignmentCount: 1,
+    }),
+    channelTask(channelId, {
+      id: taskEvidence,
+      parentTaskId: taskReleaseNote,
+      rootTaskId: taskReleaseNote,
+      ownerAgentId: "research",
+      requestMessageId: requestReleaseNote,
+      instruction: evidenceText,
+      expectedResult: "Name the primary source of each verified claim, or report the claim as open.",
+      state: "completed",
+    }),
+    channelTask(channelId, {
+      id: taskStandup,
+      ownerAgentId: "chief",
+      requestMessageId: requestStandup,
+      instruction: standup.instruction,
+      state: "completed",
+    }),
+    channelTask(channelId, {
+      id: taskRollback,
+      ownerAgentId: "builder",
+      requestMessageId: requestRollback,
+      instruction: rollbackText,
+      state: "failed",
+      error: "The agent could not complete this task.",
+    }),
+  ];
+  store.update(created, { messages, tasks }, "dev-seed:channel-launch-room:transcript");
+  // Two messages the user did not write stay unread, so the sidebar count and the unread divider
+  // both have something to show.
+  store.markRead(channelId, LOCAL_MEMBER_ID, 6, "dev-seed:channel-launch-room:read");
+
+  const standupRun = routines.createRun(standup, standup.trigger.id, "scheduled", clock.at(26 * HOUR));
+  routines.attachRequest(standupRun.id, requestStandup);
+  routines.updateRunStatus(standupRun.id, "succeeded");
+  // A fire that never reached the channel: the run holds the error and no request message.
+  const blockedRun = routines.createRun(standup, null, "manual", clock.at(4 * HOUR));
+  routines.updateRunStatus(blockedRun.id, "failed", "Every member was busy when the routine fired.");
+
+  const memories = new ChannelMemoryStore(store.database);
+  memories.createManual(channelId, "Name the owner and the evidence for every release claim.");
+  memories.createManual(channelId, "Use Europe/Warsaw when presenting launch dates and times.");
+  memories.saveFromTool(
+    channelId,
+    "The retention claim has no primary source, so it stays out of the release note.",
+    "dev-seed-turn-channel-evidence",
+    "dev-seed:channel-memory:retention-claim",
+  );
+}
+
+/** Finished work behind the sidebar's archived toggle, which is empty without it. */
+function seedBetaFeedbackChannel(store: ChannelStore, agents: Map<string, AgentSummary>, clock: SeedClock): void {
+  const channelId = CHANNEL_BETA_FEEDBACK;
+  const created = store.update(
+    {
+      ...store.create(channelId, {
+        name: "Beta feedback",
+        title: "Read the beta reports",
+        instructions: "Report counts, not impressions. Name the source of every number.",
+        members: [{ agentId: "research" }, { agentId: "launch" }],
+        leadAgentId: "launch",
+      }),
+      createdAt: clock.at(12 * DAY),
+    },
+    {},
+    "dev-seed:channel-beta-feedback",
+  );
+  store.context(channelId, "research");
+  const requestSummary = "channel-beta-request-summary";
+  const taskSummary = "channel-beta-task-summary";
+  const summaryText = "Summarize the beta feedback and list the three most common requests.";
+  const messages: ChannelMessage[] = [
+    channelMessage(channelId, clock, {
+      id: requestSummary,
+      taskId: taskSummary,
+      author: { kind: "member", id: LOCAL_MEMBER_ID, name: "You" },
+      text: summaryText,
+      ago: 8 * DAY,
+    }),
+    channelMessage(channelId, clock, {
+      id: "channel-beta-dispatch-summary",
+      taskId: taskSummary,
+      author: { kind: "agent", id: "launch", name: requireAgent(agents, "launch").name },
+      text: "Assigned to Research.",
+      ago: 8 * DAY - 2 * MINUTE,
+    }),
+    channelMessage(channelId, clock, {
+      id: "channel-beta-result-summary",
+      taskId: taskSummary,
+      author: { kind: "agent", id: "research", name: requireAgent(agents, "research").name },
+      text: "Ninety-four reports. The three most common requests are a shared inbox, faster search, and per-agent notification control.",
+      turnId: "dev-seed-turn-channel-beta",
+      ago: 8 * DAY - 35 * MINUTE,
+    }),
+  ];
+  store.update(
+    created,
+    {
+      messages,
+      tasks: [
+        channelTask(channelId, {
+          id: taskSummary,
+          ownerAgentId: "research",
+          requestMessageId: requestSummary,
+          instruction: summaryText,
+          state: "completed",
+        }),
+      ],
+    },
+    "dev-seed:channel-beta-feedback:transcript",
+  );
+  store.markRead(channelId, LOCAL_MEMBER_ID, messages.length, "dev-seed:channel-beta-feedback:read");
+  store.update({ ...store.get(channelId), archived: true }, {}, "dev-seed:channel-beta-feedback:archive");
+}
+
+interface SeedChannelMessage {
+  id: string;
+  taskId: string;
+  author: ChannelMessage["author"];
+  text: string;
+  ago: number;
+  turnId?: string;
+  replyToMessageId?: string;
+  attachments?: AttachmentSummary[];
+}
+
+/**
+ * The same message shape `ChannelService` writes: a member request is a `user` message, a lead
+ * dispatch or a handoff is a `system` message, and a reported result is an `assistant` message
+ * with the turn that produced it.
+ */
+function channelMessage(channelId: string, clock: SeedClock, input: SeedChannelMessage): ChannelMessage {
+  return {
+    id: input.id,
+    channelId,
+    taskId: input.taskId,
+    author: input.author,
+    sequence: 0,
+    superseded: false,
+    message: {
+      id: input.id,
+      text: input.text,
+      author: input.author.kind === "member" ? "user" : input.turnId ? "assistant" : "system",
+      createdAt: clock.at(input.ago),
+      status: "completed",
+      turnId: input.turnId,
+      replyToMessageId: input.replyToMessageId,
+      attachments: input.attachments,
+    },
+  };
+}
+
+interface SeedChannelTask {
+  id: string;
+  ownerAgentId: string;
+  requestMessageId: string;
+  instruction: string;
+  state: ChannelTask["state"];
+  parentTaskId?: string;
+  rootTaskId?: string;
+  expectedResult?: string;
+  dependencies?: string[];
+  assignmentCount?: number;
+  error?: string;
+}
+
+function channelTask(channelId: string, input: SeedChannelTask): ChannelTask {
+  return {
+    id: input.id,
+    channelId,
+    parentTaskId: input.parentTaskId ?? null,
+    rootTaskId: input.rootTaskId ?? input.id,
+    ownerAgentId: input.ownerAgentId,
+    requestMessageId: input.requestMessageId,
+    instruction: input.instruction,
+    attachmentDraftIds: [],
+    expectedResult: input.expectedResult ?? "Complete the requested work and report the result.",
+    sourceMessageIds: [input.requestMessageId],
+    dependencies: input.dependencies ?? [],
+    resources: ["host"],
+    state: input.state,
+    revision: 0,
+    assignmentCount: input.assignmentCount ?? 0,
+    error: input.error ?? null,
+  };
+}
+
+function mentionAgent(agents: Map<string, AgentSummary>, agentId: string): string {
+  return serializeChatTagReference("agent", requireAgent(agents, agentId).name, agentId);
+}
+
+async function seedTeam(profilePath: string, agentStore: AgentStore, clock: SeedClock): Promise<void> {
   const team = new TeamStore(join(profilePath, TEAM_FILE), join(profilePath, LEGACY_TEAM_FILE));
   await team.initialize();
   const owner = {
@@ -644,28 +1118,28 @@ async function seedTeam(profilePath: string, agentStore: AgentStore): Promise<vo
     senderMemberId: ownerSession.member.id,
     recipientMemberId: alice.member.id,
     text: "I added the launch notes. Can you review the last section?",
-    createdAt: timestamp(40),
+    createdAt: clock.at(3 * HOUR),
   });
   chat.sendMessage({
     clientMessageId: "dev-seed-dm-alice-owner-1",
     senderMemberId: alice.member.id,
     recipientMemberId: ownerSession.member.id,
     text: "The notes look good. I left one comment on the rollout section.",
-    createdAt: timestamp(41),
+    createdAt: clock.at(2 * HOUR + 40 * MINUTE),
   });
   chat.sendMessage({
     clientMessageId: "dev-seed-dm-jon-owner-1",
     senderMemberId: jon.member.id,
     recipientMemberId: ownerSession.member.id,
     text: "The customer examples are ready for the release note.",
-    createdAt: timestamp(42),
+    createdAt: clock.at(2 * HOUR),
   });
   chat.sendMessage({
     clientMessageId: "dev-seed-dm-maya-owner-1",
     senderMemberId: maya.member.id,
     recipientMemberId: ownerSession.member.id,
     text: "I checked the final asset sizes. Everything is within the limits.",
-    createdAt: timestamp(43),
+    createdAt: clock.at(35 * MINUTE),
   });
 }
 
@@ -691,10 +1165,10 @@ async function replaceDevelopmentProfile(target: string, staging: string, homeDi
   }
 }
 
-async function writeSeedManifest(profilePath: string, transferDirectories: string[]): Promise<void> {
+async function writeSeedManifest(profilePath: string, clock: SeedClock, transferDirectories: string[]): Promise<void> {
   const manifest: DevelopmentSeedManifest = {
     version: 1,
-    createdAt: SEEDED_AT,
+    createdAt: clock.at(0),
     transferDirectories: [...transferDirectories],
   };
   await writeFile(join(profilePath, DEVELOPMENT_SEED_MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`, {
@@ -731,24 +1205,39 @@ async function removeTransferDirectories(homeDirectory: string, directories: str
   return removed;
 }
 
-function message(
+/**
+ * Every seeded record is dated backwards from the run. A fixed date would put the whole showcase
+ * weeks before the routine runs, which the schedulers date from the real clock, and would make the
+ * date separators and the sidebar order read wrong on the day a developer seeds.
+ */
+interface SeedClock {
+  now: Date;
+  at(millisecondsAgo: number): string;
+}
+
+function createSeedClock(now = new Date()): SeedClock {
+  return { now, at: (millisecondsAgo) => new Date(now.getTime() - millisecondsAgo).toISOString() };
+}
+
+function seedTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
+function conversationMessage(
+  clock: SeedClock,
   id: string,
   author: ConversationMessage["author"],
   text: string,
-  minuteOffset: number,
+  millisecondsAgo: number,
 ): ConversationMessage {
   return {
     id,
     author,
     source: author === "assistant" ? "assistant" : author,
     text,
-    createdAt: timestamp(minuteOffset),
+    createdAt: clock.at(millisecondsAgo),
     status: "completed",
   };
-}
-
-function timestamp(minuteOffset: number): string {
-  return new Date(Date.parse(SEEDED_AT) + minuteOffset * 60_000).toISOString();
 }
 
 function requireAgent(agents: Map<string, AgentSummary>, agentId: string): AgentSummary {
@@ -809,6 +1298,12 @@ async function main(): Promise<void> {
   logger.info(`- memories: ${summary.memories}`);
   logger.info(`- routines: ${summary.routines}`);
   logger.info(`- routine runs: ${summary.routineRuns}`);
+  logger.info(`- channels: ${summary.channels}`);
+  logger.info(`- channel messages: ${summary.channelMessages}`);
+  logger.info(`- channel tasks: ${summary.channelTasks}`);
+  logger.info(`- channel memories: ${summary.channelMemories}`);
+  logger.info(`- channel routines: ${summary.channelRoutines}`);
+  logger.info(`- channel routine runs: ${summary.channelRoutineRuns}`);
   if (dryRun) logger.info("No files were changed.");
   else logger.info("Run `bun run dev` to open the seeded showcase.");
 }

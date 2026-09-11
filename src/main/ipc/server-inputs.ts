@@ -190,3 +190,8 @@ export function parseRemoteDesktopDisplay(input: unknown): { serverId: string; d
     displayId: requireString(input.displayId, "displayId"),
   };
 }
+
+export function parseSetServerMuted(value: unknown): { serverId: string; muted: boolean } {
+  if (!isObject(value) || !isBoolean(value.muted)) throw new Error("Invalid server mute setting.");
+  return { serverId: requireString(value.serverId, "serverId", INPUT_LIMITS.identifier), muted: value.muted };
+}

@@ -270,11 +270,30 @@ Conversation read cursors belong to a team member and are shared across that mem
 Advancing a cursor emits a conversation invalidation without the reader's identity or cursor;
 clients reload their own read state even when the conversation content revision is unchanged.
 Mobile acknowledges rendered replies only in the foreground, focused chat at the latest messages.
-Mobile chat keeps viewport, tail-group, and composer measurements in its motion controller. The
+Mobile attachments use the shared desktop filename allowlist in `packages/contracts/src/attachment-files.ts`.
+The native document and photo pickers and the in-chat camera panel prepare local drafts. The existing Team file protocol
+uploads them to the host before one message commits the ordered draft IDs. Mobile limits each file
+to 10 MB because the native/DOM bridge copies Base64 data. Downloads use the same authenticated file
+channel, validate size, chunk order, and SHA-256, and pass verified bytes back through the command
+bridge. Mobile queues downloads to limit concurrent copies. Image previews preserve aspect ratio;
+other files use the system share sheet through a temporary cache file.
+
+Mobile chat loads the latest 50 messages through `conversation-page` and loads older pages by cursor.
+Its `FlatList` virtualizes messages and retains the visible position when older pages are added.
+Reply references travel with each page. A page with no overlap replaces the cached window so a
+reconnect cannot leave an invisible gap. Older-page responses do not advance the live revision.
+The in-memory conversation store notifies subscribers per agent and combines streamed text once
+per animation frame. Windows above 50 messages are released when their last subscriber leaves;
+the complete history remains in the host database. Connection recovery prioritizes observed chats.
+Mobile chat keeps viewport, latest-user, and composer measurements in its motion controller. The
 last user message anchors a native blank-space inset; streamed replies consume that inset without
 autoscrolling. Initial history positioning and the first-send/first-response animation are separate
-states. Pending message bubbles reconcile through the host receipt ID, not message text. Selected
-mobile attachments use the existing WebRTC file frames followed by the attachment upload endpoint;
+states. Pending message bubbles reconcile through the host receipt ID, not message text.
+Mobile replies use the existing `replyToMessageId` field and retain their source after delivery.
+Agent bubbles support swipe-to-reply and a long-press action sheet with haptic feedback. The
+sheet has one nested native stack for actions and text selection; message text stays in memory,
+outside route parameters. Failed sends restore the reply target, and the composer can cancel it.
+Selected mobile attachments use the existing WebRTC file frames followed by the attachment upload endpoint;
 the native/DOM bridge limits each file to 10 MB and cancels transfers when its connection is replaced.
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
@@ -300,11 +319,24 @@ account-to-Signal outbox before returning. Worker `waitUntil` delivers notificat
 profile-save response path, with a five-second timeout per request and outbox retries. Signal forwards the optional frame only to authenticated sockets for that
 user; the frame contains no profile or credential. Desktop and mobile fetch the profile through
 the account API on notification, cold launch, and every 15 minutes while active.
-Returning from the background or restoring window focus does not trigger an automatic account
-or directory check. iOS `inactive` alone does not trigger a check or reset the periodic timer.
+Desktop window focus does not trigger an automatic account or directory check.
+Mobile uses one shared lifecycle subscription and a refresh controller per account endpoint.
+A foreground return checks absolute freshness: successful account and directory responses stay fresh
+for 15 minutes, and background time counts toward that deadline. Failed mobile checks retry after
+one minute while foregrounded. Concurrent requests share one promise; invalidations received during
+a request cause one follow-up after success. iOS `inactive` alone does not reset these deadlines.
+Stored mobile sessions become available before startup validation completes; network failures retain
+them, and validation results apply only to the initiating login.
 Explicit profile invalidations trigger an earlier check and are deferred while mobile is in the
 background. Signal readiness does not trigger a profile check; the account timer remains independent
-of transport recovery. Failed automatic checks use the same interval.
+of transport recovery. Failed desktop automatic checks use the same interval.
+Each mobile server has one connection recovery owner. It reloads workspace reads on foreground
+return without changing a healthy server to `connecting` or disabling its actions. These reads reuse
+the existing WebRTC peer and do not request new account sessions or tickets. The first replacement
+starts immediately after actual connection loss.
+The required compatibility read has a three-second timeout to detect stale open channels. Delays
+apply after failed replacements and survive app switches. The peer owns Signal socket recovery,
+not full connection retries. Ordinary transport loss does not invalidate the account directory.
 Older Signal clients ignore this optional event. API and Signal both need the event support for push;
 the periodic check remains the fallback when Signal is unavailable. Unchanged responses do not
 publish a new identity. Desktop ignores reads overtaken by a local edit, sign-out or shutdown;
@@ -429,6 +461,27 @@ on failure. Updating an existing profile and its retry receipt shares a SQLite
 transaction. Creation follows the existing workspace/initial-message flow with
 cleanup on failure. Receipts make retries after a lost response return the saved
 agent. This does not introduce a schema migration or alter released protocol codecs.
+
+## Mobile product analytics
+
+`apps/mobile/src/features/analytics` owns the React Native OpenPanel client, typed event allowlists,
+account-scoped operations, the local SecureStore preference, and foreground/connection events.
+Before session creation, it buffers at most 100 sanitized events in memory for 30 minutes from the
+first buffered event. The next account claims this buffer; identify precedes ordered delivery with
+original timestamps. Reconnects do not replay it. Expiry, opt-out, and process exit discard it.
+Account changes invalidate prior operation scopes; the anonymous-to-account transition retains the
+pairing scope so its completion can be recorded. Mobile uses a write-only client in the existing
+Openbot OpenPanel project shared with desktop and the website.
+Workspace command wrappers record outcomes once at the mobile caller; conversation availability is measured in
+the visible chat view, including cached reads, not from background broadcasts. The host remains the only source of turn lifecycle
+events. No Team API or database schema changes are required.
+
+Only native production builds with mobile write credentials initialize the client, after the
+preference is loaded. UI actions never await analytics transport. Account/consent generations
+reject late results; ordered identity changes preserve attribution of already accepted events.
+A final SDK filter replaces properties to remove SDK-added Android referrers and route paths.
+The SDK's optional persistent queue and screen tracking are not enabled. Configuration, event
+semantics and native verification steps are in [the mobile README](../apps/mobile/README.md#openpanel-product-analytics).
 
 ## Website analytics
 
@@ -576,8 +629,44 @@ Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact acces
 
 `src/backend/acp-client.ts` owns ACP process transport, model discovery, session start/load,
 streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts` supplies xAI
-login and billing hooks. The OpenCode driver starts the installed `opencode acp` command and
-uses external sign-in. OpenCode is not a managed runtime. Profile clients deny tool permissions.
+login and billing hooks. The OpenCode driver starts `opencode acp` on the runtime OpenBot pins and
+downloads, or on a CLI the user installed. Profile clients deny tool permissions.
+
+OpenCode has no login step OpenBot can drive, because the account is one environment variable: a
+spawn without `OPENCODE_API_KEY` lists the free OpenCode Zen models, and a spawn with one lists the
+paid catalog. So `AcpAgentClient` derives `#signedIn` from the models `session/new` returns, not
+from a credential, and a keyless OpenCode reports `available`. `AcpProviderOptions.extraEnv` is read
+at every spawn, which is what lets a key saved in Settings reach the next process with no other
+plumbing, and what carries `OPENCODE_DISABLE_AUTOUPDATE` to a managed install so the CLI cannot
+update past the pin. `src/main/provider-credential-store.ts` holds that optional key, encrypted by
+`safeStorage` in a `0o600` envelope under `userData`. Only a status (`missing`, `saved` or
+`unreadable`) crosses IPC; no getter returns the key. A file the store cannot read does not stop
+startup: OpenCode runs keyless, Settings reports the key as unreadable, and the file stays until the
+user saves or removes a key. The store writes a change to disk before it changes memory, so a
+failed write changes neither. `ProviderRuntime.changeProviderCredential` applies a key change inside
+the provider's serialized connection command. It refuses a provider that is running a turn, holds
+deliveries while it writes, and reports success only after a new process runs with the new key.
+
+That one variable turns on two products: OpenCode reports OpenCode Zen and OpenCode Go as a single
+catalog, on the separate endpoints `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and a Zen key
+does not buy Go. So `CREDENTIAL_ONLY_MODEL_PREFIXES` in `src/backend/agent/provider-runtime.ts`
+drops the `opencode-go/` models from `#refreshModelCatalog` while OpenBot is the one supplying the
+key; with no key stored those models can only come from the user's own OpenCode sign-in, which does
+buy them. Neither `/models` endpoint authenticates, so entitlement cannot be read back and the
+split is a product rule rather than a check.
+
+`PREFERRED_MODEL_ORDER` in the same pass reorders that catalog, because a provider with no
+`defaultProviderModel` runs the first model of its list and OpenCode reports the third-party
+services the user signed in to before its own — so the fallback used to pick a model behind a token
+OpenBot can neither see nor refresh. `opencodeModelRank` sorts free models first with Muse ahead of
+the rest, then OpenCode's own paid models, then everything behind a separate sign-in. The sort is
+stable, so the CLI's order survives inside one tier.
+
+Free means a display name ending in "Free": `model/list` carries no price and neither Zen endpoint
+authenticates, so the name is the only signal. `isFreeOpencodeModelName` in
+`packages/contracts/src/agent-providers.ts` is shared with the picker badge in
+`src/renderer/src/components/provider-model-options.ts`, so a badge and a default cannot disagree
+about what costs money.
 Provider session IDs remain in `projection_provider_sessions`; migration 17 adds OpenCode while
 preserving turn links. Provider switches keep the same agent, workspace, and local thread.
 
@@ -586,3 +675,74 @@ with their released provider vocabulary. The host filters OpenCode agents, model
 sidebar references, and runtime events before encoding an older client's response. Requests for
 an OpenCode agent from those clients return 404. WebRTC keeps its v2 frame transport and selects
 the v4 application codec when the peer advertises the `opencode` capability.
+
+### Desktop server notifications
+
+Each desktop profile stores muted server IDs in `servers.json`. `RemoteServerStore` saves a
+mute change before publishing it. These preferences survive restart, re-login, and host-list
+reconciliation. The server context menu controls mute for local and remote servers.
+
+`renderer-forwarders.ts` continues to deliver live events for muted servers, but suppresses
+system notifications. Remote notification content uses the source server's agent list. Both
+server mute and per-agent notification settings apply. Unread state is unchanged. Mobile does
+not yet deliver system notifications; mute settings are not synchronized between devices.
+
+## Shared desktop channel chats
+
+Channels are separate from sidebar sections. A channel has one host, a purpose, participating agents,
+a selected lead, and linked agent conversations. Agent membership selects who can receive work.
+It does not restrict human access: each authenticated server member can read and use its channels.
+The Electron app provides the channel interface. A creation dialog provides member search and optional
+coordination settings. The chat shows each author and keeps settings in a side panel. Channels use the sidebar
+context menu for management and have no Pause or Resume controls. The mobile interface is unchanged.
+
+`ChannelStore` stores the canonical transcript, channel configuration, tasks, assignments, summaries,
+execution threads, and human read positions in SQLite. Migration 18 adds these projections without
+changing existing agent data. Channel commands use the orchestration log and command receipts.
+Messages have stable IDs and per-channel sequences. A channel projection can be rebuilt from its events.
+Archiving stops channel work and retains its records. Restore makes the chat available for new messages again. Neither action removes agents or linked conversations.
+
+Each channel-agent pair has a separate execution thread in `projection_threads`. The normal agent
+thread is never replaced. Provider sessions, turns, questions, approvals, attachments, compaction,
+and restart recovery use the explicit execution thread. These internal execution records do not
+create extra navigation entries. The per-agent drain scheduler remains the authority for work.
+
+`ChannelService` selects one owner. A selected recipient has priority, followed by the task attached
+to a reply, a reply to a member message that has no task, a clear follow-up to the sole open task,
+and a channel with one available member. These selections use no model. Other requests use the
+lead's provider, model, and reasoning setting in a separate session with no work tools. The request
+supplies the accepted result schema and the channel summary in place of the transcript. Invalid or
+stale routing cannot broadcast a request. Routing can select an existing task, ask a question, or
+indicate that no work is needed. A selected owner or existing task adds one channel message from the
+lead, so the selection is visible and the user can correct it. Deterministic selection adds no
+message.
+
+Channel tools retrieve history, assign a child task, transfer ownership, and report results. The
+runtime supplies channel and caller identity. A child keeps its parent owner; a transfer changes it.
+Only assignments and awaited results start turns. Completed child results are combined before the
+owner returns. The limit is eight automatic assignments per root request and two active assignments
+per channel. One agent runs at most one work turn across all chats. Declared workspace and browser
+resources are serialized; undeclared resources reserve the host. An assignment keeps the resources
+it started with until it ends, and a task with an active assignment starts no second owner. These
+controls do not restrict provider process privileges.
+
+Each turn receives bounded channel context: purpose, responsibilities, the current request, source
+messages and replies, shared decisions, recent messages, and attachment references. A versioned
+summary covers older messages, with a sequence and source IDs. Full messages remain retrievable.
+The provider acceptance cursor records context delivery. Context packets remain self-contained so
+provider replacement or compaction does not remove shared decisions. Unrelated server conversations
+are available through paginated retrieval and are not inserted automatically. Agent memories keep
+their existing meaning.
+
+Task revisions prevent an old assignment from completing a corrected request. The stored request
+keeps its own text and files: only its first dispatch converts the attachment drafts, and a later
+dispatch of the same request sends the stored copies again. Stop pauses a task and its descendants
+and interrupts active work. Reassign waits for the old assignment to finish stopping. Restart
+recovery checks accepted provider work before retrying. Unknown outcomes require attention.
+Command, assignment, and result IDs prevent duplicate dispatch and visible results; external side
+effects do not have an exactly-once guarantee.
+
+Desktop IPC and remote desktop transports expose `channel-chats-v1` as an optional capability with
+separate payload codecs. Released Team API adapters keep their existing meaning. A host advertises
+the capability only when its channel service is connected. Unsupported remote hosts show an explanation
+in place of channel controls. The account API and Signal service add no channel storage or routing.

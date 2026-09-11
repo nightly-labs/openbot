@@ -33,6 +33,7 @@ import type {
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import { IPC_CHANNELS } from "@openbot/contracts/ipc";
+import { createOpenBotLogger } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, safeStorage, screen, shell } from "electron";
 import electronUpdater from "electron-updater";
@@ -69,6 +70,7 @@ import {
   showMainWindow,
 } from "./main-window";
 import { ManagedSkillService } from "./managed-skill-service";
+import { ProviderCredentialStore } from "./provider-credential-store";
 import { ProviderRuntimeManager } from "./provider-runtime-manager";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
@@ -92,6 +94,7 @@ import { supportsInstalledUpdates, UpdateService } from "./update-service";
 import { WHISPER_MODEL_NAME, WHISPER_MODEL_URL } from "./voice-model-service";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 
+const logger = createOpenBotLogger("application-services");
 const SETUP_FILE = "openbot-setup-v2.json";
 const ANALYTICS_PREFERENCE_FILE = "openbot-analytics-preference-v1.json";
 const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
@@ -106,6 +109,7 @@ const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
 const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential-v1.json";
 const REMOTE_DESKTOP_RUNTIME_SECRET_FILE = "openbot-remote-desktop-runtime-v1.json";
 const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
+const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
 
 /**
  * Where each service stops, as a position in the shutdown sequence rather than a position in the
@@ -150,6 +154,7 @@ export interface ApplicationServiceContext {
 export interface ApplicationServices {
   service: AgentService;
   providerRuntimes: ProviderRuntimeManager;
+  providerCredentials: ProviderCredentialStore;
   mailbox: MailboxStore;
   browser: BrowserHost;
   browserPictureInPicture: BrowserPictureInPicture;
@@ -301,7 +306,6 @@ export async function createApplicationServices({
   const hostedSites = new HostedSiteDesktopService(centralAuth);
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await sidebarLayout.initialize();
-  await sidebarLayout.reconcileAgents(new Set(store.list().map((agent) => agent.id)));
   const mailbox = new MailboxStore(app.getPath("userData"), store.sharedRoot, store.database);
   await mailbox.initialize();
   configureApplicationProtocol();
@@ -361,6 +365,25 @@ export async function createApplicationServices({
   // Before the service, which reads the endpoints at its first provider spawn. A file this build
   // cannot read leaves the list empty and every write refused; it does not stop the app.
   await customProviders.load();
+  /*
+   * Loaded before the service, not on first use: a provider spawn reads its key synchronously, so
+   * the decrypted map has to already exist by the time any client is built. A machine with no
+   * secret storage keeps working on the free tier -- only saving a key needs the cipher.
+   */
+  const providerCredentials = new ProviderCredentialStore(join(app.getPath("userData"), PROVIDER_CREDENTIAL_FILE), {
+    encrypt: (value) => {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
+      return safeStorage.encryptString(value);
+    },
+    decrypt: (value) => safeStorage.decryptString(value),
+  });
+  // An unreadable key file is reported, not fatal: the app starts, OpenCode runs on the free models,
+  // and Settings tells the user to save the key again. Only the error's class is logged, because a
+  // parse message quotes the file.
+  const credentialLoadError = await providerCredentials.load();
+  if (credentialLoadError) {
+    logger.warn(`OpenBot could not read the provider key file (${credentialLoadError.name}). It was left unchanged.`);
+  }
   const service = new AgentService(
     store,
     mailbox,
@@ -372,12 +395,19 @@ export async function createApplicationServices({
     (agent) => managedSkills.syncAgent(agent),
     hostedSites,
     sidebarLayout,
-    // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
-    // spawned provider process. The IPC handlers are given `list()`.
-    () => customProviders.configs(),
     setupState.preferredModel,
+    {
+      apiKey: (provider) => providerCredentials.get(provider),
+      // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
+      // spawned provider process. The IPC handlers are given `list()`.
+      customProviders: () => customProviders.configs(),
+    },
   );
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
+  // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
+  // reconciling against the agents alone would read every channel as gone and drop where it sits.
+  await sidebarLayout.reconcileAgents(service.sidebarChatIds());
+
   /*
    * The runtime manager decides which provider has an update waiting, by comparing against the
    * pinned lock. It knows the copies it downloaded itself; a CLI the user installed is only ever
@@ -435,6 +465,7 @@ export async function createApplicationServices({
     mailbox,
     browser,
     chat: teamChatStore,
+    channels: service.channels,
     teamWebRtcBridge,
     registerRemoteHost: (input) => centralAuth.registerRemoteHost(input),
     issueRemoteHostTicket: (hostId) => centralAuth.issueRemoteHostTicket(hostId),
@@ -614,6 +645,7 @@ export async function createApplicationServices({
   return {
     service,
     providerRuntimes,
+    providerCredentials,
     mailbox,
     browser,
     browserPictureInPicture,

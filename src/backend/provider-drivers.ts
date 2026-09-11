@@ -23,6 +23,22 @@ export interface ProviderCliCommand {
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
 
 /**
+ * The environment one OpenCode process gets, read at spawn time.
+ *
+ * `OPENCODE_API_KEY` is the whole of the optional account: with it the CLI lists the paid Zen
+ * catalog, without it the free one. `OPENCODE_DISABLE_AUTOUPDATE` is not optional on a managed
+ * install -- a CLI that updates itself past the pin fails the exact-version compare in
+ * `verifyInstalledRuntime`, and OpenBot would then keep re-downloading a runtime it already has.
+ */
+function opencodeEnv(cli: AgentCliInfo, credentials: ProviderClientContext): Record<string, string> {
+  const key = credentials.apiKey("opencode");
+  return {
+    ...(key ? { OPENCODE_API_KEY: key } : {}),
+    ...(cli.source === "managed" ? { OPENCODE_DISABLE_AUTOUPDATE: "1" } : {}),
+  };
+}
+
+/**
  * How a provider is signed in. This used to be an optional `cliLogin` field, and its absence meant
  * "this is Codex": two call sites ran the Codex browser login for any driver without one, so a
  * provider that simply had nothing to spawn would have opened a ChatGPT login. The union makes each
@@ -37,15 +53,21 @@ export type ProviderSignIn =
   | { kind: "external" };
 
 /**
- * What a client needs from the app at spawn, beyond its own CLI.
+ * What a client needs from the app at spawn, beyond its own CLI: the stored secrets, and the user's
+ * own endpoints.
  *
- * It is a required parameter rather than an optional one so that a new call site which forgets it is
- * a compile error. The failure it prevents is silent: an OpenCode client built without the source
- * spawns with no custom providers, and the user simply sees their endpoint's models missing.
+ * Required rather than optional on purpose: a driver that needs a stored key has no other way to
+ * reach one, and a call site that forgets the endpoints builds a client whose user simply sees their
+ * models missing. `apiKey` is synchronous because the store is loaded eagerly at startup, and
+ * `customProviders` is a getter, because both are read inside a spawn.
  */
 export interface ProviderClientContext {
+  apiKey(provider: AgentProviderId): string | null;
   readonly customProviders: CustomProviderSource;
 }
+
+/** Nothing stored and no endpoint, for tests and for call sites that predate the credential store. */
+export const NO_PROVIDER_CREDENTIALS: ProviderClientContext = { apiKey: () => null, customProviders: () => [] };
 
 /**
  * What a provider *does*. What it is called, how it is described and where its sign-in help points
@@ -113,25 +135,33 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   },
   {
     id: "opencode",
+    // `opencode auth login` is an interactive terminal UI and cannot be spawned headless, so the
+    // optional OpenCode Zen key is pasted into OpenBot instead. Nothing is required to sign in:
+    // with no credential at all the CLI still lists the free models and answers a turn.
     signIn: { kind: "external" },
     resolveCli: resolveOpencodeCli,
-    // Both clients read the custom providers at spawn, and the profile client merges them *into* the
-    // deny-all layer rather than beside it: the two share one environment variable, so the layer
-    // would be lost if a custom provider config replaced it.
-    createClient: (cli, timeout, { customProviders }) =>
+    // Both clients read the key and the custom providers at spawn, and the profile client merges the
+    // endpoints *into* the deny-all layer rather than beside it: the two share one environment
+    // variable, so the layer would be lost if a custom provider config replaced it.
+    createClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
         provider: "opencode",
         argv: ["acp"],
-        env: () => openCodeConfigEnv({}, customProviders),
-        signInMessage: openCodeSignInMessage(customProviders().length),
+        env: {},
+        extraEnv: () => ({ ...opencodeEnv(cli, context), ...openCodeConfigEnv({}, context.customProviders) }),
+        signInMessage: openCodeSignInMessage(context.customProviders().length),
       }),
-    createProfileClient: (cli, timeout, { customProviders }) =>
+    createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
         provider: "opencode",
         argv: ["acp"],
         profileGeneration: true,
-        env: () => openCodeConfigEnv(OPENCODE_PROFILE_CONFIG, customProviders),
-        signInMessage: openCodeSignInMessage(customProviders().length),
+        env: {},
+        extraEnv: () => ({
+          ...opencodeEnv(cli, context),
+          ...openCodeConfigEnv(OPENCODE_PROFILE_CONFIG, context.customProviders),
+        }),
+        signInMessage: openCodeSignInMessage(context.customProviders().length),
       }),
     authState: (account) => ({ kind: "opencode", email: account?.email ?? null }),
     validateAccount: () => undefined,

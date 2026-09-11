@@ -191,6 +191,119 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         .map((model) => model.id),
     ).toEqual(["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.4", "gpt-5.3-codex-spark"]);
   });
+  async function opencodeModelIds(storedKey: string | null, catalog?: string[]): Promise<string[]> {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "opencode",
+      (provider) => {
+        const client = new FakeAgentClient(provider);
+        // Zen and Go reach OpenBot as one catalog, which is what makes the split a decision this
+        // app has to make rather than one it can read off the response.
+        if (provider === "opencode") {
+          const ids = catalog ?? ["opencode/big-pickle", "opencode/claude-opus-5", "opencode-go/kimi-k3"];
+          client.modelList = () => ({ data: ids.map((model) => ({ model })) });
+        }
+        return client;
+      },
+      {},
+      async () => undefined,
+      null,
+      null,
+      null,
+      { apiKey: () => storedKey, customProviders: () => [] },
+    );
+    await service.initialize();
+    return service
+      .listModels()
+      .filter((model) => model.provider === "opencode")
+      .map((model) => model.id);
+  }
+
+  it("hides the OpenCode Go models that the key OpenBot supplied does not buy", async () => {
+    expect(await opencodeModelIds("zen-key")).toEqual(["opencode/big-pickle", "opencode/claude-opus-5"]);
+  });
+
+  it("keeps the OpenCode Go models when the user's own OpenCode sign-in is what lists them", async () => {
+    expect(await opencodeModelIds(null)).toEqual([
+      "opencode/big-pickle",
+      "opencode/claude-opus-5",
+      "opencode-go/kimi-k3",
+    ]);
+  });
+
+  it("leads the OpenCode catalog with the free models, Muse first", async () => {
+    // An agent that has chosen no model runs whatever comes first, and OpenCode reports the
+    // services the user signed in to before its own. So the order carries four claims: Muse leads,
+    // no billed model outranks a free one, OpenCode's own paid models outrank a third-party
+    // sign-in OpenBot cannot refresh, and the CLI's order survives inside one tier.
+    expect(
+      await opencodeModelIds(null, [
+        "openai/gpt-5.3-codex-spark",
+        "opencode/big-pickle",
+        "opencode/nemotron-3.5-lightning-free",
+        "opencode/mimo-v2.5-free",
+        "opencode/muse-spark-1.3-contributor-free",
+      ]),
+    ).toEqual([
+      "opencode/muse-spark-1.3-contributor-free",
+      "opencode/nemotron-3.5-lightning-free",
+      "opencode/mimo-v2.5-free",
+      "opencode/big-pickle",
+      "openai/gpt-5.3-codex-spark",
+    ]);
+  });
+
+  it("restarts OpenCode on a changed key before it reports the change", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    let storedKey: string | null = null;
+    const clients: FakeAgentClient[] = [];
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "opencode",
+      (provider) => {
+        const client = new FakeAgentClient(provider);
+        if (provider === "opencode") {
+          client.modelList = () => ({
+            data: ["opencode/big-pickle", "opencode-go/kimi-k3"].map((model) => ({ model })),
+          });
+          clients.push(client);
+        }
+        return client;
+      },
+      {},
+      async () => undefined,
+      null,
+      null,
+      null,
+      { apiKey: () => storedKey, customProviders: () => [] },
+    );
+    await service.initialize();
+
+    await service.changeProviderCredential("opencode", async () => {
+      storedKey = "zen-key";
+    });
+
+    // A CLI reads its key at spawn, so only a new process can list what the key buys. The Go
+    // model leaves the catalog only when that process is the one reporting it.
+    expect(clients).toHaveLength(2);
+    expect(clients[0]?.running).toBe(false);
+    expect(
+      service
+        .listModels()
+        .filter((model) => model.provider === "opencode")
+        .map((model) => model.id),
+    ).toEqual(["opencode/big-pickle"]);
+  });
+
   it("uses startup fallbacks when provider discovery is unavailable", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
@@ -719,6 +832,113 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
   });
 
+  it("keeps the old key while the provider is working on a turn", async () => {
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => new FakeAgentClient(provider, "", false),
+    );
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Keep working." });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+
+    // Writing the key and then failing to restart would leave a key on disk that no process uses,
+    // under a dialog that reports the save as failed. So a busy provider is refused first.
+    let changed = false;
+    await expect(
+      service.changeProviderCredential("codex", async () => {
+        changed = true;
+      }),
+    ).rejects.toThrow(/working on a turn/u);
+    expect(changed).toBe(false);
+  });
+
+  it("delivers messages again after a key change that could not be saved", async () => {
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => new FakeAgentClient(provider),
+    );
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+
+    await expect(
+      service.changeProviderCredential("codex", async () => {
+        throw new Error("System secret storage is unavailable.");
+      }),
+    ).rejects.toThrow("System secret storage is unavailable.");
+
+    // The change holds deliveries while it runs. A failed save must release them, or the agent
+    // stays silent until the app restarts.
+    await service.sendMessage({ agentId: "chief", text: "Still there?" });
+    await waitFor(() => events.some((event) => event.type === "turn-completed"));
+  });
+
+  it("refuses to replace a CLI that is running a channel turn", async () => {
+    const { store, mailbox } = stores(root);
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => new FakeAgentClient(provider, "", false),
+    );
+    await service.initialize();
+    await store.getOrCreate("chief");
+    const actor = { id: "human", name: "Alex" };
+    await service.channels.command(
+      {
+        type: "save",
+        channelId: "channel-1",
+        operationId: "create",
+        draft: {
+          name: "Project",
+          title: "",
+          instructions: "Shared work",
+          members: [{ agentId: "chief" }],
+          leadAgentId: "chief",
+        },
+      },
+      actor,
+    );
+    await service.channels.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: "send",
+        text: "Work in the channel.",
+        recipientAgentId: "chief",
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    // A channel turn runs on a thread of its own, so the conversation of the agent holds no turn id
+    // while the CLI works. The delivery has reached its turn, so no counter reports it either.
+    // The assignment holds the turn id the provider answered with, so the CLI is on a turn. The
+    // channel keeps that turn out of the conversation of the agent, and the delivery has left the
+    // counter of the deliveries that are starting.
+    await waitFor(() => service?.channels.store.assignments("channel-1").some((item) => item.turnId));
+
+    await expect(
+      service.updateProviderCli("codex", async () => {
+        throw new Error("Busy provider started an install.");
+      }),
+    ).rejects.toThrow(/working on a turn/u);
+  });
+
   it("refuses to replace a CLI while a delivery is on its way to a turn", async () => {
     let releaseTurnStart: (() => void) | undefined;
     const blocked = new Promise<void>((resolve) => {
@@ -955,7 +1175,8 @@ describe.sequential("ProviderRuntime: custom provider reload", () => {
       async () => undefined,
       null,
       null,
-      () => endpoints,
+      null,
+      { apiKey: () => null, customProviders: () => endpoints },
     );
     return { service, store };
   }
@@ -1032,7 +1253,7 @@ describe.sequential("ProviderRuntime: custom provider reload", () => {
         id: "opencode",
         state: "sign-in-required",
         message:
-          "OpenCode could not start a session. Check your custom provider's base URL and API key, or run `opencode auth login` if you also use OpenCode's own models.",
+          "OpenCode could not start a session. Check your custom provider's base URL and API key, or add an OpenCode Zen key if you also use OpenCode's own models.",
       }),
     );
     // Signed out, OpenCode keeps no client. A save must not read as a failure: the next spawn - the

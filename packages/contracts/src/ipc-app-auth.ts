@@ -179,6 +179,7 @@ export interface ComputerUseMacSetupState {
 
 export type ExternalDestination =
   | "opencode-install"
+  | "opencode-auth"
   | "agent-setup"
   | "claude-install"
   | "claude-sign-in"

@@ -2,8 +2,10 @@ import { MenuView } from "@expo/ui/community/menu";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentPromptQuestion } from "@openbot/contracts/ipc";
 import { GlassView } from "expo-glass-effect";
+import { Image } from "expo-image";
+import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
-import { ArrowUp, Mic, Plus } from "lucide-react-native";
+import { ArrowUp, FileText, Mic, Plus, Reply, X } from "lucide-react-native";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -18,12 +20,13 @@ import {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { scheduleOnRN } from "react-native-worklets";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import type { ChatBubbleMessage } from "@/features/chat/context/message-actions-context";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { largePastedText } from "../model/composer-paste";
 import { createComposerSendGate } from "../model/composer-send";
-import { ChatGlassIconButton } from "./chat-glass-icon-button";
-import { CHAT_ATTACHMENTS_ENABLED, type ChatAttachments } from "./use-chat-attachments";
+import type { ChatAttachments } from "./use-chat-attachments";
 
 interface ChatComposerProps {
   action: ViewStyle["backgroundColor"];
@@ -44,6 +47,9 @@ interface ChatComposerProps {
   attachments: ChatAttachments;
   sending: boolean;
   sendRetryVersion: number;
+  replyTarget: ChatBubbleMessage | null;
+  replyFocusVersion: number;
+  onCancelReply: () => void;
 }
 
 export function ChatComposer({
@@ -65,6 +71,9 @@ export function ChatComposer({
   attachments,
   sending,
   sendRetryVersion,
+  replyTarget,
+  replyFocusVersion,
+  onCancelReply,
 }: ChatComposerProps) {
   const display = mentionDraft(answerQuestion ? "" : draft);
   const displayText = answerQuestion ? draft : display.text;
@@ -79,6 +88,14 @@ export function ChatComposer({
     : [];
   const hasDraft = Boolean(draft.trim()) || attachments.items.length > 0;
   const inputRef = useRef<TextInput>(null);
+  const isFocused = useIsFocused();
+  const focusedReplyVersion = useRef(0);
+  useEffect(() => {
+    if (isFocused && !disabled && !answerQuestion && replyTarget && focusedReplyVersion.current !== replyFocusVersion) {
+      focusedReplyVersion.current = replyFocusVersion;
+      inputRef.current?.focus();
+    }
+  }, [isFocused, disabled, answerQuestion, replyTarget, replyFocusVersion]);
   const pendingCursor = useRef<number | null>(null);
   useLayoutEffect(() => {
     if (pendingCursor.current === null) return;
@@ -99,6 +116,11 @@ export function ChatComposer({
   const [sendGate] = useState(createComposerSendGate);
 
   useLayoutEffect(() => {
+    // Selecting a file is a draft edit even when TextInput never receives focus.
+    if (attachments.items.length > 0) sendGate.edit();
+  }, [attachments.items, sendGate]);
+
+  useLayoutEffect(() => {
     if (sendRetryVersion > 0) sendGate.allowRetry();
   }, [sendGate, sendRetryVersion]);
 
@@ -114,7 +136,7 @@ export function ChatComposer({
   }, [disabled, sendGate]);
 
   function requestSend(): void {
-    if (disabled || sending) return;
+    if (disabled || sending || attachments.preparing) return;
     const action = sendGate.request();
     if (action === "blur") inputRef.current?.blur();
     else if (action === "send") onSend(latestTextRef.current);
@@ -138,6 +160,30 @@ export function ChatComposer({
 
   return (
     <View>
+      {liquidGlassAvailable ? (
+        <SheetScrollEdgeEffect
+          edge="bottom"
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            // Keep the original 32 pt fade above the input, independent of the reply preview.
+            height: inputHeight + 8 + Math.max(bottomInset, 10) + 32,
+          }}
+        />
+      ) : null}
+      {replyTarget ? (
+        <View className="flex-row items-center gap-2 pl-6 pr-4">
+          <Reply color={String(muted)} size={18} />
+          <Typography.Paragraph numberOfLines={1} type="body-sm" className="flex-1 text-text-secondary">
+            {mentionDraft(replyTarget.body).text || "Attachment"}
+          </Typography.Paragraph>
+          <Button isIconOnly variant="ghost" accessibilityLabel="Cancel reply" onPress={onCancelReply}>
+            <X color={String(muted)} size={18} />
+          </Button>
+        </View>
+      ) : null}
       {focused && query && suggestions.length > 0 && !disabled ? (
         <GlassView
           glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
@@ -178,7 +224,7 @@ export function ChatComposer({
           </ScrollView>
         </GlassView>
       ) : null}
-      {attachments.items.length > 0 ? (
+      {!sending && attachments.items.length > 0 ? (
         <ScrollView
           horizontal
           keyboardShouldPersistTaps="handled"
@@ -186,15 +232,34 @@ export function ChatComposer({
           contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
         >
           {attachments.items.map((item) => (
-            <Button
-              key={item.id}
-              variant="secondary"
-              isDisabled={sending}
-              accessibilityLabel={`Remove ${item.name}`}
-              onPress={() => attachments.remove(item.id)}
-            >
-              <Typography.Paragraph type="body-xs">{item.name} ×</Typography.Paragraph>
-            </Button>
+            <View key={item.id} className="size-28 overflow-hidden rounded-2xl bg-control p-3">
+              {item.mimeType.startsWith("image/") ? (
+                <Image
+                  source={item.uri ?? `data:${item.mimeType};base64,${item.base64}`}
+                  contentFit="contain"
+                  accessibilityLabel={item.name}
+                  style={{ position: "absolute", inset: 0 }}
+                />
+              ) : (
+                <FileText color={String(foreground)} size={24} />
+              )}
+              {!item.mimeType.startsWith("image/") ? (
+                <Typography.Paragraph numberOfLines={2} type="body-xs" className="mt-auto">
+                  {item.name}
+                </Typography.Paragraph>
+              ) : null}
+              <Button
+                isIconOnly
+                size="sm"
+                variant="secondary"
+                className="absolute right-0 top-0"
+                isDisabled={sending}
+                accessibilityLabel={`Remove ${item.name}`}
+                onPress={() => attachments.remove(item.id)}
+              >
+                <X color={String(foreground)} size={16} />
+              </Button>
+            </View>
           ))}
         </ScrollView>
       ) : null}
@@ -209,57 +274,49 @@ export function ChatComposer({
           paddingBottom: Math.max(bottomInset, 10),
         }}
       >
-        {!CHAT_ATTACHMENTS_ENABLED ? (
-          <ChatGlassIconButton
-            accessibilityLabel="Add attachment"
-            disabled={disabled || sending || Boolean(answerQuestion)}
-            fallbackBackground={fallbackBackground}
-            liquidGlassAvailable={liquidGlassAvailable}
-            onPress={attachments.chooseFiles}
+        <View pointerEvents={disabled || sending || attachments.preparing || answerQuestion ? "none" : "auto"}>
+          <MenuView
+            style={{ width: 48, height: 48 }}
+            actions={[
+              { id: "camera", title: "Camera", image: "camera" },
+              { id: "photos", title: "Photos", image: "photo" },
+              {
+                id: "files",
+                title: "Files",
+                image: "paperclip",
+                attributes: { disabled: disabled || sending || attachments.preparing || Boolean(answerQuestion) },
+              },
+            ]}
+            onPressAction={({ nativeEvent }) => {
+              if (disabled || sending || attachments.preparing || answerQuestion) return;
+              if (nativeEvent.event === "files") void attachments.chooseFiles();
+              if (nativeEvent.event === "photos") void attachments.choosePhotos();
+              if (nativeEvent.event === "camera") void attachments.takePhoto();
+            }}
           >
-            <Plus color={String(foreground)} size={25} strokeWidth={1.8} />
-          </ChatGlassIconButton>
-        ) : (
-          <View pointerEvents={disabled || sending || answerQuestion ? "none" : "auto"}>
-            <MenuView
-              style={{ width: 48, height: 48 }}
-              actions={[
-                {
-                  id: "files",
-                  title: "Files",
-                  image: "paperclip",
-                  attributes: { disabled: disabled || sending || Boolean(answerQuestion) },
-                },
-              ]}
-              onPressAction={({ nativeEvent }) => {
-                if (nativeEvent.event === "files" && !disabled && !sending && !answerQuestion)
-                  attachments.chooseFiles();
+            <GlassView
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Add attachment"
+              accessibilityState={{ disabled: disabled || sending || attachments.preparing || Boolean(answerQuestion) }}
+              glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
+              isInteractive={liquidGlassAvailable && !disabled && !sending && !answerQuestion}
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                borderCurve: "continuous",
+                overflow: "hidden",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
+                opacity: disabled || sending || attachments.preparing || answerQuestion ? 0.45 : 1,
               }}
             >
-              <GlassView
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel="Add attachment"
-                accessibilityState={{ disabled: disabled || sending || Boolean(answerQuestion) }}
-                glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
-                isInteractive={liquidGlassAvailable && !disabled && !sending && !answerQuestion}
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
-                  borderCurve: "continuous",
-                  overflow: "hidden",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
-                  opacity: disabled || sending || answerQuestion ? 0.45 : 1,
-                }}
-              >
-                <Plus color={String(foreground)} size={25} strokeWidth={1.8} />
-              </GlassView>
-            </MenuView>
-          </View>
-        )}
+              <Plus color={String(foreground)} size={25} strokeWidth={1.8} />
+            </GlassView>
+          </MenuView>
+        </View>
         <GestureDetector gesture={pan}>
           <GlassView
             glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
@@ -347,10 +404,7 @@ export function ChatComposer({
                 onBlur={() => setFocused(false)}
                 onChangeText={(text) => {
                   sendGate.edit();
-                  const pasted =
-                    CHAT_ATTACHMENTS_ENABLED && !answerQuestion && !sending
-                      ? largePastedText(latestTextRef.current, text)
-                      : null;
+                  const pasted = !answerQuestion && !sending ? largePastedText(latestTextRef.current, text) : null;
                   if (pasted) {
                     try {
                       attachments.paste({ type: "text", text: pasted.text }, () => {});
@@ -400,8 +454,8 @@ export function ChatComposer({
             <Pressable
               accessibilityLabel={hasDraft ? (answerQuestion ? "Send answer" : "Send message") : "Start voice message"}
               accessibilityRole="button"
-              accessibilityState={{ disabled: disabled || sending }}
-              disabled={disabled || sending}
+              accessibilityState={{ disabled: disabled || sending || attachments.preparing }}
+              disabled={disabled || sending || attachments.preparing}
               className="mb-1 size-10 items-center justify-center rounded-full"
               style={{ backgroundColor: hasDraft ? action : raised }}
               onPress={() =>

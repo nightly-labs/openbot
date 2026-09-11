@@ -126,7 +126,7 @@ export async function routeAgents(
     const action = parseSidebarLayoutAction(await readJson(request));
     if ("agentId" in action) requireVisible(action.agentId);
     if ("beforeAgentId" in action) requireVisible(action.beforeAgentId);
-    const layout = await sidebarLayout.mutate(action, new Set(agents.listAgents().map((agent) => agent.id)));
+    const layout = await sidebarLayout.mutate(action, agents.sidebarChatIds());
     return json(200, layout);
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.usage) {

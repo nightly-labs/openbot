@@ -87,6 +87,11 @@ export class ContextCompaction {
     budget.pending = true;
   }
 
+  contextInputCharacters(threadId: string): number {
+    const budget = this.#budgets.get(threadId);
+    return budget ? Math.min(120_000, Math.floor(budget.contextWindow * 2)) : 120_000;
+  }
+
   reserve(agentId: string, threadId: string): boolean {
     const budget = this.#budgets.get(threadId);
     if (!budget?.pending || budget.phase !== "idle" || this.#compactingAgents.has(agentId)) {

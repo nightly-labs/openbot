@@ -14,9 +14,16 @@ import type { UpdateService } from "../update-service";
 import { parseAnalyticsPreference, parseExternalDestination, parseSetup } from "./app-inputs";
 import { stringPayload } from "./validation";
 
-const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
+/**
+ * Every page `openExternal` may reach, as a closed table.
+ *
+ * Exported because the addresses are a product contract the checker cannot judge: a wrong one sends
+ * a user who asked for an OpenCode Zen key to some other site, and the type only says "a string".
+ */
+export const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
   "agent-setup": "https://github.com/NorbertBodziony/openbot/blob/main/docs/TROUBLESHOOTING.md",
   "opencode-install": "https://opencode.ai/docs/",
+  "opencode-auth": "https://opencode.ai/auth",
   "claude-install": "https://code.claude.com/docs",
   "claude-sign-in": "https://code.claude.com/docs/en/authentication",
   feedback: "https://x.com/intent/post?text=Feedback%20for%20OpenBot%20%40norbertbodziony%3A%20",

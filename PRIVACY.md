@@ -5,7 +5,7 @@ browser data, and team data stay on the computer that runs OpenBot. The optional
 service stores the minimum central data needed for email sign-in, account avatars, remote host
 configuration, memberships, invitations, and logical sessions.
 
-Production builds of OpenBot and the website use a self-hosted OpenPanel service for product
+Production builds of OpenBot desktop, the configured mobile app, and the website use a self-hosted OpenPanel service for product
 analytics. Development builds, previews, tests, and Storybook do not send analytics.
 
 ## Agent and host usage
@@ -39,6 +39,15 @@ application-version-change actions. Event properties are limited to metadata suc
 states, timing, provider, model, reasoning effort, application version, operating system, and coarse
 failure codes.
 
+The configured production mobile app records app opens and foreground returns, sign-in QR pairing
+and camera-permission outcomes, host connection attempts and losses, conversation-load outcomes,
+message and prompt-answer submissions, attachment operations, agent/routine/memory actions,
+server selection/join/leave, search result counts, pin/unpin, hide/unhide, Usage views and sign-out.
+Mobile properties include app version/build, iOS or Android, result, timing, bounded connection stage,
+counts, coarse attachment size buckets, and provider/model/reasoning metadata where available.
+Mobile never sends scanned QR values, install-referrer URLs or route identifiers. It does not
+emit host lifecycle events again. Agent/host token and cost reports remain separate local data.
+
 Analytics events do not contain message or direct-message text, prompts, replies, generated content,
 search queries, embedded-browser URLs or page titles, file names, local paths, commands, raw error
 messages, or local identifiers for agents, threads, turns, messages, servers, and team members.
@@ -61,7 +70,18 @@ through `analytics.openbot.run`.
 Analytics is enabled in production by default. Desktop users can disable it under **Settings →
 General → Privacy → Share product analytics**. The preference is stored locally and disables both UI
 analytics and lifecycle analytics emitted by the local host. Website analytics does not use the
-desktop preference.
+desktop preference. Mobile has its own phone-wide **Settings → General → Privacy → Share product
+analytics** preference, independent of desktop and host collection. It defaults to enabled in a
+configured production build, is read before collection starts, and remains disabled if the stored
+preference cannot be read. Disabling it drops pending mobile events; it does not remove previously
+received events or retract an in-flight request. There is no persistent offline analytics queue.
+Development and preview mobile builds do not collect product analytics. Mobile sign-in uses the
+same account ID and normalized email profile traits described above. Before mobile sign-in, up to
+100 sanitized events stay in process memory for at most 30 minutes from the first buffered event.
+They are sent once with their original timestamps after an account becomes available. Opt-out,
+expiry, and process exit discard unclaimed events. The oldest event is removed when the buffer is
+full. Sign-out ends the old account's operation scopes; later signed-out activity can be associated
+with the next account that signs in. No anonymous mobile event is sent before that association.
 
 Hosted Site analytics records only the operation, entry point, result, and bounded failure code. It
 does not contain the site's URL, hostname, title, source path, site ID, or content. A one-time
@@ -144,7 +164,11 @@ Mobile chat can send selected files to the conversation's desktop host through t
 team connection. Text pasted into the input is processed only after the user pastes it. A text paste
 longer than 4,000 characters becomes a text attachment. Selected documents can also have a temporary
 copy in the phone's system cache. Uploads are limited to 10 MB per file on mobile; successful uploads
-become managed attachments on the host. Cloudflare account storage does not receive these files.
+become managed attachments on the host. Camera capture uses an in-chat preview. Photo selection uses the phone's system interface.
+Image attachment previews are downloaded from the desktop host through the same encrypted connection.
+Other attachments are downloaded when you choose Open or save. The phone creates a temporary file for
+the system share sheet and removes it when that sheet closes. The app you select can keep its own copy.
+Cloudflare account storage does not receive these files.
 
 ## Email delivery and infrastructure providers
 
@@ -254,7 +278,33 @@ Marketplace submissions from the desktop app show the publisher’s current acco
 
 ### OpenCode
 
-OpenBot starts the OpenCode CLI installed on the host with `opencode acp`. Prompts, attachments,
-and tool results go to that local process. OpenCode can send them to the model provider selected
-in its configuration. OpenBot does not copy OpenCode credentials or upload its session files.
-OpenCode manages its own login and resume state.
+OpenBot downloads the pinned OpenCode CLI from `registry.npmjs.org` and its license from
+`github.com/anomalyco/opencode`, then starts it with `opencode acp`. Prompts, attachments, and tool
+results go to that local process. OpenCode can send them to the model provider selected in its
+configuration. OpenCode's free models are the default, and they reach OpenCode Zen with no account,
+so a first OpenCode turn leaves this computer without a sign-in.
+
+An OpenCode Zen key is optional and unlocks the paid catalog. OpenBot encrypts it with the operating
+system's secret storage, writes it to a file that only your user account can read, and passes it
+only to the local OpenCode process. No screen, log, data export, or diagnostics report contains it;
+the data export lists it under `scope.excludes`. OpenBot does not copy OpenCode credentials or
+upload its session files. OpenCode manages its own login and resume state.
+
+## Shared desktop channels
+
+Channel names, purposes, participating agents, linked conversation references, messages, tasks,
+assignment records, history summaries, and human read positions are stored in the host's SQLite
+database. All authenticated members of that server can read and use its channels. Agent membership
+selects participating agents; it is not a separate human access boundary.
+
+The selected lead's provider receives relevant channel content for routing and history summaries in
+separate sessions without work tools. Assigned agents receive the channel purpose, responsibilities,
+request, relevant source messages, shared history summary, recent messages, and attachment references.
+Agents can retrieve earlier channel messages and other conversations on that server when needed.
+Unrelated conversations are not sent automatically. Provider session internals remain internal.
+The provider's own data policies apply to content it receives.
+
+Archiving a channel stops its work and retains its transcript. Restore makes the channel available again.
+These actions do not remove agents, their memories, or linked conversations. Channel traffic between
+desktop clients and a host uses the existing host transport. The account API and Signal service do
+not store channel chats or make routing decisions. This feature adds no mobile chat interface.

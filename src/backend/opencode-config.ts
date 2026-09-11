@@ -65,8 +65,8 @@ export const OPENCODE_PROFILE_CONFIG: OpenCodeConfigBase = { permission: { "*": 
 
 export const OPENCODE_CONFIG_ENV = "OPENCODE_CONFIG_CONTENT";
 
-/** The command that signs OpenCode into its own account, which a custom endpoint does not need. */
-const OPENCODE_LOGIN_COMMAND = "opencode auth login";
+/** What a plain OpenCode user needs, now that the free models run without an account at all. */
+const OPENCODE_ZEN_ADVICE = "OpenCode listed no model. Add an OpenCode Zen key to continue.";
 
 /** The provider adapter OpenCode bundles for an OpenAI-compatible endpoint. */
 export const OPENCODE_COMPATIBLE_NPM = "@ai-sdk/openai-compatible";
@@ -128,11 +128,11 @@ export function openCodeConfigEnv(base: OpenCodeConfigBase, source: CustomProvid
 /**
  * What to tell the user when OpenCode will not start a session.
  *
- * With a custom endpoint configured, `opencode auth login` is usually the wrong advice: OpenCode
- * reports "not signed in" for a refused key or an unreachable base URL just as it does for a missing
- * account, and the endpoint brings its own credentials.
+ * With a custom endpoint configured, the Zen key is usually the wrong advice: OpenCode reports "not
+ * signed in" for a refused key or an unreachable base URL just as it does for an empty catalog, and
+ * the endpoint brings its own credentials.
  */
 export function openCodeSignInMessage(customProviderCount: number): string {
-  if (customProviderCount === 0) return `Run \`${OPENCODE_LOGIN_COMMAND}\`, then connect again.`;
-  return `OpenCode could not start a session. Check your custom provider's base URL and API key, or run \`${OPENCODE_LOGIN_COMMAND}\` if you also use OpenCode's own models.`;
+  if (customProviderCount === 0) return OPENCODE_ZEN_ADVICE;
+  return `OpenCode could not start a session. Check your custom provider's base URL and API key, or add an OpenCode Zen key if you also use OpenCode's own models.`;
 }

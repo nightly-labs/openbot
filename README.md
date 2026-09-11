@@ -23,6 +23,7 @@ messaging in one desktop app.
 - Per-agent context monitoring with automatic compaction before long threads exhaust the model window.
 - FIFO message queues with pause, resume, cancellation, and crash-safe persistence.
 - Agent-to-agent messages, replies, reactions, images, and managed file transfers.
+- Shared desktop channel chats with one task owner, explicit delegation, shared history, and Stop, Resume, Reassign, Archive, and Restore controls.
 - A persistent embedded browser that agents can open, inspect, and control.
 - Optional Computer Use integration for macOS through a locally installed Codex plugin.
 - Per-agent model, reasoning, profile, notification, browser, and panel state.
@@ -75,11 +76,16 @@ curl -fsSL https://claude.ai/install.sh | bash
 Install Grok CLI following the [Grok Build documentation](https://docs.x.ai/build/overview), then
 authenticate with `grok login` or set `XAI_API_KEY` in the environment used to launch OpenBot.
 
-OpenCode uses your installed CLI through ACP. Install it from [OpenCode](https://opencode.ai/docs/),
-then run `opencode auth login` for the provider you want to use. In OpenBot, select OpenCode and
-click Connect. OpenBot reads the models that the CLI advertises. It does not download or update
-OpenCode. Set `OPENBOT_OPENCODE_PATH` if the executable is outside your shell's search path.
-Remote OpenCode agents require Team API v4; older clients do not show these agents.
+OpenBot downloads and pins the OpenCode CLI, like Codex, Claude, and Grok. OpenCode's free models
+need no account and no sign-in: select OpenCode, click Connect, and OpenBot reads the models that
+the CLI advertises. To use the paid OpenCode Zen models, click Sign in on the OpenCode row and
+paste a key from [opencode.ai/auth](https://opencode.ai/auth). OpenBot encrypts the key on this
+computer and gives it only to the local CLI. OpenCode Go is a separate subscription that a Zen key
+does not buy, so OpenBot leaves the `opencode-go/` models out of the picker unless you signed in to
+Go in OpenCode itself. If you installed OpenCode yourself, OpenBot
+keeps that install and offers no download. Set `OPENBOT_OPENCODE_PATH` to select an executable
+outside your shell's search path. Remote OpenCode agents require Team API v4; older clients do not
+show these agents.
 
 On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is available in PowerShell.
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.
@@ -136,7 +142,10 @@ bun run dev
 ```
 
 The seed adds agents, rich conversations, managed files and references, reactions, completed
-agent exchanges, and local team chat data. It does not add live queue items or start model turns.
+agent exchanges, two channels with a delegated task run, channel memories and routines, and local
+team chat data. It dates every record backwards from the run, so the transcripts read Today and
+Yesterday. It does not add live queue items, open routine runs, or queued channel tasks, so it
+starts no model turn.
 Use `bun run dev:seed --dry-run` to inspect the target and fixture counts without changing files.
 
 ### Marketplace launch catalog
@@ -152,6 +161,8 @@ Seed the approved OpenBot team catalog locally with `bun run marketplace:seed:lo
 | `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`, and `--isolated` gives the worktree a profile of its own keyed to its path instead of the shared `OpenBot Dev` one. |
 | `bun run preview` | Preview the built Electron client with the green preview icon. |
 | `bun run mobile:go` | Start the mobile app in Expo Go and clear the Metro cache. |
+| `bun mobile:ios` | Build and launch the iOS simulator app without RocketSim. |
+| `bun mobile:ios:rocketsim` | Start RocketSim and build and launch the iOS simulator app with RocketSim Connect. See [mobile setup](apps/mobile/README.md#development). |
 | `bun run mobile:go:tunnel` | Start the mobile app in Expo Go through a Metro tunnel and clear the cache. The OpenBot API and Signal still need their own reachable addresses. |
 | `bun run dev:api` | Start the TanStack Start API and its local D1 database on `127.0.0.1:3100`. |
 | `bun run api:start` | Build and preview the Cloudflare Worker locally. |
@@ -164,7 +175,7 @@ Seed the approved OpenBot team catalog locally with `bun run marketplace:seed:lo
 | `bun run remote:update` | Update Signal, then drain and update the single coturn instance. |
 | `bun run dev:all` | Start the Auth API, Signal service, and single local Electron instance. |
 | `bun run dev:test-client` | Start the Auth API, Signal service, local instance, and an isolated second client for team testing. |
-| `bun run dev:seed` | Replace only the app development profile with deterministic showcase data. |
+| `bun run dev:seed` | Replace only the app development profile with durable showcase data. |
 | `bun run dev:reset` | Delete the local app, test-client, and legacy host development state. |
 | `bun run dev:status` | Print, as JSON, every dev stack and dev app instance live on this machine: services, ports, pids, which of them belong to this worktree, and which are orphaned - a supervisor that is gone with its children still holding the ports. Each recorded process carries the state a stop command acts on: `live`, `gone` with `groupLive` for a survivor of a dead leader, and `unverified` for a pid this machine cannot date. |
 | `bun run dev:stop` | Stop this worktree's dev stack, children included, using the pids in the registry rather than a process-name pattern. It signals only a pid whose start time still matches the record, so a recycled pid is never sent SIGTERM; anything it cannot confirm is reported, left running and kept in the registry, and the command exits non-zero. `--pid=<supervisor pid>` stops one other stack, `--all` stops every stack on the machine. |
@@ -199,6 +210,9 @@ records, and public assets. It does not carry chats, files, commands, or remote 
 The development runner advertises both Mobile Connect and its Signal service on the preferred private
 LAN interface. Restart the runner after changing networks so newly generated QR codes contain the
 current address.
+
+Production mobile analytics setup and required OpenPanel credentials are documented in
+[OpenBot Mobile](apps/mobile/README.md#openpanel-product-analytics).
 
 `mobile:go:tunnel` exposes only the Expo development server. It does not expose the local account
 API, Signal, or TURN. A phone on 5G cannot use the default LAN addresses. For a test across networks,

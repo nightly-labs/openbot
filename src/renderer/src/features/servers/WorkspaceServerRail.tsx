@@ -17,7 +17,7 @@ import { useServers } from "./servers-context";
 export function WorkspaceServerRail() {
   const platform = usePlatform();
   const { openUsage } = useUsage();
-  const { servers, reorderServers, setJoinServerOpen } = useServers();
+  const { servers, reorderServers, setServerMuted, setJoinServerOpen } = useServers();
   const { selectServer } = useServerSelection();
   const { openServerSettings } = useServerSettings();
 
@@ -66,6 +66,7 @@ export function WorkspaceServerRail() {
         servers={servers()}
         onSelect={handleSelect}
         onReorder={(serverIds) => void reorderServers(serverIds)}
+        onSetMuted={(serverId, muted) => void setServerMuted(serverId, muted)}
         onAdd={() => {
           if (!platform.landingPreview) setJoinServerOpen(true);
         }}

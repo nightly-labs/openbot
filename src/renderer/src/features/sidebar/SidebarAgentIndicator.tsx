@@ -1,7 +1,8 @@
 import { Show } from "solid-js";
 import { TypingDots } from "../../components/TypingDots";
+import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import type { ResolvedPinnedItem, SidebarAgentState } from "./sidebar-types";
+import type { SidebarAgentState } from "./sidebar-types";
 
 export function SidebarAgentIndicator(props: { state: SidebarAgentState }) {
   const unreadCount = () => (props.state.kind === "unread" ? props.state.count : 0);
@@ -23,13 +24,10 @@ export function SidebarAgentIndicator(props: { state: SidebarAgentState }) {
   );
 }
 
-export function SidebarPinnedAvatar(props: {
-  item: ResolvedPinnedItem;
-  agentState: () => SidebarAgentState | undefined;
-}) {
+export function SidebarPinnedAvatar(props: { agent: AgentProfile; agentState: () => SidebarAgentState | undefined }) {
   return (
     <span class="agent-row-avatar sidebar-pinned-avatar">
-      <AgentAvatar agent={props.item.agent} motion={props.agentState()?.kind === "working" ? "working" : "idle"} />
+      <AgentAvatar agent={props.agent} motion={props.agentState()?.kind === "working" ? "working" : "idle"} />
       <Show when={props.agentState()}>{(state) => <SidebarAgentIndicator state={state()} />}</Show>
     </span>
   );

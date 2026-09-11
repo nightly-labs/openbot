@@ -68,7 +68,7 @@
   },
   "scripts": {
     "prepare": "bun scripts/install-git-hooks.ts",
-    "postinstall": "install-electron",
+    "postinstall": "install-electron && bun run --cwd apps/mobile setup:skia",
     "api:start": "bun run --cwd apps/auth-api start",
     "api:build": "bun run --cwd apps/auth-api build",
     "api:deploy": "bun run --cwd apps/auth-api deploy",
@@ -98,6 +98,7 @@
     "mobile:go:tunnel": "bun run --cwd apps/mobile start:go:tunnel",
     "mobile:android": "bun run --cwd apps/mobile android",
     "mobile:ios": "bun run --cwd apps/mobile ios",
+    "mobile:ios:rocketsim": "bun run --cwd apps/mobile ios:rocketsim",
     "mobile:lint": "bun run --cwd apps/mobile lint",
     "mobile:typecheck": "bun run typecheck:mobile",
     "mobile:doctor": "bun run --cwd apps/mobile doctor",
@@ -118,6 +119,7 @@
     "install:codex-runtime": "bun scripts/install-codex-runtime.ts",
     "install:claude-runtime": "bun scripts/install-claude-runtime.ts",
     "install:grok-runtime": "bun scripts/install-grok-runtime.ts",
+    "pin:opencode-runtime": "bun scripts/pin-opencode-runtime.ts",
     "verify:remote-desktop-runtime": "bun scripts/verify-remote-desktop-runtime.ts",
     "preview": "bun scripts/preview.ts",
     "storybook": "bun scripts/dev-storybook.ts",
@@ -245,7 +247,7 @@
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
     "dmg-builder@26.15.7": "patches/dmg-builder@26.15.7.patch",
     "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch",
-    "expo-router@57.0.17": "patches/expo-router@57.0.17.patch",
+    "expo-router@57.0.20": "patches/expo-router@57.0.20.patch",
     "react-native-keyboard-controller@1.21.9": "patches/react-native-keyboard-controller@1.21.9.patch",
     "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
     "@norbert_bodziony/bloub@0.3.0": "patches/@norbert_bodziony%2Fbloub@0.3.0.patch"

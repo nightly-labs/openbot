@@ -73,7 +73,7 @@ const openCode = requireProviderDriver("opencode");
 describe("the OpenCode driver", () => {
   it("starts the ACP process with the custom provider config", async () => {
     const capture = await captureSpawn((cli) =>
-      openCode.createClient(cli, 30_000, { customProviders: () => [provider()] }),
+      openCode.createClient(cli, 30_000, { apiKey: () => null, customProviders: () => [provider()] }),
     );
     expect(capture.argv).toBe("acp");
     expect(JSON.parse(capture.config ?? "")).toEqual({
@@ -93,7 +93,7 @@ describe("the OpenCode driver", () => {
     // a respawn of a client that was built long before the save.
     const providers: CustomProviderConfig[] = [];
     const capture = await captureSpawn((cli) => {
-      const client = openCode.createClient(cli, 30_000, { customProviders: () => providers });
+      const client = openCode.createClient(cli, 30_000, { apiKey: () => null, customProviders: () => providers });
       providers.push(provider());
       return client;
     });
@@ -106,8 +106,8 @@ describe("the OpenCode driver", () => {
     // prompt full permissions.
     const capture = await captureSpawn(
       (cli) =>
-        openCode.createProfileClient?.(cli, 30_000, { customProviders: () => [provider()] }) ??
-        openCode.createClient(cli, 30_000, { customProviders: () => [provider()] }),
+        openCode.createProfileClient?.(cli, 30_000, { apiKey: () => null, customProviders: () => [provider()] }) ??
+        openCode.createClient(cli, 30_000, { apiKey: () => null, customProviders: () => [provider()] }),
     );
     const config = JSON.parse(capture.config ?? "");
     expect(config.permission).toEqual({ "*": "deny" });
@@ -115,7 +115,9 @@ describe("the OpenCode driver", () => {
   });
 
   it("sets no config variable at all without a custom provider", async () => {
-    const capture = await captureSpawn((cli) => openCode.createClient(cli, 30_000, { customProviders: () => [] }));
+    const capture = await captureSpawn((cli) =>
+      openCode.createClient(cli, 30_000, { apiKey: () => null, customProviders: () => [] }),
+    );
     expect(capture.config).toBeNull();
   });
 });

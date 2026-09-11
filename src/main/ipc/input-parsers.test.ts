@@ -60,6 +60,7 @@ import {
   parseLoginServer,
   parseMarkDirectRead,
   parseReorderServers,
+  parseSetServerMuted,
   parseUpdateTeamMember,
 } from "./server-inputs";
 import { nullishPayload, optionalPayload, requireString } from "./validation";
@@ -832,4 +833,18 @@ describe("custom provider input parsing", () => {
       }),
     ).toThrowError("Two headers have the same name.");
   });
+});
+
+it("validates the server mute request", () => {
+  expect(parseSetServerMuted({ serverId: "local", muted: true })).toEqual({ serverId: "local", muted: true });
+  expect(parseSetServerMuted({ serverId: "remote", muted: false })).toEqual({ serverId: "remote", muted: false });
+  for (const input of [
+    null,
+    {},
+    { serverId: "local", muted: "true" },
+    { serverId: "", muted: true },
+    { serverId: 1, muted: true },
+  ]) {
+    expect(() => parseSetServerMuted(input)).toThrow();
+  }
 });

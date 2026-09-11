@@ -106,6 +106,7 @@ import {
   STORY_USAGE,
 } from "./fixtures";
 import { mockAgentAnalytics, mockHostAnalytics } from "./mock-agent-analytics";
+import { createMockChannels } from "./mock-channels";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 
 type Listener<T> = (value: T) => void;
@@ -290,6 +291,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let messageCounter = 10;
   let directMessageCounter = 10;
 
+  /** Which providers have a key saved. The preview holds the flag only, like the real boundary. */
+  const providerApiKeys = new Set<AgentProviderId>();
+
   const runtimeSnapshot: ProviderRuntimeSnapshot = clone(
     options.providerRuntimeSnapshot ?? {
       revision: 0,
@@ -297,6 +301,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         codex: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
         claude: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
         grok: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
+        opencode: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
       },
     },
   );
@@ -560,10 +565,23 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     connectProvider: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
+    setProviderApiKey: async ({ provider, key }) => {
+      if (!key.trim()) throw new Error("A provider key is required.");
+      providerApiKeys.add(provider);
+      return clone(agentStatus);
+    },
+    clearProviderApiKey: async (provider) => {
+      providerApiKeys.delete(provider);
+      return clone(agentStatus);
+    },
+    getProviderApiKeyState: async (provider) => ({
+      provider,
+      status: providerApiKeys.has(provider) ? "saved" : "missing",
+    }),
     providerRuntimes: {
       getStatus: async () => clone(runtimeSnapshot),
       download: async (provider) => {
-        if (!isManagedRuntimeProvider(provider)) throw new Error("OpenCode updates are managed outside OpenBot.");
+        if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
         const installed = runtimeSnapshot.providers[provider];
         if (runtimeTransfers.has(provider) || (installed.phase === "ready" && !installed.availableVersion))
           return clone(runtimeSnapshot);
@@ -605,7 +623,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(runtimeSnapshot);
       },
       cancel: async (provider) => {
-        if (!isManagedRuntimeProvider(provider)) throw new Error("OpenCode updates are managed outside OpenBot.");
+        if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
         const current = runtimeSnapshot.providers[provider];
         if (current.phase !== "downloading") return clone(runtimeSnapshot);
         runtimeTransfers.delete(provider);
@@ -993,6 +1011,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listModels: async () => clone([...models, ...customProviders.flatMap(mockCustomProviderModels)]),
       listAgents: async () => clone(agents),
       listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
+      ...createMockChannels(emitAgentEvent, (agentId) => agents.find((entry) => entry.id === agentId)?.name ?? agentId),
       getSidebarLayout: async () => clone(sidebarLayout),
       mutateSidebarLayout: async (action) => {
         sidebarLayout = applySidebarLayoutAction(sidebarLayout, action);
@@ -1561,6 +1580,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       exportDiagnostics: async () => ({ saved: true }),
     },
     servers: {
+      setMuted: async ({ serverId, muted }) => {
+        if (!servers.some((server) => server.id === serverId)) throw new Error("Remote server not found.");
+        servers = servers.map((server) => (server.id === serverId ? { ...server, notificationsMuted: muted } : server));
+        return clone(servers);
+      },
       list: async () => clone(servers),
       select: async (serverId) => {
         servers = servers.map((server) => ({ ...server, active: server.id === serverId }));
@@ -1583,6 +1607,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           id: `server-${servers.length + 1}`,
           name: "Joined workspace",
           logoUrl: null,
+          notificationsMuted: false,
           kind: "remote",
           state: "online",
           apiUrl: input.inviteUrl,

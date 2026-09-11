@@ -1,4 +1,3 @@
-import * as Haptics from "expo-haptics";
 import { DeviceMotion } from "expo-sensors";
 import { useCallback, useEffect, useRef } from "react";
 import {
@@ -13,6 +12,7 @@ import {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+import { haptics } from "@/shared/lib/haptics";
 
 export type AppLogoAnimation = "none" | "blink";
 
@@ -158,7 +158,7 @@ export function useAppLogoMotion({
   }, [deviceRotation, followDeviceOrientation, reduceMotion]);
 
   const handlePressIn = useCallback(() => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void haptics.impact();
 
     if (resumeBlinkTimer.current) clearTimeout(resumeBlinkTimer.current);
     stopEyeAnimations();

@@ -125,15 +125,15 @@ describe("openCodeConfigEnv", () => {
 });
 
 describe("openCodeSignInMessage", () => {
-  it("sends a plain OpenCode user to the login command", () => {
-    expect(openCodeSignInMessage(0)).toContain("opencode auth login");
+  it("sends a plain OpenCode user to the Zen key", () => {
+    expect(openCodeSignInMessage(0)).toContain("OpenCode Zen key");
   });
 
   it("names the endpoint first when a custom provider is configured", () => {
     const message = openCodeSignInMessage(1);
     expect(message).toContain("base URL");
     expect(message).toContain("API key");
-    // The command is still offered, but as the alternative rather than the instruction.
-    expect(message.indexOf("base URL")).toBeLessThan(message.indexOf("opencode auth login"));
+    // The Zen key is still offered, but as the alternative rather than the instruction.
+    expect(message.indexOf("base URL")).toBeLessThan(message.indexOf("OpenCode Zen key"));
   });
 });

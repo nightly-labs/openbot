@@ -80,6 +80,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       codex: emptyStatus(unsupportedMessage),
       claude: emptyStatus(unsupportedMessage),
       grok: emptyStatus(unsupportedMessage),
+      opencode: emptyStatus(unsupportedMessage),
     };
   }
 

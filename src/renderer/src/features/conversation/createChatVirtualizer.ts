@@ -144,6 +144,28 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
   };
 }
 
+/* The reader is at the start of the loaded transcript when the first rows are on the screen. */
+const HISTORY_BOUNDARY_ROWS = 5;
+const HISTORY_BOUNDARY_DISTANCE = 80;
+
+/**
+ * Whether the reader has reached the start of the loaded transcript, which is what asks the chat
+ * for the next older page.
+ *
+ * Both the distance and the row index are needed. A transcript that is short against its viewport
+ * renders its first row at every scroll position, so the row index alone reports the boundary
+ * while the reader sits at the newest message: the chat then pages in its history under a reply
+ * that is still arriving, and each page moves the transcript under the reader. The distance alone
+ * reports the boundary in a virtualized transcript that keeps its first row far above the screen.
+ */
+export function chatHistoryBoundaryReached(
+  scrollElement: HTMLElement | undefined,
+  firstRenderedIndex: number,
+): boolean {
+  if (!scrollElement) return false;
+  return scrollElement.scrollTop <= HISTORY_BOUNDARY_DISTANCE && firstRenderedIndex <= HISTORY_BOUNDARY_ROWS;
+}
+
 export function calculateChatScrollMargin(
   scrollElement: HTMLElement | undefined,
   virtualRoot: HTMLElement | undefined,

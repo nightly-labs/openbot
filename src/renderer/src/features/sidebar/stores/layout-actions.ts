@@ -10,27 +10,26 @@ import {
   type SidebarLayoutAction,
   type TeamPresenceMember,
 } from "@openbot/contracts/ipc";
-import type { AgentProfile } from "../../../data";
 import { teamMemberName } from "../../team/TeamPersonAvatar";
 import type {
-  AgentDropTarget,
+  ChatDropTarget,
   PersonDropTarget,
   SectionDropTarget,
   SidebarDragSource,
   SidebarDropTarget,
 } from "../sidebar-drag-model";
 import { type SidebarPinnedItem, sidebarPinnedItemKey } from "../sidebar-pins";
-import type { SidebarProps } from "../sidebar-types";
+import type { SidebarChatItem, SidebarProps } from "../sidebar-types";
 
 export function createSidebarLayoutActions(deps: {
-  agentPinnedItems: () => SidebarPinnedItem[];
+  chatPinnedItems: () => SidebarPinnedItem[];
   announce: (message: string) => void;
   announceError: (cause: unknown) => void;
-  assignedSectionId: (agentId: string) => string;
-  agentById: () => Map<string, AgentProfile>;
+  assignedSectionId: (chatId: string) => string;
   canPinDraggedSidebarItem: () => boolean;
+  chatName: (chatId: string) => string;
   draggedSidebarItem: () => SidebarPinnedItem | null;
-  filteredAgentsBySection: () => Map<string, AgentProfile[]>;
+  filteredChatsBySection: () => Map<string, SidebarChatItem[]>;
   filteredPeople: () => TeamPresenceMember[];
   layoutMutable: () => boolean;
   orderedPeople: () => TeamPresenceMember[];
@@ -41,14 +40,14 @@ export function createSidebarLayoutActions(deps: {
   visibleSectionIds: () => string[];
 }) {
   const {
-    agentPinnedItems,
     announce,
     announceError,
     assignedSectionId,
-    agentById,
     canPinDraggedSidebarItem,
+    chatName,
+    chatPinnedItems,
     draggedSidebarItem,
-    filteredAgentsBySection,
+    filteredChatsBySection,
     filteredPeople,
     layoutMutable,
     orderedPeople,
@@ -70,9 +69,19 @@ export function createSidebarLayoutActions(deps: {
     void props.onMutateLayout({ type: "move", sectionId, direction, steps }).catch(announceError);
   }
 
-  /** Moves one agent into a section, or out of every section when `sectionId` is null. */
-  function assignAgentSection(agentId: string, sectionId: string | null): void {
-    void props.onMutateLayout({ type: "assign", agentId, sectionId }).catch(announceError);
+  /**
+   * Moves one chat into a section, or out of every section when `sectionId` is null. The action
+   * keeps its released `agentId` field name; a channel id travels in it the same way.
+   */
+  function assignChatSection(chatId: string, sectionId: string | null): void {
+    void props.onMutateLayout({ type: "assign", agentId: chatId, sectionId }).catch(announceError);
+  }
+
+  /** The ids a section shows, in order, without the chat that is being dragged out of it. */
+  function sectionChatIdsWithout(sectionId: string, chatId: string): string[] {
+    return (filteredChatsBySection().get(sectionId) ?? [])
+      .map((item) => item.id)
+      .filter((candidate) => candidate !== chatId);
   }
 
   function reorderDraggedPerson(sourceMemberId: string, target: PersonDropTarget): void {
@@ -99,23 +108,12 @@ export function createSidebarLayoutActions(deps: {
     });
   }
 
-  function moveDraggedAgent(agentId: string, target: AgentDropTarget): void {
-    const sectionAgents = filteredAgentsBySection().get(target.sectionId) ?? [];
-    const idsWithoutSource = sectionAgents.map((agent) => agent.id).filter((candidate) => candidate !== agentId);
-    const targetIndex = idsWithoutSource.indexOf(target.agentId);
-    if (targetIndex < 0) return;
-    const beforeAgentId = target.placement === "before" ? target.agentId : (idsWithoutSource[targetIndex + 1] ?? null);
+  function moveDraggedChat(chatId: string, target: ChatDropTarget): void {
+    const action = moveChatAction(chatId, target);
+    if (!action) return;
     void props
-      .onMutateLayout({
-        type: "move-agent",
-        agentId,
-        sectionId: target.sectionId === SIDEBAR_UNASSIGNED_SECTION_ID ? null : target.sectionId,
-        beforeAgentId,
-      })
-      .then(
-        () => announce(`Moved ${agentById().get(agentId)?.name ?? "agent"} in ${sectionLabel(target.sectionId)}.`),
-        announceError,
-      );
+      .onMutateLayout(action)
+      .then(() => announce(`Moved ${chatName(chatId)} in ${sectionLabel(target.sectionId)}.`), announceError);
   }
 
   function reorderDraggedSection(sourceSectionId: string, target: SectionDropTarget): void {
@@ -148,35 +146,38 @@ export function createSidebarLayoutActions(deps: {
     const item = draggedSidebarItem();
     if (!item || !canPinDraggedSidebarItem()) return false;
     props.onPin(item);
-    const name = agentById().get(item.id)?.name ?? "agent";
-    announce(`Pinned ${name}.`);
+    announce(`Pinned ${chatName(item.id)}.`);
     return true;
   }
 
-  function moveAgentAction(agentId: string, target: AgentDropTarget): SidebarLayoutAction | null {
-    const sectionAgents = filteredAgentsBySection().get(target.sectionId) ?? [];
-    const idsWithoutSource = sectionAgents.map((agent) => agent.id).filter((candidate) => candidate !== agentId);
-    const targetIndex = idsWithoutSource.indexOf(target.agentId);
+  function moveChatAction(chatId: string, target: ChatDropTarget): SidebarLayoutAction | null {
+    const idsWithoutSource = sectionChatIdsWithout(target.sectionId, chatId);
+    const targetIndex = idsWithoutSource.indexOf(target.chatId);
     if (targetIndex < 0) return null;
     return {
       type: "move-agent",
-      agentId,
+      agentId: chatId,
       sectionId: target.sectionId === SIDEBAR_UNASSIGNED_SECTION_ID ? null : target.sectionId,
-      beforeAgentId: target.placement === "before" ? target.agentId : (idsWithoutSource[targetIndex + 1] ?? null),
+      beforeAgentId: target.placement === "before" ? target.chatId : (idsWithoutSource[targetIndex + 1] ?? null),
     };
   }
 
-  function appendAgentAction(agentId: string, sectionId: string): SidebarLayoutAction {
+  function appendChatAction(chatId: string, sectionId: string): SidebarLayoutAction {
     return {
       type: "move-agent",
-      agentId,
+      agentId: chatId,
       sectionId: sectionId === SIDEBAR_UNASSIGNED_SECTION_ID ? null : sectionId,
       beforeAgentId: null,
     };
   }
 
-  async function commitPinnedAgentDrop(
-    source: Extract<SidebarDragSource, { kind: "agent" }>,
+  /** The pin a dragged tile stands for, found by the key the tile carries. */
+  function pinnedRef(key: string): SidebarPinnedItem | undefined {
+    return chatPinnedItems().find((item) => sidebarPinnedItemKey(item) === key);
+  }
+
+  async function commitPinnedChatDrop(
+    source: Extract<SidebarDragSource, { kind: "pinned" }>,
     target: SidebarDropTarget | null,
   ) {
     if (target && target.kind !== "pinned" && !layoutMutable()) {
@@ -185,17 +186,19 @@ export function createSidebarLayoutActions(deps: {
     }
     let action: SidebarLayoutAction | null = null;
     let sectionId = assignedSectionId(source.id);
-    if (target?.kind === "agent") {
-      action = moveAgentAction(source.id, target.target);
+    if (target?.kind === "chat") {
+      action = moveChatAction(source.id, target.target);
       sectionId = target.target.sectionId;
     } else if (target?.kind === "section") {
       sectionId = target.sectionId;
-      if (assignedSectionId(source.id) !== target.sectionId) action = appendAgentAction(source.id, target.sectionId);
+      if (assignedSectionId(source.id) !== target.sectionId) action = appendChatAction(source.id, target.sectionId);
     }
+    const ref = pinnedRef(source.key);
+    if (!ref) return;
     try {
       if (action) await props.onMutateLayout(action);
-      props.onUnpin({ kind: "agent", id: source.id });
-      announce(`Moved ${agentById().get(source.id)?.name ?? "agent"} to ${sectionLabel(sectionId)}.`);
+      props.onUnpin(ref);
+      announce(`Moved ${chatName(source.id)} to ${sectionLabel(sectionId)}.`);
     } catch (error) {
       announceError(error);
     }
@@ -211,22 +214,18 @@ export function createSidebarLayoutActions(deps: {
       if (target?.kind === "pinned") {
         if (target.key) reorderPinnedItem(source.key, target.key);
       } else {
-        void commitPinnedAgentDrop(source, target);
+        void commitPinnedChatDrop(source, target);
       }
       return;
     }
 
-    if (source.kind === "agent") {
+    if (source.kind === "chat") {
       if (target?.kind === "pinned") pinDraggedSidebarItem();
-      else if (target?.kind === "agent") moveDraggedAgent(source.id, target.target);
+      else if (target?.kind === "chat") moveDraggedChat(source.id, target.target);
       else if (target?.kind === "section") {
         void props
-          .onMutateLayout(appendAgentAction(source.id, target.sectionId))
-          .then(
-            () =>
-              announce(`Moved ${agentById().get(source.id)?.name ?? "agent"} to ${sectionLabel(target.sectionId)}.`),
-            announceError,
-          );
+          .onMutateLayout(appendChatAction(source.id, target.sectionId))
+          .then(() => announce(`Moved ${chatName(source.id)} to ${sectionLabel(target.sectionId)}.`), announceError);
       }
       return;
     }
@@ -241,7 +240,7 @@ export function createSidebarLayoutActions(deps: {
 
   function reorderPinnedItem(sourceKey: string, targetKey: string): void {
     if (sourceKey === targetKey) return;
-    const items = [...agentPinnedItems()];
+    const items = [...chatPinnedItems()];
     const sourceIndex = items.findIndex((item) => sidebarPinnedItemKey(item) === sourceKey);
     const targetIndex = items.findIndex((item) => sidebarPinnedItemKey(item) === targetKey);
     if (sourceIndex < 0 || targetIndex < 0) return;
@@ -261,9 +260,9 @@ export function createSidebarLayoutActions(deps: {
   }
 
   return {
-    assignAgentSection,
+    assignChatSection,
     commitSidebarDrop,
-    moveDraggedAgent,
+    moveDraggedChat,
     movePersonByKeyboard,
     movePinnedItem,
     moveSection,

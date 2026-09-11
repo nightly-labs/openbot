@@ -5,22 +5,22 @@ import { errorMessage } from "../../../error-message";
  * closing either is then what discards what the failed attempt was saying.
  */
 
-import type { SidebarSection } from "@openbot/contracts/ipc";
+import type { ChannelSummary, SidebarSection } from "@openbot/contracts/ipc";
 import { createMemo, createStore } from "solid-js";
 import type { SidebarProps } from "../sidebar-types";
 
 /**
- * The one delete confirmation the sidebar can have open: an agent, or a custom section, never both.
+ * The one delete confirmation the sidebar can have open: an agent, channel or custom section, never both.
  * The attempt's progress and the reason it failed live inside the record rather than beside it, so
  * closing the dialog cannot leave a "Deleting…" button or the previous attempt's message behind.
  */
 interface SidebarPendingDelete {
   deleting: boolean;
   error: string | null;
-  /** The agent or the section, whichever `kind` names. */
+  /** The agent, channel or section, whichever `kind` names. */
   id: string;
-  /** Which of the two confirmations is on screen. Each dialog renders from one arm. */
-  kind: "agent" | "section";
+  /** Which confirmation is on screen. Each dialog renders from one arm. */
+  kind: "agent" | "channel" | "section";
 }
 
 /** What the section editor is editing: a section about to exist, or the one being renamed. */
@@ -51,7 +51,7 @@ export function createSidebarPendingStore(deps: {
   const { customSectionById, props } = deps;
 
   const [pending, setPending] = createStore<SidebarPending>({ deletion: null, sectionEditor: null });
-  // Both dialogs read these: only one confirmation exists, and each dialog only renders while it is
+  // Each dialog reads these: only one confirmation exists, and each dialog only renders while it is
   // the one. That is also why a section delete no longer needs its own pair of flags.
   const deleting = () => pending.deletion?.deleting === true;
   const deleteError = () => pending.deletion?.error ?? null;
@@ -60,6 +60,10 @@ export function createSidebarPendingStore(deps: {
   const deleteTarget = createMemo(() => {
     const deletion = pending.deletion;
     return deletion?.kind === "agent" ? props.agents.find((agent) => agent.id === deletion.id) : undefined;
+  });
+  const channelDeleteTarget = createMemo<ChannelSummary | undefined>(() => {
+    const deletion = pending.deletion;
+    return deletion?.kind === "channel" ? props.channels?.find((channel) => channel.id === deletion.id) : undefined;
   });
   const sectionDeleteTarget = createMemo(() => {
     const deletion = pending.deletion;
@@ -101,10 +105,12 @@ export function createSidebarPendingStore(deps: {
 
   async function confirmDelete() {
     const deletion = pending.deletion;
-    if (deletion?.kind !== "agent" || deletion.deleting) return;
+    if (!deletion || deletion.deleting || (deletion.kind !== "agent" && deletion.kind !== "channel")) return;
+    const onDelete = deletion.kind === "agent" ? props.onDeleteAgent : props.onDeleteChannel;
+    if (!onDelete) return;
     beginDelete();
     try {
-      await props.onDeleteAgent(deletion.id);
+      await onDelete(deletion.id);
       closeDelete();
     } catch (error) {
       failDelete(error);
@@ -241,6 +247,7 @@ export function createSidebarPendingStore(deps: {
     confirmSectionDelete,
     deleteError,
     deleteTarget,
+    channelDeleteTarget,
     deleting,
     openDelete,
     pending,

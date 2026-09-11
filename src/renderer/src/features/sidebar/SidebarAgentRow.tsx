@@ -12,12 +12,12 @@ import { useSidebarScope } from "./sidebar-scope";
 export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
   const {
     dragOffset,
-    draggedAgentId,
-    endAgentDragging,
+    draggedChatId,
+    endChatDragging,
     layoutMutable,
     props,
     sidebarClickIsSuppressed,
-    startAgentDragging,
+    startChatDragging,
   } = useSidebarScope();
   const title = () => rowProps.agent.title.trim();
   const working = () => props.agentStates[rowProps.agent.id]?.kind === "working";
@@ -27,15 +27,15 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
       class={[
         "sidebar-agent-item",
         {
-          "sidebar-agent-item-dragging": draggedAgentId() === rowProps.agent.id,
+          "sidebar-agent-item-dragging": draggedChatId() === rowProps.agent.id,
           "sidebar-drag-shifting": dragOffset(rowProps.agent.id).y !== 0,
         },
       ]}
       style={`--sidebar-drag-y: ${dragOffset(rowProps.agent.id).y}px;`}
-      data-agent-id={rowProps.agent.id}
+      data-chat-id={rowProps.agent.id}
       draggable={!layoutMutable() || props.compact ? "false" : "true"}
-      onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) => startAgentDragging(event, rowProps.agent)}
-      onDragEnd={endAgentDragging}
+      onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) => startChatDragging(event, rowProps.agent.id)}
+      onDragEnd={endChatDragging}
     >
       <ContextMenu.Root modal={false}>
         <ContextMenu.Trigger
@@ -46,7 +46,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
             "agent-row",
             {
               "agent-row-active": props.activeAgentId === rowProps.agent.id,
-              "sidebar-agent-row-dragging": draggedAgentId() === rowProps.agent.id,
+              "sidebar-agent-row-dragging": draggedChatId() === rowProps.agent.id,
             },
           ]}
           aria-label={`${rowProps.agent.name}${title() ? `, ${title()}` : ""}. ${rowProps.agent.preview}`}

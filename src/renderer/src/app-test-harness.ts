@@ -19,6 +19,7 @@ import type {
 import { screen } from "@solidjs/testing-library";
 import { vi } from "vitest";
 import { type AnalyticsEventName, type DesktopAnalyticsEvents, desktopAnalytics } from "./analytics";
+import { createMockChannels } from "./preview/mock-channels";
 
 /** Shared by every harness helper, so `expect(trackAnalytics)` works without re-importing the spy. */
 export const trackAnalytics =
@@ -267,6 +268,7 @@ export function testServer(id: string, active: boolean): ServerSummary {
     id,
     name: local ? "Local" : "Studio Mac",
     logoUrl: null,
+    notificationsMuted: false,
     kind: local ? "local" : "remote",
     state: "online",
     apiUrl: local ? null : "https://studio.example.com",
@@ -501,6 +503,10 @@ export function installOpenbotStub(): void {
         onEvent: vi.fn(authBridge.subscribe),
       },
       agent: {
+        ...createMockChannels(
+          (event) => emitAgentEvent?.(event),
+          (agentId) => AGENTS.find((agent) => agent.id === agentId)?.name ?? agentId,
+        ),
         getStatus: vi.fn().mockResolvedValue({
           phase: "ready",
           cliVersion: "0.144.1",
@@ -783,11 +789,17 @@ export function installOpenbotStub(): void {
         exportDiagnostics: vi.fn().mockResolvedValue({ saved: true }),
       },
       servers: {
+        setMuted: vi
+          .fn()
+          .mockImplementation(async ({ serverId, muted }) => [
+            { ...testServer(serverId, true), notificationsMuted: muted },
+          ]),
         list: vi.fn().mockResolvedValue([
           {
             id: "local",
             name: "Local",
             logoUrl: null,
+            notificationsMuted: false,
             kind: "local",
             state: "online",
             apiUrl: null,
@@ -801,6 +813,7 @@ export function installOpenbotStub(): void {
             id: "local",
             name: "Local",
             logoUrl: null,
+            notificationsMuted: false,
             kind: "local",
             state: "online",
             apiUrl: null,

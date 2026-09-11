@@ -21,7 +21,7 @@ import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { redactText } from "@openbot/logging";
 import type { AgentProvider } from "./agent-client";
-import type { AgentCliInfo } from "./cli";
+import { type AgentCliInfo, cliSpawnTarget } from "./cli";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
 import {
   type AccountRateLimitsReadResult,
@@ -87,11 +87,12 @@ export interface AcpProviderOptions {
   provider: AgentProvider;
   profileGeneration?: boolean;
   argv: readonly string[];
+  env: Record<string, string>;
   /**
-   * A getter is resolved in `start()`, so a config the app changed after this client was built still
-   * reaches the process. OpenCode needs that: its custom-provider config is only read at spawn.
+   * Variables read once per spawn rather than once per client, which is what lets a key saved after
+   * construction reach the next process without any other plumbing. Spread after `env`.
    */
-  env: Record<string, string> | (() => Record<string, string>);
+  extraEnv?: () => Record<string, string>;
   signInMessage: string;
   authenticate?(connection: ClientSideConnection, initialization: InitializeResponse): Promise<void>;
   readRateLimits?(connection: ClientSideConnection): Promise<AccountRateLimitsReadResult>;
@@ -131,11 +132,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   start(): void {
     if (this.running) return;
     this.#stopping = false;
-    const extraEnv = typeof this.options.env === "function" ? this.options.env() : this.options.env;
-    const child = spawn(this.#cli.executable, [...this.options.argv], {
+    const target = cliSpawnTarget(this.#cli.executable, this.options.argv);
+    const child = spawn(target.command, target.args, {
       stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, ...extraEnv },
-      shell: process.platform === "win32",
+      env: { ...process.env, ...this.options.env, ...this.options.extraEnv?.() },
+      windowsVerbatimArguments: target.windowsVerbatimArguments,
       windowsHide: true,
     });
     this.#process = child;

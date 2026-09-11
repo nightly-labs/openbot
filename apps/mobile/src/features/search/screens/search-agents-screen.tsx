@@ -2,9 +2,10 @@ import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Search } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 
+import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { MobileSearchFilterButton } from "@/features/search/components/search-filter-button";
 import { MobileSearchResultRow } from "@/features/search/components/search-result-row";
 import { MobileSearchTextInput } from "@/features/search/components/search-text-input";
@@ -33,6 +34,19 @@ export function SearchAgentsScreen() {
     });
   }, [activeAgents, category, query]);
 
+  const searchSummary = useRef({ used: false, count: 0 });
+  if (query.trim() || category !== "all") searchSummary.current = { used: true, count: filteredResults.length };
+  useEffect(() => {
+    const scope = mobileAnalytics.scope();
+    return () => {
+      if (searchSummary.current.used)
+        scope.track("search_action", {
+          scope: "global",
+          result: "succeeded",
+          result_count: searchSummary.current.count,
+        });
+    };
+  }, []);
   return (
     <SheetScrollView
       className="flex-1 bg-background"

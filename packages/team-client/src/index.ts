@@ -1,5 +1,6 @@
 export { readAgentAnalytics } from "./agent-analytics";
 export { readHostAnalytics } from "./host-analytics";
+export { createRemoteAccountRefresh } from "./remote-account-refresh";
 export type TeamClientFetch = typeof globalThis.fetch;
 
 export { saveReviewedAgentProfile } from "./profile-save";

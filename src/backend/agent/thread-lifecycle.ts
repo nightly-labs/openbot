@@ -106,11 +106,13 @@ export class ThreadLifecycle {
     this.#pendingRuntimeRefreshes.clear();
   }
 
-  async ensureThread(agent: AgentSummary, client: AgentClient): Promise<string> {
-    const publicThreadId = await this.#store.ensureThreadId(agent.id);
+  async ensureThread(agent: AgentSummary, client: AgentClient, executionThreadId?: string): Promise<string> {
+    const publicThreadId = executionThreadId ?? (await this.#store.ensureThreadId(agent.id));
+    if (executionThreadId) this.#conversation.registerExecutionThread(agent.id, executionThreadId);
     const currentAgent = this.#store.list().find((candidate) => candidate.id === agent.id) ?? agent;
-    const session = this.#store.activeProviderSession(agent.id);
+    const session = this.#store.database.activeProviderSession(publicThreadId, agent.provider);
     if (session) {
+      this.#conversation.bindThread(session.externalSessionId, agent.id, publicThreadId);
       try {
         const handoff = await readFile(this.handoffPath(session.externalSessionId), "utf8");
         this.#pendingHandoffs.set(session.externalSessionId, handoff);
@@ -136,7 +138,7 @@ export class ThreadLifecycle {
           return replacementThreadId;
         }
       }
-      this.#conversation.bindThread(session.externalSessionId, agent.id);
+      this.#conversation.bindThread(session.externalSessionId, agent.id, publicThreadId);
       return session.externalSessionId;
     }
 
@@ -174,14 +176,22 @@ export class ThreadLifecycle {
         await writeFile(this.handoffPath(externalThreadId), handoff, { mode: 0o600 });
         this.#pendingHandoffs.set(externalThreadId, handoff);
       }
-      this.#store.bindProviderSession(agent.id, externalThreadId);
+      if (publicThreadId === agent.threadId) this.#store.bindProviderSession(agent.id, externalThreadId);
+      else
+        this.#store.database.bindProviderSession({
+          threadId: publicThreadId,
+          provider: agent.provider,
+          externalSessionId: externalThreadId,
+          model: agent.model,
+          effort: agent.reasoningEffort,
+        });
     } catch (error) {
       await this.deleteProviderSessionFiles(externalThreadId).catch((cleanupError: unknown) => {
         throw new AggregateError([error, cleanupError], "Failed to prepare and clean up the provider session.");
       });
       throw error;
     }
-    this.#conversation.bindThread(externalThreadId, agent.id);
+    this.#conversation.bindThread(externalThreadId, agent.id, publicThreadId);
     this.#conversation.markThreadLoaded(externalThreadId, client);
     this.#conversation.ensureSnapshot(agent.id, publicThreadId);
     return externalThreadId;
@@ -243,9 +253,10 @@ export class ThreadLifecycle {
   }
 
   retireProviderSession(agent: AgentSummary, externalThreadId: string): void {
-    const session = this.#store.activeProviderSession(agent.id);
-    if (session?.externalSessionId !== externalThreadId || !agent.threadId) return;
-    this.#store.database.deactivateProviderSessions(agent.threadId);
+    const publicThreadId = this.#conversation.publicThreadId(agent.id, externalThreadId);
+    const session = this.#store.database.activeProviderSession(publicThreadId, agent.provider);
+    if (session?.externalSessionId !== externalThreadId) return;
+    this.#store.database.deactivateProviderSessions(publicThreadId);
     this.#conversation.unbindThread(externalThreadId);
     this.#conversation.unloadThread(externalThreadId);
     this.#compaction.forgetThread(externalThreadId);
@@ -294,6 +305,7 @@ export class ThreadLifecycle {
   }
 
   buildProviderHandoff(agentId: string, threadId: string): string | null {
+    if (this.#conversation.isExecutionThread(threadId)) return null;
     if (this.#store.database.listProviderSessions(threadId).length < 1) return null;
     const persisted = this.#store.database.readConversation(agentId, threadId);
     const messages = mergeConversationSnapshots(persisted, {

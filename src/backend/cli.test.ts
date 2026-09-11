@@ -8,10 +8,13 @@ import {
   bundledClaudeExecutable,
   bundledCodexExecutable,
   bundledGrokExecutable,
+  bundledOpencodeExecutable,
   CodexCliError,
+  cliSpawnTarget,
   parseClaudeVersion,
   parseCodexVersion,
   parseGrokVersion,
+  parseOpencodeVersion,
   posixFallbackPaths,
   resolveClaudeCli,
   resolveCodexCli,
@@ -259,6 +262,35 @@ describe("Windows CLI fallback paths", () => {
   });
 });
 
+describe("CLI spawn target", () => {
+  it("starts a Windows executable whose path contains a space", () => {
+    // A managed CLI lives under `userData`. Through `cmd.exe` the unquoted path splits at the space
+    // and the downloaded CLI never connects, so a native executable must start with no shell.
+    const executable = "C:\\Users\\Jane Doe\\AppData\\Roaming\\OpenBot Dev\\provider-runtimes\\opencode.exe";
+
+    expect(cliSpawnTarget(executable, ["acp"], "win32")).toEqual({
+      command: executable,
+      args: ["acp"],
+      windowsVerbatimArguments: false,
+    });
+  });
+
+  it("runs a Windows command shim through the command processor", () => {
+    const target = cliSpawnTarget("C:\\Users\\Jane Doe\\AppData\\Roaming\\npm\\opencode.cmd", ["acp"], "win32");
+
+    expect(target.windowsVerbatimArguments).toBe(true);
+    expect(target.args).toEqual(["/d", "/s", "/c", '""C:\\Users\\Jane Doe\\AppData\\Roaming\\npm\\opencode.cmd" acp"']);
+  });
+
+  it("uses no command processor away from Windows", () => {
+    expect(cliSpawnTarget("/opt/homebrew/bin/opencode", ["acp"], "darwin")).toEqual({
+      command: "/opt/homebrew/bin/opencode",
+      args: ["acp"],
+      windowsVerbatimArguments: false,
+    });
+  });
+});
+
 async function createWindowsNpmShims(): Promise<void> {
   const root = await mkdtemp(join(tmpdir(), "openbot-cli-test-"));
   temporaryPaths.push(root);
@@ -292,12 +324,81 @@ function restoreEnvironment(name: string, value: string | undefined): void {
   else process.env[name] = value;
 }
 
-describe("OpenCode system CLI", () => {
+describe("OpenCode CLI version parsing", () => {
+  it("reads the bare version the CLI prints", () => {
+    // `verifyInstalledRuntime` compares this against the pinned version for exact equality, so the
+    // parser must not normalise `1.18.30` into anything else.
+    expect(parseOpencodeVersion("1.18.30\n")).toBe("1.18.30");
+    expect(parseOpencodeVersion("opencode v1.18.30")).toBe("1.18.30");
+  });
+
+  it("fails closed on an unknown format", () => {
+    expect(() => parseOpencodeVersion("opencode development build")).toThrow(CodexCliError);
+    expect(() => parseOpencodeVersion("opencode development build")).toThrowError(
+      expect.objectContaining({ code: "invalid" }),
+    );
+  });
+});
+
+describe("OpenCode CLI resolution", () => {
+  it("resolves the managed runtime path for supported targets", () => {
+    expect(bundledOpencodeExecutable("darwin", "arm64", "/Applications/OpenBot.app/Contents/Resources")).toBe(
+      "/Applications/OpenBot.app/Contents/Resources/opencode/mac/arm64/bin/opencode",
+    );
+    expect(bundledOpencodeExecutable("linux", "x64", "/resources")).toBeNull();
+  });
+
   it.runIf(process.platform !== "win32")("uses the installed CLI and reports a missing override", async () => {
     const executable = await createExecutable("opencode", "1.3.13");
     process.env.OPENBOT_OPENCODE_PATH = executable;
     await expect(resolveOpencodeCli()).resolves.toEqual({ executable, version: "1.3.13", source: "system" });
     process.env.OPENBOT_OPENCODE_PATH = join(executable, "missing");
-    await expect(resolveOpencodeCli()).rejects.toThrow("Install OpenCode on this computer to continue.");
+    await expect(resolveOpencodeCli()).rejects.toMatchObject({
+      code: "missing",
+      message: "OpenCode is not downloaded. Download it in OpenBot to continue.",
+    });
+  });
+
+  it.runIf(process.platform !== "win32")("prefers the managed runtime over a system install", async () => {
+    const system = await createExecutable("opencode", "1.3.13");
+    const managed = await createExecutable("opencode", "1.18.30");
+    await expect(resolveOpencodeCli({ systemCandidates: [system], bundledExecutable: managed })).resolves.toEqual({
+      executable: managed,
+      version: "1.18.30",
+      source: "managed",
+    });
+  });
+
+  /*
+   * The regression that keeps an existing install from being replaced by a ~46 MB download. The
+   * managed path is what a first run holds: a directory name no runtime has been staged into yet.
+   */
+  it.runIf(process.platform !== "win32")("keeps a system install when nothing is downloaded", async () => {
+    const system = await createExecutable("opencode", "1.3.13");
+    await expect(
+      resolveOpencodeCli({ systemCandidates: [system], bundledExecutable: join(system, "not-downloaded") }),
+    ).resolves.toEqual({ executable: system, version: "1.3.13", source: "system" });
+  });
+
+  it.runIf(process.platform !== "win32")("lets the path override win over the managed runtime", async () => {
+    const override = await createExecutable("opencode", "1.3.13");
+    const managed = await createExecutable("opencode", "1.18.30");
+    process.env.OPENBOT_OPENCODE_PATH = override;
+    await expect(resolveOpencodeCli({ bundledExecutable: managed })).resolves.toEqual({
+      executable: override,
+      version: "1.3.13",
+      source: "system",
+    });
+  });
+
+  it("reports a CLI that cannot be started apart from one that is absent", async () => {
+    const broken = await createExecutable("opencode", "not a version");
+    await expect(resolveOpencodeCli({ systemCandidates: [broken], bundledExecutable: null })).rejects.toMatchObject({
+      code: "invalid",
+      message: "OpenCode could not start. Run `opencode --version` in a terminal.",
+    });
+    await expect(resolveOpencodeCli({ systemCandidates: [], bundledExecutable: null })).rejects.toMatchObject({
+      code: "missing",
+    });
   });
 });

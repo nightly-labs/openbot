@@ -230,6 +230,7 @@ describe("OnboardingFlow", () => {
       codex: { phase: "not-downloaded", progress: null, message: null, version: null },
       claude: { phase: "not-downloaded", progress: null, message: null, version: null },
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
+      opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     };
     const [agentStatus, setAgentStatus] = createSignal(initialAgentStatus);
     const [runtimeStatuses, setRuntimeStatuses] = createSignal(initialRuntimeStatuses);
@@ -288,5 +289,45 @@ describe("OnboardingFlow", () => {
     await waitFor(() => expect(next).toBeEnabled());
     await fireEvent.click(view.getByRole("button", { name: "Reconnect Claude" }));
     expect(onConnectProvider).toHaveBeenCalledTimes(2);
+  });
+
+  it("offers no OpenCode download to a user who installed the CLI already", () => {
+    activeMock = createMockOpenBot();
+    window.openbot = activeMock.api;
+    // An empty managed directory is the normal state for anyone with their own OpenCode install, so
+    // the row has to read the provider's answer and not the directory: the alternative offers a
+    // ~46 MB download to a user whose CLI already works.
+    const agentStatus: AgentStatus = {
+      ...STORY_AGENT_STATUS,
+      providers: [
+        ...(STORY_AGENT_STATUS.providers ?? []).map((provider) =>
+          provider.id === "codex" ? { ...provider, state: "not-installed" as const, version: null } : provider,
+        ),
+        { id: "opencode", state: "available", version: "1.18.27", message: null, cliSource: "system" },
+      ],
+    };
+    const runtimeStatuses: Record<ManagedProviderId, ProviderRuntimeStatus> = {
+      codex: { phase: "not-downloaded", progress: null, message: null, version: null },
+      claude: { phase: "not-downloaded", progress: null, message: null, version: null },
+      grok: { phase: "not-downloaded", progress: null, message: null, version: null },
+      opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
+    };
+    const view = render(() => (
+      <OnboardingFlow
+        state={{ completed: false, preferredProvider: null, preferredModel: null }}
+        agentStatus={agentStatus}
+        platform="darwin"
+        providerRuntimeStatuses={runtimeStatuses}
+        onDownloadProvider={vi.fn()}
+        onSave={async () => undefined}
+      />
+    ));
+
+    // ChatGPT is the control: the same empty runtime entry, on a provider that reports no CLI, does
+    // offer the download.
+    expect(view.getByRole("button", { name: "Download ChatGPT" })).toBeInTheDocument();
+    expect(view.queryByRole("button", { name: "Download OpenCode" })).toBeNull();
+    // The version the user's own CLI reports, which is the one the row must show.
+    expect(view.getByText("v1.18.27")).toBeInTheDocument();
   });
 });

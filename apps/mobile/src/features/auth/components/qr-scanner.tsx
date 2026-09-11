@@ -11,6 +11,7 @@ import { AppState, Linking, ScrollView, StyleSheet, useWindowDimensions, View } 
 
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
+import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
 type ScanState = { status: "idle" } | { status: "connecting" } | { status: "error"; message: string };
@@ -84,16 +85,29 @@ function ScannerCamera({ onBarcodeScanned }: Pick<CameraViewProps, "onBarcodeSca
 
 export function QrScanner({
   onScan,
+  pairing = true,
   embedded = false,
   scanEnabled = true,
   renderOverlay,
 }: {
   onScan: (data: string) => Promise<void>;
+  pairing?: boolean;
   embedded?: boolean;
   scanEnabled?: boolean;
   renderOverlay?: (camera: boolean) => ReactNode;
 }) {
   const scanLocked = useRef(false);
+  const completed = useRef(false);
+  const scanPending = useRef(false);
+  useEffect(() => {
+    if (!pairing) return;
+    const scope = mobileAnalytics.scope();
+    scope.track("mobile_pairing_action", { action: "scanner_opened", result: "succeeded" });
+    return () => {
+      if (!completed.current && !scanPending.current)
+        scope.track("mobile_pairing_action", { action: "cancel", result: "cancelled" });
+    };
+  }, [pairing]);
   const focused = useIsFocused();
   const [foreground, setForeground] = useState(AppState.currentState === "active");
   const [permission, requestPermission, getPermission] = useCameraPermissions();
@@ -116,14 +130,18 @@ export function QrScanner({
   async function connect(data: string): Promise<void> {
     if (!scanEnabled || scanLocked.current) return;
     scanLocked.current = true;
+    scanPending.current = true;
     setScanState({ status: "connecting" });
     try {
       await onScan(data);
+      completed.current = true;
     } catch (error) {
       setScanState({
         status: "error",
         message: errorMessage(error, "OpenBot could not connect this phone."),
       });
+    } finally {
+      scanPending.current = false;
     }
   }
 
@@ -172,7 +190,29 @@ export function QrScanner({
                 <Button
                   size="lg"
                   className="w-full"
-                  onPress={canRequestPermission ? requestPermission : () => void Linking.openSettings()}
+                  onPress={
+                    canRequestPermission
+                      ? async () => {
+                          const scope = mobileAnalytics.scope();
+                          try {
+                            const response = await requestPermission();
+                            if (pairing)
+                              scope.track("mobile_pairing_action", {
+                                action: "camera_permission",
+                                result: response.granted ? "succeeded" : "failed",
+                                ...(response.granted ? {} : { failure_code: "permission_denied" }),
+                              });
+                          } catch {
+                            if (pairing)
+                              scope.track("mobile_pairing_action", {
+                                action: "camera_permission",
+                                result: "failed",
+                                failure_code: "permission_denied",
+                              });
+                          }
+                        }
+                      : () => void Linking.openSettings()
+                  }
                 >
                   <Camera size={19} color={accentForeground} strokeWidth={2} />
                   <Button.Label className="font-sans font-semibold">

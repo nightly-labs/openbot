@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type AnalyticsEventName, type DesktopAnalyticsEvents, desktopAnalytics } from "../../analytics";
 import { createMockOpenBot, type MockOpenBotControls } from "../../preview/mock-openbot";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
+import { agentMemoriesPort } from "./memories-port";
 
 const firstMemory: AgentMemory = {
   id: "memory-1",
@@ -93,7 +94,12 @@ describe("AgentMemoriesModal", () => {
   it("shows the empty state, adds a memory, and refreshes after a memory event", async () => {
     const onCountChange = vi.fn();
     render(() => (
-      <AgentMemoriesModal agentId="chief" agentName="Chief" open onOpenChange={vi.fn()} onCountChange={onCountChange} />
+      <AgentMemoriesModal
+        port={agentMemoriesPort("chief", "Chief")}
+        open
+        onOpenChange={vi.fn()}
+        onCountChange={onCountChange}
+      />
     ));
 
     expect(await screen.findByRole("dialog", { name: "Memories" })).toBeInTheDocument();
@@ -137,7 +143,12 @@ describe("AgentMemoriesModal", () => {
   it("edits a memory and deletes it without confirmation", async () => {
     memoryState = [{ ...firstMemory }];
     render(() => (
-      <AgentMemoriesModal agentId="chief" agentName="Chief" open onOpenChange={vi.fn()} onCountChange={vi.fn()} />
+      <AgentMemoriesModal
+        port={agentMemoriesPort("chief", "Chief")}
+        open
+        onOpenChange={vi.fn()}
+        onCountChange={vi.fn()}
+      />
     ));
 
     expect(await screen.findByText("Uses metric units.")).toBeInTheDocument();
@@ -162,7 +173,12 @@ describe("AgentMemoriesModal", () => {
   it("requires confirmation before clearing all memories", async () => {
     memoryState = [{ ...firstMemory }, { ...firstMemory, id: "memory-2", text: "Prefers short status reports." }];
     render(() => (
-      <AgentMemoriesModal agentId="chief" agentName="Chief" open onOpenChange={vi.fn()} onCountChange={vi.fn()} />
+      <AgentMemoriesModal
+        port={agentMemoriesPort("chief", "Chief")}
+        open
+        onOpenChange={vi.fn()}
+        onCountChange={vi.fn()}
+      />
     ));
 
     expect(await screen.findByText("Uses metric units.")).toBeInTheDocument();
@@ -200,7 +216,12 @@ describe("AgentMemoriesModal", () => {
     listMemories.mockRejectedValueOnce(new Error(error));
     const onOpenChange = vi.fn();
     render(() => (
-      <AgentMemoriesModal agentId="chief" agentName="Chief" open onOpenChange={onOpenChange} onCountChange={vi.fn()} />
+      <AgentMemoriesModal
+        port={agentMemoriesPort("chief", "Chief")}
+        open
+        onOpenChange={onOpenChange}
+        onCountChange={vi.fn()}
+      />
     ));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(message);
