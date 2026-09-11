@@ -2704,15 +2704,15 @@ async function runTakeoverForms(browser: BrowserHost, origin: string): Promise<v
       document.querySelector('form').addEventListener('submit', event => {
         event.preventDefault();
         if (document.querySelector('input[type=password]').value !== 'smoke-secret') throw new Error('Incorrect form value');
-        document.body.innerHTML = '<form aria-label="Verification"><label>Code<input name="code" required></label><button>Verify</button></form>';
-        document.querySelector('form').addEventListener('submit', event => { event.preventDefault(); document.body.innerHTML = '<main>Signed in</main>'; });
+        document.body.innerHTML = '<div role="dialog"><input autocomplete="one-time-code" inputmode="numeric" maxlength="6"></div>';
+        document.querySelector('input').addEventListener('input', event => { if (event.target.value === "123456") document.body.innerHTML = '<main>Signed in</main>'; });
       }); true`);
     await browser.beginTakeover(tab.id);
     const request = { requestId: "smoke", agentId: "form-agent", threadId: "form-thread", tabId: tab.id };
     const first = await browser.readTakeoverForm(tab.id, () => undefined);
     const form = first.forms[0];
     if (form?.fields.length !== 2) throw new Error("Takeover did not expose the login form.");
-    const submitted = await browser.submitTakeoverForm(
+    const next = await browser.submitTakeoverForm(
       {
         ...request,
         revision: first.revision,
@@ -2725,14 +2725,9 @@ async function runTakeoverForms(browser: BrowserHost, origin: string): Promise<v
       },
       () => undefined,
     );
-    if (submitted.status !== "complete") throw new Error("Valid submission did not return control to the agent.");
-    browser.endTakeover(tab.id);
-    const verificationSnapshot = await browser.snapshot(tab.id);
-    if (!verificationSnapshot.text.includes("Code")) throw new Error("Agent could not inspect the next step.");
-    await browser.beginTakeover(tab.id);
-    const next = await browser.readTakeoverForm(tab.id, () => undefined);
     const verification = next.forms[0];
-    if (verification?.fields[0].label !== "Code") throw new Error("Next takeover did not expose verification.");
+    if (verification?.fields[0].label !== "Verification code" || next.status === "complete")
+      throw new Error("Takeover did not expose the next verification code step.");
     if (JSON.stringify(next).includes("smoke-secret")) throw new Error("Takeover returned entered credentials.");
     const complete = await browser.submitTakeoverForm(
       {

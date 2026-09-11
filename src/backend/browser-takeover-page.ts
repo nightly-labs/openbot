@@ -12,6 +12,7 @@ interface PageCapture {
   revision: string;
   url: string;
   forms: Map<string, CapturedForm>;
+  code?: { node: HTMLInputElement; signature: string };
 }
 declare global {
   interface Window {
@@ -192,12 +193,79 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     forms,
     status: unsupported ? "manual" : "ready",
   };
+  // Some verification widgets submit on input and have no native form or button.
+  const codeInputs = [...document.querySelectorAll('input[autocomplete="one-time-code"]')].filter(
+    (node): node is HTMLInputElement =>
+      node instanceof HTMLInputElement && !node.form && !node.disabled && !node.readOnly && visible(node),
+  );
+  const code = codeInputs.length === 1 ? codeInputs[0] : undefined;
+  const codeSignature = code
+    ? JSON.stringify([code.type, code.maxLength, code.pattern, code.inputMode, code.autocomplete])
+    : "";
+  if (code) {
+    forms.push({
+      id: "one-time-code",
+      label: "Verification",
+      fields: [
+        {
+          id: "code",
+          label: "Verification code",
+          type: "text",
+          required: true,
+          name: "code",
+          options: [],
+          checked: false,
+          multiple: false,
+          min: "",
+          max: "",
+          step: "",
+        },
+      ],
+      actions: [{ id: "enter-code", label: "Continue" }],
+    });
+  }
   if (command.kind === "read") {
-    window.__openbotTakeoverForm = { revision: command.revision, url: location.href, forms: captured };
+    window.__openbotTakeoverForm = {
+      revision: command.revision,
+      url: location.href,
+      forms: captured,
+      code: code ? { node: code, signature: codeSignature } : undefined,
+    };
     return state;
   }
   const { input } = command;
   const previous = window.__openbotTakeoverForm;
+  if (input.formId === "one-time-code") {
+    if (
+      !code ||
+      previous?.revision !== input.revision ||
+      previous.url !== location.href ||
+      previous.code?.node !== code ||
+      previous.code.signature !== codeSignature
+    )
+      throw new Error("The browser form changed. Refresh it before submitting.");
+    if (
+      input.actionId !== "enter-code" ||
+      input.values.length !== 1 ||
+      input.values[0].id !== "code" ||
+      typeof input.values[0].value !== "string"
+    )
+      throw new Error("Invalid browser form submission.");
+    const value = input.values[0].value;
+    if (
+      !value ||
+      (code.maxLength > 0 && value.length !== code.maxLength) ||
+      (code.inputMode === "numeric" && !/^\d+$/.test(value))
+    )
+      return { ...state, status: "invalid" };
+    delete window.__openbotTakeoverForm;
+    code.value = value;
+    if (!code.checkValidity()) return { ...state, status: "invalid" };
+    code.dispatchEvent(new Event("input", { bubbles: true }));
+    // The input handler can replace the widget immediately after a complete code.
+    if (code.isConnected) code.dispatchEvent(new Event("change", { bubbles: true }));
+    return state;
+  }
   const prior = previous?.forms.get(input.formId);
   const current = captured.get(input.formId);
   if (

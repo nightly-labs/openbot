@@ -35,6 +35,27 @@ beforeEach(() => {
 });
 
 describe("browser takeover page", () => {
+  it("enters a standalone verification code without exposing it or accepting stale widgets", () => {
+    document.body.innerHTML =
+      '<div role="dialog"><input autocomplete="one-time-code" inputmode="numeric" maxlength="6"></div>';
+    const state = read();
+    expect(state.forms[0]?.fields[0].label).toBe("Verification code");
+    const input = document.querySelector("input");
+    const received = vi.fn();
+    input?.addEventListener("input", () => received(input.value));
+    expect(run(submission(state, [{ id: "code", value: "12" }])).status).toBe("invalid");
+    expect(received).not.toHaveBeenCalled();
+    run(submission(state, [{ id: "code", value: "123456" }]));
+    expect(received).toHaveBeenCalledWith("123456");
+    expect(JSON.stringify(read())).not.toContain("123456");
+    if (input) {
+      const replacement = document.createElement("input");
+      for (const attribute of input.attributes) replacement.setAttribute(attribute.name, attribute.value);
+      input.replaceWith(replacement);
+    }
+    expect(() => run(submission(state, [{ id: "code", value: "654321" }]))).toThrow("The browser form changed");
+    expect(document.querySelector("input")?.value).toBe("");
+  });
   it("submits a login form in a dialog with an auxiliary login action", () => {
     document.body.innerHTML =
       '<div role="dialog"><form><input type="email" name="email" placeholder="Your email" required><button type="button">Sign in with password</button><button type="submit">Continue</button></form></div>';
