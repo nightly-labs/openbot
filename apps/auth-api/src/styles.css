@@ -2009,8 +2009,10 @@ a {
    hover but over 760ms puts the block at 97% of the way there by the halfway mark
    and then spends the rest on motion too small to see; and every part of the block
    moved at the same instant, so there was nothing to follow. A gentler curve
-   spreads the same distance across the whole duration, and the stagger gives the
-   eye an order: the offer, the reason for it, then the two ways to act on it. */
+   spreads the same distance across the whole duration, and it holds back at the
+   start rather than opening at speed, so the block reads as arriving instead of
+   appearing. The stagger gives the eye an order to take it in: the offer, the
+   reason for it, then the two ways to act on it. */
 .news-cta[data-revealed="false"] .news-cta-title,
 .news-cta[data-revealed="false"] .news-cta-description,
 .news-cta[data-revealed="false"] .news-cta-actions {
@@ -2020,15 +2022,15 @@ a {
 .news-cta[data-revealed="true"] .news-cta-title,
 .news-cta[data-revealed="true"] .news-cta-description,
 .news-cta[data-revealed="true"] .news-cta-actions {
-  animation: landing-download-reveal 660ms cubic-bezier(0.25, 0.46, 0.45, 0.94) backwards;
+  animation: landing-download-reveal 880ms cubic-bezier(0.4, 0.18, 0.28, 1) backwards;
 }
 
 .news-cta[data-revealed="true"] .news-cta-description {
-  animation-delay: 120ms;
+  animation-delay: 170ms;
 }
 
 .news-cta[data-revealed="true"] .news-cta-actions {
-  animation-delay: 240ms;
+  animation-delay: 340ms;
 }
 
 @media (max-width: 1080px) {
