@@ -11,9 +11,18 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { saveAppearance, useAppearance } from "@/features/settings/model/appearance";
+import { saveHapticsPreference, useHapticsPreference } from "@/features/settings/model/haptics";
 
 export function GeneralSettingsScreen() {
   const { theme } = useUniwind();
+  const hapticsPreference = useHapticsPreference();
+  const [hapticsError, setHapticsError] = useState<string | null>(null);
+  function saveHaptics(enabled: boolean) {
+    setHapticsError(null);
+    void saveHapticsPreference(enabled).catch(() => {
+      setHapticsError("Could not save this setting. Try again.");
+    });
+  }
   const analytics = useAnalyticsPreference();
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [retryAnalyticsValue, setRetryAnalyticsValue] = useState<boolean | null>(null);
@@ -51,6 +60,32 @@ export function GeneralSettingsScreen() {
           <Typography.Paragraph type="body-sm">Theme</Typography.Paragraph>
         </SettingsRow>
         <SettingsNote>{error || "System follows your device’s appearance."}</SettingsNote>
+      </SettingsSection>
+      <SettingsSection title="Feedback">
+        <SettingsRow>
+          <Host
+            matchContents={{ vertical: true }}
+            style={{ width: "100%" }}
+            colorScheme={theme === "dark" ? "dark" : "light"}
+          >
+            <Switch
+              value={hapticsPreference.enabled}
+              disabled={!hapticsPreference.ready || hapticsPreference.saving}
+              label="Haptics"
+              onValueChange={saveHaptics}
+            />
+          </Host>
+        </SettingsRow>
+        {hapticsError ? (
+          <SettingsRow
+            disabled={hapticsPreference.saving}
+            disclosure={false}
+            onPress={() => saveHaptics(hapticsPreference.enabled)}
+          >
+            <Typography.Paragraph type="body-sm">Retry saving haptics setting</Typography.Paragraph>
+          </SettingsRow>
+        ) : null}
+        <SettingsNote>{hapticsError ?? "Touch feedback for actions in the app on this device."}</SettingsNote>
       </SettingsSection>
       <SettingsSection title="Privacy">
         <SettingsRow>

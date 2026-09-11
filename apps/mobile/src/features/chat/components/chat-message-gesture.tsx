@@ -1,4 +1,3 @@
-import * as Haptics from "expo-haptics";
 import { Button } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Reply } from "lucide-react-native";
@@ -7,6 +6,7 @@ import { View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { haptics } from "@/shared/lib/haptics";
 
 export function ChatMessageGesture({
   children,
@@ -23,11 +23,11 @@ export function ChatMessageGesture({
   const bubbleStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.get() }] }));
   const iconStyle = useAnimatedStyle(() => ({ opacity: Math.min(1, offset.get() / 64) }));
   const reply = () => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void haptics.impact();
     onReply?.();
   };
   const openActions = () => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void haptics.impact();
     onOpenActions();
   };
   const swipe = Gesture.Pan()

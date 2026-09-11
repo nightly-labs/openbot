@@ -1,14 +1,12 @@
-import * as Haptics from "expo-haptics";
 import { Link, router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Eye } from "lucide-react-native";
 import { Pressable, View } from "react-native";
-
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
-import { isIOS } from "@/shared/lib/platform";
+import { haptics } from "@/shared/lib/haptics";
 
 export function HiddenChatsScreen() {
   const { hiddenAgents, unhideAgent } = useMobileWorkspace();
@@ -16,7 +14,7 @@ export function HiddenChatsScreen() {
 
   function showAgent(agentId: string): void {
     unhideAgent(agentId);
-    if (isIOS) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void haptics.notification();
     if (hiddenAgents.length === 1) router.back();
   }
 
@@ -39,7 +37,7 @@ export function HiddenChatsScreen() {
               asChild
               dismissTo
               onPress={() => {
-                if (isIOS) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+                void haptics.impact("soft");
               }}
             >
               <Link.Trigger>

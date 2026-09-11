@@ -1,7 +1,6 @@
 import { userErrorMessage } from "@openbot/user-errors";
 import { useQueryClient } from "@tanstack/react-query";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
-import * as Haptics from "expo-haptics";
 import { router, useIsFocused } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -34,6 +33,7 @@ import { ConnectionStatus } from "@/features/workspace/components/connection-sta
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { retainConfirmedAttachments, uploadChatAttachments } from "../model/upload-chat-attachments";
@@ -250,7 +250,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     motion.beginSend();
     Keyboard.dismiss();
 
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void haptics.impact();
     if (questionForm.question) {
       questionForm.answer([body]);
       motion.cancelSend();
