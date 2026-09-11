@@ -35,6 +35,13 @@ beforeEach(() => {
 });
 
 describe("browser takeover page", () => {
+  it.each([
+    "<form novalidate><input required><button>Save</button></form>",
+    "<form><input required><button formnovalidate>Save draft</button></form>",
+  ])("uses manual takeover for native validation overrides: %s", (markup) => {
+    document.body.innerHTML = markup;
+    expect(read()).toMatchObject({ forms: [], status: "manual" });
+  });
   it("keeps initially disabled submit actions and clicks only after the page enables them", () => {
     const button = document.querySelector("button");
     if (!button) throw new Error("Missing fixture button");

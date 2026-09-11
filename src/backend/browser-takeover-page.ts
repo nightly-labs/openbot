@@ -151,6 +151,8 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     if (fields.length === 0 && actionDescriptions.length === 0) continue;
     if (
       invalid ||
+      form.noValidate ||
+      [...actions.values()].some((action) => action.formNoValidate) ||
       fields.length > 100 ||
       actionDescriptions.length === 0 ||
       actionDescriptions.length > 20 ||
