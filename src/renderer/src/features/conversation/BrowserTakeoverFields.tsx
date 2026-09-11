@@ -159,6 +159,7 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
       <For each={state.form?.forms ?? []}>
         {(form) => (
           <form
+            novalidate
             class="browser-takeover-form"
             aria-label={form.label}
             onSubmit={(event) => {

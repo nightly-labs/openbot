@@ -2751,6 +2751,33 @@ async function runTakeoverForms(browser: BrowserHost, origin: string): Promise<v
     const snapshot = await browser.snapshot(tab.id);
     if (!snapshot.text.includes("Signed in") || JSON.stringify(snapshot).includes("smoke-secret"))
       throw new Error("Agent did not receive a clean page after takeover.");
+    for (const markup of [
+      '<form novalidate><input type="email" required><button>Next</button></form>',
+      "<form><input required><button formnovalidate>Next</button></form>",
+      '<main><input aria-label="Email or phone"><button type="button">Next</button></main>',
+    ]) {
+      await contents.executeJavaScript(`(() => { document.body.innerHTML = ${JSON.stringify(markup)};
+        const form = document.querySelector('form');
+        (form || document.querySelector('button')).addEventListener(form ? 'submit' : 'click', event => {
+          event.preventDefault(); document.body.innerHTML = '<main>Accepted</main>';
+        }); })(); true`);
+      await browser.beginTakeover(tab.id);
+      const discovered = await browser.readTakeoverForm(tab.id, () => undefined);
+      const entry = discovered.forms[0];
+      if (entry?.fields.length !== 1) throw new Error("Takeover did not expose website-managed fields.");
+      const result = await browser.submitTakeoverForm(
+        {
+          ...request,
+          revision: discovered.revision,
+          formId: entry.id,
+          actionId: entry.actions[0].id,
+          values: [{ id: entry.fields[0].id, value: "" }],
+        },
+        () => undefined,
+      );
+      if (result.status !== "complete") throw new Error("Takeover did not run the website-managed action.");
+      browser.endTakeover(tab.id);
+    }
     process.stdout.write("BrowserHost: takeover forms passed without opening the browser panel.\n");
   } finally {
     browser.endTakeover(tab.id);

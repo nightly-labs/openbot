@@ -99,56 +99,63 @@ describe("BrowserTakeoverCard", () => {
 });
 
 describe("takeover chat forms", () => {
-  it.each(["click", "enter", "alternate"])("submits with %s and clears values for the next step", async (method) => {
-    installOpenbotStub();
-    const login = browserFormPreview();
-    login.forms[0].fields[0].multiple = true;
-    login.forms[0].actions.push({ id: "alternate", label: "Use password" });
-    vi.mocked(window.openbot.browser.readTakeoverForm).mockResolvedValue(login);
-    const next = browserFormPreview();
-    next.revision = "code-step";
-    next.forms[0].fields = [{ ...next.forms[0].fields[0], id: "code", label: "Code", type: "text" }];
-    next.forms[0].actions = [{ id: "verify", label: "Verify" }];
-    let sent: BrowserFormSubmission | undefined;
-    vi.mocked(window.openbot.browser.submitTakeoverForm).mockImplementation(async (input) => {
-      sent = structuredClone(input);
-      return next;
-    });
-    render(() => (
-      <BrowserTakeoverCard
-        agentName="Chief"
-        tab={undefined}
-        preview={null}
-        previewStatus="failed"
-        formRequest={{ requestId: "request", agentId: "chief", threadId: "thread", tabId: "tab" }}
-        onComplete={async () => true}
-        onCancel={async () => true}
-      />
-    ));
-    const email = await screen.findByRole("textbox", { name: "Email (required)" });
-    await fireEvent.input(email, { target: { value: "user@example.com,other@example.com" } });
-    await fireEvent.input(screen.getByLabelText("Password (required)"), { target: { value: "private-password" } });
-    if (method === "enter") {
-      email.focus();
-      await userEvent.keyboard("{Enter}");
-    } else
-      await fireEvent.click(screen.getByRole("button", { name: method === "alternate" ? "Use password" : "Sign in" }));
-    expect(await screen.findByRole("textbox", { name: "Code (required)" })).toHaveValue("");
-    expect(sent).toEqual(
-      expect.objectContaining({
-        requestId: "request",
-        revision: "preview-form",
-        formId: "sign-in",
-        actionId: method === "alternate" ? "alternate" : "submit",
-        values: [
-          { id: "email", value: "user@example.com,other@example.com" },
-          { id: "password", value: "private-password" },
-        ],
-      }),
-    );
-    expect(window.openbot.agent.sendMessage).not.toHaveBeenCalled();
-    expect(screen.queryByLabelText("Password (required)")).not.toBeInTheDocument();
-  });
+  it.each(["click", "enter", "alternate", "website-validation"])(
+    "submits with %s and clears values for the next step",
+    async (method) => {
+      installOpenbotStub();
+      const login = browserFormPreview();
+      login.forms[0].fields[0].multiple = true;
+      login.forms[0].actions.push({ id: "alternate", label: "Use password" });
+      vi.mocked(window.openbot.browser.readTakeoverForm).mockResolvedValue(login);
+      const next = browserFormPreview();
+      next.revision = "code-step";
+      next.forms[0].fields = [{ ...next.forms[0].fields[0], id: "code", label: "Code", type: "text" }];
+      next.forms[0].actions = [{ id: "verify", label: "Verify" }];
+      let sent: BrowserFormSubmission | undefined;
+      vi.mocked(window.openbot.browser.submitTakeoverForm).mockImplementation(async (input) => {
+        sent = structuredClone(input);
+        return next;
+      });
+      render(() => (
+        <BrowserTakeoverCard
+          agentName="Chief"
+          tab={undefined}
+          preview={null}
+          previewStatus="failed"
+          formRequest={{ requestId: "request", agentId: "chief", threadId: "thread", tabId: "tab" }}
+          onComplete={async () => true}
+          onCancel={async () => true}
+        />
+      ));
+      const email = await screen.findByRole("textbox", { name: "Email (required)" });
+      const emailValue =
+        method === "website-validation" ? "website-validates-this" : "user@example.com,other@example.com";
+      await fireEvent.input(email, { target: { value: emailValue } });
+      await fireEvent.input(screen.getByLabelText("Password (required)"), { target: { value: "private-password" } });
+      if (method === "enter") {
+        email.focus();
+        await userEvent.keyboard("{Enter}");
+      } else
+        await fireEvent.click(
+          screen.getByRole("button", { name: method === "alternate" ? "Use password" : "Sign in" }),
+        );
+      expect(await screen.findByRole("textbox", { name: "Code (required)" })).toHaveValue("");
+      expect(sent).toEqual(
+        expect.objectContaining({
+          requestId: "request",
+          revision: "preview-form",
+          formId: "sign-in",
+          actionId: method === "alternate" ? "alternate" : "submit",
+          values: [
+            { id: "email", value: emailValue },
+            { id: "password", value: "private-password" },
+          ],
+        }),
+      );
+      expect(window.openbot.agent.sendMessage).not.toHaveBeenCalled();
+      expect(screen.queryByLabelText("Password (required)")).not.toBeInTheDocument();
+    },
+  );
   it("keeps manual takeover available when form discovery fails", async () => {
     installOpenbotStub();
     vi.mocked(window.openbot.browser.readTakeoverForm).mockRejectedValue(new Error("secret from page"));

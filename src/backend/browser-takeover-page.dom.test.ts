@@ -84,9 +84,31 @@ describe("browser takeover page", () => {
   it.each([
     "<form novalidate><input required><button>Save</button></form>",
     "<form><input required><button formnovalidate>Save draft</button></form>",
-  ])("uses manual takeover for native validation overrides: %s", (markup) => {
+  ])("lets the website validate native validation overrides: %s", (markup) => {
     document.body.innerHTML = markup;
-    expect(read()).toMatchObject({ forms: [], status: "manual" });
+    const submit = vi.fn((event: Event) => event.preventDefault());
+    // jsdom does not implement formnovalidate; the Electron smoke test checks native submission.
+    document.querySelector("button")?.addEventListener("click", submit);
+    run(submission(read(), [{ id: "field-0", value: "" }]));
+    expect(submit).toHaveBeenCalledOnce();
+  });
+  it("submits the chosen action for fields without a native form", () => {
+    document.body.innerHTML =
+      '<main><input aria-label="Email or phone"><input type="password" style="display:none"><button type="button">Forgot email?</button><button type="button">Next</button><button type="button">Create account</button></main>';
+    const state = read();
+    expect(state.forms[0]?.fields.map((field) => field.label)).toEqual(["Email or phone"]);
+    const next = vi.fn();
+    const forgot = vi.fn();
+    document.querySelectorAll("button")[0].addEventListener("click", forgot);
+    document.querySelectorAll("button")[1].addEventListener("click", next);
+    const command = submission(state, [{ id: "field-0", value: "example" }]);
+    if (command.kind !== "submit") throw new Error("Expected submission");
+    command.input.actionId = state.forms[0].actions.find((action) => action.label === "Next")?.id ?? "";
+    run(command);
+    expect(document.querySelector("input")?.value).toBe("example");
+    expect(next).toHaveBeenCalledOnce();
+    expect(forgot).not.toHaveBeenCalled();
+    expect(() => run(command)).toThrow("The browser form changed");
   });
   it("keeps initially disabled submit actions and clicks only after the page enables them", () => {
     const button = document.querySelector("button");

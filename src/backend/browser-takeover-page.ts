@@ -3,7 +3,7 @@ import type { BrowserFormField, BrowserFormState, BrowserFormSubmission } from "
 type Control = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 type Submitter = HTMLInputElement | HTMLButtonElement;
 interface CapturedForm {
-  form: HTMLFormElement;
+  form: HTMLElement;
   controls: Map<string, Control>;
   actions: Map<string, Submitter>;
   signature: string;
@@ -67,7 +67,25 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
       !node.form &&
       visible(node),
   );
-  for (const [formIndex, form] of [...document.forms].entries()) {
+  const roots = new Set<HTMLElement>(document.forms);
+  for (const node of document.querySelectorAll("input, textarea, select")) {
+    if (
+      (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement) &&
+      !node.form &&
+      visible(node) &&
+      !node.matches(':disabled, [type=hidden], [autocomplete="one-time-code"]')
+    ) {
+      const root = node.closest<HTMLElement>("[role=form], [role=dialog], main");
+      if (root) roots.add(root);
+    }
+  }
+  const destination = (root: HTMLElement) => (root instanceof HTMLFormElement ? [root.action, root.method] : []);
+  const belongs = (node: Control | Submitter, root: HTMLElement) =>
+    root instanceof HTMLFormElement
+      ? node.form === root
+      : !node.form && node.closest("[role=form], [role=dialog], main") === root;
+  for (const [formIndex, form] of [...roots].entries()) {
+    const native = form instanceof HTMLFormElement ? form : null;
     const prior = previous?.url === location.href ? previous.forms.get(`form-${formIndex}`) : undefined;
     const retry = prior?.filled && prior.form === form ? prior : undefined;
     const fields: BrowserFormField[] = [];
@@ -75,7 +93,8 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     const actions = new Map<string, Submitter>();
     const actionDescriptions: BrowserFormState["forms"][number]["actions"] = [];
     let invalid = false;
-    for (const [index, node] of [...form.elements].entries()) {
+    const elements = native ? [...native.elements] : [...form.querySelectorAll("input, textarea, select, button")];
+    for (const [index, node] of elements.entries()) {
       if (
         !(
           node instanceof HTMLInputElement ||
@@ -85,9 +104,14 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
         )
       )
         continue;
-      if (!visible(node) || (node instanceof HTMLInputElement && node.type === "hidden")) continue;
+      if (!belongs(node, form) || !visible(node) || (node instanceof HTMLInputElement && node.type === "hidden"))
+        continue;
       const id = `field-${index}`;
-      if ((node instanceof HTMLInputElement || node instanceof HTMLButtonElement) && node.type === "submit") {
+      if (
+        (node instanceof HTMLButtonElement || (node instanceof HTMLInputElement && node.type === "submit")) &&
+        (node.type === "submit" || !native)
+      ) {
+        if (!native && label(node) === "Field") continue;
         actions.set(id, node);
         actionDescriptions.push({ id, label: label(node) === "Field" ? "Submit" : label(node) });
         continue;
@@ -166,8 +190,6 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     if (fields.length === 0 && actionDescriptions.length === 0) continue;
     if (
       invalid ||
-      form.noValidate ||
-      [...actions.values()].some((action) => action.formNoValidate) ||
       fields.length > 100 ||
       actionDescriptions.length === 0 ||
       actionDescriptions.length > 20 ||
@@ -195,12 +217,12 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
           options: field.options.map((option) => ({ ...option, selected: false })),
         })),
       },
-      action: form.action,
-      method: form.method,
+      destination: destination(form),
+      noValidate: native?.noValidate ?? true,
       optionValues: [...controls.values()].map((node) =>
         node instanceof HTMLSelectElement ? [...node.options].map((option) => option.value) : null,
       ),
-      submitters: [...actions.values()].map((action) => [action.formAction, action.formMethod]),
+      submitters: [...actions.values()].map((action) => [action.formAction, action.formMethod, action.formNoValidate]),
     });
     if (
       retry &&
@@ -306,6 +328,8 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
   )
     throw new Error("The browser form changed. Refresh it before submitting.");
   const action = current.actions.get(input.actionId);
+  const native = current.form instanceof HTMLFormElement ? current.form : null;
+  const validate = !!native && !native.noValidate && !action?.formNoValidate;
   const values = new Map(input.values.map((entry) => [entry.id, entry.value]));
   if (!action || values.size !== input.values.length || values.size !== current.controls.size)
     throw new Error("Invalid browser form submission.");
@@ -333,20 +357,27 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
         (node instanceof HTMLInputElement &&
           ["text", "search", "url", "tel", "email", "password"].includes(node.type))) &&
       ((node.maxLength >= 0 && value.length > node.maxLength) ||
-        (value.length > 0 && node.minLength > 0 && value.length < node.minLength))
+        (validate && value.length > 0 && node.minLength > 0 && value.length < node.minLength))
     )
       return { ...state, status: "invalid" };
   }
-  const destination = JSON.stringify([current.form.action, current.form.method, action.formAction, action.formMethod]);
+  const target = () =>
+    JSON.stringify([
+      destination(current.form),
+      native?.noValidate,
+      action.formAction,
+      action.formMethod,
+      action.formNoValidate,
+    ]);
+  const originalTarget = target();
   const checkTargets = () => {
     if (
       previous.url !== location.href ||
       !current.form.isConnected ||
       !action.isConnected ||
-      action.form !== current.form ||
-      destination !==
-        JSON.stringify([current.form.action, current.form.method, action.formAction, action.formMethod]) ||
-      [...current.controls.values()].some((node) => !node.isConnected || node.form !== current.form)
+      !belongs(action, current.form) ||
+      originalTarget !== target() ||
+      [...current.controls.values()].some((node) => !node.isConnected || !belongs(node, current.form))
     ) {
       throw new Error("The browser form changed. Refresh it before submitting.");
     }
@@ -374,7 +405,7 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     node.dispatchEvent(new Event("change", { bubbles: true }));
   }
   checkTargets();
-  if (!current.form.checkValidity() || action.matches(":disabled")) return { ...state, status: "invalid" };
+  if ((validate && !native?.checkValidity()) || action.matches(":disabled")) return { ...state, status: "invalid" };
   checkTargets();
   action.click();
   return state;
