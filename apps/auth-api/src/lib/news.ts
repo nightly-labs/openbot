@@ -59,7 +59,7 @@ export const NEWS_COLLECTION: ContentCollection = {
       slug: "every-agent-gets-a-workspace",
       title: "Every agent gets a workspace",
       description:
-        "One directory per agent, kept between runs. Separate workspaces make the question of which agent touched a file unnecessary rather than answerable.",
+        "One directory per agent, kept between runs, and one shared directory for handoffs. A workspace organizes an agent's work; it does not limit what the agent can touch.",
       publishedAt: "2026-07-24",
       author: NEWS_AUTHOR,
     },

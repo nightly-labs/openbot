@@ -132,8 +132,13 @@ export function ArticleClip(props: ArticleClipProps) {
     if (playing() && onScreen) {
       // A browser can still refuse — iOS in Low Power Mode refuses even a muted
       // clip. Answer that by showing the reader a Play button rather than a
-      // control that says Pause over a picture that is not moving.
-      void video.play().catch(() => setPlaying(false));
+      // control that says Pause over a picture that is not moving. A start that
+      // was cut short because the clip left the screen is not a refusal: the
+      // pause below cancels it, and the reader's choice has to stand for when the
+      // clip comes back.
+      void video.play().catch(() => {
+        if (onScreen) setPlaying(false);
+      });
       return;
     }
     if (!video.paused) video.pause();

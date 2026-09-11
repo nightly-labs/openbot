@@ -12,8 +12,12 @@ export function GiveAnAgentItsFirstTask() {
 
       <h2>Make the agent</h2>
       <p>
-        Create an agent, give it a name you will recognise in a list of six, and point it at a directory. The directory
-        is its workspace: it is kept between runs, it belongs to that agent alone, and nothing else writes into it.
+        Create an agent and give it a name you will recognise in a list of six. OpenBot gives it a directory of its own
+        under ~/OpenBot: its workspace. The workspace is kept between runs, and it is where the agent keeps its files.
+      </p>
+      <p>
+        It is not a fence. The agent can read and change files anywhere on your computer, so say in your instruction
+        where its work belongs.
       </p>
 
       <h2>Ask for something small</h2>

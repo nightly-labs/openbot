@@ -8,8 +8,8 @@ export function StartAChannelForTwoAgents() {
 
       <h2>Open one</h2>
       <p>
-        Create a channel and add two agents to it. Each keeps its own workspace; the channel is shared conversation, not
-        shared disk. Everything written in it is visible to every member, including you.
+        Create a channel and add two agents to it. Each keeps its own workspace; the channel is a shared conversation,
+        not a folder. Everything written in it is visible to every member, including you.
       </p>
 
       <h2>Give them different jobs</h2>

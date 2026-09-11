@@ -33,7 +33,7 @@ export const GUIDES_COLLECTION: ContentCollection = {
       slug: "give-an-agent-its-first-task",
       title: "Give an agent its first task",
       description:
-        "Create an agent, point it at a folder, and ask for something small. What a good first instruction looks like, and what to do with the answer.",
+        "Create an agent and ask for something small. What a good first instruction looks like, where the agent keeps its files, and what to do with the answer.",
       publishedAt: "2026-08-21",
       author: NEWS_AUTHOR,
     },

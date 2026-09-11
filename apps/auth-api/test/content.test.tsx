@@ -153,8 +153,8 @@ describe("article media", () => {
   }
 
   // A clip plays only where it can be seen, so nothing at all happens until an
-  // observer reports it on screen. This one reports that as soon as it is asked,
-  // and the returned `scrollAway` reports the opposite for everything observed.
+  // observer reports it on screen. This one reports that as soon as it is asked;
+  // the returned `scrollAway` and `scrollBack` report it for everything observed.
   function stubOnScreen() {
     const watchers = new Set<{
       report: IntersectionObserverCallback;
@@ -206,12 +206,15 @@ describe("article media", () => {
 
     vi.stubGlobal("IntersectionObserver", OnScreenObserver);
 
+    function reportAll(isIntersecting: boolean) {
+      for (const watcher of watchers) {
+        for (const target of watcher.targets) watcher.report([entry(target, isIntersecting)], watcher.self);
+      }
+    }
+
     return {
-      scrollAway() {
-        for (const watcher of watchers) {
-          for (const target of watcher.targets) watcher.report([entry(target, false)], watcher.self);
-        }
-      },
+      scrollAway: () => reportAll(false),
+      scrollBack: () => reportAll(true),
     };
   }
 
@@ -223,6 +226,19 @@ describe("article media", () => {
       return Promise.resolve();
     });
     return { play, playedMedia: () => played };
+  }
+
+  /** The clip the browser was asked to stop. `onPause` runs as the pause does. */
+  function spyOnPause(onPause: () => void = () => {}) {
+    let paused: HTMLMediaElement | undefined;
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(function (this: HTMLMediaElement) {
+      paused = this;
+      onPause();
+    });
+    // jsdom never really plays anything, so the clip would report itself as
+    // already stopped and there would be nothing to stop.
+    vi.spyOn(HTMLMediaElement.prototype, "paused", "get").mockReturnValue(false);
+    return { pause, pausedMedia: () => paused };
   }
 
   function renderGif() {
@@ -274,11 +290,8 @@ describe("article media", () => {
   it("stops a clip that has been scrolled away from", async () => {
     stubMotionPreference(false);
     const viewport = stubOnScreen();
-    const { play } = spyOnPlay();
-    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
-    // jsdom never really plays anything, so the clip would report itself as
-    // already stopped and there would be nothing to stop.
-    vi.spyOn(HTMLMediaElement.prototype, "paused", "get").mockReturnValue(false);
+    const { play, playedMedia } = spyOnPlay();
+    const { pause, pausedMedia } = spyOnPause();
 
     renderClip();
     await waitFor(() => expect(play).toHaveBeenCalled());
@@ -286,6 +299,36 @@ describe("article media", () => {
     viewport.scrollAway();
 
     await waitFor(() => expect(pause).toHaveBeenCalled());
+    // The clip that stops has to be the one that started, not any video at all.
+    expect(pausedMedia()).toHaveAttribute("src", CLIP.src);
+    expect(pausedMedia()).toBe(playedMedia());
+  });
+
+  it("starts a clip again when a start cut short by scrolling away comes back on screen", async () => {
+    stubMotionPreference(false);
+    const viewport = stubOnScreen();
+    // A start that is still pending, which a pause cancels the way a browser does.
+    const starts: Promise<void>[] = [];
+    let cancelStart = () => {};
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => {
+      const start = new Promise<void>((_, reject) => {
+        cancelStart = () => reject(new DOMException("The play() request was interrupted by pause().", "AbortError"));
+      });
+      starts.push(start);
+      return start;
+    });
+    spyOnPause(() => cancelStart());
+
+    renderClip();
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+
+    viewport.scrollAway();
+    // The clip handles the cancelled start before this wait ends.
+    await starts[0]?.catch(() => {});
+    viewport.scrollBack();
+
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("button", { name: "Pause animation" })).toBeInTheDocument();
   });
 
   it("does not start a clip for a reader who asked for less motion", async () => {
