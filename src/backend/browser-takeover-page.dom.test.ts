@@ -57,13 +57,13 @@ describe("browser takeover page", () => {
   });
   it("enters a standalone verification code without exposing it or accepting stale widgets", () => {
     document.body.innerHTML =
-      '<div role="dialog"><input autocomplete="one-time-code" inputmode="numeric" maxlength="6"></div>';
+      '<div role="dialog"><input autocomplete="one-time-code" inputmode="numeric" maxlength="8"></div>';
     const state = read();
     expect(state.forms[0]?.fields[0].label).toBe("Verification code");
     const input = document.querySelector("input");
     const received = vi.fn();
     input?.addEventListener("input", () => received(input.value));
-    expect(run(submission(state, [{ id: "code", value: "12" }])).status).toBe("invalid");
+    expect(run(submission(state, [{ id: "code", value: "123456789" }])).status).toBe("invalid");
     expect(received).not.toHaveBeenCalled();
     run(submission(state, [{ id: "code", value: "123456" }]));
     expect(received).toHaveBeenCalledWith("123456");
@@ -142,6 +142,10 @@ describe("browser takeover page", () => {
       '<form><textarea name="note"></textarea><select name="country"><option>Poland</option><option>France</option></select><input type="checkbox" name="agree"><input type="radio" name="plan" value="a"><input type="radio" name="plan" value="b"><input type="date" name="date"><button>Continue</button></form>';
     const state = read();
     const form = window.document.forms[0];
+    const selectionInput = vi.fn();
+    const selectionChange = vi.fn();
+    form.querySelector("input[type=checkbox]")?.addEventListener("input", selectionInput);
+    form.querySelector("input[type=checkbox]")?.addEventListener("change", selectionChange);
     form.querySelector("input[type=checkbox]")?.addEventListener("click", () => {
       const note = form.querySelector("textarea");
       if (note) note.value = "Checkbox event";
@@ -156,6 +160,8 @@ describe("browser takeover page", () => {
     ];
     form.addEventListener("submit", (event) => event.preventDefault());
     run(submission(state, values));
+    expect(selectionInput).toHaveBeenCalledOnce();
+    expect(selectionChange).toHaveBeenCalledOnce();
     expect([...new window.FormData(form)]).toEqual([
       ["note", "Checkbox event"],
       ["country", "France"],

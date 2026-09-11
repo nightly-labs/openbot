@@ -254,7 +254,7 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
     const value = input.values[0].value;
     if (
       !value ||
-      (code.maxLength > 0 && value.length !== code.maxLength) ||
+      (code.maxLength > 0 && value.length > code.maxLength) ||
       (code.inputMode === "numeric" && !/^\d+$/.test(value))
     )
       return { ...state, status: "invalid" };
@@ -322,15 +322,19 @@ export function browserTakeoverPage(command: TakeoverPageCommand): BrowserFormSt
   for (const [id, node] of current.controls) {
     checkTargets();
     const value = values.get(id);
+    let clicked = false;
     if (node instanceof HTMLSelectElement && Array.isArray(value)) {
       [...node.options].forEach((option, index) => {
         option.selected = value.includes(`option-${index}`);
       });
     } else if (node instanceof HTMLInputElement && typeof value === "boolean") {
-      if (node.checked !== value && (node.type === "checkbox" || value)) node.click();
-      else node.checked = value;
+      if (node.checked !== value && (node.type === "checkbox" || value)) {
+        node.click();
+        clicked = true;
+      } else node.checked = value;
     } else if (typeof value === "string") node.value = value;
     checkTargets();
+    if (clicked) continue;
     node.dispatchEvent(new Event("input", { bubbles: true }));
     node.dispatchEvent(new Event("change", { bubbles: true }));
   }
