@@ -8023,3 +8023,7 @@ body:has(.browser-panel-expanded) .app-frame {
   flex-wrap: wrap;
   gap: var(--openbot-space-2);
 }
+
+.browser-takeover-refresh {
+  margin-inline-start: auto;
+}

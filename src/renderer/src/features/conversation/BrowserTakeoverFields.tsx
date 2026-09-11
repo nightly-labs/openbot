@@ -134,6 +134,7 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
       type="button"
       variant="ghost"
       size="sm"
+      class="browser-takeover-refresh"
       disabled={state.busy}
       onClick={() => {
         if (!pending) void read(props.request, ++generation);
@@ -257,6 +258,8 @@ export function BrowserTakeoverFields(props: { request: BrowserFormRequest; onBu
                 {(action) => (
                   <Button
                     type="button"
+                    size="sm"
+                    class="approval-button"
                     disabled={state.busy}
                     onClick={(event) => {
                       if (event.currentTarget.form?.reportValidity()) void submit(form.id, action.id);
