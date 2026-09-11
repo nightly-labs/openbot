@@ -4,6 +4,9 @@ import { expect, it, vi } from "vitest";
 import { App } from "./App";
 import { emitAgentEvent, emitAuth, emitInvite, installOpenbotStub, trackAnalytics } from "./app-test-harness";
 
+/** A model of a custom endpoint, which only the first-run flow can choose. */
+const CUSTOM_ENDPOINT_MODEL = "opencode/local-studio/qwen3-coder";
+
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
     installOpenbotStub();
@@ -13,6 +16,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     render(() => <App />);
 
@@ -29,7 +33,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await fireEvent.click(screen.getByRole("button", { name: "Open OpenBot" }));
-    expect(window.openbot.saveSetup).toHaveBeenCalledWith({ preferredProvider: "claude" });
+    expect(window.openbot.saveSetup).toHaveBeenCalledWith({ preferredProvider: "claude", preferredModel: null });
     expect(await screen.findByRole("heading", { name: "Chief" })).toBeInTheDocument();
   });
 
@@ -37,6 +41,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     const disconnectedStatus: AgentStatus = {
       phase: "blocked",
@@ -143,6 +148,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     vi.mocked(window.openbot.agent.getStatus).mockResolvedValueOnce({
       phase: "blocked",
@@ -204,6 +210,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     vi.mocked(window.openbot.agent.getStatus).mockResolvedValueOnce({
       phase: "blocked",
@@ -233,6 +240,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     vi.mocked(window.openbot.agent.getStatus).mockResolvedValueOnce({
       phase: "blocked",
@@ -270,6 +278,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     vi.mocked(window.openbot.agent.getStatus).mockResolvedValueOnce({
       phase: "blocked",
@@ -318,6 +327,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     vi.mocked(window.openbot.servers.takePendingInvite).mockResolvedValueOnce(inviteUrl);
     render(() => <App />);
@@ -337,7 +347,9 @@ describe("OpenBot connected desktop shell", () => {
         inviteUrl,
       }),
     );
-    await waitFor(() => expect(window.openbot.saveSetup).toHaveBeenCalledWith({ preferredProvider: "codex" }));
+    await waitFor(() =>
+      expect(window.openbot.saveSetup).toHaveBeenCalledWith({ preferredProvider: "codex", preferredModel: null }),
+    );
     expect(trackAnalytics).toHaveBeenCalledWith("team_action", {
       action: "server_joined",
       result: "succeeded",
@@ -365,6 +377,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     vi.mocked(window.openbot.auth.getState).mockResolvedValueOnce({ status: "signed_out" });
     render(() => <App />);
@@ -446,7 +459,12 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.servers.previewInvite).toHaveBeenCalledWith({ inviteUrl }));
   });
 
-  it("saves a different default provider from the account menu", async () => {
+  it("saves a different default provider from the account menu and drops its model", async () => {
+    vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
+      completed: true,
+      preferredProvider: "codex",
+      preferredModel: CUSTOM_ENDPOINT_MODEL,
+    });
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
 
@@ -457,8 +475,32 @@ describe("OpenBot connected desktop shell", () => {
     const providers = screen.getByRole("radiogroup", { name: "Default provider" });
     await fireEvent.click(within(providers).getByRole("radio", { name: /Claude.*Connected/ }));
     await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    expect(window.openbot.saveSetup).toHaveBeenLastCalledWith({ preferredProvider: "claude" });
+    // The model belongs to the provider that was replaced, so this save must clear it.
+    expect(window.openbot.saveSetup).toHaveBeenLastCalledWith({ preferredProvider: "claude", preferredModel: null });
     expect(screen.queryByRole("dialog", { name: "Providers & permissions" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the chosen model when the account menu review leaves the provider alone", async () => {
+    vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
+      completed: true,
+      preferredProvider: "codex",
+      preferredModel: CUSTOM_ENDPOINT_MODEL,
+    });
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Open account actions" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Providers & permissions" }));
+
+    await screen.findByRole("dialog", { name: "Providers & permissions" });
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    // The review screen names a provider alone. It must not send the agents to a hosted model when
+    // the user chose a local endpoint during onboarding.
+    expect(window.openbot.saveSetup).toHaveBeenLastCalledWith({
+      preferredProvider: "codex",
+      preferredModel: CUSTOM_ENDPOINT_MODEL,
+    });
   });
 
   it("opens the required first-agent setup for a new user", async () => {

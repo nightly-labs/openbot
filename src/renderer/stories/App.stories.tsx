@@ -419,7 +419,9 @@ export const DifferentRemoteVersions: Story = {
 };
 
 export const Onboarding: Story = {
-  render: () => <OpenBotPlayground options={{ setupState: { completed: false, preferredProvider: null } }} />,
+  render: () => (
+    <OpenBotPlayground options={{ setupState: { completed: false, preferredProvider: null, preferredModel: null } }} />
+  ),
   play: async ({ canvas, userEvent }) => {
     await expect(canvas.findByRole("heading", { name: "Meet OpenBot" })).resolves.toBeInTheDocument();
     await expect(canvas.getByRole("radiogroup", { name: "Default provider" })).toBeInTheDocument();

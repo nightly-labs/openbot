@@ -812,7 +812,9 @@
   cursor: pointer;
 }
 
-.provider-picker-option + .provider-picker-option {
+/* The custom row follows the radio group rather than a radio, so the sibling rule cannot reach it. */
+.provider-picker-option + .provider-picker-option,
+.provider-picker-option-custom {
   border-top: 1px solid var(--openbot-border);
 }
 
@@ -870,7 +872,18 @@
   fill: var(--openbot-provider-current);
 }
 
-.provider-picker-option-unavailable .provider-picker-logo {
+/* A custom endpoint has no brand mark, so a stroke icon takes the logo column. Until an endpoint
+   exists the radio column before it stays empty, because the row can then only add. */
+.provider-picker-custom-mark {
+  width: 18px;
+  height: 18px;
+  grid-column: 2;
+  color: var(--openbot-text-secondary);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.provider-picker-option-unavailable .provider-picker-logo,
+.provider-picker-option-unavailable .provider-picker-custom-mark {
   opacity: 0.44;
 }
 
@@ -954,6 +967,26 @@
   font-size: var(--openbot-text-sm);
   line-height: 16px;
   white-space: nowrap;
+}
+
+/* How many endpoints the Custom provider row stands for. It reads like a status badge, because it
+   sits in the same cell and answers the same kind of question, but it reports no state. */
+.provider-picker-custom-count {
+  color: var(--text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+/* The same count, as the button that opens the saved endpoints. It keeps the badge's quiet colour
+   and sits with the row's other actions, so it needs their margin and the button's own specificity. */
+.ui-button.provider-picker-custom-count {
+  min-height: 28px;
+  margin-right: 8px;
+  border-radius: var(--openbot-radius-md);
+  padding-inline: 9px;
+  color: var(--text-muted);
+  font-size: var(--openbot-text-sm);
 }
 
 .provider-picker-status-available {

@@ -24,6 +24,7 @@ import type {
   ConversationMessage,
   ConversationSnapshot,
   CreateTeamInviteInput,
+  CustomProviderSummary,
   DirectConversationSnapshot,
   DirectMessage,
   DirectMessageRealtimeEvent,
@@ -69,6 +70,7 @@ import type {
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
 import {
+  composedCustomModelId,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   SIDEBAR_PEOPLE_SECTION_ID,
   SIDEBAR_UNASSIGNED_SECTION_ID,
@@ -124,6 +126,7 @@ export interface MockOpenBotOptions {
   browserTabs?: BrowserTab[];
   browserControlState?: BrowserControlState;
   browserPreview?: BrowserPreview | null;
+  browserPreviews?: Record<string, BrowserPreview | null>;
   servers?: ServerSummary[];
   presence?: TeamPresenceSnapshot;
   directThreads?: DirectThreadSummary[];
@@ -136,6 +139,26 @@ export interface MockOpenBotOptions {
   updateStatus?: UpdateStatus;
   memories?: Record<string, AgentMemory[]>;
   routines?: Record<string, Routine[]>;
+  customProviders?: CustomProviderSummary[];
+}
+
+/**
+ * What the OpenCode CLI would report for one endpoint, read from the endpoint itself. Preview
+ * composes these into `listModels()` instead of putting them in `STORY_MODELS`, which several
+ * stories read directly as their whole catalogue.
+ *
+ * OpenCode names a custom model `<provider name>/<model name>` and ids it
+ * `<provider id>/<model id>`.
+ */
+function mockCustomProviderModels(provider: CustomProviderSummary): AgentModelOption[] {
+  return provider.models.map((model) => ({
+    provider: "opencode",
+    id: composedCustomModelId(provider.id, model.id),
+    name: `${provider.name}/${model.name}`,
+    description: `Served by ${provider.baseUrl}.`,
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["low", "medium", "high"],
+  }));
 }
 
 export interface MockOpenBotControls {
@@ -183,7 +206,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
   };
   let authState = clone<CentralAuthState>(options.authState ?? defaultAuthState);
-  let setupState = clone<AppSetupState>(options.setupState ?? { completed: true, preferredProvider: "codex" });
+  let setupState = clone<AppSetupState>(
+    options.setupState ?? { completed: true, preferredProvider: "codex", preferredModel: null },
+  );
   let analyticsPreference = clone<AnalyticsPreference>(options.analyticsPreference ?? { enabled: true });
   let dynamicIslandPreference: DynamicIslandPreference = { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
   let dynamicIslandPresentation: DynamicIslandPresentation = { serverId: "local", mode: "idle" };
@@ -249,6 +274,28 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let skillSubmissions = clone(STORY_SKILL_SUBMISSIONS);
   const installedSkills = new Map(Object.entries(clone(STORY_INSTALLED_SKILLS)));
   let hostedSites = clone(STORY_HOSTED_SITES);
+  // The same two endpoints the model-picker stories invent, so preview shows one list everywhere.
+  let customProviders = clone(
+    options.customProviders ?? [
+      {
+        id: "studio-local",
+        name: "Studio Local",
+        baseUrl: "http://127.0.0.1:11434/v1",
+        hasApiKey: false,
+        models: [
+          { id: "qwen3-coder:30b", name: "Qwen3 Coder 30B" },
+          { id: "gpt-oss:120b", name: "GPT-OSS 120B" },
+        ],
+      },
+      {
+        id: "house-router",
+        name: "House Router",
+        baseUrl: "https://models.example.com/v1",
+        hasApiKey: true,
+        models: [{ id: "glm-5-air", name: "GLM-5 Air" }],
+      },
+    ],
+  );
   let marketplaceAgentSubmissions = clone(STORY_AGENT_SUBMISSIONS);
   let messageCounter = 10;
   let directMessageCounter = 10;
@@ -481,8 +528,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const api: OpenBotDesktopApi = {
     getAppInfo: async () => clone(appInfo),
     getSetupState: async () => clone(setupState),
-    saveSetup: async ({ preferredProvider }) => {
-      setupState = { completed: true, preferredProvider };
+    saveSetup: async ({ preferredProvider, preferredModel }) => {
+      setupState = { completed: true, preferredProvider, preferredModel };
       return clone(setupState);
     },
     getAnalyticsPreference: async () => clone(analyticsPreference),
@@ -781,6 +828,38 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         hostedSites = hostedSites.filter((site) => site.id !== siteId);
       },
     },
+    customProviders: {
+      list: async () => clone(customProviders),
+      /**
+       * Keeps only `hasApiKey`, like the real store: the key is dropped on arrival, so no preview
+       * state and no story snapshot can hold one.
+       *
+       * The ready `status` event is what makes the new models appear, exactly as in the app, so
+       * preview exercises the refresh path rather than a shortcut.
+       */
+      save: async (input) => {
+        if (customProviders.some((provider) => provider.id === input.id)) {
+          throw new Error("An endpoint with this provider ID is already saved. Remove it first, or use another ID.");
+        }
+        customProviders = [
+          ...customProviders,
+          {
+            id: input.id,
+            name: input.name,
+            baseUrl: input.baseUrl,
+            hasApiKey: input.apiKey !== null,
+            models: input.models.map((model) => ({ id: model.id, name: model.name })),
+          },
+        ];
+        emitAgentEvent({ type: "status", status: clone(agentStatus) });
+        return { providers: clone(customProviders), restart: "restarted" };
+      },
+      delete: async ({ id }) => {
+        customProviders = customProviders.filter((provider) => provider.id !== id);
+        emitAgentEvent({ type: "status", status: clone(agentStatus) });
+        return { providers: clone(customProviders), restart: "restarted" };
+      },
+    },
     marketplaceAgents: {
       list: async (query) => {
         const matches = STORY_MARKETPLACE_AGENTS.filter(
@@ -941,7 +1020,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         const agent = agents.find((candidate) => candidate.id === agentId);
         return clone(agent && `${agent.provider}:${agent.model}` === usageTargetKey ? usage : { limits: [] });
       },
-      listModels: async () => clone(models),
+      // A saved endpoint's models are composed here, not stored, so a removal drops them the way a
+      // respawned OpenCode would: it lists what its config names and nothing else.
+      listModels: async () => clone([...models, ...customProviders.flatMap(mockCustomProviderModels)]),
       listAgents: async () => clone(agents),
       listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
       ...createMockChannels(emitAgentEvent, (agentId) => agents.find((entry) => entry.id === agentId)?.name ?? agentId),
@@ -1451,9 +1532,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listTabs: async () => clone(browserTabs),
       getDisplayState: async () => ({ tabs: clone(browserTabs), activeTabId: activeBrowserTabId }),
       getControlState: async () => clone(browserControlState),
-      capturePreview: async () => {
-        if (!browserPreview) throw new Error("Browser preview is unavailable.");
-        return clone(browserPreview);
+      capturePreview: async (tabId) => {
+        const preview =
+          options.browserPreviews?.[tabId] === undefined ? browserPreview : options.browserPreviews[tabId];
+        if (!preview) throw new Error("Browser preview is unavailable.");
+        return clone(preview);
       },
       setVisible: async () => undefined,
       onDisplayState: (listener) => {

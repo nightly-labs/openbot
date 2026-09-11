@@ -93,6 +93,25 @@ to the content scroll view, not a larger sheet detent. Native dismissal remains 
 `systemMaterial` or another `headerBlurEffect` on these sheets, or put an opaque header color back
 on iOS. The native soft scroll edge handles the transition under the title.
 
+### Save and create actions
+
+Use `SheetSaveAction` for every form with an explicit save or create action. Put its checkmark
+on the right of the native header. Do not put a second Save/Create button in the content.
+
+- Hide the action until the draft differs from the saved values (or initial creation values).
+  Restore the initial values to hide it again. Keep validity separate from change detection.
+- Show a disabled checkmark for changed but invalid input or an unavailable host. Keep validation
+  and request errors in the form. A failed request keeps the draft and permits retry.
+- Disable the action and fields during the request, expose a pending accessibility label, and
+  prevent duplicate requests and dismissal. Hide the action after a successful save. A successful
+  create returns to the previous page after the draft guard is released.
+- Use a clear accessible action name, such as `Save name` or `Create agent`, even with an icon.
+  Preserve keyboard submission where the form supports it.
+- Standalone creation forms have a native close (`×`) action on the left. Nested pages keep the
+  native back button. Closing or going back must respect existing unsaved-change guards.
+- Keep `SheetScrollView` in charge of header clearance, safe areas, and keyboard behavior.
+  Do not add footer spacing for the header action.
+
 ### Scroll ownership
 
 Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. In particular:
@@ -166,9 +185,9 @@ in smaller secondary text. Place the pencil immediately beside the visible name,
 sheet edge. Keep the name centered and constrain long names to the available width.
 
 Edit the name inline with the same mounted native input and typography in both states. Do not
-replace the label with a separate form that moves the surrounding content. Show Save only after
+replace the label with a separate form that moves the surrounding content. Show the header checkmark only after
 the name changes, disable it for invalid input or a pending request, and let Cancel restore the
-saved name. Reserve a compact action area so showing these controls does not shift the page.
+saved name. Reserve a compact Cancel area so editing does not shift the page.
 Group the identity, action area and Profile photo section together instead of applying the
 standard section gap on both sides of the reserved area. Keep the email close to the name.
 

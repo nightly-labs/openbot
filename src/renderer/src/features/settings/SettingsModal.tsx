@@ -5,10 +5,13 @@ import type {
   AppInfo,
   AvatarImageInput,
   CentralAuthUser,
+  CustomProviderRestart,
+  CustomProviderSummary,
   HostedSitesDesktopApi,
   MobileConnectedDevice,
   MobileConnectTicket,
   ProviderRuntimeStatus,
+  SaveCustomProviderInput,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
 import { createSignal, Show } from "solid-js";
@@ -63,6 +66,10 @@ export interface SettingsModalProps {
   onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  /** Accepts a described endpoint from the General tab. Omitted on a remote server, which hides it. */
+  onAddCustomProvider?: (value: SaveCustomProviderInput) => Promise<CustomProviderRestart>;
+  customProviders?: readonly CustomProviderSummary[];
+  onDeleteCustomProvider?: (id: string) => Promise<CustomProviderRestart>;
   /**
    * Reads and writes the optional provider keys. Absent while the active server is not this
    * computer, which is also what takes the row's sign-in button away.
@@ -227,6 +234,9 @@ export function SettingsModal(props: SettingsModalProps) {
             onUpdateProvider={props.onUpdateProvider}
             onConnectProvider={props.onConnectProvider}
             onInstallProvider={props.onInstallProvider}
+            onAddCustomProvider={props.onAddCustomProvider}
+            customProviders={props.customProviders}
+            onDeleteCustomProvider={props.onDeleteCustomProvider}
             onSignInProvider={props.providerKeys ? openProviderKeyDialog : undefined}
           />
         </Tabs.Content>

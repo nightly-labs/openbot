@@ -5,6 +5,7 @@ import { useRef } from "react";
 import { Alert } from "react-native";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import { haptics } from "@/shared/lib/haptics";
 
 export function useAgentContextMenu(agent: MobileAgent) {
@@ -69,7 +70,12 @@ export function useAgentContextMenu(agent: MobileAgent) {
       <Link.MenuAction icon={isUnread ? "envelope.open" : "envelope.badge"} onPress={handleRead}>
         {isUnread ? "Mark read" : "Mark unread"}
       </Link.MenuAction>
-      <Link.MenuAction icon={isPinned ? "pin.slash" : "pin"} isOn={isPinned} onPress={handlePin}>
+      <Link.MenuAction
+        icon={isPinned ? "pin.slash" : "pin"}
+        isOn={isPinned}
+        onPress={handlePin}
+        disabled={!canToggleAgentPin(pinnedAgentIds, agent.id)}
+      >
         {isPinned ? "Unpin" : "Pin"}
       </Link.MenuAction>
       <Link.MenuAction icon="eye.slash" onPress={handleHide}>

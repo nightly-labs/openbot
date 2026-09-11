@@ -1,6 +1,7 @@
 import { Loading, Show } from "solid-js";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
+import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useServerSelection } from "./features/servers/server-selection";
 import { AccountLogin, InitialSetup, OnboardingFlow } from "./lazy-views";
@@ -45,6 +46,9 @@ export function AppAccessGate() {
     openProviderSignInGuide,
     refreshAgentProviders,
   } = useProviders();
+  // Onboarding is ungated: it only ever runs against this computer, so there is no remote server to
+  // hide the endpoints from. Settings gates on `activeServer()`; see `WorkspaceOverlays.tsx`.
+  const { customProviders, saveCustomProvider, deleteCustomProvider } = useCustomProviders();
   const { joinRemoteDuringSetup } = useServerSelection();
 
   return (
@@ -73,7 +77,7 @@ export function AppAccessGate() {
                 fallback={
                   <Loading fallback={<LoadingScreen />}>
                     <OnboardingFlow
-                      state={setup.setupState() ?? { completed: false, preferredProvider: null }}
+                      state={setup.setupState() ?? { completed: false, preferredProvider: null, preferredModel: null }}
                       agentStatus={agentStatus()}
                       platform={platform.appInfo()?.platform ?? "darwin"}
                       refreshingProviders={
@@ -93,13 +97,16 @@ export function AppAccessGate() {
                       onSignInProvider={providerRuntimeDownloadsAvailable() ? undefined : openProviderSignInGuide}
                       onRefreshProviders={providerRuntimeDownloadsAvailable() ? undefined : refreshAgentProviders}
                       onSave={setup.saveSetup}
+                      customProviders={customProviders()}
+                      onAddCustomProvider={saveCustomProvider}
+                      onDeleteCustomProvider={deleteCustomProvider}
                     />
                   </Loading>
                 }
               >
                 <Loading fallback={<LoadingScreen />}>
                   <InitialSetup
-                    state={setup.setupState() ?? { completed: false, preferredProvider: null }}
+                    state={setup.setupState() ?? { completed: false, preferredProvider: null, preferredModel: null }}
                     agentStatus={agentStatus()}
                     platform={platform.appInfo()?.platform ?? "darwin"}
                     accountEmail={account().email}

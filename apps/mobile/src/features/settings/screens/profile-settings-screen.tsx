@@ -16,6 +16,7 @@ import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
+import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 
 export function ProfileSettingsScreen() {
   const { session, updateProfile, signOut } = useMobileSession();
@@ -42,7 +43,7 @@ export function ProfileSettingsScreen() {
   const [error, setError] = useState<string | null>(null);
   if (!session) return null;
   const validatedName = validateProfileName(name);
-  const nameChanged = name !== savedName;
+  const nameChanged = name.trim() !== savedName;
   const profileError =
     error ||
     (editingName && nameChanged && validatedName.error
@@ -98,6 +99,13 @@ export function ProfileSettingsScreen() {
 
   return (
     <SettingsContent>
+      <SheetSaveAction
+        dirty={editingName && nameChanged}
+        canSave={!busy && !validatedName.error}
+        pending={busy && editingName && nameChanged}
+        label="Save name"
+        onSave={() => void saveName()}
+      />
       <View>
         <View className="items-center gap-3 py-3">
           <ProfileAvatar neutral name={savedName} imageUrl={avatarUrl} size={72} />
@@ -203,19 +211,6 @@ export function ProfileSettingsScreen() {
               className="min-h-11 justify-center px-3"
             >
               <Typography.Paragraph className="text-grouped-secondary">Cancel</Typography.Paragraph>
-            </Pressable>
-          ) : null}
-          {editingName && nameChanged ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Save name"
-              accessibilityState={{ disabled: busy || Boolean(validatedName.error) }}
-              disabled={busy || Boolean(validatedName.error)}
-              onPress={() => void saveName()}
-              className="min-h-11 justify-center px-3"
-              style={{ opacity: busy || validatedName.error ? 0.45 : 1 }}
-            >
-              <Typography.Paragraph weight="semibold">{busy ? "Saving…" : "Save"}</Typography.Paragraph>
             </Pressable>
           ) : null}
         </View>

@@ -8,7 +8,16 @@ import { OnboardingFlow } from "../src/features/onboarding/OnboardingFlow";
 import { STORY_AGENT_STATUS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
-const setupState: AppSetupState = { completed: false, preferredProvider: null };
+const setupState: AppSetupState = { completed: false, preferredProvider: null, preferredModel: null };
+
+/** OpenCode installed with no account of its own: enough to run an endpoint that brings its own key. */
+const openCodeInstalledAgentStatus: AgentStatus = {
+  ...STORY_AGENT_STATUS,
+  providers: [
+    ...(STORY_AGENT_STATUS.providers ?? []),
+    { id: "opencode", state: "sign-in-required", version: "1.18.27", message: null },
+  ],
+};
 
 const noProvidersConnectedAgentStatus: AgentStatus = {
   ...STORY_AGENT_STATUS,
@@ -242,6 +251,18 @@ const args: Parameters<typeof OnboardingFlow>[0] = {
   agentStatus: STORY_AGENT_STATUS,
   platform: "darwin",
   onSave: async (_provider: AgentProviderId) => undefined,
+  // Every onboarding story offers it: naming your own endpoint is part of choosing a provider,
+  // not a variant of the step.
+  onAddCustomProvider: fn(async () => "restarted" as const),
+  customProviders: [
+    {
+      id: "studio-local",
+      name: "Studio Local",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      hasApiKey: false,
+      models: [{ id: "qwen3-coder:30b", name: "Qwen3 Coder 30B" }],
+    },
+  ],
 };
 
 const meta = {
@@ -266,6 +287,40 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Initial: Story = {};
+
+/** The row that adds a self-described endpoint. OpenCode is installed, so the row offers Add. */
+export const AddCustomProvider: Story = {
+  args: { agentStatus: openCodeInstalledAgentStatus },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(await canvas.findByRole("button", { name: "Add custom provider" }));
+    const body = within(document.body);
+    await expect(body.findByRole("heading", { name: "Custom provider" })).resolves.toBeTruthy();
+  },
+};
+
+/** The endpoint is refused, so the form stays with the values, including the key the user typed. */
+export const CustomProviderSaveFails: Story = {
+  args: {
+    agentStatus: openCodeInstalledAgentStatus,
+    onAddCustomProvider: fn(async () => {
+      throw new Error("House Router refused the API key.");
+    }),
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(await canvas.findByRole("button", { name: "Add custom provider" }));
+    const body = within(document.body);
+    // A required field appends an aria-hidden asterisk to its label, so its name is not an exact match.
+    await userEvent.type(await body.findByLabelText(/^Provider ID/), "house-router");
+    await userEvent.type(body.getByLabelText(/^Display name/), "House Router");
+    await userEvent.type(body.getByLabelText(/^Base URL/), "https://models.example.com/v1");
+    await userEvent.type(body.getByLabelText("Model 1 ID"), "glm-5-air");
+    await userEvent.type(body.getByLabelText("Model 1 display name"), "GLM 5 Air");
+    await userEvent.click(body.getByRole("button", { name: "Submit" }));
+
+    await expect(body.findByText("House Router refused the API key.")).resolves.toBeTruthy();
+    await expect(body.getByLabelText(/^Provider ID/)).toHaveValue("house-router");
+  },
+};
 
 export const NarrowProviderVersions: Story = {
   globals: { viewport: "onboardingNarrow" },

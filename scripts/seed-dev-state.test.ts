@@ -61,6 +61,7 @@ describe("development state seed", () => {
     await expect(readSetupState(join(profilePath, "openbot-setup-v2.json"))).resolves.toEqual({
       completed: true,
       preferredProvider: "codex",
+      preferredModel: null,
     });
 
     const agents = new AgentStore(profilePath, homeDirectory);

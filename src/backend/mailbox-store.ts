@@ -25,6 +25,7 @@ import {
   isMessageReaction,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { redactText } from "@openbot/logging";
 import {
   AttachmentFiles,
   type ExportedAttachmentFile,
@@ -825,7 +826,13 @@ export class MailboxStore {
     status: Extract<QueueDeliveryStatus, "completed" | "failed" | "interrupted">,
     error: string | null = null,
   ): Promise<void> {
-    await this.#updateDelivery(deliveryId, ["starting", "running"], { status, error });
+    // Redacted here, not at the call site: this text is written to the database and read back by
+    // the renderer through the queue. A provider CLI quotes what it was given, so a failure against
+    // a custom endpoint can carry that endpoint's API key or a header value.
+    await this.#updateDelivery(deliveryId, ["starting", "running"], {
+      status,
+      error: error === null ? null : redactText(error),
+    });
   }
 
   async cancel(agentId: string, deliveryId: string): Promise<void> {
@@ -1002,7 +1009,7 @@ export class MailboxStore {
   async recoverAsInterrupted(deliveryId: string, reason: string): Promise<void> {
     await this.#updateDelivery(deliveryId, ["starting", "running"], {
       status: "interrupted",
-      error: reason,
+      error: redactText(reason),
     });
   }
 

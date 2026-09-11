@@ -60,6 +60,13 @@ const SECRET_KEY = new RegExp(`^(?:${SECRET_LABEL}|keys?)$`, "iu");
 // does accept a bare `key` - never gets to see it.
 const JSON_BARE_KEY = /("keys?"\s*:\s*)(\[redacted\]|"[^"]*"|'[^']*'|[^\s,;)}\]]+)/giu;
 
+// A credential sits under `X-Api-Token` as often as under `apiKey`, and a header name is chosen by
+// whoever owns the endpoint, so no label list can cover one. Below a `headers` object every string
+// is treated as the credential it might be - including the names in a `{ name, value }` list, which
+// is the shape a custom provider is described in. Only an object matches: `headers: "none"` in prose
+// is not a key-value pair.
+const HEADER_KEY = /^headers$/iu;
+
 const MAX_PARAM_LENGTH = 2_000;
 
 // What a value becomes when reading it is itself the failure. A constant
@@ -70,6 +77,10 @@ const UNSERIALIZABLE = "[unserializable]";
 export function redactText(value: string): string {
   const reparsed = redactSerializedJson(value);
   if (reparsed !== null) return reparsed;
+  return applyTextRules(redactEmbeddedJson(value));
+}
+
+function applyTextRules(value: string): string {
   return value
     .replace(AUTH_HEADER_SECRET, "$1[redacted]")
     .replace(BEARER_SECRET, "[redacted]")
@@ -77,6 +88,125 @@ export function redactText(value: string): string {
     .replace(JSON_BARE_KEY, redactAssignedValue)
     .replace(KNOWN_SECRET_PREFIXES, "[redacted]")
     .replace(EMAIL, "[redacted-email]");
+}
+
+/**
+ * How many runs one line may be *tried*, whether or not they parse.
+ *
+ * Counting only the successes would not bound anything: `"{".repeat(65536)` gives a failed attempt
+ * at every position, each scanning the rest of the line, and this function is synchronous on the
+ * path that carries provider stderr. Past the bound the rest of the line is
+ * dropped rather than shown unread, because the regex rules match no header name.
+ */
+const MAX_EMBEDDED_SCANS = 16;
+
+/** What is left of a line whose payloads went past the scan bound. */
+const UNSCANNED = "[redacted-unscanned]";
+
+/**
+ * A payload that sits inside a longer line, rather than being the whole of it.
+ *
+ * A provider writes `ERROR request failed: {"headers":{"X-Tenant":"…"}}` on one stderr line, so the
+ * text does not parse as JSON and the key rules above never see the header. Every balanced `{…}` or
+ * `[…]` run that does parse is replaced by its redacted form, which gives an embedded payload the
+ * same treatment as a structured param: `headers` values go, secret-named keys go, prose stays.
+ */
+function redactEmbeddedJson(value: string): string {
+  let result = "";
+  let index = 0;
+  let scans = 0;
+  while (index < value.length) {
+    const start = findPayloadStart(value, index);
+    if (start < 0) break;
+    if (scans >= MAX_EMBEDDED_SCANS) {
+      // The bound was reached with a payload still ahead. The tail cannot be read, so it cannot be
+      // shown either: text before the bound is kept, and everything from the unread payload on is
+      // dropped. A truncated line is a smaller loss than a credential that survived the limit.
+      return `${result + value.slice(index, start)}${UNSCANNED}`;
+    }
+    scans += 1;
+    const end = findBalancedEnd(value, start);
+    if (end < 0 && startsLikeJson(value, start)) {
+      // A payload that never closes, because a caller redacts each stderr chunk on its own and a
+      // chunk ends wherever the pipe filled up. `ERROR {"headers":{"X-Tenant":"…` carries the
+      // credential with no closing brace to parse, so the run is dropped rather than passed on.
+      return `${result + value.slice(index, start)}${UNSCANNED}`;
+    }
+    const parsed = end < 0 ? null : parseRedacted(value.slice(start, end));
+    if (parsed === null) {
+      if (end >= 0 && startsLikeJson(value, start)) {
+        // A run a serializer wrote that does not parse: a trailing comma, a value cut short. Going on
+        // into it would read `{"X-Tenant":"…"}` without the `headers` name above it, which is the
+        // name that redacts what is under it, so the whole run goes instead.
+        result += value.slice(index, start) + UNSCANNED;
+        index = end;
+        continue;
+      }
+      result += value.slice(index, start + 1);
+      index = start + 1;
+      continue;
+    }
+    result += value.slice(index, start) + parsed;
+    index = end;
+  }
+  return result + value.slice(index);
+}
+
+function parseRedacted(candidate: string): string | null {
+  try {
+    return JSON.stringify(convertValue(JSON.parse(candidate), new Set<object>())) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether the bracket at `start` opens what a serializer wrote, rather than a brace in prose.
+ *
+ * `{ and the run never closes` is a sentence; `{"headers":…` is a record. Only the second is worth
+ * dropping when it does not close, because prose loses nothing by staying and a record can hold a
+ * credential under a header name no rule can predict.
+ */
+function startsLikeJson(value: string, start: number): boolean {
+  for (let index = start + 1; index < value.length; index += 1) {
+    const char = value[index];
+    if (char === " " || char === "\t" || char === "\n" || char === "\r") continue;
+    return char === '"' || char === "{" || char === "[";
+  }
+  return false;
+}
+
+function findPayloadStart(value: string, from: number): number {
+  for (let index = from; index < value.length; index += 1) {
+    const char = value[index];
+    if (char === "{" || char === "[") return index;
+  }
+  return -1;
+}
+
+// The index one past the run that closes the bracket at `start`, or -1 when nothing closes it. Text
+// inside a JSON string is skipped, so a brace in a header value cannot end the run early.
+function findBalancedEnd(value: string, start: number): number {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < value.length; index += 1) {
+    const char = value[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === "{" || char === "[") depth += 1;
+    else if (char === "}" || char === "]") {
+      depth -= 1;
+      if (depth === 0) return index + 1;
+      if (depth < 0) return -1;
+    }
+  }
+  return -1;
 }
 
 function redactAssignedValue(_match: string, label: string, value: string): string {
@@ -179,7 +309,7 @@ function convertValue<T>(value: T, seen: Set<object>, depth = 0): LogValue {
         // email address, or by the header that failed, leaks through a rule
         // that only looks at values.
         redactText(key),
-        SECRET_KEY.test(key) ? "[redacted]" : convertValue(entry, seen, depth + 1),
+        convertEntry(key, entry, seen, depth),
       ]),
     );
   }
@@ -192,6 +322,25 @@ function convertValue<T>(value: T, seen: Set<object>, depth = 0): LogValue {
   } catch {
     return UNSERIALIZABLE;
   }
+}
+
+function convertEntry(key: string, entry: unknown, seen: Set<object>, depth: number): LogValue {
+  if (SECRET_KEY.test(key)) return "[redacted]";
+  const converted = convertValue(entry, seen, depth + 1);
+  if (!HEADER_KEY.test(key) || entry === null || typeof entry !== "object") return converted;
+  return redactHeaderStrings(converted);
+}
+
+// The conversion above runs first, so this walks plain values only: no cycles, no getters and no
+// depth left to overflow. It keeps the shape, because which headers were set is diagnostic and only
+// their text is a secret.
+function redactHeaderStrings(value: LogValue): LogValue {
+  if (typeof value === "string") return "[redacted]";
+  if (Array.isArray(value)) return value.map(redactHeaderStrings);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, redactHeaderStrings(entry)]));
+  }
+  return value;
 }
 
 function formatParam(param: LogValue): string {

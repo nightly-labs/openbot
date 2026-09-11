@@ -248,7 +248,7 @@ async function buildSeedProfile(
     await seedConversations(agentStore, mailbox, agents, attachments, clock);
     await seedChannels(agentStore, mailbox, agents, clock, transferDirectories);
     await seedTeam(profilePath, agentStore, clock);
-    await writeSetupState(join(profilePath, SETUP_FILE), "codex");
+    await writeSetupState(join(profilePath, SETUP_FILE), { preferredProvider: "codex", preferredModel: null });
     await writeSeedManifest(profilePath, clock, transferDirectories);
   } finally {
     agentStore.database.close();

@@ -1,42 +1,33 @@
 import { Stack } from "expo-router";
-import { useEffect, useRef, useState } from "react";
 import { isIOS } from "@/shared/lib/platform";
 
 export function SheetSaveAction({
+  dirty,
   canSave,
   pending,
-  saved,
+  label = "Save changes",
+  pendingLabel = "Saving…",
   onSave,
-  onSavedHidden,
 }: {
+  dirty: boolean;
   canSave: boolean;
   pending: boolean;
-  saved: boolean;
+  label?: string;
+  pendingLabel?: string;
   onSave: () => void;
-  onSavedHidden?: () => void;
 }) {
-  const [showSaved, setShowSaved] = useState(false);
-  const hidden = useRef(onSavedHidden);
-  hidden.current = onSavedHidden;
-  useEffect(() => {
-    setShowSaved(saved);
-    if (!saved) return;
-    const timer = setTimeout(() => {
-      setShowSaved(false);
-      hidden.current?.();
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [saved]);
   return (
     <Stack.Toolbar placement="right">
       <Stack.Toolbar.Button
-        hidden={!canSave && !pending && !showSaved}
-        disabled={!canSave || pending || showSaved}
-        icon={isIOS && !showSaved ? "checkmark" : undefined}
-        accessibilityLabel={showSaved ? "Saved" : pending ? "Saving…" : "Save changes"}
-        onPress={onSave}
+        hidden={!dirty && !pending}
+        disabled={!dirty || !canSave || pending}
+        icon={isIOS ? "checkmark" : undefined}
+        accessibilityLabel={pending ? pendingLabel : label}
+        onPress={() => {
+          if (dirty && canSave && !pending) onSave();
+        }}
       >
-        {showSaved ? "Saved" : isIOS ? "Save changes" : "✓"}
+        {isIOS ? label : "✓"}
       </Stack.Toolbar.Button>
     </Stack.Toolbar>
   );

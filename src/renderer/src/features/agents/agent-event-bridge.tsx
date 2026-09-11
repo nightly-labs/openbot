@@ -2,6 +2,7 @@ import type { AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { flush, onSettled } from "solid-js";
 import { withoutAgent } from "../../app-message-projection";
 import { playCompletionSoundForAgentEvent } from "../../completion-sound";
+import { toast } from "../../components/ui";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
 import { queueAfterTurnCompleted } from "../../queue-reconciliation";
@@ -18,6 +19,14 @@ import { useSidebar } from "../sidebar/sidebar-context";
 import { cleanAgentMessageText } from "./agent-message-text";
 import { reconcileAttentionApprovals, reconcileAttentionPrompts } from "./agent-runtime-snapshot";
 import { useAgents } from "./agents-context";
+
+/** A provider quotes what it was given, so an error can carry a whole request body back. */
+const ERROR_TOAST_DESCRIPTION_LIMIT = 300;
+
+function errorToastDescription(message: string): string {
+  if (message.length <= ERROR_TOAST_DESCRIPTION_LIMIT) return message;
+  return `${message.slice(0, ERROR_TOAST_DESCRIPTION_LIMIT - 1).trimEnd()}…`;
+}
 
 /**
  * The one subscriber to `agent.onEvent`, and the only place a single event is
@@ -245,8 +254,16 @@ export function AgentEventBridge() {
             : current;
         });
         return;
-      case "error":
+      case "error": {
         if (event.agentId) appendUiError(event.agentId, event.message, "Error", activeServerId());
+        // The inline feed is keyed by agent and by server, so it reaches nobody when the error
+        // carries no agent - a provider that fails to start is the common case - and it is unread
+        // until the user opens that chat. The message is already redacted in the main process.
+        const failing = event.agentId ? agentList().find((agent) => agent.id === event.agentId) : undefined;
+        toast.error(failing ? `${failing.name} could not continue` : "Provider error", {
+          description: errorToastDescription(event.message),
+        });
+      }
     }
   }
 

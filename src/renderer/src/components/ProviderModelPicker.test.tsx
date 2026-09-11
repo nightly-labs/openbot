@@ -169,12 +169,12 @@ async function openOpenCodePicker() {
   return { view, onChange, dialog: within(view.getByRole("dialog", { name: "Choose agent model" })) };
 }
 
-it("puts provider-labelled free models first and keeps one selected row per model", async () => {
+it("puts the service that holds a free model first and keeps one selected row per model", async () => {
   const { dialog } = await openOpenCodePicker();
   expect(dialog.getAllByRole("option").map((option) => option.getAttribute("aria-label"))).toEqual([
     "Example Free",
-    "GPT",
     "Unknown price",
+    "GPT",
   ]);
   expect(dialog.getByRole("option", { name: "Example Free" })).toHaveAttribute("aria-selected", "true");
 });

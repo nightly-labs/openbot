@@ -22,6 +22,7 @@ import { browserIpcHandlers } from "./ipc/browser-handlers";
 import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
 import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
 import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
+import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
 import { registerIpcGroups } from "./ipc/define-ipc-group";
 import { dynamicIslandIpcHandlers } from "./ipc/dynamic-island-handlers";
 import { hostedSiteIpcHandlers } from "./ipc/hosted-site-handlers";
@@ -264,6 +265,7 @@ function registerIpcHandlers({
   centralAuth,
   skills,
   hostedSites,
+  customProviders,
   marketplaceAgents,
   voice,
   dynamicIsland,
@@ -297,6 +299,7 @@ function registerIpcHandlers({
     ...accountIpcHandlers({ centralAuth, host }),
     ...skillIpcHandlers({ skills, getMainWindow }),
     ...hostedSiteIpcHandlers({ hostedSites, getMainWindow }),
+    ...customProviderIpcHandlers({ service, customProviders }),
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
     ...updateIpcHandlers({ updater, updatePreferenceFile }),
     ...teamIpcHandlers({
