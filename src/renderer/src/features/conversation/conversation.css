@@ -7829,6 +7829,7 @@ button.chat-action-target:active,
 .browser-preview-list {
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: var(--openbot-space-2) var(--openbot-space-4) var(--openbot-space-4);
 }
 
