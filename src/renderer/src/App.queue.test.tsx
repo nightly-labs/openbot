@@ -1,6 +1,6 @@
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
-import type { DirectConversationSnapshot } from "@openbot/contracts/ipc";
+import type { ConversationSnapshot, DirectConversationSnapshot } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
@@ -377,30 +377,29 @@ describe("OpenBot connected desktop shell", () => {
   it("sends an action for selected agent text without clearing the composer draft", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
-    // The heading renders before the conversation subscribes, so an emit here can reach nobody and
-    // the message under test never arrives. The binding is undefined until a listener exists.
-    await waitFor(() => expect(emitAgentEvent).toBeDefined());
     const answer = "The launch note needs a friendlier closing sentence.";
-    emitAgentEvent?.({
-      type: "conversation",
-      snapshot: {
-        agentId: "chief",
-        threadId: "thread-chief",
-        activeTurnId: null,
-        revision: 1,
-        messages: [
-          {
-            id: "assistant-selection",
-            author: "assistant",
-            text: answer,
-            createdAt: "2026-08-12T10:00:00.000Z",
-            status: "completed",
-          },
-        ],
-      },
+    const snapshot: ConversationSnapshot = {
+      agentId: "chief",
+      threadId: "thread-chief",
+      activeTurnId: null,
+      revision: 1,
+      messages: [
+        {
+          id: "assistant-selection",
+          author: "assistant",
+          text: answer,
+          createdAt: "2026-08-12T10:00:00.000Z",
+          status: "completed",
+        },
+      ],
+    };
+    // The heading renders before this thread subscribes, and the moment it does is not observable
+    // from here: `emitAgentEvent` is bound by the first subscriber of any kind. The snapshot is sent
+    // again until it lands, which changes nothing when it already has -- the revision is the same.
+    const message = await waitFor(() => {
+      emitAgentEvent?.({ type: "conversation", snapshot });
+      return screen.getByText(answer);
     });
-
-    const message = await screen.findByText(answer);
     const composer = screen.getByRole("textbox", { name: "Message Chief" });
     composer.textContent = "Keep this draft";
     await fireEvent.input(composer);

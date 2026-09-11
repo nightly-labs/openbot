@@ -30,6 +30,8 @@ export function createDiagnosticStream(options: {
 }): DiagnosticStream {
   const limit = options.limit ?? DEFAULT_LIMIT;
   let pending = "";
+  /** Set while the rest of a record that went over the bound is being thrown away. */
+  let dropping = false;
 
   function emitRecord(record: string): void {
     const message = options.redact(record.trim());
@@ -38,7 +40,17 @@ export function createDiagnosticStream(options: {
 
   return {
     push(chunk) {
-      pending += chunk;
+      let text = chunk;
+      if (dropping) {
+        // The rest of an over-long record is thrown away, not read: its first bytes were already
+        // emitted, and reading its tail as a record of its own is what would hand on the half of a
+        // payload that carries the credential.
+        const newline = text.indexOf("\n");
+        if (newline < 0) return;
+        text = text.slice(newline + 1);
+        dropping = false;
+      }
+      pending += text;
       const records = pending.split("\n");
       // The last piece has no newline yet, so it is the start of the next record.
       pending = records.pop() ?? "";
@@ -46,11 +58,13 @@ export function createDiagnosticStream(options: {
       if (pending.length > limit) {
         emitRecord(pending);
         pending = "";
+        dropping = true;
       }
     },
     flush() {
-      const record = pending;
+      const record = dropping ? "" : pending;
       pending = "";
+      dropping = false;
       if (record) emitRecord(record);
     },
   };

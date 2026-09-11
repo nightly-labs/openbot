@@ -49,11 +49,23 @@ describe("stderr diagnostics", () => {
 
   it("keeps no more than the bound, and shows no credential it could not read", () => {
     const { messages, stream } = collect(32);
-    stream.push('{"headers":{"X-Tenant":"tenant-secret');
-    expect(messages).toEqual(["[redacted-unscanned]"]);
+    stream.push('ERROR request failed: {"headers":{"X-Tenant":"');
+    expect(messages).toEqual(["ERROR request failed: [redacted-unscanned]"]);
 
-    // The bound is released with the record, so the next one is read normally.
-    stream.push("plain line\n");
-    expect(messages).toEqual(["[redacted-unscanned]", "plain line"]);
+    // The rest of that record is thrown away with it. Read as a record of its own it is plain text,
+    // and the credential in it matches no rule.
+    stream.push('tenant-secret"},"message":"request failed"}\nplain line\n');
+
+    expect(messages).toEqual(["ERROR request failed: [redacted-unscanned]", "plain line"]);
+    expect(messages.join(" ")).not.toContain("tenant-secret");
+  });
+
+  it("holds nothing from a record it threw away when the process exits", () => {
+    const { messages, stream } = collect(32);
+    stream.push('ERROR request failed: {"headers":{"X-Tenant":"');
+    stream.push('tenant-secret"},"message":"request');
+    stream.flush();
+
+    expect(messages).toEqual(["ERROR request failed: [redacted-unscanned]"]);
   });
 });
