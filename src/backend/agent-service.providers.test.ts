@@ -794,6 +794,45 @@ describe.sequential("AgentService: providers", () => {
     expect(opencodeMethods).not.toContain("turn/start");
   });
 
+  it("refuses to steer a message into a turn that runs on a removed endpoint", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    // No Codex CLI, so no fallback exists and the removal goes ahead while the turn runs.
+    process.env.OPENBOT_CODEX_PATH = join(root, "absent-codex");
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      // The turn stays active, which is the state that holds back the restart of the CLI.
+      const client = new FakeAgentClient(provider, "OPENCODE_DONE", false);
+      if (provider === "opencode") client.modelList = () => ({ data: [{ model: "lmstudio/local-llm" }] });
+      clients.set(provider, client);
+      return client;
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" });
+
+    await service.sendMessage({ agentId: "chief", text: "Start this turn" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const active = events.find((event) => event.type === "turn-started");
+    if (active?.type !== "turn-started") throw new Error("Turn did not start.");
+    await service.sendMessage({ agentId: "chief", text: "Add this to the active turn" });
+    const queued = service.listQueue("chief").deliveries.find((delivery) => delivery.status === "queued");
+    if (!queued) throw new Error("Queued delivery was not created.");
+
+    await service.removeCustomProvider("lmstudio", async () => undefined);
+
+    // The process still holds the session it opened on the removed endpoint, so a steered message
+    // would arrive there with the credentials that process started with.
+    await expect(
+      service.steerQueuedMessage({ agentId: "chief", deliveryId: queued.id, expectedTurnId: active.turnId }),
+    ).rejects.toThrow("The endpoint this agent used was removed. Choose another model for it.");
+    expect(clients.get("opencode")?.requests.some((request) => request.method === "turn/steer")).toBe(false);
+    // The message stays in the queue, so the user can send it again once a model is chosen.
+    expect(service.listQueue("chief").deliveries.find((delivery) => delivery.id === queued.id)?.status).toBe("queued");
+  });
+
   // An id saved again is served again, whatever the CLI did with the removal before it.
   it("offers an endpoint's models again after the id is saved a second time", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);

@@ -83,7 +83,7 @@ import {
   responseAttachmentMessageId,
 } from "./agent/delivery-content";
 import { DeltaBuffer } from "./agent/delta-buffer";
-import { DrainScheduler } from "./agent/drain-scheduler";
+import { DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./agent/drain-scheduler";
 import { DuplicationGate } from "./agent/duplication-gate";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./agent/hosted-site-events";
@@ -1434,6 +1434,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async steerQueuedMessage(input: SteerQueuedMessageInput): Promise<void> {
     const agent = await this.#store.getOrCreate(input.agentId);
+    // Steering carries a new message into the turn that is running, on the session the CLI holds, so
+    // it reaches the removed endpoint with the credentials that process started with. A restart
+    // waits for the turn, which is why the exclusion is what has to answer here.
+    if (!this.#servesModel(agent.model)) throw new Error(REMOVED_ENDPOINT_MESSAGE);
     const client = this.#providers.requireReadyClient(providerForAgent(agent));
     const session = this.#store.activeProviderSession(agent.id);
     const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);

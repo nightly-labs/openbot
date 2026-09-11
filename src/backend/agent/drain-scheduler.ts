@@ -15,8 +15,8 @@ import type { RoutineScheduler } from "./routine-scheduler";
 import { isMissingProviderSessionError, isRequestTimeout, providerForAgent } from "./thread-items";
 import type { ThreadLifecycle } from "./thread-lifecycle";
 
-/** Shown to the user when a delivery names a model of an endpoint that was taken out. */
-const REMOVED_ENDPOINT_MESSAGE = "The endpoint this agent used was removed. Choose another model for it.";
+/** Shown to the user when a message names a model of an endpoint that was taken out. */
+export const REMOVED_ENDPOINT_MESSAGE = "The endpoint this agent used was removed. Choose another model for it.";
 
 export interface DrainHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
