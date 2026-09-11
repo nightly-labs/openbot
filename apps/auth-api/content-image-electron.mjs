@@ -17,12 +17,6 @@ app.commandLine.appendSwitch("use-gl", "angle");
 app.commandLine.appendSwitch("use-angle", "swiftshader");
 app.commandLine.appendSwitch("enable-unsafe-swiftshader");
 
-// Chromium asks the desktop keyring for a password store while it starts. A
-// machine with no session bus has no keyring to answer, and the question can
-// wait long enough that the app never becomes ready. Nothing here stores a
-// password, so answer it with the plain store.
-app.commandLine.appendSwitch("password-store", "basic");
-
 // A build tool must not leave a process behind when its last window closes.
 app.on("window-all-closed", () => app.quit());
 
@@ -30,13 +24,16 @@ app.on("window-all-closed", () => app.quit());
 // nothing after it knows the process ran and stopped on the way to ready.
 console.log("content-images: Electron started.");
 
-try {
-  await main();
-  app.exit(0);
-} catch (error) {
-  console.error(`content-images: ${error instanceof Error ? error.message : String(error)}`);
-  app.exit(1);
-}
+// No top-level await here. Electron sends `ready` only after this module has
+// finished loading, so awaiting `app.whenReady()` at the top level waits for
+// itself and never ends.
+main().then(
+  () => app.exit(0),
+  (error) => {
+    console.error(`content-images: ${error instanceof Error ? error.message : String(error)}`);
+    app.exit(1);
+  },
+);
 
 async function main() {
   const controlPath = process.argv[2];
