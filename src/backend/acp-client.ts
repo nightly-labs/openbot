@@ -59,6 +59,7 @@ interface AcpTurn {
   thoughtStarted: boolean;
   receivedOutput: boolean;
   messages: ThreadItem[];
+  toolNames: Map<string, string>;
   task: Promise<void>;
 }
 
@@ -463,6 +464,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       thoughtStarted: false,
       receivedOutput: false,
       messages: [],
+      toolNames: new Map(),
       task: Promise.resolve(),
     };
     thread.activeTurn = turn;
@@ -542,6 +544,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
       turn.receivedOutput = true;
       if (update.sessionUpdate === "tool_call") this.#completeMessage(thread, turn, "commentary");
+      // ACP updates are partial; OpenCode omits the name when a tool finishes.
+      const name = update.name ?? update.title ?? turn.toolNames.get(update.toolCallId) ?? "tool";
+      turn.toolNames.set(update.toolCallId, name);
       this.emit("notification", {
         method: update.status === "completed" || update.status === "failed" ? "item/completed" : "item/started",
         params: {
@@ -550,7 +555,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           item: {
             id: update.toolCallId,
             type: "toolCall",
-            name: update.name ?? update.title ?? "tool",
+            name,
             status: update.status,
             arguments: update.rawInput,
             result: update.rawOutput,
@@ -605,9 +610,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#completeThought(thread, turn);
     this.#completeMessage(thread, turn, "final_answer");
     if (status === "failed" && error) {
+      const detail = redactText(String(error));
+      const message =
+        this.provider === "opencode" &&
+        /invalid api key|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail)
+          ? `OpenCode rejected the selected model's credentials. Update or remove the OpenCode Zen key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\n${detail}`
+          : detail;
       this.emit("notification", {
         method: "error",
-        params: { threadId: thread.id, turnId: turn.id, message: redactText(String(error)) },
+        params: { threadId: thread.id, turnId: turn.id, message },
       });
     }
     this.emit("notification", {

@@ -1,5 +1,9 @@
 # Releasing OpenBot
 
+For iOS builds uploaded to TestFlight through GitHub Actions, see
+[the mobile release guide](../apps/mobile/README.md#github-actions-testflight-release).
+The mobile workflow is separate from the desktop tag release described below.
+
 OpenBot updates are published through GitHub Releases and installed with `electron-updater`.
 macOS requires every auto-updatable build to be signed with a Developer ID Application certificate.
 The release workflow also notarizes and staples the macOS application before publishing it. Windows

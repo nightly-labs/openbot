@@ -1,0 +1,106 @@
+name: Release iOS to TestFlight
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-ios
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build iOS and upload to TestFlight
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-26
+    timeout-minutes: 90
+    environment: release-ios
+    permissions:
+      contents: read
+    env:
+      CI: "1"
+      FASTLANE_SKIP_UPDATE_CHECK: "1"
+      FASTLANE_HIDE_CHANGELOG: "1"
+      FASTLANE_OPT_OUT_USAGE: "1"
+    steps:
+      - name: Check out release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require release credentials
+        shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          missing=()
+          for name in EXPO_TOKEN ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY; do
+            if [[ -z "${!name}" ]]; then missing+=("$name"); fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            echo "Missing release-ios secrets: ${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Set up Bun and Node
+        uses: ./.github/actions/setup-bun
+        with:
+          install: none
+
+      - name: Select and verify iOS tools
+        shell: bash
+        run: |
+          echo "IPA_PATH=$RUNNER_TEMP/openbot-testflight.ipa" >> "$GITHUB_ENV"
+          sudo xcode-select --switch /Applications/Xcode_26.6.app/Contents/Developer
+          xcodebuild -version
+          pod --version
+          fastlane --version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check source
+        run: |
+          bun run lint
+          bun run typecheck
+          bun run test:desktop -- apps/mobile/src packages/contracts packages/team-client scripts/mobile-release.test.ts
+
+      - name: Build production iOS on this runner
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: >-
+          bunx eas-cli@24.1.2 build
+          --platform ios --profile production --local --non-interactive
+          --output "$IPA_PATH"
+
+      - name: Save signed IPA
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ios-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.IPA_PATH }}
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload to App Store Connect
+        working-directory: apps/mobile
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: fastlane ios beta
+
+      - name: Summarize upload
+        shell: bash
+        run: |
+          {
+            echo '## iOS upload complete'
+            echo "Commit: $GITHUB_SHA"
+            echo "Artifact: ios-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            echo 'Apple must process the build before it is available in TestFlight.'
+            echo 'Manage tester groups in App Store Connect. This workflow does not publish to the App Store.'
+          } >> "$GITHUB_STEP_SUMMARY"
