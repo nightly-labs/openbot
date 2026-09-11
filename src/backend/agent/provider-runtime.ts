@@ -1261,6 +1261,11 @@ export class ProviderRuntime implements ProviderPort {
           },
     );
 
+    /**
+     * The providers this connect started itself. A client that was already running read the endpoint
+     * files as they were then, so it says nothing about the files as they are now.
+     */
+    const activated: AgentProvider[] = [];
     const results = await Promise.all(
       requestedProviders.map(async (provider): Promise<string | null> => {
         if (this.#clients.has(provider)) return null;
@@ -1302,6 +1307,7 @@ export class ProviderRuntime implements ProviderPort {
           this.#cli.set(provider, cli);
           this.#clients.set(provider, client);
           this.#accounts.set(provider, account.account);
+          activated.push(provider);
           this.#setStatus({
             providers: updateProviderStatus(this.#status.providers, provider, {
               state: "available",
@@ -1367,7 +1373,9 @@ export class ProviderRuntime implements ProviderPort {
         this.#refreshModelCatalog(),
         codexClient ? this.#probeComputerUse(codexClient) : Promise.resolve("unavailable" as const),
       ]);
-      for (const provider of this.#clients.keys()) this.#hooks.onProviderActivated(provider);
+      for (const provider of activated) {
+        if (this.#clients.has(provider)) this.#hooks.onProviderActivated(provider);
+      }
       if (codexClient === this.#clients.get("codex")) {
         this.#setStatus({
           capabilities: { ...this.#status.capabilities, computerUse },

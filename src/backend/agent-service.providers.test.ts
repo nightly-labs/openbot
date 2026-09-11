@@ -609,26 +609,35 @@ describe.sequential("AgentService: providers", () => {
   // endpoint the user has just replaced.
   it("keeps a replaced endpoint out until a new process reads it", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
-    let opencodeClients = 0;
-    // The second OpenCode process refuses to start, which is the restart that fails: the process
-    // from before it keeps answering, on the endpoint as it was.
+    // Each flag decides whether the *next* process of that CLI starts. OpenCode's says whether the
+    // restart works; Claude's keeps Claude unconnected until the test connects it, which is a
+    // connect that runs while the OpenCode process stays the one it was.
+    let opencodeFailsToStart = false;
+    let claudeFailsToStart = true;
     service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
       const client = new FakeAgentClient(provider);
+      const start = client.start.bind(client);
       if (provider === "opencode") {
-        opencodeClients += 1;
-        if (opencodeClients === 2)
-          client.start = () => {
-            throw new Error("OpenCode would not start.");
-          };
         client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
+        client.start = () => {
+          if (opencodeFailsToStart) throw new Error("OpenCode would not start.");
+          start();
+        };
+      }
+      if (provider === "claude") {
+        client.start = () => {
+          if (claudeFailsToStart) throw new Error("Claude would not start.");
+          start();
+        };
       }
       return client;
     });
     await service.initialize();
     await store.getOrCreate("chief");
 
-    // The endpoint is removed and saved again under the same id, which may now be another server.
+    // The endpoint is removed and saved again under the same id, which may now name another server.
     await service.removeCustomProvider("studio", async () => undefined);
 
     expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
@@ -636,12 +645,22 @@ describe.sequential("AgentService: providers", () => {
       service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }),
     ).rejects.toThrow("The selected agent model is unavailable.");
 
-    // A restart that fails reports no failure of its own -- it is reported as a provider status --
-    // so the answer it gives here says nothing about which process answers now.
+    // A restart that fails is reported as a provider status, not as a throw of its own, so what it
+    // answers here says nothing about which process answers on the endpoint now.
+    opencodeFailsToStart = true;
     await service.reloadOpenCodeConfig().catch(() => undefined);
+    // The process from before still answers, which its other model shows, and the removed id is
+    // still not among what may be given to an agent.
+    expect(service.listModels().map((model) => model.id)).toContain("house/router-llm");
     expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
 
-    // A process that started reads the endpoint files as they are, and what it lists is the truth.
+    // Connecting another provider starts no new OpenCode process, so it may not give the id back.
+    claudeFailsToStart = false;
+    await service.ensureProvider("claude");
+    expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
+
+    // A process that started read the endpoint files as they are, and what it lists is the truth.
+    opencodeFailsToStart = false;
     await service.reloadOpenCodeConfig();
 
     expect(service.listModels().map((model) => model.id)).toContain("studio/local-llm");
