@@ -144,27 +144,6 @@ function redactEmbeddedJson(value: string): string {
   return result + value.slice(index);
 }
 
-/**
- * Whether the text ends inside a payload a serializer began, so the rest of it is still to come.
- *
- * A provider may write one record over several lines. Redacting each line on its own shows
- * `{"X-Tenant":"tenant-secret"}` without the `headers` parent that makes it a header record, and the
- * credential survives. A caller that reads a stream holds a record open while this answers `true`.
- */
-export function hasUnterminatedPayload(value: string): boolean {
-  let index = 0;
-  while (index < value.length) {
-    const start = findPayloadStart(value, index);
-    if (start < 0) return false;
-    const end = findBalancedEnd(value, start);
-    // A run that does not close is only held when a serializer wrote it; a brace in prose closes
-    // nothing and would hold the stream open to the bound.
-    if (end < 0) return startsLikeJson(value, start);
-    index = end;
-  }
-  return false;
-}
-
 function parseRedacted(candidate: string): string | null {
   try {
     return JSON.stringify(convertValue(JSON.parse(candidate), new Set<object>())) ?? null;

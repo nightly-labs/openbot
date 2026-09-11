@@ -38,6 +38,41 @@ describe("stderr diagnostics", () => {
     expect(messages.join("\n")).not.toContain("tenant-secret");
   });
 
+  it("waits for the text that says what an opening bracket is", () => {
+    const { messages, stream } = collect();
+    // The line ends on the bracket itself, so nothing after it says yet whether a record starts here
+    // or a sentence ends. Read as the end of a record, the lines under it lose the `headers` name
+    // that redacts what they hold.
+    // The chunk ends on the bracket, so the decision has to wait for the chunk that follows it.
+    stream.push("ERROR {");
+    expect(messages).toEqual([]);
+
+    stream.push('\n"headers":\n{"X-Tenant":"tenant-secret"},"message":"request failed"}\n');
+
+    expect(messages).toEqual(['ERROR {"headers":{"X-Tenant":"[redacted]"},"message":"request failed"}']);
+    expect(messages.join("\n")).not.toContain("tenant-secret");
+  });
+
+  // A brace in prose closes nothing. Holding the lines under it would keep every later record unread
+  // until the bound, and the CLI writes its progress on those lines.
+  it("ends a record on a bracket that opens no payload", () => {
+    const { messages, stream } = collect();
+    stream.push("the agent wrote {\nand then stopped\n");
+
+    expect(messages).toEqual(["the agent wrote {", "and then stopped"]);
+  });
+
+  // One pass over the text, whatever its shape: a payload that stays open over many lines used to be
+  // read again from its start at every one of them.
+  it("reads a long unterminated payload without rescanning it", () => {
+    const { messages, stream } = collect();
+    const start = Date.now();
+    stream.push(`ERROR {"headers":${"\n".repeat(60_000)}`);
+
+    expect(Date.now() - start).toBeLessThan(1_000);
+    expect(messages).toEqual([]);
+  });
+
   it("emits every complete record in one chunk and holds the rest", () => {
     const { messages, stream } = collect();
     stream.push('first line\nsecond line\n{"apiKey":"abcdef123456"');

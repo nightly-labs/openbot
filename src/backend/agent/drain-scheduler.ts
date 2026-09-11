@@ -195,14 +195,9 @@ export class DrainScheduler {
       if (!this.#hooks.servesModel(agent.model)) {
         // The endpoint was removed while this agent was busy, so no other model could be given to it
         // then. The old process would still answer on the removed endpoint, with the credentials it
-        // started with, until it restarts.
-        await this.#mailbox.markTerminal(
-          delivery.id,
-          "failed",
-          "The endpoint this agent used was removed. Choose another model for it.",
-        );
-        this.#mailboxSync.emitQueue(agent.id);
-        return;
+        // started with, until it restarts. Thrown rather than failed here: the catch below also ends
+        // the channel assignment, and an assignment left active holds back every other agent.
+        throw new Error("The endpoint this agent used was removed. Choose another model for it.");
       }
       this.#threads.applyPendingRuntimeRefresh(agent);
       await this.#providers.ensureProvider(providerForAgent(agent));
