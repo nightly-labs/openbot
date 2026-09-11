@@ -485,6 +485,8 @@ export class BrowserHost {
           keepQueueBlocked,
         );
         check();
+        // A valid submission finishes the user's step. The agent checks the page outcome.
+        if (submitted.status !== "invalid") return { ...submitted, forms: [], status: "complete" };
         const revision = randomUUID();
         const next = await this.#boundEngineOperation(
           tab,
@@ -495,10 +497,7 @@ export class BrowserHost {
         );
         check();
         this.#takeoverFormRevisions.set(input.tabId, revision);
-        if (submitted.status === "invalid") return { ...next, status: "invalid" };
-        if (next.status === "ready" && next.forms.length === 0 && !tab.view.webContents.isLoading())
-          return { ...next, status: "complete" };
-        return next;
+        return { ...next, status: "invalid" };
       } catch {
         throw new Error(
           "The browser form could not be submitted. Refresh the form or open the browser to check the result.",

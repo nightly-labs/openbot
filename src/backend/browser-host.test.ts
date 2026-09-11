@@ -236,14 +236,14 @@ describe("browser tab capacity", () => {
 });
 
 describe("local takeover forms", () => {
-  it("resumes only when a submitted form is gone and rejects reused revisions", async () => {
+  it("returns a valid submission to the agent even when the page needs another step and rejects reused revisions", async () => {
     formEngine.run.mockImplementation(async (command, check) => {
       check();
       return {
         revision: command.kind === "read" ? command.revision : command.input.revision,
         origin: "https://example.com",
         forms: [],
-        status: "ready",
+        status: "manual",
       };
     });
     formEngine.wait.mockResolvedValue();

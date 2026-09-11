@@ -96,7 +96,9 @@ Local browser takeover forms use separate IPC methods. The main process validate
 request and tab ownership. The browser reads native form controls in an isolated world and binds
 submission to the captured document, controls, and action. Values stay in temporary UI state and
 are sent directly to the website; they do not enter chat history or provider tool results. Unsupported
-controls keep manual takeover available. Remote clients retain the existing takeover protocol.
+controls keep manual takeover available. A valid submission returns control to the agent to inspect
+the page result and request any next verification step. Invalid fields keep the current takeover
+active. Remote clients retain the existing takeover protocol.
 
 ## Provider CLI updates
 

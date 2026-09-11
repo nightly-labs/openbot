@@ -2712,7 +2712,7 @@ async function runTakeoverForms(browser: BrowserHost, origin: string): Promise<v
     const first = await browser.readTakeoverForm(tab.id, () => undefined);
     const form = first.forms[0];
     if (form?.fields.length !== 2) throw new Error("Takeover did not expose the login form.");
-    const next = await browser.submitTakeoverForm(
+    const submitted = await browser.submitTakeoverForm(
       {
         ...request,
         revision: first.revision,
@@ -2725,9 +2725,14 @@ async function runTakeoverForms(browser: BrowserHost, origin: string): Promise<v
       },
       () => undefined,
     );
+    if (submitted.status !== "complete") throw new Error("Valid submission did not return control to the agent.");
+    browser.endTakeover(tab.id);
+    const verificationSnapshot = await browser.snapshot(tab.id);
+    if (!verificationSnapshot.text.includes("Code")) throw new Error("Agent could not inspect the next step.");
+    await browser.beginTakeover(tab.id);
+    const next = await browser.readTakeoverForm(tab.id, () => undefined);
     const verification = next.forms[0];
-    if (verification?.fields[0].label !== "Code" || next.status === "complete")
-      throw new Error("Takeover did not retain the verification step.");
+    if (verification?.fields[0].label !== "Code") throw new Error("Next takeover did not expose verification.");
     if (JSON.stringify(next).includes("smoke-secret")) throw new Error("Takeover returned entered credentials.");
     const complete = await browser.submitTakeoverForm(
       {
