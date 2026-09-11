@@ -124,6 +124,7 @@ export interface MockOpenBotOptions {
   browserTabs?: BrowserTab[];
   browserControlState?: BrowserControlState;
   browserPreview?: BrowserPreview | null;
+  browserPreviews?: Record<string, BrowserPreview | null>;
   servers?: ServerSummary[];
   presence?: TeamPresenceSnapshot;
   directThreads?: DirectThreadSummary[];
@@ -1451,9 +1452,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listTabs: async () => clone(browserTabs),
       getDisplayState: async () => ({ tabs: clone(browserTabs), activeTabId: activeBrowserTabId }),
       getControlState: async () => clone(browserControlState),
-      capturePreview: async () => {
-        if (!browserPreview) throw new Error("Browser preview is unavailable.");
-        return clone(browserPreview);
+      capturePreview: async (tabId) => {
+        const preview =
+          options.browserPreviews?.[tabId] === undefined ? browserPreview : options.browserPreviews[tabId];
+        if (!preview) throw new Error("Browser preview is unavailable.");
+        return clone(preview);
       },
       setVisible: async () => undefined,
       onDisplayState: (listener) => {
