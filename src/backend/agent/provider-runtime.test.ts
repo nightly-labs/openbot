@@ -804,6 +804,36 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
   });
 
+  it("logs a provider's MCP server failure and raises the provider's own failures", async () => {
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+      const client = new FakeAgentClient(provider);
+      clients.set(provider, client);
+      return client;
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    const client = clients.get("codex");
+    if (!client) throw new Error("The fake provider did not start.");
+
+    // Verbatim, because these two lines are what the user met: a per-session MCP server that lost a
+    // race with the short session OpenBot opens to read the model list, and an MCP client's own
+    // transport giving up. Neither stops the turn and neither is OpenBot's to configure.
+    client.emit(
+      "diagnostic",
+      "Failed to spawn MCP server 'chrome-devtools': session is closing (process scope already reclaimed); MCP server not started",
+    );
+    client.emit("diagnostic", "ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed");
+    client.emit("diagnostic", "ERROR the provider failed to reach the model endpoint");
+
+    await waitFor(() => events.some((event) => event.type === "error"));
+    expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({ message: "ERROR the provider failed to reach the model endpoint" }),
+    ]);
+  });
+
   it("refuses to replace a CLI that is running a turn", async () => {
     const { store, mailbox } = stores(root);
     service = new AgentService(

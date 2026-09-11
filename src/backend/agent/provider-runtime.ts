@@ -11,7 +11,7 @@ import type {
   CustomProviderRestart,
 } from "@openbot/contracts/ipc";
 import { agentProviderDescriptor, isFreeOpencodeModelName, isReasoningEffort } from "@openbot/contracts/ipc";
-import { redactText } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import {
@@ -50,7 +50,26 @@ import {
 } from "./provider-status";
 import { providerForAgent, providerLabel } from "./thread-items";
 
+const logger = createOpenBotLogger("provider-runtime");
+
 const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
+
+/**
+ * Whether a provider diagnostic is about an MCP server rather than about the agent's work.
+ *
+ * A CLI writes its MCP subsystem's failures to the same stderr as its own. OpenCode reads the user's
+ * MCP list from their own files, so OpenBot neither owns those servers nor can act on them, and a
+ * server that does not start leaves the turn running with fewer tools. Two of them arrive on every
+ * restart, because a server spawns per session and OpenBot opens a short session to read the model
+ * list. That belongs in the log, not in an error the user is asked to read.
+ *
+ * OpenBot's own bridge servers carry its name, and stay visible: a failure there is a failure of
+ * this app.
+ */
+export function isMcpSubsystemDiagnostic(message: string): boolean {
+  if (/openbot/i.test(message)) return false;
+  return /\b(mcp|rmcp)\b/i.test(message);
+}
 
 interface PendingCodexLogin {
   client: AgentClient;
@@ -1358,9 +1377,12 @@ export class ProviderRuntime implements ProviderPort {
   #bindClient(client: AgentClient): void {
     this.#hooks.bindClient(client);
     client.on("diagnostic", (message) => {
-      if (/error|failed|warning/i.test(message)) {
-        this.#emitError(`${client.provider}_diagnostic`, message);
+      if (!/error|failed|warning/i.test(message)) return;
+      if (isMcpSubsystemDiagnostic(message)) {
+        logger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });
+        return;
       }
+      this.#emitError(`${client.provider}_diagnostic`, message);
     });
     client.once("exit", (error) => this.#handleExit(client, error));
   }
