@@ -13,7 +13,7 @@ import {
 } from "@/features/agents/components/agent-list-reveal";
 import { AgentListRow } from "@/features/agents/components/agent-list-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
-import { PinnedAgentsStrip } from "@/features/agents/components/pinned-agents-strip";
+import { PinnedAgentsGrid } from "@/features/agents/components/pinned-agents-grid";
 import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
 import { ConnectionHeaderStatus } from "@/features/workspace/components/connection-header-status";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
@@ -127,7 +127,7 @@ export function ConnectedScreen() {
           )}
           ListHeaderComponent={
             <AgentListRowReveal index={0} reveal={listReveal}>
-              <PinnedAgentsStrip agents={pinnedAgents} />
+              <PinnedAgentsGrid agents={pinnedAgents} />
             </AgentListRowReveal>
           }
           ListEmptyComponent={

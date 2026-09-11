@@ -25,6 +25,7 @@ import { type AgentAvatarLocation, useAgentPinTransition } from "@/features/agen
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -101,7 +102,7 @@ export function AgentListRow({
 }: AgentListRowProps) {
   const { theme } = useUniwind();
   const [background] = useThemeColor(["background"]);
-  const { unreadAgentIds } = useMobileWorkspace();
+  const { unreadAgentIds, pinnedAgentIds } = useMobileWorkspace();
   const { startAgentNavigationAnimated, toggleAgentPinAnimated, transition } = useAgentPinTransition();
   const editMenu = useRef<MenuComponentRef>(null);
   const agentContextMenu = useAgentContextMenu(agent);
@@ -186,6 +187,7 @@ export function AgentListRow({
   return (
     <AgentPinSwipeRow
       agentName={agent.name}
+      pinBlocked={!canToggleAgentPin(pinnedAgentIds, agent.id)}
       onPin={(withHaptic) => toggleAgentPinAnimated(agent.id, { haptic: withHaptic })}
     >
       {Platform.OS === "android" ? (

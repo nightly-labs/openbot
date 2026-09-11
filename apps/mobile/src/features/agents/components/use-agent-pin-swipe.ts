@@ -13,7 +13,11 @@ function thresholdFeedback() {
   void haptics.impact("light");
 }
 
-export function useAgentPinSwipe(openingGesture: PanGesture, onPin: (withHaptic: boolean) => void) {
+export function useAgentPinSwipe(
+  openingGesture: PanGesture,
+  onPin: (withHaptic: boolean) => void,
+  pinBlocked: boolean,
+) {
   const swipeable = useRef<SwipeableMethods>(null);
   const restOffset = useSharedValue(0);
   const pendingPin = useRef<boolean | null>(null);
@@ -34,13 +38,18 @@ export function useAgentPinSwipe(openingGesture: PanGesture, onPin: (withHaptic:
 
   const pin = useCallback(
     (withHaptic = true) => {
-      if (pendingPin.current !== null) return;
-      pendingPin.current = withHaptic;
+      if (committing.get()) return;
       committing.set(true);
       setPinPending(true);
+      if (pinBlocked) {
+        void haptics.notification("warning");
+        swipeable.current?.close();
+        return;
+      }
+      pendingPin.current = withHaptic;
       swipeable.current?.close();
     },
-    [committing],
+    [committing, pinBlocked],
   );
 
   const onWillOpen = () => {
@@ -56,7 +65,10 @@ export function useAgentPinSwipe(openingGesture: PanGesture, onPin: (withHaptic:
     pendingPin.current = null;
     committing.set(false);
     setPinPending(false);
-    if (withHaptic !== null) onPin(withHaptic);
+    if (withHaptic !== null) {
+      if (pinBlocked) void haptics.notification("warning");
+      else onPin(withHaptic);
+    }
   };
 
   // Swipeable owns movement and settling. This simultaneous observer adds only
@@ -101,7 +113,7 @@ export function useAgentPinSwipe(openingGesture: PanGesture, onPin: (withHaptic:
           const distance = Math.max(0, -(start.get() + event.translationX));
           if (distance >= PIN_COMMIT_DISTANCE && !armed.get()) {
             armed.set(true);
-            if (!feedbackPlayed.get()) {
+            if (!pinBlocked && !feedbackPlayed.get()) {
               feedbackPlayed.set(true);
               scheduleOnRN(thresholdFeedback);
             }
@@ -116,7 +128,7 @@ export function useAgentPinSwipe(openingGesture: PanGesture, onPin: (withHaptic:
           armed.set(false);
           if (!success && !committing.get()) scheduleOnRN(restore);
         }),
-    [active, armed, committing, feedbackPlayed, openingGesture, origin, pin, restOffset, restore, start],
+    [active, armed, committing, feedbackPlayed, openingGesture, origin, pin, pinBlocked, restOffset, restore, start],
   );
 
   return { close, gesture, onClose, onWillClose, onWillOpen, pin, pinPending, revealed, swipeable };
