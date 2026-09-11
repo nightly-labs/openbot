@@ -117,12 +117,12 @@ export function MemoryEditor({
               ])
             }
           >
-            <Typography.Paragraph className="text-danger">Delete memory</Typography.Paragraph>
+            <Typography.Paragraph className="text-danger-text">Delete memory</Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>
       ) : null}
       {action.error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger">
+        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
           {action.error}
         </Typography.Paragraph>
       ) : null}
@@ -397,17 +397,17 @@ export function RoutineEditor({
               ])
             }
           >
-            <Typography.Paragraph className="text-danger">Delete routine</Typography.Paragraph>
+            <Typography.Paragraph className="text-danger-text">Delete routine</Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>
       ) : null}
       {toggle.error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger">
+        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
           {toggle.error}
         </Typography.Paragraph>
       ) : null}
       {action.error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger">
+        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
           {action.error}
         </Typography.Paragraph>
       ) : null}

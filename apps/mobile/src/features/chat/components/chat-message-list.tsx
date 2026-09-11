@@ -153,7 +153,11 @@ export function ChatMessageList({
       subscription.remove();
     };
   }, []);
-  const replyColor = String(useCSSVariable("--openbot-text-dim"));
+  const [userForeground, themeForeground, themeMuted] = useCSSVariable([
+    "--openbot-text-on-light",
+    "--openbot-text-primary",
+    "--openbot-text-muted",
+  ]).map(String);
   const reducedMotion = useReducedMotion();
   const animateMessages = isFocused && canSend && appActive;
   const arrivals = useMessageArrivals(agent.id, messages, animateMessages && historyState === "ready");
@@ -275,7 +279,7 @@ export function ChatMessageList({
                 agents={agents}
                 body={message.body}
                 selectable={message.author === "user"}
-                color={message.author === "user" ? "#0a0a0c" : foreground}
+                color={message.author === "user" ? userForeground : foreground}
                 streaming={message.author === "agent" && message.streaming}
                 animationEnabled={animateMessages && arrivals.has(message.id) && motion.responseVisible}
               />
@@ -305,11 +309,11 @@ export function ChatMessageList({
       >
         {message.replyToMessageId ? (
           <View className="flex-row items-center gap-1 self-end">
-            <CornerUpRight size={14} color={replyColor} />
+            <CornerUpRight size={14} color={themeMuted} />
             <Typography.Paragraph
               type="body-xs"
               numberOfLines={1}
-              className="shrink text-text-dim"
+              className="shrink text-muted"
               accessibilityLabel={`Reply to: ${source?.kind === "message" ? mentionDraft(source.body).text || "Attachment" : "Message unavailable"}`}
             >
               {source?.kind === "message" ? mentionDraft(source.body).text || "Attachment" : "Message unavailable"}
@@ -333,8 +337,8 @@ export function ChatMessageList({
         <StreamRevealProvider>
           <ThinkingTextGradient
             text={activityLabel}
-            foreground={foreground ?? "#ffffff"}
-            muted={muted ?? "#888888"}
+            foreground={foreground ?? themeForeground}
+            muted={muted ?? themeMuted}
             enabled={
               animateMessages &&
               motion.historyVisible &&
@@ -450,7 +454,7 @@ export function ChatMessageList({
                     {historyState === "waiting" ? "Waiting for connection" : "Could not load chat history"}
                   </Typography.Paragraph>
                   {historyState === "waiting" ? (
-                    <Typography.Paragraph type="body-xs" align="center" className="text-text-dim">
+                    <Typography.Paragraph type="body-xs" align="center" className="text-muted">
                       Your chat history will load when the server reconnects.
                     </Typography.Paragraph>
                   ) : null}

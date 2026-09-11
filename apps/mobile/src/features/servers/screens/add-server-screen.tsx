@@ -28,7 +28,7 @@ export function AddServerScreen({
   initialInvite?: string;
   onJoined?: () => void;
 } = {}) {
-  const foreground = useThemeColor("foreground");
+  const [foreground, accentForeground] = useThemeColor(["foreground", "accent-foreground"]);
   const { addRemoteServer, servers } = useMobileWorkspace();
   const [joinedId, setJoinedId] = useState<string | null>(null);
   const joinedServer = servers.find((server) => server.id === joinedId);
@@ -106,7 +106,7 @@ export function AddServerScreen({
         <View className="gap-5">
           <View className="flex-row items-center gap-3 rounded-3xl bg-control px-4 py-4">
             <View className="size-12 items-center justify-center rounded-2xl bg-accent">
-              <Server color="#ffffff" size={23} strokeWidth={1.8} />
+              <Server color={accentForeground} size={23} strokeWidth={1.8} />
             </View>
             <View className="min-w-0 flex-1 gap-0.5">
               <Typography.Paragraph weight="semibold">Invitation ready</Typography.Paragraph>
@@ -117,7 +117,7 @@ export function AddServerScreen({
           </View>
 
           {error ? (
-            <Typography.Paragraph align="center" className="text-danger">
+            <Typography.Paragraph align="center" className="text-danger-text">
               {error}
             </Typography.Paragraph>
           ) : null}

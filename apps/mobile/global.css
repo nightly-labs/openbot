@@ -20,6 +20,9 @@
   --color-text-secondary: var(--openbot-text-secondary);
   --color-text-dim: var(--openbot-text-dim);
   --color-accent-text: var(--openbot-accent-text);
+  --color-success-text: var(--openbot-success-text);
+  --color-warning-text: var(--openbot-warning-text);
+  --color-danger-text: var(--openbot-danger-text);
   --color-brand-logo: var(--openbot-logo-production);
   --color-action: var(--openbot-action);
   --color-action-foreground: var(--openbot-action-foreground);

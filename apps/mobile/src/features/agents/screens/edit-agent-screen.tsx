@@ -200,7 +200,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
         </Typography.Paragraph>
       ) : null}
       {error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger">
+        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
           {error}
         </Typography.Paragraph>
       ) : null}

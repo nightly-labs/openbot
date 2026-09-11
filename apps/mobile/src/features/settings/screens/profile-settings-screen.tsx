@@ -229,7 +229,7 @@ export function ProfileSettingsScreen() {
               disabled={busy}
               onPress={() => void perform(() => updateProfile({ avatar: null }), "Photo removed.")}
             >
-              <Typography.Paragraph type="body-sm" className="text-danger">
+              <Typography.Paragraph type="body-sm" className="text-danger-text">
                 Remove photo
               </Typography.Paragraph>
             </SettingsRow>
@@ -244,7 +244,7 @@ export function ProfileSettingsScreen() {
 
       <View className="gap-3">
         {profileError ? (
-          <Typography.Paragraph accessibilityRole="alert" className="text-danger">
+          <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
             {profileError}
           </Typography.Paragraph>
         ) : null}
@@ -260,7 +260,7 @@ export function ProfileSettingsScreen() {
               ])
             }
           >
-            <Typography.Paragraph className="text-danger">Sign out</Typography.Paragraph>
+            <Typography.Paragraph className="text-danger-text">Sign out</Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>
       </View>
