@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { NEWS_ARTICLES, newsArticleUrl, newsOgImageUrl } from "../src/lib/news";
+import { newsOgJobs } from "../news-og-images";
+import { NEWS_ART_SHAPES, NEWS_ARTICLES, newsArticleUrl, newsCardImagePath, newsOgImageUrl } from "../src/lib/news";
 import { NEWS_GRADIENT_BRAND_HEXES, newsGradient } from "../src/lib/news-gradient";
 import {
   NEWS_FEED_URL,
@@ -83,6 +84,22 @@ describe("rss feed", () => {
       const url = newsArticleUrl(article.slug);
       expect(xml).toContain(`<link>${url}</link>`);
       expect(xml).toContain(`<guid isPermaLink="true">${url}</guid>`);
+    }
+  });
+});
+
+describe("article artwork files", () => {
+  it("bakes an image at every path the pages ask for", () => {
+    // The pages build these paths and the build writes them from its own list.
+    // Nothing else connects the two, and a disagreement is invisible: a missing
+    // background falls through to the CSS approximation rather than failing.
+    const written = newsOgJobs().map((job) => `/${job.fileName}`);
+
+    for (const article of NEWS_ARTICLES) {
+      for (const shape of NEWS_ART_SHAPES) {
+        expect(written).toContain(newsCardImagePath(article.slug, shape));
+      }
+      expect(written).toContain(new URL(newsOgImageUrl(article.slug)).pathname);
     }
   });
 });

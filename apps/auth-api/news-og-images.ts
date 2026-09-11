@@ -17,7 +17,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import type { Plugin } from "vite";
-import { NEWS_ARTICLES } from "./src/lib/news";
+import { NEWS_ART_SHAPES, NEWS_ARTICLES, newsCardImagePath } from "./src/lib/news";
 import { newsGradient } from "./src/lib/news-gradient";
 
 const execFileAsync = promisify(execFile);
@@ -31,9 +31,13 @@ const GENERATOR_VERSION = 1;
 const OG_WIDTH = 1200;
 const OG_HEIGHT = 630;
 /** The card artwork on /news. The title sits over it as real text, not pixels.
-    2:1 matches the grid card, the frame that shows the most of it. */
-const CARD_WIDTH = 1200;
-const CARD_HEIGHT = 600;
+    One size per frame, at that frame's own aspect ratio, so the image a reader
+    sees before the shader starts is the frame the shader opens on. */
+const CARD_SIZES = {
+  featured: { width: 1216, height: 640 },
+  card: { width: 1200, height: 600 },
+  article: { width: 1260, height: 540 },
+} as const;
 
 export interface NewsOgJob {
   /** Path inside the client bundle, for example `news/og/some-article.png`. */
@@ -106,14 +110,16 @@ export function newsOgJobs(): NewsOgJob[] {
       height: OG_HEIGHT,
       withTitle: true,
     },
-    {
-      fileName: `news/card/${article.slug}.png`,
+    ...NEWS_ART_SHAPES.map((shape) => ({
+      // The one path builder, so the file written here and the file the page
+      // asks for cannot drift apart. It is a URL, and a bundle name is relative.
+      fileName: newsCardImagePath(article.slug, shape).slice(1),
       slug: article.slug,
       title: article.title,
-      width: CARD_WIDTH,
-      height: CARD_HEIGHT,
+      width: CARD_SIZES[shape].width,
+      height: CARD_SIZES[shape].height,
       withTitle: false,
-    },
+    })),
   ]);
 }
 

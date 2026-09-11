@@ -1,6 +1,6 @@
 import type { ShaderMount } from "@paper-design/shaders";
 import { createMemo, createSignal, onSettled } from "solid-js";
-import { newsCardImagePath } from "../../lib/news";
+import { type NewsArtShape, newsCardImagePath } from "../../lib/news";
 import { newsGradient, newsGradientCss, newsGradientUniforms } from "../../lib/news-gradient";
 import { cx } from "../../lib/utils";
 
@@ -22,11 +22,19 @@ import { cx } from "../../lib/utils";
 // that. The index page shows one featured card and a grid, so "live" is used once
 // and everything else waits to be hovered. At most two contexts exist at a time.
 //
-// The baked PNG is the animation's own first frame: the generator draws it from
-// this same description at `gradient.frame` with the clock stopped. So the canvas
-// takes the picture over rather than replacing it. It is revealed only once it has
-// drawn, and it fades in, so the handover is never a cut and never a cut to an
-// empty rectangle.
+// The still has to be the animation's own first frame, or the moment the shader
+// arrives is a cut between two different pictures. The baked PNG is drawn from
+// this same description at `gradient.frame` with the clock stopped, so it is that
+// frame — but only in a full build, and only at the shape it was baked at. In
+// development it answers 404, and the CSS approximation underneath is a handful of
+// coloured blobs that look nothing like the shader's output.
+//
+// So the component draws its own. Before anything is hovered it mounts the shader
+// with the clock stopped, keeps the frame it produced as the still, and lets the
+// context go again. That picture is exact, it is the right shape because it was
+// drawn at the element's own size, and it costs one short-lived context per card.
+// The canvas is revealed only once it has drawn, and it fades in over that same
+// frame, so the handover is never a cut and never a cut to an empty rectangle.
 
 export type NewsGradientMode = "live" | "hover";
 
@@ -34,6 +42,8 @@ export interface NewsGradientProps {
   slug: string;
   title: string;
   mode: NewsGradientMode;
+  /** The frame this artwork fills, which decides the shape it is drawn at. */
+  shape: NewsArtShape;
   /**
    * The element a pointer must be over for a `hover` gradient to run. Give it the
    * whole card, so the artwork reacts to the date and the title under it as well.
@@ -47,6 +57,12 @@ const ANIMATION_SPEED = 0.6;
 
 /** Enough frames for the mount's ResizeObserver to have sized the canvas. */
 const CANVAS_FRAME_BUDGET = 12;
+
+// Priming is serialised across every card on the page. Each one is a WebGL
+// context that lives for a few frames, and a browser keeps only so many before it
+// drops the oldest without warning; one at a time keeps the page far under that
+// however many articles are published.
+let primeQueue: Promise<void> = Promise.resolve();
 
 export function NewsGradient(props: NewsGradientProps) {
   let host: HTMLDivElement | undefined;
@@ -72,7 +88,7 @@ export function NewsGradient(props: NewsGradientProps) {
   const background = createMemo(() => {
     const captured = frozen();
     if (captured) return `url("${captured}")`;
-    return `url("${newsCardImagePath(props.slug)}"), ${newsGradientCss(gradient())}`;
+    return `url("${newsCardImagePath(props.slug, props.shape)}"), ${newsGradientCss(gradient())}`;
   });
 
   /**
@@ -104,7 +120,7 @@ export function NewsGradient(props: NewsGradientProps) {
     setShaderReady(false);
   };
 
-  const mountShader = async (speed = ANIMATION_SPEED) => {
+  const mountShader = async (speed = ANIMATION_SPEED, reveal = true): Promise<ShaderMount | undefined> => {
     if (mount || !host) return;
     generation += 1;
     const attempt = generation;
@@ -132,7 +148,7 @@ export function NewsGradient(props: NewsGradientProps) {
       );
     } catch {
       mount = undefined;
-      return;
+      return undefined;
     }
 
     // The canvas has no size, and so no picture, until the mount's ResizeObserver
@@ -141,38 +157,108 @@ export function NewsGradient(props: NewsGradientProps) {
     // keeps the still picture on screen for those few frames instead of blinking
     // through to nothing.
     for (let frames = 0; frames < CANVAS_FRAME_BUDGET; frames += 1) {
-      if (attempt !== generation || !mount) return;
+      if (attempt !== generation || !mount) return undefined;
       if (mount.canvasElement.width > 0) {
-        setShaderReady(true);
-        return;
+        // A priming mount is never shown: its whole purpose is the picture it
+        // leaves behind, and revealing it would fade a canvas in and straight
+        // back out again.
+        if (reveal) setShaderReady(true);
+        return mount;
       }
       await nextAnimationFrame();
     }
+    // The canvas was never sized. The mount is still real, and the caller is
+    // responsible for letting it go.
+    return undefined;
+  };
+
+  // Whether a prime is in flight, and whether a pointer is waiting on it. A
+  // prime owns `mount` while it runs, so hover must not reach in and change the
+  // speed of a mount that is about to be thrown away.
+  let priming = false;
+  let hovered = false;
+  let detached = false;
+
+  /**
+   * Draw the first frame, keep it, and let the context go. `disposeShader` does
+   * the keeping: it captures the canvas and records the frame it stopped on, so
+   * with the clock stopped the card is left holding exactly `gradient.frame` and
+   * the first hover carries on from the picture already on screen.
+   */
+  const primeStill = (): Promise<void> => {
+    primeQueue = primeQueue.then(async () => {
+      if (detached || mount || frozen() || !host) return;
+      priming = true;
+      try {
+        const primed = await mountShader(0, false);
+        // The constructor does not draw with the clock stopped, so the canvas is
+        // still empty here. `setFrame` draws synchronously, and it is the same
+        // call the build-time generator makes, so the still the card keeps and
+        // the baked PNG are the same frame of the same picture.
+        primed?.setFrame(gradient().frame);
+        // Unconditional: a mount that never sized its canvas still holds a
+        // context, and `disposeShader` is what captures the frame and frees it.
+        disposeShader();
+      } finally {
+        priming = false;
+      }
+      if (hovered && !detached) void mountShader();
+    });
+    return primeQueue;
   };
 
   onSettled(() => {
-    if (!animationWelcome()) return;
+    // The still must be the first frame whether or not the animation may run:
+    // it is what the reader looks at while the shader starts, and what they keep
+    // if it never does. Reduced motion is a reason not to move, not a reason to
+    // show a different picture.
+    if (!animationWelcome()) {
+      void primeStill();
+      return;
+    }
 
     if (props.mode === "live") {
-      void mountShader();
-      return () => disposeShader();
+      // The still is painted first and the animation starts from it, so the
+      // canvas fades in over the very frame it opens on.
+      void primeStill().then(() => {
+        if (!detached) void mountShader();
+      });
+      return () => {
+        detached = true;
+        disposeShader();
+      };
     }
 
     // Hover only makes sense where a pointer can rest on something. A touch
     // screen reports a hover that never ends, which would leave a context alive
     // for the rest of the session.
-    if (!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches) return;
+    if (!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches) {
+      void primeStill();
+      return;
+    }
 
     const element = props.hoverTarget?.() ?? host;
     if (!element) return;
 
+    // Paint the first frame now and let the context go again, so a card at rest
+    // shows the picture its animation opens on.
+    void primeStill();
+
     // A pointer that arrives while a stopped mount is still on the element starts
     // that one again rather than building a second.
     const enter = () => {
+      hovered = true;
+      // The prime finishes by starting the animation itself when a pointer
+      // arrived while it was running.
+      if (priming) return;
       if (mount) mount.setSpeed(ANIMATION_SPEED);
       else void mountShader();
     };
-    const leave = () => disposeShader();
+    const leave = () => {
+      hovered = false;
+      if (priming) return;
+      disposeShader();
+    };
     element.addEventListener("pointerenter", enter);
     element.addEventListener("pointerleave", leave);
     // A card can be scrolled out from under a held pointer, and Safari does not
@@ -183,6 +269,8 @@ export function NewsGradient(props: NewsGradientProps) {
       element.removeEventListener("pointerenter", enter);
       element.removeEventListener("pointerleave", leave);
       element.removeEventListener("pointercancel", leave);
+      hovered = false;
+      detached = true;
       disposeShader();
     };
   });

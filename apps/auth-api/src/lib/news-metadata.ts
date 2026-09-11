@@ -64,7 +64,7 @@ export function openBotNewsIndexHead() {
 function featuredArtworkPreload() {
   const featured = NEWS_ARTICLES[0];
   if (!featured) return [];
-  return [{ rel: "preload", as: "image" as const, href: newsCardImagePath(featured.slug) }];
+  return [{ rel: "preload", as: "image" as const, href: newsCardImagePath(featured.slug, "featured") }];
 }
 
 export function openBotArticleHead(article: NewsArticle) {
@@ -104,7 +104,7 @@ export function openBotArticleHead(article: NewsArticle) {
       { rel: "alternate", type: "application/rss+xml", title: "OpenBot news", href: NEWS_FEED_URL },
       // The same reason as on the index: this article's artwork is the first
       // thing under the title and it is a background, not an <img>.
-      { rel: "preload", as: "image" as const, href: newsCardImagePath(article.slug) },
+      { rel: "preload", as: "image" as const, href: newsCardImagePath(article.slug, "article") },
     ],
   };
 }

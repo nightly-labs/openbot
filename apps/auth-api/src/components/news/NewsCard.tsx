@@ -21,7 +21,13 @@ export function NewsCard(props: NewsCardProps) {
       style={{ "--news-card-index": props.index }}
     >
       <div class="news-card-art">
-        <NewsGradient slug={props.article.slug} title={props.article.title} mode="hover" hoverTarget={() => root} />
+        <NewsGradient
+          slug={props.article.slug}
+          title={props.article.title}
+          mode="hover"
+          shape="card"
+          hoverTarget={() => root}
+        />
         <span class="news-card-art-title" aria-hidden="true">
           {props.article.title}
         </span>

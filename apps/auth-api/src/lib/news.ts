@@ -102,9 +102,18 @@ export function newsOgImageUrl(slug: string): string {
   return new URL(`/news/og/${slug}.png`, OPENBOT_SITE_URL).toString();
 }
 
+/**
+ * The shapes the artwork is drawn in, one per frame on the site. Each frame gets
+ * its own image because the mesh gradient is not scale-invariant: the same
+ * description drawn at 2:1 and at 21:9 is a different picture, not a crop of one,
+ * so a single image stretched to fit would not be the frame the animation opens on.
+ */
+export const NEWS_ART_SHAPES = ["featured", "card", "article"] as const;
+export type NewsArtShape = (typeof NEWS_ART_SHAPES)[number];
+
 /** The card artwork on /news. Gradient only: the title sits over it as real text. */
-export function newsCardImagePath(slug: string): string {
-  return `/news/card/${slug}.png`;
+export function newsCardImagePath(slug: string, shape: NewsArtShape): string {
+  return `/news/art/${shape}/${slug}.png`;
 }
 
 // Fixed to UTC on purpose. The Worker renders in UTC and the reader's browser does

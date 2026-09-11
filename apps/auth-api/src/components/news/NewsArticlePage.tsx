@@ -52,7 +52,7 @@ export function NewsArticlePage(props: NewsArticlePageProps) {
           </header>
 
           <div class="news-article-art" data-enter="news-art">
-            <NewsGradient slug={props.article.slug} title={props.article.title} mode="live" />
+            <NewsGradient slug={props.article.slug} title={props.article.title} mode="live" shape="article" />
           </div>
 
           <div class="news-prose">
