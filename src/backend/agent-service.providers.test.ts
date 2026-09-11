@@ -564,7 +564,7 @@ describe.sequential("AgentService: providers", () => {
     ).rejects.toThrow("The selected agent model is unavailable.");
 
     // Saved again under the same id, so both the list and the selection accept it once more.
-    service.noteCustomProviderSaved("studio", ["local-llm"]);
+    service.noteCustomProviderSaved("studio", ["local-llm"], "restarted");
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ model: "studio/local-llm" });
   });
@@ -619,7 +619,7 @@ describe.sequential("AgentService: providers", () => {
     await store.getOrCreate("chief");
 
     await service.removeCustomProvider("studio", async () => undefined);
-    service.noteCustomProviderSaved("studio", ["new-llm"]);
+    service.noteCustomProviderSaved("studio", ["new-llm"], "restarted");
 
     const listed = service.listModels().map((model) => model.id);
     expect(listed).toContain("studio/new-llm");
@@ -627,6 +627,40 @@ describe.sequential("AgentService: providers", () => {
     await expect(
       service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/old-llm" }),
     ).rejects.toThrow("The selected agent model is unavailable.");
+  });
+
+  // The same id may name a different server after a second save. While the process that answers on
+  // it is the one the save before started, offering the id again would send the next message to the
+  // endpoint the user has just replaced.
+  it("keeps a replaced endpoint out until a new process reads it", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider);
+      if (provider === "opencode") {
+        client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
+      }
+      return client;
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+
+    await service.removeCustomProvider("studio", async () => undefined);
+    // A busy CLI took neither the removal nor this save, so it still answers on the old address.
+    service.noteCustomProviderSaved("studio", ["local-llm"], "skipped-busy");
+
+    expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
+    await expect(
+      service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }),
+    ).rejects.toThrow("The selected agent model is unavailable.");
+
+    // The CLI is free now, so a restart reads the endpoint files as they are, and what the fresh
+    // process lists is the truth again.
+    expect(await service.reloadOpenCodeConfig()).toBe("restarted");
+
+    expect(service.listModels().map((model) => model.id)).toContain("studio/local-llm");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ model: "studio/local-llm" });
   });
 
   // An id saved again is served again, whatever the CLI did with the removal before it.
@@ -646,7 +680,7 @@ describe.sequential("AgentService: providers", () => {
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
 
     await service.removeCustomProvider("studio", async () => undefined);
-    service.noteCustomProviderSaved("studio", ["local-llm"]);
+    service.noteCustomProviderSaved("studio", ["local-llm"], "restarted");
 
     await service.removeCustomProvider("house", async () => undefined);
 

@@ -25,6 +25,17 @@ describe("redactText", () => {
     expect(redactText('{"key":"pk_live_abcdefgh1234","truncated')).toBe("[redacted-unscanned]");
   });
 
+  it("drops a balanced payload that does not parse, with everything under it", () => {
+    // The trailing comma makes the whole run unreadable. Read on into it, `{"X-Tenant":"…"}` parses
+    // on its own, and without the `headers` name above it no rule takes the value out.
+    expect(redactText('ERROR {"headers":{"X-Tenant":"tenant-secret"},}')).toBe("ERROR [redacted-unscanned]");
+  });
+
+  // A brace in prose is not a payload, and a sentence loses nothing by staying.
+  it("keeps a line whose braces hold no payload", () => {
+    expect(redactText("note {not json} and more")).toBe("note {not json} and more");
+  });
+
   it("redacts a serialized payload no matter how long it is", () => {
     const padding = "x".repeat(200_000);
     expect(redactText(JSON.stringify({ key: "pk_live_abcdefgh1234", padding }))).toBe(

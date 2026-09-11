@@ -279,6 +279,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       hooks: {
         bindClient: (client) => {
+          if (client.provider === "opencode") this.#clearReleasedCustomProviders();
           client.on("notification", (notification) => this.#turn.handleNotification(notification, client));
           client.on("request", (request) => void this.#handleServerRequest(client, request));
         },
@@ -1157,13 +1158,24 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * only those. A save that replaces `studio/old` with `studio/new` while a busy CLI keeps the old
    * catalogue would otherwise make `studio/old` selectable, and it disappears at the next restart.
    *
-   * This is why nothing here is keyed on a restart outcome. `reloadOpenCodeConfig` reports
-   * `restarted` for a replacement that failed to come up, and clearing the exclusions on that word
-   * would offer the models of a deleted endpoint to the next removal.
+   * `skipped-busy` says the process that is running still holds this endpoint as it was: the address
+   * and the key of the save before this one. The same id may now name a different server, so serving
+   * it again here would send the next message to the endpoint the user has just replaced. It stays
+   * excluded until a new process reads the file, which is where `#clearReleasedCustomProviders` runs.
    */
-  noteCustomProviderSaved(providerId: string, modelIds: readonly string[]): void {
-    if (!this.#releasedCustomProviders.has(providerId)) return;
+  noteCustomProviderSaved(providerId: string, modelIds: readonly string[], restart: CustomProviderRestart): void {
+    if (!this.#releasedCustomProviders.has(providerId) || restart === "skipped-busy") return;
     this.#releasedCustomProviders.set(providerId, new Set(modelIds));
+    this.#emitModelsChanged();
+  }
+
+  /**
+   * A fresh OpenCode process read the endpoint files as they are now, so what it lists is the truth
+   * and nothing has to be masked any more.
+   */
+  #clearReleasedCustomProviders(): void {
+    if (this.#releasedCustomProviders.size === 0) return;
+    this.#releasedCustomProviders.clear();
     this.#emitModelsChanged();
   }
 

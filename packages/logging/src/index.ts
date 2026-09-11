@@ -134,6 +134,14 @@ function redactEmbeddedJson(value: string): string {
     }
     const parsed = end < 0 ? null : parseRedacted(value.slice(start, end));
     if (parsed === null) {
+      if (end >= 0 && startsLikeJson(value, start)) {
+        // A run a serializer wrote that does not parse: a trailing comma, a value cut short. Going on
+        // into it would read `{"X-Tenant":"…"}` without the `headers` name above it, which is the
+        // name that redacts what is under it, so the whole run goes instead.
+        result += value.slice(index, start) + UNSCANNED;
+        index = end;
+        continue;
+      }
       result += value.slice(index, start + 1);
       index = start + 1;
       continue;

@@ -50,13 +50,17 @@ export function customProviderIpcHandlers({
         (input): Promise<CustomProviderResult> =>
           serialize(async () => {
             const providers = await customProviders.save(input);
+            const restart = await service.reloadOpenCodeConfig();
             // An id that was removed before serves the models of this write from now on -- and only
-            // those, because the running CLI may still list the ones this save left out.
+            // those, because the running CLI may still list the ones this save left out. The restart
+            // comes first: a CLI that kept running kept this endpoint as it was before the save, and
+            // the backend needs to hear that before it offers the id again.
             service.noteCustomProviderSaved(
               input.id,
               input.models.map((model) => model.id),
+              restart,
             );
-            return { providers, restart: await service.reloadOpenCodeConfig() };
+            return { providers, restart };
           }),
       ),
       /**

@@ -7,6 +7,9 @@
  * catalog, without it the free one. Nothing else in OpenBot reads that variable, so this file spawns
  * a fake ACP agent that reports the environment it was given, and asserts what a user gets: free
  * models with no account, the paid list after a key is saved, and no forced sign-in in between.
+ *
+ * A custom endpoint travels the same way, on `OPENCODE_CONFIG_CONTENT`, so the same spawn record
+ * answers what the CLI was told about the endpoints the user saved.
  */
 
 import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
@@ -15,6 +18,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentClient } from "./agent-client";
 import type { OpencodeCliInfo } from "./cli";
+import type { CustomProviderConfig } from "./opencode-config";
 import { decodeAccountReadResult, decodeModelListResponse, decodeRecordResponse } from "./protocol";
 import { requireProviderDriver } from "./provider-drivers";
 
@@ -36,6 +40,7 @@ if (envLog) {
   fs.appendFileSync(
     envLog,
     JSON.stringify({
+      argv: process.argv.slice(2),
       apiKey: process.env.OPENCODE_API_KEY ?? null,
       disableAutoupdate: process.env.OPENCODE_DISABLE_AUTOUPDATE ?? null,
       configContent: process.env.OPENCODE_CONFIG_CONTENT ?? null,
@@ -94,7 +99,14 @@ function handle(message) {
 interface FakeOpencode {
   cli: OpencodeCliInfo;
   envLog: string;
-  readSpawnEnvironments: () => Promise<Array<{ apiKey: string | null; disableAutoupdate: string | null }>>;
+  readSpawnEnvironments: () => Promise<
+    Array<{
+      argv: string[];
+      apiKey: string | null;
+      disableAutoupdate: string | null;
+      configContent: string | null;
+    }>
+  >;
 }
 
 async function createFakeOpencodeAgent(source?: "system" | "managed"): Promise<FakeOpencode> {
@@ -116,12 +128,37 @@ async function createFakeOpencodeAgent(source?: "system" | "managed"): Promise<F
   };
 }
 
-function startOpencode(cli: OpencodeCliInfo, apiKey: () => string | null, envLog: string): AgentClient {
+function startOpencode(
+  cli: OpencodeCliInfo,
+  apiKey: () => string | null,
+  envLog: string,
+  options: {
+    /** Read at every spawn, so a test can save an endpoint between two processes. */
+    customProviders?: () => CustomProviderConfig[];
+    /** The one-shot client that generates a profile, which must stay unable to act. */
+    profile?: boolean;
+  } = {},
+): AgentClient {
   vi.stubEnv("OPENBOT_FAKE_ACP_ENV_LOG", envLog);
-  const client = requireProviderDriver("opencode").createClient(cli, 10_000, { apiKey, customProviders: () => [] });
+  const driver = requireProviderDriver("opencode");
+  const context = { apiKey, customProviders: options.customProviders ?? (() => []) };
+  const client = options.profile
+    ? (driver.createProfileClient?.(cli, 10_000, context) ?? driver.createClient(cli, 10_000, context))
+    : driver.createClient(cli, 10_000, context);
   started.push(client);
   client.start();
   return client;
+}
+
+function customProvider(): CustomProviderConfig {
+  return {
+    id: "studio-local",
+    name: "Studio Local",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    apiKey: "test-key",
+    models: [{ id: "qwen3-coder:30b", name: "Qwen3 Coder 30B" }],
+    headers: [],
+  };
 }
 
 describe("OpenCode ACP environment", () => {
@@ -134,7 +171,7 @@ describe("OpenCode ACP environment", () => {
     // An empty `OPENCODE_API_KEY` is not the same as an absent one: the CLI reads it as an account
     // and lists nothing. A user with no account has to see the variable missing.
     const [environment] = await fake.readSpawnEnvironments();
-    expect(environment).toEqual({ apiKey: null, disableAutoupdate: null, configContent: null });
+    expect(environment).toEqual({ argv: ["acp"], apiKey: null, disableAutoupdate: null, configContent: null });
     const account = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult);
     expect(account.account).not.toBeNull();
     const models = await client.request("model/list", {}, decodeModelListResponse);
@@ -193,6 +230,61 @@ describe("OpenCode ACP environment", () => {
     // `provider-runtime` turns into `sign-in-required` with the provider's own message.
     const account = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult);
     expect(account.account).toBeNull();
+  });
+
+  it("spawns the ACP process with the custom endpoints the user saved", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    const client = startOpencode(fake.cli, () => null, fake.envLog, { customProviders: () => [customProvider()] });
+
+    await client.request("initialize", {}, decodeRecordResponse);
+
+    const [environment] = await fake.readSpawnEnvironments();
+    expect(JSON.parse(environment?.configContent ?? "")).toEqual({
+      provider: {
+        "studio-local": {
+          npm: "@ai-sdk/openai-compatible",
+          name: "Studio Local",
+          options: { baseURL: "http://127.0.0.1:11434/v1", apiKey: "test-key" },
+          models: { "qwen3-coder:30b": { name: "Qwen3 Coder 30B" } },
+        },
+      },
+    });
+  });
+
+  it("reads the endpoints at every spawn, so one saved later reaches the next process", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    const providers: CustomProviderConfig[] = [];
+    // One `opencode acp` process serves the whole app, so a saved endpoint can only reach it through
+    // a respawn of a client that was built long before the save.
+    const client = startOpencode(fake.cli, () => null, fake.envLog, { customProviders: () => providers });
+    await client.request("initialize", {}, decodeRecordResponse);
+    await client.stop();
+
+    providers.push(customProvider());
+    client.start();
+    await client.request("initialize", {}, decodeRecordResponse);
+
+    const environments = await fake.readSpawnEnvironments();
+    // No endpoint means no config layer at all: an empty layer is not the same as no layer.
+    expect(environments[0]?.configContent).toBeNull();
+    expect(environments[1]?.configContent).toContain("studio-local");
+  });
+
+  it("keeps the deny-all layer while a profile client carries an endpoint", async () => {
+    // Profile generation must not let the model act. Both layers travel on one environment variable,
+    // so a custom endpoint that replaced the layer rather than joining it would give a one-shot
+    // prompt full permissions.
+    const fake = await createFakeOpencodeAgent("system");
+    const client = startOpencode(fake.cli, () => null, fake.envLog, {
+      customProviders: () => [customProvider()],
+      profile: true,
+    });
+
+    await client.request("initialize", {}, decodeRecordResponse);
+
+    const config = JSON.parse((await fake.readSpawnEnvironments())[0]?.configContent ?? "");
+    expect(config.permission).toEqual({ "*": "deny" });
+    expect(Object.keys(config.provider)).toEqual(["studio-local"]);
   });
 
   it("refuses to start on an OpenCode that lists no model at all", async () => {
