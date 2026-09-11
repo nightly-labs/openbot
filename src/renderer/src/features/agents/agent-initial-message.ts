@@ -1,6 +1,7 @@
 import type { FirstAgentDraft } from "./FirstAgentSetup";
 
-/** The first message a newly created agent receives, turning its purpose into a standing role. */
+/** Give a newly created agent its standing role, or ask for a greeting when no purpose is supplied. */
 export function createAgentInitialMessage(draft: Pick<FirstAgentDraft, "purpose">): string {
-  return `Your ongoing role is: ${draft.purpose.trim()}`;
+  const purpose = draft.purpose.trim();
+  return purpose ? `Your ongoing role is: ${purpose}` : "Greet me briefly.";
 }

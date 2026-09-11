@@ -4,10 +4,8 @@ import { BlurView } from "expo-blur";
 import { Link, router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { Pin } from "lucide-react-native";
 import { type PropsWithChildren, useEffect, useId, useRef } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
-import ReanimatedSwipeable, { type SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
+import { Platform, StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
   interpolate,
@@ -22,10 +20,10 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useUniwind } from "uniwind";
 import { useAgentContextMenu } from "@/features/agents/components/agent-context-menu";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
+import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
 import { type AgentAvatarLocation, useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
-import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
@@ -102,11 +100,9 @@ export function AgentListRow({
   rightInset = 20,
 }: AgentListRowProps) {
   const { theme } = useUniwind();
-  const [background, accent, accentForeground] = useThemeColor(["background", "accent", "accent-foreground"]);
+  const [background] = useThemeColor(["background"]);
   const { unreadAgentIds } = useMobileWorkspace();
-  const { openingGesture } = useAppDrawer();
   const { startAgentNavigationAnimated, toggleAgentPinAnimated, transition } = useAgentPinTransition();
-  const pendingPinRef = useRef(false);
   const editMenu = useRef<MenuComponentRef>(null);
   const agentContextMenu = useAgentContextMenu(agent);
   const isUnread = unreadAgentIds.includes(agent.id);
@@ -126,6 +122,14 @@ export function AgentListRow({
       <ChatLinkPressable
         accessibilityLabel={`Open chat with ${agent.name}`}
         accessibilityRole="button"
+        accessibilityActions={enableActions ? [{ name: "pin", label: `Pin ${agent.name}` }] : undefined}
+        onAccessibilityAction={
+          enableActions
+            ? (event) => {
+                if (event.nativeEvent.actionName === "pin") toggleAgentPinAnimated(agent.id);
+              }
+            : undefined
+        }
         className="w-full"
         onLongPress={enableActions && Platform.OS === "android" ? () => editMenu.current?.show() : undefined}
       >
@@ -179,44 +183,10 @@ export function AgentListRow({
 
   if (!enableActions) return agentLink;
 
-  const handlePin = (swipeable: SwipeableMethods) => {
-    pendingPinRef.current = true;
-    swipeable.close();
-  };
-
-  const handleSwipeableClose = () => {
-    if (!pendingPinRef.current) return;
-    pendingPinRef.current = false;
-    toggleAgentPinAnimated(agent.id);
-  };
-
   return (
-    <ReanimatedSwipeable
-      childrenContainerStyle={{ backgroundColor: background }}
-      containerStyle={{ backgroundColor: background, overflow: "hidden" }}
-      enableTrackpadTwoFingerGesture
-      onSwipeableClose={handleSwipeableClose}
-      overshootFriction={8}
-      overshootRight={false}
-      // Rightward drags belong to the drawer; it yields to row actions on leftward drags.
-      requireExternalGestureToFail={openingGesture}
-      renderRightActions={(_progress, _translation, swipeable) => (
-        <View className="w-[88px] overflow-hidden" style={{ backgroundColor: accent }}>
-          <Pressable
-            accessibilityLabel={`Pin ${agent.name}`}
-            accessibilityRole="button"
-            className="flex-1 items-center justify-center gap-1.5"
-            style={({ pressed }) => ({ backgroundColor: accent, opacity: pressed ? 0.72 : 1 })}
-            onPress={() => handlePin(swipeable)}
-          >
-            <Pin color={String(accentForeground)} fill={String(accentForeground)} size={22} strokeWidth={1.8} />
-            <Typography.Paragraph type="body-xs" weight="semibold" style={{ color: accentForeground }}>
-              Pin
-            </Typography.Paragraph>
-          </Pressable>
-        </View>
-      )}
-      rightThreshold={42}
+    <AgentPinSwipeRow
+      agentName={agent.name}
+      onPin={(withHaptic) => toggleAgentPinAnimated(agent.id, { haptic: withHaptic })}
     >
       {Platform.OS === "android" ? (
         <MenuView
@@ -237,6 +207,6 @@ export function AgentListRow({
       ) : (
         agentLink
       )}
-    </ReanimatedSwipeable>
+    </AgentPinSwipeRow>
   );
 }
