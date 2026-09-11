@@ -7832,6 +7832,30 @@ button.chat-action-target:active,
   padding: var(--openbot-space-2) var(--openbot-space-4) var(--openbot-space-4);
 }
 
+.browser-preview-list > .browser-empty-state {
+  height: auto;
+  justify-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-8) var(--openbot-space-4);
+}
+
+.browser-preview-list > .browser-empty-state > svg {
+  width: var(--openbot-space-8);
+  height: var(--openbot-space-8);
+  margin-bottom: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+}
+
+.browser-preview-list > .browser-empty-state > strong {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  font-weight: 500;
+}
+
+.browser-preview-list > .browser-empty-state > .ui-button {
+  margin-top: var(--openbot-space-1);
+}
+
 .browser-preview-card {
   position: relative;
   margin-bottom: var(--openbot-space-4);
