@@ -319,11 +319,24 @@ account-to-Signal outbox before returning. Worker `waitUntil` delivers notificat
 profile-save response path, with a five-second timeout per request and outbox retries. Signal forwards the optional frame only to authenticated sockets for that
 user; the frame contains no profile or credential. Desktop and mobile fetch the profile through
 the account API on notification, cold launch, and every 15 minutes while active.
-Returning from the background or restoring window focus does not trigger an automatic account
-or directory check. iOS `inactive` alone does not trigger a check or reset the periodic timer.
+Desktop window focus does not trigger an automatic account or directory check.
+Mobile uses one shared lifecycle subscription and a refresh controller per account endpoint.
+A foreground return checks absolute freshness: successful account and directory responses stay fresh
+for 15 minutes, and background time counts toward that deadline. Failed mobile checks retry after
+one minute while foregrounded. Concurrent requests share one promise; invalidations received during
+a request cause one follow-up after success. iOS `inactive` alone does not reset these deadlines.
+Stored mobile sessions become available before startup validation completes; network failures retain
+them, and validation results apply only to the initiating login.
 Explicit profile invalidations trigger an earlier check and are deferred while mobile is in the
 background. Signal readiness does not trigger a profile check; the account timer remains independent
-of transport recovery. Failed automatic checks use the same interval.
+of transport recovery. Failed desktop automatic checks use the same interval.
+Each mobile server has one connection recovery owner. It reloads workspace reads on foreground
+return without changing a healthy server to `connecting` or disabling its actions. These reads reuse
+the existing WebRTC peer and do not request new account sessions or tickets. The first replacement
+starts immediately after actual connection loss.
+The required compatibility read has a three-second timeout to detect stale open channels. Delays
+apply after failed replacements and survive app switches. The peer owns Signal socket recovery,
+not full connection retries. Ordinary transport loss does not invalidate the account directory.
 Older Signal clients ignore this optional event. API and Signal both need the event support for push;
 the periodic check remains the fallback when Signal is unavailable. Unchanged responses do not
 publish a new identity. Desktop ignores reads overtaken by a local edit, sign-out or shutdown;
@@ -448,6 +461,27 @@ on failure. Updating an existing profile and its retry receipt shares a SQLite
 transaction. Creation follows the existing workspace/initial-message flow with
 cleanup on failure. Receipts make retries after a lost response return the saved
 agent. This does not introduce a schema migration or alter released protocol codecs.
+
+## Mobile product analytics
+
+`apps/mobile/src/features/analytics` owns the React Native OpenPanel client, typed event allowlists,
+account-scoped operations, the local SecureStore preference, and foreground/connection events.
+Before session creation, it buffers at most 100 sanitized events in memory for 30 minutes from the
+first buffered event. The next account claims this buffer; identify precedes ordered delivery with
+original timestamps. Reconnects do not replay it. Expiry, opt-out, and process exit discard it.
+Account changes invalidate prior operation scopes; the anonymous-to-account transition retains the
+pairing scope so its completion can be recorded. Mobile uses a write-only client in the existing
+Openbot OpenPanel project shared with desktop and the website.
+Workspace command wrappers record outcomes once at the mobile caller; conversation availability is measured in
+the visible chat view, including cached reads, not from background broadcasts. The host remains the only source of turn lifecycle
+events. No Team API or database schema changes are required.
+
+Only native production builds with mobile write credentials initialize the client, after the
+preference is loaded. UI actions never await analytics transport. Account/consent generations
+reject late results; ordered identity changes preserve attribution of already accepted events.
+A final SDK filter replaces properties to remove SDK-added Android referrers and route paths.
+The SDK's optional persistent queue and screen tracking are not enabled. Configuration, event
+semantics and native verification steps are in [the mobile README](../apps/mobile/README.md#openpanel-product-analytics).
 
 ## Website analytics
 

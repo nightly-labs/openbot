@@ -1,2 +1,4 @@
 [install]
 exact = true
+# Keep one physical copy of native Expo modules across workspace peer contexts.
+linker = "hoisted"

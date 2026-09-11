@@ -1,7 +1,6 @@
 import { userErrorMessage } from "@openbot/user-errors";
 import { useQueryClient } from "@tanstack/react-query";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
-import * as Haptics from "expo-haptics";
 import { router, useIsFocused } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -14,6 +13,8 @@ import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
+import { MobileConversationAnalytics } from "@/features/analytics/conversation";
+import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { ChatHeader } from "@/features/chat/components/chat-header";
@@ -32,7 +33,9 @@ import { ConnectionStatus } from "@/features/workspace/components/connection-sta
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
+import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { retainConfirmedAttachments, uploadChatAttachments } from "../model/upload-chat-attachments";
 import { ChatCameraPanel } from "./chat-camera-panel";
 
@@ -50,6 +53,8 @@ function leaveConversation(): void {
 
 export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileChatViewProps) {
   const isFocused = useIsFocused();
+  const foregroundVisit = useAppForeground();
+  const [conversationAnalytics] = useState(() => new MobileConversationAnalytics(mobileAnalytics));
   const [appActive, setAppActive] = useState(AppState.currentState === "active");
   const [reducedTransparency, setReducedTransparency] = useState(true);
   const insets = useSafeAreaInsets();
@@ -139,6 +144,21 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   const readBoundaryStatus = latestMessage?.status;
   const server = servers.find((server) => server.id === agent.serverId);
   const serverOnline = server?.state === "online";
+  useEffect(() => {
+    conversationAnalytics.update(
+      isFocused && foregroundVisit,
+      Boolean(conversation),
+      historyLoadFailed || (!serverOnline && server?.initialConnectionPending === false),
+    );
+  }, [
+    conversationAnalytics,
+    isFocused,
+    foregroundVisit,
+    conversation,
+    historyLoadFailed,
+    serverOnline,
+    server?.initialConnectionPending,
+  ]);
   const activePrompt = messages.findLast(
     (message) =>
       message.kind === "question" &&
@@ -230,7 +250,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     motion.beginSend();
     Keyboard.dismiss();
 
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void haptics.impact();
     if (questionForm.question) {
       questionForm.answer([body]);
       motion.cancelSend();

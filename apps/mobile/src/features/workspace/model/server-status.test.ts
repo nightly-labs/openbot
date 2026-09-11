@@ -71,8 +71,14 @@ describe("mobile server availability", () => {
     expect(current.state).toBe("online");
     connection = Promise.withResolvers<void>();
     controller.offline();
+    expect(current.state).toBe("connecting");
+    connection.reject(new Error("The desktop is offline."));
+    await vi.advanceTimersByTimeAsync(0);
     expect(current.state).toBe("offline");
-    await vi.advanceTimersByTimeAsync(REMOTE_RETRY_INTERVAL_MS);
+    connection = Promise.withResolvers<void>();
+    await vi.advanceTimersByTimeAsync(REMOTE_RETRY_INTERVAL_MS - 1);
+    expect(current.state).toBe("offline");
+    await vi.advanceTimersByTimeAsync(1);
     expect(current.state).toBe("connecting");
     expect(serverStatusLabel(current)).toBe("Offline");
     connection.resolve();

@@ -161,6 +161,8 @@ Seed the approved OpenBot team catalog locally with `bun run marketplace:seed:lo
 | `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`, and `--isolated` gives the worktree a profile of its own keyed to its path instead of the shared `OpenBot Dev` one. |
 | `bun run preview` | Preview the built Electron client with the green preview icon. |
 | `bun run mobile:go` | Start the mobile app in Expo Go and clear the Metro cache. |
+| `bun mobile:ios` | Build and launch the iOS simulator app without RocketSim. |
+| `bun mobile:ios:rocketsim` | Start RocketSim and build and launch the iOS simulator app with RocketSim Connect. See [mobile setup](apps/mobile/README.md#development). |
 | `bun run mobile:go:tunnel` | Start the mobile app in Expo Go through a Metro tunnel and clear the cache. The OpenBot API and Signal still need their own reachable addresses. |
 | `bun run dev:api` | Start the TanStack Start API and its local D1 database on `127.0.0.1:3100`. |
 | `bun run api:start` | Build and preview the Cloudflare Worker locally. |
@@ -208,6 +210,9 @@ records, and public assets. It does not carry chats, files, commands, or remote 
 The development runner advertises both Mobile Connect and its Signal service on the preferred private
 LAN interface. Restart the runner after changing networks so newly generated QR codes contain the
 current address.
+
+Production mobile analytics setup and required OpenPanel credentials are documented in
+[OpenBot Mobile](apps/mobile/README.md#openpanel-product-analytics).
 
 `mobile:go:tunnel` exposes only the Expo development server. It does not expose the local account
 API, Signal, or TURN. A phone on 5G cannot use the default LAN addresses. For a test across networks,

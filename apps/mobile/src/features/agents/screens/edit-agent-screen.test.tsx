@@ -11,12 +11,15 @@ import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { act, type PropsWithChildren } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { useHapticsPreference } from "@/features/settings/model/haptics";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { ChatHeader } from "../../chat/components/chat-header";
 import { saveAgentRecord } from "../../workspace/model/save-agent-record";
 import type { MobileAgent, MobileServer } from "../../workspace/model/workspace-types";
 import { useAgentContextMenu } from "../components/agent-context-menu";
 import { EditAgentScreen } from "./edit-agent-screen";
+
+vi.mock("expo-secure-store", () => ({}));
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
@@ -305,7 +308,7 @@ vi.mock("@expo/ui", () => {
   };
 });
 vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn() }));
-vi.mock("expo-haptics", () => ({}));
+vi.mock("@/shared/lib/haptics", () => ({ haptics: { impact: async () => {} } }));
 vi.mock("lucide-react-native", () => ({ ArrowLeft: () => null }));
 
 const container = document.createElement("div");
@@ -330,6 +333,7 @@ async function edit(name: string, value: string) {
   await act(() => fireEvent.change(screen.getByRole("textbox", { name }), { target: { value } }));
 }
 beforeEach(() => {
+  useHapticsPreference.setState({ enabled: true, ready: true });
   workspace.agents = [{ ...original }];
   workspace.servers = [{ ...host }];
   workspace.activeServer = host;
@@ -357,7 +361,8 @@ afterEach(async () => {
   root = createRoot(container);
 });
 
-it("opens the same host-bound sheet from the chat avatar and the row Info action", async () => {
+it.each([true, false])("keeps the native Info action available with haptics enabled=%s", async (enabled) => {
+  useHapticsPreference.setState({ enabled });
   function Menu() {
     return useAgentContextMenu(original);
   }

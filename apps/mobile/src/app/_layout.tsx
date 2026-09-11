@@ -12,8 +12,10 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { useUniwind, withUniwind } from "uniwind";
 
+import { MobileAnalyticsLifecycle } from "@/features/analytics/lifecycle";
 import { MobileSessionProvider, useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { loadAppearance } from "@/features/settings/model/appearance";
+import { loadHapticsPreference } from "@/features/settings/model/haptics";
 import { AppLoadingOverlayProvider, useAppLoadingOverlay } from "@/shared/components/app-loading-overlay";
 import { BloubAnimationProvider } from "@/shared/components/bloub-loader";
 import { isIOS } from "@/shared/lib/platform";
@@ -63,6 +65,7 @@ export default function RootLayout() {
   const { theme: colorScheme } = useUniwind();
   useEffect(() => {
     void loadAppearance().catch(() => undefined);
+    void loadHapticsPreference().catch(() => undefined);
   }, []);
 
   return (
@@ -74,6 +77,7 @@ export default function RootLayout() {
               <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
               <BloubAnimationProvider>
                 <MobileSessionProvider>
+                  <MobileAnalyticsLifecycle />
                   <AppLoadingOverlayProvider>
                     <RootNavigator />
                   </AppLoadingOverlayProvider>

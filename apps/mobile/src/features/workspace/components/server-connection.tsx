@@ -7,6 +7,8 @@ import {
   remoteConnectionFailure,
 } from "@openbot/team-client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MobileConnectionAnalytics } from "@/features/analytics/connection";
+import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { RemoteTeamTransport, type RemoteTeamTransportRef } from "./remote-team-transport";
 
 export interface ServerConnectionHandle {
@@ -48,7 +50,7 @@ export function ServerConnection({
   const activeRef = useRef(active);
   activeRef.current = active;
   const generation = useRef(0);
-  const wasOnline = useRef(false);
+  const [analytics] = useState(() => new MobileConnectionAnalytics(mobileAnalytics));
   const membershipRefreshPending = useRef(false);
   const attach = useCallback((value: RemoteTeamTransportRef | null) => setClient(value), []);
 
@@ -64,7 +66,17 @@ export function ServerConnection({
           stage: "connection",
           isCurrent: () => !disposed && activeRef.current && attempt === generation.current,
         };
-        return load(hostId, publicKey, client, context);
+        const finish = analytics.attempt();
+        const initiatingContext = context;
+        return load(hostId, publicKey, client, initiatingContext).then(
+          () => {
+            if (initiatingContext.isCurrent()) finish("succeeded", initiatingContext.stage);
+          },
+          (error) => {
+            if (initiatingContext.isCurrent()) finish("failed", initiatingContext.stage);
+            throw error;
+          },
+        );
       },
       (error) => {
         failure = remoteConnectionFailure(context.stage, error);
@@ -85,16 +97,19 @@ export function ServerConnection({
       controller.current = null;
       register(hostId, null);
     };
-  }, [client, hostId, publicKey, register, load, onStatus]);
+  }, [client, hostId, publicKey, register, load, onStatus, analytics]);
 
   useEffect(() => {
-    if (!active) generation.current += 1;
+    if (!active) {
+      generation.current += 1;
+      analytics.background();
+    }
     controller.current?.setActive(active);
     if (active && membershipRefreshPending.current) {
       membershipRefreshPending.current = false;
       void onMembershipChanged?.().catch(() => undefined);
     }
-  }, [active, onMembershipChanged]);
+  }, [active, onMembershipChanged, analytics]);
 
   return (
     <RemoteTeamTransport
@@ -104,13 +119,12 @@ export function ServerConnection({
       onTeamEvent={onTeamEvent}
       onConnectionUpdate={(update) => {
         if (update.hostId !== hostId) return;
-        if (update.state === "online") wasOnline.current = true;
         if (update.state === "offline") {
-          if (update.code === "session_revoked" || wasOnline.current) {
+          if (activeRef.current) analytics.lost();
+          if (update.code === "session_revoked") {
             if (activeRef.current) void onMembershipChanged?.().catch(() => undefined);
             else membershipRefreshPending.current = true;
           }
-          wasOnline.current = false;
           const error = new Error(update.message ?? "The desktop went offline.");
           if (update.code === "protocol_error") controller.current?.suspend(error);
           else controller.current?.offline(error);

@@ -14,7 +14,8 @@
         "NSLocalNetworkUsageDescription": "Allow OpenBot to connect to your desktop during local development.",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
-        }
+        },
+        "ITSAppUsesNonExemptEncryption": false
       },
       "icon": {
         "light": "./assets/icons/app-icon.png",
@@ -25,9 +26,11 @@
     "android": {
       "package": "run.openbot.mobile",
       "icon": "./assets/icons/app-icon.png",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["android.permission.CAMERA"]
     },
     "plugins": [
+      "./plugins/with-rocketsim",
       "expo-router",
       [
         "expo-splash-screen",
@@ -70,7 +73,9 @@
           }
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-font",
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true,

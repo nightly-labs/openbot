@@ -17,6 +17,7 @@ import { TeamPersonAvatar, teamMemberName } from "../team/TeamPersonAvatar";
 import { formatChatTimestamp } from "./chat-timestamp";
 import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "./createChatVirtualizer";
 import { ScrollToLatestButton, scrollToLatestMessage } from "./MessageNavigation";
+import { anchorNewMessages, type NewMessageTally, tallyNewMessages } from "./new-message-tally";
 import {
   scrollToUnreadBoundary,
   UnreadMessagesBanner,
@@ -49,6 +50,7 @@ export function DirectConversation(props: DirectConversationProps) {
   const [showScrollToLatest, setShowScrollToLatest] = createSignal(false);
   const [unreadDividerVisible, setUnreadDividerVisible] = createSignal(false);
   const [virtualScrollMargin, setVirtualScrollMargin] = createSignal(0);
+  const [newMessageCount, setNewMessageCount] = createSignal(0);
   let messageList: HTMLDivElement | undefined;
   let virtualRoot: HTMLDivElement | undefined;
   let unreadMessagesDivider: HTMLDivElement | undefined;
@@ -57,6 +59,19 @@ export function DirectConversation(props: DirectConversationProps) {
   let typingIdleTimer: ReturnType<typeof setTimeout> | undefined;
   let stickToLatest = true;
   let lastThreadId: string | undefined;
+  let newMessages: NewMessageTally = { count: 0, anchorId: undefined };
+  /* Every message anchors the count, but the reader's own arrival is not news to them. */
+  const timelineRows = createMemo(
+    () =>
+      props.snapshot?.messages.map((message) => ({
+        id: message.id,
+        countable: message.senderMemberId !== props.currentMemberId,
+      })) ?? [],
+  );
+  const clearNewMessages = (): void => {
+    newMessages = anchorNewMessages(timelineRows());
+    setNewMessageCount(0);
+  };
   const messageVirtualizer = createChatVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: () => props.snapshot?.messages.length ?? 0,
     getScrollElement: () => messageList ?? null,
@@ -86,17 +101,28 @@ export function DirectConversation(props: DirectConversationProps) {
   };
 
   createEffect(
-    () => ({
-      threadId: props.snapshot?.threadId,
-      revision: props.snapshot?.revision ?? -1,
-      messageCount: props.snapshot?.messages.length ?? 0,
-      unreadCount: props.snapshot?.readState?.unreadCount ?? 0,
-    }),
+    () => {
+      const rows = timelineRows();
+      return {
+        threadId: props.snapshot?.threadId,
+        revision: props.snapshot?.revision ?? -1,
+        messageCount: rows.length,
+        unreadCount: props.snapshot?.readState?.unreadCount ?? 0,
+        latestMessageId: rows.at(-1)?.id,
+      };
+    },
     ({ threadId, unreadCount }) => {
       currentUnreadCount = unreadCount;
+      const rows = timelineRows();
       if (threadId !== lastThreadId) {
         lastThreadId = threadId;
         stickToLatest = true;
+        newMessages = anchorNewMessages(rows);
+        setNewMessageCount(0);
+      } else {
+        // The sticky flag has to be read here: the frame below has already moved the view.
+        newMessages = tallyNewMessages(newMessages, rows, stickToLatest);
+        setNewMessageCount(newMessages.count);
       }
       requestAnimationFrame(() => {
         if (!messageList) return;
@@ -138,6 +164,7 @@ export function DirectConversation(props: DirectConversationProps) {
   function updateScrollState(element: HTMLElement): void {
     const remaining = element.scrollHeight - element.scrollTop - element.clientHeight;
     setShowScrollToLatest(remaining > 80);
+    if (remaining <= 80) clearNewMessages();
   }
 
   function updateVirtualScrollMargin(): void {
@@ -218,6 +245,7 @@ export function DirectConversation(props: DirectConversationProps) {
   function jumpToLatestMessage(): void {
     if (!messageList) return;
     stickToLatest = true;
+    clearNewMessages();
     scrollToLatestMessage(messageList);
   }
 
@@ -263,7 +291,11 @@ export function DirectConversation(props: DirectConversationProps) {
         }}
       >
         <Show when={showScrollToLatest()}>
-          <ScrollToLatestButton onClick={jumpToLatestMessage} />
+          <ScrollToLatestButton
+            onClick={jumpToLatestMessage}
+            newMessageCount={newMessageCount()}
+            onDismiss={clearNewMessages}
+          />
         </Show>
         <Show when={!props.loading} fallback={<div class="direct-conversation-state">Loading messages…</div>}>
           <Show

@@ -1,5 +1,5 @@
 import { Button } from "../../components/ui";
-import { preferredMessageScrollBehavior } from "./MessageNavigation";
+import { newMessagesLabel, preferredMessageScrollBehavior } from "./MessageNavigation";
 
 export function UnreadMessagesBanner(props: {
   count: number;
@@ -7,7 +7,7 @@ export function UnreadMessagesBanner(props: {
   onJumpToUnread: () => void;
   onMarkRead: () => void;
 }) {
-  const label = () => `${props.count} new ${props.count === 1 ? "message" : "messages"}`;
+  const label = () => newMessagesLabel(props.count);
   return (
     <div class="unread-messages-banner" role="status" aria-label={label()}>
       <Button
