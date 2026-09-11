@@ -131,6 +131,18 @@ describe.each(COLLECTION_CASES)("%s rss feed", (_name, collection) => {
     }
   });
 
+  it("names each author as a creator, not in the email-only author field", () => {
+    // RSS 2.0 `<author>` holds an email address. A display name there makes every
+    // item invalid, so the name goes in Dublin Core's `<dc:creator>`.
+    const xml = contentRssXml(collection);
+
+    expect(xml).toContain('xmlns:dc="http://purl.org/dc/elements/1.1/"');
+    expect(xml).not.toContain("<author>");
+    for (const article of collection.articles) {
+      expect(xml).toContain(`<dc:creator>${article.author}</dc:creator>`);
+    }
+  });
+
   it("holds only its own articles", () => {
     const xml = contentRssXml(collection);
 

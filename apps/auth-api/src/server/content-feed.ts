@@ -72,7 +72,9 @@ export function contentRssXml(collection: ContentCollection): string {
         `      <guid isPermaLink="true">${escapeXml(url)}</guid>`,
         `      <description>${escapeXml(article.description)}</description>`,
         `      <pubDate>${articleRssDate(article.publishedAt)}</pubDate>`,
-        `      <author>${escapeXml(article.author)}</author>`,
+        // RSS 2.0 `<author>` holds an email address, and a name there makes the
+        // item invalid. Dublin Core's creator is the field for a name.
+        `      <dc:creator>${escapeXml(article.author)}</dc:creator>`,
         `      <enclosure url="${escapeXml(articleOgImageUrl(collection, article.slug))}" type="image/png" length="0" />`,
         "    </item>",
       ].join("\n");
@@ -81,7 +83,7 @@ export function contentRssXml(collection: ContentCollection): string {
 
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">',
+    '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">',
     "  <channel>",
     `    <title>${escapeXml(`${collection.feedTitle} — ${OPENBOT_SITE_TITLE}`)}</title>`,
     `    <link>${escapeXml(collectionIndexUrl(collection))}</link>`,
