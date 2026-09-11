@@ -215,3 +215,13 @@ Any fallback away from this ownership model must be explained in the change: wha
 AI agents must follow the same workflow and must not infer component APIs from memory. Before changing Expo Router, `@expo/ui`, or other Expo UI code, confirm the installed Expo major version and use its versioned documentation. Before using a HeroUI Native component, confirm the installed package API or project usage.
 
 An AI-generated UI change is incomplete when it introduces a custom navigation or search surface that a native API can own, duplicates an available HeroUI component, adds a second theme, or omits platform and accessibility fallbacks.
+
+## Haptics
+
+Use `shared/lib/haptics.ts` for application feedback. It reads the device preference on every call;
+components must not import `expo-haptics` directly. From a worklet, schedule feedback on the RN runtime.
+
+Keep native Liquid Glass context menus in both Haptics states. Do not replace `Link.Menu` or
+long-press `MenuView` with an action sheet to suppress feedback. These system context menus expose
+no public haptics opt-out in the installed Expo APIs. Their feedback, like system keyboard and
+picker feedback, remains owned by iOS. Do not use private UIKit APIs to suppress it.

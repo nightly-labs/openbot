@@ -1,13 +1,11 @@
 import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import * as Clipboard from "expo-clipboard";
-import * as Haptics from "expo-haptics";
 import { Link, router } from "expo-router";
 import { useRef } from "react";
 import { Alert } from "react-native";
-
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
-import { isIOS } from "@/shared/lib/platform";
+import { haptics } from "@/shared/lib/haptics";
 
 export function useAgentContextMenu(agent: MobileAgent) {
   const { deleteAgent, duplicateAgent, hideAgent, markAgentRead, markAgentUnread, pinnedAgentIds, unreadAgentIds } =
@@ -23,9 +21,7 @@ export function useAgentContextMenu(agent: MobileAgent) {
     try {
       if (action === "delete") await deleteAgent(agent.id);
       else await duplicateAgent(agent.id);
-      if (isIOS) {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-      }
+      void haptics.notification();
     } catch (error) {
       Alert.alert(
         action === "delete" ? "Could not delete agent" : "Could not duplicate agent",
@@ -40,7 +36,7 @@ export function useAgentContextMenu(agent: MobileAgent) {
 
   const handleCopyId = () => {
     void Clipboard.setStringAsync(agent.id).then(() => {
-      if (isIOS) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      void haptics.notification();
     });
   };
 
@@ -57,36 +53,29 @@ export function useAgentContextMenu(agent: MobileAgent) {
     ]);
   };
 
+  const handleRead = () => {
+    if (isUnread) markAgentRead(agent.id);
+    else markAgentUnread(agent.id);
+    void haptics.selection();
+  };
+  const handleHide = () => {
+    hideAgent(agent.id);
+    void haptics.impact();
+  };
+  const handleInfo = () =>
+    router.push({ pathname: "/agent-info/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } });
   return (
     <Link.Menu>
-      <Link.MenuAction
-        icon={isUnread ? "envelope.open" : "envelope.badge"}
-        onPress={() => {
-          if (isUnread) markAgentRead(agent.id);
-          else markAgentUnread(agent.id);
-          if (isIOS) void Haptics.selectionAsync();
-        }}
-      >
+      <Link.MenuAction icon={isUnread ? "envelope.open" : "envelope.badge"} onPress={handleRead}>
         {isUnread ? "Mark read" : "Mark unread"}
       </Link.MenuAction>
       <Link.MenuAction icon={isPinned ? "pin.slash" : "pin"} isOn={isPinned} onPress={handlePin}>
         {isPinned ? "Unpin" : "Pin"}
       </Link.MenuAction>
-      <Link.MenuAction
-        icon="eye.slash"
-        onPress={() => {
-          hideAgent(agent.id);
-          if (isIOS) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }}
-      >
+      <Link.MenuAction icon="eye.slash" onPress={handleHide}>
         Hide
       </Link.MenuAction>
-      <Link.MenuAction
-        icon="info.circle"
-        onPress={() =>
-          router.push({ pathname: "/agent-info/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } })
-        }
-      >
+      <Link.MenuAction icon="info.circle" onPress={handleInfo}>
         Info
       </Link.MenuAction>
       <Link.Menu icon="ellipsis" title="More">

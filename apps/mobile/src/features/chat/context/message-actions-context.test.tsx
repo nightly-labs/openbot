@@ -32,7 +32,7 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("@/shared/lib/platform", () => ({ isIOS: true }));
 vi.mock("expo-clipboard", () => ({ setStringAsync: mocks.copy }));
-vi.mock("expo-haptics", () => ({ impactAsync: async () => {}, ImpactFeedbackStyle: { Light: "light" } }));
+vi.mock("@/shared/lib/haptics", () => ({ haptics: { impact: async () => {} } }));
 vi.mock("react-native-reanimated", async () => {
   const { View } = await import("react-native");
   return {

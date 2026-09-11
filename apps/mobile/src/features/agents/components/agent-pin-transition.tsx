@@ -1,5 +1,4 @@
 import type { AvatarHue } from "@openbot/contracts/ipc";
-import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import {
   createContext,
@@ -14,10 +13,9 @@ import {
 import { View } from "react-native";
 import { Easing, ReduceMotion, useSharedValue, withTiming } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-
 import { AgentPinTransitionOverlay } from "@/features/agents/components/agent-pin-transition-overlay";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
-import { isIOS } from "@/shared/lib/platform";
+import { haptics } from "@/shared/lib/haptics";
 
 export type AgentAvatarLocation = "chat" | "pinned" | "row" | "search";
 
@@ -218,7 +216,7 @@ export function AgentPinTransitionProvider({ children }: PropsWithChildren) {
 
       const commitWithoutMovement = () => {
         toggleAgentPin(agentId);
-        if (isIOS) void Haptics.selectionAsync();
+        void haptics.selection();
       };
 
       if (!sourceNode || !container) {
@@ -242,7 +240,7 @@ export function AgentPinTransitionProvider({ children }: PropsWithChildren) {
 
           requestAnimationFrame(() => {
             toggleAgentPin(agentId);
-            if (isIOS) void Haptics.selectionAsync();
+            void haptics.selection();
             fallbackTimerRef.current = setTimeout(finishTransition, 700);
           });
         });
