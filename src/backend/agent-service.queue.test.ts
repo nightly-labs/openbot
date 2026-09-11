@@ -87,6 +87,24 @@ describe.sequential("AgentService: queue", () => {
       model: "gpt-5.6-luna",
       reasoningEffort: "medium",
     });
+    // Setup can record a model beside the provider, which is how a custom endpoint becomes the
+    // default: it is a model of the CLI that runs it, so only the model names it.
+    await service.setPreferredProvider("claude", "claude-opus-5");
+    await expect(
+      service.createAgent({ ...CREATE_AGENT_INPUT, name: "Opus Agent", avatarSeed: "setup:opus" }),
+    ).resolves.toMatchObject({
+      provider: "claude",
+      model: "claude-opus-5",
+      reasoningEffort: "high",
+    });
+    // A recorded model the provider no longer lists is ignored, so a new agent still starts usable.
+    await service.setPreferredProvider("claude", "claude-retired-9");
+    await expect(
+      service.createAgent({ ...CREATE_AGENT_INPUT, name: "Fallback Agent", avatarSeed: "setup:fallback" }),
+    ).resolves.toMatchObject({
+      provider: "claude",
+      model: "claude-sonnet-5",
+    });
   });
 
   it("detects a newly installed provider without disconnecting an available one", async () => {

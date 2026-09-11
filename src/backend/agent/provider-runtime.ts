@@ -1,11 +1,14 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AccountUsage,
   AgentEvent,
+  AgentModelId,
   AgentModelOption,
   AgentProviderStatus,
   AgentStatus,
   AgentSummary,
+  CustomProviderRestart,
 } from "@openbot/contracts/ipc";
 import { agentProviderDescriptor, isReasoningEffort } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
@@ -18,6 +21,7 @@ import {
   type CodexCliInfo,
   resolveCodexCli,
 } from "./../cli";
+import { type CustomProviderSource, openCodeSignInMessage } from "./../opencode-config";
 import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
@@ -30,7 +34,12 @@ import {
   isRecord,
   type ModelListResponse,
 } from "./../protocol";
-import { BUILT_IN_PROVIDER_DRIVERS, type ProviderCliCommand, requireProviderDriver } from "./../provider-drivers";
+import {
+  BUILT_IN_PROVIDER_DRIVERS,
+  type ProviderCliCommand,
+  type ProviderClientContext,
+  requireProviderDriver,
+} from "./../provider-drivers";
 import { normalizeAccountUsage } from "./account-usage";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
@@ -122,6 +131,15 @@ const SUPPRESSED_MODEL_IDS: ReadonlyMap<AgentProvider, ReadonlySet<string>> = ne
 ]);
 
 /**
+ * A model name the contract guards accept. `isAgentModelOption` bounds the name, and both the IPC
+ * and the Team API list decoders reject the whole array when one option fails, so a name that is one
+ * character too long does not shorten a label - it empties the model picker.
+ */
+function modelDisplayName(name: string): string {
+  return name.slice(0, INPUT_LIMITS.modelName);
+}
+
+/**
  * The product name of a Claude model, from its id, or `null` for an id that does not read as one.
  *
  * Claude Code lists a model by the part it plays in that CLI - "Default (recommended)", "Opus" -
@@ -211,6 +229,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #requestTimeoutMs: number;
   readonly #clientFactory: AgentClientFactory | null;
+  readonly #customProviders: CustomProviderSource;
   readonly #bundledExecutables: BundledProviderExecutables;
   readonly #clients = new Map<AgentProvider, AgentClient>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
@@ -233,6 +252,12 @@ export class ProviderRuntime implements ProviderPort {
   readonly #cliLogins = new Map<AgentProvider, PendingCliLogin>();
   #providerActivation = Promise.resolve();
   #preferredProvider: AgentProvider;
+  /**
+   * The model setup chose beside the preferred provider, or `null` for that provider's own default.
+   * It is a preference, not a promise: the provider lists its own models, so a model that is gone
+   * is ignored by the callers that read it.
+   */
+  #preferredModel: AgentModelId | null;
   #restartAttempts = 0;
   #restartTimer: NodeJS.Timeout | null = null;
   #models = structuredClone(FALLBACK_MODELS);
@@ -244,8 +269,10 @@ export class ProviderRuntime implements ProviderPort {
     emitError: (code: string, error: unknown, agentId?: string) => void;
     requestTimeoutMs: number;
     preferredProvider: AgentProvider;
+    preferredModel?: AgentModelId | null;
     clientFactory: AgentClientFactory | null;
     bundledExecutables: BundledProviderExecutables;
+    customProviders?: CustomProviderSource;
   }) {
     this.#conversation = options.conversation;
     this.#hooks = options.hooks;
@@ -253,8 +280,19 @@ export class ProviderRuntime implements ProviderPort {
     this.#emitError = options.emitError;
     this.#requestTimeoutMs = options.requestTimeoutMs;
     this.#preferredProvider = options.preferredProvider;
+    this.#preferredModel = options.preferredModel ?? null;
     this.#clientFactory = options.clientFactory;
     this.#bundledExecutables = { ...options.bundledExecutables };
+    this.#customProviders = options.customProviders ?? (() => []);
+  }
+
+  /**
+   * What a driver needs to build a client. `#clientFactory` takes its place in tests, which is why
+   * the custom-provider config is proven at the driver boundary in `provider-drivers.test.ts`: a
+   * fake client never reads it.
+   */
+  get #clientContext(): ProviderClientContext {
+    return { customProviders: this.#customProviders };
   }
 
   /**
@@ -308,12 +346,18 @@ export class ProviderRuntime implements ProviderPort {
       throw new Error("Connect the selected provider before generating a profile.");
     if (this.#clientFactory) return this.#clientFactory(provider, cli);
     const driver = requireProviderDriver(provider);
-    if (driver.createProfileClient) return driver.createProfileClient(cli, this.#requestTimeoutMs);
-    return driver.createClient(cli, this.#requestTimeoutMs);
+    if (driver.createProfileClient) {
+      return driver.createProfileClient(cli, this.#requestTimeoutMs, this.#clientContext);
+    }
+    return driver.createClient(cli, this.#requestTimeoutMs, this.#clientContext);
   }
 
   preferredProvider(): AgentProvider {
     return this.#preferredProvider;
+  }
+
+  preferredModel(): AgentModelId | null {
+    return this.#preferredModel;
   }
 
   /**
@@ -337,8 +381,11 @@ export class ProviderRuntime implements ProviderPort {
     );
   }
 
-  async setPreferredProvider(provider: AgentProvider, initialized: boolean): Promise<void> {
+  async setPreferredProvider(provider: AgentProvider, initialized: boolean, model: AgentModelId | null): Promise<void> {
     this.#preferredProvider = provider;
+    // The two travel together: a provider chosen without a model means that provider's default, so
+    // the model of an earlier choice must not survive the new one.
+    this.#preferredModel = model;
     if (!initialized) return;
     await this.ensureProvider(provider).catch(() => undefined);
     const account = this.#accounts.get(provider);
@@ -421,6 +468,50 @@ export class ProviderRuntime implements ProviderPort {
           return this.#reprobeProvider(provider);
       }
     });
+  }
+
+  /**
+   * The custom-endpoint wording, when there is a custom endpoint to talk about.
+   *
+   * OpenCode answers "not signed in" for a refused key or an unreachable base URL exactly as it does
+   * for a missing account, so once an endpoint exists the default advice - run `opencode auth login`
+   * - sends the user to the wrong fix. Returns null when the usual message is still right, so every
+   * caller keeps its own default.
+   */
+  #customProviderSignInMessage(provider: AgentProvider): string | null {
+    const count = provider === "opencode" ? this.#customProviders().length : 0;
+    return count > 0 ? openCodeSignInMessage(count) : null;
+  }
+
+  /**
+   * Replaces the OpenCode process so a changed custom-provider config reaches it.
+   *
+   * `connectProvider` cannot do this: it returns early for a provider that is already connected, so
+   * it never respawns a running OpenCode. This reuses the rest of that path unchanged - re-resolve
+   * the CLI, build a fresh client, swap it in, refresh the model catalogue - and threads survive it,
+   * because a provider session id lives in `projection_provider_sessions` and is resumed.
+   *
+   * One `opencode acp` process serves every OpenCode agent, so a respawn is felt account-wide. That
+   * is why a turn in progress wins: the config is only read at spawn, so skipping costs nothing
+   * durable, and the next connect or app start picks the endpoint up.
+   *
+   * It reports how the respawn went and never throws, because the caller has already written the
+   * endpoint to disk: a throw here would read to the user as a save that failed. A respawn that
+   * fails - an endpoint OpenCode refuses at spawn - is reported the way every other connection
+   * failure is, as an error state and a message on the provider's own status.
+   */
+  async reloadOpenCodeConfig(): Promise<CustomProviderRestart> {
+    if (!this.#clients.has("opencode")) return "not-running";
+    if (this.#hooks.isProviderBusy("opencode")) return "skipped-busy";
+    try {
+      await this.#runProviderConnectionCommand("opencode", () => this.#reprobeProvider("opencode"));
+    } catch {
+      // `#reprobeProvider` has already set the failure status and emitted it. It also throws for a
+      // turn that started after the check above, which is the same answer: the config waits for the
+      // next spawn.
+      return this.#hooks.isProviderBusy("opencode") ? "skipped-busy" : "restarted";
+    }
+    return "restarted";
   }
 
   /** Keeps this provider idle until its managed runtime is installed and activated. */
@@ -664,7 +755,7 @@ export class ProviderRuntime implements ProviderPort {
     const driver = requireProviderDriver(provider);
     const client = this.#clientFactory
       ? this.#clientFactory(provider, cli)
-      : driver.createClient(cli, this.#requestTimeoutMs);
+      : driver.createClient(cli, this.#requestTimeoutMs, this.#clientContext);
     this.#bindClient(client);
     client.start();
     try {
@@ -678,7 +769,12 @@ export class ProviderRuntime implements ProviderPort {
       );
       client.notify("initialized");
       const account = await client.request("account/read", { refreshToken: true }, decodeAccountReadResult);
-      if (!account.account) throw new Error(`${providerLabel(provider)} did not return an authenticated account.`);
+      if (!account.account) {
+        throw new Error(
+          this.#customProviderSignInMessage(provider) ??
+            `${providerLabel(provider)} did not return an authenticated account.`,
+        );
+      }
       driver.validateAccount(account.account);
       return { client, account: account.account };
     } catch (error) {
@@ -1089,7 +1185,7 @@ export class ProviderRuntime implements ProviderPort {
           cli = await this.#resolveProviderCli(provider);
           client = this.#clientFactory
             ? this.#clientFactory(provider, cli)
-            : driver.createClient(cli, this.#requestTimeoutMs);
+            : driver.createClient(cli, this.#requestTimeoutMs, this.#clientContext);
           this.#bindClient(client);
           client.start();
           await client.request(
@@ -1103,7 +1199,8 @@ export class ProviderRuntime implements ProviderPort {
           client.notify("initialized");
           const account = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult, 5_000);
           if (!account.account) {
-            const message = agentProviderDescriptor(provider).signInMessage;
+            const message =
+              this.#customProviderSignInMessage(provider) ?? agentProviderDescriptor(provider).signInMessage;
             await client.stop().catch(() => undefined);
             this.#setStatus({
               providers: updateProviderStatus(this.#status.providers, provider, {
@@ -1316,11 +1413,17 @@ export class ProviderRuntime implements ProviderPort {
                 // The name the provider CLI gives, whole: a model is easier to recognise as
                 // `GPT-5.6 Sol` than as `Sol`, and its own CLI names it that way.
                 // Claude Code is the exception, and `claudeModelName` says why.
-                name:
+                // Clamped, because a name over the limit is not a long name downstream: it fails
+                // `isAgentModelOption`, and the IPC and Team API list decoders fail closed on the
+                // whole array, so one over-long name empties the picker. OpenCode is the CLI that
+                // reaches it - it names a custom model `"<provider name>/<model name>"`, and 80 plus
+                // 160 characters passes 160 - but the clamp protects every CLI.
+                name: modelDisplayName(
                   (client.provider === "claude" ? claudeModelName(server.model) : null) ||
-                  server.displayName?.trim() ||
-                  fallback?.name ||
-                  server.model,
+                    server.displayName?.trim() ||
+                    fallback?.name ||
+                    server.model,
+                ),
                 description:
                   fallback?.description ?? `${providerLabel(client.provider)} model discovered from the local CLI.`,
                 defaultReasoningEffort: isReasoningEffort(server?.defaultReasoningEffort)

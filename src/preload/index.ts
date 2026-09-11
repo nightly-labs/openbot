@@ -15,6 +15,8 @@ import {
   type ConversationReadState,
   type ConversationSearchPage,
   type ConversationWithReadState,
+  type CustomProviderResult,
+  type CustomProviderSummary,
   type DraftAttachment,
   type DuplicateAgentResult,
   type DynamicIslandAction,
@@ -41,6 +43,8 @@ import {
   isConversationMessage,
   isConversationReadState,
   isConversationWithReadState,
+  isCustomProviderResult,
+  isCustomProviderSummary,
   isDynamicIslandAction,
   isDynamicIslandNotchSize,
   isDynamicIslandPreference,
@@ -236,6 +240,23 @@ function decodeHostedSiteStatus(value: unknown): HostedSiteSummary["status"] {
 function decodeHostedSites(value: unknown): HostedSiteSummary[] {
   if (!Array.isArray(value)) throw new Error("Invalid hosted site list response.");
   return value.map(decodeHostedSite);
+}
+
+/**
+ * The guard, not a decoder of its own: it is the assertion that a summary carries no `apiKey`, and a
+ * second implementation here could disagree with it. It fails closed on the whole list, so a main
+ * process that ever put a key in a row empties the picker rather than leaking one.
+ */
+function decodeCustomProviders(value: unknown): CustomProviderSummary[] {
+  if (!Array.isArray(value) || !value.every(isCustomProviderSummary)) {
+    throw new Error("Invalid custom provider list response.");
+  }
+  return value;
+}
+
+function decodeCustomProviderResult(value: unknown): CustomProviderResult {
+  if (!isCustomProviderResult(value)) throw new Error("Invalid custom provider response.");
+  return value;
 }
 
 function decodeNullablePath(value: unknown): string | null {
@@ -804,6 +825,11 @@ const openbotApi: OpenBotDesktopApi = {
     publish: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesPublish, input).then(decodeHostedSite),
     replace: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesReplace, input).then(decodeHostedSite),
     delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesDelete, input).then(decodeVoid),
+  },
+  customProviders: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.customProvidersList).then(decodeCustomProviders),
+    save: (input) => ipcRenderer.invoke(IPC_CHANNELS.customProvidersSave, input).then(decodeCustomProviderResult),
+    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.customProvidersDelete, input).then(decodeCustomProviderResult),
   },
   marketplaceAgents: {
     list: (query) =>

@@ -11,7 +11,7 @@ import { readAnalyticsPreference, writeAnalyticsPreference } from "../analytics-
 import { exportDiagnostics, exportOpenBotData } from "../maintenance-service";
 import { readSetupState, writeSetupState } from "../setup-store";
 import type { UpdateService } from "../update-service";
-import { parseAnalyticsPreference, parseExternalDestination, parseProvider } from "./app-inputs";
+import { parseAnalyticsPreference, parseExternalDestination, parseSetup } from "./app-inputs";
 import { stringPayload } from "./validation";
 
 const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
@@ -66,9 +66,9 @@ export function appIpcHandlers({
         setAnalyticsTrackingEnabled(preference.enabled);
         return preference;
       }),
-      saveSetup: payloadHandler(parseProvider, async (preferredProvider): Promise<AppSetupState> => {
-        const state = await writeSetupState(setupFile, preferredProvider);
-        await service.setPreferredProvider(preferredProvider);
+      saveSetup: payloadHandler(parseSetup, async (input): Promise<AppSetupState> => {
+        const state = await writeSetupState(setupFile, input);
+        await service.setPreferredProvider(input.preferredProvider, input.preferredModel);
         await initializeAgent();
         return state;
       }),

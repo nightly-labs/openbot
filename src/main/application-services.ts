@@ -50,6 +50,7 @@ import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
 import { ComputerUseMacSetupService } from "./computer-use-mac-setup";
 import { ComputerUseMacSetupWindowController } from "./computer-use-mac-setup-window";
+import { CustomProviderStore } from "./custom-provider-store";
 import {
   applyDevelopmentRemoteAccount,
   type DevelopmentRemoteRole,
@@ -104,6 +105,7 @@ const REMOTE_SERVERS_FILE = "openbot-remote-servers-v1.json";
 const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
 const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential-v1.json";
 const REMOTE_DESKTOP_RUNTIME_SECRET_FILE = "openbot-remote-desktop-runtime-v1.json";
+const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
 
 /**
  * Where each service stops, as a position in the shutdown sequence rather than a position in the
@@ -163,6 +165,7 @@ export interface ApplicationServices {
   centralAuth: CentralAuthManager;
   skills: SkillMarketplaceService;
   hostedSites: HostedSiteDesktopService;
+  customProviders: CustomProviderStore;
   marketplaceAgents: AgentMarketplaceService;
   voice: VoiceTranscriptionService;
   dynamicIsland: DynamicIslandWindowController;
@@ -344,6 +347,20 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () => providerRuntimes.stop());
   // Before `new AgentService`, which reads every `executablePath` eagerly.
   await providerRuntimes.initialize();
+  const customProviders = new CustomProviderStore({
+    path: join(app.getPath("userData"), CUSTOM_PROVIDERS_FILE),
+    cipher: {
+      canPersist: () => safeStorage.isEncryptionAvailable(),
+      encrypt: (value) => {
+        if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
+        return safeStorage.encryptString(value);
+      },
+      decrypt: (value) => safeStorage.decryptString(value),
+    },
+  });
+  // Before the service, which reads the endpoints at its first provider spawn. A file this build
+  // cannot read leaves the list empty and every write refused; it does not stop the app.
+  await customProviders.load();
   const service = new AgentService(
     store,
     mailbox,
@@ -355,6 +372,10 @@ export async function createApplicationServices({
     (agent) => managedSkills.syncAgent(agent),
     hostedSites,
     sidebarLayout,
+    // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
+    // spawned provider process. The IPC handlers are given `list()`.
+    () => customProviders.configs(),
+    setupState.preferredModel,
   );
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
   /*
@@ -608,6 +629,7 @@ export async function createApplicationServices({
     centralAuth,
     skills,
     hostedSites,
+    customProviders,
     marketplaceAgents,
     voice,
     dynamicIsland,

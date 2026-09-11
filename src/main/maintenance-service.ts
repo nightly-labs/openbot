@@ -51,7 +51,7 @@ export async function exportOpenBotData(
       application: { name: "OpenBot", version: app.getVersion() },
       scope: {
         includes: ["agent profiles", "agent memories", "conversation snapshots", "queues", "attachments"],
-        excludes: ["Codex credentials", "browser cookies", "agent workspace files"],
+        excludes: ["Codex credentials", "custom provider API keys", "browser cookies", "agent workspace files"],
       },
       agents: agents.map(toBackupAgent),
       memories: agents.flatMap((agent) => context.service.listMemories(agent.id)),

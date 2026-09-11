@@ -6,6 +6,7 @@ import { useProviders } from "../../providers";
 import { useTurns } from "../../turns";
 import { useAgents } from "../agents/agents-context";
 import { useBrowserTabs } from "../browser/browser-context";
+import { useCustomProviders } from "../custom-providers/custom-providers-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
@@ -39,6 +40,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     cancelProviderRuntimeDownload,
     connectProvider,
   } = useProviders();
+  // Not gated on the server: the picker needs these IDs to label a model it is already showing, and
+  // a remote server's OpenCode has its own catalogue. Only the write paths are local-only.
+  const { customProviders } = useCustomProviders();
   const { agentStatus, agentList, activeAgent, modelOptions, settingsRequest, updateAgent, setAgentAvatar } =
     useAgents();
   const {
@@ -102,6 +106,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     <Conversation
       agentStatus={agentStatus()}
       providerRuntimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
+      customProviders={customProviders()}
       onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
       onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
       onConnectProvider={localProviderDownloads() ? connectProvider : undefined}

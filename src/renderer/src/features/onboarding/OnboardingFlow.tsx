@@ -1,11 +1,15 @@
 import {
   AGENT_PROVIDER_DESCRIPTORS,
+  type AgentModelId,
   type AgentProviderId,
   type AgentStatus,
   type AppSetupState,
   type AvatarHue,
+  type CustomProviderRestart,
+  type CustomProviderSummary,
   type DesktopPlatform,
   type ProviderRuntimeStatus,
+  type SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { ProviderPicker, type ProviderPickerOption } from "../../components/ProviderPicker";
@@ -13,6 +17,9 @@ import { ArrowUp, Button, Plus } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
+import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
+import { CustomProviderListDialog } from "../custom-providers/CustomProviderListDialog";
+import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
 import { fallbackProviderState } from "./onboarding-provider-state";
 
 export interface OnboardingFlowProps {
@@ -27,7 +34,20 @@ export interface OnboardingFlowProps {
   onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onRefreshProviders?: () => void | Promise<void>;
-  onSave: (provider: AgentProviderId) => Promise<void>;
+  /**
+   * Records the choice. The model is `null` for a built-in provider, which keeps its own default, and
+   * names the endpoint the user just described when they chose their own.
+   */
+  onSave: (provider: AgentProviderId, model: AgentModelId | null) => Promise<void>;
+  /** Accepts a described endpoint. Without it the step offers no custom provider at all. */
+  onAddCustomProvider?: (value: SaveCustomProviderInput) => Promise<CustomProviderRestart>;
+  /** Removes a saved endpoint. Onboarding always runs on this computer, so it is passed ungated. */
+  onDeleteCustomProvider?: (id: string) => Promise<CustomProviderRestart>;
+  /**
+   * The endpoints already saved. They share one Custom provider row, which counts them and becomes a
+   * choice beside the built-in providers, and a duplicate ID is a field error before the round trip.
+   */
+  customProviders?: readonly CustomProviderSummary[];
 }
 
 type OnboardingStep = "meet" | "computer" | "jobs";
@@ -58,6 +78,18 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
   const [step, setStep] = createSignal<OnboardingStep>("meet");
   const [direction, setDirection] = createSignal<StepDirection>("forward");
   const [selectedProvider, setSelectedProvider] = createSignal<AgentProviderId | null>(null);
+  /**
+   * Whether the user chose their own endpoints rather than a built-in provider. `selectedProvider`
+   * stays `opencode` beside it, because that is the provider setup records: which endpoint an agent
+   * uses is a model choice, which comes later than this step.
+   */
+  const [customSelected, setCustomSelected] = createSignal(false);
+  /**
+   * The model a new agent starts on while the custom row holds the choice. Only an endpoint saved
+   * here names one: the user listed its models in the dialog a moment ago, and nothing else on this
+   * screen chooses a model. Without one the provider falls back to the first model it lists.
+   */
+  const [customModel, setCustomModel] = createSignal<AgentModelId | null>(null);
   const [providerSelectedByUser, setProviderSelectedByUser] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal("");
@@ -91,6 +123,38 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
       };
     }),
   );
+  /**
+   * The dialogs that add and remove an endpoint. The state is shared with Settings, which carries the
+   * same removal sentence and the same busy row; what happens after a save or a removal is this
+   * step's own, because only this step starts an agent on the model it just learned about.
+   */
+  const host = createCustomProviderHostState({
+    onAdd: (value) => props.onAddCustomProvider?.(value),
+    onDelete: (id) => props.onDeleteCustomProvider?.(id),
+    onSaved: (value) => {
+      // The endpoint the user just described is what they came here to use, so the step selects the
+      // custom row rather than leaving the choice on whichever provider connected first, and its
+      // first model becomes the one a new agent starts on. OpenCode names a custom model by its
+      // endpoint, so the id is composed here rather than looked up in a catalog it has yet to list.
+      selectCustomProvider();
+      const [firstModel] = value.models;
+      if (firstModel) setCustomModel(`${value.id}/${firstModel.id}`);
+    },
+    onRemoved: (id) => {
+      // `onSave` reads these two to decide whether to send a model, so a model of an endpoint that is
+      // gone would be stored on the first agent. The remaining endpoints keep the row selected.
+      if (customModel()?.startsWith(`${id}/`)) setCustomModel(null);
+      if ((props.customProviders ?? []).length === 0) setCustomSelected(false);
+    },
+  });
+
+  /** OpenCode runs every custom endpoint, so choosing them chooses that provider along with them. */
+  function selectCustomProvider(): void {
+    setProviderSelectedByUser(true);
+    setSelectedProvider("opencode");
+    setCustomSelected(true);
+  }
+
   const showsProviderSetup = () =>
     Boolean(
       props.onConnectProvider ||
@@ -283,7 +347,8 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     setSaving(true);
     setError("");
     try {
-      await props.onSave(provider);
+      // A built-in provider keeps its own default model, so only the custom row sends one.
+      await props.onSave(provider, customSelected() ? customModel() : null);
     } catch (cause) {
       setError(errorMessage(cause, "OpenBot could not finish setup."));
       setSaving(false);
@@ -381,11 +446,35 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                         : undefined
                     }
                     onRefreshProviders={!lazyProviderMode() && props.onRefreshProviders ? refreshProviders : undefined}
+                    onAddCustomProvider={props.onAddCustomProvider ? host.openForm : undefined}
+                    customProviders={props.customProviders}
+                    customSelected={customSelected()}
+                    onSelectCustomProvider={props.onAddCustomProvider ? selectCustomProvider : undefined}
+                    onManageCustomProviders={props.onAddCustomProvider ? host.openList : undefined}
                     onChange={(provider) => {
                       setProviderSelectedByUser(true);
                       setSelectedProvider(provider);
+                      setCustomSelected(false);
                     }}
                   />
+                  <Show when={props.onAddCustomProvider}>
+                    <CustomProviderDialog
+                      open={host.state.open}
+                      busy={host.state.saving}
+                      submitError={host.state.submitError}
+                      takenProviderIds={(props.customProviders ?? []).map((provider) => provider.id)}
+                      onSubmit={(value) => void host.submit(value)}
+                      onCancel={host.closeForm}
+                    />
+                    <CustomProviderListDialog
+                      open={host.state.manageOpen}
+                      providers={props.customProviders ?? []}
+                      removing={host.state.removing}
+                      note={host.state.note}
+                      onDelete={(provider) => void host.remove(provider)}
+                      onClose={host.closeList}
+                    />
+                  </Show>
                 </div>
               </section>
             </Match>

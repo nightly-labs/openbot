@@ -13,6 +13,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     render(() => <App />);
 
@@ -29,7 +30,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await fireEvent.click(screen.getByRole("button", { name: "Open OpenBot" }));
-    expect(window.openbot.saveSetup).toHaveBeenCalledWith({ preferredProvider: "claude" });
+    expect(window.openbot.saveSetup).toHaveBeenCalledWith({ preferredProvider: "claude", preferredModel: null });
     expect(await screen.findByRole("heading", { name: "Chief" })).toBeInTheDocument();
   });
 
@@ -37,6 +38,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     const disconnectedStatus: AgentStatus = {
       phase: "blocked",
@@ -143,6 +145,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     vi.mocked(window.openbot.agent.getStatus).mockResolvedValueOnce({
       phase: "blocked",
@@ -204,6 +207,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     vi.mocked(window.openbot.agent.getStatus).mockResolvedValueOnce({
       phase: "blocked",
@@ -233,6 +237,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     vi.mocked(window.openbot.agent.getStatus).mockResolvedValueOnce({
       phase: "blocked",
@@ -270,6 +275,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     vi.mocked(window.openbot.agent.getStatus).mockResolvedValueOnce({
       phase: "blocked",
@@ -318,6 +324,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     vi.mocked(window.openbot.servers.takePendingInvite).mockResolvedValueOnce(inviteUrl);
     render(() => <App />);
@@ -337,7 +344,9 @@ describe("OpenBot connected desktop shell", () => {
         inviteUrl,
       }),
     );
-    await waitFor(() => expect(window.openbot.saveSetup).toHaveBeenCalledWith({ preferredProvider: "codex" }));
+    await waitFor(() =>
+      expect(window.openbot.saveSetup).toHaveBeenCalledWith({ preferredProvider: "codex", preferredModel: null }),
+    );
     expect(trackAnalytics).toHaveBeenCalledWith("team_action", {
       action: "server_joined",
       result: "succeeded",
@@ -365,6 +374,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
       preferredProvider: null,
+      preferredModel: null,
     });
     vi.mocked(window.openbot.auth.getState).mockResolvedValueOnce({ status: "signed_out" });
     render(() => <App />);
@@ -457,7 +467,7 @@ describe("OpenBot connected desktop shell", () => {
     const providers = screen.getByRole("radiogroup", { name: "Default provider" });
     await fireEvent.click(within(providers).getByRole("radio", { name: /Claude.*Connected/ }));
     await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    expect(window.openbot.saveSetup).toHaveBeenLastCalledWith({ preferredProvider: "claude" });
+    expect(window.openbot.saveSetup).toHaveBeenLastCalledWith({ preferredProvider: "claude", preferredModel: null });
     expect(screen.queryByRole("dialog", { name: "Providers & permissions" })).not.toBeInTheDocument();
   });
 

@@ -15,6 +15,7 @@ export * from "./ipc-channels";
 export * from "./ipc-conversation-events";
 export * from "./ipc-conversation-messages";
 export * from "./ipc-conversations";
+export * from "./ipc-custom-providers";
 export * from "./ipc-desktop-apis";
 export * from "./ipc-dynamic-island";
 export * from "./ipc-endpoints";

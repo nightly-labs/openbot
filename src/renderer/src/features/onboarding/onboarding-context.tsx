@@ -1,4 +1,4 @@
-import type { AgentProviderId, AppSetupState } from "@openbot/contracts/ipc";
+import type { AgentModelId, AgentProviderId, AppSetupState } from "@openbot/contracts/ipc";
 import { createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
@@ -42,10 +42,15 @@ const Setup = createSimpleContext({
         .finally(() => setSetupLoaded(true));
     });
 
-    async function saveSetup(preferredProvider: AgentProviderId): Promise<void> {
+    /**
+     * `preferredModel` defaults to the provider's own default, because the review screens choose a
+     * provider alone. Only the first-run flow can name a model: it is where a custom endpoint is
+     * described, and that endpoint is reachable as a model of the CLI that runs it.
+     */
+    async function saveSetup(preferredProvider: AgentProviderId, preferredModel: AgentModelId | null = null) {
       const wasCompleted = setupState()?.completed === true;
       const analytics = desktopAnalytics.scope();
-      const state = await window.openbot.saveSetup({ preferredProvider });
+      const state = await window.openbot.saveSetup({ preferredProvider, preferredModel });
       flush(() => {
         setSetupState(state);
         setPermissionsOpen(false);

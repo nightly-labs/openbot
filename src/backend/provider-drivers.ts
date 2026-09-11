@@ -5,6 +5,12 @@ import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
 import { type AgentCliInfo, resolveClaudeCli, resolveCodexCli, resolveGrokCli, resolveOpencodeCli } from "./cli";
 import { GrokAgentClient } from "./grok-client";
+import {
+  type CustomProviderSource,
+  OPENCODE_PROFILE_CONFIG,
+  openCodeConfigEnv,
+  openCodeSignInMessage,
+} from "./opencode-config";
 import type { AccountReadResult } from "./protocol";
 
 /** One command OpenBot runs against a provider's own CLI, waiting for the process to exit. */
@@ -31,6 +37,17 @@ export type ProviderSignIn =
   | { kind: "external" };
 
 /**
+ * What a client needs from the app at spawn, beyond its own CLI.
+ *
+ * It is a required parameter rather than an optional one so that a new call site which forgets it is
+ * a compile error. The failure it prevents is silent: an OpenCode client built without the source
+ * spawns with no custom providers, and the user simply sees their endpoint's models missing.
+ */
+export interface ProviderClientContext {
+  readonly customProviders: CustomProviderSource;
+}
+
+/**
  * What a provider *does*. What it is called, how it is described and where its sign-in help points
  * live in the provider registry in `@openbot/contracts/agent-providers`; a driver holds only the
  * behaviour, so a new provider is one registry row plus one driver.
@@ -39,13 +56,13 @@ export interface BuiltInProviderDriver {
   id: AgentProviderId;
   signIn: ProviderSignIn;
   resolveCli(options?: { bundledExecutable?: string | null }): Promise<AgentCliInfo>;
-  createClient(cli: AgentCliInfo, requestTimeoutMs: number): AgentClient;
+  createClient(cli: AgentCliInfo, requestTimeoutMs: number, context: ProviderClientContext): AgentClient;
   /**
    * The client that writes an agent profile, when the provider needs a different one. Profile
    * generation asks the model one question and must not let it act, so a provider that can be
    * started without tools starts that way here. Without this hook the normal client is used.
    */
-  createProfileClient?(cli: AgentCliInfo, requestTimeoutMs: number): AgentClient;
+  createProfileClient?(cli: AgentCliInfo, requestTimeoutMs: number, context: ProviderClientContext): AgentClient;
   authState(account: AccountReadResult["account"]): AgentAuthState;
   validateAccount(account: NonNullable<AccountReadResult["account"]>): void;
 }
@@ -98,20 +115,23 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     id: "opencode",
     signIn: { kind: "external" },
     resolveCli: resolveOpencodeCli,
-    createClient: (cli, timeout) =>
+    // Both clients read the custom providers at spawn, and the profile client merges them *into* the
+    // deny-all layer rather than beside it: the two share one environment variable, so the layer
+    // would be lost if a custom provider config replaced it.
+    createClient: (cli, timeout, { customProviders }) =>
       new AcpAgentClient(cli, timeout, {
         provider: "opencode",
         argv: ["acp"],
-        env: {},
-        signInMessage: "Run `opencode auth login`, then connect again.",
+        env: () => openCodeConfigEnv({}, customProviders),
+        signInMessage: openCodeSignInMessage(customProviders().length),
       }),
-    createProfileClient: (cli, timeout) =>
+    createProfileClient: (cli, timeout, { customProviders }) =>
       new AcpAgentClient(cli, timeout, {
         provider: "opencode",
         argv: ["acp"],
         profileGeneration: true,
-        env: { OPENCODE_CONFIG_CONTENT: JSON.stringify({ permission: { "*": "deny" } }) },
-        signInMessage: "Run `opencode auth login`, then connect again.",
+        env: () => openCodeConfigEnv(OPENCODE_PROFILE_CONFIG, customProviders),
+        signInMessage: openCodeSignInMessage(customProviders().length),
       }),
     authState: (account) => ({ kind: "opencode", email: account?.email ?? null }),
     validateAccount: () => undefined,

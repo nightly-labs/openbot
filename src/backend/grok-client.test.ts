@@ -129,7 +129,9 @@ describe.sequential("GrokAgentClient", () => {
   it("uses external sign-in for OpenCode and creates its ACP process", async () => {
     const driver = requireProviderDriver("opencode");
     expect(driver.signIn).toEqual({ kind: "external" });
-    const providerClient = driver.createClient({ executable, version: "1.0.0" }, 5_000);
+    const providerClient = driver.createClient({ executable, version: "1.0.0" }, 5_000, {
+      customProviders: () => [],
+    });
     providerClient.start();
     try {
       await providerClient.request("initialize", {}, decodeRecordResponse);

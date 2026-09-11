@@ -60,6 +60,13 @@ const SECRET_KEY = new RegExp(`^(?:${SECRET_LABEL}|keys?)$`, "iu");
 // does accept a bare `key` - never gets to see it.
 const JSON_BARE_KEY = /("keys?"\s*:\s*)(\[redacted\]|"[^"]*"|'[^']*'|[^\s,;)}\]]+)/giu;
 
+// A credential sits under `X-Api-Token` as often as under `apiKey`, and a header name is chosen by
+// whoever owns the endpoint, so no label list can cover one. Below a `headers` object every string
+// is treated as the credential it might be - including the names in a `{ name, value }` list, which
+// is the shape a custom provider is described in. Only an object matches: `headers: "none"` in prose
+// is not a key-value pair.
+const HEADER_KEY = /^headers$/iu;
+
 const MAX_PARAM_LENGTH = 2_000;
 
 // What a value becomes when reading it is itself the failure. A constant
@@ -179,7 +186,7 @@ function convertValue<T>(value: T, seen: Set<object>, depth = 0): LogValue {
         // email address, or by the header that failed, leaks through a rule
         // that only looks at values.
         redactText(key),
-        SECRET_KEY.test(key) ? "[redacted]" : convertValue(entry, seen, depth + 1),
+        convertEntry(key, entry, seen, depth),
       ]),
     );
   }
@@ -192,6 +199,25 @@ function convertValue<T>(value: T, seen: Set<object>, depth = 0): LogValue {
   } catch {
     return UNSERIALIZABLE;
   }
+}
+
+function convertEntry(key: string, entry: unknown, seen: Set<object>, depth: number): LogValue {
+  if (SECRET_KEY.test(key)) return "[redacted]";
+  const converted = convertValue(entry, seen, depth + 1);
+  if (!HEADER_KEY.test(key) || entry === null || typeof entry !== "object") return converted;
+  return redactHeaderStrings(converted);
+}
+
+// The conversion above runs first, so this walks plain values only: no cycles, no getters and no
+// depth left to overflow. It keeps the shape, because which headers were set is diagnostic and only
+// their text is a secret.
+function redactHeaderStrings(value: LogValue): LogValue {
+  if (typeof value === "string") return "[redacted]";
+  if (Array.isArray(value)) return value.map(redactHeaderStrings);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, redactHeaderStrings(entry)]));
+  }
+  return value;
 }
 
 function formatParam(param: LogValue): string {

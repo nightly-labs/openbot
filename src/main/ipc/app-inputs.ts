@@ -12,6 +12,7 @@ import type {
   MarketplaceSkillQuery,
   PublishHostedSiteInput,
   ReplaceHostedSiteInput,
+  SaveSetupInput,
   SetAnalyticsPreferenceInput,
   SubmitMarketplaceAgentInput,
   SubmitSkillInput,
@@ -19,6 +20,7 @@ import type {
   UpdatePreference,
 } from "@openbot/contracts/ipc";
 import {
+  isAgentModel,
   isAgentProvider,
   isDynamicIslandAction,
   isDynamicIslandInteractive,
@@ -31,11 +33,15 @@ import { validateProfileName } from "@openbot/contracts/validation";
 import { parseAvatarImage } from "./avatar-inputs";
 import { isObject, optionalBoolean, requireString } from "./validation";
 
-export function parseProvider(input: unknown): AgentProviderId {
+export function parseSetup(input: unknown): SaveSetupInput {
   if (!isDynamicRecord(input)) throw new Error("Setup input is required.");
   const provider = input.preferredProvider;
   if (!isAgentProvider(provider)) throw new Error("Unknown provider.");
-  return provider;
+  // `null` is the whole meaning of "no model chosen", so a missing field is not accepted in its
+  // place: setup is written from one screen that always knows which of the two it means.
+  const model = input.preferredModel;
+  if (model !== null && !isAgentModel(model)) throw new Error("Unknown model.");
+  return { preferredProvider: provider, preferredModel: model };
 }
 
 export function parseProviderId(input: unknown): AgentProviderId {

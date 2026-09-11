@@ -1,4 +1,4 @@
-import { fn } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { ProviderPicker, type ProviderPickerOption } from "../src/components/ProviderPicker";
 
@@ -130,5 +130,94 @@ export const AllowUnavailableSelection: Story = {
   args: {
     value: "claude",
     allowUnavailableSelection: true,
+  },
+};
+
+/**
+ * A custom endpoint runs as OpenCode, so its row follows OpenCode's row: it offers OpenCode's install
+ * until the CLI is there, and Add from then on, with or without an OpenCode account.
+ */
+function withOpenCode(state: ProviderPickerOption["state"]): ProviderPickerOption[] {
+  return [...options, { id: "opencode", name: "OpenCode", state, description: "Use your installed OpenCode CLI" }];
+}
+
+export const CustomProviderNotInstalled: Story = {
+  args: { options: withOpenCode("not-installed"), onAddCustomProvider: fn(), onInstallProvider: fn() },
+  play: async ({ args, canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "Install custom provider" }));
+    await expect(args.onInstallProvider).toHaveBeenCalledWith("opencode");
+    await expect(canvas.queryByRole("button", { name: "Add custom provider" })).toBeNull();
+  },
+};
+
+/**
+ * Two saved endpoints in the one row that stands for them all. The row is a choice now, so it joins
+ * the group and takes the check mark from the provider that serves it, and the count is the button
+ * that opens the list. The button sits beside Add, outside the label: a button inside a `<label>`
+ * would answer the radio instead.
+ */
+export const CustomProviderEndpoints: Story = {
+  args: {
+    value: "opencode",
+    options: withOpenCode("available"),
+    customProviders: [
+      { id: "studio-local", name: "Studio Local", baseUrl: "http://127.0.0.1:11434/v1", hasApiKey: false },
+      { id: "house-router", name: "House Router", baseUrl: "https://models.example.com/v1", hasApiKey: true },
+    ],
+    customSelected: false,
+    onAddCustomProvider: fn(),
+    onSelectCustomProvider: fn(),
+    onManageCustomProviders: fn(),
+  },
+  play: async ({ args, canvas, userEvent }) => {
+    const providers = within(canvas.getByRole("radiogroup", { name: "Default provider" }));
+    const custom = providers.getByRole("radio", { name: /Custom provider/ });
+    await userEvent.click(custom);
+    await expect(args.onSelectCustomProvider).toHaveBeenCalledTimes(1);
+    // The count counts, and opens the list. The radio keeps its own name.
+    await expect(custom).not.toHaveAccessibleName(/endpoints/);
+    const manage = canvas.getByRole("button", { name: "Manage 2 endpoints" });
+    await expect(manage).toHaveTextContent("2 endpoints");
+    await userEvent.click(manage);
+    await expect(args.onManageCustomProviders).toHaveBeenCalledTimes(1);
+    // Add keeps its own place on the row, so choosing the row never opens the form.
+    await expect(canvas.getByRole("button", { name: "Add custom provider" })).toBeVisible();
+  },
+};
+
+/**
+ * One endpoint, chosen, and no list to open. Without `onManageCustomProviders` the count stays a
+ * badge inside the label and counts in the singular. No provider row holds the check.
+ */
+export const CustomProviderSelected: Story = {
+  args: {
+    value: "opencode",
+    options: withOpenCode("available"),
+    customProviders: [
+      { id: "studio-local", name: "Studio Local", baseUrl: "http://127.0.0.1:11434/v1", hasApiKey: false },
+    ],
+    customSelected: true,
+    onAddCustomProvider: fn(),
+    onSelectCustomProvider: fn(),
+  },
+  play: async ({ canvas }) => {
+    const providers = within(canvas.getByRole("radiogroup", { name: "Default provider" }));
+    const custom = providers.getByRole("radio", { name: /Custom provider/ });
+    await expect(custom).toBeChecked();
+    await expect(custom).toHaveAccessibleName(/1 endpoint/);
+    await expect(providers.getByRole("radio", { name: /OpenCode/ })).not.toBeChecked();
+  },
+};
+
+export const CustomProviderReady: Story = {
+  args: { options: withOpenCode("sign-in-required"), onAddCustomProvider: fn() },
+  play: async ({ args, canvas, userEvent }) => {
+    // Anywhere on the row answers, as it does on the rows above, not only the button at its edge.
+    await userEvent.click(canvas.getByText("Custom provider"));
+    await expect(args.onAddCustomProvider).toHaveBeenCalledTimes(1);
+    // It adds, it does not select, so it stays outside the group of choices.
+    await expect(canvas.getByRole("radiogroup", { name: "Default provider" })).not.toContainElement(
+      canvas.getByRole("button", { name: "Add custom provider" }),
+    );
   },
 };

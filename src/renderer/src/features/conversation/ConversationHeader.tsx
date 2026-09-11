@@ -55,6 +55,7 @@ export function ConversationHeader() {
             modelOptions={props.modelOptions}
             agentStatus={props.agentStatus}
             runtimeStatuses={props.providerRuntimeStatuses}
+            customProviders={props.customProviders}
             onDownloadProvider={props.onDownloadProvider}
             onCancelProviderDownload={props.onCancelProviderDownload}
             onConnectProvider={props.onConnectProvider}

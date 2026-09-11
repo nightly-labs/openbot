@@ -71,6 +71,21 @@ describe("redactText", () => {
     expect(redactText(redactText("password=hunter2"))).toBe("password=[redacted]");
   });
 
+  // How a custom endpoint reaches OpenCode: one serialized config on an environment variable. A
+  // spawn line echoed into a diagnostic must lose the key and keep the endpoint that failed.
+  it("redacts the key inside a serialized OpenCode config and keeps the base URL", () => {
+    const config = JSON.stringify({
+      provider: {
+        "studio-local": {
+          options: { baseURL: "http://127.0.0.1:11434/v1", apiKey: "abcdef123456" },
+        },
+      },
+    });
+    const redacted = redactText(config);
+    expect(redacted).not.toContain("abcdef123456");
+    expect(redacted).toContain("http://127.0.0.1:11434/v1");
+  });
+
   it("leaves identifiers such as agent UUIDs untouched", () => {
     const uuid = "agent-3fa85f64-5717-4562-b3fc-2c963f66afa6";
     expect(redactText(`loaded ${uuid}`)).toBe(`loaded ${uuid}`);
@@ -81,6 +96,26 @@ describe("redactValue", () => {
   it("redacts secret-valued keys deep inside objects", () => {
     expect(redactValue({ nested: { machineToken: "abcdef123456", name: "alfred" } })).toEqual({
       nested: { machineToken: "[redacted]", name: "alfred" },
+    });
+  });
+
+  // A custom endpoint sends its credential under a header the user names, so `apiKey` is not the
+  // only label to cover. The names stay: which header was set is diagnostic, its text is the secret.
+  it("redacts every value under a headers object, whatever the header is called", () => {
+    expect(redactValue({ headers: { "X-Api-Token": "abcdef123456", "X-Tenant": "acme" } })).toEqual({
+      headers: { "X-Api-Token": "[redacted]", "X-Tenant": "[redacted]" },
+    });
+    // The list form the renderer sends: every string under `headers` goes, so the header's own name
+    // is redacted here as well. Only the object form keeps a name, because there it is a key.
+    expect(redactValue({ headers: [{ name: "X-Api-Token", value: "abcdef123456" }] })).toEqual({
+      headers: [{ name: "[redacted]", value: "[redacted]" }],
+    });
+  });
+
+  it("leaves a headers count and the word in prose alone", () => {
+    expect(redactValue({ headers: 3, note: "two headers were rejected" })).toEqual({
+      headers: 3,
+      note: "two headers were rejected",
     });
   });
 });

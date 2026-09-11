@@ -217,7 +217,7 @@ async function buildSeedProfile(
     await seedAgentExchanges(mailbox);
     await seedConversations(agentStore, mailbox, agents, attachments);
     await seedTeam(profilePath, agentStore);
-    await writeSetupState(join(profilePath, SETUP_FILE), "codex");
+    await writeSetupState(join(profilePath, SETUP_FILE), { preferredProvider: "codex", preferredModel: null });
     await writeSeedManifest(profilePath, transferDirectories);
   } finally {
     agentStore.database.close();

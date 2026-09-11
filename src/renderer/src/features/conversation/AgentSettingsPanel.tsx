@@ -7,6 +7,7 @@ import type {
   AgentStatus,
   AvatarHue,
   AvatarImageInput,
+  CustomProviderSummary,
   ProviderRuntimeStatus,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -56,6 +57,8 @@ interface AgentSettingsPanelProps {
   modelOptions: AgentModelOption[];
   working: boolean;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
+  /** Threaded, not read from `useCustomProviders()`: this component is mounted bare by its test. */
+  customProviders?: readonly CustomProviderSummary[];
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
@@ -738,6 +741,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   agentStatus={props.agentStatus}
                   modelOptions={props.modelOptions}
                   runtimeStatuses={props.providerRuntimeStatuses}
+                  customProviders={props.customProviders}
                   onDownloadProvider={props.onDownloadProvider}
                   onCancelProviderDownload={props.onCancelProviderDownload}
                   onConnectProvider={props.onConnectProvider}

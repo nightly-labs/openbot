@@ -2,6 +2,7 @@ import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { createMemo, Loading, Show } from "solid-js";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
+import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { useServerSelection } from "./features/servers/server-selection";
@@ -66,7 +67,7 @@ function PermissionsReview(props: AccountProps) {
       <Loading>
         <InitialSetup
           reviewing
-          state={setup.setupState() ?? { completed: true, preferredProvider: "codex" }}
+          state={setup.setupState() ?? { completed: true, preferredProvider: "codex", preferredModel: null }}
           agentStatus={agentStatus()}
           platform={platform.appInfo()?.platform ?? "darwin"}
           accountEmail={props.account().email}
@@ -208,10 +209,18 @@ function AppSettings(props: AccountProps) {
     connectProvider,
     openProviderInstallGuide,
   } = useProviders();
+  const { customProviders, saveCustomProvider, deleteCustomProvider } = useCustomProviders();
   /** Provider downloads are the local machine's business, never a remote host's. */
   const localProviderDownloads = createMemo(
     () => activeServer()?.kind === "local" && providerRuntimeDownloadsAvailable(),
   );
+  /**
+   * A named endpoint merges into the `opencode acp` process on *this* computer, so a remote server
+   * must show no custom row, no list and no Add. This is not `localProviderDownloads()`: that one
+   * also needs `providerRuntimeDownloadsAvailable()`, which is about managed runtime downloads and
+   * would hide this feature on a build without them.
+   */
+  const localCustomProviders = createMemo(() => activeServer()?.kind === "local");
 
   return (
     <Loading>
@@ -239,6 +248,9 @@ function AppSettings(props: AccountProps) {
         onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
         onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
         onInstallProvider={localProviderDownloads() ? openProviderInstallGuide : undefined}
+        customProviders={localCustomProviders() ? customProviders() : undefined}
+        onAddCustomProvider={localCustomProviders() ? saveCustomProvider : undefined}
+        onDeleteCustomProvider={localCustomProviders() ? deleteCustomProvider : undefined}
         hostedSitesApi={window.openbot.hostedSites}
         restoreFocusTarget={appSettingsRestoreTarget()}
       />

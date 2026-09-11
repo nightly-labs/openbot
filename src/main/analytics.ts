@@ -431,7 +431,7 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
   if (key === "reasoning_effort") {
     return isOneOf(AGENT_REASONING_EFFORTS, value) ? value : undefined;
   }
-  if (key === "model") return isAgentModel(value) ? value : undefined;
+  if (key === "model") return isAgentModel(value) ? reportedModel(value) : undefined;
   if (key === "origin") {
     return isOneOf(["user", "routine", "agent", "unknown"] as const, value) ? value : undefined;
   }
@@ -449,6 +449,18 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
   }
   if (key === "has_secret_prompt") return isBoolean(value) ? value : undefined;
   return undefined;
+}
+
+/**
+ * A model OpenCode serves is named `<provider>/<model>`, and when the user named that provider the
+ * prefix is a string they typed - a company name, a hostname, a project. Nothing in the id separates
+ * one of those from OpenCode's own `anthropic/...`, so every prefixed id is reported as `custom`.
+ * That costs the model breakdown for OpenCode, which is the cheaper of the two mistakes.
+ */
+function reportedModel(value: string): string {
+  const separator = value.indexOf("/");
+  if (separator < 0) return value;
+  return isOneOf(AGENT_PROVIDERS, value.slice(0, separator)) ? value : "custom";
 }
 
 function hostedSiteFailureCode(value: string): string {

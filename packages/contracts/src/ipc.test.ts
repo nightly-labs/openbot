@@ -18,6 +18,8 @@ import {
   isAvatarSeed,
   isConversationMessage,
   isConversationWithReadState,
+  isCustomProviderResult,
+  isCustomProviderSummary,
   isDynamicIslandAction,
   isHostedSiteConversationEventUrl,
   isMessageReaction,
@@ -794,5 +796,28 @@ describe("renderer-to-main boundary guards", () => {
     };
     expect(isAgentModelOption({ ...model, name: "S".repeat(INPUT_LIMITS.modelName) })).toBe(true);
     expect(isAgentModelOption({ ...model, name: "S".repeat(INPUT_LIMITS.modelName + 1) })).toBe(false);
+  });
+
+  // The API key of a custom endpoint is the one secret in this feature, and this guard is the only
+  // thing that makes "the renderer never sees it" a runtime fact rather than a convention: the
+  // preload runs it over every row main sends, and it fails closed on the whole list.
+  it("rejects a custom provider summary that carries an API key", () => {
+    const summary = { id: "studio-local", name: "Studio Local", baseUrl: "http://127.0.0.1:11434/v1", hasApiKey: true };
+    expect(isCustomProviderSummary(summary)).toBe(true);
+    expect(isCustomProviderSummary({ ...summary, apiKey: "sk-not-for-the-renderer" })).toBe(false);
+    // Not just a truthy one: an entry whose key failed to decrypt would carry `null` here.
+    expect(isCustomProviderSummary({ ...summary, apiKey: null })).toBe(false);
+    expect(isCustomProviderSummary({ ...summary, headers: [] })).toBe(false);
+    expect(isCustomProviderSummary({ ...summary, hasApiKey: "yes" })).toBe(false);
+    expect(isCustomProviderSummary({ ...summary, id: "Studio/Local" })).toBe(false);
+  });
+
+  it("requires a known restart outcome on a custom provider result", () => {
+    const summary = { id: "studio-local", name: "Studio Local", baseUrl: "http://127.0.0.1:11434/v1", hasApiKey: true };
+    expect(isCustomProviderResult({ providers: [summary], restart: "skipped-busy" })).toBe(true);
+    expect(isCustomProviderResult({ providers: [summary], restart: "queued" })).toBe(false);
+    expect(isCustomProviderResult({ providers: [{ ...summary, apiKey: "sk-live" }], restart: "restarted" })).toBe(
+      false,
+    );
   });
 });

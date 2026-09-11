@@ -230,6 +230,32 @@ describe.sequential("AgentService: providers", () => {
     },
   );
 
+  it("moves an agent off a removed endpoint onto a model OpenCode still lists", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const client = new FakeAgentClient(provider);
+      // OpenCode reports a custom endpoint's model as `<endpoint id>/<model id>`, beside its own.
+      if (provider === "opencode") {
+        client.modelList = () => ({ data: [{ model: "opencode/example-model" }, { model: "lmstudio/local-llm" }] });
+      }
+      return client;
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" });
+
+    await service.releaseCustomProviderModels("lmstudio");
+
+    // OpenCode declares no default model of its own, so the fallback has to be read from what it
+    // lists. An empty model id is refused by `updateAgent`, and that refusal reached the user as a
+    // failed removal with the endpoint still saved.
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
+      provider: "opencode",
+      model: "opencode/example-model",
+    });
+  });
+
   it("derives live progress from the provider-neutral turn and tool lifecycle", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);

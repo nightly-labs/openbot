@@ -7,6 +7,7 @@ import type {
   AvatarImageInput,
   BrowserControlState,
   BrowserTab,
+  CustomProviderSummary,
   DraftAttachment,
   FilePreview,
   ProviderRuntimeStatus,
@@ -34,6 +35,13 @@ export interface ConversationTarget {
 export interface ConversationProps {
   agentStatus: AgentStatus;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
+  /**
+   * The endpoints the user named, so both model pickers can tell a custom model from an OpenCode
+   * one. It travels as a prop rather than through `useCustomProviders()`, because
+   * `AgentSettingsPanel.test.tsx` mounts that component bare and a context `use()` throws without
+   * its provider - the same path `providerRuntimeStatuses` above already takes.
+   */
+  customProviders?: readonly CustomProviderSummary[];
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;

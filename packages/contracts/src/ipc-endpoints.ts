@@ -92,6 +92,13 @@ export const IPC_ENDPOINTS = {
     install: request(IPC_CHANNELS.skillsInstall),
     uninstall: request(IPC_CHANNELS.skillsUninstall),
   },
+  // No event channel: the renderer is the only writer, and the models a saved endpoint adds arrive
+  // through the ready `status` event the provider restart already emits.
+  customProviders: {
+    list: request(IPC_CHANNELS.customProvidersList),
+    save: request(IPC_CHANNELS.customProvidersSave),
+    delete: request(IPC_CHANNELS.customProvidersDelete),
+  },
   hostedSites: {
     list: request(IPC_CHANNELS.hostedSitesList),
     chooseDirectory: request(IPC_CHANNELS.hostedSitesChooseDirectory),

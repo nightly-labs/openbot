@@ -18,6 +18,7 @@ import {
   testConversationPage,
   testServer,
 } from "./app-test-harness";
+import { toast } from "./components/ui";
 import { createAgentInitialMessage } from "./features/agents/agent-initial-message";
 import { AGENT_SELECTION_STORAGE_KEY } from "./features/agents/agent-selection";
 import { useAgents } from "./features/agents/agents-context";
@@ -31,6 +32,11 @@ import { useNavigation } from "./navigation";
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
     installOpenbotStub();
+  });
+
+  // The toast store is module-global, so a notification outlives the render that raised it.
+  afterEach(() => {
+    toast.dismiss();
   });
 
   it("restores the selected agent after the app remounts", async () => {
@@ -1262,5 +1268,31 @@ describe("OpenBot connected desktop shell", () => {
       expect(screen.getByText("Newest streamed answer")).toBeInTheDocument();
       expect(screen.queryByText("Stale history answer")).not.toBeInTheDocument();
     });
+  });
+
+  it("notifies and keeps the inline entry when an agent reports an error", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+
+    emitAgentEvent?.({
+      type: "error",
+      agentId: "chief",
+      code: "agent_error",
+      message: "The model endpoint refused the request.",
+    });
+
+    expect(await screen.findByText("Chief could not continue")).toBeVisible();
+    // Once in the notification and once in the agent's own message list.
+    await waitFor(() => expect(screen.getAllByText("The model endpoint refused the request.")).toHaveLength(2));
+  });
+
+  it("notifies about a provider error that names no agent", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+
+    emitAgentEvent?.({ type: "error", code: "opencode_start_failed", message: "OpenCode could not start." });
+
+    expect(await screen.findByText("Provider error")).toBeVisible();
+    expect(await screen.findByText("OpenCode could not start.")).toBeVisible();
   });
 });

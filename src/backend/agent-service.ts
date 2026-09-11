@@ -8,6 +8,7 @@ import type {
   AgentAnalyticsInput,
   AgentEvent,
   AgentMemory,
+  AgentModelId,
   AgentModelOption,
   AgentProfileDraft,
   AgentRuntimeSnapshot,
@@ -24,6 +25,7 @@ import type {
   CreateAgentInput,
   CreateAgentMemoryInput,
   CreateRoutineInput,
+  CustomProviderRestart,
   DeleteAgentMemoryInput,
   DeleteRoutineInput,
   DraftAttachment,
@@ -52,9 +54,14 @@ import type {
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_RUNTIME_TEXT_LIMIT, defaultProviderModel, isMessageReaction } from "@openbot/contracts/ipc";
+import {
+  AGENT_RUNTIME_TEXT_LIMIT,
+  defaultProviderModel,
+  isCustomProviderModelId,
+  isMessageReaction,
+} from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
 import { AttachmentGateway } from "./agent/attachment-gateway";
 import { AttentionRegistry } from "./agent/attention-registry";
@@ -88,12 +95,13 @@ import { isDynamicToolCall, providerForAgent, providerLabel } from "./agent/thre
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import type { AgentClient, AgentProvider } from "./agent-client";
-import type { AgentStore } from "./agent-store";
+import { type AgentStore, DEFAULT_AGENT_PROVIDER } from "./agent-store";
 import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import type { BundledProviderExecutables } from "./cli";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "./conversation-read-store";
 import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
+import type { CustomProviderSource } from "./opencode-config";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePathFromInput } from "./workspace-paths";
@@ -164,6 +172,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     prepareAgentWorkspace: (agent: AgentSummary) => Promise<void> = async () => undefined,
     hostedSites: AgentHostedSites | null = null,
     sidebarLayout: AgentSidebar | null = null,
+    /**
+     * The user's own model endpoints, read again at every provider spawn. The main process owns them,
+     * because they carry an API key that must not reach the renderer or the database.
+     */
+    customProviders: CustomProviderSource = () => [],
+    /**
+     * The model setup chose beside `preferredProvider`, or `null` for that provider's own default.
+     * It arrives last because it was added last, and every caller that has no answer says `null`.
+     */
+    preferredModel: AgentModelId | null = null,
   ) {
     super();
     this.#store = store;
@@ -261,8 +279,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       requestTimeoutMs,
       preferredProvider,
+      preferredModel,
       clientFactory,
       bundledExecutables,
+      customProviders,
     });
     this.#compaction = new ContextCompaction({
       store,
@@ -536,11 +556,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const provider = agent?.provider ?? this.#providers.preferredProvider();
     await this.ensureProvider(provider);
     const models = this.#providers.listModels();
-    const defaultModel = defaultProviderModel(provider);
     const model = agent
       ? models.find((candidate) => candidate.id === agent.model && candidate.provider === provider)
-      : (models.find((candidate) => candidate.provider === provider && candidate.id === defaultModel) ??
-        models.find((candidate) => candidate.provider === provider));
+      : this.#startingModel(provider, models);
     if (!model) throw new Error("The selected provider has no available model.");
     if (this.#stopping) throw new Error("OpenBot is shutting down.");
     if (this.#profileClients.size >= 3) throw new Error("Profile generation is busy. Try again shortly.");
@@ -564,6 +582,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.preferredProvider();
   }
 
+  /**
+   * The model a new agent, or a profile draft with no agent, starts on for `provider`.
+   *
+   * Setup records a model beside the preferred provider, so that model comes first -- but only while
+   * the CLI still lists it, because the list is the provider's answer and a saved id can name an
+   * endpoint or a model that is gone. After it come the provider's own default and then whatever it
+   * does list; `null` means it listed nothing at all.
+   */
+  #startingModel(provider: AgentProvider, models: AgentModelOption[]): AgentModelOption | null {
+    const listed = (id: AgentModelId) => models.find((model) => model.provider === provider && model.id === id);
+    const preferred = this.#providers.preferredModel();
+    const chosen = preferred !== null && provider === this.#providers.preferredProvider() ? listed(preferred) : null;
+    return (
+      chosen ?? listed(defaultProviderModel(provider)) ?? models.find((model) => model.provider === provider) ?? null
+    );
+  }
+
   async createAgent(
     input: CreateAgentInput,
     configure?: (agent: AgentSummary) => Promise<AgentSummary>,
@@ -576,12 +611,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     try {
       await this.#prepareAgentWorkspace(agent);
       const preferredProvider = this.#providers.preferredProvider();
+      // A new record starts on the built-in default provider, so this is the one place a preferred
+      // provider lands on a new agent -- and with it the model setup chose, which is how a custom
+      // endpoint becomes the default: it is a model of the CLI that runs it, never a provider.
       if (preferredProvider !== agent.provider) {
-        const models = this.#providers.listModels();
-        const preferredDefault = defaultProviderModel(preferredProvider);
-        const preferredModel =
-          models.find((model) => model.provider === preferredProvider && model.id === preferredDefault) ??
-          models.find((model) => model.provider === preferredProvider);
+        const preferredModel = this.#startingModel(preferredProvider, this.#providers.listModels());
         if (!preferredModel) throw new Error(`${providerLabel(preferredProvider)} has no available model.`);
         agent = await this.#store.updateAgent({
           agentId: agent.id,
@@ -823,8 +857,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#routines.arm();
   }
 
-  setPreferredProvider(provider: AgentProvider): Promise<void> {
-    return this.#providers.setPreferredProvider(provider, this.#initialized);
+  setPreferredProvider(provider: AgentProvider, model: AgentModelId | null = null): Promise<void> {
+    return this.#providers.setPreferredProvider(provider, this.#initialized, model);
   }
 
   ensureProvider(provider: AgentProvider): Promise<void> {
@@ -845,6 +879,45 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   updateProviderCli(provider: AgentProvider, install: () => Promise<string>): Promise<AgentStatus> {
     return this.#providers.updateProviderCli(provider, install);
+  }
+
+  /** Restarts OpenCode so a saved or removed endpoint reaches it. Reports why, if it did not. */
+  reloadOpenCodeConfig(): Promise<CustomProviderRestart> {
+    return this.#providers.reloadOpenCodeConfig();
+  }
+
+  /**
+   * Moves every agent off a removed endpoint's models, onto a model that is still served.
+   *
+   * The caller runs this *before* the endpoint is removed and OpenCode restarts, so no agent is left
+   * naming a model the fresh catalogue does not list. A new pick is already safe: `updateAgent`
+   * refuses a model that no connected provider reports.
+   */
+  async releaseCustomProviderModels(providerId: string): Promise<void> {
+    const owned = new Set([providerId]);
+    const affected = this.#store
+      .list()
+      .filter((agent) => providerForAgent(agent) === "opencode" && isCustomProviderModelId(agent.model, owned));
+    if (affected.length === 0) return;
+    // OpenCode declares no default model of its own -- its catalogue is whatever the CLI lists -- so
+    // the fallback is chosen from the live list with the endpoint being removed taken out of it.
+    // The built-in default provider comes second, because an agent left on a model the CLI no longer
+    // serves cannot answer, and a provider switch keeps its workspace, thread and identity.
+    const remaining = this.#providers.listModels().filter((option) => !isCustomProviderModelId(option.id, owned));
+    const fallback =
+      this.#startingModel("opencode", remaining) ?? this.#startingModel(DEFAULT_AGENT_PROVIDER, remaining);
+    // Nothing is listed, so there is no model to move to. The removal still goes ahead: refusing it
+    // would trap the user on an endpoint that may be the reason no model is listed.
+    if (!fallback) return;
+    for (const agent of affected) {
+      await this.#store.updateAgent({
+        agentId: agent.id,
+        provider: fallback.provider,
+        model: fallback.id,
+        reasoningEffort: fallback.defaultReasoningEffort,
+      });
+    }
+    this.#emit({ type: "agents-changed", agents: this.listAgents() });
   }
 
   async stop(): Promise<void> {
@@ -1413,7 +1486,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       type: "error",
       agentId,
       code,
-      message: error instanceof Error ? error.message : String(error),
+      // Redacted, because every error from a provider CLI arrives here on its way to the renderer
+      // and the log, and a CLI quotes what it was given: a failure against a custom endpoint can
+      // carry that endpoint's API key or a header value.
+      message: redactText(error instanceof Error ? error.message : String(error)),
     });
   }
 

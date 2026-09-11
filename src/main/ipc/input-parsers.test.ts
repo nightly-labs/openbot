@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { CUSTOM_PROVIDER_LIMITS } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import {
   parseAcknowledgeFailedTurn,
@@ -44,13 +45,14 @@ import {
   parseMarketplaceAgentQuery,
   parseMarketplaceSkillQuery,
   parseProfileName,
-  parseProvider,
   parseProviderId,
+  parseSetup,
   parseSubmitMarketplaceAgent,
   parseSubmitSkill,
   parseUpdatePreference,
 } from "./app-inputs";
 import { parseBrowserNavigate, parseBrowserOpen, parseVisibility } from "./browser-inputs";
+import { parseDeleteCustomProvider, parseSaveCustomProvider } from "./custom-provider-inputs";
 import {
   parseCreateTeamInvite,
   parseHostConfig,
@@ -82,8 +84,15 @@ describe("app IPC input parsing", () => {
   });
 
   it("parses setup and permission values", () => {
-    expect(parseProvider({ preferredProvider: "codex" })).toBe("codex");
-    expect(parseProvider({ preferredProvider: "claude" })).toBe("claude");
+    expect(parseSetup({ preferredProvider: "codex", preferredModel: null })).toEqual({
+      preferredProvider: "codex",
+      preferredModel: null,
+    });
+    // A custom endpoint is a model of the CLI that runs it, so this is the shape that records one.
+    expect(parseSetup({ preferredProvider: "opencode", preferredModel: "studio-local/glm-5-air" })).toEqual({
+      preferredProvider: "opencode",
+      preferredModel: "studio-local/glm-5-air",
+    });
     expect(parseProviderId("grok")).toBe("grok");
     expect(parseMacPermission("screen-recording")).toBe("screen-recording");
     expect(parseMacPermission("accessibility")).toBe("accessibility");
@@ -136,8 +145,10 @@ describe("app IPC input parsing", () => {
   });
 
   it("keeps setup and permission error messages", () => {
-    expect(() => parseProvider(null)).toThrowError("Setup input is required.");
-    expect(() => parseProvider({ preferredProvider: "other" })).toThrowError("Unknown provider.");
+    expect(() => parseSetup(null)).toThrowError("Setup input is required.");
+    expect(() => parseSetup({ preferredProvider: "other", preferredModel: null })).toThrowError("Unknown provider.");
+    expect(() => parseSetup({ preferredProvider: "codex" })).toThrowError("Unknown model.");
+    expect(() => parseSetup({ preferredProvider: "codex", preferredModel: "a model" })).toThrowError("Unknown model.");
     expect(() => parseProviderId("other")).toThrowError("Unknown provider.");
     expect(() => parseMacPermission("camera")).toThrowError("Unknown macOS permission.");
     expect(() => parseExternalDestination("https://example.com")).toThrowError("Unknown external destination.");
@@ -714,5 +725,111 @@ describe("sidebar layout input parsing", () => {
     expect(() =>
       parseSidebarLayoutAction({ type: "move", sectionId: "section-1", direction: "down", steps: 0 }),
     ).toThrowError("Invalid section move distance.");
+  });
+});
+
+describe("custom provider input parsing", () => {
+  const endpoint = {
+    id: "studio-local",
+    name: "Studio Local",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    apiKey: "abcdef123456",
+    models: [{ id: "glm-5-air", name: "GLM 5 Air" }],
+    headers: [{ name: "X-Tenant", value: "acme" }],
+  };
+
+  it("accepts a described endpoint and keeps a null key as null", () => {
+    expect(parseSaveCustomProvider(endpoint)).toEqual(endpoint);
+    // The common case: a model server on this computer that asks for no credential. An empty string
+    // would reach OpenCode as a blank Authorization header, so it collapses to null too.
+    expect(parseSaveCustomProvider({ ...endpoint, apiKey: null }).apiKey).toBeNull();
+    expect(parseSaveCustomProvider({ ...endpoint, apiKey: "   " }).apiKey).toBeNull();
+    expect(parseSaveCustomProvider({ ...endpoint, headers: undefined }).headers).toEqual([]);
+  });
+
+  // An endpoint named `opencode` would take a `provider` key OpenCode already owns, so its own
+  // models would disappear behind the user's. `codex`, `claude` and `grok` are refused for the same
+  // reason in the picker, where a built-in id already means a driver.
+  it("rejects a built-in provider name and an id OpenCode cannot use as a key", () => {
+    for (const id of ["opencode", "claude", "codex", "grok"]) {
+      expect(() => parseSaveCustomProvider({ ...endpoint, id })).toThrowError("A provider ID must be");
+    }
+    expect(() => parseSaveCustomProvider({ ...endpoint, id: "studio/local" })).toThrowError("A provider ID must be");
+    expect(() => parseSaveCustomProvider({ ...endpoint, id: "Studio" })).toThrowError("A provider ID must be");
+    expect(() => parseDeleteCustomProvider({ id: "studio/local" })).toThrowError("A provider ID must be");
+  });
+
+  // The CLI is given this URL to call. Any other scheme is a way to make the provider process read
+  // something local instead of an HTTP API.
+  it("rejects a base URL that is not http or https", () => {
+    expect(() => parseSaveCustomProvider({ ...endpoint, baseUrl: "file:///etc/passwd" })).toThrowError(
+      "The base URL must start with http:// or https://.",
+    );
+    expect(() => parseSaveCustomProvider({ ...endpoint, baseUrl: "data:text/plain,x" })).toThrowError(
+      "The base URL must start with http:// or https://.",
+    );
+    expect(() => parseSaveCustomProvider({ ...endpoint, baseUrl: "127.0.0.1:11434" })).toThrowError(
+      "The base URL is not a URL.",
+    );
+  });
+
+  it("rejects an over-limit name, URL or key", () => {
+    expect(() => parseSaveCustomProvider({ ...endpoint, name: "n".repeat(INPUT_LIMITS.agentName + 1) })).toThrowError(
+      "Display name is too long.",
+    );
+    const longPath = `http://127.0.0.1/${"p".repeat(CUSTOM_PROVIDER_LIMITS.baseUrl)}`;
+    expect(() => parseSaveCustomProvider({ ...endpoint, baseUrl: longPath })).toThrowError("Base URL is too long.");
+    expect(() =>
+      parseSaveCustomProvider({ ...endpoint, apiKey: "k".repeat(CUSTOM_PROVIDER_LIMITS.apiKey + 1) }),
+    ).toThrowError("The API key is too long.");
+  });
+
+  // The composed `<id>/<model>` is what reaches the agent roster, the picker and the Team API, and
+  // every one of those list decoders fails closed on a whole array when one id is malformed.
+  // Checking the halves would let a legal model id and a legal provider id compose into an illegal
+  // model, which empties the picker rather than rejecting the save.
+  it("rejects a model whose composed id is not a usable model id", () => {
+    expect(() => parseSaveCustomProvider({ ...endpoint, models: [{ id: "glm 5 air", name: "GLM" }] })).toThrowError(
+      "A model ID has an unusable character.",
+    );
+    // Both halves are inside their own 128-character bound; together they are over the 160 an agent
+    // model id may be, which is exactly the case checking the halves would let through.
+    expect(() =>
+      parseSaveCustomProvider({
+        ...endpoint,
+        id: "s".repeat(100),
+        models: [{ id: "m".repeat(100), name: "Long" }],
+      }),
+    ).toThrowError("A model ID has an unusable character.");
+  });
+
+  it("rejects an empty model list and two models with one ID", () => {
+    expect(() => parseSaveCustomProvider({ ...endpoint, models: [] })).toThrowError("At least one model is required.");
+    expect(() =>
+      parseSaveCustomProvider({
+        ...endpoint,
+        models: [
+          { id: "glm-5-air", name: "GLM 5 Air" },
+          { id: "glm-5-air", name: "Same ID" },
+        ],
+      }),
+    ).toThrowError("Two models have the same ID.");
+  });
+
+  it("rejects a header name HTTP does not allow and a duplicate name", () => {
+    expect(() => parseSaveCustomProvider({ ...endpoint, headers: [{ name: "X Tenant", value: "acme" }] })).toThrowError(
+      "A header name has a character HTTP does not allow.",
+    );
+    // Case does not distinguish two HTTP field names, so the second one is a duplicate, not a
+    // second header that quietly replaces the first at the endpoint.
+    expect(() =>
+      parseSaveCustomProvider({
+        ...endpoint,
+        headers: [
+          { name: "X-Tenant", value: "acme" },
+          { name: "x-tenant", value: "other" },
+        ],
+      }),
+    ).toThrowError("Two headers have the same name.");
   });
 });
