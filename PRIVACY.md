@@ -76,7 +76,12 @@ configured production build, is read before collection starts, and remains disab
 preference cannot be read. Disabling it drops pending mobile events; it does not remove previously
 received events or retract an in-flight request. There is no persistent offline analytics queue.
 Development and preview mobile builds do not collect product analytics. Mobile sign-in uses the
-same account ID and normalized email profile traits described above.
+same account ID and normalized email profile traits described above. Before mobile sign-in, up to
+100 sanitized events stay in process memory for at most 30 minutes from the first buffered event.
+They are sent once with their original timestamps after an account becomes available. Opt-out,
+expiry, and process exit discard unclaimed events. The oldest event is removed when the buffer is
+full. Sign-out ends the old account's operation scopes; later signed-out activity can be associated
+with the next account that signs in. No anonymous mobile event is sent before that association.
 
 Hosted Site analytics records only the operation, entry point, result, and bounded failure code. It
 does not contain the site's URL, hostname, title, source path, site ID, or content. A one-time

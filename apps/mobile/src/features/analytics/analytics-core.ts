@@ -3,7 +3,7 @@ import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { type MobileEventName, type MobileEventProperties, type SafeProperties, sanitizeMobileEvent } from "./events";
 
 export interface MobileAnalyticsClient {
-  track(name: string, properties: SafeProperties): Promise<unknown> | undefined;
+  track(name: string, properties: SafeProperties, timestamp?: string): Promise<unknown> | undefined;
   identify(user: { profileId: string; email: string }): Promise<unknown> | undefined;
   clear(): undefined;
 }
@@ -11,8 +11,15 @@ export interface MobileAnalyticsScope {
   track<N extends MobileEventName>(name: N, properties: MobileEventProperties<N>): void;
 }
 
+const ANONYMOUS_TTL_MS = 30 * 60 * 1_000;
+const MAX_PENDING_EVENTS = 100;
+type PendingEvent = { name: MobileEventName; properties: SafeProperties; timestamp: string };
+
 /** A scope belongs to the account and consent state that started an operation. */
 export class MobileAnalytics {
+  private anonymous: PendingEvent[] = [];
+  private anonymousStartedAt: number | null = null;
+  private expiry: ReturnType<typeof setTimeout> | undefined;
   private enabled = false;
   private generation = 0;
   private consentGeneration = 0;
@@ -28,8 +35,10 @@ export class MobileAnalytics {
     this.enabled = enabled;
     this.consentGeneration += 1;
     this.generation += 1;
-    if (!enabled) this.client?.clear();
-    else this.identify();
+    if (!enabled) {
+      this.clearAnonymous();
+      this.client?.clear();
+    } else this.identify();
   }
 
   isEnabled(): boolean {
@@ -40,10 +49,34 @@ export class MobileAnalytics {
     const email = user ? normalizeEmailAddress(user.email) : null;
     const next = user && email ? { id: user.id, email } : null;
     if (this.user?.id === next?.id && this.user?.email === next?.email) return;
-    this.generation += 1;
+    this.expireAnonymous();
+    if (this.user) {
+      this.generation += 1;
+      this.clearAnonymous();
+    }
     this.user = next;
     this.enqueue(() => this.client?.clear());
     this.identify();
+    if (next) {
+      const events = this.anonymous;
+      this.clearAnonymous();
+      for (const event of events) {
+        this.enqueue(() => this.client?.track(event.name, event.properties, event.timestamp));
+      }
+    }
+  }
+
+  private clearAnonymous(): void {
+    clearTimeout(this.expiry);
+    this.expiry = undefined;
+    this.anonymous = [];
+    this.anonymousStartedAt = null;
+  }
+
+  private expireAnonymous(): void {
+    if (this.anonymousStartedAt === null || Date.now() - this.anonymousStartedAt < ANONYMOUS_TTL_MS) return;
+    this.clearAnonymous();
+    this.generation += 1;
   }
 
   private identify(): void {
@@ -72,10 +105,12 @@ export class MobileAnalytics {
   }
 
   scope(): MobileAnalyticsScope {
+    this.expireAnonymous();
     const generation = this.generation;
     const enabled = this.enabled;
     return {
       track: (name, properties) => {
+        this.expireAnonymous();
         if (!enabled || generation !== this.generation) return;
         this.track(name, properties);
       },
@@ -83,8 +118,18 @@ export class MobileAnalytics {
   }
 
   track<N extends MobileEventName>(name: N, properties: MobileEventProperties<N>): void {
-    if (this.pending >= 100) return;
+    if (!this.enabled || !this.client || this.pending >= MAX_PENDING_EVENTS) return;
+    this.expireAnonymous();
     const safe = sanitizeMobileEvent(name, properties);
+    if (!this.user) {
+      if (this.anonymousStartedAt === null) {
+        this.anonymousStartedAt = Date.now();
+        this.expiry = setTimeout(() => this.expireAnonymous(), ANONYMOUS_TTL_MS);
+      }
+      if (this.anonymous.length >= MAX_PENDING_EVENTS) this.anonymous.shift();
+      this.anonymous.push({ name, properties: safe, timestamp: new Date().toISOString() });
+      return;
+    }
     this.enqueue(() => this.client?.track(name, safe));
   }
 
