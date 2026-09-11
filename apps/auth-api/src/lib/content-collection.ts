@@ -83,7 +83,7 @@ export function collectionFeedUrl(collection: ContentCollection): string {
   return new URL(collectionFeedPath(collection), OPENBOT_SITE_URL).toString();
 }
 
-/** The 1200x630 social card, with the title baked in. Built by `content-images.ts`. */
+/** The 1200x630 social card, with the title baked in. Drawn by `bun run api:images`. */
 export function articleOgImageUrl(collection: ContentCollection, slug: string): string {
   return new URL(`/${collection.id}/og/${slug}.png`, OPENBOT_SITE_URL).toString();
 }

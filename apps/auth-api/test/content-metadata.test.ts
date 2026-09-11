@@ -158,7 +158,7 @@ describe("article artwork files", () => {
 
 describe("article slugs", () => {
   it("never reuses a slug across the whole site", () => {
-    // The image cache and the social cards are keyed by slug, so two articles that
+    // The artwork files and the social cards are keyed by slug, so two articles that
     // share one overwrite each other's artwork whichever section they sit in.
     const slugs = ALL_ARTICLES.map((article) => article.slug);
     expect(new Set(slugs).size).toBe(slugs.length);

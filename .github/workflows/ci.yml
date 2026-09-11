@@ -150,28 +150,10 @@ jobs:
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
 
-      - name: Prepare the display and the Chromium sandbox
-        # Electron draws the article artwork during the build. The runner has no
-        # display, and `bun install` unpacks `chrome-sandbox` as the runner user,
-        # which Chromium refuses to use: it aborts with SIGTRAP and the build
-        # reports only "Electron exited with code 133". Give the helper the owner
-        # and mode it asks for, so the sandbox stays on.
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y xvfb
-          sudo chown root:root node_modules/electron/dist/chrome-sandbox
-          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
-
-      - name: Draw the article artwork
-        # A step of its own, so a failure names it. The build below finds every
-        # image in the cache and does not start Electron.
-        run: bun run api:images
-
       - name: Build isolated preview
         run: bun run api:build
         env:
           CLOUDFLARE_ENV: preview
-          OPENBOT_CONTENT_IMAGES: require
 
       - name: Upload preview version
         id: deploy-preview
@@ -238,27 +220,8 @@ jobs:
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
 
-      - name: Prepare the display and the Chromium sandbox
-        # Electron draws the article artwork during the build. The runner has no
-        # display, and `bun install` unpacks `chrome-sandbox` as the runner user,
-        # which Chromium refuses to use: it aborts with SIGTRAP and the build
-        # reports only "Electron exited with code 133". Give the helper the owner
-        # and mode it asks for, so the sandbox stays on.
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y xvfb
-          sudo chown root:root node_modules/electron/dist/chrome-sandbox
-          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
-
-      - name: Draw the article artwork
-        # A step of its own, so a failure names it. The build below finds every
-        # image in the cache and does not start Electron.
-        run: bun run api:images
-
       - name: Build production Worker
         run: bun run api:build
-        env:
-          OPENBOT_CONTENT_IMAGES: require
 
       - name: Apply production D1 migrations
         working-directory: apps/auth-api

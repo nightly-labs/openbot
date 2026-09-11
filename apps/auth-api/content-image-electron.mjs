@@ -1,21 +1,14 @@
 // The Electron half of the article image generator. Plain JavaScript because
 // Electron runs this file directly and cannot read TypeScript.
 //
-// It opens one hidden window, injects the bundle that content-images.ts built,
-// and asks it for one data URL per image. The page is `about:blank` with context
-// isolation on: the injected code runs in the isolated world, which shares the
-// DOM but nothing else, and no file is ever loaded into the page.
+// It opens one hidden window, injects the bundle that render-content-images.ts
+// built, and asks it for one data URL per image. The page is `about:blank` with
+// context isolation on: the injected code runs in the isolated world, which
+// shares the DOM but nothing else, and no file is ever loaded into the page.
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { app, BrowserWindow } from "electron";
-
-// SwiftShader rather than the real GPU. A CI runner has no GPU at all, and using
-// the same rasteriser everywhere means a locally built image and a CI-built image
-// are the same picture.
-app.commandLine.appendSwitch("use-gl", "angle");
-app.commandLine.appendSwitch("use-angle", "swiftshader");
-app.commandLine.appendSwitch("enable-unsafe-swiftshader");
 
 // A build tool must not leave a process behind when its last window closes.
 app.on("window-all-closed", () => app.quit());

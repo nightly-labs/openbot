@@ -1,31 +1,32 @@
-// Bakes the article artwork of every collection during `vite build`.
+// The article artwork of every collection: which images there are, where they
+// live, and the build step that ships them.
 //
-// The card gradients come from a WebGL shader and a Cloudflare Worker has no
-// WebGL, so the images cannot be made at request time. They are not committed
-// either: they are derived from the article title, so committing them would add a
-// second copy of something already in the repository, and one that can silently
-// drift. Instead Electron — already a devDependency for the desktop app — renders
-// them offscreen here, keyed by a content hash so an unchanged article is never
-// rendered twice.
+// The card gradients come from a WebGL shader. A Cloudflare Worker has no WebGL
+// and a CI runner has no GPU, so neither can draw them. `bun run api:images`
+// (render-content-images.ts) draws them on a developer's machine into
+// `content-art/`, which is committed. The build copies that folder into the site
+// and fails when it does not match the articles.
 
-import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import type { Plugin } from "vite";
 import { articleGradient } from "./src/lib/article-gradient";
 import { CONTENT_COLLECTIONS } from "./src/lib/content";
 import { articleArtPath, CONTENT_ART_SHAPES, type ContentCollection } from "./src/lib/content-collection";
 
-const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
 
-/** Change this when the drawing changes but the article does not, to void the cache. */
+/** The committed images, at the same paths they have in the site. */
+export const CONTENT_ART_DIRECTORY = path.join(appRoot, "content-art");
+/** File name to input hash, for every image in `CONTENT_ART_DIRECTORY`. Not shipped. */
+export const CONTENT_ART_MANIFEST = path.join(CONTENT_ART_DIRECTORY, "manifest.json");
+
+/** Change this when the drawing changes but the article does not, so every image is drawn again. */
 const GENERATOR_VERSION = 1;
 
 /** The social card. Fixed by Open Graph, which crops anything else. */
@@ -53,19 +54,7 @@ export interface ContentImageJob {
   withTitle: boolean;
 }
 
-export interface ContentImage {
-  fileName: string;
-  data: Uint8Array;
-}
-
-/**
- * `require` — the generator either renders every image or fails the build.
- * `skip` — emit nothing. Used by `api:build:check`, which installs without
- * scripts and so has no Electron binary.
- * Unset — try, and fall back to the CSS gradient with a warning. This is the
- * developer's build; CI always states which one it wants.
- */
-type ContentImageMode = "require" | "skip" | "auto";
+export type ContentArtManifest = Record<string, string>;
 
 export function contentImages(): Plugin {
   return {
@@ -74,33 +63,19 @@ export function contentImages(): Plugin {
     async generateBundle() {
       if (this.environment.name !== "client") return;
 
-      const mode = readContentImageMode(process.env.OPENBOT_CONTENT_IMAGES);
-      if (mode === "skip") {
-        this.info("OPENBOT_CONTENT_IMAGES=skip: the article artwork was not rendered.");
-        return;
+      const problems = await contentArtProblems();
+      if (problems.length > 0) {
+        throw new Error(
+          `The committed article artwork does not match the articles:\n${problems.map((problem) => `  - ${problem}`).join("\n")}\nRun \`bun run api:images\` and commit apps/auth-api/content-art.`,
+        );
       }
 
-      try {
-        for (const image of await renderContentImages((line) => this.info(line))) {
-          this.emitFile({ type: "asset", fileName: image.fileName, source: image.data });
-        }
-      } catch (error) {
-        const reason = error instanceof Error ? error.message : String(error);
-        if (mode === "require") {
-          throw new Error(`Article artwork could not be rendered: ${reason}`);
-        }
-        this.warn(
-          `Article artwork could not be rendered, so the cards fall back to their CSS gradient: ${reason}\nSet OPENBOT_CONTENT_IMAGES=require to make this fail the build.`,
-        );
+      for (const job of contentImageJobs()) {
+        const source = await readFile(path.join(CONTENT_ART_DIRECTORY, job.fileName));
+        this.emitFile({ type: "asset", fileName: job.fileName, source });
       }
     },
   };
-}
-
-export function readContentImageMode(value: string | undefined): ContentImageMode {
-  if (value === "require" || value === "skip") return value;
-  if (value === undefined || value.trim() === "") return "auto";
-  throw new Error(`OPENBOT_CONTENT_IMAGES must be "require" or "skip", not ${JSON.stringify(value)}.`);
 }
 
 export function contentImageJobs(): ContentImageJob[] {
@@ -133,11 +108,11 @@ function collectionJobs(collection: ContentCollection): ContentImageJob[] {
 }
 
 /**
- * The cache key. It covers everything that can change the pixels: the gradient
- * itself, the size, the drawing code and the shader library version. A miss on
- * any of those renders again; a hit reuses bytes from a previous build.
+ * The hash of everything that can change the pixels: the gradient itself, the
+ * size, the drawing code and the shader library version. An image whose hash in
+ * the manifest differs was drawn for an older version of its article.
  */
-function jobCacheKey(job: ContentImageJob): string {
+export function contentImageKey(job: ContentImageJob): string {
   const gradient = articleGradient(job.title);
   const digest = createHash("sha256")
     .update(
@@ -160,207 +135,47 @@ function shadersVersion(): string {
   return manifest.dependencies?.["@paper-design/shaders"] ?? "unknown";
 }
 
-export async function renderContentImages(report: (line: string) => void = () => {}): Promise<ContentImage[]> {
+/** Each way the committed artwork differs from the articles. Empty when it matches. */
+export async function contentArtProblems(): Promise<string[]> {
+  const manifest = await readContentArtManifest();
   const jobs = contentImageJobs();
-  if (jobs.length === 0) return [];
-
-  const cacheDirectory = path.join(appRoot, "node_modules", ".cache", "openbot-content-images");
-  await mkdir(cacheDirectory, { recursive: true });
-
-  const cachePaths = new Map(jobs.map((job) => [job.fileName, path.join(cacheDirectory, `${jobCacheKey(job)}.png`)]));
-  const images: ContentImage[] = [];
-  const missing: ContentImageJob[] = [];
+  const expected = new Set(jobs.map((job) => job.fileName));
+  const present = new Set(await listContentArt());
+  const problems: string[] = [];
 
   for (const job of jobs) {
-    const cachePath = cachePaths.get(job.fileName);
-    const cached = cachePath ? await readIfPresent(cachePath) : undefined;
-    if (cached) images.push({ fileName: job.fileName, data: cached });
-    else missing.push(job);
+    if (!present.has(job.fileName)) problems.push(`${job.fileName} is missing.`);
+    else if (manifest[job.fileName] !== contentImageKey(job)) problems.push(`${job.fileName} is out of date.`);
   }
-
-  if (missing.length === 0) return images;
-
-  report(`Drawing ${missing.length} of ${jobs.length} article images; the rest come from the cache.`);
-  const rendered = await renderInElectron(missing, report);
-  for (const image of rendered) {
-    const cachePath = cachePaths.get(image.fileName);
-    if (cachePath) await writeFile(cachePath, image.data);
-    images.push(image);
+  for (const fileName of present) {
+    if (!expected.has(fileName)) problems.push(`${fileName} belongs to no article.`);
   }
-
-  return images;
+  return problems;
 }
 
-async function readIfPresent(filePath: string): Promise<Uint8Array | undefined> {
+export async function readContentArtManifest(): Promise<ContentArtManifest> {
+  let text: string;
   try {
-    return new Uint8Array(await readFile(filePath));
+    text = await readFile(CONTENT_ART_MANIFEST, "utf8");
   } catch {
-    return undefined;
+    return {};
   }
+  const value = JSON.parse(text);
+  if (!isDynamicRecord(value)) throw new Error(`${CONTENT_ART_MANIFEST} must hold one object.`);
+  const manifest: ContentArtManifest = {};
+  for (const [fileName, key] of Object.entries(value)) {
+    if (typeof key === "string") manifest[fileName] = key;
+  }
+  return manifest;
 }
 
-async function renderInElectron(jobs: ContentImageJob[], report: (line: string) => void): Promise<ContentImage[]> {
-  const electronBinary = resolveElectronBinary();
-  const workspace = await mkdtemp(path.join(tmpdir(), "openbot-content-images-"));
-
+/** Every image in `CONTENT_ART_DIRECTORY`, as a bundle path. */
+export async function listContentArt(): Promise<string[]> {
+  let entries: string[];
   try {
-    const outputDirectory = path.join(workspace, "out");
-    await mkdir(outputDirectory, { recursive: true });
-
-    const control = {
-      jobs,
-      outputDirectory,
-      // The window only has to be large enough to hold the biggest job, because
-      // an element outside the viewport never gets a rendering tick.
-      viewportWidth: Math.max(...jobs.map((job) => job.width)),
-      viewportHeight: Math.max(...jobs.map((job) => job.height)),
-      bundle: await bundlePageScript(workspace),
-      fontScript: await buildFontScript(),
-    };
-
-    const controlPath = path.join(workspace, "control.json");
-    await writeFile(controlPath, JSON.stringify(control));
-
-    await runElectron(electronBinary, [path.join(appRoot, "content-image-electron.mjs"), controlPath], report);
-
-    return await Promise.all(
-      jobs.map(async (job) => ({
-        fileName: job.fileName,
-        data: new Uint8Array(await readFile(path.join(outputDirectory, job.fileName))),
-      })),
-    );
-  } finally {
-    await rm(workspace, { recursive: true, force: true });
+    entries = await readdir(CONTENT_ART_DIRECTORY, { recursive: true });
+  } catch {
+    return [];
   }
-}
-
-function resolveElectronBinary(): string {
-  try {
-    // The electron package exports the path of its binary. It throws when the
-    // install script did not run, which is exactly the case this must report.
-    const resolved: string = require("electron");
-    if (resolved.length > 0) return resolved;
-    throw new Error("the electron package did not report a binary path");
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    throw new Error(`Electron is not available (${reason}). Install without --ignore-scripts.`);
-  }
-}
-
-/**
- * One classic script with the shader library inlined. A file:// page cannot load
- * ES modules, and injecting one self-contained script avoids needing a page that
- * can load anything at all.
- */
-async function bundlePageScript(workspace: string): Promise<string> {
-  const outFile = path.join(workspace, "page.js");
-  await execFileAsync("bun", [
-    "build",
-    path.join(appRoot, "content-image-page.ts"),
-    "--target=browser",
-    "--format=iife",
-    "--minify",
-    `--outfile=${outFile}`,
-  ]);
-  return await readFile(outFile, "utf8");
-}
-
-/**
- * Inter is not installed on a build machine, so the baked title would fall back
- * to whatever the system has and the social cards would not match the site. The
- * font travels into the page as a data URL, since the page loads no files.
- */
-async function buildFontScript(): Promise<string> {
-  const fontPath = require.resolve("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2");
-  const font = await readFile(fontPath, "base64");
-  return `(async () => {
-    const face = new FontFace("Inter Variable", "url(data:font/woff2;base64,${font}) format('woff2')", { weight: "100 900" });
-    await face.load();
-    document.fonts.add(face);
-  })()`;
-}
-
-/**
- * How long the build waits for the next line from the renderer, not for the
- * whole run. A machine with no window server never reaches `app.whenReady()` and
- * then waits without printing anything, which would otherwise burn the agent's
- * entire time budget on a step that can never finish. A whole-run limit cannot
- * tell that apart from a full set of images drawn slowly on a software
- * rasteriser, and the renderer reports each image as it lands.
- */
-const ELECTRON_SILENCE_MS = 90_000;
-
-function runElectron(binary: string, args: string[], report: (line: string) => void): Promise<void> {
-  const { command, commandArgs } = withVirtualDisplay(binary, args);
-
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, commandArgs, {
-      stdio: ["ignore", "pipe", "inherit"],
-      env: electronEnvironment(),
-    });
-
-    let timer: NodeJS.Timeout;
-    const waitForProgress = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        child.kill("SIGKILL");
-        reject(
-          new Error(
-            `Electron drew nothing for ${ELECTRON_SILENCE_MS / 1000} seconds. It usually means the machine has no display; run the build where a window server or xvfb is available, or set OPENBOT_CONTENT_IMAGES=skip.`,
-          ),
-        );
-      }, ELECTRON_SILENCE_MS);
-    };
-    waitForProgress();
-
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => {
-      waitForProgress();
-      for (const line of chunk.split("\n")) {
-        if (line.trim()) report(line.trim());
-      }
-    });
-
-    child.on("error", (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      if (code === 0) resolve();
-      else reject(new Error(`Electron exited with code ${code}.${electronExitHint(code)}`));
-    });
-  });
-}
-
-/**
- * Chromium aborts on a signal when it cannot build its sandbox. A Linux machine
- * hits this because an install as a normal user cannot give `chrome-sandbox` the
- * owner and mode the helper requires.
- */
-function electronExitHint(code: number | null) {
-  if (code !== 128 + 5 && code !== 128 + 6) return "";
-  return " Chromium stopped on a signal, which usually means it could not start its sandbox. On Linux, give `node_modules/electron/dist/chrome-sandbox` the owner root and mode 4755.";
-}
-
-/**
- * `ELECTRON_RUN_AS_NODE` is set by whatever spawned this build in some setups. If
- * it survives into the child, Electron starts as plain Node and fails the moment
- * it reaches BrowserWindow, with an error that says nothing about the cause.
- */
-function electronEnvironment(): NodeJS.ProcessEnv {
-  const environment = { ...process.env };
-  delete environment.ELECTRON_RUN_AS_NODE;
-  return environment;
-}
-
-/** A Linux CI runner has no display server, and Chromium will not start without one. */
-function withVirtualDisplay(binary: string, args: string[]): { command: string; commandArgs: string[] } {
-  if (process.platform !== "linux" || process.env.DISPLAY) {
-    return { command: binary, commandArgs: args };
-  }
-  return {
-    command: "xvfb-run",
-    commandArgs: ["--auto-servernum", "--server-args=-screen 0 1280x1024x24", binary, ...args],
-  };
+  return entries.filter((entry) => entry.endsWith(".png")).map((entry) => entry.split(path.sep).join("/"));
 }
