@@ -141,8 +141,6 @@ risks since the last release.
 - Tests are mandatory for changes to the renderer-to-main boundary, IPC contracts, database schema
   and migrations, persisted state, secrets, provider processes, Team API wire protocols, and the
   updater. Test once at the lowest stable boundary.
-- For each added assertion, break the behavior and confirm the test fails for the intended reason.
-  Restore the code and report this check in the PR.
 - Wait for state, an event, or a promise, not elapsed time. A spy can provide the wait condition,
   such as `await waitFor(() => expect(send).toHaveBeenCalled())`; assert the user consequence after
   that wait. Do not remove synchronization because it uses a spy.
