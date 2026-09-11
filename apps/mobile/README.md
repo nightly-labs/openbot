@@ -223,7 +223,8 @@ The endpoint is fixed to `https://analytics.openbot.run/api`. No analytics crede
 
 ### Production configuration
 
-1. In the self-hosted OpenPanel dashboard, open the same project used by desktop and the website.
+1. In the self-hosted OpenPanel dashboard, open the existing **Openbot** project used by desktop and the website.
+   Do not create or select a separate **Openbot Mobile** project.
    Create a separate client for OpenBot Mobile with **write** access only. Copy its Client ID and
    Client Secret. Do not use an organization/root client or a client with read access.
 2. In the Expo dashboard, open the **openbot** project → **Environment variables**, select the
@@ -242,9 +243,10 @@ The endpoint is fixed to `https://analytics.openbot.run/api`. No analytics crede
    `expo-application` native dependency requires a new binary; do not send this change as an OTA
    update to a binary that lacks it. Build and deployment are separate operations, not part of setup.
 4. In that build, leave **Settings → General → Privacy → Share product analytics** enabled.
-   OpenPanel's Real-time view should show `mobile_app_opened` with `surface=mobile`. Pair the phone,
-   open a conversation and send a message. Confirm connection and message events, then disable the
-   setting and confirm that new actions do not send events. Repeat on iOS and Android.
+   Before pairing, events stay in memory and do not appear in OpenPanel. Pair the phone.
+   OpenPanel's Real-time view should then show `mobile_app_opened` and pairing events with
+   `surface=mobile`, the account ID, and the email on its profile. Open a conversation and send
+   a message. Confirm connection and message events, then disable the setting and confirm that new actions do not send events. Repeat on iOS and Android.
 
 React Native requires a Client Secret according to OpenPanel's native SDK guide. In this direct
 native integration it is an **embedded write credential**, not a confidential server secret.
@@ -288,8 +290,9 @@ where available, `duration_ms`. Failure codes are fixed categories, never raw er
 | `account_sign_out` | Sign-out result under the initiating account |
 
 Use a mobile activation funnel from open → successful QR redemption → successful connection →
-conversation load or message send. Measure signed-in D1/D7 retention by OpenBot account ID. Anonymous
-pairing events precede identity, so do not interpret account-only funnels as the full pairing funnel.
+conversation load or message send. Measure signed-in D1/D7 retention by OpenBot account ID. Eligible
+pre-session events join that account after sign-in. Unclaimed and expired attempts are not sent, so
+this funnel does not measure all abandoned pairing attempts.
 A message receipt means the host accepted the message, not that the agent finished its work.
 Connection retries are separate attempts; countdown ticks and background suspension are not failures.
 
@@ -304,3 +307,12 @@ never blocks product actions. Session replay, automatic screen capture, route ID
 file names, contents, URLs and raw errors are excluded. The SDK's Android referrer and path metadata
 are removed again at the final send filter. Account ID and normalized email identify the profile;
 email is not an event property. The phone preference is independent of desktop/host analytics.
+
+Pre-session events stay in memory for at most 30 minutes from the first buffered event, with a
+limit of 100 events (the oldest is removed when full). Session creation sends eligible events once,
+with their original timestamps, after identifying the account. Reconnects do not replay them.
+Opt-out and process exit discard the buffer. Sign-out ends the previous account's operation scopes;
+new signed-out activity can be claimed by the next sign-in. There is no disk queue.
+Existing anonymous events already sent by older builds are not reassigned by this fix.
+If mobile credentials belong to another project, replace both production variables with credentials
+for a write-only client in **Openbot**, then ship a build or compatible update with those values.
