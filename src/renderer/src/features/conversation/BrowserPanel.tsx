@@ -9,7 +9,6 @@ import type {
 import { Portal } from "@solidjs/web";
 import { createEffect, For, onSettled, Show } from "solid-js";
 import {
-  ArrowLeft,
   Button,
   buttonVariants,
   CircleDot,
@@ -84,7 +83,7 @@ function diagnosticErrorLabel(count: number): string {
 
 export default function BrowserPanel(props: BrowserPanelProps) {
   const actingControl = () => (props.activeControl?.phase === "acting" ? props.activeControl : undefined);
-  let backButton: HTMLButtonElement | undefined;
+  let hideButton: HTMLButtonElement | undefined;
   let panel: HTMLElement | undefined;
   let surfaceElement: HTMLDivElement | undefined;
   createEffect(
@@ -94,7 +93,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
       if (!open) return;
       let disposed = false;
       onSettled(() => {
-        backButton?.focus();
+        hideButton?.focus();
         // Chromium is a native child view. Attach it only after the CSS panel settles.
         const animations = panel?.getAnimations() ?? [];
         const showSurface = () => {
@@ -157,15 +156,6 @@ export default function BrowserPanel(props: BrowserPanelProps) {
       activationMode="automatic"
     >
       <header class="browser-panel-header window-drag">
-        <Button
-          ref={(element) => (backButton = element)}
-          variant="ghost"
-          size="sm"
-          class="no-drag browser-return"
-          onClick={props.onBack}
-        >
-          <ArrowLeft aria-hidden="true" /> Back to conversation
-        </Button>
         <div class="browser-tabs no-drag">
           <Tabs.List class="browser-tab-strip" aria-label="Browser tabs">
             <For each={props.tabs}>
@@ -250,8 +240,9 @@ export default function BrowserPanel(props: BrowserPanelProps) {
       <Portal>
         <Show when={props.open}>
           <Button
-            variant="secondary"
+            variant="ghost"
             size="icon-xs"
+            ref={(element) => (hideButton = element)}
             class="no-drag browser-hide"
             aria-label="Hide browser"
             title="Hide browser"

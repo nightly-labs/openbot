@@ -7888,6 +7888,11 @@ button.chat-action-target:active,
   opacity: 1;
 }
 
+/* Keep app navigation below the portaled browser and its backdrop. */
+body:has(.browser-panel-expanded) .app-frame {
+  isolation: isolate;
+}
+
 .browser-expanded-backdrop {
   position: fixed;
   inset: 0;
@@ -7967,10 +7972,6 @@ button.chat-action-target:active,
   align-items: center;
   gap: var(--openbot-space-3);
   padding-inline: var(--openbot-space-2);
-}
-
-.browser-return {
-  flex-shrink: 0;
 }
 
 .browser-panel-expanded .browser-tabs {
