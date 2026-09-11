@@ -783,6 +783,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return !this.#releasedCustomProviders.has(modelId.slice(0, separator));
   }
 
+  /** Ends every disposable client that may hold a session on an endpoint the user has taken out. */
+  #stopProfileClients(): void {
+    for (const client of this.#profileClients) {
+      if (client.provider !== "opencode") continue;
+      void client.stop().catch(() => undefined);
+    }
+  }
+
   async generateProfile(input: GenerateAgentProfileInput, sections: SidebarSection[]): Promise<AgentProfileDraft> {
     const agent = input.agentId ? this.listAgents().find((candidate) => candidate.id === input.agentId) : null;
     if (input.agentId && !agent) throw new Error("This agent no longer exists.");
@@ -1155,6 +1163,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const revision = this.#endpointRevision;
       this.#releasedCustomProviders.set(providerId, revision);
       this.#emitModelsChanged();
+      // A profile or channel client is a process of its own, spawned with the endpoints as they
+      // were, and no restart of the main client reaches it. It is one short request, so it is
+      // stopped rather than watched: its caller reports a failure the user can repeat.
+      this.#stopProfileClients();
       try {
         await this.#releaseCustomProviderModels();
         const persisted = await persist();

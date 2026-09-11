@@ -873,6 +873,55 @@ describe.sequential("AgentService: providers", () => {
     expect(service.listQueue("chief").deliveries.find((delivery) => delivery.id === queued.id)?.status).toBe("queued");
   });
 
+  it("stops a profile client when the endpoint it may hold is removed", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    const profileClients: FakeAgentClient[] = [];
+    // The profile client is a process of its own, so it is the one created while this is true.
+    let generating = false;
+    let signalProfileStarted: () => void = () => undefined;
+    const profileStarted = new Promise<void>((resolve) => {
+      signalProfileStarted = resolve;
+    });
+    let releaseProfile: () => void = () => undefined;
+    const profileHeld = new Promise<void>((resolve) => {
+      releaseProfile = resolve;
+    });
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
+      const profile = generating;
+      const client = new FakeAgentClient(provider, undefined, true, true, {}, async () => {
+        if (!profile) return;
+        signalProfileStarted();
+        await profileHeld;
+      });
+      if (provider === "opencode") {
+        client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
+      }
+      if (profile) profileClients.push(client);
+      return client;
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+
+    generating = true;
+    const generation = service.generateProfile({ prompt: "Describe a research assistant" }, []);
+    void generation.catch(() => undefined);
+    await profileStarted;
+    generating = false;
+    const profileClient = profileClients[0];
+    if (!profileClient) throw new Error("No profile client was created.");
+    expect(profileClient.running).toBe(true);
+
+    await service.removeCustomProvider("studio", async () => undefined);
+
+    // No restart of the main client reaches this process, so it is ended instead.
+    expect(profileClient.running).toBe(false);
+    // The held request is released so the fake client has nothing left in flight. The generation
+    // itself is not awaited: its client is gone, so its result no longer belongs to this test.
+    releaseProfile();
+  });
+
   // An id saved again is served again, whatever the CLI did with the removal before it.
   it("offers an endpoint's models again after the id is saved a second time", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);

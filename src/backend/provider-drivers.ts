@@ -169,6 +169,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           ...openCodeConfigEnv(OPENCODE_PROFILE_CONFIG, context.customProviders),
         }),
         signInMessage: openCodeSignInMessage(context.customProviders().length),
+        servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "opencode", email: account?.email ?? null }),
     validateAccount: () => undefined,
