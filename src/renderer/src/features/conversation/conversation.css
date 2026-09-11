@@ -7949,7 +7949,10 @@ button.chat-action-target:active,
 }
 
 .browser-hide {
-  flex-shrink: 0;
+  position: fixed;
+  top: var(--openbot-space-1);
+  right: var(--openbot-space-1);
+  z-index: calc(var(--openbot-layer-dropdown) - 1);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -6,6 +6,7 @@ import type {
   BrowserPreview,
   BrowserTab,
 } from "@openbot/contracts/ipc";
+import { Portal } from "@solidjs/web";
 import { createEffect, For, onSettled, Show } from "solid-js";
 import {
   ArrowLeft,
@@ -13,10 +14,10 @@ import {
   buttonVariants,
   CircleDot,
   Input,
+  Minimize2,
   PictureInPicture2,
   Tabs,
   TriangleAlert,
-  X,
 } from "../../components/ui";
 import type { AgentProfile } from "../../data";
 import {
@@ -245,17 +246,21 @@ export default function BrowserPanel(props: BrowserPanelProps) {
             <PlusIcon />
           </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          class="no-drag browser-hide"
-          aria-label="Hide browser"
-          title="Hide browser"
-          onClick={props.onBack}
-        >
-          <X aria-hidden="true" />
-        </Button>
       </header>
+      <Portal>
+        <Show when={props.open}>
+          <Button
+            variant="secondary"
+            size="icon-xs"
+            class="no-drag browser-hide"
+            aria-label="Hide browser"
+            title="Hide browser"
+            onClick={props.onBack}
+          >
+            <Minimize2 aria-hidden="true" />
+          </Button>
+        </Show>
+      </Portal>
       <Tabs.Content forceMount value={props.activeTab?.id ?? "__empty"} class="browser-tab-panel">
         <div class="browser-toolbar">
           <Button
