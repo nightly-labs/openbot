@@ -26,9 +26,13 @@ export function filterMobilePayload(event: TrackHandlerPayload): boolean {
     (candidate): candidate is MobileEventName => candidate === event.payload.name,
   );
   if (!name) return false;
+  const timestamp = event.payload.properties?.__timestamp;
   event.payload.properties = {
     ...sanitizeMobileEvent(name, event.payload.properties ?? {}),
     ...metadata,
+    ...(typeof timestamp === "string" && Number.isFinite(Date.parse(timestamp))
+      ? { __timestamp: new Date(timestamp).toISOString() }
+      : {}),
     __referrer: "",
     __path: "",
   };
@@ -59,7 +63,8 @@ export const mobileAnalytics = new MobileAnalytics(() => {
   const send = client.api.fetch.bind(client.api);
   client.api.fetch = (path, data, options) => send(path, data, { ...options, signal: transport.signal });
   return {
-    track: (name, properties) => client.track(name, properties),
+    track: (name, properties, timestamp) =>
+      client.track(name, { ...properties, ...(timestamp ? { __timestamp: timestamp } : {}) }),
     identify: (user) => client.identify(user),
     clear: () => {
       transport.abort();

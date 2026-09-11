@@ -59,7 +59,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function clientFixture() {
+function clientFixture(authenticated = true) {
   let profileId: string | null = null;
   const events: { name: string; profileId: string | null; properties: object }[] = [];
   const client: MobileAnalyticsClient = {
@@ -74,6 +74,7 @@ function clientFixture() {
     },
   };
   const analytics = new MobileAnalytics(() => client);
+  if (authenticated) analytics.setUser({ id: "account", email: "person@example.com" });
   return { analytics, client, events };
 }
 
@@ -98,7 +99,7 @@ it("removes private values, unknown enums and prototype keys at the event bounda
 });
 
 it("preserves accepted events under their original account and drops late operation results", async () => {
-  const { analytics, events } = clientFixture();
+  const { analytics, events } = clientFixture(false);
   analytics.setEnabled(true);
   analytics.track("mobile_pairing_action", { action: "redeem", result: "succeeded" });
   analytics.setUser({ id: "first", email: "first@example.com" });
@@ -112,11 +113,10 @@ it("preserves accepted events under their original account and drops late operat
   analytics.track("mobile_app_opened", { kind: "foreground", signed_in: false });
   await analytics.settled();
   expect(events.map(({ name, profileId }) => [name, profileId])).toEqual([
-    ["mobile_pairing_action", null],
+    ["mobile_pairing_action", "first"],
     ["message_send", "first"],
     ["usage_viewed", "second"],
     ["account_sign_out", "second"],
-    ["mobile_app_opened", null],
   ]);
 });
 
@@ -213,8 +213,14 @@ describe("installed React Native SDK", () => {
       return new Response("{}", { status: fail ? 503 : 200 });
     });
     const { mobileAnalytics } = await import("./mobile-analytics");
-    if (kind === "identify") mobileAnalytics.setUser({ id: "account", email: "person@example.com" });
+    mobileAnalytics.setUser({ id: "account", email: "person@example.com" });
+    if (kind === "track") fail = false;
     mobileAnalytics.setEnabled(true);
+    if (kind === "track") {
+      await mobileAnalytics.settled();
+      requests.length = 0;
+      fail = true;
+    }
     if (kind === "track") mobileAnalytics.track("usage_viewed", {});
     await vi.advanceTimersByTimeAsync(0);
     expect(requests).toHaveLength(1);
@@ -228,7 +234,7 @@ describe("installed React Native SDK", () => {
     await vi.runAllTimersAsync();
     await mobileAnalytics.settled();
     expect(requests.map((body) => JSON.parse(body).type)).toEqual(
-      kind === "identify" ? ["identify", "identify", "track"] : ["track", "track"],
+      kind === "identify" ? ["identify", "identify", "track"] : ["track", "identify", "track"],
     );
     expect(JSON.parse(requests[requests.length - 1]).payload.name).toBe("mobile_app_opened");
   });
@@ -311,9 +317,10 @@ it("restores opt-out after restart and supports opting back in without replay", 
   await next.settled();
   expect(requests).toEqual([]);
   await restarted.saveAnalyticsPreference(true);
+  next.setUser({ id: "account", email: "person@example.com" });
   next.track("usage_viewed", {});
   await next.settled();
-  expect(requests).toHaveLength(1);
+  expect(requests).toHaveLength(2);
 });
 
 it("fails closed when preference storage is unreadable and does not enable tracking on a failed save", async () => {
@@ -395,6 +402,9 @@ it("instruments message commands without sending their contents or changing the 
     markAgentUnread: () => {},
     toggleAgentPin: () => "pinned",
   };
+  mobileAnalytics.setUser({ id: "account", email: "person@example.com" });
+  await mobileAnalytics.settled();
+  requests.length = 0;
   const tracked = trackWorkspaceActions(workspace);
   await expect(
     tracked.sendMessage("agent-private", "private contents", ["file-private"], "reply-private"),
@@ -406,6 +416,7 @@ it("instruments message commands without sending their contents or changing the 
       type: "track",
       payload: {
         name: "message_send",
+        profileId: "account",
         properties: expect.objectContaining({
           result: "succeeded",
           attachment_count: 1,
@@ -455,4 +466,66 @@ it("counts visible conversation outcomes once, including cached reads and failed
       properties: { result: "failed", duration_ms: expect.any(Number), failure_code: "load_failed" },
     },
   ]);
+});
+
+it("claims app open and pairing once, preserving timestamps and pairing scopes through session creation", async () => {
+  const requests = captureRequests();
+  const { mobileAnalytics } = await import("./mobile-analytics");
+  mobileAnalytics.setEnabled(true);
+  mobileAnalytics.track("mobile_app_opened", { kind: "cold_start", signed_in: false });
+  const pairing = mobileAnalytics.scope();
+  pairing.track("mobile_pairing_action", { action: "scanner_opened" });
+  await mobileAnalytics.settled();
+  expect(requests).toEqual([]);
+  mobileAnalytics.setUser({ id: "claimed", email: " PERSON@Example.com " });
+  pairing.track("mobile_pairing_action", { action: "redeem", result: "succeeded" });
+  mobileAnalytics.setUser({ id: "claimed", email: "person@example.com" });
+  await mobileAnalytics.settled();
+  const bodies = requests.map(({ body }) => JSON.parse(body));
+  expect(bodies.map(({ type, payload }) => [type, payload.name, payload.profileId])).toEqual([
+    ["identify", undefined, "claimed"],
+    ["track", "mobile_app_opened", "claimed"],
+    ["track", "mobile_pairing_action", "claimed"],
+    ["track", "mobile_pairing_action", "claimed"],
+  ]);
+  expect(bodies[0].payload.email).toBe("person@example.com");
+  expect(bodies[1].payload.properties.__timestamp).toEqual(expect.any(String));
+  expect(bodies[2].payload.properties.__timestamp).toEqual(expect.any(String));
+});
+
+it("expires unclaimed activity and scopes after 30 minutes", async () => {
+  vi.useFakeTimers();
+  const { analytics, events } = clientFixture(false);
+  analytics.setEnabled(true);
+  analytics.track("mobile_app_opened", { kind: "cold_start", signed_in: false });
+  const expired = analytics.scope();
+  await vi.advanceTimersByTimeAsync(30 * 60 * 1_000);
+  analytics.track("mobile_pairing_action", { action: "scanner_opened" });
+  analytics.setUser({ id: "account", email: "person@example.com" });
+  expired.track("mobile_pairing_action", { action: "redeem", result: "succeeded" });
+  await analytics.settled();
+  expect(events.map(({ name }) => name)).toEqual(["mobile_pairing_action"]);
+});
+
+it("bounds unclaimed activity and clears it on opt-out and process restart", async () => {
+  const { analytics, events } = clientFixture(false);
+  analytics.setEnabled(true);
+  analytics.track("mobile_app_opened", { kind: "cold_start", signed_in: false });
+  for (let i = 0; i < 100; i += 1) analytics.track("usage_viewed", {});
+  analytics.setUser({ id: "account", email: "person@example.com" });
+  await analytics.settled();
+  expect(events).toHaveLength(100);
+  expect(events.every(({ name }) => name === "usage_viewed")).toBe(true);
+  analytics.setUser(null);
+  analytics.track("usage_viewed", {});
+  analytics.setEnabled(false);
+  analytics.setEnabled(true);
+  analytics.setUser({ id: "second", email: "second@example.com" });
+  await analytics.settled();
+  expect(events).toHaveLength(100);
+  const restarted = clientFixture(false);
+  restarted.analytics.setEnabled(true);
+  restarted.analytics.setUser({ id: "second", email: "second@example.com" });
+  await restarted.analytics.settled();
+  expect(restarted.events).toEqual([]);
 });

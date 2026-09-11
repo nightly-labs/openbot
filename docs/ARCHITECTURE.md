@@ -466,6 +466,12 @@ agent. This does not introduce a schema migration or alter released protocol cod
 
 `apps/mobile/src/features/analytics` owns the React Native OpenPanel client, typed event allowlists,
 account-scoped operations, the local SecureStore preference, and foreground/connection events.
+Before session creation, it buffers at most 100 sanitized events in memory for 30 minutes from the
+first buffered event. The next account claims this buffer; identify precedes ordered delivery with
+original timestamps. Reconnects do not replay it. Expiry, opt-out, and process exit discard it.
+Account changes invalidate prior operation scopes; the anonymous-to-account transition retains the
+pairing scope so its completion can be recorded. Mobile uses a write-only client in the existing
+Openbot OpenPanel project shared with desktop and the website.
 Workspace command wrappers record outcomes once at the mobile caller; conversation availability is measured in
 the visible chat view, including cached reads, not from background broadcasts. The host remains the only source of turn lifecycle
 events. No Team API or database schema changes are required.

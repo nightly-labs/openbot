@@ -47,6 +47,45 @@ bun run mobile:ios
 bun run mobile:android
 ```
 
+Choose an iOS command:
+
+| Repository root | `apps/mobile` | Integration |
+| --- | --- | --- |
+| `bun mobile:ios` | `bun ios` | No RocketSim installation required |
+| `bun mobile:ios:rocketsim` | `bun ios:rocketsim` | Start RocketSim and enable Connect |
+
+Both commands apply the iOS config plugins without clearing the native directory,
+then build and launch the app with Expo. Expo arguments such as `--device` and
+`--port` pass through. The RocketSim command requires the app in `/Applications`
+or `~/Applications`, or `ROCKETSIM_APP_PATH` set to its `.app` directory. If it is
+missing, the command stops with setup instructions. The standard command does not
+look for RocketSim, even if `ROCKETSIM_APP_PATH` or the old `OPENBOT_ROCKETSIM`
+variable is set.
+
+The local launcher enables RocketSim Connect in the local native project. The config plugin
+loads it before React Native starts, only in Debug builds on the iOS Simulator.
+It does not copy the framework into the app. Release builds and physical devices
+cannot load it. A normal prebuild without the launcher removes the hook, as does
+`bun ios`. Switching back to the standard command removes the previous Connect
+hook before building. It does not close the RocketSim Mac app. The installed Debug
+simulator app built with `ios:rocketsim` can also reconnect
+when opened from its icon while RocketSim is running.
+
+In RocketSim, select a camera source and allow camera access when macOS asks.
+Allow local network access if requested. Camera and Network Monitor need Connect;
+network speed control also needs RocketSim Pro and approval of the Network Extension
+in RocketSim's Networking window. These OS approvals require user interaction.
+Network Monitor does not establish that WebRTC DataChannel traffic is visible.
+See [RocketSim Connect setup](https://www.rocketsim.app/docs/getting-started/setting-up-rocketsim-connect/).
+
+Verified with RocketSim 16.4.6 (332), Expo SDK 57, and the iOS 26.5 iPhone 17 Pro
+simulator: the app builds, starts Metro, and loads the Connect framework. Camera
+startup then hit an uncaught exception inside RocketSim's `AVCaptureSession rs_stopRunning`:
+`stopRunning may not be called between calls to beginConfiguration and commitConfiguration`.
+Camera operation is therefore not verified with this combination. Use
+`bun ios` if this occurs. The CLI also rejects network speed
+control with `pro_required` when RocketSim Pro is unavailable.
+
 For an Expo Go device outside the computer's trusted local network context, start Metro with a secure
 tunnel:
 
@@ -223,7 +262,8 @@ The endpoint is fixed to `https://analytics.openbot.run/api`. No analytics crede
 
 ### Production configuration
 
-1. In the self-hosted OpenPanel dashboard, open the same project used by desktop and the website.
+1. In the self-hosted OpenPanel dashboard, open the existing **Openbot** project used by desktop and the website.
+   Do not create or select a separate **Openbot Mobile** project.
    Create a separate client for OpenBot Mobile with **write** access only. Copy its Client ID and
    Client Secret. Do not use an organization/root client or a client with read access.
 2. In the Expo dashboard, open the **openbot** project → **Environment variables**, select the
@@ -242,9 +282,10 @@ The endpoint is fixed to `https://analytics.openbot.run/api`. No analytics crede
    `expo-application` native dependency requires a new binary; do not send this change as an OTA
    update to a binary that lacks it. Build and deployment are separate operations, not part of setup.
 4. In that build, leave **Settings → General → Privacy → Share product analytics** enabled.
-   OpenPanel's Real-time view should show `mobile_app_opened` with `surface=mobile`. Pair the phone,
-   open a conversation and send a message. Confirm connection and message events, then disable the
-   setting and confirm that new actions do not send events. Repeat on iOS and Android.
+   Before pairing, events stay in memory and do not appear in OpenPanel. Pair the phone.
+   OpenPanel's Real-time view should then show `mobile_app_opened` and pairing events with
+   `surface=mobile`, the account ID, and the email on its profile. Open a conversation and send
+   a message. Confirm connection and message events, then disable the setting and confirm that new actions do not send events. Repeat on iOS and Android.
 
 React Native requires a Client Secret according to OpenPanel's native SDK guide. In this direct
 native integration it is an **embedded write credential**, not a confidential server secret.
@@ -288,8 +329,9 @@ where available, `duration_ms`. Failure codes are fixed categories, never raw er
 | `account_sign_out` | Sign-out result under the initiating account |
 
 Use a mobile activation funnel from open → successful QR redemption → successful connection →
-conversation load or message send. Measure signed-in D1/D7 retention by OpenBot account ID. Anonymous
-pairing events precede identity, so do not interpret account-only funnels as the full pairing funnel.
+conversation load or message send. Measure signed-in D1/D7 retention by OpenBot account ID. Eligible
+pre-session events join that account after sign-in. Unclaimed and expired attempts are not sent, so
+this funnel does not measure all abandoned pairing attempts.
 A message receipt means the host accepted the message, not that the agent finished its work.
 Connection retries are separate attempts; countdown ticks and background suspension are not failures.
 
@@ -304,3 +346,12 @@ never blocks product actions. Session replay, automatic screen capture, route ID
 file names, contents, URLs and raw errors are excluded. The SDK's Android referrer and path metadata
 are removed again at the final send filter. Account ID and normalized email identify the profile;
 email is not an event property. The phone preference is independent of desktop/host analytics.
+
+Pre-session events stay in memory for at most 30 minutes from the first buffered event, with a
+limit of 100 events (the oldest is removed when full). Session creation sends eligible events once,
+with their original timestamps, after identifying the account. Reconnects do not replay them.
+Opt-out and process exit discard the buffer. Sign-out ends the previous account's operation scopes;
+new signed-out activity can be claimed by the next sign-in. There is no disk queue.
+Existing anonymous events already sent by older builds are not reassigned by this fix.
+If mobile credentials belong to another project, replace both production variables with credentials
+for a write-only client in **Openbot**, then ship a build or compatible update with those values.
