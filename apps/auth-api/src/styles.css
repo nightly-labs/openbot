@@ -1802,7 +1802,9 @@ a {
    than an observer: nothing has to arrive before it can play. The longhands below
    the `[data-enter]` shorthand swap in the same reveal the cards use, so one page
    has one motion. The artwork follows the copy by a step, which is the order the
-   block is read in.
+   block is read in, and the body follows the artwork by another step, so an
+   article opens as one movement down the page instead of a title and a picture
+   arriving over text that is already sitting there.
 
    `backwards`, not the shorthand's `both`, and it is what the cards already use.
    The reveal ends on `blur(0.001px)`, and a filter that is held makes the element
@@ -1811,7 +1813,8 @@ a {
    the copy, and the artwork beside it stops being clickable. The last frame is
    the resting state anyway, so there is nothing for the fill to hold. */
 [data-enter="news-copy"],
-[data-enter="news-art"] {
+[data-enter="news-art"],
+[data-enter="news-prose"] {
   animation-name: landing-download-reveal;
   animation-duration: 720ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
@@ -1824,6 +1827,10 @@ a {
 
 [data-enter="news-art"] {
   animation-delay: 160ms;
+}
+
+[data-enter="news-prose"] {
+  animation-delay: 260ms;
 }
 
 .news-article-body {
@@ -1947,6 +1954,19 @@ a {
   letter-spacing: -0.035em;
 }
 
+/* The heading joins the sweep of the cards under it. Left out, it was the one
+   fixed thing in a moving section. It carries no card index, so it arrives with
+   the first of them, which is the pair a reader takes as one thing anyway. It is
+   written here rather than beside the cards because its own rule is above, and a
+   reveal declared before it would be the higher specificity of the two. */
+.news-more[data-revealed="false"] .news-more-title {
+  opacity: 0;
+}
+
+.news-more[data-revealed="true"] .news-more-title {
+  animation: landing-download-reveal 720ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
 /* The closing block of a news page. Centred, because it is an end rather than
    another row of the page, and separated by a rule so it reads as an offer and not
    as the last article. The type scale is the download section's, so the two places
@@ -2061,7 +2081,21 @@ a {
 
 @media (prefers-reduced-motion: reduce) {
   .news-grid-section[data-revealed] .news-card,
-  .news-more[data-revealed] .news-card {
+  .news-more[data-revealed] .news-card,
+  .news-more[data-revealed] .news-more-title {
+    opacity: 1;
+    animation: none;
+  }
+
+  /* The global escape shortens every animation to nothing, but it selects with
+     `*`, and an attribute selector outranks that. So the blocks below were still
+     running their full reveal for a reader who asked for no motion. Naming them
+     is what makes a news page arrive at rest. The shared `[data-enter]` header
+     has the same gap and is left alone here, because it is not ours to change. */
+  [data-enter="news-copy"],
+  [data-enter="news-art"],
+  [data-enter="news-prose"],
+  .news-cta[data-revealed] {
     opacity: 1;
     animation: none;
   }

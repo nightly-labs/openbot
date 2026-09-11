@@ -55,7 +55,7 @@ export function NewsArticlePage(props: NewsArticlePageProps) {
             <NewsGradient slug={props.article.slug} title={props.article.title} mode="live" shape="article" />
           </div>
 
-          <div class="news-prose">
+          <div class="news-prose" data-enter="news-prose">
             <Show when={body()}>{(Body) => <Dynamic component={Body()} />}</Show>
           </div>
         </article>
