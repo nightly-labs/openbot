@@ -15,7 +15,7 @@ export function loadNewsArticle(slug: string): CollectionArticle {
 
 export const Route = createFileRoute("/news/$slug")({
   loader: ({ params }) => loadNewsArticle(params.slug),
-  head: ({ loaderData }) => (loaderData ? articleHead(NEWS_COLLECTION, loaderData) : {}),
+  head: ({ loaderData, match }) => (loaderData ? articleHead(NEWS_COLLECTION, loaderData, match.context.siteUrl) : {}),
   component: NewsArticleRoute,
 });
 

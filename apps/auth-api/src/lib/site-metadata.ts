@@ -10,6 +10,21 @@ export const OPENBOT_SITE_DESCRIPTION =
 export const OPENBOT_SOCIAL_IMAGE_URL = `${OPENBOT_SITE_URL}openbot-social.png`;
 export const OPENBOT_SOCIAL_IMAGE_ALT = "Meet OpenBot on a dark grid background";
 
+// The hosts production answers on. Both serve the same pages, and those pages go by
+// openbot.run.
+const OPENBOT_PRODUCTION_HOSTS = new Set(["openbot.run", "api.openbot.run"]);
+
+/**
+ * The site that the head tags of a page served at `pageUrl` name. Social sites fetch
+ * `og:url` and `og:image` themselves and show no card when those answer 404. A
+ * pull-request preview serves pages and images that openbot.run does not have yet,
+ * so any host other than production names itself. Cloudflare marks preview URLs
+ * `noindex`, so a preview canonical does not compete with production.
+ */
+export function siteUrlForPage(pageUrl: URL): string {
+  return OPENBOT_PRODUCTION_HOSTS.has(pageUrl.hostname) ? OPENBOT_SITE_URL : `${pageUrl.origin}/`;
+}
+
 export const OPENBOT_SOFTWARE_APPLICATION = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",

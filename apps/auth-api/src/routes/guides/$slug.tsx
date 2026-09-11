@@ -14,7 +14,8 @@ export function loadGuide(slug: string): CollectionArticle {
 
 export const Route = createFileRoute("/guides/$slug")({
   loader: ({ params }) => loadGuide(params.slug),
-  head: ({ loaderData }) => (loaderData ? articleHead(GUIDES_COLLECTION, loaderData) : {}),
+  head: ({ loaderData, match }) =>
+    loaderData ? articleHead(GUIDES_COLLECTION, loaderData, match.context.siteUrl) : {},
   component: GuideRoute,
 });
 

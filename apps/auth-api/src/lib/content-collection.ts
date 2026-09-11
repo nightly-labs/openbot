@@ -67,25 +67,29 @@ export function articlePath(collection: ContentCollection, slug: string): string
   return `${collection.indexRoute}/${slug}`;
 }
 
-export function articleUrl(collection: ContentCollection, slug: string): string {
-  return new URL(articlePath(collection, slug), OPENBOT_SITE_URL).toString();
+// The absolute URLs below take the site they sit on. The head tags pass the site
+// that served the page (see `servingSiteUrl`); the feed and the sitemap keep
+// openbot.run.
+
+export function articleUrl(collection: ContentCollection, slug: string, siteUrl = OPENBOT_SITE_URL): string {
+  return new URL(articlePath(collection, slug), siteUrl).toString();
 }
 
-export function collectionIndexUrl(collection: ContentCollection): string {
-  return new URL(collection.indexRoute, OPENBOT_SITE_URL).toString();
+export function collectionIndexUrl(collection: ContentCollection, siteUrl = OPENBOT_SITE_URL): string {
+  return new URL(collection.indexRoute, siteUrl).toString();
 }
 
 export function collectionFeedPath(collection: ContentCollection): string {
   return `${collection.indexRoute}/rss.xml`;
 }
 
-export function collectionFeedUrl(collection: ContentCollection): string {
-  return new URL(collectionFeedPath(collection), OPENBOT_SITE_URL).toString();
+export function collectionFeedUrl(collection: ContentCollection, siteUrl = OPENBOT_SITE_URL): string {
+  return new URL(collectionFeedPath(collection), siteUrl).toString();
 }
 
 /** The 1200x630 social card, with the title baked in. Drawn by `bun run api:images`. */
-export function articleOgImageUrl(collection: ContentCollection, slug: string): string {
-  return new URL(`/${collection.id}/og/${slug}.png`, OPENBOT_SITE_URL).toString();
+export function articleOgImageUrl(collection: ContentCollection, slug: string, siteUrl = OPENBOT_SITE_URL): string {
+  return new URL(`/${collection.id}/og/${slug}.png`, siteUrl).toString();
 }
 
 /**

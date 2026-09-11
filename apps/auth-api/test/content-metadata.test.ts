@@ -48,10 +48,12 @@ function firstArticle(collection: ContentCollection): CollectionArticle {
 const COLLECTION_CASES = CONTENT_COLLECTIONS.map((collection) => [collection.name, collection] as const);
 const ALL_ARTICLES = CONTENT_COLLECTIONS.flatMap((collection) => collection.articles);
 
+const PREVIEW_SITE_URL = "https://pr-451-openbot-landing-preview.example.workers.dev/";
+
 describe.each(COLLECTION_CASES)("%s head tags", (_name, collection) => {
   it("points each article at its own page and social card", () => {
     for (const article of collection.articles) {
-      const { meta, links } = articleHead(collection, article);
+      const { meta, links } = articleHead(collection, article, OPENBOT_SITE_URL);
       const url = articleUrl(collection, article.slug);
 
       expect(links).toContainEqual({ rel: "canonical", href: url });
@@ -62,14 +64,31 @@ describe.each(COLLECTION_CASES)("%s head tags", (_name, collection) => {
     }
   });
 
+  it("points a preview's social card at the preview, where the card exists", () => {
+    // A social site fetches og:url and og:image itself. Pointed at production, a
+    // preview of a new article shows no card, because production does not have it.
+    const article = firstArticle(collection);
+    const { meta, links } = articleHead(collection, article, PREVIEW_SITE_URL);
+    const url = `${PREVIEW_SITE_URL}${collection.id}/${article.slug}`;
+    const image = `${PREVIEW_SITE_URL}${collection.id}/og/${article.slug}.png`;
+
+    expect(links).toContainEqual({ rel: "canonical", href: url });
+    expect(propertyContent(meta, "og:url")).toBe(url);
+    expect(propertyContent(meta, "og:image")).toBe(image);
+    expect(nameContent(meta, "twitter:image")).toBe(image);
+    expect(structuredData(meta)).toMatchObject({ image, mainEntityOfPage: { "@id": url } });
+  });
+
   it("names the section the article belongs to", () => {
     const article = firstArticle(collection);
-    expect(propertyContent(articleHead(collection, article).meta, "article:section")).toBe(collection.name);
+    expect(propertyContent(articleHead(collection, article, OPENBOT_SITE_URL).meta, "article:section")).toBe(
+      collection.name,
+    );
   });
 
   it("describes the article to search engines as an Article", () => {
     const article = firstArticle(collection);
-    expect(structuredData(articleHead(collection, article).meta)).toMatchObject({
+    expect(structuredData(articleHead(collection, article, OPENBOT_SITE_URL).meta)).toMatchObject({
       "@context": "https://schema.org",
       "@type": "Article",
       headline: article.title,

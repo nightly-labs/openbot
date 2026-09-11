@@ -2,6 +2,9 @@
 // site-metadata.ts to keep the import direction one-way: site-metadata knows
 // nothing about articles, content-collection.ts reads the site URL from it, and
 // this file is the only thing that reads both.
+//
+// Each function takes `siteUrl`, the site that served the page. It is required, so
+// that no route can forget it and send a preview's social card to production.
 
 import {
   articleArtPath,
@@ -27,15 +30,15 @@ export function articleOgImageAlt(title: string): string {
   return `${title} — OpenBot`;
 }
 
-export function collectionIndexHead(collection: ContentCollection) {
-  const url = collectionIndexUrl(collection);
-  const feed = collectionFeedUrl(collection);
+export function collectionIndexHead(collection: ContentCollection, siteUrl: string) {
+  const url = collectionIndexUrl(collection, siteUrl);
+  const feed = collectionFeedUrl(collection, siteUrl);
 
   return {
     meta: [
       { title: collection.indexTitle },
       { name: "description", content: collection.indexDescription },
-      { "script:ld+json": collectionStructuredData(collection) },
+      { "script:ld+json": collectionStructuredData(collection, siteUrl) },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "OpenBot" },
       { property: "og:locale", content: "en_US" },
@@ -73,9 +76,9 @@ function featuredArtworkPreload(collection: ContentCollection) {
   return [{ rel: "preload", as: "image" as const, href: articleArtPath(collection, featured.slug, "featured") }];
 }
 
-export function articleHead(collection: ContentCollection, article: CollectionArticle) {
-  const url = articleUrl(collection, article.slug);
-  const image = articleOgImageUrl(collection, article.slug);
+export function articleHead(collection: ContentCollection, article: CollectionArticle, siteUrl: string) {
+  const url = articleUrl(collection, article.slug, siteUrl);
+  const image = articleOgImageUrl(collection, article.slug, siteUrl);
   const alt = articleOgImageAlt(article.title);
   const title = `${article.title} — OpenBot`;
 
@@ -84,7 +87,7 @@ export function articleHead(collection: ContentCollection, article: CollectionAr
       { title },
       { name: "description", content: article.description },
       { name: "author", content: article.author },
-      { "script:ld+json": articleStructuredData(collection, article) },
+      { "script:ld+json": articleStructuredData(collection, article, siteUrl) },
       { property: "og:type", content: "article" },
       { property: "og:site_name", content: "OpenBot" },
       { property: "og:locale", content: "en_US" },
@@ -112,7 +115,7 @@ export function articleHead(collection: ContentCollection, article: CollectionAr
         rel: "alternate",
         type: "application/rss+xml",
         title: collection.feedTitle,
-        href: collectionFeedUrl(collection),
+        href: collectionFeedUrl(collection, siteUrl),
       },
       // The same reason as on the index: this article's artwork is the first
       // thing under the title and it is a background, not an <img>.
@@ -124,14 +127,14 @@ export function articleHead(collection: ContentCollection, article: CollectionAr
 // schema.org wants an absolute URL for every entity it can resolve, and a
 // `mainEntityOfPage` that matches the canonical. Google drops the date from a
 // result when those disagree with each other.
-export function articleStructuredData(collection: ContentCollection, article: CollectionArticle) {
-  const url = articleUrl(collection, article.slug);
+export function articleStructuredData(collection: ContentCollection, article: CollectionArticle, siteUrl: string) {
+  const url = articleUrl(collection, article.slug, siteUrl);
   return {
     "@context": "https://schema.org",
     "@type": "Article",
     headline: article.title,
     description: article.description,
-    image: articleOgImageUrl(collection, article.slug),
+    image: articleOgImageUrl(collection, article.slug, siteUrl),
     datePublished: `${article.publishedAt}T00:00:00Z`,
     dateModified: `${article.updatedAt ?? article.publishedAt}T00:00:00Z`,
     author: { "@type": "Person", name: article.author },
@@ -147,20 +150,20 @@ export function articleStructuredData(collection: ContentCollection, article: Co
   };
 }
 
-export function collectionStructuredData(collection: ContentCollection) {
+export function collectionStructuredData(collection: ContentCollection, siteUrl: string) {
   return {
     "@context": "https://schema.org",
     "@type": "Blog",
     name: `${collection.name} — ${OPENBOT_SITE_TITLE}`,
     description: collection.indexDescription,
-    url: collectionIndexUrl(collection),
+    url: collectionIndexUrl(collection, siteUrl),
     blogPost: collection.articles.map((article) => ({
       "@type": "BlogPosting",
       headline: article.title,
       description: article.description,
       datePublished: `${article.publishedAt}T00:00:00Z`,
       author: { "@type": "Person", name: article.author },
-      url: articleUrl(collection, article.slug),
+      url: articleUrl(collection, article.slug, siteUrl),
     })),
   };
 }

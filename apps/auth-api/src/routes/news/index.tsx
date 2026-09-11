@@ -4,7 +4,7 @@ import { collectionIndexHead } from "../../lib/content-metadata";
 import { NEWS_COLLECTION } from "../../lib/news";
 
 export const Route = createFileRoute("/news/")({
-  head: () => collectionIndexHead(NEWS_COLLECTION),
+  head: ({ match }) => collectionIndexHead(NEWS_COLLECTION, match.context.siteUrl),
   component: NewsIndexRoute,
 });
 
