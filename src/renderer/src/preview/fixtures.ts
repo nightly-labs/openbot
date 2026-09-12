@@ -543,6 +543,13 @@ export const STORY_APP_INFO = {
  * `mock-openbot.ts`, so an empty list here reads as "the marketplace is empty" rather than "the
  * preview never wired this up" — which is what the three stubs it replaced looked like.
  */
+// Self-contained sample artwork keeps preview icons available without network requests.
+function skillPreviewIcon(symbol: string, background: string): string {
+  return `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" rx="18" fill="${background}"/><text x="40" y="43" text-anchor="middle" dominant-baseline="middle" font-size="42">${symbol}</text></svg>`,
+  )}`;
+}
+
 export const STORY_MARKETPLACE_SKILLS: MarketplaceSkillSummary[] = [
   {
     id: "skill-release-notes",
@@ -554,7 +561,7 @@ export const STORY_MARKETPLACE_SKILLS: MarketplaceSkillSummary[] = [
     version: 4,
     installs: 1_284,
     featured: true,
-    iconUrl: null,
+    iconUrl: skillPreviewIcon("📝", "#7255ce"),
     updatedAt: "2026-08-17T09:12:00.000Z",
   },
   {
@@ -567,7 +574,7 @@ export const STORY_MARKETPLACE_SKILLS: MarketplaceSkillSummary[] = [
     version: 2,
     installs: 862,
     featured: true,
-    iconUrl: null,
+    iconUrl: skillPreviewIcon("🗄️", "#2463a6"),
     updatedAt: "2026-08-15T14:40:00.000Z",
   },
   {
@@ -580,7 +587,7 @@ export const STORY_MARKETPLACE_SKILLS: MarketplaceSkillSummary[] = [
     version: 7,
     installs: 517,
     featured: false,
-    iconUrl: null,
+    iconUrl: skillPreviewIcon("🎨", "#be4d86"),
     updatedAt: "2026-08-11T11:05:00.000Z",
   },
   {
@@ -593,7 +600,7 @@ export const STORY_MARKETPLACE_SKILLS: MarketplaceSkillSummary[] = [
     version: 1,
     installs: 344,
     featured: false,
-    iconUrl: null,
+    iconUrl: skillPreviewIcon("📬", "#e88124"),
     updatedAt: "2026-08-09T07:30:00.000Z",
   },
   {
@@ -606,7 +613,7 @@ export const STORY_MARKETPLACE_SKILLS: MarketplaceSkillSummary[] = [
     version: 3,
     installs: 209,
     featured: false,
-    iconUrl: null,
+    iconUrl: skillPreviewIcon("🔎", "#268477"),
     updatedAt: "2026-08-04T16:20:00.000Z",
   },
   {
@@ -619,7 +626,7 @@ export const STORY_MARKETPLACE_SKILLS: MarketplaceSkillSummary[] = [
     version: 5,
     installs: 156,
     featured: false,
-    iconUrl: null,
+    iconUrl: skillPreviewIcon("💾", "#526178"),
     updatedAt: "2026-07-28T22:00:00.000Z",
   },
 ];
@@ -651,6 +658,12 @@ export const STORY_MARKETPLACE_SKILL_DETAILS: Record<string, MarketplaceSkillDet
       ),
       files: ["SKILL.md", "README.md", `scripts/${skill.slug}.ts`],
       instructions: STORY_SKILL_INSTRUCTIONS[skill.id] ?? "",
+      ...(skill.id === "skill-release-notes"
+        ? {
+            examplePrompt:
+              "Turn the latest commits into release notes. Group the changes and explain what users can do now.",
+          }
+        : {}),
     },
   ]),
 );

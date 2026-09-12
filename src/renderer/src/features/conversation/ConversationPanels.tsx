@@ -1,3 +1,4 @@
+import { useConversationController } from "./conversation-controller-context";
 import { useConversationViewScope } from "./conversation-scope";
 
 const SETTINGS_PANEL_MIN = 180;
@@ -14,7 +15,9 @@ import { createEffect, createSignal, Loading, lazy, onSettled, Show } from "soli
 
 /** @internal Stable HMR boundary for conversation panels. */
 export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButtonElement) => void }) {
+  const controller = useConversationController();
   const {
+    agentReady,
     activateBrowserTab,
     activeBrowserControl,
     activeBrowserTab,
@@ -172,6 +175,35 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
         {(agent) => (
           <Loading>
             <AgentSettingsPanel
+              skillsMode={props.server?.kind === "local" ? "mutable" : "readonly"}
+              onCreateSkill={
+                props.server?.kind === "local" &&
+                agentReady() &&
+                !controller.submitting() &&
+                !controller.selectionSending() &&
+                controller.voicePhase() === "idle" &&
+                !controller.editingDeliveryId()
+                  ? () => {
+                      if (!props.agent || !props.server) return;
+                      controller.startSkillCreation({ serverId: props.server.id, agentId: props.agent.id });
+                      setActiveRightPanel("none");
+                    }
+                  : undefined
+              }
+              onTrySkill={
+                props.server?.kind === "local" &&
+                agentReady() &&
+                !controller.submitting() &&
+                !controller.selectionSending() &&
+                controller.voicePhase() === "idle" &&
+                !controller.editingDeliveryId()
+                  ? (skill) => {
+                      if (!props.agent || !props.server) return;
+                      controller.appendSkillExample({ serverId: props.server.id, agentId: props.agent.id }, skill);
+                      setActiveRightPanel("none");
+                    }
+                  : undefined
+              }
               onOpenUsage={panelProps.onOpenUsage}
               agent={agent()}
               runtimeSettings={{

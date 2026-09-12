@@ -19,6 +19,7 @@
         "@openbot/team-client": "workspace:*",
         "@openbot/user-errors": "workspace:*",
         "@openpanel/web": "catalog:",
+        "@paper-design/shaders": "0.0.80",
         "@solidjs/signals": "catalog:",
         "@solidjs/web": "catalog:",
         "@speed-highlight/core": "catalog:",

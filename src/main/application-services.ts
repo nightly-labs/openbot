@@ -1,4 +1,6 @@
 import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
+import { LocalSkillLibrary } from "./local-skill-library";
+import { localSkillTools } from "./local-skill-tools";
 /**
  * The composition root. Every long-lived service the desktop app owns is built here, in one
  * function, in dependency order, and handed back as a single record.
@@ -305,7 +307,16 @@ export async function createApplicationServices({
       ? join(process.resourcesPath, "managed-skills", "openbot-site-hosting", "SKILL.md")
       : resolve(__dirname, "../../resources/managed-skills/openbot-site-hosting/SKILL.md"),
   );
+  const skillCreator = new ManagedSkillService(
+    app.isPackaged
+      ? join(process.resourcesPath, "managed-skills", "openbot-skill-creator", "SKILL.md")
+      : resolve(__dirname, "../../resources/managed-skills/openbot-skill-creator/SKILL.md"),
+    undefined,
+    undefined,
+    "openbot-skill-creator",
+  );
   await managedSkills.syncAll(store.list());
+  await skillCreator.syncAll(store.list());
   const hostedSites = new HostedSiteDesktopService(centralAuth);
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await sidebarLayout.initialize();
@@ -394,7 +405,7 @@ export async function createApplicationServices({
   if (credentialLoadError) {
     logger.warn(`OpenBot could not read the provider key file (${credentialLoadError.name}). It was left unchanged.`);
   }
-  const service = new AgentService(
+  const service: AgentService = new AgentService(
     store,
     mailbox,
     browser,
@@ -402,7 +413,10 @@ export async function createApplicationServices({
     setupState.preferredProvider ?? "codex",
     null,
     providerRuntimes.bundledExecutables(),
-    (agent) => managedSkills.syncAgent(agent),
+    async (agent) => {
+      await managedSkills.syncAgent(agent);
+      await skillCreator.syncAgent(agent);
+    },
     hostedSites,
     sidebarLayout,
     setupState.preferredModel,
@@ -412,6 +426,7 @@ export async function createApplicationServices({
       // spawned provider process. The IPC handlers are given `list()`.
       customProviders: () => customProviders.configs(),
     },
+    () => localSkillTools(skills),
   );
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
@@ -439,6 +454,7 @@ export async function createApplicationServices({
     centralAuth,
     () => service.listAgents(),
     async (agentId) => service.refreshAgentRuntime(agentId),
+    new LocalSkillLibrary(join(app.getPath("userData"), "local-skills"), () => service.listAgents()),
   );
   const marketplaceAgents = new AgentMarketplaceService(centralAuth, service, skills);
   const teamStore = new TeamStore(

@@ -1,3 +1,10 @@
+import { localSkillTools } from "../local-skill-tools";
+import {
+  parseCreateLocalSkill,
+  parseInstallLocalSkill,
+  parseReadLocalSkill,
+  parseReviseLocalSkill,
+} from "./local-skill-inputs";
 // The skill marketplace, and the skills installed into a workspace.
 
 import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
@@ -20,6 +27,11 @@ export interface SkillIpcDependencies {
 export function skillIpcHandlers({ skills, getMainWindow }: SkillIpcDependencies): Pick<IpcGroupHandlers, "skills"> {
   return {
     skills: {
+      localList: handler(() => localSkillTools(skills).list()),
+      localGet: payloadHandler(parseReadLocalSkill, (input) => localSkillTools(skills).get(input)),
+      localCreate: payloadHandler(parseCreateLocalSkill, (input) => localSkillTools(skills).create(input)),
+      localRevise: payloadHandler(parseReviseLocalSkill, (input) => localSkillTools(skills).revise(input)),
+      localInstall: payloadHandler(parseInstallLocalSkill, (input) => localSkillTools(skills).install(input)),
       list: payloadHandler(nullishPayload(parseMarketplaceSkillQuery), (query) => skills.list(query)),
       get: payloadHandler(stringPayload("skillId"), (skillId) => skills.get(skillId)),
       listMine: handler(() => skills.listMine()),

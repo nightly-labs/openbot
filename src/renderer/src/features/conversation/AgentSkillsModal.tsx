@@ -3,6 +3,7 @@ import type { InstalledSkill, MarketplaceSkillDetail } from "@openbot/contracts/
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createScrollFades } from "../../components/createScrollFades";
+import { SkillPreview } from "../../components/SkillPreview";
 import {
   Button,
   ChevronRight,
@@ -11,11 +12,15 @@ import {
   Ellipsis,
   IconButton,
   Puzzle,
+  SlidingTabs,
+  Store,
   Switch,
   Trash2,
   X,
 } from "../../components/ui";
 import { errorMessage } from "../../error-message";
+import { LocalSkillsLibrary } from "./LocalSkillsLibrary";
+import { SkillLibraryToolbar } from "./SkillLibraryToolbar";
 
 export type AgentSkillsMode = "mutable" | "readonly" | "hidden";
 
@@ -26,6 +31,8 @@ interface AgentSkillsModalProps {
   onOpenChange: (open: boolean) => void;
   onCountChange: (count: number) => void;
   skillsMode?: AgentSkillsMode;
+  onCreateSkill?: () => void;
+  onTrySkill?: (skill: MarketplaceSkillDetail) => void;
   onAddFromMarketplace?: (agentId: string) => void;
 }
 
@@ -44,9 +51,14 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
   const [detailLoading, setDetailLoading] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  const [filter, setFilter] = createSignal("all");
+  const libraryOpen = () => filter() === "local";
+  const visibleSkills = createMemo(() => (filter() === "enabled" ? skills().filter(isEnabled) : skills()));
   const [savingId, setSavingId] = createSignal<string | null>(null);
   const [confirm, setConfirm] = createSignal<ConfirmRequest | null>(null);
   const scrollFades = createScrollFades();
+  let detailRequest = 0;
+  let listRequest = 0;
   let modalContent: HTMLDivElement | undefined;
   let confirmationTrigger: HTMLButtonElement | undefined;
   const skillsMode = () => props.skillsMode ?? "mutable";
@@ -60,34 +72,43 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
   });
 
   onSettled(() => scrollFades.stop);
+  createEffect(
+    () => [detail(), detailLoading(), selectedId(), visibleSkills()] as const,
+    () => scrollFades.remeasure(),
+  );
 
   async function loadSkills(showLoading = true): Promise<void> {
+    const request = ++listRequest;
+    const agentId = props.agentId;
     if (showLoading) setLoading(true);
     setError(null);
     try {
       const next = userAssignedSkills(
         skillsMode() === "readonly"
-          ? await window.openbot.agent.listInstalledSkills(props.agentId)
-          : await window.openbot.skills.listInstalled(props.agentId),
+          ? await window.openbot.agent.listInstalledSkills(agentId)
+          : await window.openbot.skills.listInstalled(agentId),
       );
+      if (request !== listRequest || agentId !== props.agentId || !props.open) return;
       setSkills(next);
       props.onCountChange(next.length);
     } catch (caught) {
-      setError(errorMessage(caught, "Could not load skills."));
+      if (request === listRequest) setError(errorMessage(caught, "Could not load skills."));
     } finally {
-      if (showLoading) setLoading(false);
+      if (showLoading && request === listRequest) setLoading(false);
     }
   }
 
   createEffect(
     () => [props.open, props.agentId, skillsMode()] as const,
     ([open]) => {
+      closeDetail();
       if (!open) {
-        closeDetail();
+        listRequest += 1;
         setConfirm(null);
         return;
       }
       setConfirm(null);
+      setFilter("all");
       void loadSkills();
       void loadCatalog();
     },
@@ -95,7 +116,16 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
 
   async function loadCatalog(): Promise<void> {
     try {
-      const page = await window.openbot.skills.list({ limit: 50 });
+      const [marketplace, local] = await Promise.allSettled([
+        window.openbot.skills.list({ limit: 50 }),
+        window.openbot.skills.localList(),
+      ]);
+      const page = {
+        skills: [
+          ...(marketplace.status === "fulfilled" ? marketplace.value.skills : []),
+          ...(local.status === "fulfilled" ? local.value : []),
+        ],
+      };
       const hints: Record<string, { description: string; iconUrl: string | null }> = {};
       for (const skill of page.skills) {
         hints[skill.id] = { description: skill.description, iconUrl: skill.iconUrl };
@@ -107,22 +137,27 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
   }
 
   function closeDetail(): void {
+    detailRequest += 1;
     setSelectedId(null);
     setDetail(null);
     setDetailLoading(false);
   }
 
   async function openDetail(skill: InstalledSkill): Promise<void> {
+    const request = ++detailRequest;
     setSelectedId(skill.skillId);
     setDetail(null);
     setDetailLoading(true);
     setError(null);
     try {
-      setDetail(await window.openbot.skills.get(skill.skillId));
+      const next = skill.skillId.startsWith("local-skill-")
+        ? await window.openbot.skills.localGet({ skillId: skill.skillId, revision: skill.installedVersion })
+        : await window.openbot.skills.get(skill.skillId);
+      if (request === detailRequest) setDetail(next);
     } catch (caught) {
-      setError(errorMessage(caught, "Could not load skill details."));
+      if (request === detailRequest) setError(errorMessage(caught, "Could not load skill details."));
     } finally {
-      setDetailLoading(false);
+      if (request === detailRequest) setDetailLoading(false);
     }
   }
 
@@ -139,7 +174,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setConfirm({ kind: "replace", skill });
   }
 
-  async function setEnabled(skill: InstalledSkill, enabled: boolean): Promise<void> {
+  async function setEnabled(skill: InstalledSkill, enabled: boolean): Promise<boolean> {
     const analytics = desktopAnalytics.scope();
     const action = enabled ? "enable" : "disable";
     let operationSucceeded = false;
@@ -150,6 +185,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
       analytics.track("marketplace_action", { entity: "skill", action, result: "succeeded" });
       operationSucceeded = true;
       await loadSkills(false);
+      return true;
     } catch (caught) {
       if (!operationSucceeded) {
         analytics.track("marketplace_action", {
@@ -160,6 +196,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
         });
       }
       setError(errorMessage(caught, enabled ? "Could not enable the skill." : "Could not disable the skill."));
+      return false;
     } finally {
       setSavingId(null);
     }
@@ -211,6 +248,8 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
       operationSucceeded = true;
       setConfirm(null);
       await loadSkills(false);
+      const updated = skills().find((item) => item.skillId === skill.skillId);
+      if (selectedId() === skill.skillId && updated) await openDetail(updated);
     } catch (caught) {
       if (!operationSucceeded) {
         analytics.track("marketplace_action", {
@@ -249,7 +288,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
           <Dialog.Overlay class="agent-memories-overlay" />
           <Dialog.Content
             ref={(element) => (modalContent = element)}
-            class="agent-memories-modal agent-skills-modal"
+            class="agent-memories-modal agent-skills-modal t-resize"
             onOpenAutoFocus={(event) => {
               event.preventDefault();
               modalContent?.focus({ preventScroll: true });
@@ -297,9 +336,14 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                   )}
                 </Show>
                 <Show when={!selectedSkill() && mutable()}>
-                  <Button size="sm" variant="ghost" disabled={!canAdd()} onClick={addFromMarketplace}>
-                    Add from marketplace
-                  </Button>
+                  <IconButton
+                    label="Add from marketplace"
+                    variant="ghost"
+                    disabled={!canAdd()}
+                    onClick={addFromMarketplace}
+                  >
+                    <Store />
+                  </IconButton>
                 </Show>
                 <IconButton label="Close skills" variant="ghost" onClick={() => props.onOpenChange(false)}>
                   <X />
@@ -307,123 +351,218 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
               </div>
             </header>
 
-            <div class="agent-memories-body">
-              <Show when={mutable() && atCap()}>
-                <p class="agent-memory-limit" role="status">
-                  This agent has reached the limit of {INPUT_LIMITS.agentSkills} skills. Remove a skill before you add
-                  another one.
-                </p>
-              </Show>
-              <Show when={skillsMode() === "readonly"}>
-                <p class="agent-memory-limit" role="status">
-                  Skills for this agent are managed on the host.
-                </p>
-              </Show>
-              <Show when={!confirm() ? error() : null}>
-                {(message) => (
-                  <p class="agent-memory-error" role="alert">
-                    {message()}
-                  </p>
-                )}
+            <SlidingTabs.Root
+              class="agent-memories-body agent-skills-tabs"
+              value={filter()}
+              onChange={(value) => setFilter(value)}
+            >
+              <Show when={!selectedSkill() && mutable()}>
+                <SkillLibraryToolbar
+                  canCreate={Boolean(props.onCreateSkill) && !atCap()}
+                  onCreate={() => {
+                    props.onCreateSkill?.();
+                    props.onOpenChange(false);
+                  }}
+                />
               </Show>
 
-              <Show when={!loading()} fallback={<p class="agent-memory-state">Loading skills…</p>}>
-                <Show
-                  when={selectedSkill()}
-                  fallback={
-                    <Show
-                      when={skills().length > 0}
-                      fallback={
-                        <div class="agent-skill-empty">
-                          <p class="agent-memory-state">This agent has no assigned skills yet.</p>
-                          <Show when={canAdd()}>
-                            <Button size="sm" onClick={addFromMarketplace}>
-                              Add from marketplace
-                            </Button>
+              <SlidingTabs.ContentSlot class="agent-skills-tab-slot">
+                <Show when={filter()} keyed>
+                  {(selectedFilter) => (
+                    <SlidingTabs.Content value={selectedFilter} class="agent-skills-tab-content">
+                      <Show
+                        when={!libraryOpen()}
+                        fallback={
+                          <LocalSkillsLibrary
+                            agentId={props.agentId}
+                            installed={skills()}
+                            disabled={loading() || savingId() !== null}
+                            onInstalled={async () => {
+                              await loadSkills(false);
+                              await loadCatalog();
+                            }}
+                            onTry={
+                              props.onTrySkill
+                                ? (skill) => {
+                                    props.onTrySkill?.(skill);
+                                    props.onOpenChange(false);
+                                  }
+                                : undefined
+                            }
+                          />
+                        }
+                      >
+                        <Show when={mutable() && atCap()}>
+                          <p class="agent-memory-limit" role="status">
+                            This agent has reached the limit of {INPUT_LIMITS.agentSkills} skills. Remove a skill before
+                            you add another one.
+                          </p>
+                        </Show>
+                        <Show when={skillsMode() === "readonly"}>
+                          <p class="agent-memory-limit" role="status">
+                            Skills for this agent are managed on the host.
+                          </p>
+                        </Show>
+                        <Show when={!confirm() ? error() : null}>
+                          {(message) => (
+                            <p class="agent-memory-error" role="alert">
+                              {message()}
+                            </p>
+                          )}
+                        </Show>
+
+                        <div class="t-page-slide agent-skills-pages" data-page={selectedSkill() ? "2" : "1"}>
+                          <Show when={!loading()} fallback={<p class="agent-memory-state">Loading skills…</p>}>
+                            <Show
+                              when={selectedSkill()}
+                              fallback={
+                                <Show
+                                  when={visibleSkills().length > 0}
+                                  fallback={
+                                    <div class="agent-skill-empty t-page" data-page-id="1">
+                                      <p class="agent-memory-state">
+                                        {filter() === "enabled"
+                                          ? "This agent has no enabled skills."
+                                          : "This agent has no assigned skills yet."}
+                                      </p>
+                                      <Show when={canAdd()}>
+                                        <Button size="sm" onClick={addFromMarketplace}>
+                                          Add from marketplace
+                                        </Button>
+                                      </Show>
+                                    </div>
+                                  }
+                                >
+                                  <div
+                                    ref={scrollFades.bind}
+                                    class={["agent-memory-list", "agent-skill-rows", "t-page", scrollFades.classes()]}
+                                    data-page-id="1"
+                                    onScroll={scrollFades.measure}
+                                  >
+                                    <For each={visibleSkills()}>
+                                      {(skill) => (
+                                        <div
+                                          class={
+                                            isEnabled(skill)
+                                              ? "agent-skill-row"
+                                              : "agent-skill-row agent-skill-row-disabled"
+                                          }
+                                        >
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            class="agent-skill-open"
+                                            onClick={() => void openDetail(skill)}
+                                          >
+                                            <SkillGlyph iconUrl={catalog()[skill.skillId]?.iconUrl ?? null} />
+                                            <div class="agent-skill-copy">
+                                              <div class="agent-skill-title">
+                                                <strong>{skill.name}</strong>
+                                              </div>
+                                              <small>{catalog()[skill.skillId]?.description ?? skillMeta(skill)}</small>
+                                            </div>
+                                          </Button>
+                                          <Show when={mutable()}>
+                                            <Show when={skill.state === "update-available"}>
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                class="agent-skill-update"
+                                                aria-label={`Update ${skill.name}`}
+                                                disabled={savingId() !== null}
+                                                onClick={() => void install(skill, false)}
+                                              >
+                                                Update
+                                              </Button>
+                                            </Show>
+                                            <SkillMoreMenu
+                                              skill={skill}
+                                              disabled={savingId() === skill.skillId}
+                                              onUpdate={() =>
+                                                skill.state === "modified"
+                                                  ? requestReplace(skill)
+                                                  : void install(skill, false)
+                                              }
+                                              onRepair={() =>
+                                                skill.state === "modified"
+                                                  ? requestReplace(skill)
+                                                  : void install(skill, false)
+                                              }
+                                              onUninstall={() => requestRemove(skill)}
+                                              triggerRef={(element) => {
+                                                confirmationTrigger = element;
+                                              }}
+                                            />
+                                            <Switch
+                                              aria-label={`Enable ${skill.name}`}
+                                              checked={isEnabled(skill)}
+                                              disabled={savingId() === skill.skillId}
+                                              onChange={(enabled) => void setEnabled(skill, enabled)}
+                                            />
+                                          </Show>
+                                        </div>
+                                      )}
+                                    </For>
+                                  </div>
+                                </Show>
+                              }
+                            >
+                              {(skill) => (
+                                <div
+                                  ref={scrollFades.bind}
+                                  class={["agent-skill-detail", "t-page", scrollFades.classes()]}
+                                  data-page-id="2"
+                                  onScroll={scrollFades.measure}
+                                >
+                                  <Show when={detailLoading()}>
+                                    <p class="agent-memory-state">Loading details…</p>
+                                  </Show>
+                                  <Show when={detail()}>
+                                    {(current) => (
+                                      <SkillPreview
+                                        skill={current()}
+                                        onTry={
+                                          mutable() &&
+                                          skill().state !== "needs-repair" &&
+                                          savingId() !== skill().skillId &&
+                                          props.onTrySkill
+                                            ? async () => {
+                                                const selected = skill();
+                                                const preview = current();
+                                                const agentId = props.agentId;
+                                                if (!isEnabled(selected) && !(await setEnabled(selected, true))) return;
+                                                if (
+                                                  !props.open ||
+                                                  props.agentId !== agentId ||
+                                                  selectedId() !== selected.skillId
+                                                )
+                                                  return;
+                                                props.onTrySkill?.(preview);
+                                                props.onOpenChange(false);
+                                              }
+                                            : undefined
+                                        }
+                                        unavailableReason={
+                                          !mutable()
+                                            ? "Remote skills are read-only."
+                                            : skill().state === "needs-repair"
+                                              ? "Repair this skill to try it."
+                                              : "The agent composer is unavailable."
+                                        }
+                                      />
+                                    )}
+                                  </Show>
+                                </div>
+                              )}
+                            </Show>
                           </Show>
                         </div>
-                      }
-                    >
-                      <div
-                        ref={scrollFades.bind}
-                        class={["agent-memory-list", "agent-skill-rows", scrollFades.classes()]}
-                        onScroll={scrollFades.measure}
-                      >
-                        <For each={skills()}>
-                          {(skill) => (
-                            <div
-                              class={isEnabled(skill) ? "agent-skill-row" : "agent-skill-row agent-skill-row-disabled"}
-                            >
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                class="agent-skill-open"
-                                onClick={() => void openDetail(skill)}
-                              >
-                                <SkillGlyph iconUrl={catalog()[skill.skillId]?.iconUrl ?? null} />
-                                <div class="agent-skill-copy">
-                                  <div class="agent-skill-title">
-                                    <strong>{skill.name}</strong>
-                                    <Show when={stateLabel(skill.state)}>
-                                      {(label) => <span class="agent-skill-tag">{label()}</span>}
-                                    </Show>
-                                  </div>
-                                  <small>{catalog()[skill.skillId]?.description ?? skillMeta(skill)}</small>
-                                </div>
-                              </Button>
-                              <Show when={mutable()}>
-                                <SkillMoreMenu
-                                  skill={skill}
-                                  disabled={savingId() === skill.skillId}
-                                  onUpdate={() =>
-                                    skill.state === "modified" ? requestReplace(skill) : void install(skill, false)
-                                  }
-                                  onRepair={() =>
-                                    skill.state === "modified" ? requestReplace(skill) : void install(skill, false)
-                                  }
-                                  onUninstall={() => requestRemove(skill)}
-                                  triggerRef={(element) => {
-                                    confirmationTrigger = element;
-                                  }}
-                                />
-                                <Switch
-                                  aria-label={`Enable ${skill.name}`}
-                                  checked={isEnabled(skill)}
-                                  disabled={savingId() === skill.skillId}
-                                  onChange={(enabled) => void setEnabled(skill, enabled)}
-                                />
-                              </Show>
-                            </div>
-                          )}
-                        </For>
-                      </div>
-                    </Show>
-                  }
-                >
-                  {(skill) => (
-                    <div class="agent-skill-detail">
-                      <p class="agent-skill-detail-lead">
-                        {detail()?.description ?? catalog()[skill().skillId]?.description ?? skillMeta(skill())}
-                      </p>
-                      <Show when={detailLoading()} fallback={null}>
-                        <p class="agent-memory-state">Loading details…</p>
                       </Show>
-                      <Show when={detail()}>
-                        {(current) => (
-                          <>
-                            <div class="agent-skill-detail-body">{displayInstructions(current())}</div>
-                            <p class="agent-skill-detail-meta">
-                              Version {skill().installedVersion}
-                              {current().files.length > 0 ? ` · ${current().files.length} files` : ""}
-                            </p>
-                          </>
-                        )}
-                      </Show>
-                    </div>
+                    </SlidingTabs.Content>
                   )}
                 </Show>
-              </Show>
-            </div>
+              </SlidingTabs.ContentSlot>
+            </SlidingTabs.Root>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
@@ -533,23 +672,9 @@ export function userAssignedSkills(skills: InstalledSkill[]): InstalledSkill[] {
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
-function stateLabel(state: InstalledSkill["state"]) {
-  if (state === "update-available") return "Update available";
-  if (state === "modified") return "Local changes";
-  if (state === "needs-repair") return "Needs repair";
-  return null;
-}
-
 function skillMeta(skill: InstalledSkill): string {
   if (skill.state === "update-available") return `v${skill.installedVersion} · v${skill.availableVersion} available`;
   return `v${skill.installedVersion}`;
-}
-
-function displayInstructions(skill: MarketplaceSkillDetail): string {
-  const instructions = skill.instructions || skill.description;
-  const [firstLine, ...remaining] = instructions.split(/\r?\n/u);
-  if (firstLine?.replace(/^#\s+/u, "").trim() === skill.name) return remaining.join("\n").trim();
-  return instructions;
 }
 
 function confirmTitle(request: ConfirmRequest | null) {

@@ -1,0 +1,309 @@
+.skill-preview {
+  display: grid;
+  gap: var(--openbot-space-6);
+  min-width: 0;
+}
+.skill-preview-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--openbot-space-3);
+  row-gap: var(--openbot-space-1);
+  align-items: start;
+}
+.skill-preview-heading .agent-skill-icon {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  align-self: center;
+}
+.skill-preview-heading h2,
+.skill-preview-heading p {
+  grid-column: 2;
+}
+.skill-preview-heading h2,
+.skill-preview-heading p,
+.skill-preview-request p {
+  margin: 0;
+}
+.skill-preview-heading h2 {
+  font-size: var(--openbot-text-2xl);
+  font-weight: var(--openbot-weight-medium);
+  overflow-wrap: anywhere;
+}
+.skill-preview-heading p,
+.skill-preview-description {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-lg);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.skill-preview-card {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 160px;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: var(--openbot-radius-xl);
+  padding: var(--openbot-space-6);
+}
+.skill-preview-gradient,
+.skill-preview-gradient canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.skill-preview-gradient {
+  z-index: -1;
+}
+.skill-preview-request {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  width: min(100%, 520px);
+  min-width: 0;
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-canvas);
+  padding: var(--openbot-space-3);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-lg);
+  line-height: 1.5;
+}
+.skill-preview-request p {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.skill-preview-request .reference-chip {
+  max-width: 100%;
+}
+.skill-preview-request button {
+  flex-shrink: 0;
+}
+.skill-preview-unavailable {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+}
+.skill-preview-description > :first-child {
+  margin-top: 0;
+}
+.skill-preview-description > :last-child {
+  margin-bottom: 0;
+}
+
+.skill-preview-request .ui-icon-button {
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-border);
+}
+.agent-skills-modal:has(.agent-skill-detail) {
+  width: min(760px, calc(100vw - 32px));
+  height: min(640px, calc(100dvh - 48px));
+}
+
+.skill-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-3);
+  margin-bottom: var(--openbot-space-4);
+}
+
+:root {
+  --page-slide-dur: 250ms;
+  --page-fade-dur: 250ms;
+  --page-slide-distance: 8px;
+  --page-blur: 3px;
+  --page-stagger: 0ms;
+  --page-exit-enabled: 1;
+  --page-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --page-fade-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.t-page-slide {
+  position: relative;
+}
+.t-page-slide .t-page[data-page-id="1"] {
+  --t-page-from-x: calc(var(--page-slide-distance) * -1);
+}
+.t-page-slide .t-page[data-page-id="2"] {
+  --t-page-from-x: var(--page-slide-distance);
+}
+.t-page-slide .t-page {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(calc(var(--t-page-from-x, 0px) * var(--page-exit-enabled)));
+  filter: blur(calc(var(--page-blur) * var(--page-exit-enabled)));
+  transition:
+    opacity var(--page-fade-dur) var(--page-fade-ease),
+    transform var(--page-slide-dur) var(--page-slide-ease),
+    filter var(--page-slide-dur) var(--page-slide-ease);
+  will-change: opacity, transform, filter;
+}
+.t-page-slide[data-page="1"] .t-page[data-page-id="1"],
+.t-page-slide[data-page="2"] .t-page[data-page-id="2"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+  filter: blur(0);
+  transition-delay: var(--page-stagger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-page-slide .t-page {
+    transition: none !important;
+  }
+}
+
+.agent-skills-pages {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Each page mounts on navigation, so its starting style supplies the entry state. */
+@starting-style {
+  .agent-skills-pages.t-page-slide .t-page {
+    opacity: 0;
+    transform: translateX(var(--t-page-from-x));
+    filter: blur(var(--page-blur));
+  }
+}
+
+:root {
+  --resize-dur: 300ms;
+  --resize-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.t-resize {
+  transition:
+    width var(--resize-dur) var(--resize-ease),
+    height var(--resize-dur) var(--resize-ease);
+  will-change: width, height;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-resize {
+    transition: none !important;
+  }
+}
+
+:root {
+  --stagger-dur: 500ms;
+  --stagger-distance: 12px;
+  --stagger-stagger: 40ms;
+  --stagger-blur: 3px;
+  --stagger-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Lines start translated down + blurred + invisible; .is-shown
+   on the parent flips them to their resting state. The second
+   line's transition-delay holds it back by --stagger-stagger
+   so the eye lands on the headline first. */
+.t-stagger-line {
+  display: block;
+  opacity: 0;
+  transform: translateY(var(--stagger-distance));
+  filter: blur(var(--stagger-blur));
+  transition:
+    opacity var(--stagger-dur) var(--stagger-ease),
+    transform var(--stagger-dur) var(--stagger-ease),
+    filter var(--stagger-dur) var(--stagger-ease);
+  will-change: transform, opacity, filter;
+}
+.t-stagger-line--2 {
+  transition-delay: var(--stagger-stagger);
+}
+
+.t-stagger.is-shown .t-stagger-line {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+/* Exit decouples from the stagger: same fade for every line,
+   no Y return, no blur — so the disappearance reads as a
+   single quiet fade instead of a reverse reveal. */
+.t-stagger.is-hiding .t-stagger-line {
+  opacity: 0;
+  transform: translateY(0);
+  filter: blur(0);
+  transition:
+    opacity var(--openbot-duration-slow) ease,
+    transform 0s linear,
+    filter 0s linear;
+  transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-stagger-line {
+    transition: none !important;
+  }
+}
+
+.skill-preview-heading.t-stagger-line,
+.skill-preview-card.t-stagger-line {
+  display: grid;
+}
+.t-stagger-line--3 {
+  transition-delay: calc(var(--stagger-stagger) * 2);
+}
+
+/* Start each newly loaded preview at the entrance state without delaying its content. */
+@starting-style {
+  .skill-preview.t-stagger.is-shown .t-stagger-line {
+    opacity: 0;
+    transform: translateY(var(--stagger-distance));
+    filter: blur(var(--stagger-blur));
+  }
+}
+
+.skill-preview-request .skill-preview-chip {
+  color: color-mix(in srgb, var(--skill-logo-color), var(--openbot-text-primary) 35%);
+  background: color-mix(in srgb, var(--skill-logo-color) 18%, transparent);
+}
+
+.agent-skills-tabs {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.agent-skills-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-2);
+  flex-shrink: 0;
+  margin: var(--openbot-space-3);
+}
+
+.agent-skills-tab-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.agent-local-skill-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+.agent-skills-tab-slot {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+@starting-style {
+  .agent-skills-tab-content[data-selected] {
+    opacity: 0;
+    transform: translateY(var(--sliding-tabs-content-distance));
+    filter: blur(var(--sliding-tabs-content-blur));
+  }
+}

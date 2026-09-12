@@ -8,7 +8,8 @@
     "./bloub-avatar": "./src/bloub-avatar.ts",
     "./logo.css": "./src/logo.css",
     "./tokens.css": "./src/tokens.css",
-    "./tokens-native.css": "./src/tokens-native.css"
+    "./tokens-native.css": "./src/tokens-native.css",
+    "./article-gradient": "./src/article-gradient.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",

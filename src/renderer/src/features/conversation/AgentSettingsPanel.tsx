@@ -8,6 +8,7 @@ import type {
   AvatarHue,
   AvatarImageInput,
   CustomProviderSummary,
+  MarketplaceSkillDetail,
   ProviderRuntimeStatus,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -26,7 +27,6 @@ import {
 } from "../../components/SettingsPanel";
 import {
   Button,
-  ChevronRight,
   Input,
   Popover,
   Select,
@@ -82,6 +82,8 @@ interface AgentSettingsPanelProps {
   onOpenRoutineRun?: (messageId: string) => void;
   skillsMode?: AgentSkillsMode;
   skillsMarketplaceOpen?: boolean;
+  onCreateSkill?: () => void;
+  onTrySkill?: (skill: MarketplaceSkillDetail) => void;
   onAddFromMarketplace?: (agentId: string) => void;
 }
 
@@ -714,12 +716,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             />
           </SettingsField>
           <SettingsLinkGroup>
-            {/* Usage opens beside its own trigger, so this row keeps the button it is anchored
-                to. It also carries no count, which is why it is not a `SettingsLinkRow`. */}
-            <Button variant="ghost" class="settings-link" onClick={(event) => props.onOpenUsage(event.currentTarget)}>
-              Usage
-              <ChevronRight />
-            </Button>
+            <SettingsLinkRow label="Usage" onClick={props.onOpenUsage} />
             <SettingsLinkRow
               label="Memories"
               value={`${draft.memories.count} saved`}
@@ -872,6 +869,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           agentName={props.agent.name}
           open={draft.skills.open}
           skillsMode={skillsMode()}
+          onCreateSkill={props.onCreateSkill}
+          onTrySkill={props.onTrySkill}
           onAddFromMarketplace={
             props.onAddFromMarketplace
               ? (agentId) => {

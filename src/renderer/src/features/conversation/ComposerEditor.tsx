@@ -6,6 +6,7 @@ import { Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, Show } from "solid-js";
 import { createStaticAvatarSvg } from "../../bloub-avatar";
 import { Listbox, Puzzle } from "../../components/ui";
+import { referenceChipClasses } from "../../components/ui/reference-chip";
 import { usesTouchLayout } from "../../components/ui/utils";
 import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -707,13 +708,15 @@ function createAttachmentToken(attachment: DraftAttachment, actions: AttachmentT
 
 function createMentionToken(agent: AgentProfile): HTMLSpanElement {
   const token = document.createElement("span");
-  token.className = "composer-mention-token";
+  token.className = `composer-mention-token ${referenceChipClasses.root}`;
+  token.dataset.kind = "agent";
+  token.title = agent.name;
   token.contentEditable = "false";
   token.dataset.mentionId = agent.id;
   token.dataset.mentionName = agent.name;
   token.setAttribute("aria-label", `Agent ${agent.name}`);
   const avatar = document.createElement("span");
-  avatar.className = "composer-mention-avatar agent-avatar-motion-hover";
+  avatar.className = `composer-mention-avatar agent-avatar-motion-hover ${referenceChipClasses.icon}`;
   if (agent.avatarUrl) {
     const image = document.createElement("img");
     image.src = agent.avatarUrl;
@@ -727,6 +730,7 @@ function createMentionToken(agent: AgentProfile): HTMLSpanElement {
     scheduleStaticMentionAvatar(avatar, agent);
   }
   const name = document.createElement("span");
+  name.className = referenceChipClasses.name;
   name.textContent = agent.name;
   token.append(avatar, name);
   return token;
@@ -739,19 +743,21 @@ function createSkillToken(skill: InstalledSkill): HTMLSpanElement {
 }
 
 function updateSkillToken(token: HTMLSpanElement, skill: InstalledSkill): void {
-  token.className = "composer-mention-token skill-chip";
+  token.className = `composer-mention-token ${referenceChipClasses.root}`;
+  token.dataset.kind = "skill";
+  token.title = skill.name;
   token.contentEditable = "false";
   token.dataset.skillId = skill.skillId;
   token.dataset.skillName = skill.name;
   token.setAttribute("aria-label", `Skill ${skill.name}`);
   const iconWrap = document.createElement("span");
-  iconWrap.className = "skill-chip-icon";
+  iconWrap.className = referenceChipClasses.icon;
   iconWrap.setAttribute("aria-hidden", "true");
   const icon = Puzzle({ class: "skill-chip-glyph" });
   if (!(icon instanceof Node)) throw new Error("Puzzle icon did not render to a DOM node");
   iconWrap.append(icon);
   const name = document.createElement("span");
-  name.className = "skill-chip-name";
+  name.className = referenceChipClasses.name;
   name.textContent = skill.name;
   token.replaceChildren(iconWrap, name);
 }

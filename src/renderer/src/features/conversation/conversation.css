@@ -1978,14 +1978,21 @@
   white-space: nowrap;
 }
 
-.agent-skill-tag {
-  overflow: hidden;
-  color: var(--openbot-text-muted);
+.agent-skill-row:has(.agent-skill-update) {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+
+.ui-button.agent-skill-update {
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
   font-size: var(--openbot-text-sm);
-  font-weight: var(--openbot-weight-regular);
-  line-height: var(--openbot-leading-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.ui-button.agent-skill-update:hover:not(:disabled):not([data-disabled]),
+.ui-button.agent-skill-update:focus-visible {
+  background: color-mix(in srgb, var(--openbot-accent-soft), var(--openbot-accent) 12%);
+  color: var(--openbot-accent-text);
 }
 
 .agent-skill-copy small {
@@ -2038,6 +2045,7 @@
   background: var(--openbot-text-primary);
 }
 
+.agent-local-library,
 .agent-skill-detail {
   min-height: 0;
   display: grid;
@@ -2045,28 +2053,12 @@
   gap: var(--openbot-space-4);
   overflow: auto;
   padding: var(--openbot-space-3);
+  scrollbar-width: none;
 }
 
-.agent-skill-detail-lead {
-  margin: 0;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
-  line-height: var(--openbot-leading-md);
-}
-
-.agent-skill-detail-body {
-  margin: 0;
-  color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-md);
-  line-height: var(--openbot-leading-lg);
-  white-space: pre-wrap;
-}
-
-.agent-skill-detail-meta {
-  margin: 0;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-sm);
+.agent-local-library::-webkit-scrollbar,
+.agent-skill-detail::-webkit-scrollbar {
+  display: none;
 }
 
 .agent-memory-confirm-dialog {
@@ -5380,28 +5372,6 @@ button.chat-action-target:active,
   font-size: var(--openbot-text-lg);
 }
 
-.message-agent-tag {
-  display: inline-flex;
-  height: 22px;
-  align-items: center;
-  gap: 4px;
-  margin: 0 1px;
-  border: 0;
-  border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-border);
-  padding: 1px 6px 1px 3px;
-  color: inherit;
-  font: inherit;
-  line-height: 20px;
-  vertical-align: middle;
-  white-space: nowrap;
-  transition: background var(--openbot-duration-hover) ease;
-}
-
-.message-agent-tag:hover {
-  background: var(--openbot-border-strong);
-}
-
 .message-tag-unavailable {
   display: inline-flex;
   height: 22px;
@@ -5417,58 +5387,6 @@ button.chat-action-target:active,
   line-height: 20px;
   vertical-align: middle;
   white-space: nowrap;
-}
-
-.skill-chip {
-  display: inline-flex;
-  max-width: 100%;
-  min-width: 0;
-  height: 24px;
-  align-items: center;
-  gap: 6px;
-  margin: 0 1px;
-  overflow: hidden;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-marketplace-detail-bg);
-  padding: 0 8px 0 4px;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-sm);
-  line-height: 18px;
-  vertical-align: middle;
-  white-space: nowrap;
-}
-
-.skill-chip-icon {
-  display: grid;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: var(--openbot-radius-xs);
-  background: var(--openbot-accent-soft);
-  color: var(--openbot-accent-text);
-}
-
-.skill-chip-glyph,
-.skill-chip-icon > svg {
-  width: 11px;
-  height: 11px;
-}
-
-.skill-chip-name {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  font-weight: 650;
-  text-overflow: ellipsis;
-}
-
-[data-slot="bubble"][data-author="user"] .message-agent-tag {
-  background: var(--openbot-shadow-popover-ambient);
-}
-
-[data-slot="bubble"][data-author="user"] .message-agent-tag:hover {
-  background: var(--openbot-shadow-popover-ambient);
 }
 
 .message-agent-tag .agent-avatar {
@@ -6210,15 +6128,6 @@ button.chat-action-target:active,
   line-height: 18px;
   vertical-align: top;
   white-space: nowrap;
-}
-
-.composer-mention-token.skill-chip {
-  height: 24px;
-  gap: 6px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-marketplace-detail-bg);
-  padding: 0 8px 0 4px;
-  color: var(--openbot-text-primary);
 }
 
 .composer-tag-unavailable {

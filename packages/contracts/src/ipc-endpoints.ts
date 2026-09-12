@@ -92,6 +92,12 @@ export const IPC_ENDPOINTS = {
     closeMacPermissionSetup: request(IPC_CHANNELS.computerUseCloseMacPermissionSetup),
   },
   skills: {
+    localList: request(IPC_CHANNELS.skillsLocalList),
+    localGet: request(IPC_CHANNELS.skillsLocalGet),
+    localCreate: request(IPC_CHANNELS.skillsLocalCreate),
+    localRevise: request(IPC_CHANNELS.skillsLocalRevise),
+    localInstall: request(IPC_CHANNELS.skillsLocalInstall),
+
     list: request(IPC_CHANNELS.skillsList),
     get: request(IPC_CHANNELS.skillsGet),
     listMine: request(IPC_CHANNELS.skillsListMine),

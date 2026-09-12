@@ -61,6 +61,7 @@ describe("SkillMarketplaceService", () => {
             bundleSha256: hash,
             files: ["SKILL.md", "references/template.md"],
             instructions: "Writes release notes.",
+            examplePrompt: "Write notes for the latest commits.",
           });
         if (path.endsWith("/content")) {
           return new Response(Uint8Array.from(bundle).buffer, {
@@ -97,6 +98,10 @@ describe("SkillMarketplaceService", () => {
         refreshedAgents.push(agentId);
       },
     );
+
+    await expect(service.get("skill-1")).resolves.toMatchObject({
+      examplePrompt: "Write notes for the latest commits.",
+    });
 
     await expect(service.install({ agentId: agent.id, skillId: "skill-1" })).resolves.toMatchObject({
       state: "installed",

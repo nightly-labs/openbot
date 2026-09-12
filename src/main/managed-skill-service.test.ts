@@ -12,6 +12,20 @@ afterEach(async () => {
 });
 
 describe("managed site hosting skill", () => {
+  it("installs the skill creation guide beside the hosting guide", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-skill-creator-"));
+    roots.push(root);
+    const workspace = join(root, "workspace");
+    await mkdir(workspace);
+    const source = join(process.cwd(), "resources/managed-skills/openbot-skill-creator/SKILL.md");
+    await new ManagedSkillService(source, undefined, undefined, "openbot-skill-creator").syncAgent(agent(workspace));
+    for (const provider of [".agents", ".claude"]) {
+      const content = await readFile(join(workspace, provider, "skills/openbot-skill-creator/SKILL.md"), "utf8");
+      expect(content).toContain("create_skill");
+      expect(content).toContain("expectedRevision");
+    }
+  });
+
   it("synchronizes the managed skill for Codex, Grok, and Claude locations", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-managed-skill-"));
     roots.push(root);

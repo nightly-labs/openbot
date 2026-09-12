@@ -515,6 +515,9 @@ function decodeSkillDetail(value: unknown): MarketplaceSkillDetail {
     bundleSha256: requiredString(item, "bundleSha256"),
     files: item.files,
     instructions: requiredString(item, "instructions"),
+    ...(isString(item.examplePrompt) && item.examplePrompt.trim().length <= 1000
+      ? { examplePrompt: item.examplePrompt.trim() }
+      : {}),
   };
 }
 
@@ -574,7 +577,9 @@ function decodeInstalledSkill(value: unknown): InstalledSkill {
     availableVersion: requiredNumber(item, "availableVersion"),
     state,
     ...(item.enabled === false ? { enabled: false } : item.enabled === true ? { enabled: true } : {}),
-    ...(item.origin === "managed" || item.origin === "marketplace" ? { origin: item.origin } : {}),
+    ...(item.origin === "managed" || item.origin === "marketplace" || item.origin === "local"
+      ? { origin: item.origin }
+      : {}),
     ...(description ? { description } : {}),
   };
 }
@@ -868,6 +873,15 @@ const openbotApi: OpenBotDesktopApi = {
     },
   },
   skills: {
+    localList: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.skillsLocalList).then((value) => {
+        if (!Array.isArray(value)) throw new Error("Invalid local skill list.");
+        return value.map(decodeSkillDetail);
+      }),
+    localGet: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsLocalGet, input).then(decodeSkillDetail),
+    localCreate: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsLocalCreate, input).then(decodeSkillDetail),
+    localRevise: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsLocalRevise, input).then(decodeSkillDetail),
+    localInstall: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsLocalInstall, input).then(decodeInstalledSkill),
     list: (query) => ipcRenderer.invoke(IPC_CHANNELS.skillsList, query ?? null).then(decodeSkillPage),
     get: (skillId) => ipcRenderer.invoke(IPC_CHANNELS.skillsGet, skillId).then(decodeSkillDetail),
     listMine: () => ipcRenderer.invoke(IPC_CHANNELS.skillsListMine).then(decodeSubmissions),

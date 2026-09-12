@@ -1,5 +1,6 @@
 export { default as ArrowDown } from "lucide-solid/icons/arrow-down";
 export { default as ArrowLeft } from "lucide-solid/icons/arrow-left";
+export { default as ArrowRight } from "lucide-solid/icons/arrow-right";
 export { default as ArrowUp } from "lucide-solid/icons/arrow-up";
 export { default as Bell } from "lucide-solid/icons/bell";
 export { default as BellOff } from "lucide-solid/icons/bell-off";
@@ -71,6 +72,7 @@ export { default as ShieldCheck } from "lucide-solid/icons/shield-check";
 export { default as SlidersHorizontal } from "lucide-solid/icons/sliders-horizontal";
 export { default as Smartphone } from "lucide-solid/icons/smartphone";
 export { default as Sparkles } from "lucide-solid/icons/sparkles";
+export { default as Store } from "lucide-solid/icons/store";
 export { default as Trash2 } from "lucide-solid/icons/trash-2";
 export { default as TriangleAlert } from "lucide-solid/icons/triangle-alert";
 export { default as Upload } from "lucide-solid/icons/upload";

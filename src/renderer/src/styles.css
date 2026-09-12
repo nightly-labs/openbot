@@ -29,6 +29,8 @@
 @import "./features/settings/skills-marketplace.css";
 @import "./features/provider-updates/provider-updates.css";
 @import "./features/custom-providers/custom-providers.css";
+@import "./styles/reference-chip.css";
+@import "./skill-preview.css";
 
 :root {
   color-scheme: dark;

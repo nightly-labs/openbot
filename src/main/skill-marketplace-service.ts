@@ -19,12 +19,11 @@ import type {
 } from "@openbot/contracts/ipc";
 import { isSkillCategory } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
-import { unzipSync, zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
 import type { CentralAuthManager } from "./central-auth-manager";
+import type { LocalSkillLibrary } from "./local-skill-library";
+import { archiveDirectory, inspectArchive, normalizedFiles } from "./skill-package";
 
-const MAX_BYTES = 10 * 1024 * 1024;
-const MAX_FILES = 200;
 const DRAFT_LIFETIME_MS = 30 * 60 * 1000;
 
 interface Draft {
@@ -51,11 +50,13 @@ interface SkillsLock {
 
 export class SkillMarketplaceService {
   readonly #drafts = new Map<string, Draft>();
+  readonly #writes = new Map<string, Promise<void>>();
 
   constructor(
     private readonly auth: CentralAuthManager,
     private readonly listAgents: () => AgentSummary[],
     private readonly refreshAgentRuntime: (agentId: string) => Promise<void> = async () => undefined,
+    readonly localLibrary?: LocalSkillLibrary,
   ) {}
 
   async list(query: MarketplaceSkillQuery = {}): Promise<MarketplaceSkillPage> {
@@ -78,6 +79,7 @@ export class SkillMarketplaceService {
   }
 
   async get(skillId: string): Promise<MarketplaceSkillDetail> {
+    if (skillId.startsWith("local-skill-")) return this.requireLocalLibrary().get(skillId);
     const detail = await this.auth.requestAuthorized(
       `/v1/skills/${encodeURIComponent(skillId)}`,
       { method: "GET" },
@@ -172,7 +174,9 @@ export class SkillMarketplaceService {
   async install(input: InstallSkillInput): Promise<InstalledSkill> {
     const agent = this.requireAgent(input.agentId);
     const detail = await this.get(input.skillId);
-    const bundle = await this.auth.downloadAuthorized(`/v1/skills/${encodeURIComponent(input.skillId)}/content`);
+    const bundle = input.skillId.startsWith("local-skill-")
+      ? await this.requireLocalLibrary().bundle(input.skillId, detail.version)
+      : await this.auth.downloadAuthorized(`/v1/skills/${encodeURIComponent(input.skillId)}/content`);
     return this.installResolved(agent, detail, bundle, input.replaceModified);
   }
 
@@ -199,6 +203,8 @@ export class SkillMarketplaceService {
     const lock = await readLock(agent.workspacePath);
     const result: MarketplaceAgentSkill[] = [];
     for (const entry of Object.values(lock.skills)) {
+      if (entry.skillId.startsWith("local-skill-"))
+        throw new Error("Publish local skills separately before publishing this agent.");
       const state = await installedState(agent.workspacePath, entry);
       if (state !== "installed") throw new Error(`${entry.name} has local changes or needs repair before publishing.`);
       let versionId = entry.versionId;
@@ -221,7 +227,29 @@ export class SkillMarketplaceService {
     return result.sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  private async installResolved(
+  private serialize<T>(agentId: string, write: () => Promise<T>): Promise<T> {
+    const result = (this.#writes.get(agentId) ?? Promise.resolve()).then(write);
+    const done = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    this.#writes.set(agentId, done);
+    void done.then(() => {
+      if (this.#writes.get(agentId) === done) this.#writes.delete(agentId);
+    });
+    return result;
+  }
+
+  private installResolved(
+    agent: AgentSummary,
+    detail: MarketplaceSkillDetail,
+    bundle: Uint8Array,
+    replaceModified = false,
+  ): Promise<InstalledSkill> {
+    return this.serialize(agent.id, () => this.writeResolved(agent, detail, bundle, replaceModified));
+  }
+
+  private async writeResolved(
     agent: AgentSummary,
     detail: MarketplaceSkillDetail,
     bundle: Uint8Array,
@@ -232,8 +260,11 @@ export class SkillMarketplaceService {
     const archive = inspectArchive(bundle);
     if (archive.slug !== detail.slug) throw new Error("The downloaded skill metadata does not match the catalog.");
     const files = normalizedFiles(bundle);
+    await assertSkillPaths(agent.workspacePath, detail.slug);
     const lock = await readLock(agent.workspacePath);
     const existing = lock.skills[detail.id];
+    if (Object.values(lock.skills).some((entry) => entry.slug === detail.slug && entry.skillId !== detail.id))
+      throw new Error("Another installed skill uses this folder name.");
     if (!existing && Object.keys(lock.skills).length >= INPUT_LIMITS.agentSkills) {
       throw new Error(`An agent can have up to ${INPUT_LIMITS.agentSkills} skills.`);
     }
@@ -242,7 +273,10 @@ export class SkillMarketplaceService {
       if (state === "modified" && !replaceModified)
         throw new Error("This skill has local changes. Confirm replacement to continue.");
     }
-    for (const target of targetDirectories(agent.workspacePath, detail.slug)) {
+    for (const target of [
+      ...targetDirectories(agent.workspacePath, detail.slug),
+      disabledDirectory(agent.workspacePath, detail.slug),
+    ]) {
       const owner = Object.values(lock.skills).find(
         (entry) => target.endsWith(`/${entry.slug}`) || target.endsWith(`\\${entry.slug}`),
       );
@@ -250,7 +284,10 @@ export class SkillMarketplaceService {
     }
     const receiptId = existing?.receiptId ?? randomUUID();
     const stayDisabled = existing?.enabled === false;
-    if (stayDisabled) await writeFiles(disabledDirectory(agent.workspacePath, detail.slug), files);
+    if (stayDisabled)
+      await replaceTargets(agent.workspacePath, detail.slug, files, [
+        disabledDirectory(agent.workspacePath, detail.slug),
+      ]);
     else await replaceTargets(agent.workspacePath, detail.slug, files);
     const entry: LockEntry = {
       skillId: detail.id,
@@ -266,20 +303,25 @@ export class SkillMarketplaceService {
     };
     lock.skills[detail.id] = entry;
     await writeLock(agent.workspacePath, lock);
-    await this.auth.requestAuthorized(
-      `/v1/skills/${encodeURIComponent(detail.id)}/install`,
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ receiptId }) },
-      decodeInstalledReceipt,
-    );
+    if (!detail.id.startsWith("local-skill-"))
+      await this.auth.requestAuthorized(
+        `/v1/skills/${encodeURIComponent(detail.id)}/install`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ receiptId }) },
+        decodeInstalledReceipt,
+      );
     await this.refreshAgentRuntime(agent.id);
     return toInstalledSkill(entry, detail.version, "installed", entry.description);
   }
 
-  async uninstall(input: UninstallSkillInput): Promise<void> {
+  uninstall(input: UninstallSkillInput): Promise<void> {
+    return this.serialize(input.agentId, () => this.removeInstalled(input));
+  }
+  private async removeInstalled(input: UninstallSkillInput): Promise<void> {
     const agent = this.requireAgent(input.agentId);
     const lock = await readLock(agent.workspacePath);
     const entry = lock.skills[input.skillId];
     if (!entry) return;
+    await assertSkillPaths(agent.workspacePath, entry.slug);
     if ((await installedState(agent.workspacePath, entry)) === "modified" && !input.removeModified) {
       throw new Error("This skill has local changes. Confirm removal to delete them.");
     }
@@ -294,11 +336,15 @@ export class SkillMarketplaceService {
     await this.refreshAgentRuntime(input.agentId);
   }
 
-  async setEnabled(input: SetEnabledSkillInput): Promise<InstalledSkill> {
+  setEnabled(input: SetEnabledSkillInput): Promise<InstalledSkill> {
+    return this.serialize(input.agentId, () => this.changeEnabled(input));
+  }
+  private async changeEnabled(input: SetEnabledSkillInput): Promise<InstalledSkill> {
     const agent = this.requireAgent(input.agentId);
     const lock = await readLock(agent.workspacePath);
     const entry = lock.skills[input.skillId];
     if (!entry) throw new Error("Skill not found.");
+    await assertSkillPaths(agent.workspacePath, entry.slug);
     const currentlyEnabled = entry.enabled !== false;
     if (currentlyEnabled === input.enabled) {
       return toInstalledSkill(
@@ -307,6 +353,13 @@ export class SkillMarketplaceService {
         await installedState(agent.workspacePath, entry),
         await installedSkillDescription(agent.workspacePath, entry),
       );
+    }
+    if (
+      !input.enabled &&
+      entry.skillId.startsWith("local-skill-") &&
+      (await installedState(agent.workspacePath, entry)) === "modified"
+    ) {
+      throw new Error("This skill has local changes. Save or reconcile both provider copies before disabling it.");
     }
     if (input.enabled) {
       const stash = disabledDirectory(agent.workspacePath, entry.slug);
@@ -346,6 +399,20 @@ export class SkillMarketplaceService {
     return agent;
   }
 
+  requireLocalLibrary(): LocalSkillLibrary {
+    if (!this.localLibrary) throw new Error("Local skill library is unavailable.");
+    return this.localLibrary;
+  }
+
+  async installLocal(input: { agentId: string; skillId: string; revision: number }): Promise<InstalledSkill> {
+    const detail = await this.requireLocalLibrary().get(input.skillId, input.revision);
+    return this.installResolved(
+      this.requireAgent(input.agentId),
+      detail,
+      await this.requireLocalLibrary().bundle(input.skillId, input.revision),
+    );
+  }
+
   private absoluteUrl(value: string | null): string | null {
     return value ? this.auth.resolveApiUrl(value) : null;
   }
@@ -353,101 +420,6 @@ export class SkillMarketplaceService {
     for (const [id, draft] of this.#drafts)
       if (Date.now() - draft.createdAt > DRAFT_LIFETIME_MS) this.#drafts.delete(id);
   }
-}
-
-async function archiveDirectory(root: string): Promise<Uint8Array> {
-  const files: Record<string, Uint8Array> = {};
-  async function visit(directory: string): Promise<void> {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-      if (entry.name === ".git" || entry.name === "node_modules" || entry.name === ".DS_Store") continue;
-      const path = join(directory, entry.name);
-      if (entry.isSymbolicLink()) throw new Error("Skill packages cannot contain symbolic links.");
-      if (entry.isDirectory()) await visit(path);
-      else if (entry.isFile()) {
-        const name = relative(root, path).replaceAll("\\", "/");
-        files[name] = new Uint8Array(await readFile(path));
-        if (Object.keys(files).length > MAX_FILES) throw new Error(`A skill can contain at most ${MAX_FILES} files.`);
-      }
-    }
-  }
-  await visit(root);
-  const bytes = zipSync(files, { level: 6 });
-  if (bytes.byteLength > MAX_BYTES) throw new Error("The skill package must be under 10 MB.");
-  return bytes;
-}
-
-function inspectArchive(bytes: Uint8Array): Omit<SkillPackagePreview, "draftId" | "size"> {
-  const files = normalizedFiles(bytes);
-  const skillFile = files["SKILL.md"];
-  if (!skillFile) throw new Error("The skill package must contain SKILL.md at its root.");
-  const text = new TextDecoder("utf-8", { fatal: true }).decode(skillFile);
-  const match = text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u);
-  if (!match) throw new Error("SKILL.md must begin with YAML frontmatter.");
-  const metadata = parseYaml(match[1] ?? "");
-  if (!isDynamicRecord(metadata)) throw new Error("SKILL.md metadata is invalid.");
-  const name = isString(metadata.name) ? metadata.name.trim() : "";
-  const description = isString(metadata.description) ? metadata.description.trim() : "";
-  if (!name || name.length > 80 || !description || description.length > 500)
-    throw new Error("SKILL.md needs a valid name and description.");
-  return { name, description, slug: slugify(name), files: Object.keys(files).sort() };
-}
-
-function normalizedFiles(bytes: Uint8Array): Record<string, Uint8Array> {
-  if (!bytes.byteLength || bytes.byteLength > MAX_BYTES) throw new Error("The skill package must be under 10 MB.");
-  let raw: Record<string, Uint8Array>;
-  try {
-    let expandedSize = 0;
-    let fileCount = 0;
-    raw = unzipSync(bytes, {
-      filter: (file) => {
-        fileCount += 1;
-        expandedSize += file.originalSize;
-        if (fileCount > MAX_FILES || expandedSize > MAX_BYTES) throw new Error("Archive limits exceeded.");
-        return true;
-      },
-    });
-  } catch {
-    throw new Error("The selected ZIP is invalid.");
-  }
-  const entries = Object.entries(raw).filter(([name]) => !name.endsWith("/"));
-  if (!entries.length || entries.length > MAX_FILES)
-    throw new Error("The skill package has an invalid number of files.");
-  const roots = new Set(entries.map(([name]) => name.replaceAll("\\", "/").split("/")[0]));
-  const wrapper = roots.size === 1 && entries.every(([name]) => name.includes("/")) ? [...roots][0] : null;
-  const result: Record<string, Uint8Array> = {};
-  let size = 0;
-  for (const [rawName, data] of entries) {
-    const name = (wrapper ? rawName.slice((wrapper?.length ?? 0) + 1) : rawName).replaceAll("\\", "/");
-    const parts = name.split("/");
-    const file = parts.at(-1)?.toLowerCase() ?? "";
-    if (
-      !name ||
-      name.startsWith("/") ||
-      parts.some((part) => !part || part === "." || part === "..") ||
-      parts.includes(".git") ||
-      parts.includes("node_modules") ||
-      file.startsWith(".env") ||
-      /private.*key/iu.test(file) ||
-      /\.(?:zip|tar|tgz|gz|7z|rar)$/iu.test(file)
-    ) {
-      throw new Error(`The skill package contains an unsafe file: ${name}`);
-    }
-    size += data.byteLength;
-    if (size > MAX_BYTES) throw new Error("The expanded skill must be under 10 MB.");
-    result[name] = data;
-  }
-  return result;
-}
-
-function slugify(name: string): string {
-  const value = name
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^a-z0-9]+/gu, "-")
-    .replace(/^-|-$/gu, "")
-    .slice(0, 64);
-  if (!value) throw new Error("The skill name cannot form a valid slug.");
-  return value;
 }
 
 function targetDirectories(workspace: string, slug: string): string[] {
@@ -474,7 +446,7 @@ function toInstalledSkill(
     availableVersion,
     state: resolved,
     enabled: entry.enabled !== false,
-    origin: "marketplace",
+    origin: entry.skillId.startsWith("local-skill-") ? "local" : "marketplace",
     ...(resolvedDescription ? { description: resolvedDescription } : {}),
   };
 }
@@ -525,10 +497,15 @@ async function readSkillFiles(root: string): Promise<Record<string, Uint8Array>>
   return files;
 }
 
-async function replaceTargets(workspace: string, slug: string, files: Record<string, Uint8Array>): Promise<void> {
+async function replaceTargets(
+  workspace: string,
+  slug: string,
+  files: Record<string, Uint8Array>,
+  targets = targetDirectories(workspace, slug),
+): Promise<void> {
   const completed: Array<{ target: string; backup: string | null }> = [];
   try {
-    for (const target of targetDirectories(workspace, slug)) {
+    for (const target of targets) {
       await mkdir(dirname(target), { recursive: true, mode: 0o700 });
       const stage = `${target}.openbot-stage-${randomUUID()}`;
       const backup = (await pathExists(target)) ? `${target}.openbot-backup-${randomUUID()}` : null;
@@ -571,6 +548,12 @@ async function installedState(workspace: string, entry: LockEntry): Promise<"ins
   for (const target of roots) {
     if (!(await pathExists(target))) continue;
     complete += 1;
+    try {
+      const files = await readSkillFiles(target);
+      if (Object.keys(files).some((name) => !(name in entry.files))) return "modified";
+    } catch {
+      return "modified";
+    }
     for (const [name, hash] of Object.entries(entry.files)) {
       try {
         if (sha256(new Uint8Array(await readFile(join(target, name)))) !== hash) return "modified";
@@ -587,12 +570,16 @@ function lockPath(workspace: string): string {
   return join(workspace, ".openbot", "skills-lock.json");
 }
 async function readLock(workspace: string): Promise<SkillsLock> {
+  let text: string;
   try {
-    const value = JSON.parse(await readFile(lockPath(workspace), "utf8"));
-    return isSkillsLock(value) ? value : { version: 1, skills: {} };
-  } catch {
-    return { version: 1, skills: {} };
+    text = await readFile(lockPath(workspace), "utf8");
+  } catch (error) {
+    if (isDynamicRecord(error) && error.code === "ENOENT") return { version: 1, skills: {} };
+    throw error;
   }
+  const value = JSON.parse(text);
+  if (!isSkillsLock(value)) throw new Error("The installed skill record is invalid. It was left unchanged.");
+  return value;
 }
 async function writeLock(workspace: string, lock: SkillsLock): Promise<void> {
   const path = lockPath(workspace);
@@ -664,6 +651,7 @@ function isMarketplaceSkillDetail(value: unknown): value is MarketplaceSkillDeta
     isString(value.versionId) &&
     isString(value.bundleSha256) &&
     isString(value.instructions) &&
+    (value.examplePrompt === undefined || (isString(value.examplePrompt) && value.examplePrompt.length <= 1_000)) &&
     Array.isArray(value.files) &&
     value.files.every(isString)
   );
@@ -711,4 +699,25 @@ function isSkillsLock(value: unknown): value is SkillsLock {
     isDynamicRecord(value.skills) &&
     Object.values(value.skills).every(isLockEntry)
   );
+}
+
+async function assertSkillPaths(workspace: string, slug: string): Promise<void> {
+  for (const target of [
+    ...targetDirectories(workspace, slug),
+    disabledDirectory(workspace, slug),
+    lockPath(workspace),
+  ]) {
+    let current = resolve(workspace);
+    const parts = relative(current, target).split(/[\\/]/u);
+    for (const part of ["", ...parts]) {
+      current = join(current, part);
+      try {
+        if ((await lstat(current)).isSymbolicLink())
+          throw new Error("Skill installation paths cannot contain symbolic links.");
+      } catch (error) {
+        if (isDynamicRecord(error) && error.code === "ENOENT") break;
+        throw error;
+      }
+    }
+  }
 }

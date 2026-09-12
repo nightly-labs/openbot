@@ -5,7 +5,6 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 
 const MANAGED_SKILL_SLUG = "openbot-site-hosting";
 const OWNERSHIP_MARKER = ".openbot-managed.json";
-const OWNERSHIP_CONTENT = `${JSON.stringify({ managedBy: "openbot", slug: MANAGED_SKILL_SLUG, version: 1 })}\n`;
 
 const logger = createOpenBotLogger("managed-skill-service");
 
@@ -25,6 +24,7 @@ export class ManagedSkillService {
     private readonly reportFailure: (target: string, error: unknown) => void = (target, error) => {
       logger.error(`OpenBot could not synchronize the managed skill at ${target}.`, toLogValue(error));
     },
+    private readonly slug = MANAGED_SKILL_SLUG,
   ) {}
 
   async syncAll(agents: AgentSummary[]): Promise<void> {
@@ -35,7 +35,9 @@ export class ManagedSkillService {
       this.reportFailure(this.sourcePath, error);
       return;
     }
-    const results = await Promise.allSettled(agents.map((agent) => syncTargets(agent.workspacePath, content)));
+    const results = await Promise.allSettled(
+      agents.map((agent) => syncTargets(agent.workspacePath, content, this.slug)),
+    );
     for (let index = 0; index < results.length; index += 1) {
       const result = results[index];
       if (result.status === "fulfilled") {
@@ -48,7 +50,7 @@ export class ManagedSkillService {
 
   async syncAgent(agent: AgentSummary): Promise<void> {
     try {
-      this.reportResult(await syncTargets(agent.workspacePath, await this.content()));
+      this.reportResult(await syncTargets(agent.workspacePath, await this.content(), this.slug));
     } catch (error) {
       this.reportFailure(agent.workspacePath, error);
     }
@@ -57,7 +59,7 @@ export class ManagedSkillService {
   private async content(): Promise<string> {
     if (this.#content !== null) return this.#content;
     const content = await readFile(this.sourcePath, "utf8");
-    if (!content.startsWith("---\nname: openbot-site-hosting\n")) {
+    if (!content.startsWith(`---\nname: ${this.slug}\n`)) {
       throw new Error("The managed site hosting skill is invalid.");
     }
     this.#content = content;
@@ -70,17 +72,19 @@ export class ManagedSkillService {
   }
 }
 
-async function syncTargets(workspacePath: string, content: string): Promise<SyncTargetsResult> {
+async function syncTargets(workspacePath: string, content: string, slug: string): Promise<SyncTargetsResult> {
   const workspaceRoot = await realpath(resolve(workspacePath));
   const targets = [
-    join(workspacePath, ".agents", "skills", MANAGED_SKILL_SLUG, "SKILL.md"),
-    join(workspacePath, ".claude", "skills", MANAGED_SKILL_SLUG, "SKILL.md"),
+    join(workspacePath, ".agents", "skills", slug, "SKILL.md"),
+    join(workspacePath, ".claude", "skills", slug, "SKILL.md"),
   ];
   const resolvedTargets = [
-    join(workspaceRoot, ".agents", "skills", MANAGED_SKILL_SLUG, "SKILL.md"),
-    join(workspaceRoot, ".claude", "skills", MANAGED_SKILL_SLUG, "SKILL.md"),
+    join(workspaceRoot, ".agents", "skills", slug, "SKILL.md"),
+    join(workspaceRoot, ".claude", "skills", slug, "SKILL.md"),
   ];
-  const results = await Promise.allSettled(resolvedTargets.map((target) => syncTarget(workspaceRoot, target, content)));
+  const results = await Promise.allSettled(
+    resolvedTargets.map((target) => syncTarget(workspaceRoot, target, content, slug)),
+  );
   const collisions: string[] = [];
   const failures: SyncTargetsResult["failures"] = [];
   for (let index = 0; index < results.length; index += 1) {
@@ -93,14 +97,20 @@ async function syncTargets(workspacePath: string, content: string): Promise<Sync
   return { collisions, failures };
 }
 
-async function syncTarget(workspaceRoot: string, target: string, content: string): Promise<"synced" | "collision"> {
+async function syncTarget(
+  workspaceRoot: string,
+  target: string,
+  content: string,
+  slug: string,
+): Promise<"synced" | "collision"> {
+  const ownershipContent = `${JSON.stringify({ managedBy: "openbot", slug, version: 1 })}\n`;
   const parent = dirname(target);
   await ensureSafeDirectory(workspaceRoot, parent);
   const marker = join(parent, OWNERSHIP_MARKER);
   await rejectSymlink(target);
   await rejectSymlink(marker);
   if (await fileExists(target)) {
-    if ((await optionalText(marker)) !== OWNERSHIP_CONTENT) return "collision";
+    if ((await optionalText(marker)) !== ownershipContent) return "collision";
     await atomicWrite(workspaceRoot, target, content);
     return "synced";
   }
@@ -112,7 +122,7 @@ async function syncTarget(workspaceRoot: string, target: string, content: string
     throw error;
   }
   try {
-    await atomicWrite(workspaceRoot, marker, OWNERSHIP_CONTENT);
+    await atomicWrite(workspaceRoot, marker, ownershipContent);
   } catch (error) {
     await verifySafeDirectory(workspaceRoot, parent)
       .then(() => unlink(target))

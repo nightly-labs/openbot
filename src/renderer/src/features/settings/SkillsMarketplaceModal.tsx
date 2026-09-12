@@ -17,6 +17,7 @@ import { createEffect, createMemo, createSignal, createStore, For, Show, snapsho
 import { desktopAnalytics } from "../../analytics";
 import { normalizeAvatarFile } from "../../avatar-image";
 import { createAsyncPanel } from "../../components/createAsyncPanel";
+import { SkillPreview } from "../../components/SkillPreview";
 import {
   ArrowLeft,
   Button,
@@ -46,6 +47,7 @@ interface SkillsMarketplaceModalProps {
   agents: Array<Pick<AgentSummary, "id" | "name" | "marketplaceSource">>;
   activeAgentId: string;
   onOpenChange: (open: boolean) => void;
+  onTrySkill?: (agentId: string, skill: MarketplaceSkillDetail) => void;
   onAgentInstalled?: (agent: AgentSummary) => void | Promise<void>;
 }
 
@@ -83,6 +85,7 @@ interface SkillsMarketplace {
   browse: SkillsBrowse;
   detail: SkillDetail;
   installed: InstalledSkill[];
+  installedForAgentId: string;
   publication: SkillPublication;
   submissions: SkillSubmission[];
 }
@@ -92,6 +95,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     browse: { kind: "agents", tab: "discover", targetAgentId: "" },
     detail: { kind: "none" },
     installed: [],
+    installedForAgentId: "",
     publication: {
       category: "other",
       icon: null,
@@ -111,7 +115,16 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   const [detailActive, setDetailActive] = createSignal(false);
   let detailTrigger: HTMLElement | null = null;
 
-  const installedById = createMemo(() => new Map(market.installed.map((item) => [item.skillId, item])));
+  let installedRequest = 0;
+  const installedById = createMemo(
+    () =>
+      new Map(
+        (market.installedForAgentId === market.browse.targetAgentId ? market.installed : []).map((item) => [
+          item.skillId,
+          item,
+        ]),
+      ),
+  );
   // The arms of the detail union, so the JSX narrows here once instead of at every read.
   const detailOpen = () => market.detail.kind !== "none";
   const detailLoading = () => market.detail.kind === "loading";
@@ -156,6 +169,8 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   }
 
   async function loadInstalled(agentId = market.browse.targetAgentId) {
+    if (agentId !== market.browse.targetAgentId) return;
+    const request = ++installedRequest;
     if (!agentId) {
       setMarket((state) => {
         state.installed = [];
@@ -163,8 +178,9 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       return;
     }
     const values = await run(() => window.openbot.skills.listInstalled(agentId));
-    if (values) {
+    if (values && request === installedRequest && props.open && market.browse.targetAgentId === agentId) {
       setMarket((state) => {
+        state.installedForAgentId = agentId;
         state.installed = values;
       });
     }
@@ -661,6 +677,7 @@ description: Turn merged work into clear, consistent release notes.
                             installed={installedById().get(skill.id)}
                             busy={panel.busy === skill.id}
                             onBack={leaveDetails}
+                            onTrySkill={props.onTrySkill}
                             onInstall={install}
                             agents={props.agents}
                             targetAgentId={market.browse.targetAgentId}
@@ -1210,20 +1227,25 @@ function SkillDetailView(props: {
   agents: Array<Pick<AgentSummary, "id" | "name">>;
   targetAgentId: string;
   onTargetChange: (id: string) => void;
+  onTrySkill?: (agentId: string, skill: MarketplaceSkillDetail) => void;
 }) {
   const current = () =>
     props.installed?.state === "installed" && props.installed.installedVersion >= props.skill.version;
+  const canTry = () =>
+    props.onTrySkill &&
+    props.targetAgentId &&
+    props.installed &&
+    props.installed.enabled !== false &&
+    props.installed.state !== "needs-repair" &&
+    !props.busy;
   return (
-    <MarketplaceDetail
-      name={props.skill.name}
-      description={props.skill.description}
-      creatorName={props.skill.creatorName}
-      creatorAvatarUrl={props.skill.creatorAvatarUrl}
-      icon={<SkillIcon skill={props.skill} />}
-      backLabel="Back to skills"
-      onBack={props.onBack}
-      action={
-        <>
+    <section class="skills-marketplace-detail marketplace-detail-page" aria-label={`${props.skill.name} details`}>
+      <div class="skill-preview-toolbar">
+        <Button variant="ghost" onClick={props.onBack}>
+          <ArrowLeft />
+          Back to skills
+        </Button>
+        <div class="marketplace-detail-action">
           <AgentSelect agents={props.agents} value={props.targetAgentId} onChange={props.onTargetChange} />
           <Button
             loading={props.busy}
@@ -1232,30 +1254,23 @@ function SkillDetailView(props: {
           >
             {current() ? "Installed" : props.installed ? "Update skill" : "Install skill"}
           </Button>
-        </>
-      }
-      sections={[
-        {
-          title: "Instructions",
-          subtitle: "How this skill should work",
-          content: () => <p>{displayInstructions(props.skill)}</p>,
-        },
-        {
-          title: "Package contents",
-          subtitle: "Files included with this skill",
-          content: () => (
-            <>
-              <p>
-                {props.skill.files.length} files included · Version {props.skill.version}
-              </p>
-              <ul>
-                <For each={props.skill.files}>{(file) => <li>{file}</li>}</For>
-              </ul>
-            </>
-          ),
-        },
-      ]}
-    />
+        </div>
+      </div>
+      <SkillPreview
+        skill={props.skill}
+        onTry={canTry() ? () => props.onTrySkill?.(props.targetAgentId, props.skill) : undefined}
+        unavailableReason={
+          !props.installed
+            ? "Install this skill for an agent to try it."
+            : props.installed.enabled === false
+              ? "Enable this skill in agent settings to try it."
+              : props.installed.state === "needs-repair"
+                ? "Repair this skill in agent settings to try it."
+                : "The agent composer is unavailable."
+        }
+      />
+      <p class="marketplace-detail-creator">By {props.skill.creatorName}</p>
+    </section>
   );
 }
 
@@ -1295,13 +1310,6 @@ function SkillSubmissionDetailView(props: { submission: SkillSubmission; onBack:
       </div>
     </section>
   );
-}
-
-function displayInstructions(skill: MarketplaceSkillDetail): string {
-  const instructions = skill.instructions || skill.description;
-  const [firstLine, ...remaining] = instructions.split(/\r?\n/u);
-  if (firstLine?.replace(/^#\s+/u, "").trim() === skill.name) return remaining.join("\n").trim();
-  return instructions;
 }
 
 function avatarImageDataUrl(image: AvatarImageInput): string {

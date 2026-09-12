@@ -38,6 +38,7 @@ import type {
   InstalledSkill,
   InviteSummary,
   JoinServerInput,
+  MarketplaceSkillDetail,
   OpenAttachmentInput,
   OpenBotDesktopApi,
   OpenSharedFileInput,
@@ -141,6 +142,7 @@ export interface MockOpenBotOptions {
   updateStatus?: UpdateStatus;
   memories?: Record<string, AgentMemory[]>;
   routines?: Record<string, Routine[]>;
+  localSkills?: MarketplaceSkillDetail[];
   installedSkills?: Record<string, InstalledSkill[]>;
   customProviders?: CustomProviderSummary[];
 }
@@ -276,6 +278,20 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const usageTargetKey = usageTarget ? `${usageTarget.provider}:${usageTarget.model}` : null;
   let agentCounter = agents.length;
   const marketplaceSkills = clone(STORY_MARKETPLACE_SKILLS);
+  const localSkills = clone(
+    options.localSkills ?? [
+      {
+        ...STORY_MARKETPLACE_SKILL_DETAILS["skill-release-notes"],
+        id: "local-skill-11111111-1111-4111-8111-111111111111",
+        name: "Weekly summary",
+        slug: "weekly-summary",
+        creatorName: "Local",
+        version: 1,
+        versionId: "1",
+      },
+    ],
+  );
+  const localRevisions = new Map(localSkills.map((skill) => [`${skill.id}:${skill.version}`, skill]));
   let skillSubmissions = clone(STORY_SKILL_SUBMISSIONS);
   const installedSkills = new Map(Object.entries(clone(options.installedSkills ?? STORY_INSTALLED_SKILLS)));
   let hostedSites = clone(STORY_HOSTED_SITES);
@@ -743,6 +759,62 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     skills: {
+      localList: async () => clone(localSkills),
+      localGet: async ({ skillId, revision }) => {
+        const skill = revision
+          ? localRevisions.get(`${skillId}:${revision}`)
+          : localSkills.find((item) => item.id === skillId);
+        if (!skill) throw new Error("Local skill not found.");
+        return clone(skill);
+      },
+      localCreate: async ({ agentId, sourcePath }) => {
+        const name = sourcePath.split("/").at(-1) || "New skill";
+        const skill = {
+          ...STORY_MARKETPLACE_SKILL_DETAILS["skill-release-notes"],
+          id: `local-skill-${crypto.randomUUID()}`,
+          name,
+          slug: name,
+          creatorName: "Local",
+          version: 1,
+          versionId: "1",
+        };
+        localSkills.push(skill);
+        localRevisions.set(`${skill.id}:1`, skill);
+        await api.skills.localInstall({ agentId, skillId: skill.id, revision: 1 });
+        return clone(skill);
+      },
+      localRevise: async ({ skillId, expectedRevision }) => {
+        const index = localSkills.findIndex((item) => item.id === skillId);
+        const current = localSkills[index];
+        if (!current || current.version !== expectedRevision)
+          throw new Error("The skill changed. Read its latest revision before revising it.");
+        const skill = { ...current, version: expectedRevision + 1, versionId: String(expectedRevision + 1) };
+        localSkills[index] = skill;
+        localRevisions.set(`${skill.id}:${skill.version}`, skill);
+        return clone(skill);
+      },
+      localInstall: async ({ agentId, skillId, revision }) => {
+        const skill = await api.skills.localGet({ skillId, revision });
+        const previous = readInstalledSkills(agentId).find((item) => item.skillId === skillId);
+        if (previous?.state === "modified")
+          throw new Error("This skill has local changes. Confirm replacement to continue.");
+        const installed: InstalledSkill = {
+          skillId,
+          name: skill.name,
+          slug: skill.slug,
+          installedVersion: revision,
+          availableVersion: revision,
+          state: "installed",
+          origin: "local",
+          enabled: previous?.enabled !== false,
+          description: skill.description,
+        };
+        installedSkills.set(agentId, [
+          ...readInstalledSkills(agentId).filter((item) => item.skillId !== skillId),
+          installed,
+        ]);
+        return clone(installed);
+      },
       list: async (query) => {
         const matches = marketplaceSkills.filter(
           (skill) =>
@@ -758,6 +830,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         });
       },
       get: async (skillId) => {
+        if (skillId.startsWith("local-skill-")) return api.skills.localGet({ skillId });
         const detail = STORY_MARKETPLACE_SKILL_DETAILS[skillId];
         if (!detail) throw new Error("Skill not found");
         return clone(detail);
@@ -783,8 +856,27 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         skillSubmissions = [submission, ...skillSubmissions];
         return clone(submission);
       },
-      listInstalled: async (agentId) => clone(readInstalledSkills(agentId)),
+      listInstalled: async (agentId) =>
+        clone(
+          readInstalledSkills(agentId).map((skill) => {
+            const latest = localSkills.find((item) => item.id === skill.skillId);
+            return latest
+              ? {
+                  ...skill,
+                  availableVersion: latest.version,
+                  state:
+                    skill.state === "installed" && latest.version > skill.installedVersion
+                      ? "update-available"
+                      : skill.state,
+                }
+              : skill;
+          }),
+        ),
       install: async ({ agentId, skillId }) => {
+        if (skillId.startsWith("local-skill-")) {
+          const skill = await api.skills.localGet({ skillId });
+          return api.skills.localInstall({ agentId, skillId, revision: skill.version });
+        }
         const skill = marketplaceSkills.find((candidate) => candidate.id === skillId);
         if (!skill) throw new Error("Skill not found");
         const previous = readInstalledSkills(agentId).find((item) => item.skillId === skillId);

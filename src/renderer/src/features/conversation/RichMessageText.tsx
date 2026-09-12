@@ -3,6 +3,7 @@ import type { AttachmentSummary, InstalledSkill } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createUniqueId, For, onCleanup, Show } from "solid-js";
 import { Button, Puzzle } from "../../components/ui";
+import { ReferenceChip } from "../../components/ui/reference-chip";
 import { usesTouchLayout } from "../../components/ui/utils";
 import type { AgentProfile, MessageCitation } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -117,28 +118,17 @@ export function RichMessageText(props: RichMessageTextProps) {
           }
           if (part.agent) {
             return (
-              <Button
-                variant="ghost"
-                type="button"
+              <ReferenceChip
+                kind="agent"
+                name={part.agent.name}
                 class="message-agent-tag"
-                aria-label={`Open agent ${part.agent.name}`}
+                icon={<AgentAvatar agent={part.agent} />}
                 onClick={() => props.onSelectAgent(part.agent?.id ?? "")}
-              >
-                <AgentAvatar agent={part.agent} />
-                <span>{part.agent.name}</span>
-              </Button>
+              />
             );
           }
           if (part.skill) {
-            return (
-              <span class="skill-chip message-skill-tag">
-                <span class="skill-chip-icon" aria-hidden="true">
-                  <Puzzle />
-                </span>
-                <span class="sr-only">Skill </span>
-                <span class="skill-chip-name">{part.skill.name}</span>
-              </span>
-            );
+            return <ReferenceChip kind="skill" name={part.skill.name} icon={<Puzzle />} />;
           }
           if (part.unavailableKind) {
             return (

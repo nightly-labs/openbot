@@ -33,6 +33,7 @@ export interface MarketplaceSkillDetail extends MarketplaceSkillSummary {
   bundleSha256: string;
   files: string[];
   instructions: string;
+  examplePrompt?: string;
 }
 
 export interface MarketplaceSkillPage {
@@ -81,7 +82,7 @@ export interface SubmitSkillInput {
   skillId?: string;
 }
 
-export type InstalledSkillOrigin = "marketplace" | "managed";
+export type InstalledSkillOrigin = "marketplace" | "managed" | "local";
 
 export interface InstalledSkill {
   skillId: string;
@@ -121,3 +122,16 @@ export function isSkillCategory(value: unknown): value is SkillCategory {
 }
 
 import { isOneOf } from "./runtime-values";
+
+export interface CreateLocalSkillInput {
+  agentId: string;
+  sourcePath: string;
+}
+export interface ReviseLocalSkillInput extends CreateLocalSkillInput {
+  skillId: string;
+  expectedRevision: number;
+}
+export interface LocalSkillRevisionInput {
+  skillId: string;
+  revision?: number;
+}

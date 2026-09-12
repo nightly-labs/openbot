@@ -473,3 +473,47 @@ export const HostUsage: Story = {
     await expect(canvas.findByRole("region", { name: "Usage summary" })).resolves.toBeInTheDocument();
   },
 };
+
+export const SkillPreviewDraft: Story = {
+  render: () => <OpenBotPlayground />,
+  play: async ({ canvas, userEvent }) => {
+    const editor = await canvas.findByRole("textbox", { name: "Message Chief" });
+    await userEvent.click(editor);
+    editor.textContent = "Keep this draft";
+    await fireEvent.input(editor);
+    await userEvent.click(canvas.getByRole("button", { name: "View agent settings" }));
+    await userEvent.click(await canvas.findByRole("button", { name: /Skills/ }));
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("button", { name: /^Release notes/ }));
+    await userEvent.click(await body.findByRole("button", { name: "Try skill" }));
+    await waitFor(() => expect(editor).toHaveFocus());
+    await expect(editor).toHaveTextContent("Keep this draft");
+    await expect(editor).toHaveTextContent("Release notes");
+    await expect(editor).toHaveTextContent("Turn the latest commits");
+    await expect(canvas.getByRole("button", { name: "Send message" })).toBeEnabled();
+  },
+};
+
+export const MarketplaceSkillPreviewDraft: Story = {
+  render: () => <OpenBotPlayground />,
+  play: async ({ canvas, userEvent }) => {
+    const chiefEditor = await canvas.findByRole("textbox", { name: "Message Chief" });
+    chiefEditor.textContent = "Keep Chief's draft";
+    await fireEvent.input(chiefEditor);
+    await userEvent.click(canvas.getByRole("button", { name: "Open Marketplace" }));
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("button", { name: "Skills" }));
+    await userEvent.click(await body.findByRole("button", { name: "View Release notes details" }));
+    await userEvent.selectOptions(body.getByRole("combobox", { name: "Install to" }), "research");
+    await expect(body.getByRole("button", { name: "Try skill" })).toBeDisabled();
+    await userEvent.click(await body.findByRole("button", { name: "Install skill" }));
+    await waitFor(() => expect(body.getByRole("button", { name: "Try skill" })).toBeEnabled());
+    await userEvent.click(body.getByRole("button", { name: "Try skill" }));
+    const researchEditor = await canvas.findByRole("textbox", { name: "Message Research" });
+    await waitFor(() => expect(researchEditor).toHaveFocus());
+    await expect(researchEditor).toHaveTextContent("Turn the latest commits");
+    await expect(canvas.queryByText(/^Mock reply from Research:/)).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: /^Chief, Chief of staff/ }));
+    await expect(await canvas.findByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Keep Chief's draft");
+  },
+};

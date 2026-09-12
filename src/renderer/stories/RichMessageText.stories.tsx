@@ -92,6 +92,13 @@ export const SkillChip: Story = {
   },
 };
 
+export const AgentAndSkillChips: Story = {
+  args: {
+    body: `Ask @Research to use ${serializeChatTagReference("skill", "Release notes", "skill-release-notes")} for the next release.`,
+    skills: STORY_INSTALLED_SKILLS.chief,
+  },
+};
+
 export const InlineCitations: Story = {
   args: {
     body: "Transformers scale well with data and compute [1], though attention is quadratic in sequence length [2].",
