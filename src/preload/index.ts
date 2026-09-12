@@ -7,6 +7,7 @@ import {
   type AgentStatus,
   type AgentSubmission,
   type AgentSummary,
+  type AppLanguagePreference,
   type AttachmentImportEvent,
   type BrowserPreview,
   type ComputerUseMacSetupState,
@@ -47,6 +48,7 @@ import {
   isAgentProvider,
   isAgentStatus,
   isAgentSummary,
+  isAppLanguage,
   isAttachmentSummary,
   isAvatarHue,
   isAvatarSeed,
@@ -273,6 +275,12 @@ function decodeCustomProviderResult(value: unknown): CustomProviderResult {
 function decodeNullablePath(value: unknown): string | null {
   if (value !== null && !isString(value)) throw new Error("Invalid directory response.");
   return value;
+}
+
+function decodeAppLanguagePreference(value: unknown): AppLanguagePreference {
+  if (!isDynamicRecord(value) || !isAppLanguage(value.language))
+    throw new Error("Invalid language preference response.");
+  return { language: value.language };
 }
 
 function decodeDynamicIslandPreference(value: unknown): DynamicIslandPreference {
@@ -735,6 +743,16 @@ const openbotApi: OpenBotDesktopApi = {
   saveSetup: (input) => ipcRenderer.invoke(IPC_CHANNELS.saveSetup, input),
   getAnalyticsPreference: () => ipcRenderer.invoke(IPC_CHANNELS.getAnalyticsPreference),
   setAnalyticsPreference: (input) => ipcRenderer.invoke(IPC_CHANNELS.setAnalyticsPreference, input),
+  getAppLanguagePreference: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.getAppLanguagePreference).then(decodeAppLanguagePreference),
+  setAppLanguagePreference: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.setAppLanguagePreference, input).then(decodeAppLanguagePreference),
+  onAppLanguagePreference: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, preference: unknown) =>
+      listener(decodeAppLanguagePreference(preference));
+    ipcRenderer.on(IPC_CHANNELS.appLanguagePreference, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.appLanguagePreference, handler);
+  },
   dynamicIsland: {
     getPreference: () =>
       ipcRenderer.invoke(IPC_CHANNELS.dynamicIslandGetPreference).then(decodeDynamicIslandPreference),

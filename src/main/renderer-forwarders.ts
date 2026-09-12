@@ -22,6 +22,7 @@ import {
   type VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import type { AppTranslate } from "@openbot/i18n";
 import { BrowserWindow, Notification } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import { notificationForAgentEvent } from "./agent-notifications";
@@ -39,6 +40,8 @@ export interface RendererForwarderDependencies {
   getHostAnalytics: () => HostAnalytics | null;
   getRemoteServerManager: () => Pick<RemoteServerManager, "list" | "request"> | null;
   showMainWindow: (window: BrowserWindow) => void;
+  /** The language every desktop notification is written in, read at the moment one is raised. */
+  getTranslate: () => AppTranslate;
 }
 
 /**
@@ -52,6 +55,7 @@ export function createRendererForwarders({
   getHostAnalytics,
   getRemoteServerManager,
   showMainWindow,
+  getTranslate,
 }: RendererForwarderDependencies) {
   function forwardAgentEvent(serverId: string, event: AgentEvent, bufferedLive = false): void {
     if (serverId === LOCAL_SERVER_ID) getHostAnalytics()?.handleAgentEvent(event);
@@ -80,7 +84,7 @@ export function createRendererForwarders({
       serverId === LOCAL_SERVER_ID
         ? (getAgentService()?.listAgents() ?? [])
         : ((await getRemoteServerManager()?.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)) ?? []);
-    const content = notificationForAgentEvent(event, agents);
+    const content = notificationForAgentEvent(event, agents, getTranslate());
     if (!content || !canNotify()) return;
     const notification = new Notification(content);
     notification.on("click", () => {

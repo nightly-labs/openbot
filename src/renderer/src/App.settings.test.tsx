@@ -289,6 +289,12 @@ describe("OpenBot connected desktop shell", () => {
     );
     expect(notchSwitch).not.toBeChecked();
 
+    // The trigger reads its label and its value, so match the start of the name. It also opens on
+    // pointer down rather than on click, so a plain click never reaches the list.
+    await fireEvent.pointerDown(screen.getByRole("button", { name: /^Language/ }), { pointerType: "mouse", button: 0 });
+    await fireEvent.click(await screen.findByRole("option", { name: "日本語" }));
+    await waitFor(() => expect(window.openbot.setAppLanguagePreference).toHaveBeenCalledWith({ language: "ja" }));
+
     await fireEvent.click(await screen.findByRole("tab", { name: "Updates" }));
     const autoDownload = await screen.findByRole("switch", { name: "Automatically download updates" });
     await waitFor(() => expect(autoDownload).not.toBeChecked());

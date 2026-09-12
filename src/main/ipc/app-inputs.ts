@@ -14,6 +14,7 @@ import type {
   ReplaceHostedSiteInput,
   SaveSetupInput,
   SetAnalyticsPreferenceInput,
+  SetAppLanguagePreferenceInput,
   SubmitMarketplaceAgentInput,
   SubmitSkillInput,
   UninstallSkillInput,
@@ -22,6 +23,7 @@ import type {
 import {
   isAgentModel,
   isAgentProvider,
+  isAppLanguage,
   isDynamicIslandAction,
   isDynamicIslandInteractive,
   isDynamicIslandPreference,
@@ -52,6 +54,11 @@ export function parseProviderId(input: unknown): AgentProviderId {
 export function parseAnalyticsPreference(input: unknown): SetAnalyticsPreferenceInput {
   if (!isDynamicRecord(input) || !isBoolean(input.enabled)) throw new Error("Analytics preference is required.");
   return { enabled: input.enabled };
+}
+
+export function parseAppLanguagePreference(input: unknown): SetAppLanguagePreferenceInput {
+  if (!isDynamicRecord(input) || !isAppLanguage(input.language)) throw new Error("Language preference is required.");
+  return { language: input.language };
 }
 
 export function parseUpdatePreference(input: unknown): UpdatePreference {

@@ -1,3 +1,4 @@
+import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
 import type { AgentEvent, ScopedAgentEvent } from "./ipc-agent-events";
 import type { AgentModelOption } from "./ipc-agent-identity";
@@ -437,6 +438,9 @@ export interface OpenBotDesktopApi {
   saveSetup: (input: SaveSetupInput) => Promise<AppSetupState>;
   getAnalyticsPreference: () => Promise<AnalyticsPreference>;
   setAnalyticsPreference: (input: SetAnalyticsPreferenceInput) => Promise<AnalyticsPreference>;
+  getAppLanguagePreference: () => Promise<AppLanguagePreference>;
+  setAppLanguagePreference: (input: SetAppLanguagePreferenceInput) => Promise<AppLanguagePreference>;
+  onAppLanguagePreference: (listener: (preference: AppLanguagePreference) => void) => () => void;
   dynamicIsland: DynamicIslandDesktopApi;
   getComputerUseMacSetupState: () => Promise<ComputerUseMacSetupState>;
   openComputerUsePermissionSetup: (permission: MacPermissionId) => Promise<ComputerUseMacSetupState>;

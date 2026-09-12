@@ -23,10 +23,12 @@ import {
   SwitchField,
   Text,
 } from "../../components/ui";
+import { useI18n } from "../../i18n-context";
 import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "../custom-providers/CustomProviderListDialog";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
 import type { GeneralSettingsValue } from "./app-settings";
+import { LanguageSelect } from "./LanguageSelect";
 import type { SettingsGeneralStore } from "./stores/general-store";
 
 const linkTargetOptions: GeneralSettingsValue["externalLinkTarget"][] = ["Default browser", "OpenBot"];
@@ -57,6 +59,7 @@ interface SettingsGeneralTabProps {
 }
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
+  const i18n = useI18n();
   const customProviders = () => props.customProviders ?? [];
   /**
    * Which row holds the check here. Nothing stores it: the whole Settings picker is local state
@@ -153,6 +156,15 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             label="Restore the last workspace on launch"
             description="Open the workspace and tasks from your previous session."
           />
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.language.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.language.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <LanguageSelect value={i18n.language()} onChange={i18n.changeLanguage} mount={props.selectMount} />
+            </ItemActions>
+          </Item>
           <Item class="settings-modal-row">
             <ItemContent>
               <ItemTitle>Open external links in</ItemTitle>

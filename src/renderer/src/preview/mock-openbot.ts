@@ -11,6 +11,7 @@ import type {
   AgentSummary,
   AnalyticsPreference,
   AppInfo,
+  AppLanguagePreference,
   AppSetupState,
   AttachmentImportEvent,
   BrowserControlState,
@@ -116,6 +117,7 @@ export interface MockOpenBotOptions {
   providerRuntimeFailure?: boolean;
   appInfo?: AppInfo;
   analyticsPreference?: AnalyticsPreference;
+  languagePreference?: AppLanguagePreference;
   authState?: CentralAuthState;
   setupState?: AppSetupState;
   agentStatus?: AgentStatus;
@@ -210,6 +212,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     options.setupState ?? { completed: true, preferredProvider: "codex", preferredModel: null },
   );
   let analyticsPreference = clone<AnalyticsPreference>(options.analyticsPreference ?? { enabled: true });
+  let languagePreference = clone<AppLanguagePreference>(options.languagePreference ?? { language: "system" });
+  const languageListeners = new Set<(preference: AppLanguagePreference) => void>();
   let dynamicIslandPreference: DynamicIslandPreference = { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
   let dynamicIslandPresentation: DynamicIslandPresentation = { serverId: "local", mode: "idle" };
   const agentStatus = clone(options.agentStatus ?? STORY_AGENT_STATUS);
@@ -536,6 +540,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     setAnalyticsPreference: async ({ enabled }) => {
       analyticsPreference = { enabled };
       return clone(analyticsPreference);
+    },
+    getAppLanguagePreference: async () => clone(languagePreference),
+    setAppLanguagePreference: async ({ language }) => {
+      languagePreference = { language };
+      // The real setting is owned by the main process, which tells every window. A preview that only
+      // answered the call would show a Settings row that changes while the rest of the app does not.
+      for (const listener of languageListeners) listener(clone(languagePreference));
+      return clone(languagePreference);
+    },
+    onAppLanguagePreference: (listener) => {
+      languageListeners.add(listener);
+      return () => languageListeners.delete(listener);
     },
     dynamicIsland: {
       getPreference: async () => clone(dynamicIslandPreference),
