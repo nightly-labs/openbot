@@ -1,6 +1,6 @@
 import { type AppLanguage, DEFAULT_APP_LANGUAGE } from "@openbot/contracts/ipc";
-import { createTranslate, type Translate } from "./message";
-import { en } from "./messages/en";
+import { createTranslate, type MessageParams, type Translate } from "./message";
+import { type AppMessages, en } from "./messages/en";
 import { ja } from "./messages/ja";
 
 export {
@@ -24,6 +24,17 @@ export type TranslatedLocale = (typeof TRANSLATED_LOCALES)[number];
 const catalogs = { en, ja } as const;
 
 export type AppTranslate = Translate<typeof en>;
+
+/**
+ * A key whose message takes no placeholders.
+ *
+ * A component that keeps a key in a list - a tab, a menu item, a column - holds this type rather
+ * than `keyof AppMessages`. The wider union includes keys that need values, so `t(key)` on it would
+ * demand a parameter object the list has no way to supply.
+ */
+export type AppTextKey = {
+  [Key in keyof AppMessages]: Record<never, never> extends MessageParams<AppMessages[Key]> ? Key : never;
+}[keyof AppMessages];
 
 function isTranslatedLocale(value: string): value is TranslatedLocale {
   return TRANSLATED_LOCALES.some((locale) => locale === value);
