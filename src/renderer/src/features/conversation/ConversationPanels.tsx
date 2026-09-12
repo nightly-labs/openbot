@@ -181,6 +181,7 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
               }}
               agentStatus={props.agentStatus}
               providerRuntimeStatuses={props.providerRuntimeStatuses}
+              customProviders={props.customProviders}
               onDownloadProvider={props.onDownloadProvider}
               onCancelProviderDownload={props.onCancelProviderDownload}
               onConnectProvider={props.onConnectProvider}

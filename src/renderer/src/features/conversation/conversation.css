@@ -2373,9 +2373,28 @@
 }
 
 .provider-model-heading {
+  display: flex;
   flex-shrink: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
   min-height: 54px;
-  padding: 3px 4px 8px;
+  /* The right inset lives on the text, not the row, so the action button can line its right edge up
+   * with the search field and the model rows below it. */
+  padding: 3px 0 8px 4px;
+}
+
+.provider-model-heading-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: 4px;
+}
+
+/* The icons are raw lucide exports with no intrinsic size, and only the icon-only button sizes
+ * carry a rule, so an icon beside a label needs one here to match every other button. */
+.provider-model-heading .ui-button svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .provider-model-heading strong,

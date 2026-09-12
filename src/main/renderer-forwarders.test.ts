@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import type { AgentEvent, AgentSummary, ServerSummary } from "@openbot/contracts/ipc";
+import { translateFor } from "@openbot/i18n";
 import { BrowserWindow } from "electron";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { AgentNotificationContent } from "./agent-notifications";
@@ -93,6 +94,7 @@ function setup() {
       },
     }),
     showMainWindow: vi.fn(),
+    getTranslate: () => translateFor("en"),
   });
   return { ...forwarders, servers, request, waitForLookup: () => lookupSettled };
 }

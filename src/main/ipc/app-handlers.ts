@@ -8,10 +8,16 @@ import type { AgentService } from "../../backend/agent-service";
 import type { BrowserHost } from "../../backend/browser-host";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import { readAnalyticsPreference, writeAnalyticsPreference } from "../analytics-preference-store";
+import type { LanguageService } from "../language-service";
 import { exportDiagnostics, exportOpenBotData } from "../maintenance-service";
 import { readSetupState, writeSetupState } from "../setup-store";
 import type { UpdateService } from "../update-service";
-import { parseAnalyticsPreference, parseExternalDestination, parseProvider } from "./app-inputs";
+import {
+  parseAnalyticsPreference,
+  parseAppLanguagePreference,
+  parseExternalDestination,
+  parseSetup,
+} from "./app-inputs";
 import { stringPayload } from "./validation";
 
 /**
@@ -39,6 +45,7 @@ export interface AppIpcDependencies {
   updater: UpdateService;
   setupFile: string;
   analyticsPreferenceFile: string;
+  language: LanguageService;
   initializeAgent: () => Promise<void>;
   appVariant: AppVariant;
   getMainWindow: () => BrowserWindow | null;
@@ -52,6 +59,7 @@ export function appIpcHandlers({
   updater,
   setupFile,
   analyticsPreferenceFile,
+  language,
   initializeAgent,
   appVariant,
   getMainWindow,
@@ -73,9 +81,11 @@ export function appIpcHandlers({
         setAnalyticsTrackingEnabled(preference.enabled);
         return preference;
       }),
-      saveSetup: payloadHandler(parseProvider, async (preferredProvider): Promise<AppSetupState> => {
-        const state = await writeSetupState(setupFile, preferredProvider);
-        await service.setPreferredProvider(preferredProvider);
+      getAppLanguagePreference: handler(() => language.preference),
+      setAppLanguagePreference: payloadHandler(parseAppLanguagePreference, (parsed) => language.set(parsed)),
+      saveSetup: payloadHandler(parseSetup, async (input): Promise<AppSetupState> => {
+        const state = await writeSetupState(setupFile, input);
+        await service.setPreferredProvider(input.preferredProvider, input.preferredModel);
         await initializeAgent();
         return state;
       }),

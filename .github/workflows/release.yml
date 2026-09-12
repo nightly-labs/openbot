@@ -403,9 +403,123 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  linux:
+    name: Build unsigned Linux x64 release
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    environment: release
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+    env:
+      RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Install a virtual display for the launch check
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes xvfb
+
+      - name: Run Linux checks
+        run: bun run lint && bun run typecheck && bunx vitest run src/backend/cli.test.ts
+
+      - name: Install and verify provider control artifacts
+        run: |
+          bun scripts/install-codex-runtime.ts linux x64
+          bun scripts/install-claude-runtime.ts linux x64
+          bun scripts/install-grok-runtime.ts linux x64
+
+      - name: Build AppImage
+        run: bun run dist:linux
+
+      # Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor, which is the same
+      # restriction the shipped profile answers for an installed AppImage. The verifier starts the
+      # unpacked build from the workspace, so that path needs its own profile, and the SUID helper
+      # needs the ownership a package manager would give it. The sandbox stays on either way:
+      # `--no-sandbox` would make the launch check prove nothing about a real install.
+      - name: Permit the Electron sandbox for the verification build
+        run: |
+          set -euo pipefail
+          sudo chown root:root dist/linux-unpacked/chrome-sandbox
+          sudo chmod 4755 dist/linux-unpacked/chrome-sandbox
+          sudo tee /etc/apparmor.d/openbot-verify >/dev/null <<PROFILE
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile openbot-verify "$GITHUB_WORKSPACE/dist/linux-unpacked/openbot" flags=(unconfined) {
+            userns,
+          }
+          PROFILE
+          sudo apparmor_parser -r /etc/apparmor.d/openbot-verify
+
+      - name: Verify packaged application metadata and launch
+        run: xvfb-run -a bun run verify:package:linux --require-update-metadata
+
+      - name: Verify AppImage and updater metadata
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          appImages=(dist/*.AppImage)
+          if [ "${#appImages[@]}" -ne 1 ] || [ ! -f dist/latest-linux.yml ]; then
+            echo "Expected one AppImage and latest-linux.yml." >&2
+            exit 1
+          fi
+          # The AppImage has to stay executable, or the download is unusable without a chmod.
+          if [ ! -x "${appImages[0]}" ]; then
+            echo "The AppImage is not executable." >&2
+            exit 1
+          fi
+          grep -Fq "version: $RELEASE_VERSION" dist/latest-linux.yml
+          grep -Fq ".AppImage" dist/latest-linux.yml
+          bun run verify:update-artifacts linux
+
+      - name: Generate checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          shasum -a 256 ./*.AppImage | sed 's| \./| |' > SHA256SUMS-linux.txt
+          cat SHA256SUMS-linux.txt
+
+      - name: Generate Linux release SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: dist/linux-unpacked
+          format: spdx-json
+          output-file: dist/OpenBot-${{ env.RELEASE_VERSION }}-linux.spdx.json
+          artifact-name: OpenBot-${{ env.RELEASE_VERSION }}-Linux-SBOM
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Attest Linux release provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS-linux.txt
+
+      - name: Upload Linux release assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-linux
+          # An AppImage embeds its block map, so there is no sidecar file to upload beside it.
+          path: |
+            dist/*.AppImage
+            dist/latest-linux.yml
+            dist/*.spdx.json
+            dist/SHA256SUMS-linux.txt
+          if-no-files-found: error
+          retention-days: 7
+
   publish:
     name: Publish GitHub Release
-    needs: [validate, macos, windows]
+    needs: [validate, macos, windows, linux]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -426,18 +540,25 @@ jobs:
           name: release-windows
           path: release-assets/windows
 
+      - name: Download Linux release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-linux
+          path: release-assets/linux
+
       - name: Generate combined checksums
         shell: bash
         run: |
           cat release-assets/macos/SHA256SUMS-macos.txt \
             release-assets/windows/SHA256SUMS-windows.txt \
+            release-assets/linux/SHA256SUMS-linux.txt \
             > release-assets/SHA256SUMS.txt
 
       - name: Publish GitHub Release
         shell: bash
         run: |
           shopt -s nullglob
-          artifacts=(release-assets/macos/* release-assets/windows/* release-assets/SHA256SUMS.txt)
+          artifacts=(release-assets/macos/* release-assets/windows/* release-assets/linux/* release-assets/SHA256SUMS.txt)
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" "${artifacts[@]}" --clobber --repo "$GITHUB_REPOSITORY"
             gh release edit "$RELEASE_TAG" --draft=false --latest --repo "$GITHUB_REPOSITORY"

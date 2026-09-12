@@ -51,6 +51,7 @@ import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
 import { ComputerUseMacSetupService } from "./computer-use-mac-setup";
 import { ComputerUseMacSetupWindowController } from "./computer-use-mac-setup-window";
+import { CustomProviderStore } from "./custom-provider-store";
 import {
   applyDevelopmentRemoteAccount,
   type DevelopmentRemoteRole,
@@ -60,6 +61,7 @@ import { performDynamicIslandCriticalAction } from "./dynamic-island-actions";
 import { DynamicIslandWindowController } from "./dynamic-island-window";
 import { HostService } from "./host-service";
 import { HostedSiteDesktopService } from "./hosted-site-service";
+import { LanguageService } from "./language-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
   createDynamicIslandWindow,
@@ -96,6 +98,7 @@ import { VoiceTranscriptionService } from "./voice-transcription-service";
 const logger = createOpenBotLogger("application-services");
 const SETUP_FILE = "openbot-setup-v2.json";
 const ANALYTICS_PREFERENCE_FILE = "openbot-analytics-preference-v1.json";
+const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
 const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
 const BROWSER_STATE_FILE = "openbot-browser-state-v1.json";
@@ -107,6 +110,7 @@ const REMOTE_SERVERS_FILE = "openbot-remote-servers-v1.json";
 const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
 const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential-v1.json";
 const REMOTE_DESKTOP_RUNTIME_SECRET_FILE = "openbot-remote-desktop-runtime-v1.json";
+const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
 const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
 
 /**
@@ -160,6 +164,7 @@ export interface ApplicationServices {
   setupFile: string;
   analyticsPreferenceFile: string;
   updatePreferenceFile: string;
+  language: LanguageService;
   agentInitialization: AgentInitializationGate;
   sidebarLayout: SidebarLayoutStore;
   host: HostService;
@@ -168,6 +173,7 @@ export interface ApplicationServices {
   centralAuth: CentralAuthManager;
   skills: SkillMarketplaceService;
   hostedSites: HostedSiteDesktopService;
+  customProviders: CustomProviderStore;
   marketplaceAgents: AgentMarketplaceService;
   voice: VoiceTranscriptionService;
   dynamicIsland: DynamicIslandWindowController;
@@ -338,6 +344,13 @@ export async function createApplicationServices({
   const updatePreferenceFile = join(app.getPath("userData"), UPDATE_PREFERENCE_FILE);
   const setupState = await readSetupState(setupFile);
   const analyticsPreference = await readAnalyticsPreference(analyticsPreferenceFile);
+  // Loaded before the first window and before the application menu is built, so every native
+  // surface draws in the saved language on the first frame rather than switching after startup.
+  const language = new LanguageService({
+    path: join(app.getPath("userData"), LANGUAGE_PREFERENCE_FILE),
+    systemLocale: app.getLocale(),
+  });
+  await language.load();
   const updatePreference = await readUpdatePreference(updatePreferenceFile);
   const providerRuntimes = new ProviderRuntimeManager({
     root: join(app.getPath("userData"), "provider-runtimes"),
@@ -348,6 +361,20 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () => providerRuntimes.stop());
   // Before `new AgentService`, which reads every `executablePath` eagerly.
   await providerRuntimes.initialize();
+  const customProviders = new CustomProviderStore({
+    path: join(app.getPath("userData"), CUSTOM_PROVIDERS_FILE),
+    cipher: {
+      canPersist: () => safeStorage.isEncryptionAvailable(),
+      encrypt: (value) => {
+        if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
+        return safeStorage.encryptString(value);
+      },
+      decrypt: (value) => safeStorage.decryptString(value),
+    },
+  });
+  // Before the service, which reads the endpoints at its first provider spawn. A file this build
+  // cannot read leaves the list empty and every write refused; it does not stop the app.
+  await customProviders.load();
   /*
    * Loaded before the service, not on first use: a provider spawn reads its key synchronously, so
    * the decrypted map has to already exist by the time any client is built. A machine with no
@@ -378,7 +405,13 @@ export async function createApplicationServices({
     (agent) => managedSkills.syncAgent(agent),
     hostedSites,
     sidebarLayout,
-    { apiKey: (provider) => providerCredentials.get(provider) },
+    setupState.preferredModel,
+    {
+      apiKey: (provider) => providerCredentials.get(provider),
+      // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
+      // spawned provider process. The IPC handlers are given `list()`.
+      customProviders: () => customProviders.configs(),
+    },
   );
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
@@ -615,7 +648,9 @@ export async function createApplicationServices({
     beforeInstall: prepareForUpdateInstall,
     platform: process.platform,
     logDirectory: join(app.getPath("userData"), "logs", "update"),
-    shipItDirectory: join(homedir(), "Library", "Caches", "app.openbot.desktop.ShipIt"),
+    // Squirrel.Mac only. The path is meaningless under a Linux or Windows home directory.
+    shipItDirectory:
+      process.platform === "darwin" ? join(homedir(), "Library", "Caches", "app.openbot.desktop.ShipIt") : undefined,
   });
   teardown.push(TEARDOWN_ORDER.updater, "the update service", () => updater.stop());
 
@@ -630,6 +665,7 @@ export async function createApplicationServices({
     setupFile,
     analyticsPreferenceFile,
     updatePreferenceFile,
+    language,
     agentInitialization: new AgentInitializationGate(() => service.initialize()),
     sidebarLayout,
     host,
@@ -638,6 +674,7 @@ export async function createApplicationServices({
     centralAuth,
     skills,
     hostedSites,
+    customProviders,
     marketplaceAgents,
     voice,
     dynamicIsland,

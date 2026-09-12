@@ -5,6 +5,12 @@ import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
 import { type AgentCliInfo, resolveClaudeCli, resolveCodexCli, resolveGrokCli, resolveOpencodeCli } from "./cli";
 import { GrokAgentClient } from "./grok-client";
+import {
+  type CustomProviderSource,
+  OPENCODE_PROFILE_CONFIG,
+  openCodeConfigEnv,
+  openCodeSignInMessage,
+} from "./opencode-config";
 import type { AccountReadResult } from "./protocol";
 
 /** One command OpenBot runs against a provider's own CLI, waiting for the process to exit. */
@@ -15,7 +21,6 @@ export interface ProviderCliCommand {
 }
 
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
-const OPENCODE_SIGN_IN_MESSAGE = "OpenCode listed no model. Add an OpenCode Zen key to continue.";
 
 /**
  * The environment one OpenCode process gets, read at spawn time.
@@ -48,19 +53,27 @@ export type ProviderSignIn =
   | { kind: "external" };
 
 /**
- * The secrets a driver may hand to the CLI it spawns.
+ * What a client needs from the app at spawn, beyond its own CLI: the stored secrets, and the user's
+ * own endpoints.
  *
  * Required rather than optional on purpose: a driver that needs a stored key has no other way to
- * reach one, and making the parameter optional would let a call site quietly build a client that
- * can never see the user's key. `apiKey` is synchronous because the store is loaded eagerly at
- * startup, which is what lets it be read inside a spawn.
+ * reach one, and a call site that forgets the endpoints builds a client whose user simply sees their
+ * models missing. `apiKey` is synchronous because the store is loaded eagerly at startup, and
+ * `customProviders` is a getter, because both are read inside a spawn.
  */
 export interface ProviderClientContext {
   apiKey(provider: AgentProviderId): string | null;
+  readonly customProviders: CustomProviderSource;
+  /**
+   * Whether this model may still be used. A removed endpoint stays in the running process, with the
+   * credentials it started with, until that process restarts, and the restart waits for the work in
+   * flight. Read at the last moment before a prompt leaves, because everything above it awaits.
+   */
+  servesModel?(modelId: string): boolean;
 }
 
-/** Nothing stored, for tests and for call sites that predate the credential store. */
-export const NO_PROVIDER_CREDENTIALS: ProviderClientContext = { apiKey: () => null };
+/** Nothing stored and no endpoint, for tests and for call sites that predate the credential store. */
+export const NO_PROVIDER_CREDENTIALS: ProviderClientContext = { apiKey: () => null, customProviders: () => [] };
 
 /**
  * What a provider *does*. What it is called, how it is described and where its sign-in help points
@@ -71,13 +84,13 @@ export interface BuiltInProviderDriver {
   id: AgentProviderId;
   signIn: ProviderSignIn;
   resolveCli(options?: { bundledExecutable?: string | null }): Promise<AgentCliInfo>;
-  createClient(cli: AgentCliInfo, requestTimeoutMs: number, credentials: ProviderClientContext): AgentClient;
+  createClient(cli: AgentCliInfo, requestTimeoutMs: number, context: ProviderClientContext): AgentClient;
   /**
    * The client that writes an agent profile, when the provider needs a different one. Profile
    * generation asks the model one question and must not let it act, so a provider that can be
    * started without tools starts that way here. Without this hook the normal client is used.
    */
-  createProfileClient?(cli: AgentCliInfo, requestTimeoutMs: number, credentials: ProviderClientContext): AgentClient;
+  createProfileClient?(cli: AgentCliInfo, requestTimeoutMs: number, context: ProviderClientContext): AgentClient;
   authState(account: AccountReadResult["account"]): AgentAuthState;
   validateAccount(account: NonNullable<AccountReadResult["account"]>): void;
 }
@@ -133,22 +146,30 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // with no credential at all the CLI still lists the free models and answers a turn.
     signIn: { kind: "external" },
     resolveCli: resolveOpencodeCli,
-    createClient: (cli, timeout, credentials) =>
+    // Both clients read the key and the custom providers at spawn, and the profile client merges the
+    // endpoints *into* the deny-all layer rather than beside it: the two share one environment
+    // variable, so the layer would be lost if a custom provider config replaced it.
+    createClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
         provider: "opencode",
         argv: ["acp"],
         env: {},
-        extraEnv: () => opencodeEnv(cli, credentials),
-        signInMessage: OPENCODE_SIGN_IN_MESSAGE,
+        extraEnv: () => ({ ...opencodeEnv(cli, context), ...openCodeConfigEnv({}, context.customProviders) }),
+        signInMessage: openCodeSignInMessage(context.customProviders().length),
+        servesModel: context.servesModel,
       }),
-    createProfileClient: (cli, timeout, credentials) =>
+    createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
         provider: "opencode",
         argv: ["acp"],
         profileGeneration: true,
-        env: { OPENCODE_CONFIG_CONTENT: JSON.stringify({ permission: { "*": "deny" } }) },
-        extraEnv: () => opencodeEnv(cli, credentials),
-        signInMessage: OPENCODE_SIGN_IN_MESSAGE,
+        env: {},
+        extraEnv: () => ({
+          ...opencodeEnv(cli, context),
+          ...openCodeConfigEnv(OPENCODE_PROFILE_CONFIG, context.customProviders),
+        }),
+        signInMessage: openCodeSignInMessage(context.customProviders().length),
+        servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "opencode", email: account?.email ?? null }),
     validateAccount: () => undefined,

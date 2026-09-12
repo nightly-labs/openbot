@@ -548,6 +548,30 @@ describe("ProviderRuntimeManager", () => {
     expect(entries).not.toContain("darwin-arm64");
     expect(entries.some((entry) => entry.startsWith(".installing-"))).toBe(false);
   });
+
+  it.each([
+    ["darwin", "arm64"],
+    ["linux", "x64"],
+    ["win32", "x64"],
+  ] as const)("offers managed downloads on %s %s", async (platform, architecture) => {
+    const root = await temporaryRoot();
+    const manager = new ProviderRuntimeManager({ root, platform, architecture });
+
+    const snapshot = await manager.initialize();
+
+    for (const provider of MANAGED_RUNTIME_PROVIDERS) {
+      expect(snapshot.providers[provider]).toMatchObject({ phase: "not-downloaded", message: null });
+    }
+  });
+
+  it("reports an unsupported platform rather than a download that cannot work", async () => {
+    const root = await temporaryRoot();
+    const manager = new ProviderRuntimeManager({ root, platform: "linux", architecture: "arm64" });
+
+    const snapshot = await manager.initialize();
+
+    expect(snapshot.providers.codex.message).toBe("This platform is not supported.");
+  });
 });
 
 interface OpencodeFixture {

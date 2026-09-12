@@ -46,6 +46,27 @@
   --openbot-glass-highlight: rgba(255, 255, 255, 0.12);
   --openbot-glass-shadow: rgba(0, 0, 0, 0.28);
   --openbot-hero-grid-line: rgba(214, 173, 242, 0.09);
+
+  /* The landing price figure, and nothing else: a dark glass "$0" lit by one soft
+     iridescent band. These are a material, not aliases of the neutral palette -
+     the body sits a shade either side of the canvas so the glyph reads as a solid
+     object, and the band is the only warm/cool pair on the page. */
+  --openbot-price-metal-high: #4c4c4c;
+  --openbot-price-metal-core: #1f1f1f;
+  --openbot-price-metal-low: #343434;
+  --openbot-price-sheen-cool: rgba(150, 196, 255, 0.92);
+  --openbot-price-sheen-light: rgba(240, 244, 250, 0.98);
+  --openbot-price-sheen-warm: rgba(255, 184, 132, 0.94);
+  /* The band has to fade out through its own hue. Fading to --openbot-transparent
+     would interpolate towards transparent *black* and leave a dirty grey halo
+     above and below the light. */
+  --openbot-price-sheen-cool-soft: rgba(150, 196, 255, 0.26);
+  --openbot-price-sheen-warm-soft: rgba(255, 184, 132, 0.28);
+  --openbot-price-sheen-cool-clear: rgba(150, 196, 255, 0);
+  --openbot-price-sheen-warm-clear: rgba(255, 184, 132, 0);
+  --openbot-price-rim: rgba(255, 255, 255, 0.28);
+  --openbot-price-rim-under: rgba(255, 255, 255, 0.1);
+  --openbot-price-glow: rgba(180, 200, 255, 0.22);
   --openbot-bg-host-inset: #101216;
   --openbot-bg-notch: #000000;
   --openbot-mask-solid: #000000;

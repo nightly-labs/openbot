@@ -7,6 +7,7 @@ import {
   type AgentStatus,
   type AgentSubmission,
   type AgentSummary,
+  type AppLanguagePreference,
   type AttachmentImportEvent,
   type BrowserPreview,
   type ComputerUseMacSetupState,
@@ -15,6 +16,8 @@ import {
   type ConversationReadState,
   type ConversationSearchPage,
   type ConversationWithReadState,
+  type CustomProviderResult,
+  type CustomProviderSummary,
   type DraftAttachment,
   type DuplicateAgentResult,
   type DynamicIslandAction,
@@ -45,12 +48,15 @@ import {
   isAgentProvider,
   isAgentStatus,
   isAgentSummary,
+  isAppLanguage,
   isAttachmentSummary,
   isAvatarHue,
   isAvatarSeed,
   isConversationMessage,
   isConversationReadState,
   isConversationWithReadState,
+  isCustomProviderResult,
+  isCustomProviderSummary,
   isDynamicIslandAction,
   isDynamicIslandNotchSize,
   isDynamicIslandPreference,
@@ -249,9 +255,32 @@ function decodeHostedSites(value: unknown): HostedSiteSummary[] {
   return value.map(decodeHostedSite);
 }
 
+/**
+ * The guard, not a decoder of its own: it is the assertion that a summary carries no `apiKey`, and a
+ * second implementation here could disagree with it. It fails closed on the whole list, so a main
+ * process that ever put a key in a row empties the picker rather than leaking one.
+ */
+function decodeCustomProviders(value: unknown): CustomProviderSummary[] {
+  if (!Array.isArray(value) || !value.every(isCustomProviderSummary)) {
+    throw new Error("Invalid custom provider list response.");
+  }
+  return value;
+}
+
+function decodeCustomProviderResult(value: unknown): CustomProviderResult {
+  if (!isCustomProviderResult(value)) throw new Error("Invalid custom provider response.");
+  return value;
+}
+
 function decodeNullablePath(value: unknown): string | null {
   if (value !== null && !isString(value)) throw new Error("Invalid directory response.");
   return value;
+}
+
+function decodeAppLanguagePreference(value: unknown): AppLanguagePreference {
+  if (!isDynamicRecord(value) || !isAppLanguage(value.language))
+    throw new Error("Invalid language preference response.");
+  return { language: value.language };
 }
 
 function decodeDynamicIslandPreference(value: unknown): DynamicIslandPreference {
@@ -714,6 +743,16 @@ const openbotApi: OpenBotDesktopApi = {
   saveSetup: (input) => ipcRenderer.invoke(IPC_CHANNELS.saveSetup, input),
   getAnalyticsPreference: () => ipcRenderer.invoke(IPC_CHANNELS.getAnalyticsPreference),
   setAnalyticsPreference: (input) => ipcRenderer.invoke(IPC_CHANNELS.setAnalyticsPreference, input),
+  getAppLanguagePreference: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.getAppLanguagePreference).then(decodeAppLanguagePreference),
+  setAppLanguagePreference: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.setAppLanguagePreference, input).then(decodeAppLanguagePreference),
+  onAppLanguagePreference: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, preference: unknown) =>
+      listener(decodeAppLanguagePreference(preference));
+    ipcRenderer.on(IPC_CHANNELS.appLanguagePreference, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.appLanguagePreference, handler);
+  },
   dynamicIsland: {
     getPreference: () =>
       ipcRenderer.invoke(IPC_CHANNELS.dynamicIslandGetPreference).then(decodeDynamicIslandPreference),
@@ -835,6 +874,11 @@ const openbotApi: OpenBotDesktopApi = {
     publish: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesPublish, input).then(decodeHostedSite),
     replace: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesReplace, input).then(decodeHostedSite),
     delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesDelete, input).then(decodeVoid),
+  },
+  customProviders: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.customProvidersList).then(decodeCustomProviders),
+    save: (input) => ipcRenderer.invoke(IPC_CHANNELS.customProvidersSave, input).then(decodeCustomProviderResult),
+    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.customProvidersDelete, input).then(decodeCustomProviderResult),
   },
   marketplaceAgents: {
     list: (query) =>

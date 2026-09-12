@@ -11,6 +11,7 @@ import {
   bundledOpencodeExecutable,
   CodexCliError,
   cliSpawnTarget,
+  loginShellCommand,
   parseClaudeVersion,
   parseCodexVersion,
   parseGrokVersion,
@@ -57,7 +58,9 @@ describe("bundled Codex resolution", () => {
     expect(bundledCodexExecutable("win32", "x64", "C:\\Program Files\\OpenBot\\resources")).toBe(
       "C:\\Program Files\\OpenBot\\resources\\codex\\win\\x64\\bin\\codex.exe",
     );
-    expect(bundledCodexExecutable("linux", "x64", "/resources")).toBeNull();
+    expect(bundledCodexExecutable("linux", "x64", "/resources")).toBe("/resources/codex/linux/x64/bin/codex");
+    expect(bundledCodexExecutable("linux", "arm64", "/resources")).toBeNull();
+    expect(bundledCodexExecutable("freebsd", "x64", "/resources")).toBeNull();
   });
 
   it("resolves the build runtime path during development", () => {
@@ -113,7 +116,7 @@ describe("bundled Claude resolution", () => {
     expect(bundledClaudeExecutable("win32", "x64", "C:\\Program Files\\OpenBot\\resources")).toBe(
       "C:\\Program Files\\OpenBot\\resources\\claude\\win\\x64\\bin\\claude.exe",
     );
-    expect(bundledClaudeExecutable("linux", "x64", "/resources")).toBeNull();
+    expect(bundledClaudeExecutable("linux", "x64", "/resources")).toBe("/resources/claude/linux/x64/bin/claude");
   });
 
   it.runIf(process.platform !== "win32")("prefers the managed CLI over a compatible system CLI", async () => {
@@ -142,10 +145,30 @@ describe("bundled Claude resolution", () => {
   });
 });
 
+describe("login shell discovery", () => {
+  it("uses zsh on macOS and the user's own shell on Linux", () => {
+    expect(loginShellCommand("darwin", {})).toEqual({ command: "/bin/zsh", args: ["-lic"] });
+    expect(loginShellCommand("win32", {})).toEqual({ command: "/bin/zsh", args: ["-lic"] });
+    expect(loginShellCommand("linux", { SHELL: "/usr/bin/fish" })).toEqual({
+      command: "/usr/bin/fish",
+      args: ["-lic"],
+    });
+  });
+
+  it("falls back to a non-interactive /bin/sh when Linux has no usable login shell", () => {
+    // dash exits rather than running the command when it is given -i without a tty.
+    expect(loginShellCommand("linux", {})).toEqual({ command: "/bin/sh", args: ["-lc"] });
+    expect(loginShellCommand("linux", { SHELL: "  " })).toEqual({ command: "/bin/sh", args: ["-lc"] });
+    expect(loginShellCommand("linux", { SHELL: "/bin/sh" })).toEqual({ command: "/bin/sh", args: ["-lc"] });
+  });
+});
+
 describe("bundled Grok CLI resolution", () => {
   it("reads Grok versions and includes documented macOS and Windows locations", () => {
     expect(parseGrokVersion("grok 1.0.5\n")).toBe("1.0.5");
-    expect(posixFallbackPaths("grok", "/Users/jane")).toContain("/Users/jane/.grok/bin/grok");
+    expect(posixFallbackPaths("grok", "/Users/jane")).toEqual(
+      expect.arrayContaining(["/Users/jane/.grok/bin/grok", "/opt/homebrew/bin/grok", "/usr/bin/grok"]),
+    );
     expect(
       windowsFallbackPaths("grok", "C:\\Users\\Jane", {
         LOCALAPPDATA: "C:\\Users\\Jane\\AppData\\Local",
@@ -165,7 +188,7 @@ describe("bundled Grok CLI resolution", () => {
     expect(bundledGrokExecutable("win32", "x64", "C:\\Program Files\\OpenBot\\resources")).toBe(
       "C:\\Program Files\\OpenBot\\resources\\grok\\win\\x64\\bin\\grok.exe",
     );
-    expect(bundledGrokExecutable("linux", "x64", "/resources")).toBeNull();
+    expect(bundledGrokExecutable("linux", "x64", "/resources")).toBe("/resources/grok/linux/x64/bin/grok");
   });
 
   it.runIf(process.platform !== "win32")("honors OPENBOT_GROK_PATH and probes --version", async () => {
@@ -345,7 +368,7 @@ describe("OpenCode CLI resolution", () => {
     expect(bundledOpencodeExecutable("darwin", "arm64", "/Applications/OpenBot.app/Contents/Resources")).toBe(
       "/Applications/OpenBot.app/Contents/Resources/opencode/mac/arm64/bin/opencode",
     );
-    expect(bundledOpencodeExecutable("linux", "x64", "/resources")).toBeNull();
+    expect(bundledOpencodeExecutable("linux", "x64", "/resources")).toBe("/resources/opencode/linux/x64/bin/opencode");
   });
 
   it.runIf(process.platform !== "win32")("uses the installed CLI and reports a missing override", async () => {

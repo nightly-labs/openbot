@@ -8,6 +8,7 @@ import type {
   AgentAnalyticsInput,
   AgentEvent,
   AgentMemory,
+  AgentModelId,
   AgentModelOption,
   AgentProfileDraft,
   AgentRuntimeSnapshot,
@@ -29,6 +30,7 @@ import type {
   CreateChannelMemoryInput,
   CreateChannelRoutineInput,
   CreateRoutineInput,
+  CustomProviderRestart,
   DeleteAgentMemoryInput,
   DeleteChannelMemoryInput,
   DeleteChannelRoutineInput,
@@ -65,7 +67,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { AGENT_RUNTIME_TEXT_LIMIT, defaultProviderModel, isMessageReaction } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
 import { AttachmentGateway } from "./agent/attachment-gateway";
 import { AttentionRegistry } from "./agent/attention-registry";
@@ -81,7 +83,7 @@ import {
   responseAttachmentMessageId,
 } from "./agent/delivery-content";
 import { DeltaBuffer } from "./agent/delta-buffer";
-import { DrainScheduler } from "./agent/drain-scheduler";
+import { DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./agent/drain-scheduler";
 import { DuplicationGate } from "./agent/duplication-gate";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./agent/hosted-site-events";
@@ -99,7 +101,7 @@ import { isDynamicToolCall, isRequestTimeout, providerForAgent, providerLabel } 
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import type { AgentClient, AgentProvider } from "./agent-client";
-import type { AgentStore } from "./agent-store";
+import { type AgentStore, DEFAULT_AGENT_PROVIDER } from "./agent-store";
 import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
 import { ChannelService } from "./channel-service";
@@ -141,8 +143,37 @@ export interface ResolvedSharedFile {
 export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly channels: ChannelService;
   readonly #profileSave: ProfileSave;
-  readonly #profileClients = new Set<AgentClient>();
+  /**
+   * Every disposable client that is generating, with the record that ends its generation. A client
+   * alone is not enough to stop the work: it may not hold a process yet.
+   */
+  readonly #profileClients = new Map<AgentClient, { cancelled: boolean }>();
   readonly #deletingAgents = new Set<string>();
+  /**
+   * Endpoints the running CLI may still list although the saved file no longer defines them, because
+   * a restart it refused or failed leaves its catalogue as it was. The value is `#endpointRevision`
+   * as it stood when the exclusion was taken, so a process that spawned before that number read the
+   * old files and its catalogue says nothing about this endpoint.
+   */
+  readonly #releasedCustomProviders = new Map<string, number>();
+  /**
+   * Counts the endpoint changes, which puts an exclusion and a spawn in order. A CLI reads the files
+   * once, at spawn, so a removal made while a process starts is not in the process that arrives.
+   */
+  #endpointRevision = 0;
+  /**
+   * The newest revision whose file write finished, which is the newest a spawning process can read.
+   * A removal is excluded before its write, so a process that starts during the write reads the old
+   * file and must not be taken as proof that the endpoint is gone.
+   */
+  #committedEndpointRevision = 0;
+  /**
+   * One endpoint change or one agent update at a time. A removal excludes the endpoint, moves the
+   * agents off it and then writes the file; an agent update that ran between those steps could put
+   * an agent back onto the endpoint after the sweep and before the write, and the removal would not
+   * notice. Both paths run here, so neither can start inside the other.
+   */
+  #endpointChain: Promise<unknown> = Promise.resolve();
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
   readonly #browser: AgentBrowserHost;
@@ -182,6 +213,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     prepareAgentWorkspace: (agent: AgentSummary) => Promise<void> = async () => undefined,
     hostedSites: AgentHostedSites | null = null,
     sidebarLayout: AgentSidebar | null = null,
+    /**
+     * The model setup chose beside `preferredProvider`, or `null` for that provider's own default.
+     * It arrives last because it was added last, and every caller that has no answer says `null`.
+     */
+    preferredModel: AgentModelId | null = null,
+    /**
+     * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
+     * endpoints. The main process owns both, because they carry secrets that must not reach the
+     * renderer or the database.
+     */
     credentials: ProviderClientContext = NO_PROVIDER_CREDENTIALS,
   ) {
     super();
@@ -284,6 +325,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               // it away. Only its own guard reports the turn the CLI is running.
               (this.#conversation.workingSnapshot(agent.id) != null || !this.#compaction.mayDrain(agent.id)),
           ),
+        captureConfigRevision: () => this.#committedEndpointRevision,
+        onProviderActivated: (provider, configRevision) => {
+          if (provider === "opencode") this.#clearReleasedCustomProviders(configRevision);
+        },
         onProviderResumed: (provider) => {
           for (const agent of this.#store.list()) {
             if (providerForAgent(agent) === provider) this.#drain.scheduleDrain(agent.id);
@@ -294,9 +339,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       requestTimeoutMs,
       preferredProvider,
+      preferredModel,
       clientFactory,
       bundledExecutables,
-      credentials,
+      // The exclusion travels with the credentials, so the client that holds a session on a removed
+      // endpoint can refuse the prompt itself, after the waits every caller above it makes.
+      credentials: { ...credentials, servesModel: (modelId) => this.#servesModel(modelId) },
     });
     this.#compaction = new ContextCompaction({
       store,
@@ -402,17 +450,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       agents: () => this.listAgents(),
       generate: async (lead, prompt) => {
         await this.#providers.ensureProvider(lead.provider);
-        const model = this.#providers
-          .listModels()
-          .find((item) => item.provider === lead.provider && item.id === lead.model);
+        const model = this.#availableModels().find((item) => item.provider === lead.provider && item.id === lead.model);
         if (!model) throw new Error("The channel lead model is unavailable.");
         const client = this.#providers.createProfileClient(lead.provider);
-        this.#profileClients.add(client);
+        const generation = { cancelled: false };
+        this.#profileClients.set(client, generation);
         try {
           return await generateTextWithoutTools(
             client,
             { ...model, defaultReasoningEffort: lead.reasoningEffort },
             prompt,
+            () => generation.cancelled,
           );
         } finally {
           this.#profileClients.delete(client);
@@ -503,6 +551,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         isStopping: () => this.#stopping,
+        servesModel: (model) => this.#servesModel(model),
       },
     });
     this.#browser.onControlChanged((state) => {
@@ -712,7 +761,44 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   listModels(): AgentModelOption[] {
-    return this.#providers.listModels();
+    return this.#availableModels();
+  }
+
+  /**
+   * The catalogue every caller may choose from: what the connected providers report, less the models
+   * of an endpoint whose removal is written.
+   *
+   * The two lists differ only while OpenCode keeps running with an old configuration, which is what
+   * a removal during a turn leaves behind. The CLI still lists the endpoint, so the raw catalogue
+   * would let the renderer show it, `updateAgent` accept it, and a new agent start on it, all after
+   * the file that defines it is gone. `alsoExcluded` names an endpoint whose removal is in progress
+   * and therefore not recorded yet.
+   */
+  #availableModels(): AgentModelOption[] {
+    if (this.#releasedCustomProviders.size === 0) return this.#providers.listModels();
+    return this.#providers.listModels().filter((option) => this.#servesModel(option.id));
+  }
+
+  /**
+   * Whether the model id is one a save still defines. A model of no custom endpoint, and a model of
+   * an endpoint nothing removed, are served; a model an endpoint no longer lists is not.
+   */
+  #servesModel(modelId: string): boolean {
+    const separator = modelId.indexOf("/");
+    if (separator <= 0) return true;
+    return !this.#releasedCustomProviders.has(modelId.slice(0, separator));
+  }
+
+  /** Ends every disposable generation that may reach an endpoint the user has taken out. */
+  #stopProfileClients(): void {
+    for (const [client, generation] of this.#profileClients) {
+      if (client.provider !== "opencode") continue;
+      // The generation is cancelled as well as the client stopped. A generation still preparing its
+      // workspace holds no process, so the stop reaches nothing, and its own `start()` would then
+      // spawn the process with the endpoints as they were before this change.
+      generation.cancelled = true;
+      void client.stop().catch(() => undefined);
+    }
   }
 
   async generateProfile(input: GenerateAgentProfileInput, sections: SidebarSection[]): Promise<AgentProfileDraft> {
@@ -722,19 +808,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (this.#profileClients.size >= 3) throw new Error("Profile generation is busy. Try again shortly.");
     const provider = agent?.provider ?? this.#providers.preferredProvider();
     await this.ensureProvider(provider);
-    const models = this.#providers.listModels();
-    const defaultModel = defaultProviderModel(provider);
+    const models = this.#availableModels();
     const model = agent
       ? models.find((candidate) => candidate.id === agent.model && candidate.provider === provider)
-      : (models.find((candidate) => candidate.provider === provider && candidate.id === defaultModel) ??
-        models.find((candidate) => candidate.provider === provider));
+      : this.#startingModel(provider, models);
     if (!model) throw new Error("The selected provider has no available model.");
     if (this.#stopping) throw new Error("OpenBot is shutting down.");
     if (this.#profileClients.size >= 3) throw new Error("Profile generation is busy. Try again shortly.");
     const client = this.#providers.createProfileClient(provider);
-    this.#profileClients.add(client);
+    const generation = { cancelled: false };
+    this.#profileClients.set(client, generation);
     try {
-      return await generateProfile(client, model, input, sections);
+      return await generateProfile(client, model, input, sections, () => generation.cancelled);
     } finally {
       this.#profileClients.delete(client);
     }
@@ -751,6 +836,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.preferredProvider();
   }
 
+  /**
+   * The model a new agent, or a profile draft with no agent, starts on for `provider`.
+   *
+   * Setup records a model beside the preferred provider, so that model comes first -- but only while
+   * the CLI still lists it, because the list is the provider's answer and a saved id can name an
+   * endpoint or a model that is gone. After it come the provider's own default and then whatever it
+   * does list; `null` means it listed nothing at all.
+   */
+  #startingModel(provider: AgentProvider, models: AgentModelOption[]): AgentModelOption | null {
+    const listed = (id: AgentModelId) => models.find((model) => model.provider === provider && model.id === id);
+    const preferred = this.#providers.preferredModel();
+    const chosen = preferred !== null && provider === this.#providers.preferredProvider() ? listed(preferred) : null;
+    return (
+      chosen ?? listed(defaultProviderModel(provider)) ?? models.find((model) => model.provider === provider) ?? null
+    );
+  }
+
   async createAgent(
     input: CreateAgentInput,
     configure?: (agent: AgentSummary) => Promise<AgentSummary>,
@@ -763,12 +865,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     try {
       await this.#prepareAgentWorkspace(agent);
       const preferredProvider = this.#providers.preferredProvider();
+      // A new record starts on the built-in default provider, so this is the one place a preferred
+      // provider lands on a new agent -- and with it the model setup chose, which is how a custom
+      // endpoint becomes the default: it is a model of the CLI that runs it, never a provider.
       if (preferredProvider !== agent.provider) {
-        const models = this.#providers.listModels();
-        const preferredDefault = defaultProviderModel(preferredProvider);
-        const preferredModel =
-          models.find((model) => model.provider === preferredProvider && model.id === preferredDefault) ??
-          models.find((model) => model.provider === preferredProvider);
+        const preferredModel = this.#startingModel(preferredProvider, this.#availableModels());
         if (!preferredModel) throw new Error(`${providerLabel(preferredProvider)} has no available model.`);
         agent = await this.#store.updateAgent({
           agentId: agent.id,
@@ -831,13 +932,24 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return agent;
   }
 
-  async updateAgent(input: UpdateAgentInput): Promise<AgentSummary> {
+  updateAgent(input: UpdateAgentInput): Promise<AgentSummary> {
+    return this.#runEndpointExclusive(() => this.#applyAgentUpdate(input));
+  }
+
+  /** A failed change does not stop the next one, so the chain swallows what it re-throws here. */
+  #runEndpointExclusive<T>(run: () => Promise<T>): Promise<T> {
+    const operation = this.#endpointChain.then(run);
+    this.#endpointChain = operation.catch(() => undefined);
+    return operation;
+  }
+
+  async #applyAgentUpdate(input: UpdateAgentInput): Promise<AgentSummary> {
     this.#conversation.requireKnownAgent(input.agentId);
     const previous = this.#store.list().find((agent) => agent.id === input.agentId);
     const requestedModel = input.model
-      ? this.#providers
-          .listModels()
-          .find((model) => model.id === input.model && (!input.provider || model.provider === input.provider))
+      ? this.#availableModels().find(
+          (model) => model.id === input.model && (!input.provider || model.provider === input.provider),
+        )
       : undefined;
     if (input.model && !requestedModel) throw new Error("The selected agent model is unavailable.");
     const requestedProvider = input.provider ?? requestedModel?.provider ?? previous?.provider;
@@ -1014,8 +1126,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#routineTimer.arm();
   }
 
-  setPreferredProvider(provider: AgentProvider): Promise<void> {
-    return this.#providers.setPreferredProvider(provider, this.#initialized);
+  setPreferredProvider(provider: AgentProvider, model: AgentModelId | null = null): Promise<void> {
+    return this.#providers.setPreferredProvider(provider, this.#initialized, model);
   }
 
   ensureProvider(provider: AgentProvider): Promise<void> {
@@ -1042,6 +1154,184 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.updateProviderCli(provider, install);
   }
 
+  /** Restarts OpenCode so a saved or removed endpoint reaches it. Reports why, if it did not. */
+  reloadOpenCodeConfig(): Promise<CustomProviderRestart> {
+    return this.#providers.reloadOpenCodeConfig();
+  }
+
+  /**
+   * Saves one endpoint: the exclusion of the id being saved and `persist`, which is the caller's file
+   * write, as one change nothing else can interleave with.
+   *
+   * The id is excluded although it is being added. The process answering now was spawned before this
+   * write, and an id this app has never saved can still exist in OpenCode's own configuration and in
+   * its live catalogue. Without the exclusion the picker reads those models as the saved endpoint's,
+   * while every prompt still goes to the old process, at the URL and with the credentials it started
+   * with. The exclusion is given back only when a process that read this write reports its own
+   * catalogue, so a restart that is skipped for a busy CLI, or one that fails, leaves it in place.
+   *
+   * No agent is moved off the id, unlike a removal: the endpoint is arriving, not going away, and a
+   * fresh process usually serves it within seconds. Until then its models are refused at delivery,
+   * which is the safe answer while two different servers could answer to one id.
+   */
+  saveCustomProvider<T>(providerId: string, persist: () => Promise<T>): Promise<T> {
+    return this.#runEndpointExclusive(async () => {
+      const previous = this.#releasedCustomProviders.get(providerId);
+      this.#endpointRevision += 1;
+      const revision = this.#endpointRevision;
+      this.#releasedCustomProviders.set(providerId, revision);
+      this.#emitModelsChanged();
+      // The same reason as a removal: a profile or channel client is a process of its own, holding
+      // the endpoints it was spawned with, and no restart of the main client reaches it.
+      this.#stopProfileClients();
+      try {
+        const persisted = await persist();
+        // Only now can a spawning process read the saved endpoint.
+        this.#committedEndpointRevision = revision;
+        return persisted;
+      } catch (error) {
+        // Nothing was written, so the id is served exactly as it was before this call.
+        if (previous !== undefined) this.#releasedCustomProviders.set(providerId, previous);
+        else this.#releasedCustomProviders.delete(providerId);
+        this.#emitModelsChanged();
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * Removes one endpoint: the exclusion, the agents that were on it, and `persist`, which is the
+   * caller's file write, as one change nothing else can interleave with.
+   *
+   * The exclusion is taken *first*, so no agent can be moved onto the endpoint while its removal
+   * runs, and given back when the write throws: an endpoint that is still on disk is still saved and
+   * still served, and its models stay a valid fallback for the next removal.
+   */
+  removeCustomProvider<T>(providerId: string, persist: () => Promise<T>): Promise<T> {
+    return this.#runEndpointExclusive(async () => {
+      const previous = this.#releasedCustomProviders.get(providerId);
+      this.#endpointRevision += 1;
+      const revision = this.#endpointRevision;
+      this.#releasedCustomProviders.set(providerId, revision);
+      this.#emitModelsChanged();
+      // A profile or channel client is a process of its own, spawned with the endpoints as they
+      // were, and no restart of the main client reaches it. It is one short request, so it is
+      // stopped rather than watched: its caller reports a failure the user can repeat.
+      this.#stopProfileClients();
+      try {
+        await this.#releaseCustomProviderModels();
+        const persisted = await persist();
+        // Only now is the removal on disk, so only now can a process read it. Removals run one at a
+        // time on the chain, so this number never goes back.
+        this.#committedEndpointRevision = revision;
+        return persisted;
+      } catch (error) {
+        if (previous !== undefined) this.#releasedCustomProviders.set(providerId, previous);
+        else this.#releasedCustomProviders.delete(providerId);
+        this.#emitModelsChanged();
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * A fresh OpenCode process is the one the app uses now, and it read the endpoint files as they are,
+   * so what it lists is the truth and nothing has to be masked any more.
+   *
+   * Only a client that reached `onProviderActivated` gets here. A restart that fails leaves the old
+   * process answering, on the endpoints it started with, and every id removed since then stays out:
+   * an id saved a second time may name another server, and the old process would take the message to
+   * the one the user has just replaced.
+   */
+  #clearReleasedCustomProviders(configRevision: number): void {
+    let changed = false;
+    for (const [providerId, revision] of this.#releasedCustomProviders) {
+      // A removal made while this process started is not in the files it read, so its catalogue is
+      // the one from before the removal and the endpoint stays out.
+      if (revision > configRevision) continue;
+      this.#releasedCustomProviders.delete(providerId);
+      changed = true;
+    }
+    if (changed) this.#emitModelsChanged();
+  }
+
+  /**
+   * Tells the renderer to read the catalogue again. The model list reaches it by pull, refreshed on a
+   * status event, and an exclusion changes what that pull answers while no provider state moves.
+   */
+  #emitModelsChanged(): void {
+    this.#emit({ type: "status", status: this.getStatus() });
+  }
+
+  /**
+   * Moves every agent off a removed endpoint's models, onto a model that is still served.
+   *
+   * Runs *before* the file write and the restart, so no agent is left naming a model the fresh
+   * catalogue does not list, and inside `removeCustomProvider`, which has already excluded the
+   * endpoint and holds the chain that keeps an agent update out.
+   *
+   * Throws while an affected agent is busy, which stops the removal: the move is a provider switch,
+   * and that is refused during a turn or a queued delivery. The check runs over all of them first,
+   * so a refusal moves no agent at all.
+   */
+  async #releaseCustomProviderModels(): Promise<void> {
+    // Every endpoint already removed, not only this one. A removal during a turn leaves the running
+    // CLI's catalogue as it was, so the models of an endpoint already taken out are still listed,
+    // and choosing one here would move agents onto an endpoint that is gone.
+    const affected = this.#store
+      .list()
+      .filter((agent) => providerForAgent(agent) === "opencode" && !this.#servesModel(agent.model));
+    if (affected.length === 0) return;
+    // OpenCode declares no default model of its own -- its catalogue is whatever the CLI lists -- so
+    // the fallback is chosen from the live list with the endpoint being removed taken out of it.
+    // The built-in default provider comes second, because an agent left on a model the CLI no longer
+    // serves cannot answer, and a provider switch keeps its workspace, thread and identity.
+    const remaining = this.#availableModels();
+    // The built-in default is offered only while it is usable: `#applyAgentUpdate` connects the
+    // provider it moves an agent to, and a Codex that is not installed or not signed in throws
+    // there. That would trap a user who runs custom endpoints only, because the last endpoint could
+    // never be removed while an agent still names one of its models.
+    const fallback =
+      this.#startingModel("opencode", remaining) ??
+      (this.#providerAvailable(DEFAULT_AGENT_PROVIDER) ? this.#startingModel(DEFAULT_AGENT_PROVIDER, remaining) : null);
+    // Nothing is listed, so there is no model to move to. The removal still goes ahead: refusing it
+    // would trap the user on an endpoint that may be the reason no model is listed.
+    if (!fallback) return;
+    if (fallback.provider !== "opencode" && affected.some((agent) => this.#hasWorkInFlight(agent))) {
+      throw new Error("Wait for the active turn and queue to finish before you remove this endpoint.");
+    }
+    for (const agent of affected) {
+      // Not the public `updateAgent`: this already runs inside the chain that one takes.
+      await this.#applyAgentUpdate({
+        agentId: agent.id,
+        provider: fallback.provider,
+        model: fallback.id,
+        reasoningEffort: fallback.defaultReasoningEffort,
+      });
+    }
+  }
+
+  /** Whether this provider reports a CLI that is installed, current, and signed in. */
+  #providerAvailable(provider: AgentProvider): boolean {
+    return (
+      this.getStatus().providers?.some((candidate) => candidate.id === provider && candidate.state === "available") ??
+      false
+    );
+  }
+
+  /**
+   * Whether a turn is running for this agent or a delivery is still queued for it. Read from the
+   * live snapshot first, then from the stored conversation, because an agent whose thread is not
+   * loaded keeps its active turn in the database.
+   */
+  #hasWorkInFlight(agent: AgentSummary): boolean {
+    if (this.#mailbox.hasUnfinishedDelivery(agent.id)) return true;
+    const active =
+      this.#conversation.workingSnapshot(agent.id)?.activeTurnId ??
+      (agent.threadId ? this.#store.database.readConversation(agent.id, agent.threadId).activeTurnId : null);
+    return Boolean(active);
+  }
+
   async stop(): Promise<void> {
     this.#stopping = true;
     const channelStop = this.channels.stop();
@@ -1055,7 +1345,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#attention.clearPrompts();
     this.#attention.clearBrowserTakeovers();
     this.#attention.clearApprovals();
-    const clients = [...this.#providers.dispose(), ...this.#profileClients];
+    const clients = [...this.#providers.dispose(), ...this.#profileClients.keys()];
     this.#profileClients.clear();
     for (const [agentId, snapshot] of this.#conversation.activeSnapshots()) {
       if (!snapshot.activeTurnId) continue;
@@ -1223,6 +1513,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     }
 
     const turnId = snapshot.activeTurnId;
+    // Steering carries a new message into the turn that is running, on the session the CLI opened,
+    // so it reaches the endpoint that turn started on. The agent record may already name another
+    // model, because a removal moves it, while the CLI keeps that session until it restarts, and
+    // the restart waits for the turn. So the turn's own model is what the exclusion is read for.
+    if (!this.#servesModel(this.#drain.modelForTurn(agent.id, turnId) ?? agent.model)) {
+      throw new Error(REMOVED_ENDPOINT_MESSAGE);
+    }
     await this.#mailbox.markSteering(input.deliveryId, turnId);
     this.#mailboxSync.emitQueue(agent.id);
     try {
@@ -1642,7 +1939,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       type: "error",
       agentId,
       code,
-      message: error instanceof Error ? error.message : String(error),
+      // Redacted, because every error from a provider CLI arrives here on its way to the renderer
+      // and the log, and a CLI quotes what it was given: a failure against a custom endpoint can
+      // carry that endpoint's API key or a header value.
+      message: redactText(error instanceof Error ? error.message : String(error)),
     });
   }
 

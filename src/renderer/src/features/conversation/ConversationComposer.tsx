@@ -17,13 +17,14 @@ import {
   Plus,
   Puzzle,
 } from "../../components/ui";
+import { usePlatform } from "../../platform";
 import { fileBadge, formatFileSize } from "./AttachmentCards";
 import { attachmentReferenceTone } from "./AttachmentReference";
 import { ComposerEditor } from "./ComposerEditor";
 import { CloseIcon, MoreIcon, StopIcon } from "./ConversationIcons";
 import { useConversationViewScope } from "./conversation-scope";
 import { RichMessageText } from "./RichMessageText";
-import { formatVoiceDuration, voiceButtonLabel } from "./voice-status";
+import { formatVoiceDuration, voiceButtonLabel, voiceSupported } from "./voice-status";
 
 /** @internal Stable HMR boundary for conversation composer. */
 export function ConversationComposer() {
@@ -66,6 +67,8 @@ export function ConversationComposer() {
     voicePhase,
     voiceModelProgress,
   } = useConversationViewScope();
+  const platform = usePlatform();
+  const voiceAvailable = () => voiceSupported(platform.appInfo()?.platform);
   const attachmentAccept = () => {
     const server = props.server;
     const local = server?.kind !== "remote";
@@ -278,53 +281,57 @@ export function ConversationComposer() {
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
             <div class="composer-primary-actions">
-              <Show when={voicePhase() === "preparing"}>
-                <span class="voice-model-progress" role="status">
-                  Downloading voice model {voiceModelProgress() ?? 0}%
-                </span>
-              </Show>
-              <Show
-                when={voicePhase() === "recording"}
-                fallback={
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    class="dictation-button"
-                    aria-label={voiceButtonLabel(voicePhase())}
-                    disabled={
-                      voicePhase() === "requesting" ||
-                      voicePhase() === "preparing" ||
-                      voicePhase() === "transcribing" ||
-                      (voicePhase() === "idle" && (!props.agent || !agentReady()))
-                    }
-                    onClick={() => void startVoiceRecording()}
-                  >
-                    <Show
-                      when={
-                        voicePhase() === "preparing" || voicePhase() === "requesting" || voicePhase() === "transcribing"
+              <Show when={voiceAvailable()}>
+                <Show when={voicePhase() === "preparing"}>
+                  <span class="voice-model-progress" role="status">
+                    Downloading voice model {voiceModelProgress() ?? 0}%
+                  </span>
+                </Show>
+                <Show
+                  when={voicePhase() === "recording"}
+                  fallback={
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      class="dictation-button"
+                      aria-label={voiceButtonLabel(voicePhase())}
+                      disabled={
+                        voicePhase() === "requesting" ||
+                        voicePhase() === "preparing" ||
+                        voicePhase() === "transcribing" ||
+                        (voicePhase() === "idle" && (!props.agent || !agentReady()))
                       }
-                      fallback={<Mic aria-hidden="true" />}
+                      onClick={() => void startVoiceRecording()}
                     >
-                      <LoaderCircle class="composer-spinner" aria-hidden="true" />
-                    </Show>
-                  </Button>
-                }
-              >
-                <fieldset class="voice-recording-status" aria-label="Voice recording">
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    class="voice-recording-stop"
-                    aria-label="Stop voice recording"
-                    onClick={stopVoiceRecording}
-                  >
-                    <StopIcon />
-                  </Button>
-                  <time class="voice-recording-duration" datetime={`PT${voiceElapsedSeconds()}S`}>
-                    {formatVoiceDuration(voiceElapsedSeconds())}
-                  </time>
-                  <MoreIcon />
-                </fieldset>
+                      <Show
+                        when={
+                          voicePhase() === "preparing" ||
+                          voicePhase() === "requesting" ||
+                          voicePhase() === "transcribing"
+                        }
+                        fallback={<Mic aria-hidden="true" />}
+                      >
+                        <LoaderCircle class="composer-spinner" aria-hidden="true" />
+                      </Show>
+                    </Button>
+                  }
+                >
+                  <fieldset class="voice-recording-status" aria-label="Voice recording">
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      class="voice-recording-stop"
+                      aria-label="Stop voice recording"
+                      onClick={stopVoiceRecording}
+                    >
+                      <StopIcon />
+                    </Button>
+                    <time class="voice-recording-duration" datetime={`PT${voiceElapsedSeconds()}S`}>
+                      {formatVoiceDuration(voiceElapsedSeconds())}
+                    </time>
+                    <MoreIcon />
+                  </fieldset>
+                </Show>
               </Show>
               <Show
                 when={

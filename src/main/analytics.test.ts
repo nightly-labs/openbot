@@ -572,6 +572,23 @@ describe("host analytics", () => {
     ).toEqual({ status: "other" });
   });
 
+  // A model OpenCode serves is named `<provider>/<model>`, and when the user named that endpoint the
+  // prefix is a string they typed. It must not leave the computer, so every prefixed id collapses.
+  it("reports a prefixed model id as custom", () => {
+    expect(sanitizeHostEvent("system_turn_completed", { model: "acme-internal/glm-5-air" })).toEqual({
+      model: "custom",
+    });
+    expect(sanitizeHostEvent("system_turn_completed", { model: "anthropic/claude-sonnet-5" })).toEqual({
+      model: "custom",
+    });
+    expect(sanitizeHostEvent("system_turn_completed", { model: "gpt-5.6-luna" })).toEqual({
+      model: "gpt-5.6-luna",
+    });
+    expect(sanitizeHostEvent("system_turn_completed", { model: "opencode/anything" })).toEqual({
+      model: "opencode/anything",
+    });
+  });
+
   it("deduplicates starts and keeps a known stored origin on completion", () => {
     const client = fakeClient();
     const analytics = new HostAnalytics(

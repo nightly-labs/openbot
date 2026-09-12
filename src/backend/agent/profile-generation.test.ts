@@ -33,7 +33,9 @@ class ProfileClient extends EventEmitter implements AgentClient {
   ) {
     super();
   }
+  starts = 0;
   start() {
+    this.starts += 1;
     this.running = true;
   }
   async stop() {
@@ -73,6 +75,24 @@ it("returns editable generated fields and removes the disposable workspace and p
   ).toEqual(draft);
   expect(client.running).toBe(false);
   await expect(access(client.cwd)).rejects.toThrow();
+});
+
+// An endpoint removed while the disposable workspace is made finds a client with no process, so
+// stopping it reaches nothing. Only the generation itself can keep the old endpoint unspawned.
+it("spawns no process for a generation cancelled while its workspace was made", async () => {
+  const client = new ProfileClient(JSON.stringify(draft));
+  await expect(
+    generateProfile(
+      client,
+      { ...model, supportedReasoningEfforts: ["medium"] },
+      { prompt: "Research assistant" },
+      [],
+      () => true,
+    ),
+  ).rejects.toThrow("The custom endpoints changed while this was generating. Try again.");
+  expect(client.starts).toBe(0);
+  // No session was opened either, so the removed endpoint was never asked for anything.
+  expect(client.cwd).toBe("");
 });
 
 it.each([

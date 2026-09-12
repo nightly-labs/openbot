@@ -1,3 +1,4 @@
+import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
 import type { AgentEvent, ScopedAgentEvent } from "./ipc-agent-events";
 import type { AgentModelOption } from "./ipc-agent-identity";
@@ -85,6 +86,12 @@ import type {
   SendMessageInput,
   SetMessageReactionInput,
 } from "./ipc-conversations";
+import type {
+  CustomProviderResult,
+  CustomProviderSummary,
+  DeleteCustomProviderInput,
+  SaveCustomProviderInput,
+} from "./ipc-custom-providers";
 import type {
   DynamicIslandAction,
   DynamicIslandGeometry,
@@ -414,12 +421,26 @@ export interface HostedSitesDesktopApi {
   delete: (input: DeleteHostedSiteInput) => Promise<void>;
 }
 
+/**
+ * The user's own model endpoints. `save` and `delete` both answer with the whole list plus how the
+ * provider restart went, so the renderer replaces its snapshot in one write and can say honestly
+ * whether the models are on their way.
+ */
+export interface CustomProvidersDesktopApi {
+  list: () => Promise<CustomProviderSummary[]>;
+  save: (input: SaveCustomProviderInput) => Promise<CustomProviderResult>;
+  delete: (input: DeleteCustomProviderInput) => Promise<CustomProviderResult>;
+}
+
 export interface OpenBotDesktopApi {
   getAppInfo: () => Promise<AppInfo>;
   getSetupState: () => Promise<AppSetupState>;
   saveSetup: (input: SaveSetupInput) => Promise<AppSetupState>;
   getAnalyticsPreference: () => Promise<AnalyticsPreference>;
   setAnalyticsPreference: (input: SetAnalyticsPreferenceInput) => Promise<AnalyticsPreference>;
+  getAppLanguagePreference: () => Promise<AppLanguagePreference>;
+  setAppLanguagePreference: (input: SetAppLanguagePreferenceInput) => Promise<AppLanguagePreference>;
+  onAppLanguagePreference: (listener: (preference: AppLanguagePreference) => void) => () => void;
   dynamicIsland: DynamicIslandDesktopApi;
   getComputerUseMacSetupState: () => Promise<ComputerUseMacSetupState>;
   openComputerUsePermissionSetup: (permission: MacPermissionId) => Promise<ComputerUseMacSetupState>;
@@ -449,6 +470,7 @@ export interface OpenBotDesktopApi {
   openUrl: (url: string) => Promise<void>;
   voice: VoiceDesktopApi;
   skills: SkillsDesktopApi;
+  customProviders: CustomProvidersDesktopApi;
   hostedSites: HostedSitesDesktopApi;
   marketplaceAgents: MarketplaceAgentsDesktopApi;
   auth: CentralAuthDesktopApi;

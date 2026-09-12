@@ -1,6 +1,6 @@
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
-import type { DirectConversationSnapshot } from "@openbot/contracts/ipc";
+import type { ConversationSnapshot, DirectConversationSnapshot } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
@@ -375,28 +375,31 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("sends an action for selected agent text without clearing the composer draft", async () => {
+    const answer = "The launch note needs a friendlier closing sentence.";
+    const snapshot: ConversationSnapshot = {
+      agentId: "chief",
+      threadId: "thread-chief",
+      activeTurnId: null,
+      revision: 1,
+      messages: [
+        {
+          id: "assistant-selection",
+          author: "assistant",
+          text: answer,
+          createdAt: "2026-08-12T10:00:00.000Z",
+          status: "completed",
+        },
+      ],
+    };
+    // The message arrives through the read the chat itself makes, not through an event. An event
+    // has to reach a subscriber that is not there yet when the heading renders, and the moment it
+    // subscribes is not observable from here; the read is awaited by the chat that asked for it.
+    vi.mocked(window.openbot.agent.readConversation).mockImplementation(
+      async (agentId): Promise<ConversationSnapshot> =>
+        agentId === "chief" ? snapshot : { agentId, threadId: null, activeTurnId: null, revision: 0, messages: [] },
+    );
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
-    const answer = "The launch note needs a friendlier closing sentence.";
-    emitAgentEvent?.({
-      type: "conversation",
-      snapshot: {
-        agentId: "chief",
-        threadId: "thread-chief",
-        activeTurnId: null,
-        revision: 1,
-        messages: [
-          {
-            id: "assistant-selection",
-            author: "assistant",
-            text: answer,
-            createdAt: "2026-08-12T10:00:00.000Z",
-            status: "completed",
-          },
-        ],
-      },
-    });
-
     const message = await screen.findByText(answer);
     const composer = screen.getByRole("textbox", { name: "Message Chief" });
     composer.textContent = "Keep this draft";

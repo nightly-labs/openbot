@@ -402,6 +402,9 @@ export function installOpenbotStub(): void {
       getSetupState: vi.fn().mockResolvedValue({ completed: true, preferredProvider: "codex" }),
       getAnalyticsPreference: vi.fn().mockResolvedValue({ enabled: true }),
       setAnalyticsPreference: vi.fn(async ({ enabled }) => ({ enabled })),
+      getAppLanguagePreference: vi.fn().mockResolvedValue({ language: "system" }),
+      setAppLanguagePreference: vi.fn(async ({ language }) => ({ language })),
+      onAppLanguagePreference: vi.fn(() => () => undefined),
       dynamicIsland: {
         getPreference: vi.fn().mockResolvedValue({
           enabled: true,
@@ -929,6 +932,12 @@ export function installOpenbotStub(): void {
         selectDisplay: vi.fn().mockResolvedValue(undefined),
         disconnect: vi.fn().mockResolvedValue(undefined),
         onEvent: vi.fn(() => () => undefined),
+      },
+      // The custom providers context lists on mount, so every harnessed mount reaches this group.
+      customProviders: {
+        list: vi.fn().mockResolvedValue([]),
+        save: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
+        delete: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
       },
     },
   });

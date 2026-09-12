@@ -63,7 +63,7 @@ export async function applyDevelopmentRemoteAccount({
     await teamStore.configureWithAccount("OpenBot Local Dev Host", user);
   }
   if (role === "client" && !setupCompleted) {
-    await writeSetupState(setupFile, "codex");
+    await writeSetupState(setupFile, { preferredProvider: "codex", preferredModel: null });
   }
   if (role === "host" && !testClientEnabled) {
     const technicalMember = teamStore

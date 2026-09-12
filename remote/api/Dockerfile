@@ -5,6 +5,7 @@ COPY patches ./patches
 COPY apps/auth-api/package.json ./apps/auth-api/package.json
 COPY packages/brand/package.json ./packages/brand/package.json
 COPY packages/contracts/package.json ./packages/contracts/package.json
+COPY packages/i18n/package.json ./packages/i18n/package.json
 COPY packages/logging/package.json ./packages/logging/package.json
 COPY packages/user-errors/package.json ./packages/user-errors/package.json
 COPY packages/team-client/package.json ./packages/team-client/package.json

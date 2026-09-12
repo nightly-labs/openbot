@@ -19,8 +19,21 @@ describe("redactText", () => {
     );
   });
 
-  it("redacts a bare JSON key in a payload too malformed to reparse", () => {
-    expect(redactText('{"key":"pk_live_abcdefgh1234","truncated')).toBe('{"key":"[redacted]","truncated');
+  // A record that the line cuts off is dropped whole, because the rules cannot promise to match every
+  // key a provider writes. What is lost is a fragment that was already unreadable.
+  it("drops a payload too malformed to reparse", () => {
+    expect(redactText('{"key":"pk_live_abcdefgh1234","truncated')).toBe("[redacted-unscanned]");
+  });
+
+  it("drops a balanced payload that does not parse, with everything under it", () => {
+    // The trailing comma makes the whole run unreadable. Read on into it, `{"X-Tenant":"…"}` parses
+    // on its own, and without the `headers` name above it no rule takes the value out.
+    expect(redactText('ERROR {"headers":{"X-Tenant":"tenant-secret"},}')).toBe("ERROR [redacted-unscanned]");
+  });
+
+  // A brace in prose is not a payload, and a sentence loses nothing by staying.
+  it("keeps a line whose braces hold no payload", () => {
+    expect(redactText("note {not json} and more")).toBe("note {not json} and more");
   });
 
   it("redacts a serialized payload no matter how long it is", () => {
@@ -74,9 +87,73 @@ describe("redactText", () => {
     expect(redactText(redactText("password=hunter2"))).toBe("password=[redacted]");
   });
 
+  // How a custom endpoint reaches OpenCode: one serialized config on an environment variable. A
+  // spawn line echoed into a diagnostic must lose the key and keep the endpoint that failed.
+  it("redacts the key inside a serialized OpenCode config and keeps the base URL", () => {
+    const config = JSON.stringify({
+      provider: {
+        "studio-local": {
+          options: { baseURL: "http://127.0.0.1:11434/v1", apiKey: "abcdef123456" },
+        },
+      },
+    });
+    const redacted = redactText(config);
+    expect(redacted).not.toContain("abcdef123456");
+    expect(redacted).toContain("http://127.0.0.1:11434/v1");
+  });
+
   it("leaves identifiers such as agent UUIDs untouched", () => {
     const uuid = "agent-3fa85f64-5717-4562-b3fc-2c963f66afa6";
     expect(redactText(`loaded ${uuid}`)).toBe(`loaded ${uuid}`);
+  });
+  // A provider writes one stderr line that holds both prose and a payload, and that line reaches the
+  // renderer through `redactText`. The payload has to be read as a payload even with a prefix.
+  it("redacts a payload embedded in a longer line", () => {
+    expect(redactText('ERROR request failed: {"headers":{"X-Tenant":"tenant-secret"}}')).toBe(
+      'ERROR request failed: {"headers":{"X-Tenant":"[redacted]"}}',
+    );
+    expect(redactText('sent {"apiKey":"abcdef123456"} and got {"headers":{"A":"b"}} back')).toBe(
+      'sent {"apiKey":"[redacted]"} and got {"headers":{"A":"[redacted]"}} back',
+    );
+  });
+
+  it("leaves prose with an unbalanced brace alone", () => {
+    expect(redactText("two headers were rejected { and the run never closes")).toBe(
+      "two headers were rejected { and the run never closes",
+    );
+  });
+
+  // `AcpAgentClient.start()` redacts each stderr chunk on its own, and a chunk ends wherever the pipe
+  // filled up, so a record can arrive with no closing brace. No rule matches a header name the user
+  // invented, so an unclosed record is dropped rather than passed on.
+  it("drops a payload that the line cuts off", () => {
+    expect(redactText('ERROR {"headers":{"X-Tenant":"tenant-secret"')).toBe("ERROR [redacted-unscanned]");
+    expect(redactText('{"apiKey":"abcdef123456')).toBe("[redacted-unscanned]");
+  });
+
+  // A payload that parses is written back as JSON, so its spacing is the serializer's. The text
+  // around it is untouched: only the run itself is read as data.
+  // A line can hold more payloads than the bound allows, and the regex rules match no header name,
+  // so what was not read must not be shown.
+  it("drops the rest of a line whose payloads pass the scan bound", () => {
+    const redacted = redactText(`${"{} ".repeat(16)}{"headers":{"X-Tenant":"tenant-secret"}}`);
+    expect(redacted).not.toContain("tenant-secret");
+    expect(redacted).toContain("[redacted-unscanned]");
+  });
+
+  // The scan is synchronous and runs on provider stderr, so a line of open braces must not cost one
+  // full pass per brace. Every attempt counts against the bound, not only the ones that parse.
+  it("bounds the work a line of open braces can cause", () => {
+    const braces = "{".repeat(65_536);
+    const started = performance.now();
+    // A brace followed by a brace opens what looks like a record, and the run never closes, so the
+    // whole line is dropped on the first read instead of once per brace.
+    expect(redactText(braces)).toBe("[redacted-unscanned]");
+    expect(performance.now() - started).toBeLessThan(1_000);
+  });
+
+  it("keeps the text around an embedded payload", () => {
+    expect(redactText("read [1, 2, 3] items")).toBe("read [1,2,3] items");
   });
 });
 
@@ -84,6 +161,26 @@ describe("redactValue", () => {
   it("redacts secret-valued keys deep inside objects", () => {
     expect(redactValue({ nested: { machineToken: "abcdef123456", name: "alfred" } })).toEqual({
       nested: { machineToken: "[redacted]", name: "alfred" },
+    });
+  });
+
+  // A custom endpoint sends its credential under a header the user names, so `apiKey` is not the
+  // only label to cover. The names stay: which header was set is diagnostic, its text is the secret.
+  it("redacts every value under a headers object, whatever the header is called", () => {
+    expect(redactValue({ headers: { "X-Api-Token": "abcdef123456", "X-Tenant": "acme" } })).toEqual({
+      headers: { "X-Api-Token": "[redacted]", "X-Tenant": "[redacted]" },
+    });
+    // The list form the renderer sends: every string under `headers` goes, so the header's own name
+    // is redacted here as well. Only the object form keeps a name, because there it is a key.
+    expect(redactValue({ headers: [{ name: "X-Api-Token", value: "abcdef123456" }] })).toEqual({
+      headers: [{ name: "[redacted]", value: "[redacted]" }],
+    });
+  });
+
+  it("leaves a headers count and the word in prose alone", () => {
+    expect(redactValue({ headers: 3, note: "two headers were rejected" })).toEqual({
+      headers: 3,
+      note: "two headers were rejected",
     });
   });
 });

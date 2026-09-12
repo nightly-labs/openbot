@@ -416,11 +416,13 @@
   padding: var(--openbot-space-3) 0;
 }
 
-.provider-picker-embedded .provider-picker-option + .provider-picker-option {
+.provider-picker-embedded .provider-picker-option + .provider-picker-option,
+.provider-picker-embedded .provider-picker-option-custom {
   border-top: 0;
 }
 
-.provider-picker-embedded .provider-picker-option + .provider-picker-option::before {
+.provider-picker-embedded .provider-picker-option + .provider-picker-option::before,
+.provider-picker-embedded .provider-picker-option-custom::before {
   position: absolute;
   top: 0;
   right: var(--openbot-space-4);
@@ -437,7 +439,8 @@
   gap: var(--openbot-space-2);
 }
 
-.provider-picker-embedded .provider-picker-install {
+.provider-picker-embedded .provider-picker-install,
+.provider-picker-embedded .provider-picker-custom-count {
   margin-right: 0;
 }
 

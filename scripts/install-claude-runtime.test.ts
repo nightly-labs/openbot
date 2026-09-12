@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { execFileSync } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -16,32 +16,34 @@ afterEach(async () => {
 });
 
 describe.runIf(process.platform !== "win32")("bundled Claude installer", () => {
-  it("installs a verified SDK binary and reuses the current runtime", async () => {
+  // The fixture binary is a shell script, so a Linux target installs and verifies on macOS too.
+  it.each([
+    ["darwin-arm64", "mac/arm64"],
+    ["linux-x64", "linux/x64"],
+  ] as const)("installs a verified %s SDK binary into %s and reuses the current runtime", async (target, directory) => {
     const root = await temporaryRoot();
     const fixture = join(root, "fixture");
     const archive = join(root, "claude.tgz");
     const output = join(root, "output");
-    await createPackage(fixture);
+    const lock = structuredClone(await loadAgentRuntimeLock());
+    await createPackage(fixture, lock.claude.artifacts[target].package);
     createArchive(fixture, archive);
     const archiveBytes = await readFile(archive);
     const binary = await readFile(join(fixture, "package/claude"));
     const license = await readFile(join(fixture, "package/LICENSE.md"));
-    const lock = structuredClone(await loadAgentRuntimeLock());
-    lock.claude.artifacts["darwin-arm64"].assetSha256 = sha256(archiveBytes);
-    lock.claude.artifacts["darwin-arm64"].binarySha256 = sha256(binary);
+    lock.claude.artifacts[target].assetSha256 = sha256(archiveBytes);
+    lock.claude.artifacts[target].binarySha256 = sha256(binary);
     lock.claude.licenseSha256 = sha256(license);
     const fetchImpl = async () => new Response(archiveBytes, { status: 200 });
 
-    await expect(installClaudeRuntime({ outputRoot: output, target: "darwin-arm64", fetchImpl, lock })).resolves.toBe(
-      "installed",
-    );
-    await expect(installClaudeRuntime({ outputRoot: output, target: "darwin-arm64", fetchImpl, lock })).resolves.toBe(
-      "current",
-    );
-    await expect(readFile(join(output, "mac/arm64/claude-package.json"), "utf8")).resolves.toContain('"2.1.263"');
+    await expect(installClaudeRuntime({ outputRoot: output, target, fetchImpl, lock })).resolves.toBe("installed");
+    await expect(installClaudeRuntime({ outputRoot: output, target, fetchImpl, lock })).resolves.toBe("current");
+    await expect(readFile(join(output, directory, "claude-package.json"), "utf8")).resolves.toContain('"2.1.263"');
     await expect(readFile(join(output, "licenses/Claude-Code-LICENSE.md"), "utf8")).resolves.toBe(
       license.toString("utf8"),
     );
+    const mode = (await stat(join(output, directory, "bin/claude"))).mode & 0o777;
+    expect(mode).toBe(0o755);
   });
 
   it("rejects links in an archive before extraction", async () => {
@@ -62,16 +64,13 @@ async function temporaryRoot(): Promise<string> {
   return root;
 }
 
-async function createPackage(root: string): Promise<void> {
+async function createPackage(root: string, packageName = "@anthropic-ai/claude-agent-sdk-darwin-arm64"): Promise<void> {
   const packageRoot = join(root, "package");
   await mkdir(packageRoot, { recursive: true });
   await Promise.all([
     writeFile(join(packageRoot, "claude"), "#!/bin/sh\nprintf '2.1.263 (Claude Code)\\n'\n"),
     writeFile(join(packageRoot, "LICENSE.md"), "Anthropic license fixture\n"),
-    writeFile(
-      join(packageRoot, "package.json"),
-      `${JSON.stringify({ name: "@anthropic-ai/claude-agent-sdk-darwin-arm64", version: "0.3.263" })}\n`,
-    ),
+    writeFile(join(packageRoot, "package.json"), `${JSON.stringify({ name: packageName, version: "0.3.263" })}\n`),
   ]);
   await chmod(join(packageRoot, "claude"), 0o755);
 }

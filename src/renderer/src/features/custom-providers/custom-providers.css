@@ -1,0 +1,154 @@
+/* The dialog that describes an OpenAI-compatible endpoint. It sits on the same modal geometry as
+ * join-server-dialog.css, but scrolls instead of paging: the repeatable model and header lists have
+ * no fixed height. */
+
+.custom-provider-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--openbot-layer-dialog);
+  display: grid;
+  place-items: center;
+  padding: var(--openbot-space-6);
+}
+
+.custom-provider-dialog {
+  display: flex;
+  width: min(460px, 100%);
+  max-height: calc(100dvh - 48px);
+  flex-direction: column;
+  overflow: hidden;
+  outline: 0;
+  /* The same radius the settings modal uses, so the two surfaces read as one family. It also nests
+   * the close button: an 8px glyph target held 8px in from the corner asks for about 16px around it,
+   * which 20px overshot. */
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-sidebar);
+  color: var(--openbot-text-primary);
+}
+
+.custom-provider-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  border-bottom: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-4);
+}
+
+.custom-provider-mark {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
+}
+
+.custom-provider-title {
+  min-width: 0;
+  flex: 1;
+}
+
+/* The close button is a 32px target around a 16px glyph, so it overhangs its own glyph by 8px on
+ * every side. It is held at the top of the header and pulled out by that 8px, so the glyph keeps the
+ * header's own 16px inset from the top and from the inline end and reads as square in the corner.
+ * Centring it instead would leave it 26px down while staying 16px in, because the title is two lines
+ * tall and the header centres its children. */
+.custom-provider-close {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-block-start: calc(var(--openbot-space-2) * -1);
+  margin-inline-end: calc(var(--openbot-space-2) * -1);
+  color: var(--openbot-text-muted);
+}
+
+/* The form is the layout box; the fields inside it are what scrolls, so the footer stays put and
+ * outside the scroll fade. */
+.custom-provider-body {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.custom-provider-form {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  overflow-y: auto;
+  padding: var(--openbot-space-4);
+}
+
+/* The saved endpoints scroll on the same terms the form's fields do, so both dialogs keep their
+ * footer outside the fade. */
+.custom-provider-list {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  overflow-y: auto;
+  padding: var(--openbot-space-4);
+}
+
+.custom-provider-list-empty {
+  padding: var(--openbot-space-4) 0;
+  text-align: center;
+}
+
+.custom-provider-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+}
+
+.custom-provider-rows-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+}
+
+.custom-provider-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
+}
+
+/* Two equal columns and a trash button: the model ID and its display name carry the same weight,
+ * and neither should reflow when the other holds a long value. */
+.custom-provider-row-inputs {
+  display: grid;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.custom-provider-rows-error,
+.custom-provider-row-error,
+.custom-provider-submit-error {
+  display: block;
+}
+
+.custom-provider-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border-top: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-4);
+}
+
+.custom-provider-actions .ui-button-variant-default {
+  width: 100%;
+}
+
+/* Same reason as the picker heading: only the direct children here are the label-and-icon buttons.
+ * The nested remove buttons are icon-only and already sized by .ui-icon-button. */
+.custom-provider-rows > .ui-button svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}

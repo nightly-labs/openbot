@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { detectDownloadPlatform } from "../src/lib/download-platforms";
+import { DOWNLOAD_PLATFORM_ORDER, DOWNLOAD_PLATFORMS, detectDownloadPlatform } from "../src/lib/download-platforms";
+import { OPENBOT_DOWNLOAD_LINKS } from "../src/lib/landing-links";
 
 describe("download platforms", () => {
   it.each([
@@ -14,5 +15,17 @@ describe("download platforms", () => {
 
   it("returns no platform for an unknown client", () => {
     expect(detectDownloadPlatform({ platform: "Unknown" })).toBeUndefined();
+  });
+
+  it("offers a download for every platform it can detect", () => {
+    for (const platform of DOWNLOAD_PLATFORM_ORDER) {
+      const details = DOWNLOAD_PLATFORMS[platform];
+      expect(details).toMatchObject({ available: true, status: "Available", href: OPENBOT_DOWNLOAD_LINKS[platform] });
+    }
+  });
+
+  it("describes the Linux download as an x64 AppImage", () => {
+    expect(DOWNLOAD_PLATFORMS.linux.description).toBe("x64 · AppImage");
+    expect(DOWNLOAD_PLATFORMS.linux.action).toBe("Download for Linux");
   });
 });

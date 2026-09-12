@@ -1797,6 +1797,11 @@
   background: var(--openbot-dialog-overlay);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
+  /* The window swallows mouse events over a `-webkit-app-region: drag` area, such as the server rail
+   * and the window headers, and hands them to the window manager instead. A click there while a
+   * dialog was open started a window drag and never reached this overlay, so that side of the window
+   * could not dismiss the dialog. The overlay takes the region back for as long as it is on screen. */
+  -webkit-app-region: no-drag;
 }
 
 .ui-dialog-content {

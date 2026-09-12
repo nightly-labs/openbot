@@ -4,7 +4,10 @@ import type { StorybookConfig } from "storybook-solidjs-vite";
 import { mergeConfig, type PluginOption } from "vite";
 
 const config = {
-  stories: ["../src/renderer/**/*.stories.@(ts|tsx)"],
+  // The desktop renderer, and the public site's article components. A site story
+  // brings its own stylesheet with it, because the two stylesheets set the same
+  // global rules to different values and cannot both be loaded for every story.
+  stories: ["../src/renderer/**/*.stories.@(ts|tsx)", "../apps/auth-api/src/**/*.stories.@(ts|tsx)"],
   addons: ["@storybook/addon-a11y"],
   framework: {
     name: "storybook-solidjs-vite",

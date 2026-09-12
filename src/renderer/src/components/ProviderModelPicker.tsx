@@ -6,21 +6,31 @@ import type {
   AgentProviderStatus,
   AgentReasoningEffort,
   AgentStatus,
+  CustomProviderSummary,
   ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
 import {
   agentProviderCliName,
   agentProviderName,
   defaultProviderModel,
+  isCustomProviderModelId,
   PICKER_PROVIDERS,
 } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import { createScrollFades } from "./createScrollFades";
-import { groupPickerModels, type PickerModel, type PickerModelGroup, pickerModels } from "./provider-model-options";
+import {
+  customProviderIds,
+  groupPickerModels,
+  isCustomModel,
+  type PickerModel,
+  type PickerModelGroup,
+  pickerModels,
+} from "./provider-model-options";
 import {
   Button,
   Input,
   Listbox,
+  Plus,
   Popover,
   Progress,
   Select,
@@ -28,8 +38,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SlidersHorizontal,
   Tabs,
 } from "./ui";
+import { cx } from "./ui/utils";
 
 interface ProviderModelPickerProps {
   provider: AgentProviderId;
@@ -47,21 +59,67 @@ interface ProviderModelPickerProps {
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  /**
+   * Endpoints the user has named themselves. These are not a provider row: OpenCode serves them, so
+   * every one still reports `provider: "opencode"` over IPC and only the picker separates them out.
+   */
+  customProviders?: readonly CustomProviderSummary[];
+  onAddCustomProvider?: () => void;
   onChange: (model: AgentModelId, provider: AgentProviderId) => void;
 }
 
-const PROVIDERS = PICKER_PROVIDERS;
+/**
+ * `PICKER_PROVIDERS` plus the one tab no contract knows about. A custom endpoint reaches OpenBot
+ * through the OpenCode CLI, so widening `AgentProviderId` for it would cost a database migration and
+ * a Team API decision to buy a rail icon - the split lives here instead, in the only place that
+ * needs it.
+ */
+type RailId = AgentProviderId | "custom";
+
+const CUSTOM_RAIL = "custom" as const;
+
+const PROVIDERS: readonly RailId[] = [...PICKER_PROVIDERS, CUSTOM_RAIL];
 export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const [open, setOpen] = createSignal(false);
-  const [railProvider, setRailProvider] = createSignal<AgentProviderId>(untrack(() => props.provider));
   const [search, setSearch] = createSignal("");
-  const providerButtons = new Map<AgentProviderId, HTMLButtonElement>();
+  const providerButtons = new Map<RailId, HTMLButtonElement>();
   let root: HTMLDivElement | undefined;
 
+  const customIds = createMemo(() => customProviderIds(props.customProviders ?? []));
   const selectedModel = createMemo(() =>
     props.modelOptions.find((option) => option.provider === props.provider && option.id === props.value),
   );
-  const activeProvider = () => props.provider;
+  /** The tab the current selection lives on, which is the Custom one when the endpoint is the user's. */
+  const activeProvider = (): RailId =>
+    props.provider === "opencode" && isCustomProviderModelId(props.value, customIds()) ? CUSTOM_RAIL : props.provider;
+  const [railProvider, setRailProvider] = createSignal<RailId>(untrack(activeProvider));
+
+  /**
+   * The OpenCode tab and the Custom tab draw from the same wire provider, so each one subtracts the
+   * other: a custom endpoint's models appear once, under the endpoint the user named.
+   */
+  function railModelOptions(rail: RailId): AgentModelOption[] {
+    if (rail === CUSTOM_RAIL) return props.modelOptions.filter((option) => isCustomModel(option, customIds()));
+    if (rail === "opencode") {
+      return props.modelOptions.filter(
+        (option) => option.provider === "opencode" && !isCustomModel(option, customIds()),
+      );
+    }
+    return props.modelOptions.filter((option) => option.provider === rail);
+  }
+
+  const customSummary = () => {
+    const count = props.customProviders?.length ?? 0;
+    if (count === 0) return "No endpoints yet";
+    return count === 1 ? "1 endpoint" : `${count} endpoints`;
+  };
+  const railSummary = (rail: RailId, status: AgentProviderStatus): string =>
+    rail === CUSTOM_RAIL ? customSummary() : providerSummary(rail, status);
+  const railHeadingSummary = (rail: RailId, status: AgentProviderStatus): string => {
+    if (rail !== CUSTOM_RAIL) return providerHeadingSummary(rail, status);
+    // OpenCode is what serves a custom endpoint, so its trouble is this tab's trouble.
+    return status.state === "available" ? customSummary() : providerStatusLabel(status.state);
+  };
 
   createEffect(
     () => ({ provider: activeProvider(), open: open() }),
@@ -102,19 +160,17 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     setOpen(next);
   }
 
-  function selectModel(model: AgentModelId, provider: AgentProviderId): void {
-    if (providerAvailability(props.agentStatus, props.modelOptions, provider).state !== "available") return;
+  function selectModel(model: AgentModelId, rail: RailId): void {
+    if (providerAvailability(props.agentStatus, props.modelOptions, rail).state !== "available") return;
     if (
       !showsReasoningEffort() &&
-      !pickerModels(props.modelOptions.filter((option) => option.provider === provider)).find(
-        (option) => option.id === model,
-      )?.variants.length
+      !pickerModels(railModelOptions(rail)).find((option) => option.id === model)?.variants.length
     )
       setOpen(false);
-    props.onChange(model, provider);
+    props.onChange(model, wireProvider(rail));
   }
 
-  function selectRailProvider(provider: AgentProviderId): void {
+  function selectRailProvider(provider: RailId): void {
     setRailProvider(provider);
     setSearch("");
   }
@@ -134,9 +190,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
           class={["provider-model-trigger", { "provider-model-trigger-field": field() }]}
           aria-label={`${props.ariaLabel ?? "Agent model"}: ${triggerModelName()}`}
           disabled={props.disabled}
-          title={
-            props.disabled ? props.disabledReason : `${agentProviderName(activeProvider())} · ${triggerModelName()}`
-          }
+          title={props.disabled ? props.disabledReason : `${railName(activeProvider())} · ${triggerModelName()}`}
           onKeyDown={(event) => {
             if (event.key !== "ArrowDown") return;
             event.preventDefault();
@@ -186,8 +240,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           "provider-model-rail-button-unavailable": status().state !== "available",
                         },
                       ]}
-                      aria-label={`${agentProviderName(provider)}: ${providerSummary(provider, status())}`}
-                      title={`${agentProviderName(provider)} · ${providerSummary(provider, status())}`}
+                      aria-label={`${railName(provider)}: ${railSummary(provider, status())}`}
+                      title={`${railName(provider)} · ${railSummary(provider, status())}`}
                       onClick={(event) => {
                         const target = event.currentTarget;
                         selectRailProvider(provider);
@@ -216,17 +270,19 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
             <For each={PROVIDERS}>
               {(provider) => {
                 const status = () => providerAvailability(props.agentStatus, props.modelOptions, provider);
-                const models = createMemo(() =>
-                  pickerModels(props.modelOptions.filter((option) => option.provider === provider)),
-                );
+                const models = createMemo(() => pickerModels(railModelOptions(provider)));
                 const groups = createMemo(() => groupPickerModels(models(), search()));
                 const selected = createMemo(() =>
                   models().find(
                     (model) => model.id === props.value || model.variants.some((variant) => variant.id === props.value),
                   ),
                 );
+                // Two tabs share the `opencode` wire id, so matching the provider does not say which
+                // one holds the selection - the tab whose own list contains it does.
+                const ownsSelection = () =>
+                  wireProvider(provider) === props.provider && (props.provider !== "opencode" || Boolean(selected()));
                 const effortOptions = createMemo(() => {
-                  if (provider !== props.provider) return [];
+                  if (!ownsSelection()) return [];
                   if (selected()?.variants.length) return selected()?.variants ?? [];
                   return showsReasoningEffort()
                     ? (selectedModel()?.supportedReasoningEfforts ?? []).map((effort) => ({
@@ -244,7 +300,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 );
                 const available = () => status().state === "available";
                 const runtime = () => {
-                  const value = props.runtimeStatuses?.[provider];
+                  const value = props.runtimeStatuses?.[wireProvider(provider)];
                   if (
                     value?.phase === "not-downloaded" &&
                     (status().state === "available" || status().state === "sign-in-required")
@@ -267,26 +323,31 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     return `Downloading ${Math.round(runtimeStatus.progress ?? 0)}%`;
                   }
                   if (runtimeStatus?.phase === "finishing") return "Setting up";
-                  return runtimeStatus?.message ?? status().message ?? `${agentProviderName(provider)} is unavailable.`;
+                  return runtimeStatus?.message ?? status().message ?? `${railName(provider)} is unavailable.`;
                 };
                 return (
                   <Tabs.Content
                     value={provider}
                     class="provider-model-panel"
-                    aria-label={`${agentProviderName(provider)} models`}
+                    aria-label={`${railName(provider)} models`}
                   >
                     <div class="provider-model-heading">
-                      <strong>{agentProviderName(provider)}</strong>
-                      <span>{providerHeadingSummary(provider, status())}</span>
+                      <div class="provider-model-heading-text">
+                        <strong>{railName(provider)}</strong>
+                        <span>{railHeadingSummary(provider, status())}</span>
+                      </div>
+                      <Show when={provider === CUSTOM_RAIL && props.onAddCustomProvider}>
+                        <Button type="button" size="xs" variant="default" onClick={() => props.onAddCustomProvider?.()}>
+                          <Plus />
+                          Add provider
+                        </Button>
+                      </Show>
                     </div>
                     <Show when={!available()}>
                       <div class="provider-model-empty" role="status">
                         <span>{runtimeMessage()}</span>
                         <Show when={runtime()?.phase === "downloading"}>
-                          <Progress
-                            value={runtime()?.progress ?? 0}
-                            aria-label={`${agentProviderName(provider)} download`}
-                          />
+                          <Progress value={runtime()?.progress ?? 0} aria-label={`${railName(provider)} download`} />
                         </Show>
                         <Show when={runtimeAction()}>
                           {(action) => (
@@ -295,9 +356,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               size="xs"
                               variant={action() === "Download" ? "default" : "outline"}
                               onClick={() => {
-                                if (action() === "Cancel") void props.onCancelProviderDownload?.(provider);
-                                else if (action() === "Connect") void props.onConnectProvider?.(provider);
-                                else void props.onDownloadProvider?.(provider);
+                                const target = wireProvider(provider);
+                                if (action() === "Cancel") void props.onCancelProviderDownload?.(target);
+                                else if (action() === "Connect") void props.onConnectProvider?.(target);
+                                else void props.onDownloadProvider?.(target);
                               }}
                             >
                               {action()}
@@ -319,16 +381,26 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         fallback={
                           <Show when={available()}>
                             <div class="provider-model-empty" role="status">
-                              {search().trim()
-                                ? "No models match your search."
-                                : `No models are available from ${agentProviderName(provider)}.`}
+                              <Show
+                                when={provider === CUSTOM_RAIL && !search().trim()}
+                                fallback={
+                                  search().trim()
+                                    ? "No models match your search."
+                                    : `No models are available from ${railName(provider)}.`
+                                }
+                              >
+                                <span>
+                                  Add an OpenAI-compatible endpoint — a model server on this computer, or any service
+                                  with a base URL and a key.
+                                </span>
+                              </Show>
                             </div>
                           </Show>
                         }
                       >
                         <Listbox.Root<PickerModel, PickerModelGroup>
                           class="provider-model-list"
-                          aria-label={`${agentProviderName(provider)} models`}
+                          aria-label={`${railName(provider)} models`}
                           options={groups()}
                           optionGroupChildren="models"
                           renderSection={(section) => (
@@ -353,7 +425,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 type="button"
                                 class={["provider-model-option", { "provider-model-option-selected": isSelected() }]}
                                 aria-label={`${displayModelName(model.name, model.id)}${
-                                  model.id === defaultProviderModel(provider) ? ", default" : ""
+                                  model.id === railDefaultModel(provider) ? ", default" : ""
                                 }`}
                                 disabled={!available()}
                                 onClick={() => {
@@ -365,7 +437,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                   <Show when={model.free}>
                                     <small>Free</small>
                                   </Show>
-                                  <Show when={model.id === defaultProviderModel(provider)}>
+                                  <Show when={model.id === railDefaultModel(provider)}>
                                     <small>default</small>
                                   </Show>
                                 </span>
@@ -389,7 +461,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           value={effortOptions().find((option) => option.id === effortValue())}
                           onChange={(option) => {
                             if (!available() || !option || option.id === effortValue()) return;
-                            if (selected()?.variants.length) props.onChange(option.id, provider);
+                            if (selected()?.variants.length) props.onChange(option.id, wireProvider(provider));
                             else {
                               const effort = selectedModel()?.supportedReasoningEfforts.find(
                                 (effort) => effort === option.id,
@@ -419,11 +491,22 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   );
 }
 
-function providerAvailability(
-  status: AgentStatus,
-  models: AgentModelOption[],
-  provider: AgentProviderId,
-): AgentProviderStatus {
+/** A custom endpoint is an OpenCode endpoint on the wire, whatever tab it is drawn on. */
+function wireProvider(rail: RailId): AgentProviderId {
+  return rail === CUSTOM_RAIL ? "opencode" : rail;
+}
+
+function railName(rail: RailId): string {
+  return rail === CUSTOM_RAIL ? "Custom" : agentProviderName(rail);
+}
+
+/** Nothing is the default on the Custom tab: the user's own endpoints have no shipped starting model. */
+function railDefaultModel(rail: RailId): AgentModelId | null {
+  return rail === CUSTOM_RAIL ? null : defaultProviderModel(rail);
+}
+
+function providerAvailability(status: AgentStatus, models: AgentModelOption[], rail: RailId): AgentProviderStatus {
+  const provider = wireProvider(rail);
   const explicit = status.providers?.find((item) => item.id === provider);
   if (explicit) return explicit;
   if (status.phase === "starting" || status.phase === "restarting") {
@@ -471,12 +554,13 @@ export function reasoningLabel(effort: AgentReasoningEffort): string {
   return `${effort.slice(0, 1).toUpperCase()}${effort.slice(1)}`;
 }
 
-function ProviderMark(props: { provider: AgentProviderId; large?: boolean }) {
+/** A custom endpoint has no brand mark and must not borrow one, so the rail draws sliders instead. */
+function ProviderMark(props: { provider: RailId; large?: boolean }) {
+  const classes = () => cx("provider-model-mark", props.large && "provider-model-mark-large");
   return (
-    <ProviderLogo
-      provider={props.provider}
-      class={["provider-model-mark", { "provider-model-mark-large": Boolean(props.large) }]}
-    />
+    <Show when={props.provider !== CUSTOM_RAIL} fallback={<SlidersHorizontal class={classes()} />}>
+      <ProviderLogo provider={wireProvider(props.provider)} class={classes()} />
+    </Show>
   );
 }
 

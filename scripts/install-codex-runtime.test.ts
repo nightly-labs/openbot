@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { execFileSync } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -16,32 +16,37 @@ afterEach(async () => {
 });
 
 describe.runIf(process.platform !== "win32")("bundled Codex installer", () => {
-  it("installs a verified full package and reuses the current runtime", async () => {
-    const root = await temporaryRoot();
-    const fixture = join(root, "fixture");
-    const archive = join(root, "codex.tar.gz");
-    const output = join(root, "output");
-    await createPackage(fixture);
-    createArchive(fixture, archive);
-    const archiveBytes = await readFile(archive);
-    const license = Buffer.from("Apache License fixture\n");
-    const lock = structuredClone(await loadAgentRuntimeLock());
-    lock.codex.artifacts["darwin-arm64"].assetSha256 = sha256(archiveBytes);
-    lock.codex.licenseSha256 = sha256(license);
-    const fetchImpl = async (input: string | URL | Request) =>
-      new Response(String(input).endsWith("/LICENSE") ? license : archiveBytes, { status: 200 });
+  // The fixture entrypoint is a shell script, so a Linux target installs and verifies on macOS too.
+  it.each([
+    ["darwin-arm64", "aarch64-apple-darwin", "mac/arm64"],
+    ["linux-x64", "x86_64-unknown-linux-musl", "linux/x64"],
+  ] as const)(
+    "installs a verified %s package into %s and reuses the current runtime",
+    async (target, manifestTarget, directory) => {
+      const root = await temporaryRoot();
+      const fixture = join(root, "fixture");
+      const archive = join(root, "codex.tar.gz");
+      const output = join(root, "output");
+      await createPackage(fixture, manifestTarget);
+      createArchive(fixture, archive);
+      const archiveBytes = await readFile(archive);
+      const license = Buffer.from("Apache License fixture\n");
+      const lock = structuredClone(await loadAgentRuntimeLock());
+      lock.codex.artifacts[target].assetSha256 = sha256(archiveBytes);
+      lock.codex.licenseSha256 = sha256(license);
+      const fetchImpl = async (input: string | URL | Request) =>
+        new Response(String(input).endsWith("/LICENSE") ? license : archiveBytes, { status: 200 });
 
-    await expect(installCodexRuntime({ outputRoot: output, target: "darwin-arm64", fetchImpl, lock })).resolves.toBe(
-      "installed",
-    );
-    await expect(installCodexRuntime({ outputRoot: output, target: "darwin-arm64", fetchImpl, lock })).resolves.toBe(
-      "current",
-    );
-    await expect(readFile(join(output, "mac/arm64/codex-package.json"), "utf8")).resolves.toContain('"0.153.4"');
-    await expect(readFile(join(output, "licenses/Codex-Apache-2.0.txt"), "utf8")).resolves.toBe(
-      license.toString("utf8"),
-    );
-  });
+      await expect(installCodexRuntime({ outputRoot: output, target, fetchImpl, lock })).resolves.toBe("installed");
+      await expect(installCodexRuntime({ outputRoot: output, target, fetchImpl, lock })).resolves.toBe("current");
+      await expect(readFile(join(output, directory, "codex-package.json"), "utf8")).resolves.toContain('"0.153.4"');
+      await expect(readFile(join(output, "licenses/Codex-Apache-2.0.txt"), "utf8")).resolves.toBe(
+        license.toString("utf8"),
+      );
+      const mode = (await stat(join(output, directory, "bin/codex"))).mode & 0o777;
+      expect(mode).toBe(0o755);
+    },
+  );
 
   it("rejects links in an archive before extraction", async () => {
     const root = await temporaryRoot();
@@ -61,7 +66,7 @@ async function temporaryRoot(): Promise<string> {
   return root;
 }
 
-async function createPackage(root: string): Promise<void> {
+async function createPackage(root: string, manifestTarget = "aarch64-apple-darwin"): Promise<void> {
   await Promise.all([
     mkdir(join(root, "bin"), { recursive: true }),
     mkdir(join(root, "codex-path"), { recursive: true }),
@@ -77,7 +82,7 @@ async function createPackage(root: string): Promise<void> {
       `${JSON.stringify({
         layoutVersion: 1,
         version: "0.153.4",
-        target: "aarch64-apple-darwin",
+        target: manifestTarget,
         variant: "codex",
         entrypoint: "bin/codex",
         resourcesDir: "codex-resources",

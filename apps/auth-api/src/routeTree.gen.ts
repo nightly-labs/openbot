@@ -13,12 +13,20 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppPreviewRouteImport } from './routes/app-preview'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as ReportSiteRouteImport } from './routes/report-site'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as DotwellKnownAppleAppSiteAssociationRouteImport } from './routes/[.]well-known/apple-app-site-association'
 import { Route as DotwellKnownJwksDotjsonRouteImport } from './routes/[.]well-known/jwks[.]json'
+import { Route as DownloadLinuxRouteImport } from './routes/download/linux'
 import { Route as DownloadMacosRouteImport } from './routes/download/macos'
 import { Route as DownloadWindowsRouteImport } from './routes/download/windows'
+import { Route as GuidesIndexRouteImport } from './routes/guides/index'
+import { Route as GuidesSlugRouteImport } from './routes/guides/$slug'
+import { Route as GuidesRssDotxmlRouteImport } from './routes/guides/rss[.]xml'
 import { Route as HealthLiveRouteImport } from './routes/health/live'
 import { Route as HealthReadyRouteImport } from './routes/health/ready'
+import { Route as NewsIndexRouteImport } from './routes/news/index'
+import { Route as NewsSlugRouteImport } from './routes/news/$slug'
+import { Route as NewsRssDotxmlRouteImport } from './routes/news/rss[.]xml'
 import { Route as V1MeRouteImport } from './routes/v1/me'
 import { Route as V1AuthLogoutRouteImport } from './routes/v1/auth/logout'
 import { Route as V1AvatarsUserIdRouteImport } from './routes/v1/avatars/$userId'
@@ -96,6 +104,11 @@ const ReportSiteRoute = ReportSiteRouteImport.update({
   path: '/report-site',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DotwellKnownAppleAppSiteAssociationRoute =
   DotwellKnownAppleAppSiteAssociationRouteImport.update({
     id: '/.well-known/apple-app-site-association',
@@ -105,6 +118,11 @@ const DotwellKnownAppleAppSiteAssociationRoute =
 const DotwellKnownJwksDotjsonRoute = DotwellKnownJwksDotjsonRouteImport.update({
   id: '/.well-known/jwks.json',
   path: '/.well-known/jwks.json',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DownloadLinuxRoute = DownloadLinuxRouteImport.update({
+  id: '/download/linux',
+  path: '/download/linux',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DownloadMacosRoute = DownloadMacosRouteImport.update({
@@ -117,6 +135,21 @@ const DownloadWindowsRoute = DownloadWindowsRouteImport.update({
   path: '/download/windows',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GuidesIndexRoute = GuidesIndexRouteImport.update({
+  id: '/guides/',
+  path: '/guides/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuidesSlugRoute = GuidesSlugRouteImport.update({
+  id: '/guides/$slug',
+  path: '/guides/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuidesRssDotxmlRoute = GuidesRssDotxmlRouteImport.update({
+  id: '/guides/rss.xml',
+  path: '/guides/rss.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HealthLiveRoute = HealthLiveRouteImport.update({
   id: '/health/live',
   path: '/health/live',
@@ -125,6 +158,21 @@ const HealthLiveRoute = HealthLiveRouteImport.update({
 const HealthReadyRoute = HealthReadyRouteImport.update({
   id: '/health/ready',
   path: '/health/ready',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NewsIndexRoute = NewsIndexRouteImport.update({
+  id: '/news/',
+  path: '/news/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NewsSlugRoute = NewsSlugRouteImport.update({
+  id: '/news/$slug',
+  path: '/news/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NewsRssDotxmlRoute = NewsRssDotxmlRouteImport.update({
+  id: '/news/rss.xml',
+  path: '/news/rss.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V1MeRoute = V1MeRouteImport.update({
@@ -434,13 +482,21 @@ export interface FileRoutesByFullPath {
   '/app-preview': typeof AppPreviewRoute
   '/join': typeof JoinRoute
   '/report-site': typeof ReportSiteRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
+  '/download/linux': typeof DownloadLinuxRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
+  '/guides/$slug': typeof GuidesSlugRoute
+  '/guides/rss.xml': typeof GuidesRssDotxmlRoute
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
+  '/news/$slug': typeof NewsSlugRoute
+  '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/v1/me': typeof V1MeRouteWithChildren
+  '/guides/': typeof GuidesIndexRoute
+  '/news/': typeof NewsIndexRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -502,13 +558,21 @@ export interface FileRoutesByTo {
   '/app-preview': typeof AppPreviewRoute
   '/join': typeof JoinRoute
   '/report-site': typeof ReportSiteRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
+  '/download/linux': typeof DownloadLinuxRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
+  '/guides/$slug': typeof GuidesSlugRoute
+  '/guides/rss.xml': typeof GuidesRssDotxmlRoute
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
+  '/news/$slug': typeof NewsSlugRoute
+  '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/v1/me': typeof V1MeRouteWithChildren
+  '/guides': typeof GuidesIndexRoute
+  '/news': typeof NewsIndexRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -571,13 +635,21 @@ export interface FileRoutesById {
   '/app-preview': typeof AppPreviewRoute
   '/join': typeof JoinRoute
   '/report-site': typeof ReportSiteRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
+  '/download/linux': typeof DownloadLinuxRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
+  '/guides/$slug': typeof GuidesSlugRoute
+  '/guides/rss.xml': typeof GuidesRssDotxmlRoute
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
+  '/news/$slug': typeof NewsSlugRoute
+  '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/v1/me': typeof V1MeRouteWithChildren
+  '/guides/': typeof GuidesIndexRoute
+  '/news/': typeof NewsIndexRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -641,13 +713,21 @@ export interface FileRouteTypes {
     | '/app-preview'
     | '/join'
     | '/report-site'
+    | '/sitemap.xml'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
+    | '/download/linux'
     | '/download/macos'
     | '/download/windows'
+    | '/guides/$slug'
+    | '/guides/rss.xml'
     | '/health/live'
     | '/health/ready'
+    | '/news/$slug'
+    | '/news/rss.xml'
     | '/v1/me'
+    | '/guides/'
+    | '/news/'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/me/avatar'
@@ -709,13 +789,21 @@ export interface FileRouteTypes {
     | '/app-preview'
     | '/join'
     | '/report-site'
+    | '/sitemap.xml'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
+    | '/download/linux'
     | '/download/macos'
     | '/download/windows'
+    | '/guides/$slug'
+    | '/guides/rss.xml'
     | '/health/live'
     | '/health/ready'
+    | '/news/$slug'
+    | '/news/rss.xml'
     | '/v1/me'
+    | '/guides'
+    | '/news'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/me/avatar'
@@ -777,13 +865,21 @@ export interface FileRouteTypes {
     | '/app-preview'
     | '/join'
     | '/report-site'
+    | '/sitemap.xml'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
+    | '/download/linux'
     | '/download/macos'
     | '/download/windows'
+    | '/guides/$slug'
+    | '/guides/rss.xml'
     | '/health/live'
     | '/health/ready'
+    | '/news/$slug'
+    | '/news/rss.xml'
     | '/v1/me'
+    | '/guides/'
+    | '/news/'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/me/avatar'
@@ -846,13 +942,21 @@ export interface RootRouteChildren {
   AppPreviewRoute: typeof AppPreviewRoute
   JoinRoute: typeof JoinRoute
   ReportSiteRoute: typeof ReportSiteRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   DotwellKnownAppleAppSiteAssociationRoute: typeof DotwellKnownAppleAppSiteAssociationRoute
   DotwellKnownJwksDotjsonRoute: typeof DotwellKnownJwksDotjsonRoute
+  DownloadLinuxRoute: typeof DownloadLinuxRoute
   DownloadMacosRoute: typeof DownloadMacosRoute
   DownloadWindowsRoute: typeof DownloadWindowsRoute
+  GuidesSlugRoute: typeof GuidesSlugRoute
+  GuidesRssDotxmlRoute: typeof GuidesRssDotxmlRoute
   HealthLiveRoute: typeof HealthLiveRoute
   HealthReadyRoute: typeof HealthReadyRoute
+  NewsSlugRoute: typeof NewsSlugRoute
+  NewsRssDotxmlRoute: typeof NewsRssDotxmlRoute
   V1MeRoute: typeof V1MeRouteWithChildren
+  GuidesIndexRoute: typeof GuidesIndexRoute
+  NewsIndexRoute: typeof NewsIndexRoute
   V1AuthLogoutRoute: typeof V1AuthLogoutRoute
   V1AvatarsUserIdRoute: typeof V1AvatarsUserIdRoute
   V1MobileAuthDevicesRoute: typeof V1MobileAuthDevicesRouteWithChildren
@@ -928,6 +1032,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof ReportSiteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.well-known/apple-app-site-association': {
       id: '/.well-known/apple-app-site-association'
       path: '/.well-known/apple-app-site-association'
@@ -940,6 +1051,13 @@ declare module '@tanstack/solid-router' {
       path: '/.well-known/jwks.json'
       fullPath: '/.well-known/jwks.json'
       preLoaderRoute: typeof DotwellKnownJwksDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/download/linux': {
+      id: '/download/linux'
+      path: '/download/linux'
+      fullPath: '/download/linux'
+      preLoaderRoute: typeof DownloadLinuxRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/download/macos': {
@@ -956,6 +1074,27 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof DownloadWindowsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/guides/': {
+      id: '/guides/'
+      path: '/guides'
+      fullPath: '/guides/'
+      preLoaderRoute: typeof GuidesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guides/$slug': {
+      id: '/guides/$slug'
+      path: '/guides/$slug'
+      fullPath: '/guides/$slug'
+      preLoaderRoute: typeof GuidesSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guides/rss.xml': {
+      id: '/guides/rss.xml'
+      path: '/guides/rss.xml'
+      fullPath: '/guides/rss.xml'
+      preLoaderRoute: typeof GuidesRssDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/health/live': {
       id: '/health/live'
       path: '/health/live'
@@ -968,6 +1107,27 @@ declare module '@tanstack/solid-router' {
       path: '/health/ready'
       fullPath: '/health/ready'
       preLoaderRoute: typeof HealthReadyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/news/': {
+      id: '/news/'
+      path: '/news'
+      fullPath: '/news/'
+      preLoaderRoute: typeof NewsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/news/$slug': {
+      id: '/news/$slug'
+      path: '/news/$slug'
+      fullPath: '/news/$slug'
+      preLoaderRoute: typeof NewsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/news/rss.xml': {
+      id: '/news/rss.xml'
+      path: '/news/rss.xml'
+      fullPath: '/news/rss.xml'
+      preLoaderRoute: typeof NewsRssDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/me': {
@@ -1475,14 +1635,22 @@ const rootRouteChildren: RootRouteChildren = {
   AppPreviewRoute: AppPreviewRoute,
   JoinRoute: JoinRoute,
   ReportSiteRoute: ReportSiteRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   DotwellKnownAppleAppSiteAssociationRoute:
     DotwellKnownAppleAppSiteAssociationRoute,
   DotwellKnownJwksDotjsonRoute: DotwellKnownJwksDotjsonRoute,
+  DownloadLinuxRoute: DownloadLinuxRoute,
   DownloadMacosRoute: DownloadMacosRoute,
   DownloadWindowsRoute: DownloadWindowsRoute,
+  GuidesSlugRoute: GuidesSlugRoute,
+  GuidesRssDotxmlRoute: GuidesRssDotxmlRoute,
   HealthLiveRoute: HealthLiveRoute,
   HealthReadyRoute: HealthReadyRoute,
+  NewsSlugRoute: NewsSlugRoute,
+  NewsRssDotxmlRoute: NewsRssDotxmlRoute,
   V1MeRoute: V1MeRouteWithChildren,
+  GuidesIndexRoute: GuidesIndexRoute,
+  NewsIndexRoute: NewsIndexRoute,
   V1AuthLogoutRoute: V1AuthLogoutRoute,
   V1AvatarsUserIdRoute: V1AvatarsUserIdRoute,
   V1MobileAuthDevicesRoute: V1MobileAuthDevicesRouteWithChildren,
@@ -1533,12 +1701,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/solid-start'
-declare module '@tanstack/solid-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

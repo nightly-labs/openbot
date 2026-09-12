@@ -344,6 +344,33 @@ describe("MailboxStore", () => {
     });
   });
 
+  it("redacts a provider failure before it is stored and read back", async () => {
+    const receipt = await store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Ask the endpoint",
+    });
+    const deliveryId = receipt.deliveries[0].id;
+    await store.markStarting(deliveryId);
+
+    // The CLI quotes the request it was given, so a failure against a custom endpoint carries that
+    // endpoint's credentials.
+    await store.markTerminal(
+      deliveryId,
+      "failed",
+      'Request failed: {"headers":{"Authorization":"Bearer sk-live-abc123"},"apiKey":"sk-proj-9999"}',
+    );
+
+    const stored = store.listQueue("chief").deliveries.find((delivery) => delivery.id === deliveryId);
+    expect(stored?.error).not.toContain("sk-live-abc123");
+    expect(stored?.error).not.toContain("sk-proj-9999");
+    expect(stored?.error).toContain("[redacted]");
+    // Read back from SQLite as well, because the queue the renderer pulls is served from the file.
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    expect(restored.listQueue("chief").deliveries.at(-1)?.error).not.toContain("sk-live-abc123");
+  });
+
   it("keeps enqueue idempotent in SQLite", async () => {
     const original = join(root, "retry.txt");
     await writeFile(original, "retry me\n");

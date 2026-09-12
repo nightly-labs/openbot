@@ -15,9 +15,18 @@ import type { RoutineScheduler } from "./routine-scheduler";
 import { isMissingProviderSessionError, isRequestTimeout, providerForAgent } from "./thread-items";
 import type { ThreadLifecycle } from "./thread-lifecycle";
 
+/** Shown to the user when a message names a model of an endpoint that was taken out. */
+export const REMOVED_ENDPOINT_MESSAGE = "The endpoint this agent used was removed. Choose another model for it.";
+
 export interface DrainHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
   isStopping(): boolean;
+  /**
+   * Whether the catalogue still serves this model. A removed endpoint's models stay in the running
+   * OpenCode process until it restarts, and the restart waits for a busy agent, so this is what
+   * keeps a delivery off an endpoint the user has taken out.
+   */
+  servesModel(model: string): boolean;
 }
 
 export interface DrainSchedulerOptions {
@@ -59,6 +68,12 @@ export class DrainScheduler {
   readonly #hooks: DrainHooks;
   readonly #channels: ChannelService | undefined;
   readonly #drainingAgents = new Set<string>();
+  /**
+   * The model each agent's running turn was started with, by turn id. The agent record can be moved
+   * to another model while that turn runs, but the CLI keeps the session it opened, so this is the
+   * endpoint a message steered into the turn would reach.
+   */
+  readonly #turnModels = new Map<string, { turnId: string; model: string }>();
   /**
    * How many deliveries are on their way to a turn, per provider.
    *
@@ -186,6 +201,14 @@ export class DrainScheduler {
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
       await this.#mailbox.verifyDeliveryAttachments(delivery.id);
       const agent = await this.#store.getOrCreate(delivery.recipientAgentId);
+      // The endpoint was removed while this agent was busy, so no other model could be given to it
+      // then. The old process would still answer on the removed endpoint, with the credentials it
+      // started with, until it restarts. Thrown rather than failed here: the catch below also ends
+      // the channel assignment, and an assignment left active holds back every other agent.
+      const requireServedModel = () => {
+        if (!this.#hooks.servesModel(agent.model)) throw new Error(REMOVED_ENDPOINT_MESSAGE);
+      };
+      requireServedModel();
       this.#threads.applyPendingRuntimeRefresh(agent);
       await this.#providers.ensureProvider(providerForAgent(agent));
       const client = this.#providers.requireReadyClient(providerForAgent(agent));
@@ -304,8 +327,12 @@ export class DrainScheduler {
       }
       this.#conversation.emitConversation(snapshot);
 
-      const startTurn = (providerThreadId: string) =>
-        this.#threads.requestWithArchivedThreadRecovery(
+      const startTurn = (providerThreadId: string) => {
+        // Read again here, not only above: the provider, the thread and the channel are prepared in
+        // between, and an endpoint removed during that wait finds the process still running. The
+        // retry below calls this as well, so the recovered thread is checked too.
+        requireServedModel();
+        return this.#threads.requestWithArchivedThreadRecovery(
           agent,
           client,
           "turn/start",
@@ -322,6 +349,7 @@ export class DrainScheduler {
           },
           decodeTurnResponse,
         );
+      };
       let response: Awaited<ReturnType<typeof startTurn>>;
       try {
         response = await startTurn(threadId);
@@ -339,6 +367,7 @@ export class DrainScheduler {
       }
       await this.#mailbox.markRunning(delivery.id, response.turn.id);
       confirmedTurnId = response.turn.id;
+      this.#turnModels.set(agent.id, { turnId: response.turn.id, model: agent.model });
       this.#channels?.accepted(delivery.id, threadId, response.turn.id);
       const currentDelivery = this.#mailbox.getDelivery(delivery.id)?.delivery;
       if (currentDelivery?.status === "running" && currentDelivery.turnId === response.turn.id) {
@@ -374,6 +403,12 @@ export class DrainScheduler {
     } finally {
       for (const provider of claimed) this.#startingDeliveries.set(provider, this.#starting(provider) - 1);
     }
+  }
+
+  /** The model this turn runs on, or `null` when this agent's running turn is not the one asked for. */
+  modelForTurn(agentId: string, turnId: string): string | null {
+    const running = this.#turnModels.get(agentId);
+    return running?.turnId === turnId ? running.model : null;
   }
 
   /** True while a delivery for this provider is between its first await and its turn. */

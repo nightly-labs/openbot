@@ -7,6 +7,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { createMemo, createSignal } from "solid-js";
 import type { ProviderPickerOption } from "../../../components/ProviderPicker";
+import { useI18n } from "../../../i18n-context";
 
 interface GeneralStoreProps {
   agentStatus?: AgentStatus;
@@ -20,6 +21,7 @@ interface GeneralStoreProps {
  * agent status and the runtime download status.
  */
 export function createSettingsGeneralStore(props: GeneralStoreProps) {
+  const i18n = useI18n();
   const [selectedProvider, setSelectedProvider] = createSignal<AgentProviderId | null>(null);
 
   const providerOptions = createMemo<ProviderPickerOption[]>(() =>
@@ -29,7 +31,7 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
       return {
         id: provider,
         name: agentProviderName(provider),
-        description: "Available on this computer",
+        description: i18n.t("provider.availableHere"),
         state: agent?.state ?? "not-installed",
         message: agent?.message,
         email: agent?.email,
