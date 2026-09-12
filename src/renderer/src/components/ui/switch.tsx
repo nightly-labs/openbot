@@ -21,6 +21,8 @@ export type SwitchProps<T extends ValidComponent = "div"> = PolymorphicProps<T, 
   OpenBotSwitchProps &
   Partial<Pick<ComponentProps<T>, "class">>;
 
+const SWITCH_DRAG_THRESHOLD_PX = 3;
+
 type SwitchMotionControlProps = {
   setPointerFocus: (pointerFocus: boolean) => void;
 };
@@ -126,7 +128,8 @@ function SwitchMotionControl(props: SwitchMotionControlProps): JSX.Element {
         pointerId: number;
         grab: number;
         startProgress: number;
-        startChecked: boolean;
+        startClientX: number;
+        progress: number;
         moved: boolean;
       }
     | undefined;
@@ -137,9 +140,11 @@ function SwitchMotionControl(props: SwitchMotionControlProps): JSX.Element {
     const rect = control.getBoundingClientRect();
     const styles = window.getComputedStyle(control);
     const inset = Number.parseFloat(styles.getPropertyValue("--ui-switch-inset")) || 0;
-    const travel =
-      Number.parseFloat(styles.getPropertyValue("--ui-switch-travel")) ||
-      Math.max(1, rect.width - rect.height - inset * 2);
+    const thumb = control.querySelector<HTMLElement>('[data-slot="switch-thumb"]');
+    const thumbWidth = thumb
+      ? thumb.offsetWidth || Number.parseFloat(window.getComputedStyle(thumb).width)
+      : rect.height;
+    const travel = Math.max(1, rect.width - (thumbWidth || rect.height) - inset * 2);
     return { left: rect.left, inset, travel };
   }
 
@@ -147,13 +152,28 @@ function SwitchMotionControl(props: SwitchMotionControlProps): JSX.Element {
     const activeDrag = drag;
     if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
 
+    if (!cancelled) updateDrag(event);
+    if (!cancelled && activeDrag.moved) context.setIsChecked(activeDrag.progress >= 0.5);
     drag = undefined;
     setDragging(false);
-    if (cancelled) context.setIsChecked(activeDrag.startChecked);
     if (activeDrag.moved) suppressClick = true;
     setDragProgress(undefined);
 
     if (control?.hasPointerCapture?.(event.pointerId)) control.releasePointerCapture?.(event.pointerId);
+  }
+
+  function updateDrag(event: PointerEvent): void {
+    const activeDrag = drag;
+    if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
+    const switchMetrics = metrics();
+    if (!switchMetrics) return;
+    const nextProgress = Math.min(
+      1,
+      Math.max(0, (event.clientX - switchMetrics.left - switchMetrics.inset - activeDrag.grab) / switchMetrics.travel),
+    );
+    if (Math.abs(event.clientX - activeDrag.startClientX) >= SWITCH_DRAG_THRESHOLD_PX) activeDrag.moved = true;
+    activeDrag.progress = nextProgress;
+    setDragProgress(nextProgress);
   }
 
   function suppressDraggedClick(event: MouseEvent): void {
@@ -194,7 +214,8 @@ function SwitchMotionControl(props: SwitchMotionControlProps): JSX.Element {
           pointerId: event.pointerId,
           grab: event.clientX - thumbStart,
           startProgress,
-          startChecked: context.checked(),
+          startClientX: event.clientX,
+          progress: startProgress,
           moved: false,
         };
         setDragging(true);
@@ -202,21 +223,7 @@ function SwitchMotionControl(props: SwitchMotionControlProps): JSX.Element {
         control?.setPointerCapture?.(event.pointerId);
       }}
       onPointerMove={(event) => {
-        const activeDrag = drag;
-        if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
-        const switchMetrics = metrics();
-        if (!switchMetrics) return;
-        const nextProgress = Math.min(
-          1,
-          Math.max(
-            0,
-            (event.clientX - switchMetrics.left - switchMetrics.inset - activeDrag.grab) / switchMetrics.travel,
-          ),
-        );
-        if (Math.abs(nextProgress - activeDrag.startProgress) > 0.01) activeDrag.moved = true;
-        setDragProgress(nextProgress);
-        const nextChecked = nextProgress >= 0.5;
-        if (nextChecked !== context.checked()) context.setIsChecked(nextChecked);
+        updateDrag(event);
       }}
       onPointerUp={(event) => finishPointer(event)}
       onPointerCancel={(event) => finishPointer(event, true)}

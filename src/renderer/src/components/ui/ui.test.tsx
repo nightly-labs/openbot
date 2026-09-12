@@ -20,6 +20,28 @@ import {
 
 const originalClipboard = navigator.clipboard;
 
+function mockSwitchLayout(): HTMLDivElement {
+  const control = document.querySelector<HTMLDivElement>('[data-slot="switch-control"]');
+  const thumb = document.querySelector<HTMLElement>('[data-slot="switch-thumb"]');
+  if (!control || !thumb) throw new Error("Expected the switch control and thumb to be rendered.");
+
+  vi.spyOn(control, "getBoundingClientRect").mockReturnValue({
+    bottom: 20,
+    height: 20,
+    left: 100,
+    right: 136,
+    top: 0,
+    width: 36,
+    x: 100,
+    y: 0,
+    toJSON: () => ({}),
+  });
+  control.style.setProperty("--ui-switch-inset", "2px");
+  thumb.style.width = "16px";
+  thumb.style.height = "16px";
+  return control;
+}
+
 afterEach(() => {
   toast.dismiss();
   vi.useRealTimers();
@@ -150,6 +172,39 @@ describe("UI primitives", () => {
     expect(control).toBeChecked();
     expect(control).toHaveAttribute("name", "notifications");
     expect(control).toHaveAttribute("value", "enabled");
+  });
+
+  it("commits pointer drags only when the pointer is released", async () => {
+    const onChange = vi.fn();
+    render(() => <SwitchField label="Notifications" onChange={onChange} />);
+
+    const input = screen.getByRole("switch", { name: "Notifications" });
+    const control = mockSwitchLayout();
+    await fireEvent.pointerDown(control, { clientX: 102, pointerId: 1 });
+    await fireEvent.pointerMove(control, { clientX: 112, pointerId: 1 });
+
+    expect(input).not.toBeChecked();
+    expect(onChange).not.toHaveBeenCalled();
+
+    await fireEvent.pointerUp(control, { clientX: 112, pointerId: 1 });
+
+    expect(input).toBeChecked();
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it("keeps normal clicks when pointer movement stays below the drag threshold", async () => {
+    const onChange = vi.fn();
+    render(() => <SwitchField label="Notifications" onChange={onChange} />);
+
+    const input = screen.getByRole("switch", { name: "Notifications" });
+    const control = mockSwitchLayout();
+    await fireEvent.pointerDown(control, { clientX: 102, pointerId: 1 });
+    await fireEvent.pointerMove(control, { clientX: 103, pointerId: 1 });
+    await fireEvent.pointerUp(control, { clientX: 103, pointerId: 1 });
+    await fireEvent.click(control);
+
+    expect(input).toBeChecked();
+    expect(onChange).toHaveBeenCalledWith(true);
   });
 
   it("exposes invalid switch state and field description", async () => {
