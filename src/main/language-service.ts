@@ -20,6 +20,7 @@ export class LanguageService {
   readonly #listeners = new Set<(preference: AppLanguagePreference) => void>();
   #preference: AppLanguagePreference = { language: DEFAULT_APP_LANGUAGE };
   #translate: AppTranslate;
+  #pending: Promise<unknown> = Promise.resolve();
 
   constructor(input: { path: string; systemLocale: string }) {
     this.#path = input.path;
@@ -48,7 +49,24 @@ export class LanguageService {
     return this.preference;
   }
 
+  /**
+   * Serialized, because each write renames its own temporary file into place and the picker stays
+   * enabled while one is in flight. Two quick choices would otherwise race: the earlier rename could
+   * land last and persist the language the user just moved away from. The apply and the broadcast
+   * are inside the same chain, so the menu and every window are told in the order the choices were
+   * made rather than in the order the disk happened to finish. `update-preference-store.ts` queues
+   * its writes for the same reason.
+   */
   async set(preference: AppLanguagePreference): Promise<AppLanguagePreference> {
+    const applied = this.#pending.then(
+      () => this.#write(preference),
+      () => this.#write(preference),
+    );
+    this.#pending = applied.catch(() => undefined);
+    return applied;
+  }
+
+  async #write(preference: AppLanguagePreference): Promise<AppLanguagePreference> {
     const saved = await writeLanguagePreference(this.#path, preference);
     this.#apply(saved);
     for (const listener of this.#listeners) listener(this.preference);

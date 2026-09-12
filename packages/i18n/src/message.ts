@@ -91,8 +91,8 @@ function countOf(values: ReadonlyMap<string, MessageValue> | undefined): number 
 /**
  * Bind a catalog to a locale.
  *
- * `translation` is the language being read; `source` is English and is also the fallback, so a key
- * a newer catalog has not translated yet renders its English text instead of disappearing.
+ * `translation` is the language being read; `source` is the fallback, so a key a newer catalog has
+ * not translated yet renders its source text instead of disappearing.
  */
 export function createTranslate<Source extends MessageCatalog>(input: {
   source: Source;
@@ -101,15 +101,24 @@ export function createTranslate<Source extends MessageCatalog>(input: {
   // to exist: a catalog shipped by an older build does not have a key this build just added.
   translation?: Partial<Translation<Source>> | undefined;
   locale: string;
+  /**
+   * The language `source` is written in. Plural forms are chosen by the language of the text that
+   * is actually rendered, not by the language that was asked for: a key falling back to an English
+   * message and then picking its form with Japanese rules - which has one form for every count -
+   * renders "1 replies".
+   */
+  sourceLocale: string;
 }): Translate<Source> {
   return function translate<Key extends keyof Source & string>(key: Key, ...args: ParamsArgument<Source[Key]>): string {
     const params = args[0];
     // Read once into a plain map so the rendering below works on values, not on the generic
     // parameter type the caller was checked against.
     const values = params ? new Map<string, MessageValue>(Object.entries(params)) : undefined;
-    const message = input.translation?.[key] ?? input.source[key];
+    const translated = input.translation?.[key];
+    const message = translated ?? input.source[key];
     if (message === undefined) return key;
-    const text = typeof message === "string" ? message : selectForm(message, countOf(values), input.locale);
+    const locale = translated === undefined ? input.sourceLocale : input.locale;
+    const text = typeof message === "string" ? message : selectForm(message, countOf(values), locale);
     return values ? interpolate(text, values) : text;
   };
 }

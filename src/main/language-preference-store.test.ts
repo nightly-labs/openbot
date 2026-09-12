@@ -34,6 +34,15 @@ describe("language preference store", () => {
     await expect(readLanguagePreference(path)).resolves.toEqual({ language: "system" });
   });
 
+  it("follows the system language when the file cannot be read at all", async () => {
+    // Startup awaits this read and has no recovery, so a rethrown error here would show the startup
+    // error box and quit. A directory in the file's place stands for any unreadable file.
+    const root = await temporaryRoot();
+    const path = join(root, "language.json");
+    await mkdir(path);
+    await expect(readLanguagePreference(path)).resolves.toEqual({ language: "system" });
+  });
+
   it("follows the system language when the file is not valid JSON", async () => {
     const root = await temporaryRoot();
     const path = join(root, "language.json");

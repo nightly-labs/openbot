@@ -42,12 +42,17 @@ describe("createTranslate", () => {
       source,
       translation: { greeting: "こんにちは {name}" },
       locale: "ja",
+      sourceLocale: "en",
     });
     expect(translate("replies", { count: 2 })).toBe("2 replies");
+    // English text, so English plural rules. Japanese has one form for every count, and choosing
+    // by the language that was asked for rather than by the language of the text renders
+    // "1 replies".
+    expect(translate("replies", { count: 1 })).toBe("1 reply");
   });
 
   it("picks the plural form the locale asks for", () => {
-    const english = createTranslate({ source, locale: "en" });
+    const english = createTranslate({ source, locale: "en", sourceLocale: "en" });
     expect(english("replies", { count: 1 })).toBe("1 reply");
     expect(english("replies", { count: 5 })).toBe("5 replies");
   });
@@ -57,13 +62,14 @@ describe("createTranslate", () => {
       source,
       translation: { greeting: "こんにちは {name}", replies: { other: "{count} 件の返信" } },
       locale: "ja",
+      sourceLocale: "en",
     });
     expect(japanese("replies", { count: 1 })).toBe("1 件の返信");
     expect(japanese("replies", { count: 5 })).toBe("5 件の返信");
   });
 
   it("renders readable text for a locale tag Intl rejects", () => {
-    const broken = createTranslate({ source, locale: "not a locale" });
+    const broken = createTranslate({ source, locale: "not a locale", sourceLocale: "en" });
     expect(broken("replies", { count: 2 })).toBe("2 replies");
   });
 });

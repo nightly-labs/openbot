@@ -11,6 +11,11 @@ const DEFAULT_PREFERENCE: AppLanguagePreference = { language: DEFAULT_APP_LANGUA
  * A file that is missing, unreadable or names a language this build no longer ships reads as the
  * system default. Unlike the analytics preference there is no safe-by-default direction to fall
  * back to: an unreadable file must not leave the app with no language at all.
+ *
+ * Every read error is absorbed, not only a missing file. `createApplicationServices` awaits this
+ * before the first window opens and has no recovery, so a rethrown `EACCES` - a preference file
+ * left unreadable by a restore from backup, say - would show the startup error box and quit. Losing
+ * a language choice is a small fault; being unable to open the app at all is not.
  */
 export async function readLanguagePreference(path: string): Promise<AppLanguagePreference> {
   try {
@@ -19,9 +24,8 @@ export async function readLanguagePreference(path: string): Promise<AppLanguageP
       return { ...DEFAULT_PREFERENCE };
     }
     return { language: parsed.language };
-  } catch (error) {
-    if (isMissing(error) || error instanceof SyntaxError) return { ...DEFAULT_PREFERENCE };
-    throw error;
+  } catch {
+    return { ...DEFAULT_PREFERENCE };
   }
 }
 
@@ -40,8 +44,4 @@ export async function writeLanguagePreference(
   } finally {
     await rm(temporaryPath, { force: true }).catch(() => undefined);
   }
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

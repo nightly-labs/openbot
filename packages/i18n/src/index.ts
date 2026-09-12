@@ -45,7 +45,7 @@ export function resolveLocale(language: AppLanguage, systemLocale: string): Tran
 
 /** The translator for a resolved locale. English is both a catalog and every other catalog's fallback. */
 export function translateFor(locale: TranslatedLocale): AppTranslate {
-  return createTranslate({ source: en, translation: catalogs[locale], locale });
+  return createTranslate({ source: en, translation: catalogs[locale], locale, sourceLocale: "en" });
 }
 
 /** The translator for a preference, in one step, for a caller that holds no resolved locale. */
