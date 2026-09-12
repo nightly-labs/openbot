@@ -295,6 +295,9 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(autoDownload);
     await waitFor(() => expect(window.openbot.update.setPreference).toHaveBeenCalledWith({ autoDownload: true }));
 
+    // The language row lives in the General tab, which the Updates tab hides through CSS that jsdom
+    // does not apply. Go back to it, so the test reaches the control the way a user does.
+    await fireEvent.click(screen.getByRole("tab", { name: "General" }));
     // The trigger reads its label and its value, so match the start of the name. It also opens on
     // pointer down rather than on click, so a plain click never reaches the list.
     await fireEvent.pointerDown(screen.getByRole("button", { name: /^Language/ }), { pointerType: "mouse", button: 0 });
@@ -302,7 +305,9 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.setAppLanguagePreference).toHaveBeenCalledWith({ language: "ja" }));
     // The screen is written in the chosen language at once, with no restart: the tab the user is
     // looking at is the same tab, now named in Japanese.
-    await screen.findByRole("tab", { name: "アップデート" });
+    await screen.findByRole("tab", { name: "一般" });
+    // The document says which language it is in, so a screen reader speaks it with the right voice.
+    expect(document.documentElement.lang).toBe("ja");
   });
 
   it("does not open desktop analytics when the saved preference is disabled", async () => {

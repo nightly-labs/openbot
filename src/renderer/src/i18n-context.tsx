@@ -1,6 +1,14 @@
 import { type AppLanguage, DEFAULT_APP_LANGUAGE } from "@openbot/contracts/ipc";
 import { type AppTranslate, resolveLocale, type TranslatedLocale, translateFor } from "@openbot/i18n";
-import { createContext, createMemo, createSignal, onSettled, type ParentProps, useContext } from "solid-js";
+import {
+  createContext,
+  createEffect,
+  createMemo,
+  createSignal,
+  onSettled,
+  type ParentProps,
+  useContext,
+} from "solid-js";
 
 export interface I18nValue {
   language: () => AppLanguage;
@@ -40,6 +48,16 @@ function createI18nValue(): I18nValue {
   const locale = createMemo<TranslatedLocale>(() => resolveLocale(language(), navigator.language));
   const translate = createMemo(() => translateFor(locale()));
   const t: AppTranslate = (key, ...params) => translate()(key, ...params);
+
+  // `index.html` declares one language, so the document would keep saying English through every
+  // change. A screen reader takes the voice for a control from the nearest `lang`, and reads
+  // Japanese text with an English voice when the two disagree.
+  createEffect(
+    () => locale(),
+    (value) => {
+      document.documentElement.lang = value;
+    },
+  );
 
   function confirm(next: AppLanguage): void {
     confirmed = next;
