@@ -1,6 +1,7 @@
 import type { JSX } from "@solidjs/web";
-import { createSignal, onSettled, Show } from "solid-js";
+import { children, createSignal, onSettled, Show } from "solid-js";
 import { motionWelcome } from "../../lib/motion";
+import { ArticleGradient } from "./ArticleGradient";
 
 // Pictures, animations and video inside an article. A body is plain TSX, so a bare
 // <img> would already render; these exist so that every picture carries the things
@@ -21,6 +22,9 @@ import { motionWelcome } from "../../lib/motion";
 // reader can also overrule it in either direction, which is the part a media query
 // cannot do.
 
+/** How much of the card gradient shows around a mounted picture. */
+export type ArticleMountPad = "tight" | "roomy";
+
 interface ArticleMediaBase {
   /** The file's own width in pixels. It is the space the page holds open for it. */
   width: number;
@@ -28,6 +32,22 @@ interface ArticleMediaBase {
   height: number;
   /** The line under the picture. Left out, the picture stands on its own. */
   caption?: JSX.Element;
+  /**
+   * Sets the picture on the article's own gradient, with room around it. Give it
+   * the article title, because that string is the whole of what the colours are
+   * drawn from: a mounted picture then carries the colours of the card the reader
+   * arrived from, and two pictures in one article agree with each other.
+   *
+   * Use it for a screenshot with a pale or busy edge, which otherwise runs into
+   * the page where it stops. A screenshot that is already dark to its edges needs
+   * nothing around it, and a mount would only make the column narrower.
+   */
+  mountOn?: string;
+  /**
+   * How much gradient shows around the picture. `"tight"` is a thin mat, `"roomy"`
+   * is a field. Left out, a wide picture is tight and a tall one is roomy.
+   */
+  mountPad?: ArticleMountPad;
 }
 
 export interface ArticleImageProps extends ArticleMediaBase {
@@ -39,7 +59,7 @@ export interface ArticleImageProps extends ArticleMediaBase {
 
 export function ArticleImage(props: ArticleImageProps) {
   return (
-    <ArticleFigure caption={props.caption}>
+    <ArticleFigure {...figureMount(props)}>
       <img
         class="post-media"
         src={props.src}
@@ -77,7 +97,7 @@ export function ArticleGif(props: ArticleGifProps) {
   });
 
   return (
-    <ArticleFigure caption={props.caption}>
+    <ArticleFigure {...figureMount(props)}>
       <div class="post-media-frame">
         <picture>
           {/* Before the script runs this is the whole of the answer, and it stays
@@ -166,7 +186,7 @@ export function ArticleClip(props: ArticleClipProps) {
   });
 
   return (
-    <ArticleFigure caption={props.caption}>
+    <ArticleFigure {...figureMount(props)}>
       <div class="post-media-frame">
         {/* A clip with no controls is a moving picture, and that is how it is
             announced — but the role and the text alternative go on the frame
@@ -223,7 +243,7 @@ export interface ArticleVideoProps extends ArticleMediaBase {
  */
 export function ArticleVideo(props: ArticleVideoProps) {
   return (
-    <ArticleFigure caption={props.caption}>
+    <ArticleFigure {...figureMount(props)}>
       <video
         class="post-media"
         src={props.src}
@@ -242,10 +262,48 @@ export function ArticleVideo(props: ArticleVideoProps) {
   );
 }
 
-function ArticleFigure(props: { caption?: JSX.Element; children: JSX.Element }) {
+function figureMount(props: ArticleMediaBase): {
+  caption?: JSX.Element;
+  mountOn?: string;
+  mountPad?: ArticleMountPad;
+  wide: boolean;
+} {
+  return {
+    caption: props.caption,
+    mountOn: props.mountOn,
+    mountPad: props.mountPad,
+    wide: props.width > props.height,
+  };
+}
+
+function ArticleFigure(props: {
+  caption?: JSX.Element;
+  mountOn?: string;
+  mountPad?: ArticleMountPad;
+  wide?: boolean;
+  children: JSX.Element;
+}) {
+  let mount: HTMLDivElement | undefined;
+  // Resolved once and reused, so that switching a picture onto a mount moves the
+  // same nodes rather than building a second copy of them.
+  const body = children(() => props.children);
+  const pad = (): ArticleMountPad => props.mountPad ?? (props.wide ? "tight" : "roomy");
+
   return (
     <figure class="post-figure">
-      {props.children}
+      <Show when={props.mountOn} fallback={body()}>
+        {(title) => (
+          <div ref={mount} class="post-mount" data-pad={pad()}>
+            {/* Hover rather than live. A body can hold several pictures, and a
+                live gradient is a WebGL context held for as long as the article
+                is open; a browser keeps only a dozen or so of those. Nothing is
+                lost by waiting: the mount is behind a picture, so a reader who
+                never rests a pointer on it never had much of it to see. */}
+            <ArticleGradient title={title()} mode="hover" hoverTarget={() => mount} />
+            {body()}
+          </div>
+        )}
+      </Show>
       <Show when={props.caption}>{(caption) => <figcaption class="post-figure-caption">{caption()}</figcaption>}</Show>
     </figure>
   );

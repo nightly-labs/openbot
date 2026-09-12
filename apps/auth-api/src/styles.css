@@ -2222,6 +2222,56 @@ a {
   background: var(--openbot-bg-surface);
 }
 
+/* A picture with room around it, standing on the article's own gradient. A
+   screenshot of a pale interface runs into the page where it stops, and a picture
+   of the product sitting on the page reads as part of the page rather than as a
+   picture of something. The gradient is the same one the reader met on the card
+   they arrived from, because both are drawn from the article title.
+
+   The gradient host inside is absolutely positioned to the padding box, so it
+   fills the room around the picture and leaves the border alone. */
+.post-mount {
+  position: relative;
+  /* The shader canvas is prepended by the library at z-index -1. Without a
+     stacking context of its own here, that negative layer leaves the mount and
+     paints behind the page instead of behind the picture. */
+  isolation: isolate;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-card);
+  /* Proportional, so the room around the picture stays the same fraction of the
+     column on a phone as on a wide screen, with a floor and a ceiling that keep
+     it from vanishing or from eating the picture. Authors pick `tight` or
+     `roomy` on the component; this is the fallback if neither is set. */
+  padding: clamp(14px, 4.5%, 52px);
+}
+
+.post-mount[data-pad="tight"] {
+  padding: clamp(12px, 3.5%, 36px);
+}
+
+.post-mount[data-pad="roomy"] {
+  padding: clamp(22px, 7%, 72px);
+}
+
+/* Inside a mount the picture is a smaller thing on a coloured field, so it takes
+   a tighter radius and a lift instead of the plain border it wears on the page.
+   `z-index` is what keeps it above the gradient host: that host is positioned,
+   so without a layer of its own the picture paints underneath and the mount
+   reads as a gradient with no screenshot on it. */
+.post-mount .post-media,
+.post-mount .post-media-frame {
+  position: relative;
+  z-index: 1;
+}
+
+.post-mount .post-media {
+  border-color: var(--openbot-border);
+  border-radius: 9px;
+  box-shadow: var(--openbot-shadow-overlay);
+}
+
 .post-figure-caption {
   margin-top: 12px;
   color: var(--openbot-text-muted);

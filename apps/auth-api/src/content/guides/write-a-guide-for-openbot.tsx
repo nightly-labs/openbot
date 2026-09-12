@@ -120,7 +120,8 @@ export function WriteAGuideForOpenBot() {
             </td>
             <td>A screenshot or a diagram.</td>
             <td>
-              <code>alt</code>
+              <code>alt</code>. Optional <code>mountOn</code> (the article title) puts it on the card gradient; leave it
+              out for a bare picture. <code>mountPad</code> is <code>"tight"</code> or <code>"roomy"</code>
             </td>
           </tr>
           <tr>
@@ -159,12 +160,26 @@ export function WriteAGuideForOpenBot() {
 
       <h3>A still picture</h3>
       <p>Reach for this first. It is the cheapest thing to load and the easiest thing to read.</p>
+      <p>
+        Leave <code>mountOn</code> out and the picture is the whole of the figure, which is right when it is already
+        dark to its edges. Give it <code>mountOn</code> with this article's title to sit it on the card gradient.{" "}
+        <code>mountPad="tight"</code> is a thin mat, <code>mountPad="roomy"</code> is a field. Leave{" "}
+        <code>mountPad</code> out and a wide picture is tight, a tall one is roomy.
+      </p>
       <ArticleImage
         src={aClearTask}
         alt="An agent thread where the reader asks Research which claim is still open and what would close it."
         width={1696}
         height={612}
-        caption="A screenshot earns its place when it shows something the sentence cannot: here, how short a good instruction is."
+        caption="No mount. The picture stops where the column stops."
+      />
+      <ArticleImage
+        src={aClearTask}
+        alt="An agent thread where the reader asks Research which claim is still open and what would close it."
+        width={1696}
+        height={612}
+        mountOn="Write a guide for OpenBot"
+        caption="The same file on the card gradient. Rest a pointer on it and the artwork starts from the frame already on screen."
       />
 
       <h3>An animation</h3>

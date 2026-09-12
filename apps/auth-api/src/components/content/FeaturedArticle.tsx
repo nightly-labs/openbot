@@ -39,11 +39,9 @@ export function FeaturedArticle(props: FeaturedArticleProps) {
           reader hearing the same destination three times. */}
       <div class="post-featured-art" data-enter="post-art">
         <ArticleGradient
-          collection={props.collection}
-          slug={props.article.slug}
           title={props.article.title}
+          art={{ collection: props.collection, slug: props.article.slug, shape: "featured" }}
           mode="live"
-          shape="featured"
         />
         <span class="post-featured-art-title" aria-hidden="true">
           {props.article.title}

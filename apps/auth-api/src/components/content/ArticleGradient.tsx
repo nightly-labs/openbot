@@ -18,6 +18,12 @@ import { cx } from "../../lib/utils";
 // images exist only in a full build, so that case is the everyday one in
 // development.
 //
+// A CSS background starts that download the moment it has a URL. The reveal's
+// opacity: 0 does not stop it, and neither does sitting below the fold, so a
+// card keeps the PNG off the element until it is near the viewport. Featured
+// and article artwork keep theirs from the first paint: they are on screen as
+// the page opens, and the index already preloads the featured still.
+//
 // The reason for the staging is context budget. A browser allows on the order of
 // eight to sixteen live WebGL contexts and drops the oldest without warning past
 // that. The index page shows one featured card and a grid, so "live" is used once
@@ -41,13 +47,25 @@ import { cx } from "../../lib/utils";
 // keeps the baked PNG. With no shader to hand over to there is no cut to avoid,
 // and drawing it again would spend a context and an image encode on every card.
 
-interface ArticleGradientBaseProps {
+/** Where the build-time still for this frame was baked, when one was. */
+export interface ArticleGradientArt {
   /** The collection the article belongs to, which is half of its image path. */
   collection: ContentCollection;
   slug: string;
-  title: string;
   /** The frame this artwork fills, which decides the shape it is drawn at. */
   shape: ContentArtShape;
+}
+
+interface ArticleGradientBaseProps {
+  /** The string the colours are drawn from. For artwork it is the article title. */
+  title: string;
+  /**
+   * The baked PNG to use as the still. Left out, the CSS approximation is the
+   * whole of the layer under the shader: a gradient behind something in an
+   * article body has no generated image, because the generator draws one picture
+   * per article and this is not it.
+   */
+  art?: ArticleGradientArt;
   class?: string;
 }
 
@@ -70,6 +88,9 @@ const ANIMATION_SPEED = 0.6;
 
 /** Enough frames for the mount's ResizeObserver to have sized the canvas. */
 const CANVAS_FRAME_BUDGET = 12;
+
+/** Start fetching the baked still before the card is on screen. */
+const CARD_ART_ROOT_MARGIN = "400px 0px";
 
 // Priming is serialised across every card on the page. Each one is a WebGL
 // context that lives for a few frames, and a browser keeps only so many before it
@@ -98,10 +119,19 @@ export function ArticleGradient(props: ArticleGradientProps) {
   // hover continues.
   const [frozen, setFrozen] = createSignal<string>();
 
+  // Grid cards start without the PNG URL so the browser does not fetch images
+  // that are still below the fold. Featured and article artwork skip this gate:
+  // they are already on screen, so the URL belongs on the first paint.
+  const [cardArtReady, setCardArtReady] = createSignal(false);
+
   const background = createMemo(() => {
     const captured = frozen();
     if (captured) return `url("${captured}")`;
-    return `url("${articleArtPath(props.collection, props.slug, props.shape)}"), ${articleGradientCss(gradient())}`;
+    const css = articleGradientCss(gradient());
+    const art = props.art;
+    if (!art) return css;
+    if (art.shape === "card" && !cardArtReady()) return css;
+    return `url("${articleArtPath(art.collection, art.slug, art.shape)}"), ${css}`;
   });
 
   /**
@@ -219,6 +249,27 @@ export function ArticleGradient(props: ArticleGradientProps) {
     });
     return primeQueue;
   };
+
+  onSettled(() => {
+    if (props.art?.shape !== "card" || !host) return;
+    // A browser with no observer cannot tell what is on screen. Load the still:
+    // it is better than the approximation, and a missing file already falls
+    // through to that approximation without drawing a broken image.
+    if (!globalThis.IntersectionObserver) {
+      setCardArtReady(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setCardArtReady(true);
+        observer.disconnect();
+      },
+      { rootMargin: CARD_ART_ROOT_MARGIN },
+    );
+    observer.observe(host);
+    return () => observer.disconnect();
+  });
 
   onSettled(() => {
     // Nothing will move, so the baked still is the whole picture.

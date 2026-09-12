@@ -9,7 +9,12 @@ import { CollectionIndexPage } from "../src/components/content/CollectionIndexPa
 import { LandingPage } from "../src/components/landing/LandingPage";
 import { articleGradient } from "../src/lib/article-gradient";
 import { CONTENT_COLLECTIONS } from "../src/lib/content";
-import { articlePath, type CollectionArticle, type ContentCollection } from "../src/lib/content-collection";
+import {
+  articleArtPath,
+  articlePath,
+  type CollectionArticle,
+  type ContentCollection,
+} from "../src/lib/content-collection";
 import { loadGuide } from "../src/routes/guides/$slug";
 import { loadNewsArticle } from "../src/routes/news/$slug";
 
@@ -390,7 +395,7 @@ describe("article artwork", () => {
     // A reader who asked for less motion.
     const asked = stubMotionPreference(true);
     render(() => (
-      <ArticleGradient mode="live" collection={collection} slug={still.slug} title={still.title} shape="featured" />
+      <ArticleGradient mode="live" title={still.title} art={{ collection, slug: still.slug, shape: "featured" }} />
     ));
     await waitFor(() => expect(asked).toContain("(prefers-reduced-motion: reduce)"));
 
@@ -400,10 +405,8 @@ describe("article artwork", () => {
       <ArticleGradient
         mode="hover"
         hoverTarget={() => document.body}
-        collection={collection}
-        slug={still.slug}
         title={still.title}
-        shape="card"
+        art={{ collection, slug: still.slug, shape: "card" }}
       />
     ));
 
@@ -411,10 +414,137 @@ describe("article artwork", () => {
     // the order they arrive, so when this one opens a shader the two above have
     // already had their turn.
     render(() => (
-      <ArticleGradient mode="live" collection={collection} slug={moving.slug} title={moving.title} shape="featured" />
+      <ArticleGradient mode="live" title={moving.title} art={{ collection, slug: moving.slug, shape: "featured" }} />
     ));
 
     await waitFor(() => expect(shaderOpeningFrames.length).toBeGreaterThan(0));
     expect(shaderOpeningFrames).not.toContain(stillFrame);
   });
+
+  it("keeps a card's baked still off the element until the card is near the viewport", async () => {
+    const collection = CONTENT_COLLECTIONS[0];
+    const article = collection?.articles[1];
+    if (!collection || !article) throw new Error("This test needs a collection with a grid article.");
+    const artPath = articleArtPath(collection, article.slug, "card");
+    const approach = stubCardApproach();
+
+    const { container } = render(() => (
+      <ArticleGradient
+        mode="hover"
+        hoverTarget={() => document.body}
+        title={article.title}
+        art={{ collection, slug: article.slug, shape: "card" }}
+      />
+    ));
+
+    expect(bakedStill(container)).not.toContain(artPath);
+
+    await waitFor(() => {
+      // onSettled attaches the observer after the first paint. Keep reporting
+      // until that has happened and the URL is on the element.
+      approach();
+      expect(bakedStill(container)).toContain(artPath);
+    });
+  });
+
+  it("puts featured and article stills on the element from the first paint", () => {
+    const collection = CONTENT_COLLECTIONS[0];
+    const article = collection?.articles[0];
+    if (!collection || !article) throw new Error("This test needs a collection with a featured article.");
+    // A card below the fold must not start a download. These two frames are on
+    // screen as the page opens, so they must not wait for the same observer.
+    stubCardApproach();
+
+    for (const shape of ["featured", "article"] as const) {
+      const { container, unmount } = render(() => (
+        <ArticleGradient mode="live" title={article.title} art={{ collection, slug: article.slug, shape }} />
+      ));
+      expect(bakedStill(container)).toContain(articleArtPath(collection, article.slug, shape));
+      unmount();
+    }
+  });
+
+  it("puts a card's baked still on the element when the browser cannot watch the viewport", async () => {
+    const collection = CONTENT_COLLECTIONS[0];
+    const article = collection?.articles[1];
+    if (!collection || !article) throw new Error("This test needs a collection with a grid article.");
+    const artPath = articleArtPath(collection, article.slug, "card");
+    vi.stubGlobal("IntersectionObserver", undefined);
+
+    const { container } = render(() => (
+      <ArticleGradient
+        mode="hover"
+        hoverTarget={() => document.body}
+        title={article.title}
+        art={{ collection, slug: article.slug, shape: "card" }}
+      />
+    ));
+
+    await waitFor(() => expect(bakedStill(container)).toContain(artPath));
+  });
 });
+
+function bakedStill(container: HTMLElement): string {
+  const host = container.querySelector("[data-shader]");
+  if (!(host instanceof HTMLElement)) throw new Error("Expected the artwork host.");
+  return host.style.backgroundImage;
+}
+
+/**
+ * An observer that reports nothing until `approach` is called. Cards must not
+ * put a PNG URL on the element at observe-time, or the download starts for
+ * every card on the page.
+ */
+function stubCardApproach(): () => void {
+  const watchers = new Set<{
+    report: IntersectionObserverCallback;
+    targets: Set<Element>;
+    self: IntersectionObserver;
+  }>();
+
+  class ApproachObserver implements IntersectionObserver {
+    readonly root = null;
+    readonly rootMargin = "0px";
+    readonly scrollMargin = "0px";
+    readonly thresholds: readonly number[] = [0];
+    private readonly targets = new Set<Element>();
+
+    constructor(callback: IntersectionObserverCallback) {
+      watchers.add({ report: callback, targets: this.targets, self: this });
+    }
+
+    observe(target: Element) {
+      this.targets.add(target);
+    }
+    unobserve(target: Element) {
+      this.targets.delete(target);
+    }
+    disconnect() {
+      this.targets.clear();
+    }
+    takeRecords(): IntersectionObserverEntry[] {
+      return [];
+    }
+  }
+
+  function entry(target: Element): IntersectionObserverEntry {
+    const rect = new DOMRectReadOnly(0, 0, 100, 100);
+    return {
+      boundingClientRect: rect,
+      intersectionRatio: 1,
+      intersectionRect: rect,
+      isIntersecting: true,
+      rootBounds: rect,
+      target,
+      time: 0,
+    };
+  }
+
+  vi.stubGlobal("IntersectionObserver", ApproachObserver);
+
+  return () => {
+    for (const watcher of watchers) {
+      for (const target of watcher.targets) watcher.report([entry(target)], watcher.self);
+    }
+  };
+}

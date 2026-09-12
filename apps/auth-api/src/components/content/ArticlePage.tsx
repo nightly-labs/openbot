@@ -62,11 +62,9 @@ export function ArticlePage(props: ArticlePageProps) {
             <Show when={props.article.slug} keyed>
               {(slug) => (
                 <ArticleGradient
-                  collection={props.collection}
-                  slug={slug}
                   title={props.article.title}
+                  art={{ collection: props.collection, slug, shape: "article" }}
                   mode="live"
-                  shape="article"
                 />
               )}
             </Show>

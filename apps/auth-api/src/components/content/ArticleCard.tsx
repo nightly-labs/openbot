@@ -26,11 +26,9 @@ export function ArticleCard(props: ArticleCardProps) {
     >
       <div class="post-card-art">
         <ArticleGradient
-          collection={props.collection}
-          slug={props.article.slug}
           title={props.article.title}
+          art={{ collection: props.collection, slug: props.article.slug, shape: "card" }}
           mode="hover"
-          shape="card"
           hoverTarget={() => root}
         />
         <span class="post-card-art-title" aria-hidden="true">
