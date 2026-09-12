@@ -70,6 +70,7 @@ export function OpenBot101() {
         alt="An agent thread. Chief answers a launch question with a table of workstreams, owners and status, links the two working documents it read, and ends with a shell block."
         width={2400}
         height={1064}
+        mountOn="OpenBot 101"
         caption="A thread is the answer and the work behind it: mentions of other agents, the files that were read, and the command it wants run next."
       />
 
@@ -102,6 +103,7 @@ export function OpenBot101() {
         alt="The model picker open on the ChatGPT tab, showing the installed Codex CLI version, a list of GPT models, and a reasoning effort control."
         width={1440}
         height={1484}
+        mountOn="OpenBot 101"
         caption="The picker names the command-line tool and its version, so you can see which binary an answer came from."
       />
 
@@ -148,6 +150,7 @@ export function OpenBot101() {
         alt="A channel called Launch room. Chief assigns the release note to Launch, Research reports which performance claims it could verify, and Launch posts the finished draft as a linked file."
         width={2400}
         height={1090}
+        mountOn="OpenBot 101"
         caption="One room, one task owner. The handover is a message, so you can read who took the work and why."
       />
 
@@ -165,6 +168,7 @@ export function OpenBot101() {
         alt="A routine in a thread. Two invoked routine markers sit above their instructions, and a side panel shows the schedule, on weekdays at 9:00 AM, with a successful run yesterday."
         width={1696}
         height={664}
+        mountOn="OpenBot 101"
         caption="The thread marks which turns a routine started, so a scheduled answer never reads as one you asked for."
       />
 

@@ -193,6 +193,7 @@ export function WriteAGuideForOpenBot() {
         alt="The provider tabs in the model picker, changing between Claude, ChatGPT, Grok and OpenCode, each with its command-line tool version."
         width={1440}
         height={912}
+        mountOn="Write a guide for OpenBot"
         caption="Four providers behind one agent. The version under each name is the command-line tool OpenBot will start."
       />
 
@@ -207,6 +208,7 @@ export function WriteAGuideForOpenBot() {
         label="A thread scrolling through an agent's answer, from the opening summary down to the table of workstreams and the shell command under it."
         width={1696}
         height={940}
+        mountOn="Write a guide for OpenBot"
         caption="Movement is worth the bytes when the point is the movement — here, how much of a turn sits below the answer."
       />
 
@@ -223,6 +225,7 @@ export function WriteAGuideForOpenBot() {
         label="A three-part tour of OpenBot: an agent thread, a shared channel, and a routine with its schedule."
         width={2400}
         height={860}
+        mountOn="Write a guide for OpenBot"
         caption="Three scenes, three seconds each. Turn the captions on to see what a hand-written WebVTT file looks like in use."
       />
 
