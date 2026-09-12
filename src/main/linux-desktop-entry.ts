@@ -11,6 +11,7 @@ const logger = createOpenBotLogger("linux-desktop-entry");
  * into `StartupWMClass` so a window groups with this entry.
  */
 const DESKTOP_FILE_NAME = "openbot.desktop";
+const ICON_FILE_NAME = "openbot.png";
 const WM_CLASS = "openbot";
 
 /**
@@ -53,9 +54,10 @@ export async function installLinuxDesktopEntry(options: {
   const appImagePath = options.environment.APPIMAGE?.trim();
   if (!appImagePath) return null;
   const dataHome = options.environment.XDG_DATA_HOME?.trim();
-  const directory = join(dataHome || join(options.homeDirectory ?? homedir(), ".local", "share"), "applications");
+  const dataDirectory = dataHome || join(options.homeDirectory ?? homedir(), ".local", "share");
+  const directory = join(dataDirectory, "applications");
   const path = join(directory, DESKTOP_FILE_NAME);
-  const entry = linuxDesktopEntry(appImagePath, options.iconPath);
+  const entry = linuxDesktopEntry(appImagePath, await installIcon(dataDirectory, options.iconPath));
   try {
     if ((await readEntry(path)) === entry) return path;
     await mkdir(directory, { recursive: true });
@@ -65,6 +67,40 @@ export async function installLinuxDesktopEntry(options: {
   } catch (error) {
     logger.warn("Unable to install the desktop entry, so openbot:// links stay unregistered.", toLogValue(error));
     return null;
+  }
+}
+
+/**
+ * Copies the launcher icon to a path that outlives the process, and reports the path the entry has
+ * to name. Reports the packaged path instead when the copy fails, because an entry with an icon
+ * that can disappear is still better than no invitation links at all.
+ *
+ * An AppImage mounts its resources in a temporary directory that the runtime removes when the app
+ * exits, so an entry that points there loses its icon as soon as OpenBot is not running. The entry
+ * names the copy by absolute path, which the desktop entry specification allows, rather than by
+ * icon theme name: one loose file under the data home is not a theme.
+ */
+async function installIcon(dataDirectory: string, iconPath: string): Promise<string> {
+  const directory = join(dataDirectory, "icons");
+  const path = join(directory, ICON_FILE_NAME);
+  try {
+    const icon = await readFile(iconPath);
+    if (icon.equals(await readIcon(path))) return path;
+    await mkdir(directory, { recursive: true });
+    await writeFile(path, icon, { mode: 0o644 });
+    logger.info(`Installed the launcher icon at ${path}.`);
+    return path;
+  } catch (error) {
+    logger.warn("Unable to install the launcher icon, so the entry names the packaged one.", toLogValue(error));
+    return iconPath;
+  }
+}
+
+async function readIcon(path: string): Promise<Buffer> {
+  try {
+    return await readFile(path);
+  } catch {
+    return Buffer.alloc(0);
   }
 }
 

@@ -66,8 +66,9 @@ The same file ships inside the AppImage at `resources/linux/openbot.apparmor`. E
 path in the profile if you keep the AppImage outside the usual locations. Do not start OpenBot with
 `--no-sandbox`: that removes the boundary between a renderer and the rest of the computer.
 
-On the first start from an AppImage, OpenBot writes `~/.local/share/applications/openbot.desktop`,
-which is what lets an `openbot://` invitation link open the app. Delete that file to undo it.
+On the first start from an AppImage, OpenBot writes `~/.local/share/applications/openbot.desktop`
+and `~/.local/share/icons/openbot.png`, which is what lets an `openbot://` invitation link open the
+app and gives the launcher an icon that stays after the app exits. Delete the two files to undo it.
 
 Voice prompts and remote desktop are not available on Linux.
 
