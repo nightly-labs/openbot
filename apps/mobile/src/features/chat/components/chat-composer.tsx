@@ -88,6 +88,7 @@ export function ChatComposer({
     : [];
   const hasDraft = Boolean(draft.trim()) || attachments.items.length > 0;
   const inputRef = useRef<TextInput>(null);
+  const attachmentButton = useRef<View>(null);
   const isFocused = useIsFocused();
   const focusedReplyVersion = useRef(0);
   useEffect(() => {
@@ -274,7 +275,11 @@ export function ChatComposer({
           paddingBottom: Math.max(bottomInset, 10),
         }}
       >
-        <View pointerEvents={disabled || sending || attachments.preparing || answerQuestion ? "none" : "auto"}>
+        <View
+          ref={attachmentButton}
+          collapsable={false}
+          pointerEvents={disabled || sending || attachments.preparing || answerQuestion ? "none" : "auto"}
+        >
           <MenuView
             style={{ width: 48, height: 48 }}
             actions={[
@@ -291,7 +296,15 @@ export function ChatComposer({
               if (disabled || sending || attachments.preparing || answerQuestion) return;
               if (nativeEvent.event === "files") void attachments.chooseFiles();
               if (nativeEvent.event === "photos") void attachments.choosePhotos();
-              if (nativeEvent.event === "camera") void attachments.takePhoto();
+              if (nativeEvent.event === "camera") {
+                if (!attachmentButton.current) {
+                  void attachments.takePhoto();
+                  return;
+                }
+                attachmentButton.current.measureInWindow((x, y, width, height) => {
+                  void attachments.takePhoto(width > 0 && height > 0 ? { x, y, width, height } : undefined);
+                });
+              }
             }}
           >
             <GlassView

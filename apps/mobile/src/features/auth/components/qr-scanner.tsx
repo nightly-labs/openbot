@@ -14,7 +14,11 @@ import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } 
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
-type ScanState = { status: "idle" } | { status: "connecting" } | { status: "error"; message: string };
+type ScanState =
+  | { status: "idle" }
+  | { status: "connecting" }
+  | { status: "error"; source: "camera" | "connection"; message: string };
+const QR_SCANNER_SETTINGS: CameraViewProps["barcodeScannerSettings"] = { barcodeTypes: ["qr"] };
 
 function ScannerStatus({ scanState, onRetry }: { scanState: ScanState; onRetry: () => void }) {
   const [foreground, accent] = useThemeColor(["foreground", "accent"]);
@@ -64,7 +68,11 @@ function ScannerStatus({ scanState, onRetry }: { scanState: ScanState; onRetry: 
 }
 
 // Mount with the session so readiness resets on close, focus loss and background.
-function ScannerCamera({ onBarcodeScanned }: Pick<CameraViewProps, "onBarcodeScanned">) {
+function ScannerCamera({
+  onBarcodeScanned,
+  onCameraReady,
+  onMountError,
+}: Pick<CameraViewProps, "onBarcodeScanned" | "onCameraReady" | "onMountError">) {
   const opacity = useSharedValue(0);
   const previewStyle = useAnimatedStyle(() => ({ opacity: opacity.get() }));
 
@@ -73,10 +81,12 @@ function ScannerCamera({ onBarcodeScanned }: Pick<CameraViewProps, "onBarcodeSca
       <CameraView
         style={StyleSheet.absoluteFill}
         facing="back"
-        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+        barcodeScannerSettings={QR_SCANNER_SETTINGS}
         onBarcodeScanned={onBarcodeScanned}
+        onMountError={onMountError}
         onCameraReady={() => {
-          opacity.set(withTiming(1, { duration: 200, reduceMotion: ReduceMotion.System }));
+          opacity.set(onCameraReady ? 1 : withTiming(1, { duration: 200, reduceMotion: ReduceMotion.System }));
+          onCameraReady?.();
         }}
       />
     </Animated.View>
@@ -88,12 +98,14 @@ export function QrScanner({
   pairing = true,
   embedded = false,
   scanEnabled = true,
+  onPreviewReady,
   renderOverlay,
 }: {
   onScan: (data: string) => Promise<void>;
   pairing?: boolean;
   embedded?: boolean;
   scanEnabled?: boolean;
+  onPreviewReady?: () => void;
   renderOverlay?: (camera: boolean) => ReactNode;
 }) {
   const scanLocked = useRef(false);
@@ -108,6 +120,7 @@ export function QrScanner({
         scope.track("mobile_pairing_action", { action: "cancel", result: "cancelled" });
     };
   }, [pairing]);
+  const [cameraAttempt, setCameraAttempt] = useState(0);
   const focused = useIsFocused();
   const [foreground, setForeground] = useState(AppState.currentState === "active");
   const [permission, requestPermission, getPermission] = useCameraPermissions();
@@ -115,6 +128,10 @@ export function QrScanner({
   const [foregroundColor, accentForeground] = useThemeColor(["foreground", "accent-foreground"]);
   const { width: windowWidth } = useWindowDimensions();
   const scannerFrameSize = Math.min(windowWidth - 80, 280);
+  useEffect(() => {
+    // Permission controls must be visible before the camera can start.
+    if (permission && !permission.granted) onPreviewReady?.();
+  }, [onPreviewReady, permission]);
   useEffect(() => {
     let previousState = AppState.currentState;
     const subscription = AppState.addEventListener("change", (state) => {
@@ -138,6 +155,7 @@ export function QrScanner({
     } catch (error) {
       setScanState({
         status: "error",
+        source: "connection",
         message: errorMessage(error, "OpenBot could not connect this phone."),
       });
     } finally {
@@ -243,7 +261,15 @@ export function QrScanner({
       <View className={embedded ? "flex-1 bg-sheet" : "flex-1 bg-black"}>
         {focused && foreground ? (
           <ScannerCamera
-            onBarcodeScanned={scanEnabled && scanState.status === "idle" ? ({ data }) => void connect(data) : undefined}
+            key={cameraAttempt}
+            onCameraReady={onPreviewReady}
+            onMountError={() => {
+              setScanState({ status: "error", source: "camera", message: "Could not start the camera. Try again." });
+              onPreviewReady?.();
+            }}
+            // Expo enables native scanning from the presence of this callback.
+            // Keep it enabled from startup; connect guards opening and pending scans.
+            onBarcodeScanned={({ data }) => void connect(data)}
           />
         ) : null}
 
@@ -258,6 +284,9 @@ export function QrScanner({
           <ScannerStatus
             scanState={scanState}
             onRetry={() => {
+              if (scanState.status === "error" && scanState.source === "camera") {
+                setCameraAttempt((attempt) => attempt + 1);
+              }
               scanLocked.current = false;
               setScanState({ status: "idle" });
             }}

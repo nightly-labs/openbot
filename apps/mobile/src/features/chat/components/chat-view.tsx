@@ -463,7 +463,11 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
           </KeyboardGestureArea>
         </View>
         {attachments.cameraOpen && isFocused && appActive ? (
-          <ChatCameraPanel onClose={attachments.closeCamera} onPhoto={attachments.addPhoto} />
+          <ChatCameraPanel
+            origin={attachments.cameraOrigin}
+            onClose={attachments.closeCamera}
+            onPhoto={attachments.addPhoto}
+          />
         ) : null}
       </View>
     </GestureDetector>

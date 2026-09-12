@@ -44,6 +44,7 @@ export function ScanQrSheet({
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const closing = useRef(false);
+  const startedOpening = useRef(false);
   const progress = useSharedValue(0);
   const insets = useSafeAreaInsets();
   const brand = String(useCSSVariable("--openbot-logo-production") ?? "#cdadec");
@@ -56,14 +57,16 @@ export function ScanQrSheet({
   const y = viewport.height - insets.bottom - 16 - height;
 
   const finishOpen = useCallback(() => setPhase("open"), []);
-  useEffect(() => {
+  const beginOpening = useCallback(() => {
+    if (closing.current || startedOpening.current) return;
+    startedOpening.current = true;
     progress.set(
       withSpring(1, MORPH, (finished) => {
         if (finished) scheduleOnRN(finishOpen);
       }),
     );
-    return () => cancelAnimation(progress);
   }, [finishOpen, progress]);
+  useEffect(() => () => cancelAnimation(progress), [progress]);
 
   const close = useCallback(() => {
     if (busyRef.current || closing.current) return;
@@ -150,6 +153,7 @@ export function ScanQrSheet({
           >
             <QrScanner
               embedded
+              onPreviewReady={beginOpening}
               scanEnabled={phase === "open"}
               onScan={scan}
               renderOverlay={(camera) => (

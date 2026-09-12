@@ -1,5 +1,5 @@
 import { fireEvent, screen } from "@testing-library/dom";
-import { act, type PropsWithChildren, type Ref, useImperativeHandle } from "react";
+import { act, type PropsWithChildren, type Ref, useImperativeHandle, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { ChatCameraPanel } from "./chat-camera-panel";
@@ -7,12 +7,13 @@ import { ChatCameraPanel } from "./chat-camera-panel";
 const native = vi.hoisted(() => ({
   capture: vi.fn(),
   ready: () => {},
+  finishMotion: () => {},
 }));
 vi.mock("expo-camera", () => ({
   CameraView: ({ ref, onCameraReady }: { ref: Ref<object>; onCameraReady: () => void }) => {
     useImperativeHandle(ref, () => ({ takePictureAsync: native.capture }));
     native.ready = onCameraReady;
-    return null;
+    return <div role="img" aria-label="Camera preview" />;
   },
 }));
 vi.mock("react-native", () => ({
@@ -26,10 +27,22 @@ vi.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 47, bottom: 34 }),
 }));
 vi.mock("react-native-reanimated", () => ({
-  default: { View: ({ children }: PropsWithChildren) => <div>{children}</div> },
-  FadeInUp: { duration: () => ({ reduceMotion: () => ({}) }) },
+  default: {
+    View: ({ children, accessibilityElementsHidden }: PropsWithChildren<{ accessibilityElementsHidden?: boolean }>) => (
+      <div hidden={accessibilityElementsHidden}>{children}</div>
+    ),
+  },
+  useSharedValue: (initial: number) => useRef({ get: () => initial, set: () => {} }).current,
+  useAnimatedStyle: () => ({}),
+  useReducedMotion: () => false,
+  cancelAnimation: () => {},
+  withSpring: (target: number, _config: object, done?: (finished: boolean) => void) => {
+    if (done) native.finishMotion = () => done(true);
+    return target;
+  },
   ReduceMotion: { System: "system" },
 }));
+vi.mock("react-native-worklets", () => ({ scheduleOnRN: (callback: () => void) => callback() }));
 vi.mock("lucide-react-native", () => ({ ChevronLeft: () => null, SwitchCamera: () => null }));
 vi.mock("heroui-native", () => ({
   Button: ({
@@ -62,13 +75,21 @@ function mount() {
   return { onPhoto, onClose, unmount: () => act(() => root.render(null)) };
 }
 
+it("prepares the camera before revealing the panel controls", () => {
+  mount();
+  expect(screen.getByRole("img", { name: "Camera preview", hidden: true })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Close camera" })).toBeNull();
+  act(() => native.ready());
+  expect(screen.getByRole("button", { name: "Close camera" })).toBeTruthy();
+});
+
 it("waits for camera readiness and attaches the captured photo", async () => {
   native.capture.mockResolvedValue({ uri: "file:///captured.jpg" });
   const { onPhoto } = mount();
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Take photo" })));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Take photo", hidden: true })));
   expect(native.capture).not.toHaveBeenCalled();
   act(() => native.ready());
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Take photo" })));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Take photo", hidden: true })));
   expect(onPhoto).toHaveBeenCalledWith("file:///captured.jpg");
 });
 
@@ -76,9 +97,11 @@ it("waits for the switched camera before capture and closes without a photo", as
   const { onClose, onPhoto } = mount();
   act(() => native.ready());
   act(() => fireEvent.click(screen.getByRole("button", { name: "Switch camera" })));
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Take photo" })));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Take photo", hidden: true })));
   expect(native.capture).not.toHaveBeenCalled();
   act(() => fireEvent.click(screen.getByRole("button", { name: "Close camera" })));
+  expect(onClose).not.toHaveBeenCalled();
+  act(() => native.finishMotion());
   expect(onClose).toHaveBeenCalledOnce();
   expect(onPhoto).not.toHaveBeenCalled();
 });
@@ -89,9 +112,9 @@ it("shows a capture error and permits another attempt", async () => {
     .mockResolvedValue({ uri: "file:///retry.jpg" });
   const { onPhoto } = mount();
   act(() => native.ready());
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Take photo" })));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Take photo", hidden: true })));
   expect(screen.getByText("Camera interrupted.")).toBeTruthy();
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Take photo" })));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Take photo", hidden: true })));
   expect(onPhoto).toHaveBeenCalledWith("file:///retry.jpg");
 });
 
@@ -104,7 +127,7 @@ it("does not attach a pending capture after the camera is removed", async () => 
   );
   const { onPhoto, unmount } = mount();
   act(() => native.ready());
-  act(() => fireEvent.click(screen.getByRole("button", { name: "Take photo" })));
+  act(() => fireEvent.click(screen.getByRole("button", { name: "Take photo", hidden: true })));
   unmount();
   await act(async () => finish({ uri: "file:///late.jpg" }));
   expect(onPhoto).not.toHaveBeenCalled();
