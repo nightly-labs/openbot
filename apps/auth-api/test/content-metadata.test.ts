@@ -46,7 +46,6 @@ function firstArticle(collection: ContentCollection): CollectionArticle {
 }
 
 const COLLECTION_CASES = CONTENT_COLLECTIONS.map((collection) => [collection.name, collection] as const);
-const ALL_ARTICLES = CONTENT_COLLECTIONS.flatMap((collection) => collection.articles);
 
 const PREVIEW_SITE_URL = "https://pr-451-openbot-landing-preview.example.workers.dev/";
 
@@ -187,11 +186,13 @@ describe("article artwork files", () => {
   });
 });
 
-describe("article slugs", () => {
-  it("never reuses a slug across the whole site", () => {
-    // The artwork files and the social cards are keyed by slug, so two articles that
-    // share one overwrite each other's artwork whichever section they sit in.
-    const slugs = ALL_ARTICLES.map((article) => article.slug);
+describe.each(COLLECTION_CASES)("%s slugs", (_name, collection) => {
+  it("never reuses a slug inside the collection", () => {
+    // Inside one collection the slug is the route parameter, the key into the body
+    // map and the artwork file name, so a repeat hides one of the two articles
+    // completely. Across collections every one of those three carries the
+    // collection id, so the same slug in /news and in /guides is two real pages.
+    const slugs = collection.articles.map((article) => article.slug);
     expect(new Set(slugs).size).toBe(slugs.length);
   });
 });
