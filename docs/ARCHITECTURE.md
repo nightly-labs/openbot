@@ -500,7 +500,7 @@ The OpenPanel Growth dashboard uses a session funnel from `landing_viewed` to
 Break down the funnel by `acquisition_source`, then `source_platform` once schema version 7
 events reach OpenPanel. Historical events do not contain the new platform property.
 
-For download-click reports, `platform` means the requested macOS or Windows download;
+For download-click reports, `platform` means the requested macOS, Windows, or Linux download;
 `placement` means the button location. These properties exist only on the download step.
 Use them to compare click counts, not as a shared visit-to-click funnel breakdown.
 The invitation-page funnel is separate: `join_page_action` with `action=view` followed by
@@ -508,9 +508,10 @@ The invitation-page funnel is separate: `join_page_action` with `action=view` fo
 
 ### Managed provider updates
 
-The main process offers provider versions pinned in `native-runtime.lock.json`. An older managed
-installation is display metadata until the pinned runtime passes the existing download and install
-checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
+The main process offers provider versions pinned in `native-runtime.lock.json`. Each provider is
+pinned for `darwin-arm64`, `linux-x64`, and `win32-x64`; a platform with no pinned artifact reports
+that it is not supported instead of offering a download. An older managed installation is display
+metadata until the pinned runtime passes the existing download and install checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
 preload decoder. Cancellation and failure preserve the previous installation and its update offer.
 
 Settings starts the shared renderer runtime store. The store announces each provider that gains an

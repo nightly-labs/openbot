@@ -9,12 +9,12 @@ import { sha256 } from "./remote-desktop-runtime-release";
 
 const logger = createOpenBotLogger("install-grok-runtime");
 
-export type GrokRuntimeTarget = "darwin-arm64" | "win32-x64";
+export type GrokRuntimeTarget = "darwin-arm64" | "linux-x64" | "win32-x64";
 
 const installedManifestSchema = z.object({
   layoutVersion: z.literal(1),
   version: z.string(),
-  target: z.enum(["darwin-arm64", "win32-x64"]),
+  target: z.enum(["darwin-arm64", "linux-x64", "win32-x64"]),
   executable: z.string(),
 });
 
@@ -63,7 +63,7 @@ export async function installGrokRuntime(
     const staged = join(temporaryRoot, "runtime");
     await mkdir(join(staged, "bin"), { recursive: true });
     await Promise.all([
-      writeFile(join(staged, "bin", artifact.executable), binary, { mode: target === "darwin-arm64" ? 0o755 : 0o644 }),
+      writeFile(join(staged, "bin", artifact.executable), binary, { mode: target === "win32-x64" ? 0o644 : 0o755 }),
       writeFile(join(staged, "LICENSE"), license),
       writeFile(join(staged, "THIRD-PARTY-NOTICES"), notices),
       writeFile(
@@ -92,12 +92,14 @@ export function grokRuntimeTarget(
   architecture: string = process.arch,
 ): GrokRuntimeTarget {
   const target = `${platform}-${architecture}`;
-  if (target === "darwin-arm64" || target === "win32-x64") return target;
+  if (target === "darwin-arm64" || target === "linux-x64" || target === "win32-x64") return target;
   throw new Error(`Unsupported bundled Grok target: ${target}`);
 }
 
 export function grokRuntimePath(root: string, target: GrokRuntimeTarget): string {
-  return target === "darwin-arm64" ? join(root, "mac", "arm64") : join(root, "win", "x64");
+  if (target === "darwin-arm64") return join(root, "mac", "arm64");
+  if (target === "linux-x64") return join(root, "linux", "x64");
+  return join(root, "win", "x64");
 }
 
 export async function verifyGrokRuntime(
@@ -124,7 +126,7 @@ export async function verifyGrokRuntime(
   if (sha256(await readFile(join(root, "THIRD-PARTY-NOTICES"))) !== lock.grok.noticesSha256) {
     throw new Error("The bundled Grok third-party notices checksum is invalid.");
   }
-  if (target === "darwin-arm64") await chmod(executable, 0o755);
+  if (target !== "win32-x64") await chmod(executable, 0o755);
   const output = execFileSync(executable, ["--version"], { encoding: "utf8", windowsHide: true }).trim();
   if (!new RegExp(`(?:^|\\s)${escapeRegExp(lock.grok.version)}(?:\\s|$)`, "u").test(output)) {
     throw new Error(`Unexpected bundled Grok version: ${output}`);

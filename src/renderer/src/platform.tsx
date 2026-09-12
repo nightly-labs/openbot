@@ -59,13 +59,13 @@ const Platform = createSimpleContext({
       appInfo,
       appFocused,
       /**
-       * Whether the window draws the vertical server rail. Only the two
-       * platforms whose own chrome leaves room for it do. Three components need
-       * the answer once the view is split along context boundaries - the frame
-       * class, the rail itself and the account dock - so it is derived here
-       * rather than spelled out as a two-branch comparison in each of them.
+       * Whether the window draws the vertical server rail. Every desktop
+       * platform does; the memo exists because three components need the answer
+       * once the view is split along context boundaries - the frame class, the
+       * rail itself and the account dock - and because `appInfo` is null until
+       * main answers, which is the state that actually has to be handled.
        */
-      serverRailVisible: createMemo(() => appInfo()?.platform === "darwin" || appInfo()?.platform === "win32"),
+      serverRailVisible: createMemo(() => appInfo() !== null),
       appInfoLoadedFromHost: () => infoFromHost,
       landingPreview: props.landingPreview === true,
       peopleEnabled: props.peopleEnabled === true,

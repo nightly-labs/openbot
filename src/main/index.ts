@@ -480,7 +480,12 @@ if (!hasSingleInstanceLock) {
         (policy) => app.setActivationPolicy(policy),
         () => app.dock?.show() ?? Promise.resolve(),
       );
-      if (process.platform === "darwin") app.setAsDefaultProtocolClient("openbot");
+      // Linux registers the scheme through xdg-settings, which matters when the AppImage runs
+      // without a package manager having installed its desktop entry. Windows gets the scheme from
+      // the NSIS installer instead.
+      if (process.platform === "darwin" || process.platform === "linux") {
+        app.setAsDefaultProtocolClient("openbot");
+      }
       if (process.platform === "darwin") app.dock?.setIcon(appIconPath);
       configureContentSecurityPolicy();
       configureRendererPermissions();

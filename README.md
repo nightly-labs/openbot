@@ -36,7 +36,8 @@ visited pages use the network, and installed plugins may connect to their own se
 
 ## Install
 
-OpenBot supports macOS 13 or newer on Apple Silicon and Windows 10 or newer on x64 systems.
+OpenBot supports macOS 13 or newer on Apple Silicon, Windows 10 or newer on x64 systems, and x64
+Linux as an AppImage.
 
 ### macOS
 
@@ -47,6 +48,25 @@ OpenBot supports macOS 13 or newer on Apple Silicon and Windows 10 or newer on x
 
 1. Download the latest `OpenBot-*-x64.exe` from [GitHub Releases](https://github.com/NorbertBodziony/openbot/releases).
 2. Run the installer and open OpenBot.
+
+### Linux
+
+1. Download the latest `OpenBot-*-x86_64.AppImage` from [GitHub Releases](https://github.com/NorbertBodziony/openbot/releases).
+2. Make it executable with `chmod +x OpenBot-*-x86_64.AppImage`, then run it.
+
+On Ubuntu 23.10 or newer and on Debian 13, unprivileged user namespaces are restricted by AppArmor
+and OpenBot exits during launch until you install an AppArmor profile:
+
+```bash
+sudo install -m 0644 build/linux/openbot.apparmor /etc/apparmor.d/openbot
+sudo systemctl reload apparmor
+```
+
+The same file ships inside the AppImage at `resources/linux/openbot.apparmor`. Edit the attachment
+path in the profile if you keep the AppImage outside the usual locations. Do not start OpenBot with
+`--no-sandbox`: that removes the boundary between a renderer and the rest of the computer.
+
+Voice prompts and remote desktop are not available on Linux.
 
 > [!IMPORTANT]
 > The Windows preview is not code-signed. Windows can show an `Unknown publisher` or SmartScreen
@@ -195,9 +215,12 @@ Seed the approved OpenBot team catalog locally with `bun run marketplace:seed:lo
 | `bun run package:verify` | Build and verify the real ARM64 app bundle, icon, metadata, ASAR, and fuses. |
 | `bun run package:win` | Build an unpacked local Windows x64 application on Windows. |
 | `bun run package:win:verify` | Build and verify the Windows x64 application on Windows. |
+| `bun run package:linux` | Build an unpacked local Linux x64 application on Linux. |
+| `bun run package:linux:verify` | Build and verify the Linux x64 application on Linux. Run it under `xvfb-run -a` without a display. |
 | `bun run release:preflight` | Verify version, Git state, and GitHub release secrets before tagging. |
 | `bun run dist:mac` | Build unsigned local ARM64 DMG and ZIP update artifacts. |
 | `bun run dist:win` | Build an unsigned Windows x64 NSIS installer on Windows. |
+| `bun run dist:linux` | Build an unsigned Linux x64 AppImage on Linux. |
 | `bun run release:patch` | Create the next patch version commit and tag. |
 | `bun run test:filesystem` | **Online/manual:** run real full-access Codex and Claude filesystem turns across private and shared workspaces. |
 | `bun run test:imagegen` | **Online/manual:** run a real full-access image-generation turn. |
@@ -335,7 +358,8 @@ described above.
 
 Releases are tag-driven. `bun run release:patch`, `release:minor`, or `release:major` prepares the
 version and changelog. After review, commit, preflight, and tag the release; pushing the tag builds a
-signed and notarized macOS ARM64 release and an unsigned Windows x64 release in GitHub Actions.
+signed and notarized macOS ARM64 release, an unsigned Windows x64 release, and an unsigned Linux x64
+AppImage in GitHub Actions.
 Installed builds check GitHub Releases for updates and expose download/restart controls in the account
 popover. Release signing secrets and the complete procedure are documented in
 [docs/RELEASING.md](docs/RELEASING.md).

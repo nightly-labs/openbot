@@ -29,6 +29,34 @@ absolute Codex executable path.
 
 For a non-standard Claude location, set `OPENBOT_CLAUDE_PATH` to the absolute Claude executable path.
 
+## The Linux AppImage exits immediately
+
+On Ubuntu 23.10 or newer and on Debian 13, unprivileged user namespaces are restricted by AppArmor.
+The Electron sandbox is built on one, so OpenBot exits during launch and writes a message about the
+SUID sandbox or a user namespace to the terminal.
+
+Install the AppArmor profile that ships with OpenBot, then reload AppArmor:
+
+```bash
+sudo install -m 0644 build/linux/openbot.apparmor /etc/apparmor.d/openbot
+sudo systemctl reload apparmor
+```
+
+The same file is inside the AppImage at `resources/linux/openbot.apparmor`. The profile attaches to
+the usual places to keep an AppImage; if yours is somewhere else, edit the path in the profile before
+you install it.
+
+Do not start OpenBot with `--no-sandbox`. It is not a supported workaround. The sandbox is the
+boundary between a web renderer and the rest of your computer, and OpenBot gives its agents full
+local access on the other side of it.
+
+## Voice prompts or remote desktop are missing on Linux
+
+Neither is available in the Linux build. The Whisper transcription binary and the Sunshine remote
+desktop runtime are built for macOS and Windows only, so the microphone control is not drawn and
+remote desktop reports itself as unavailable. Everything else works as it does on the other
+platforms.
+
 ## Computer Use is unavailable
 
 Computer Use requires a compatible local Codex plugin plus macOS Screen Recording and Accessibility
@@ -99,13 +127,15 @@ remove `~/.codex` or `~/.claude` unless you intentionally want to manage CLI log
 
 ## Uninstall
 
-Quit OpenBot and remove `OpenBot.app` from Applications. If you also want to remove local OpenBot
+Quit OpenBot. On macOS remove `OpenBot.app` from Applications; on Windows use the installer's
+uninstaller; on Linux delete the AppImage, and `/etc/apparmor.d/openbot` if you installed the
+profile. If you also want to remove local OpenBot
 data, follow the reset steps above. Agent CLIs and their data are independent and are not removed
 with OpenBot.
 
 ## Report a problem
 
 Use [GitHub Issues](https://github.com/NorbertBodziony/openbot/issues) for reproducible bugs. Include
-the OpenBot version, macOS version, Apple Silicon model, provider and CLI version, and minimal
-reproduction steps. Never publish tokens, `~/.codex`, `~/.claude`, conversations, private files,
+the OpenBot version, the operating system and its version, the hardware, the provider and CLI
+version, and minimal reproduction steps. Never publish tokens, `~/.codex`, `~/.claude`, conversations, private files,
 Electron user data, or full unreviewed diagnostics.

@@ -15,6 +15,7 @@ import { Route as JoinRouteImport } from './routes/join'
 import { Route as ReportSiteRouteImport } from './routes/report-site'
 import { Route as DotwellKnownAppleAppSiteAssociationRouteImport } from './routes/[.]well-known/apple-app-site-association'
 import { Route as DotwellKnownJwksDotjsonRouteImport } from './routes/[.]well-known/jwks[.]json'
+import { Route as DownloadLinuxRouteImport } from './routes/download/linux'
 import { Route as DownloadMacosRouteImport } from './routes/download/macos'
 import { Route as DownloadWindowsRouteImport } from './routes/download/windows'
 import { Route as HealthLiveRouteImport } from './routes/health/live'
@@ -105,6 +106,11 @@ const DotwellKnownAppleAppSiteAssociationRoute =
 const DotwellKnownJwksDotjsonRoute = DotwellKnownJwksDotjsonRouteImport.update({
   id: '/.well-known/jwks.json',
   path: '/.well-known/jwks.json',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DownloadLinuxRoute = DownloadLinuxRouteImport.update({
+  id: '/download/linux',
+  path: '/download/linux',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DownloadMacosRoute = DownloadMacosRouteImport.update({
@@ -436,6 +442,7 @@ export interface FileRoutesByFullPath {
   '/report-site': typeof ReportSiteRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
+  '/download/linux': typeof DownloadLinuxRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
   '/health/live': typeof HealthLiveRoute
@@ -504,6 +511,7 @@ export interface FileRoutesByTo {
   '/report-site': typeof ReportSiteRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
+  '/download/linux': typeof DownloadLinuxRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
   '/health/live': typeof HealthLiveRoute
@@ -573,6 +581,7 @@ export interface FileRoutesById {
   '/report-site': typeof ReportSiteRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
+  '/download/linux': typeof DownloadLinuxRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
   '/health/live': typeof HealthLiveRoute
@@ -643,6 +652,7 @@ export interface FileRouteTypes {
     | '/report-site'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
+    | '/download/linux'
     | '/download/macos'
     | '/download/windows'
     | '/health/live'
@@ -711,6 +721,7 @@ export interface FileRouteTypes {
     | '/report-site'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
+    | '/download/linux'
     | '/download/macos'
     | '/download/windows'
     | '/health/live'
@@ -779,6 +790,7 @@ export interface FileRouteTypes {
     | '/report-site'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
+    | '/download/linux'
     | '/download/macos'
     | '/download/windows'
     | '/health/live'
@@ -848,6 +860,7 @@ export interface RootRouteChildren {
   ReportSiteRoute: typeof ReportSiteRoute
   DotwellKnownAppleAppSiteAssociationRoute: typeof DotwellKnownAppleAppSiteAssociationRoute
   DotwellKnownJwksDotjsonRoute: typeof DotwellKnownJwksDotjsonRoute
+  DownloadLinuxRoute: typeof DownloadLinuxRoute
   DownloadMacosRoute: typeof DownloadMacosRoute
   DownloadWindowsRoute: typeof DownloadWindowsRoute
   HealthLiveRoute: typeof HealthLiveRoute
@@ -940,6 +953,13 @@ declare module '@tanstack/solid-router' {
       path: '/.well-known/jwks.json'
       fullPath: '/.well-known/jwks.json'
       preLoaderRoute: typeof DotwellKnownJwksDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/download/linux': {
+      id: '/download/linux'
+      path: '/download/linux'
+      fullPath: '/download/linux'
+      preLoaderRoute: typeof DownloadLinuxRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/download/macos': {
@@ -1478,6 +1498,7 @@ const rootRouteChildren: RootRouteChildren = {
   DotwellKnownAppleAppSiteAssociationRoute:
     DotwellKnownAppleAppSiteAssociationRoute,
   DotwellKnownJwksDotjsonRoute: DotwellKnownJwksDotjsonRoute,
+  DownloadLinuxRoute: DownloadLinuxRoute,
   DownloadMacosRoute: DownloadMacosRoute,
   DownloadWindowsRoute: DownloadWindowsRoute,
   HealthLiveRoute: HealthLiveRoute,
@@ -1533,12 +1554,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/solid-start'
-declare module '@tanstack/solid-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

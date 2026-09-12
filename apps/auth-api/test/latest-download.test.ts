@@ -6,6 +6,8 @@ describe("latest download", () => {
   it.each([
     ["macos", "latest-mac.yml", "OpenBot-0.1.11-arm64.dmg"],
     ["windows", "latest.yml", "OpenBot-0.1.11-x64.exe"],
+    // The AppImage extension is mixed case in the published manifest, and the match is lowercase.
+    ["linux", "latest-linux.yml", "OpenBot-0.1.11-x64.AppImage"],
   ] as const)("redirects %s to its installer from the latest manifest", async (platform, manifest, installer) => {
     const fetcher = vi
       .fn<typeof fetch>()
