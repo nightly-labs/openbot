@@ -65,6 +65,13 @@
   background: var(--openbot-accent);
 }
 
+/* The width of the Settings modal content column, so a settings row is reviewed at its real size. */
+.settings-story-panel {
+  width: min(560px, 100%);
+  display: grid;
+  gap: var(--openbot-space-6);
+}
+
 .foundation-form {
   width: min(420px, 100%);
   display: grid;

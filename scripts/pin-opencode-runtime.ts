@@ -6,16 +6,17 @@ import { z } from "zod";
 import { type AgentRuntimeLock, loadAgentRuntimeLock } from "./agent-runtime-lock";
 import { sha256, sha256File } from "./remote-desktop-runtime-release";
 
-export type OpencodeRuntimeTarget = "darwin-arm64" | "win32-x64";
+export type OpencodeRuntimeTarget = "darwin-arm64" | "linux-x64" | "win32-x64";
 
 /** The npm platform package and the executable inside it, per target OpenBot supports. */
 const TARGETS = {
   "darwin-arm64": { package: "opencode-darwin-arm64", executable: "opencode", platformDirectory: "mac" },
+  "linux-x64": { package: "opencode-linux-x64", executable: "opencode", platformDirectory: "linux" },
   "win32-x64": { package: "opencode-windows-x64", executable: "opencode.exe", platformDirectory: "win" },
 } as const satisfies Record<OpencodeRuntimeTarget, { package: string; executable: string; platformDirectory: string }>;
 
 /** The same keys as `TARGETS`, in the order the lock file lists them. */
-const TARGET_IDS: readonly OpencodeRuntimeTarget[] = ["darwin-arm64", "win32-x64"];
+const TARGET_IDS: readonly OpencodeRuntimeTarget[] = ["darwin-arm64", "linux-x64", "win32-x64"];
 
 const REGISTRY = "https://registry.npmjs.org";
 const REPOSITORY = "https://github.com/anomalyco/opencode";
@@ -80,9 +81,10 @@ export async function pinOpencodeRuntime(
   const pinTarget = (target: OpencodeRuntimeTarget) =>
     pinArtifact(fetchImpl, target, version, umbrella.optionalDependencies, input.runBinary);
   // One target at a time, in the lock file's order: two 50 MB downloads at once only make the
-  // registry slower, and a literal is what proves both keys are present without an assertion.
+  // registry slower, and a literal is what proves every key is present without an assertion.
   const artifacts: Record<OpencodeRuntimeTarget, OpencodeArtifactPin> = {
     "darwin-arm64": await pinTarget("darwin-arm64"),
+    "linux-x64": await pinTarget("linux-x64"),
     "win32-x64": await pinTarget("win32-x64"),
   };
 

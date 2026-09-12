@@ -38,6 +38,12 @@ export const IPC_ENDPOINTS = {
     saveSetup: request(IPC_CHANNELS.saveSetup),
     getAnalyticsPreference: request(IPC_CHANNELS.getAnalyticsPreference),
     setAnalyticsPreference: request(IPC_CHANNELS.setAnalyticsPreference),
+    getAppLanguagePreference: request(IPC_CHANNELS.getAppLanguagePreference),
+    setAppLanguagePreference: request(IPC_CHANNELS.setAppLanguagePreference),
+    // Every window draws its own text, so the choice is broadcast rather than returned: the
+    // Dynamic Island overlay has no Settings of its own and would otherwise stay in the old
+    // language until it was next recreated.
+    appLanguagePreference: event(IPC_CHANNELS.appLanguagePreference),
     openExternal: request(IPC_CHANNELS.openExternal),
     openUrl: request(IPC_CHANNELS.openUrl),
   },

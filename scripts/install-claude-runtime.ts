@@ -9,7 +9,7 @@ import { rejectNonRegularFiles, sha256 } from "./remote-desktop-runtime-release"
 
 const logger = createOpenBotLogger("install-claude-runtime");
 
-export type ClaudeRuntimeTarget = "darwin-arm64" | "win32-x64";
+export type ClaudeRuntimeTarget = "darwin-arm64" | "linux-x64" | "win32-x64";
 
 const packageManifestSchema = z.object({
   name: z.string(),
@@ -20,7 +20,7 @@ const installedManifestSchema = z.object({
   layoutVersion: z.literal(1),
   version: z.string(),
   sdkVersion: z.string(),
-  target: z.enum(["darwin-arm64", "win32-x64"]),
+  target: z.enum(["darwin-arm64", "linux-x64", "win32-x64"]),
   executable: z.string(),
 });
 
@@ -86,12 +86,14 @@ export function claudeRuntimeTarget(
   architecture: string = process.arch,
 ): ClaudeRuntimeTarget {
   const target = `${platform}-${architecture}`;
-  if (target === "darwin-arm64" || target === "win32-x64") return target;
+  if (target === "darwin-arm64" || target === "linux-x64" || target === "win32-x64") return target;
   throw new Error(`Unsupported bundled Claude target: ${target}`);
 }
 
 export function claudeRuntimePath(root: string, target: ClaudeRuntimeTarget): string {
-  return target === "darwin-arm64" ? join(root, "mac", "arm64") : join(root, "win", "x64");
+  if (target === "darwin-arm64") return join(root, "mac", "arm64");
+  if (target === "linux-x64") return join(root, "linux", "x64");
+  return join(root, "win", "x64");
 }
 
 export async function verifyClaudeRuntime(
@@ -170,7 +172,7 @@ async function stageClaudeRuntime(
       )}\n`,
     ),
   ]);
-  if (target === "darwin-arm64") await chmod(join(destination, "bin", artifact.executable), 0o755);
+  if (target !== "win32-x64") await chmod(join(destination, "bin", artifact.executable), 0o755);
 }
 
 function validateArchivePath(name: string): void {

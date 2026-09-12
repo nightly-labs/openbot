@@ -1,6 +1,7 @@
 {
   "name": "openbot",
   "productName": "OpenBot",
+  "desktopName": "openbot.desktop",
   "version": "0.8.0",
   "description": "A local-first multi-agent desktop workspace for Codex, Claude, and Grok.",
   "author": {
@@ -182,10 +183,14 @@
     "package:verify": "bun run package && bun run verify:package",
     "package:win": "bun run voice:prepare-runtime && bun scripts/prepare-remote-desktop-runtime.ts win32 x64 && bun run verify:remote-desktop-runtime --windows && bun run build && electron-builder --dir --win --x64 --publish never",
     "verify:package:win": "bun scripts/verify-windows-package.ts",
+    "package:linux": "bun run build && electron-builder --dir --linux --x64 --publish never",
+    "verify:package:linux": "bun scripts/verify-linux-package.ts",
+    "package:linux:verify": "bun run package:linux && bun run verify:package:linux",
     "verify:update-artifacts": "bun scripts/verify-update-artifacts.ts",
     "package:win:verify": "bun run package:win && bun run verify:package:win",
     "dist:mac": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run build && electron-builder --mac --arm64 --config.mac.identity=null --config.mac.notarize=false",
     "dist:win": "bun run voice:prepare-runtime && bun scripts/prepare-remote-desktop-runtime.ts win32 x64 && bun run verify:remote-desktop-runtime --windows && bun run build && electron-builder --win nsis --x64 --publish never",
+    "dist:linux": "bun run build && electron-builder --linux AppImage --x64 --publish never",
     "dist:release": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run build && electron-builder --mac --arm64 --publish never"
   },
   "dependencies": {
@@ -198,6 +203,7 @@
     "@norbert_bodziony/bloub": "catalog:",
     "@openbot/brand": "workspace:*",
     "@openbot/contracts": "workspace:*",
+    "@openbot/i18n": "workspace:*",
     "@openbot/logging": "workspace:*",
     "@openbot/team-client": "workspace:*",
     "@openbot/user-errors": "workspace:*",

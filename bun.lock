@@ -14,6 +14,7 @@
         "@norbert_bodziony/bloub": "catalog:",
         "@openbot/brand": "workspace:*",
         "@openbot/contracts": "workspace:*",
+        "@openbot/i18n": "workspace:*",
         "@openbot/logging": "workspace:*",
         "@openbot/team-client": "workspace:*",
         "@openbot/user-errors": "workspace:*",
@@ -213,6 +214,18 @@
         "emoji-regex": "10.6.0",
       },
       "devDependencies": {
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/i18n": {
+      "name": "@openbot/i18n",
+      "version": "0.0.0",
+      "dependencies": {
+        "@openbot/contracts": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -827,6 +840,8 @@
     "@openbot/brand": ["@openbot/brand@workspace:packages/brand"],
 
     "@openbot/contracts": ["@openbot/contracts@workspace:packages/contracts"],
+
+    "@openbot/i18n": ["@openbot/i18n@workspace:packages/i18n"],
 
     "@openbot/logging": ["@openbot/logging@workspace:packages/logging"],
 

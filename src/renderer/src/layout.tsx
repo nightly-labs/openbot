@@ -17,18 +17,21 @@ import { createSimpleContext } from "./simple-context";
 
 /**
  * Whether the conversation still has room beside a sidebar of this width. The
- * server rail only exists on macOS and Windows, and narrows on a small Windows
- * window, so the platform is part of the arithmetic rather than a style detail.
+ * server rail is part of the arithmetic rather than a style detail, and its
+ * width depends on the platform: macOS reserves space for the traffic lights,
+ * while the two platforms that draw a standard OS frame narrow the rail on a
+ * small window. A width of `0` means the rail is not drawn yet, which is only
+ * true before main reports the platform.
  */
 function shouldAutoCompactSidebar(platform: AppInfo["platform"] | undefined, panelWidth: number): boolean {
   const serverRailWidth =
-    platform === "darwin"
-      ? MAC_SERVER_RAIL_WIDTH
-      : platform === "win32"
-        ? window.innerWidth <= 800
+    platform === undefined
+      ? 0
+      : platform === "darwin"
+        ? MAC_SERVER_RAIL_WIDTH
+        : window.innerWidth <= 800
           ? NARROW_SERVER_RAIL_WIDTH
-          : SERVER_RAIL_WIDTH
-        : 0;
+          : SERVER_RAIL_WIDTH;
   return window.innerWidth - serverRailWidth - panelWidth < CONVERSATION_MIN_WIDTH;
 }
 

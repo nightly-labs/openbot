@@ -11,32 +11,32 @@ const codexArtifactSchema = z.object({
   executable: z.string().regex(/^bin\/codex(?:\.exe)?$/u),
 });
 const claudeArtifactSchema = z.object({
-  package: z.string().regex(/^@anthropic-ai\/claude-agent-sdk-(?:darwin-arm64|win32-x64)$/u),
-  asset: z.string().regex(/^claude-agent-sdk-(?:darwin-arm64|win32-x64)-\d+\.\d+\.\d+\.tgz$/u),
+  package: z.string().regex(/^@anthropic-ai\/claude-agent-sdk-(?:darwin-arm64|linux-x64|win32-x64)$/u),
+  asset: z.string().regex(/^claude-agent-sdk-(?:darwin-arm64|linux-x64|win32-x64)-\d+\.\d+\.\d+\.tgz$/u),
   assetSha256: sha256Schema,
   binarySha256: sha256Schema,
   downloadBytes: z.number().int().positive(),
   installedBytes: z.number().int().positive(),
   executable: z.enum(["claude", "claude.exe"]),
-  platformDirectory: z.enum(["mac", "win"]),
+  platformDirectory: z.enum(["linux", "mac", "win"]),
 });
 const opencodeArtifactSchema = z.object({
-  package: z.string().regex(/^opencode-(?:darwin-arm64|windows-x64)$/u),
-  asset: z.string().regex(/^opencode-(?:darwin-arm64|windows-x64)-\d+\.\d+\.\d+\.tgz$/u),
+  package: z.string().regex(/^opencode-(?:darwin-arm64|linux-x64|windows-x64)$/u),
+  asset: z.string().regex(/^opencode-(?:darwin-arm64|linux-x64|windows-x64)-\d+\.\d+\.\d+\.tgz$/u),
   assetSha256: sha256Schema,
   binarySha256: sha256Schema,
   downloadBytes: z.number().int().positive(),
   installedBytes: z.number().int().positive(),
   executable: z.enum(["opencode", "opencode.exe"]),
-  platformDirectory: z.enum(["mac", "win"]),
+  platformDirectory: z.enum(["linux", "mac", "win"]),
 });
 const grokArtifactSchema = z.object({
-  asset: z.string().regex(/^grok-\d+\.\d+\.\d+-(?:macos-aarch64|windows-x86_64(?:\.exe)?)$/u),
+  asset: z.string().regex(/^grok-\d+\.\d+\.\d+-(?:linux-x86_64|macos-aarch64|windows-x86_64(?:\.exe)?)$/u),
   assetSha256: sha256Schema,
   downloadBytes: z.number().int().positive(),
   installedBytes: z.number().int().positive(),
   executable: z.enum(["grok", "grok.exe"]),
-  platformDirectory: z.enum(["mac", "win"]),
+  platformDirectory: z.enum(["linux", "mac", "win"]),
 });
 
 const agentRuntimeLockSchema = z.object({
@@ -49,6 +49,7 @@ const agentRuntimeLockSchema = z.object({
     licenseSha256: sha256Schema,
     artifacts: z.object({
       "darwin-arm64": codexArtifactSchema,
+      "linux-x64": codexArtifactSchema,
       "win32-x64": codexArtifactSchema,
     }),
   }),
@@ -60,6 +61,7 @@ const agentRuntimeLockSchema = z.object({
     licenseSha256: sha256Schema,
     artifacts: z.object({
       "darwin-arm64": claudeArtifactSchema,
+      "linux-x64": claudeArtifactSchema,
       "win32-x64": claudeArtifactSchema,
     }),
   }),
@@ -78,6 +80,7 @@ const agentRuntimeLockSchema = z.object({
     licenseSha256: sha256Schema,
     artifacts: z.object({
       "darwin-arm64": opencodeArtifactSchema,
+      "linux-x64": opencodeArtifactSchema,
       "win32-x64": opencodeArtifactSchema,
     }),
   }),
@@ -91,6 +94,7 @@ const agentRuntimeLockSchema = z.object({
     noticesSha256: sha256Schema,
     artifacts: z.object({
       "darwin-arm64": grokArtifactSchema,
+      "linux-x64": grokArtifactSchema,
       "win32-x64": grokArtifactSchema,
     }),
   }),

@@ -3,6 +3,7 @@ export const EXTERNAL_LINK_REL = "noopener noreferrer";
 export const OPENBOT_DOWNLOAD_LINKS = {
   macos: "/download/macos",
   windows: "/download/windows",
+  linux: "/download/linux",
 } as const;
 
 export const OPENBOT_LINKS = {

@@ -11,6 +11,7 @@
 
 import { join } from "node:path";
 import { type AgentEvent, LOCAL_SERVER_ID, type MacPermissionId } from "@openbot/contracts/ipc";
+import type { AppTranslate } from "@openbot/i18n";
 import { app, BrowserWindow, type Display, Menu, type Rectangle, screen } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import type { BrowserHost } from "../backend/browser-host";
@@ -370,20 +371,27 @@ export function loadComputerUseMacSetupRenderer(window: BrowserWindow, permissio
   return window.loadURL(url.toString());
 }
 
-export function configureApplicationMenu(service: AgentService, updater: UpdateService): void {
+/**
+ * The native application menu.
+ *
+ * Electron gives no way to relabel a built-in role, so the roles below stay in the system language
+ * macOS and Windows draw them in, and only the two custom items follow the app language. The caller
+ * builds the menu again on a language change, because a `MenuItem` label cannot be changed in place.
+ */
+export function configureApplicationMenu(service: AgentService, updater: UpdateService, translate: AppTranslate): void {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
         role: "appMenu",
         submenu: [
           {
-            label: "Stop all agents",
+            label: translate("menu.stopAllAgents"),
             accelerator: "CommandOrControl+.",
             click: () => void service.interruptAll(),
           },
           { type: "separator" },
           {
-            label: "Check for Updates…",
+            label: translate("menu.checkForUpdates"),
             click: () => void updater.checkForUpdates(),
           },
           { type: "separator" },

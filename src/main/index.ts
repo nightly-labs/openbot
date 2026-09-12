@@ -1,9 +1,10 @@
 import { join, resolve } from "node:path";
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
 import { type CentralAuthState, IPC_CHANNELS } from "@openbot/contracts/ipc";
+import { translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
-import { app, type BrowserWindow, dialog, powerMonitor, protocol, screen } from "electron";
+import { app, BrowserWindow, dialog, powerMonitor, protocol, screen } from "electron";
 import { readAppVariant, resolveAppIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
 import { guardDevelopmentOutput } from "./development-output";
@@ -34,6 +35,7 @@ import { skillIpcHandlers } from "./ipc/skill-handlers";
 import { teamIpcHandlers } from "./ipc/team-handlers";
 import { updateIpcHandlers } from "./ipc/update-handlers";
 import { voiceIpcHandlers } from "./ipc/voice-handlers";
+import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
   configureApplicationMenu,
@@ -186,6 +188,9 @@ const {
   getHostAnalytics: () => services?.analytics ?? null,
   getRemoteServerManager: () => services?.remoteServers ?? null,
   showMainWindow,
+  // An agent event cannot arrive before the services that raise it, so the fallback stands only so
+  // that this module-level value needs no null check on the notification path.
+  getTranslate: () => services?.language.translate ?? translateFor("en"),
 });
 
 // Resolved once, safely: every `app.setPath("userData", ...)` above has already run.
@@ -257,6 +262,7 @@ function registerIpcHandlers({
   setupFile,
   analyticsPreferenceFile,
   updatePreferenceFile,
+  language,
   agentInitialization,
   sidebarLayout,
   host,
@@ -287,6 +293,7 @@ function registerIpcHandlers({
       updater,
       setupFile,
       analyticsPreferenceFile,
+      language,
       initializeAgent: () => agentInitialization.start(),
       appVariant,
       getMainWindow,
@@ -474,7 +481,15 @@ if (!hasSingleInstanceLock) {
         (policy) => app.setActivationPolicy(policy),
         () => app.dock?.show() ?? Promise.resolve(),
       );
-      if (process.platform === "darwin") app.setAsDefaultProtocolClient("openbot");
+      // Linux registers the scheme through xdg-settings, which can only name a desktop entry that
+      // exists, so an AppImage writes its own first. Windows gets the scheme from the NSIS installer
+      // instead.
+      await installLinuxDesktopEntry({ platform: process.platform, environment: process.env, iconPath: appIconPath });
+      if (process.platform === "darwin" || process.platform === "linux") {
+        if (!app.setAsDefaultProtocolClient("openbot")) {
+          logger.warn("Unable to register the openbot:// scheme. Invitation links will not open OpenBot.");
+        }
+      }
       if (process.platform === "darwin") app.dock?.setIcon(appIconPath);
       configureContentSecurityPolicy();
       configureRendererPermissions();
@@ -513,7 +528,17 @@ if (!hasSingleInstanceLock) {
       ) {
         forwardCentralAuth(currentAccount);
       }
-      const { service, sidebarLayout, host, remoteDesktop, remoteServers, updater, dynamicIsland, teamStore } = built;
+      const {
+        service,
+        sidebarLayout,
+        host,
+        remoteDesktop,
+        remoteServers,
+        updater,
+        dynamicIsland,
+        teamStore,
+        language,
+      } = built;
 
       service.on("event", (event) => forwardAgentEvent("local", event));
       sidebarLayout.on("changed", (layout) => forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }));
@@ -534,7 +559,16 @@ if (!hasSingleInstanceLock) {
       // Before the renderer loads: the trust boundary and every protocol it fetches through have to
       // be in place before the first request can arrive.
       registerIpcHandlers(built);
-      configureApplicationMenu(service, updater);
+      configureApplicationMenu(service, updater, language.translate);
+      // One place turns a language change into every visible consequence: the menu is built again
+      // because a native label cannot be changed in place, and every window is told, including the
+      // Dynamic Island, which has no Settings of its own to read the new value from.
+      language.subscribe((preference) => {
+        configureApplicationMenu(service, updater, language.translate);
+        for (const window of BrowserWindow.getAllWindows()) {
+          sendToRenderer(window, IPC_CHANNELS.appLanguagePreference, preference);
+        }
+      });
       await dynamicIsland
         .initialize()
         .catch((error) => logger.error("Unable to initialize Dynamic Island:", toLogValue(error)));

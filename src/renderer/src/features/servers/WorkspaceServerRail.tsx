@@ -9,10 +9,9 @@ import { useServerSettings } from "./server-settings";
 import { useServers } from "./servers-context";
 
 /**
- * The rail of team servers down the left edge, and the platform test for
- * whether there is one at all. The test lives here rather than in the shell
- * because the rail is the thing it decides about; the shell only needs to know
- * that the frame has to leave room, which it asks `serverRailVisible` itself.
+ * The rail of team servers down the left edge. It is drawn once main has
+ * reported the build, which `serverRailVisible` answers; the shell asks the
+ * same question to decide whether the frame has to leave room for it.
  */
 export function WorkspaceServerRail() {
   const platform = usePlatform();
