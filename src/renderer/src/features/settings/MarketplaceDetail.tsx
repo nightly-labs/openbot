@@ -1,6 +1,7 @@
 import type { JSX } from "@solidjs/web";
 import { createSignal, For } from "solid-js";
 import { ArrowLeft, Button, IconButton } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import { MarketplaceIdentity } from "./MarketplaceCatalog";
 
 export function MarketplaceDetail(props: {
@@ -15,8 +16,12 @@ export function MarketplaceDetail(props: {
   sections: Array<{ title: string; subtitle: string; content: () => JSX.Element }>;
 }) {
   const [selected, setSelected] = createSignal(0);
+  const i18n = useI18n();
   return (
-    <section class="skills-marketplace-detail marketplace-detail-page" aria-label={`${props.name} details`}>
+    <section
+      class="skills-marketplace-detail marketplace-detail-page"
+      aria-label={`${props.name} ${i18n.t("settingsMarketplace.details")}`}
+    >
       <IconButton
         class="marketplace-detail-back"
         variant="ghost"
@@ -46,7 +51,7 @@ export function MarketplaceDetail(props: {
         </div>
       </div>
       <div class="marketplace-detail-sections">
-        <nav aria-label="Detail sections">
+        <nav aria-label={i18n.t("settingsMarketplace.detailSections")}>
           <For each={props.sections}>
             {(section, index) => (
               <Button

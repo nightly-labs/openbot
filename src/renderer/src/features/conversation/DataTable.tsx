@@ -1,5 +1,6 @@
 import type { JSX } from "@solidjs/web";
 import { For } from "solid-js";
+import { useI18n } from "../i18n/i18n-context";
 
 export type DataTableAlignment = "left" | "center" | "right";
 
@@ -31,8 +32,9 @@ export interface MessageCodeBlock {
 export type MessageContentBlock = ComparisonTableBlock | DataTableBlock | MessageCodeBlock | MessageTextBlock;
 
 export function DataTable(props: { table: DataTableBlock; renderCell?: (text: string) => JSX.Element }) {
+  const i18n = useI18n();
   return (
-    <section class="message-data-table-scroll" aria-label="Data table" tabindex="0">
+    <section class="message-data-table-scroll" aria-label={i18n.t("conversation.dataTable")} tabindex="0">
       <table class="message-data-table" style={`--message-data-table-columns: ${props.table.headers.length}`}>
         <thead>
           <tr>

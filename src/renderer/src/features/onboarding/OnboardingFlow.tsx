@@ -20,6 +20,7 @@ import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
 import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "../custom-providers/CustomProviderListDialog";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
+import { useI18n } from "../i18n/i18n-context";
 import { fallbackProviderState } from "./onboarding-provider-state";
 
 export interface OnboardingFlowProps {
@@ -75,6 +76,7 @@ type OnboardingAvatarVariants = {
 };
 
 export function OnboardingFlow(props: OnboardingFlowProps) {
+  const i18n = useI18n();
   const [step, setStep] = createSignal<OnboardingStep>("meet");
   const [direction, setDirection] = createSignal<StepDirection>("forward");
   const [selectedProvider, setSelectedProvider] = createSignal<AgentProviderId | null>(null);
@@ -266,7 +268,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     } catch {
       const providerName = PROVIDERS.find((candidate) => candidate.id === provider)?.name ?? "provider";
       setError(
-        `OpenBot could not open the ${kind === "install" ? "installation" : "sign-in"} guide for ${providerName}.`,
+        `${i18n.t("onboarding.flow.providerGuideError")} ${kind === "install" ? "installation" : "sign-in"} guide for ${providerName}.`,
       );
     }
   }
@@ -286,7 +288,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     } catch {
       providersAwaitingFocusRefresh.delete(provider);
       const providerName = PROVIDERS.find((candidate) => candidate.id === provider)?.name ?? "provider";
-      setError(`OpenBot could not connect ${providerName}. Try again.`);
+      setError(`${i18n.t("onboarding.flow.connectProviderError")} ${providerName}. Try again.`);
     }
   }
 
@@ -299,7 +301,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
       await props.onDownloadProvider(provider);
     } catch {
       const providerName = PROVIDERS.find((candidate) => candidate.id === provider)?.name ?? "provider";
-      setError(`OpenBot could not download ${providerName}. Try again.`);
+      setError(`${i18n.t("onboarding.flow.downloadProviderError")} ${providerName}. Try again.`);
     }
   }
 
@@ -310,7 +312,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
       await props.onCancelProviderDownload(provider);
     } catch {
       const providerName = PROVIDERS.find((candidate) => candidate.id === provider)?.name ?? "provider";
-      setError(`OpenBot could not cancel the ${providerName} download. Try again.`);
+      setError(`${i18n.t("onboarding.flow.cancelDownloadError")} ${providerName}. Try again.`);
     }
   }
 
@@ -326,7 +328,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     try {
       await props.onRefreshProviders();
     } catch {
-      setError("OpenBot could not refresh your local AI providers. Try again.");
+      setError(i18n.t("onboarding.flow.refreshError"));
     }
   }
 
@@ -339,7 +341,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
 
   function nextStep(): void {
     if (!selectedProviderConnected()) {
-      setError("Connect and select a provider to continue.");
+      setError(i18n.t("onboarding.flow.connectContinue"));
       return;
     }
     if (step() === "meet") {
@@ -367,7 +369,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
       // A built-in provider keeps its own default model, so only the custom row sends one.
       await props.onSave(provider, customSelected() ? (customModel() ?? firstSavedCustomModel()) : null);
     } catch (cause) {
-      setError(errorMessage(cause, "OpenBot could not finish setup."));
+      setError(errorMessage(cause, i18n.t("onboarding.flow.finishError")));
       setSaving(false);
     }
   }
@@ -377,7 +379,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
   return (
     <main class="onboarding-screen" data-step={step()} data-direction={direction()}>
       <div class="onboarding-shell">
-        <nav class="onboarding-progress" aria-label={`Onboarding step ${stepNumber()} of 3`}>
+        <nav class="onboarding-progress" aria-label={`${i18n.t("onboarding.flow.step")} ${stepNumber()} of 3`}>
           <For each={[1, 2, 3]}>
             {(item) => <span class={item === stepNumber() ? "is-active" : item < stepNumber() ? "is-complete" : ""} />}
           </For>
@@ -397,13 +399,17 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                     class="onboarding-avatar-hero"
                   />
                 </div>
-                <h1 id="onboarding-title">Meet OpenBot</h1>
-                <p class="onboarding-description">A team that works with you.</p>
+                <h1 id="onboarding-title">{i18n.t("onboarding.flow.meet")}</h1>
+                <p class="onboarding-description">{i18n.t("onboarding.flow.meetDescription")}</p>
 
-                <section class="composer onboarding-composer" data-compact aria-label="Example task handoff">
+                <section
+                  class="composer onboarding-composer"
+                  data-compact
+                  aria-label={i18n.t("onboarding.flow.taskHandoff")}
+                >
                   <div class="composer-input-label">
                     <div class="composer-editor-root">
-                      <span class="composer-editor-placeholder">Hand off any task to your team</span>
+                      <span class="composer-editor-placeholder">{i18n.t("onboarding.flow.handoffPlaceholder")}</span>
                     </div>
                   </div>
                   <div class="composer-toolbar">
@@ -412,7 +418,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                       variant="ghost"
                       size="xs"
                       class="composer-button"
-                      aria-label="Add to prompt"
+                      aria-label={i18n.t("onboarding.flow.addPrompt")}
                       disabled
                     >
                       <Plus aria-hidden="true" />
@@ -423,7 +429,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                         variant="ghost"
                         size="xs"
                         class="voice-button"
-                        aria-label="Send message"
+                        aria-label={i18n.t("onboarding.flow.sendMessage")}
                         disabled
                       >
                         <ArrowUp aria-hidden="true" />
@@ -436,14 +442,14 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                   <ProviderPicker
                     value={selectedProvider()}
                     options={providerOptions()}
-                    ariaLabel="Default provider"
-                    label="Choose your AI provider"
+                    ariaLabel={i18n.t("onboarding.setup.defaultProvider")}
+                    label={i18n.t("onboarding.flow.chooseProvider")}
                     hint={
                       lazyProviderMode()
-                        ? "Download, connect, and select a provider to continue."
+                        ? i18n.t("onboarding.flow.downloadConnectSelect")
                         : showsProviderSetup()
-                          ? "Connect and select a provider to continue. Use Refresh after external account changes."
-                          : "You can change this for each agent later."
+                          ? i18n.t("onboarding.flow.connectSelectRefresh")
+                          : i18n.t("onboarding.flow.providerLater")
                     }
                     allowUnavailableSelection
                     focusFirst
@@ -498,7 +504,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
 
             <Match when={step() === "computer"}>
               <section class="onboarding-panel onboarding-panel-computer" aria-labelledby="onboarding-title">
-                <h1 id="onboarding-title">OpenBot might control your computer</h1>
+                <h1 id="onboarding-title">{i18n.t("onboarding.flow.computerTitle")}</h1>
 
                 <div class="onboarding-computer-visual" aria-hidden="true">
                   <svg viewBox="0 0 400 240" role="presentation">
@@ -574,10 +580,10 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
 
             <Match when={step() === "jobs"}>
               <section class="onboarding-panel onboarding-panel-jobs" aria-labelledby="onboarding-title">
-                <h1 id="onboarding-title">Give each agent a job</h1>
-                <p class="onboarding-description">Start with focused agents, then build the team around your work.</p>
+                <h1 id="onboarding-title">{i18n.t("onboarding.flow.jobsTitle")}</h1>
+                <p class="onboarding-description">{i18n.t("onboarding.flow.jobsDescription")}</p>
 
-                <section class="onboarding-job-orbit" aria-label="Example agent jobs">
+                <section class="onboarding-job-orbit" aria-label={i18n.t("onboarding.flow.exampleJobs")}>
                   <article class="onboarding-job-card onboarding-job-card-top">
                     <AgentAvatar
                       seed={avatarVariants.inbox.seed}
@@ -587,7 +593,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                       animationOffset={avatarVariants.inbox.animationOffset}
                       class="onboarding-job-avatar"
                     />
-                    <span>Inbox Triage</span>
+                    <span>{i18n.t("onboarding.flow.inboxTriage")}</span>
                   </article>
                   <article class="onboarding-job-card onboarding-job-card-left">
                     <AgentAvatar
@@ -598,7 +604,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                       animationOffset={avatarVariants.weekly.animationOffset}
                       class="onboarding-job-avatar"
                     />
-                    <span>Weekly Planning</span>
+                    <span>{i18n.t("onboarding.flow.weeklyPlanning")}</span>
                   </article>
                   <article class="onboarding-job-card onboarding-job-card-right">
                     <AgentAvatar
@@ -609,7 +615,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                       animationOffset={avatarVariants.research.animationOffset}
                       class="onboarding-job-avatar"
                     />
-                    <span>Research Digest</span>
+                    <span>{i18n.t("onboarding.flow.researchDigest")}</span>
                   </article>
                 </section>
               </section>
@@ -635,10 +641,10 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
             class="onboarding-next"
             disabled={saving() || !selectedProviderConnected()}
             loading={saving()}
-            loadingLabel="Opening OpenBot…"
+            loadingLabel={i18n.t("onboarding.flow.opening")}
             onClick={nextStep}
           >
-            {step() === "jobs" ? "Open OpenBot" : "Next"}
+            {step() === "jobs" ? i18n.t("onboarding.flow.open") : i18n.t("onboarding.flow.next")}
           </Button>
         </div>
       </div>

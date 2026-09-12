@@ -19,6 +19,7 @@ import { DirectMessagesProvider } from "./features/conversation/direct-messages-
 import { CustomProvidersProvider } from "./features/custom-providers/custom-providers-context";
 import { DynamicIslandBridge } from "./features/dynamic-island/dynamic-island-bridge";
 import { DynamicIslandProvider } from "./features/dynamic-island/dynamic-island-context";
+import { I18nProvider } from "./features/i18n/i18n-context";
 import { SetupProvider } from "./features/onboarding/onboarding-context";
 import { RemoteDesktopProvider } from "./features/remote-desktop/remote-desktop-context";
 import { ServerScopeProvider } from "./features/servers/server-scope";
@@ -38,7 +39,6 @@ import { PlatformProvider } from "./platform";
 import { ProvidersProvider } from "./providers";
 import { TurnsProvider } from "./turns";
 import { UiErrorsProvider } from "./ui-errors";
-
 /**
  * How the renderer is mounted, as opposed to anything it later loads. Both
  * flags are fixed for the life of a mount: `index.tsx` passes neither, and
@@ -85,34 +85,36 @@ export function AppProviders(props: ParentProps<AppProps>): JSX.Element {
       <AuthProvider>
         <SetupProvider>
           <SettingsProvider>
-            <LayoutProvider>
-              <UpdatesProvider>
-                <CustomProvidersProvider>
-                  <ServersProvider>
-                    <DynamicIslandProvider>
-                      <ServerSettingsProvider>
-                        <RemoteDesktopProvider>
-                          <ServerSwitchProvider>
-                            <AnsweredPromptsProvider>
-                              <UiErrorsProvider>
-                                <UsageProvider>
-                                  <AgentReadTrackingProvider>
-                                    <AppBootstrap />
-                                    <ServerScopeBoundary stableConversation={stableConversation}>
-                                      {props.children}
-                                    </ServerScopeBoundary>
-                                  </AgentReadTrackingProvider>
-                                </UsageProvider>
-                              </UiErrorsProvider>
-                            </AnsweredPromptsProvider>
-                          </ServerSwitchProvider>
-                        </RemoteDesktopProvider>
-                      </ServerSettingsProvider>
-                    </DynamicIslandProvider>
-                  </ServersProvider>
-                </CustomProvidersProvider>
-              </UpdatesProvider>
-            </LayoutProvider>
+            <I18nProvider>
+              <LayoutProvider>
+                <UpdatesProvider>
+                  <CustomProvidersProvider>
+                    <ServersProvider>
+                      <DynamicIslandProvider>
+                        <ServerSettingsProvider>
+                          <RemoteDesktopProvider>
+                            <ServerSwitchProvider>
+                              <AnsweredPromptsProvider>
+                                <UiErrorsProvider>
+                                  <UsageProvider>
+                                    <AgentReadTrackingProvider>
+                                      <AppBootstrap />
+                                      <ServerScopeBoundary stableConversation={stableConversation}>
+                                        {props.children}
+                                      </ServerScopeBoundary>
+                                    </AgentReadTrackingProvider>
+                                  </UsageProvider>
+                                </UiErrorsProvider>
+                              </AnsweredPromptsProvider>
+                            </ServerSwitchProvider>
+                          </RemoteDesktopProvider>
+                        </ServerSettingsProvider>
+                      </DynamicIslandProvider>
+                    </ServersProvider>
+                  </CustomProvidersProvider>
+                </UpdatesProvider>
+              </LayoutProvider>
+            </I18nProvider>
           </SettingsProvider>
         </SetupProvider>
       </AuthProvider>

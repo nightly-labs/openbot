@@ -1,16 +1,18 @@
 import { render } from "@solidjs/web";
 import { Button, PanelRight, X } from "../../components/ui";
 import "../../styles.css";
+import { useI18n } from "../i18n/i18n-context";
 
 function BrowserPictureInPictureControls() {
+  const { t } = useI18n();
   return (
-    <div class="browser-pip-hover-controls" role="toolbar" aria-label="Browser window controls">
+    <div class="browser-pip-hover-controls" role="toolbar" aria-label={t("browser.windowControls")}>
       <Button
         variant="ghost"
         type="button"
         class="browser-pip-hover-button"
-        aria-label="Reattach browser to right sidebar"
-        title="Reattach browser"
+        aria-label={t("browser.reattach")}
+        title={t("browser.reattach")}
         onClick={() => void window.openbot.browser.dockPictureInPicture()}
       >
         <PanelRight class="browser-toolbar-icon" />
@@ -19,8 +21,8 @@ function BrowserPictureInPictureControls() {
         variant="ghost"
         type="button"
         class="browser-pip-hover-button"
-        aria-label="Close browser popup"
-        title="Close browser popup"
+        aria-label={t("browser.closePopup")}
+        title={t("browser.closePopup")}
         onClick={() => void window.openbot.browser.hidePictureInPicture()}
       >
         <X class="browser-toolbar-icon" />

@@ -9,6 +9,7 @@
 
 import { SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
 import { For, Match, Show, Switch } from "solid-js";
+import { useI18n } from "../i18n/i18n-context";
 import { SidebarAgentRow } from "./SidebarAgentRow";
 import { SidebarChannelRow } from "./SidebarChannelRow";
 import { SidebarSectionHeader } from "./SidebarSectionHeader";
@@ -24,10 +25,12 @@ export function SidebarAgentSection(sectionProps: { sectionId: string }) {
     sectionDragClasses,
     sectionIsCollapsed,
   } = useSidebarScope();
+  const i18n = useI18n();
   const sectionId = () => sectionProps.sectionId;
   const chats = () => filteredChatsBySection().get(sectionId()) ?? [];
   const custom = () => customSectionById().get(sectionId());
-  const name = () => (sectionId() === SIDEBAR_UNASSIGNED_SECTION_ID ? "Unassigned" : (custom()?.name ?? ""));
+  const name = () =>
+    sectionId() === SIDEBAR_UNASSIGNED_SECTION_ID ? i18n.t("sidebar.unassigned") : (custom()?.name ?? "");
   const headed = () => Boolean(custom()) || props.layout.sections.length > 0;
   const collapsed = () => headed() && sectionIsCollapsed(sectionId());
   return (

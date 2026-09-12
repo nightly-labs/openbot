@@ -38,6 +38,7 @@ import {
 import { errorMessage } from "../../error-message";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { routineScheduleSummary } from "../conversation/routine-schedule-ui";
+import { useI18n } from "../i18n/i18n-context";
 import { CATEGORY_LABELS, MarketplaceCatalog } from "./MarketplaceCatalog";
 import { MarketplaceDetail } from "./MarketplaceDetail";
 
@@ -88,6 +89,7 @@ interface SkillsMarketplace {
 }
 
 export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
+  const i18n = useI18n();
   const [market, setMarket] = createStore<SkillsMarketplace>({
     browse: { kind: "agents", tab: "discover", targetAgentId: "" },
     detail: { kind: "none" },
@@ -383,7 +385,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
         <Dialog.Overlay class="skills-marketplace-backdrop">
           <Dialog.Content class="skills-marketplace" onOpenAutoFocus={(event) => event.preventDefault()}>
             <header class="skills-marketplace-topbar" data-detail={detailActive() ? "" : undefined}>
-              <Dialog.Title class="marketplace-title">Marketplace</Dialog.Title>
+              <Dialog.Title class="marketplace-title">{i18n.t("settingsMarketplace.marketplace")}</Dialog.Title>
               <nav class="skills-marketplace-kind-tabs" aria-label="Marketplace content types">
                 <Button
                   class="skills-marketplace-kind-tab"
@@ -412,8 +414,12 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Portal>
                   <DropdownMenu.Content class="marketplace-menu">
-                    <DropdownMenu.Item onSelect={() => selectTab("discover")}>Discover</DropdownMenu.Item>
-                    <DropdownMenu.Item onSelect={() => selectTab("mine")}>My submissions</DropdownMenu.Item>
+                    <DropdownMenu.Item onSelect={() => selectTab("discover")}>
+                      {i18n.t("settingsMarketplace.discover")}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item onSelect={() => selectTab("mine")}>
+                      {i18n.t("settingsMarketplace.mySubmissions")}
+                    </DropdownMenu.Item>
                     <DropdownMenu.Separator />
                     <DropdownMenu.Item
                       onSelect={() => {
@@ -433,7 +439,11 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>
-              <IconButton label="Close marketplace" variant="ghost" onClick={() => props.onOpenChange(false)}>
+              <IconButton
+                label={i18n.t("settingsMarketplace.close")}
+                variant="ghost"
+                onClick={() => props.onOpenChange(false)}
+              >
                 <X />
               </IconButton>
             </header>
@@ -463,7 +473,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                   <section class="skills-marketplace-panel">
                     <div class="skills-marketplace-heading">
                       <div>
-                        <h1>My submissions</h1>
+                        <h1>{i18n.t("settingsMarketplace.mySubmissions")}</h1>
                         <p>Package a focused, safe skill and submit it for marketplace review.</p>
                       </div>
                       <Button onClick={() => void choosePackage()}>
@@ -472,12 +482,14 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                     </div>
                     <section class="skills-submission-guide" aria-labelledby="skills-submission-guide-title">
                       <div class="skills-submission-guide-heading">
-                        <h2 id="skills-submission-guide-title">Submission requirements</h2>
+                        <h2 id="skills-submission-guide-title">
+                          {i18n.t("settingsMarketplace.submissionRequirements")}
+                        </h2>
                         <p>Your skill is validated before it can be sent for review.</p>
                       </div>
                       <div class="skills-submission-guide-grid">
                         <div>
-                          <h3>Package</h3>
+                          <h3>{i18n.t("settingsMarketplace.package")}</h3>
                           <ul>
                             <li>
                               <Check />
@@ -498,7 +510,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                           </ul>
                         </div>
                         <div>
-                          <h3>Safety and review</h3>
+                          <h3>{i18n.t("settingsMarketplace.safetyReview")}</h3>
                           <ul>
                             <li>
                               <Check />
@@ -521,7 +533,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                       </div>
                       <div class="skills-submission-example">
                         <div>
-                          <h3>Required SKILL.md metadata</h3>
+                          <h3>{i18n.t("settingsMarketplace.metadata")}</h3>
                           <p>Name: 80 characters maximum · Description: 500 characters maximum</p>
                         </div>
                         <pre>{`---
@@ -575,7 +587,7 @@ description: Turn merged work into clear, consistent release notes.
                                 }}
                               >
                                 <For each={SKILL_CATEGORIES}>
-                                  {(item) => <option value={item}>{CATEGORY_LABELS[item]}</option>}
+                                  {(item) => <option value={item}>{i18n.t(CATEGORY_LABELS[item])}</option>}
                                 </For>
                               </NativeSelect>
                               <ChevronDown aria-hidden="true" />
@@ -629,7 +641,7 @@ description: Turn merged work into clear, consistent release notes.
                                 <div>
                                   <h3>{item.name}</h3>
                                   <p>
-                                    {CATEGORY_LABELS[item.category]} · version {item.version}
+                                    {i18n.t(CATEGORY_LABELS[item.category])} · version {item.version}
                                   </p>
                                   <Show when={item.rejectionNote}>
                                     <small>{item.rejectionNote}</small>
@@ -727,6 +739,7 @@ function AgentMarketplacePanel(props: {
   onEnterDetail: () => void;
   onLeaveDetail: () => void;
 }) {
+  const i18n = useI18n();
   const [market, setMarket] = createStore<AgentsMarketplace>({
     detail: null,
     publication: {
@@ -919,7 +932,7 @@ function AgentMarketplacePanel(props: {
   return (
     <section
       class="skills-marketplace-panel agent-marketplace-panel"
-      aria-label="Agent marketplace"
+      aria-label={i18n.t("settingsMarketplace.agentMarketplace")}
       data-preview-loading={panel.busy === "publish" ? "" : undefined}
     >
       <Show when={props.view === "discover"}>
@@ -984,7 +997,7 @@ function AgentMarketplacePanel(props: {
                   title: "Skills",
                   subtitle: "Playbooks it can run",
                   content: () => (
-                    <Show when={agent.skills.length} fallback={<p>No marketplace skills included.</p>}>
+                    <Show when={agent.skills.length} fallback={<p>{i18n.t("settingsMarketplace.noSkills")}</p>}>
                       <ul class="agent-marketplace-dependency-list">
                         <For each={agent.skills}>
                           {(skill) => (
@@ -1002,7 +1015,7 @@ function AgentMarketplacePanel(props: {
                   title: "Routines",
                   subtitle: "Jobs that run on their own",
                   content: () => (
-                    <Show when={agent.routines.length} fallback={<p>No routines included.</p>}>
+                    <Show when={agent.routines.length} fallback={<p>{i18n.t("settingsMarketplace.noRoutines")}</p>}>
                       <ul class="agent-marketplace-routine-list">
                         <For each={agent.routines}>
                           {(routine) => (
@@ -1029,13 +1042,13 @@ function AgentMarketplacePanel(props: {
       <Show when={props.view === "mine"}>
         <div class="skills-marketplace-heading">
           <div>
-            <h1>My agent submissions</h1>
+            <h1>{i18n.t("settingsMarketplace.myAgentSubmissions")}</h1>
             <p>Publish a reusable snapshot of a local agent for review.</p>
           </div>
           <div class="agent-marketplace-publish-picker">
             <span class="skills-agent-select-control">
               <NativeSelect
-                aria-label="Agent to publish"
+                aria-label={i18n.t("settingsMarketplace.agentToPublish")}
                 value={market.publication.sourceAgentId}
                 onChange={(event) => {
                   const agentId = event.currentTarget.value;
@@ -1046,7 +1059,10 @@ function AgentMarketplacePanel(props: {
                 }}
                 disabled={!props.agents.length}
               >
-                <Show when={props.agents.length} fallback={<option value="">No local agents</option>}>
+                <Show
+                  when={props.agents.length}
+                  fallback={<option value="">{i18n.t("settingsMarketplace.noLocalAgents")}</option>}
+                >
                   <For each={props.agents}>{(agent) => <option value={agent.id}>{agent.name}</option>}</For>
                 </Show>
               </NativeSelect>
@@ -1073,11 +1089,11 @@ function AgentMarketplacePanel(props: {
                 </div>
               )}
             </Show>
-            <p>Conversation history, memories, model settings, and workspace files are not included.</p>
+            <p>{i18n.t("settingsMarketplace.agentPublishExcludes")}</p>
             <label class="marketplace-publication-category">
               Category
               <NativeSelect
-                aria-label="Agent category"
+                aria-label={i18n.t("settingsMarketplace.agentCategory")}
                 value={market.publication.category}
                 onChange={(event) => {
                   const category = event.currentTarget.value;
@@ -1088,7 +1104,7 @@ function AgentMarketplacePanel(props: {
                 }}
               >
                 <For each={SKILL_CATEGORIES}>
-                  {(category) => <option value={category}>{CATEGORY_LABELS[category]}</option>}
+                  {(category) => <option value={category}>{i18n.t(CATEGORY_LABELS[category])}</option>}
                 </For>
               </NativeSelect>
             </label>
@@ -1108,10 +1124,13 @@ function AgentMarketplacePanel(props: {
           </div>
         </Show>
         <Show when={!market.publication.preview}>
-          <Show when={!panel.loading} fallback={<div class="skills-marketplace-state">Loading submissions…</div>}>
+          <Show
+            when={!panel.loading}
+            fallback={<div class="skills-marketplace-state">{i18n.t("settingsMarketplace.loadingSubmissions")}</div>}
+          >
             <Show
               when={market.submissions.length}
-              fallback={<div class="skills-marketplace-state">No agent submissions yet.</div>}
+              fallback={<div class="skills-marketplace-state">{i18n.t("settingsMarketplace.noAgentSubmissions")}</div>}
             >
               <div class="skills-submission-list">
                 <For each={market.submissions}>
@@ -1260,6 +1279,7 @@ function SkillDetailView(props: {
 }
 
 function SkillSubmissionDetailView(props: { submission: SkillSubmission; onBack: () => void }) {
+  const i18n = useI18n();
   return (
     <section class="skills-marketplace-detail" aria-label={`${props.submission.name} submission details`}>
       <Button class="skills-marketplace-detail-back" variant="ghost" size="sm" onClick={props.onBack}>
@@ -1268,7 +1288,7 @@ function SkillSubmissionDetailView(props: { submission: SkillSubmission; onBack:
       <div class="skills-marketplace-detail-hero skills-submission-detail-hero">
         <SkillIcon skill={props.submission} />
         <div>
-          <p class="skills-marketplace-detail-category">{CATEGORY_LABELS[props.submission.category]}</p>
+          <p class="skills-marketplace-detail-category">{i18n.t(CATEGORY_LABELS[props.submission.category])}</p>
           <h1>{props.submission.name}</h1>
           <p>{props.submission.description}</p>
           <div class="skills-marketplace-detail-meta">
@@ -1326,16 +1346,20 @@ function AgentSelect(props: {
   value: string;
   onChange: (value: string) => void;
 }) {
+  const i18n = useI18n();
   return (
     <label class="skills-agent-select">
-      <span>Install to</span>
+      <span>{i18n.t("settingsMarketplace.installTo")}</span>
       <span class="skills-agent-select-control">
         <NativeSelect
           value={props.value}
           onChange={(event) => props.onChange(event.currentTarget.value)}
           disabled={!props.agents.length}
         >
-          <Show when={props.agents.length} fallback={<option value="">No local agents</option>}>
+          <Show
+            when={props.agents.length}
+            fallback={<option value="">{i18n.t("settingsMarketplace.noLocalAgents")}</option>}
+          >
             <For each={props.agents}>{(agent) => <option value={agent.id}>{agent.name}</option>}</For>
           </Show>
         </NativeSelect>

@@ -4,6 +4,7 @@ import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { Button, Download, RefreshCw, Spinner } from "../../components/ui";
 import { errorMessage as formatErrorMessage } from "../../error-message";
 import { rendererDuration } from "../conversation/activity-timing";
+import { useI18n } from "../i18n/i18n-context";
 
 // `--panel-close-dur` is a calc() on the island itself, so it cannot be read off
 // the document root the way `rendererDuration` reads a token. Sum the two tokens
@@ -63,11 +64,12 @@ function UpdateProgressValue(props: UpdateProgressValueProps) {
 }
 
 export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
+  const i18n = useI18n();
   const [actionPending, setActionPending] = createSignal(false);
   const phase = () => props.updateStatus.phase;
   const errorMessage = createMemo(() => {
     const message = props.errorMessage?.trim() || props.updateStatus.message?.trim();
-    return formatErrorMessage(message, "Update failed. Try again.");
+    return formatErrorMessage(message, i18n.t("account.update.failed"));
   });
   const failed = createMemo(() => Boolean(props.errorMessage) || phase() === "error");
   const open = createMemo(() => failed() || isUpdateActivePhase(phase()));
@@ -78,20 +80,26 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
     const value = props.updateStatus.progress;
     return value === null ? null : Math.min(100, Math.max(0, Math.round(value)));
   });
-  const actionLabel = createMemo(() => (failed() ? "Retry" : ready() ? "Restart" : "Download"));
+  const actionLabel = createMemo(() =>
+    failed()
+      ? i18n.t("account.update.retry")
+      : ready()
+        ? i18n.t("account.update.restart")
+        : i18n.t("account.update.download"),
+  );
   const busyLabel = createMemo(() => {
-    if (actionPending() && failed()) return "Retrying";
+    if (actionPending() && failed()) return i18n.t("account.update.retrying");
     if (downloading() && progress() !== null) return null;
-    if (phase() === "installing" || (actionPending() && ready())) return "Restarting";
-    return "Starting";
+    if (phase() === "installing" || (actionPending() && ready())) return i18n.t("account.update.restarting");
+    return i18n.t("account.update.starting");
   });
   const accessibleActionLabel = createMemo(() => {
-    if (actionPending() && failed()) return "Retrying update";
-    if (downloading() && progress() !== null) return `Downloading update, ${progress()}%`;
-    if (phase() === "installing" || (actionPending() && ready())) return "Restarting to update";
-    if (failed()) return `Retry update. ${errorMessage()}`;
-    return `${ready() ? "Restart to update" : "Download update"}. ${
-      ready() ? "Update ready" : "New update available"
+    if (actionPending() && failed()) return i18n.t("account.update.retryingUpdate");
+    if (downloading() && progress() !== null) return `${i18n.t("account.update.downloading")}, ${progress()}%`;
+    if (phase() === "installing" || (actionPending() && ready())) return i18n.t("account.update.restartingToUpdate");
+    if (failed()) return `${i18n.t("account.update.retryUpdate")} ${errorMessage()}`;
+    return `${ready() ? i18n.t("account.update.restartToUpdate") : i18n.t("account.update.downloadUpdate")}. ${
+      ready() ? i18n.t("account.update.updateReady") : i18n.t("account.update.newAvailable")
     }.`;
   });
 
@@ -206,7 +214,7 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
               aria-valuenow={progress() ?? 0}
               aria-valuemin="0"
               aria-valuemax="100"
-              aria-label="Update download progress"
+              aria-label={i18n.t("account.update.downloadProgress")}
             />
           </Show>
         </div>

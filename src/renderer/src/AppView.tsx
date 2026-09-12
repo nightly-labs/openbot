@@ -2,6 +2,7 @@ import { Loading, Show } from "solid-js";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
+import { useI18n } from "./features/i18n/i18n-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useServerSelection } from "./features/servers/server-selection";
 import { AccountLogin, InitialSetup, OnboardingFlow } from "./lazy-views";
@@ -11,7 +12,8 @@ import { WorkspaceShell } from "./WorkspaceShell";
 
 /** The one placeholder every gate below falls back to, at every depth. */
 function LoadingScreen() {
-  return <div class="initial-setup-screen" role="status" aria-label="Loading OpenBot" />;
+  const i18n = useI18n();
+  return <div class="initial-setup-screen" role="status" aria-label={i18n.t("common.loadingOpenBot")} />;
 }
 
 /**

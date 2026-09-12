@@ -3,6 +3,7 @@ import { createEffect, createSignal, createStore, For, onCleanup, Show } from "s
 import { createScrollFades } from "../../components/createScrollFades";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
 import { BellOff, buttonVariants, ChartArea, ContextMenu, ServerGradientLogo, Tooltip } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 
 const SERVER_RAIL_TOOLTIP_OPEN_DELAY = 150;
 
@@ -22,6 +23,7 @@ interface DragSlot {
 }
 
 export function ServerRail(props: ServerRailProps) {
+  const i18n = useI18n();
   const [draggedId, setDraggedId] = createSignal<string | null>(null);
   const [dragOverId, setDragOverId] = createSignal<string | null>(null);
   const [announcement, setAnnouncement] = createSignal("");
@@ -158,7 +160,7 @@ export function ServerRail(props: ServerRailProps) {
     if (index < 0 || targetIndex < 0 || targetIndex >= ids.length) return;
     [ids[index], ids[targetIndex]] = [ids[targetIndex], ids[index]];
     props.onReorder(ids);
-    setAnnouncement(`Moved server to position ${targetIndex + 1} of ${ids.length}.`);
+    setAnnouncement(i18n.t("servers.rail.moved", { position: targetIndex + 1, total: ids.length }));
   }
 
   function dropServer(targetId: string): void {
@@ -171,7 +173,7 @@ export function ServerRail(props: ServerRailProps) {
     ids.splice(sourceIndex, 1);
     ids.splice(targetIndex, 0, sourceId);
     props.onReorder(ids);
-    setAnnouncement(`Moved server to position ${targetIndex + 1} of ${ids.length}.`);
+    setAnnouncement(i18n.t("servers.rail.moved", { position: targetIndex + 1, total: ids.length }));
   }
 
   function stopDragging(): void {
@@ -184,7 +186,7 @@ export function ServerRail(props: ServerRailProps) {
   return (
     <aside
       class="server-rail"
-      aria-label="Servers"
+      aria-label={i18n.t("servers.rail.label")}
       onDragOver={(event) => {
         if (!draggedId()) return;
         event.preventDefault();
@@ -278,13 +280,13 @@ export function ServerRail(props: ServerRailProps) {
           <Tooltip.Trigger
             type="button"
             class={`${buttonVariants({ variant: "outline", size: "sm" })} server-rail-button server-rail-action`}
-            aria-label="Add remote server"
+            aria-label={i18n.t("servers.rail.add")}
             onClick={props.onAdd}
           >
             <span class="server-rail-monogram">+</span>
           </Tooltip.Trigger>
           <Tooltip.Portal>
-            <Tooltip.Content class="server-rail-tooltip">Add remote server</Tooltip.Content>
+            <Tooltip.Content class="server-rail-tooltip">{i18n.t("servers.rail.add")}</Tooltip.Content>
           </Tooltip.Portal>
         </Tooltip.Root>
         <span class="sr-only" aria-live="polite">
@@ -303,6 +305,7 @@ function ServerRailButton(props: {
   onOpenSettings: (serverId: string, trigger: HTMLElement | null) => void;
   onMove?: (direction: -1 | 1) => void;
 }) {
+  const i18n = useI18n();
   const [overlay, setOverlay] = createStore({ tooltipOpen: false, menuOpen: false });
   let trigger: HTMLElement | null = null;
   return (
@@ -376,15 +379,17 @@ function ServerRailButton(props: {
             </Show>
           </ContextMenu.Trigger>
           <ContextMenu.Portal>
-            <ContextMenu.Content class="agent-context-menu" aria-label="Server actions">
+            <ContextMenu.Content class="agent-context-menu" aria-label={i18n.t("servers.rail.actions")}>
               <ContextMenu.Item onSelect={() => props.onSetMuted(props.server.id, !props.server.notificationsMuted)}>
                 <BellOff class="agent-context-icon size-4" aria-hidden="true" />
-                <span>{props.server.notificationsMuted ? "Unmute notifications" : "Mute notifications"}</span>
+                <span>
+                  {props.server.notificationsMuted ? i18n.t("servers.rail.unmute") : i18n.t("servers.rail.mute")}
+                </span>
               </ContextMenu.Item>
               <Show when={props.onOpenUsage}>
                 <ContextMenu.Item onSelect={() => props.onOpenUsage?.(props.server.id, trigger)}>
                   <ChartArea class="agent-context-icon size-4" aria-hidden="true" />
-                  <span>Usage</span>
+                  <span>{i18n.t("servers.rail.usage")}</span>
                 </ContextMenu.Item>
               </Show>
               <ContextMenu.Item onSelect={() => props.onOpenSettings(props.server.id, trigger)}>
@@ -400,7 +405,7 @@ function ServerRailButton(props: {
                   <circle cx="6" cy="5.5" r=".8" />
                   <circle cx="6" cy="14.5" r=".8" />
                 </svg>
-                <span>Server settings</span>
+                <span>{i18n.t("servers.rail.settings")}</span>
               </ContextMenu.Item>
             </ContextMenu.Content>
           </ContextMenu.Portal>
@@ -409,7 +414,7 @@ function ServerRailButton(props: {
       <Tooltip.Portal>
         <Tooltip.Content class="server-rail-tooltip">
           {props.server.name}
-          {props.server.notificationsMuted ? " · Notifications muted" : ""}
+          {props.server.notificationsMuted ? ` · ${i18n.t("servers.rail.muted")}` : ""}
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>

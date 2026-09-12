@@ -185,7 +185,8 @@
     "package:win:verify": "bun run package:win && bun run verify:package:win",
     "dist:mac": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run build && electron-builder --mac --arm64 --config.mac.identity=null --config.mac.notarize=false",
     "dist:win": "bun run voice:prepare-runtime && bun scripts/prepare-remote-desktop-runtime.ts win32 x64 && bun run verify:remote-desktop-runtime --windows && bun run build && electron-builder --win nsis --x64 --publish never",
-    "dist:release": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run build && electron-builder --mac --arm64 --publish never"
+    "dist:release": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run build && electron-builder --mac --arm64 --publish never",
+    "i18n:extract": "bunx i18next-parser -c i18next-parser.config.cjs \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.4.0",
@@ -201,6 +202,7 @@
     "@openbot/team-client": "workspace:*",
     "@openbot/user-errors": "workspace:*",
     "@openpanel/web": "catalog:",
+    "@solid-primitives/i18n": "2.2.1",
     "@solidjs/signals": "catalog:",
     "@solidjs/web": "catalog:",
     "@speed-highlight/core": "catalog:",
@@ -208,6 +210,7 @@
     "class-variance-authority": "catalog:",
     "electron-updater": "6.8.9",
     "fflate": "catalog:",
+    "i18next": "26.4.2",
     "jose": "catalog:",
     "lucide-solid": "1.33.0",
     "marked": "catalog:",
@@ -234,6 +237,7 @@
     "electron": "44.0.0",
     "electron-builder": "26.15.7",
     "electron-vite": "5.0.0",
+    "i18next-parser": "9.4.0",
     "jsdom": "catalog:",
     "playwright-core": "1.62.1",
     "storybook": "^10.5.10",

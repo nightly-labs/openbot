@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-j
 import { PanelResizer, readPanelWidth, savePanelWidth } from "../../components/PanelResizer";
 import { Button, ExternalLink, File, X } from "../../components/ui";
 import type { AgentProfile } from "../../data";
+import { useI18n } from "../i18n/i18n-context";
 import { MarkdownMessageText } from "./MarkdownMessageText";
 
 const PANEL_STORAGE_KEY = "openbot:browser-panel-width";
@@ -24,6 +25,7 @@ interface FilePreviewPanelProps {
 }
 
 export default function FilePreviewPanel(props: FilePreviewPanelProps) {
+  const i18n = useI18n();
   const defaultPanelWidth = () => Math.round(Math.min(PANEL_MAX, Math.max(PANEL_MIN, props.defaultWidth())));
   const [panelWidth, setPanelWidth] = createSignal(
     readPanelWidth(PANEL_STORAGE_KEY, defaultPanelWidth(), PANEL_MIN, PANEL_MAX),
@@ -67,7 +69,11 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
   };
 
   return (
-    <aside id="file-preview-panel" class="browser-panel file-preview-panel" aria-label="File preview">
+    <aside
+      id="file-preview-panel"
+      class="browser-panel file-preview-panel"
+      aria-label={i18n.t("conversation.filePreview.label")}
+    >
       <PanelResizer
         class="right-panel-resizer"
         label="Resize file preview"
@@ -92,7 +98,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
           variant="ghost"
           type="button"
           class="browser-toolbar-button"
-          aria-label="Open file externally"
+          aria-label={i18n.t("conversation.filePreview.openExternally")}
           onClick={props.onOpenExternally}
         >
           <ExternalLink class="browser-toolbar-icon" />
@@ -101,7 +107,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
           variant="ghost"
           type="button"
           class="browser-toolbar-button"
-          aria-label="Close file preview"
+          aria-label={i18n.t("conversation.filePreview.close")}
           onClick={props.onClose}
         >
           <X class="browser-toolbar-icon" />
@@ -137,15 +143,15 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         <Show when={props.preview.previewKind === "none"}>
           <div class="file-preview-unsupported">
             <File />
-            <strong>Preview unavailable</strong>
-            <span>This file type can be opened in its default application.</span>
+            <strong>{i18n.t("conversation.filePreview.unavailable")}</strong>
+            <span>{i18n.t("conversation.filePreview.openDefault")}</span>
             <Button variant="outline" type="button" onClick={props.onOpenExternally}>
               Open externally
             </Button>
           </div>
         </Show>
         <Show when={text().truncated}>
-          <p class="file-preview-truncated">Preview truncated after 1,000,000 characters.</p>
+          <p class="file-preview-truncated">{i18n.t("conversation.filePreview.truncated")}</p>
         </Show>
       </div>
     </aside>

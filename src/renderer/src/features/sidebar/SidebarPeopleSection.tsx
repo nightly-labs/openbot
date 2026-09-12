@@ -6,6 +6,7 @@
 
 import { For, Show } from "solid-js";
 import { Badge, Button } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import { TeamPersonAvatar, teamMemberName } from "../team/TeamPersonAvatar";
 import { SidebarSectionHeader } from "./SidebarSectionHeader";
 import { sidebarMessageTime } from "./sidebar-filtering";
@@ -24,18 +25,19 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
     startPersonDragging,
     stopSidebarDragging,
   } = useSidebarScope();
+  const i18n = useI18n();
   const sectionId = () => sectionProps.sectionId;
   return (
     <Show when={props.showPeople !== false && filteredPeople().length > 0}>
       <section
         class={["sidebar-chat-group sidebar-section", sectionDragClasses(sectionId())]}
         style={`--sidebar-drag-y: ${dragOffset(sectionId()).y}px;`}
-        aria-label="People"
+        aria-label={i18n.t("sidebar.people")}
         data-section-id={sectionId()}
         onFocusIn={() => props.onPreloadDirectConversation?.()}
         onPointerEnter={() => props.onPreloadDirectConversation?.()}
       >
-        <SidebarSectionHeader sectionId={sectionId()} name="People" />
+        <SidebarSectionHeader sectionId={sectionId()} name={i18n.t("sidebar.people")} />
         <div
           class="sidebar-section-collapse"
           data-collapsed={sectionIsCollapsed(sectionId()) ? "" : undefined}
@@ -62,7 +64,7 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
                       variant="ghost"
                       type="button"
                       class={["agent-row person-row", { "agent-row-active": props.activeDirectMemberId === member.id }]}
-                      aria-label={`${teamMemberName(member)}. ${thread()?.lastMessage.text ?? (member.online ? "Online now" : "Offline")}`}
+                      aria-label={`${teamMemberName(member)}. ${thread()?.lastMessage.text ?? (member.online ? i18n.t("sidebar.onlineNow") : i18n.t("sidebar.offline"))}`}
                       aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
                       aria-pressed={props.activeDirectMemberId === member.id ? "true" : "false"}
                       onClick={(event: MouseEvent) => {
@@ -95,11 +97,14 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
                           <span>{thread() ? sidebarMessageTime(thread()?.updatedAt ?? "") : ""}</span>
                         </span>
                         <span class="agent-row-preview">
-                          {thread()?.lastMessage.text ?? (member.online ? "Online now" : "Offline")}
+                          {thread()?.lastMessage.text ??
+                            (member.online ? i18n.t("sidebar.onlineNow") : i18n.t("sidebar.offline"))}
                         </span>
                       </span>
                       <Show when={(thread()?.unreadCount ?? 0) > 0}>
-                        <span class="sr-only">{thread()?.unreadCount} unread direct messages</span>
+                        <span class="sr-only">
+                          {i18n.t("sidebar.unreadDirectMessages", { count: thread()?.unreadCount })}
+                        </span>
                       </Show>
                     </Button>
                   </div>

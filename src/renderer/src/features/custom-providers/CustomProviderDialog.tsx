@@ -17,6 +17,7 @@ import {
   Trash2,
   X,
 } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import {
   type CustomProviderDraft,
   type CustomProviderErrors,
@@ -76,6 +77,7 @@ interface RepeatableRowsProps<T> {
  * share one row, error and add-button shape instead of keeping two copies that drift apart.
  */
 function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
+  const i18n = useI18n();
   const lower = () => props.singular.toLowerCase();
   return (
     <section class="custom-provider-rows" aria-label={props.label}>
@@ -96,7 +98,11 @@ function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
               <For each={props.columns}>
                 {(column) => (
                   <Input
-                    aria-label={`${props.singular} ${index() + 1} ${column.suffix}`}
+                    aria-label={i18n.t("providers.form.field", {
+                      singular: props.singular,
+                      index: index() + 1,
+                      suffix: column.suffix,
+                    })}
                     value={column.read(row)}
                     onValueChange={(value) => column.write(index(), value)}
                     placeholder={column.placeholder}
@@ -108,7 +114,7 @@ function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
                 )}
               </For>
               <IconButton
-                label={`Remove ${lower()} ${index() + 1}`}
+                label={i18n.t("providers.form.remove", { item: lower(), index: index() + 1 })}
                 variant="ghost"
                 disabled={props.busy || props.rows.length < 2}
                 onClick={() => props.onRemove(index())}
@@ -134,7 +140,7 @@ function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
         onClick={() => props.onAdd()}
       >
         <Plus />
-        Add {lower()}
+        {i18n.t("providers.form.add", { item: lower() })}
       </Button>
     </section>
   );
@@ -159,6 +165,7 @@ interface CustomProviderDialogProps {
 }
 
 export function CustomProviderDialog(props: CustomProviderDialogProps) {
+  const i18n = useI18n();
   // The form owns its state from here on: the incoming draft is read once, as a snapshot, so later
   // edits by the caller do not reach in and overwrite what the user is typing.
   const [draft, setDraft] = createStore<CustomProviderDraft>(
@@ -255,14 +262,17 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
       <Dialog.Portal>
         <Dialog.Overlay class="custom-provider-backdrop">
           <Dialog.Content as="section" class="custom-provider-dialog" aria-busy={busy() ? "true" : undefined}>
-            <Dialog.Title class="sr-only">Add a custom provider</Dialog.Title>
-            <Dialog.Description class="sr-only">
-              Describe an OpenAI-compatible endpoint and the models it serves.
-            </Dialog.Description>
+            <Dialog.Title class="sr-only">{i18n.t("providers.form.title")}</Dialog.Title>
+            <Dialog.Description class="sr-only">{i18n.t("providers.form.description")}</Dialog.Description>
 
             <header class="custom-provider-header">
               <Show when={props.onBack}>
-                <IconButton label="Back" variant="ghost" disabled={busy()} onClick={() => props.onBack?.()}>
+                <IconButton
+                  label={i18n.t("providers.actions.back")}
+                  variant="ghost"
+                  disabled={busy()}
+                  onClick={() => props.onBack?.()}
+                >
                   <ArrowLeft />
                 </IconButton>
               </Show>
@@ -271,15 +281,15 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
               </span>
               <div class="custom-provider-title">
                 <Heading as="h2" size="md">
-                  Custom provider
+                  {i18n.t("providers.form.titleShort")}
                 </Heading>
                 <Text tone="muted" variant="caption">
-                  Any OpenAI-compatible endpoint.
+                  {i18n.t("providers.form.subtitle")}
                 </Text>
               </div>
               <IconButton
                 class="custom-provider-close"
-                label="Close"
+                label={i18n.t("providers.actions.close")}
                 variant="ghost"
                 disabled={busy()}
                 onClick={props.onCancel}
@@ -302,8 +312,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
             >
               <div class={["custom-provider-form", fades.classes()]} ref={fades.bind} onScroll={fades.measure}>
                 <Field
-                  label="Provider ID"
-                  description="Lowercase letters, numbers, hyphens, or underscores."
+                  label={i18n.t("providers.form.providerId")}
+                  description={i18n.t("providers.form.providerIdDescription")}
                   error={shown()?.providerId}
                   required
                 >
@@ -322,7 +332,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                   />
                 </Field>
 
-                <Field label="Display name" error={shown()?.displayName} required>
+                <Field label={i18n.t("providers.form.displayName")} error={shown()?.displayName} required>
                   <Input
                     value={draft.displayName}
                     onValueChange={(value) =>
@@ -336,7 +346,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                   />
                 </Field>
 
-                <Field label="Base URL" error={shown()?.baseUrl} required>
+                <Field label={i18n.t("providers.form.baseUrl")} error={shown()?.baseUrl} required>
                   <Input
                     value={draft.baseUrl}
                     onValueChange={(value) =>
@@ -354,8 +364,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                 </Field>
 
                 <Field
-                  label="API key"
-                  description="Optional. Leave empty if you manage auth via headers."
+                  label={i18n.t("providers.form.apiKey")}
+                  description={i18n.t("providers.form.apiKeyDescription")}
                   error={shown()?.apiKey}
                 >
                   <Input
@@ -374,8 +384,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                 </Field>
 
                 <RepeatableRows
-                  label="Models"
-                  singular="Model"
+                  label={i18n.t("providers.form.models")}
+                  singular={i18n.t("providers.form.model")}
                   columns={modelColumns}
                   rows={draft.models}
                   limit={CUSTOM_PROVIDER_LIMITS.models}
@@ -395,8 +405,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                 />
 
                 <RepeatableRows
-                  label="Headers"
-                  singular="Header"
+                  label={i18n.t("providers.form.headers")}
+                  singular={i18n.t("providers.form.header")}
                   columns={headerColumns}
                   rows={draft.headers}
                   limit={CUSTOM_PROVIDER_LIMITS.headers}
@@ -423,8 +433,13 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                     </Text>
                   )}
                 </Show>
-                <Button type="submit" variant="default" loading={busy()} loadingLabel="Saving…">
-                  Submit
+                <Button
+                  type="submit"
+                  variant="default"
+                  loading={busy()}
+                  loadingLabel={i18n.t("providers.actions.saving")}
+                >
+                  {i18n.t("providers.actions.submit")}
                 </Button>
               </footer>
             </form>

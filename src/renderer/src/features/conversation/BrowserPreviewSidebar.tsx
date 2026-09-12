@@ -2,6 +2,7 @@ import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show } from "solid-js";
 import { PanelResizer, readPanelWidth, savePanelWidth } from "../../components/PanelResizer";
 import { Button, ChevronRight, Monitor, Plus, Skeleton, X } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 
 const BROWSER_PANEL_STORAGE_KEY = "openbot:browser-preview-panel-width";
 const BROWSER_PANEL_MIN = 220;
@@ -22,6 +23,7 @@ interface BrowserPreviewSidebarProps {
 }
 
 export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps) {
+  const i18n = useI18n();
   const defaultPanelWidth = () =>
     Math.round(Math.min(BROWSER_PANEL_MAX, Math.max(BROWSER_PANEL_MIN, props.defaultWidth())));
   const storedPanelWidth = Number.parseFloat(window.localStorage.getItem(BROWSER_PANEL_STORAGE_KEY) ?? "");
@@ -64,12 +66,12 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
     <aside
       id="browser-side-panel"
       class="browser-panel browser-preview-sidebar"
-      aria-label="Browser previews"
+      aria-label={i18n.t("conversation.browser.previews")}
       hidden={props.hidden}
     >
       <PanelResizer
         class="right-panel-resizer"
-        label="Resize right panel"
+        label={i18n.t("conversation.browser.resizePanel")}
         controls="browser-side-panel"
         direction="right"
         value={panelWidth()}
@@ -83,11 +85,21 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
       />
 
       <header class="browser-preview-header">
-        <span>Browser</span>
-        <Button variant="ghost" size="icon-sm" aria-label="New browser tab" onClick={props.onNewTab}>
+        <span>{i18n.t("conversation.browser.browser")}</span>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={i18n.t("conversation.browser.newTab")}
+          onClick={props.onNewTab}
+        >
           <Plus />
         </Button>
-        <Button variant="ghost" size="icon-sm" aria-label="Collapse browser previews" onClick={props.onCollapse}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={i18n.t("conversation.browser.collapsePreviews")}
+          onClick={props.onCollapse}
+        >
           <ChevronRight />
         </Button>
       </header>
@@ -106,9 +118,9 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
         <Show when={props.tabs.length === 0}>
           <div class="browser-empty-state">
             <Monitor aria-hidden="true" />
-            <strong>No browser tabs</strong>
+            <strong>{i18n.t("conversation.browser.noTabs")}</strong>
             <Button variant="secondary" size="sm" onClick={props.onNewTab}>
-              Open a page
+              {i18n.t("conversation.browser.openPage")}
             </Button>
           </div>
         </Show>

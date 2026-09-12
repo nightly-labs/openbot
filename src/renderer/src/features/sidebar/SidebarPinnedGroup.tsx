@@ -11,6 +11,7 @@
 import { For, Match, Show, Switch } from "solid-js";
 import { Badge, buttonVariants, ContextMenu } from "../../components/ui";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
+import { useI18n } from "../i18n/i18n-context";
 import { SidebarAgentContextMenu } from "./SidebarAgentContextMenu";
 import { SidebarPinnedAvatar } from "./SidebarAgentIndicator";
 import { SidebarChannelContextMenu } from "./SidebarChannelContextMenu";
@@ -32,6 +33,7 @@ export function SidebarPinnedGroup() {
     startNativeItemDragging,
     stopSidebarDragging,
   } = useSidebarScope();
+  const i18n = useI18n();
   const chatName = (chat: SidebarChatItem) => (chat.kind === "agent" ? chat.agent.name : chat.channel.name);
   const chatIsActive = (chat: SidebarChatItem) =>
     chat.kind === "agent" ? props.activeAgentId === chat.id : props.activeChannelId === chat.id;
@@ -49,11 +51,11 @@ export function SidebarPinnedGroup() {
             "sidebar-pinned-group-empty-target": emptyPinnedDropVisible(),
           },
         ]}
-        aria-label="Pinned chats"
+        aria-label={i18n.t("sidebar.pinnedChats")}
       >
         <ul class="sidebar-pinned-list" data-dragging={draggedPinnedKey() ? "" : undefined}>
           <Show when={emptyPinnedDropVisible()}>
-            <li class="sidebar-pinned-empty-drop">Drag here to pin</li>
+            <li class="sidebar-pinned-empty-drop">{i18n.t("sidebar.dragToPin")}</li>
           </Show>
           <For each={resolvedPinnedItems()}>
             {(item) => {
@@ -100,7 +102,7 @@ export function SidebarPinnedGroup() {
                         "agent-row sidebar-pinned-row",
                         { "agent-row-active": active() },
                       ]}
-                      aria-label={`${name()}, pinned ${item.chat.kind}`}
+                      aria-label={i18n.t("sidebar.pinnedItem", { name: name(), kind: item.chat.kind })}
                       aria-pressed={active() ? "true" : "false"}
                       onClick={() => selectChat(item.chat)}
                     >
@@ -139,7 +141,9 @@ export function SidebarPinnedGroup() {
                                 </strong>
                               </span>
                               <Show when={channel().unreadCount > 0}>
-                                <span class="sr-only">{channel().unreadCount} unread messages</span>
+                                <span class="sr-only">
+                                  {i18n.t("sidebar.unreadMessages", { count: channel().unreadCount })}
+                                </span>
                               </Show>
                             </>
                           )}

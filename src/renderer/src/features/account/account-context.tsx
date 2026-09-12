@@ -2,6 +2,7 @@ import type { AccountUsage, AvatarImageInput, CentralAuthState } from "@openbot/
 import { createMemo, createSignal, createStore, flush, onCleanup, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
+import i18n from "../i18n/i18n";
 
 /** How long the sign-in success animation holds the account out of the view. */
 const AUTH_SUCCESS_HOLD_MS = 600;
@@ -110,7 +111,7 @@ const Auth = createSimpleContext({
             status: "error",
             issue: {
               code: "auth_unavailable",
-              message: "OpenBot could not load the account service.",
+              message: i18n.t("account.serviceLoadError"),
             },
           }),
         );

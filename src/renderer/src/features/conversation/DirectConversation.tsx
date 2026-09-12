@@ -13,6 +13,7 @@ import {
   Textarea,
 } from "../../components/ui";
 import { errorMessage } from "../../error-message";
+import { useI18n } from "../i18n/i18n-context";
 import { TeamPersonAvatar, teamMemberName } from "../team/TeamPersonAvatar";
 import { formatChatTimestamp } from "./chat-timestamp";
 import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "./createChatVirtualizer";
@@ -43,6 +44,7 @@ interface DirectConversationProps {
 }
 
 export function DirectConversation(props: DirectConversationProps) {
+  const i18n = useI18n();
   const [text, setText] = createSignal("");
   const [sending, setSending] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -302,7 +304,7 @@ export function DirectConversation(props: DirectConversationProps) {
             when={!props.loadError}
             fallback={
               <div class="direct-conversation-state" role="alert">
-                <strong>The messages could not load.</strong>
+                <strong>{i18n.t("conversation.direct.loadFailed")}</strong>
                 <span>{props.loadError}</span>
               </div>
             }
@@ -313,7 +315,7 @@ export function DirectConversation(props: DirectConversationProps) {
                 <div class="direct-conversation-empty">
                   <TeamPersonAvatar member={props.member} large />
                   <h2>Message {teamMemberName(props.member)}</h2>
-                  <p>This is a private conversation between the two of you.</p>
+                  <p>{i18n.t("conversation.direct.private")}</p>
                 </div>
               }
             >
@@ -423,7 +425,7 @@ export function DirectConversation(props: DirectConversationProps) {
           <Button
             variant="default"
             type="button"
-            aria-label="Send direct message"
+            aria-label={i18n.t("conversation.direct.send")}
             disabled={!text().trim() || sending()}
             onClick={() => void send()}
           >

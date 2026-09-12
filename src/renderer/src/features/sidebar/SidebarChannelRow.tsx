@@ -8,6 +8,7 @@ import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { Show } from "solid-js";
 import { Badge, buttonVariants, ContextMenu } from "../../components/ui";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
+import { useI18n } from "../i18n/i18n-context";
 import { SidebarChannelContextMenu } from "./SidebarChannelContextMenu";
 import { sidebarMessageTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
@@ -22,12 +23,13 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary }) {
     sidebarClickIsSuppressed,
     startChatDragging,
   } = useSidebarScope();
+  const i18n = useI18n();
   const active = () => props.activeChannelId === rowProps.channel.id;
   /* Running work is a prefix on the preview line rather than a word beside the name: one line
    * carries both and the row keeps the height every other row in the list has. */
   const preview = () => {
-    const text = rowProps.channel.lastMessage?.text ?? "No messages yet";
-    return rowProps.channel.activeTasks > 0 ? `Working · ${text}` : text;
+    const text = rowProps.channel.lastMessage?.text ?? i18n.t("sidebar.noMessagesYet");
+    return rowProps.channel.activeTasks > 0 ? i18n.t("sidebar.working", { text }) : text;
   };
   return (
     /* biome-ignore lint/a11y/noStaticElementInteractions: Native drag belongs to the wrapper around the accessible button. */
@@ -79,7 +81,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary }) {
             <span class="agent-row-preview">{preview()}</span>
           </span>
           <Show when={rowProps.channel.unreadCount > 0}>
-            <span class="sr-only">{rowProps.channel.unreadCount} unread messages</span>
+            <span class="sr-only">{i18n.t("sidebar.unreadMessages", { count: rowProps.channel.unreadCount })}</span>
           </Show>
         </ContextMenu.Trigger>
         <SidebarChannelContextMenu channel={rowProps.channel} pinned={false} />

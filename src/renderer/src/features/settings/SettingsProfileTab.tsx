@@ -15,6 +15,7 @@ import {
   Text,
   UserAvatar,
 } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import type { SettingsProfileStore } from "./stores/profile-store";
 
 interface SettingsProfileTabProps {
@@ -25,22 +26,25 @@ interface SettingsProfileTabProps {
 }
 
 export function SettingsProfileTab(props: SettingsProfileTabProps) {
+  const i18n = useI18n();
   return (
     <>
-      <SettingsSection title="Identity">
+      <SettingsSection title={i18n.t("settings.profile.identity")}>
         <Input
           ref={(element) => props.store.registerAvatarInput(element)}
           class="sr-only"
           type="file"
-          aria-label="Upload profile photo"
+          aria-label={i18n.t("settings.profile.uploadPhoto")}
           accept="image/png,image/jpeg,image/webp"
           onChange={(event) => void props.store.uploadAvatar(event.currentTarget.files?.[0])}
         />
         <ItemGroup class="settings-modal-card">
           <Item class="settings-identity-name-row">
             <ItemContent>
-              <ItemTitle id="settings-profile-name-label">Display name</ItemTitle>
-              <ItemDescription id="settings-profile-name-description">Visible in shared workspaces.</ItemDescription>
+              <ItemTitle id="settings-profile-name-label">{i18n.t("settings.profile.displayName")}</ItemTitle>
+              <ItemDescription id="settings-profile-name-description">
+                {i18n.t("settings.profile.displayNameDescription")}
+              </ItemDescription>
             </ItemContent>
             <ItemActions
               class="settings-identity-name-control"
@@ -77,9 +81,9 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
           </Item>
           <Item class="settings-identity-image-row">
             <ItemContent>
-              <ItemTitle>Profile photo</ItemTitle>
+              <ItemTitle>{i18n.t("settings.profile.photo")}</ItemTitle>
               <ItemDescription class={props.store.state.avatar.error ? "settings-modal-error" : undefined}>
-                {props.store.state.avatar.error ?? "Shown with your profile in OpenBot."}
+                {props.store.state.avatar.error ?? i18n.t("settings.profile.photoDescription")}
               </ItemDescription>
             </ItemContent>
             <ItemActions class="settings-identity-image-control">
@@ -89,14 +93,19 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
                   variant="outline"
                   size="icon-lg"
                   class="settings-identity-image-trigger settings-modal-profile-photo-trigger"
-                  aria-label={props.account.avatarUrl ? "Edit profile photo" : "Add profile photo"}
+                  aria-label={
+                    props.account.avatarUrl ? i18n.t("settings.profile.editPhoto") : i18n.t("settings.profile.addPhoto")
+                  }
                   disabled={props.store.state.avatar.busy}
                   onClick={props.store.openAvatarPicker}
                 >
                   <UserAvatar user={props.account} class="settings-modal-avatar" decorative />
                 </Button>
                 <Show when={props.account.avatarUrl && !props.store.state.avatar.busy}>
-                  <ImageRemoveButton label="Remove profile photo" onClick={() => void props.store.updateAvatar(null)} />
+                  <ImageRemoveButton
+                    label={i18n.t("settings.profile.removePhoto")}
+                    onClick={() => void props.store.updateAvatar(null)}
+                  />
                 </Show>
               </div>
             </ItemActions>
@@ -104,12 +113,12 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
         </ItemGroup>
       </SettingsSection>
 
-      <SettingsSection title="Account">
+      <SettingsSection title={i18n.t("settings.profile.account")}>
         <ItemGroup class="settings-modal-card">
           <Item class="settings-modal-account-email-row">
             <ItemContent>
-              <ItemTitle>Email</ItemTitle>
-              <ItemDescription>Used to sign in to OpenBot.</ItemDescription>
+              <ItemTitle>{i18n.t("settings.profile.email")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.profile.emailDescription")}</ItemDescription>
             </ItemContent>
             <ItemActions>
               <Text as="span" class="settings-modal-readonly-value" variant="body">
@@ -121,15 +130,17 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
       </SettingsSection>
       <Show when={props.canListSessions}>
         <SettingsSection
-          title="Account sessions"
-          description="Sessions stay signed in until you log out or disconnect them. Disconnecting also ends this account's active remote connections."
+          title={i18n.t("settings.profile.sessions")}
+          description={i18n.t("settings.profile.sessionsDescription")}
         >
           <Button
             variant="outline"
             disabled={props.store.state.sessions.loading || Boolean(props.store.state.sessions.revokingId)}
             onClick={() => void props.store.refreshSessions()}
           >
-            {props.store.state.sessions.loading ? "Loading sessions…" : "Refresh sessions"}
+            {props.store.state.sessions.loading
+              ? i18n.t("settings.profile.loadingSessions")
+              : i18n.t("settings.profile.refreshSessions")}
           </Button>
           <Show when={props.store.state.sessions.error}>
             {(error) => (
@@ -145,23 +156,27 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
                   <ItemContent>
                     <ItemTitle>
                       {session.name}
-                      {session.current ? " · This device" : ""}
+                      {session.current ? ` · ${i18n.t("settings.profile.thisDevice")}` : ""}
                     </ItemTitle>
                     <ItemDescription>
-                      {session.kind === "desktop" ? "Desktop" : "Mobile"} · Signed in{" "}
-                      {new Date(session.connectedAt).toLocaleString()} · Last active{" "}
-                      {new Date(session.lastActiveAt).toLocaleString()}
+                      {session.kind === "desktop"
+                        ? i18n.t("settings.profile.desktop")
+                        : i18n.t("settings.profile.mobile")}{" "}
+                      · {i18n.t("settings.profile.signedIn")} {new Date(session.connectedAt).toLocaleString()} · Last
+                      active {new Date(session.lastActiveAt).toLocaleString()}
                     </ItemDescription>
                   </ItemContent>
                   <ItemActions>
-                    <Show when={!session.current} fallback={<Badge>This device</Badge>}>
+                    <Show when={!session.current} fallback={<Badge>{i18n.t("settings.profile.thisDevice")}</Badge>}>
                       <Button
                         variant="outline"
-                        aria-label={`Disconnect ${session.name} session from ${new Date(session.connectedAt).toLocaleString()}`}
+                        aria-label={`${i18n.t("settings.profile.disconnectSession")} ${session.name}`}
                         disabled={Boolean(props.store.state.sessions.revokingId) || !props.canRevokeSession}
                         onClick={() => void props.store.revokeSession(session.sessionId)}
                       >
-                        {props.store.state.sessions.revokingId === session.sessionId ? "Disconnecting…" : "Disconnect"}
+                        {props.store.state.sessions.revokingId === session.sessionId
+                          ? i18n.t("settings.profile.disconnecting")
+                          : i18n.t("settings.profile.disconnect")}
                       </Button>
                     </Show>
                   </ItemActions>

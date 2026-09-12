@@ -4,6 +4,7 @@ import type { AppVariant, CentralAuthIssue, CentralAuthState } from "@openbot/co
 import { normalizeEmailAddress, normalizeOneTimeCode } from "@openbot/contracts/validation";
 import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { ArrowLeft, Button, Input, RefreshCw } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import { OtpInput, type OtpInputStatus } from "./OtpInput";
 
 interface AccountLoginProps {
@@ -33,6 +34,7 @@ const UNCERTAIN_EMAIL_DELIVERY_ISSUES = new Set([
 ]);
 
 export function AccountLogin(props: AccountLoginProps) {
+  const i18n = useI18n();
   const [email, setEmail] = createSignal("");
   const [code, setCode] = createSignal("");
   const [presentedEmailError, setPresentedEmailError] = createSignal<string | null>(null);
@@ -86,8 +88,13 @@ export function AccountLogin(props: AccountLoginProps) {
   };
   const emailSubmitLabel = () => {
     const retryIn = emailRetryIn();
-    if (emailDeliveryUncertain()) return retryIn > 0 ? `Check again in ${formatTimer(retryIn)}` : "Check delivery";
-    return retryIn > 0 ? `Try again in ${formatTimer(retryIn)}` : "Send sign-in code";
+    if (emailDeliveryUncertain())
+      return retryIn > 0
+        ? `${i18n.t("account.login.checkDelivery")} in ${formatTimer(retryIn)}`
+        : i18n.t("account.login.checkDelivery");
+    return retryIn > 0
+      ? `${i18n.t("account.login.tryAgainIn")} ${formatTimer(retryIn)}`
+      : i18n.t("account.login.sendSignInCode");
   };
   const emailBusy = () =>
     pendingAction() === "send" || pendingAction() === "check" || props.state.status === "signing_in";
@@ -151,8 +158,8 @@ export function AccountLogin(props: AccountLoginProps) {
   );
 
   function validateEmail(value: string): string | null {
-    if (!value.trim()) return "Enter your email address.";
-    return normalizeEmailAddress(value) ? null : "Enter a valid email address.";
+    if (!value.trim()) return i18n.t("account.login.enterEmail");
+    return normalizeEmailAddress(value) ? null : i18n.t("account.login.validEmail");
   }
 
   function clearEmailErrorTimers(): void {
@@ -242,7 +249,7 @@ export function AccountLogin(props: AccountLoginProps) {
     try {
       await props.onRequestEmailCode(normalizedEmail);
     } catch {
-      setLocalError("Something went wrong while sending the code. Try again.");
+      setLocalError(i18n.t("account.login.sendError"));
     } finally {
       setPendingAction(null);
     }
@@ -252,7 +259,7 @@ export function AccountLogin(props: AccountLoginProps) {
     if (props.state.status !== "code_sent" || pendingAction() || codeBusy() || codeNeedsReplacement()) return;
     const normalizedCode = normalizeOneTimeCode(value);
     if (!normalizedCode) {
-      setCodeError("Enter the full 8-character code.");
+      setCodeError(i18n.t("account.login.fullCode"));
       return;
     }
     setCodeError(null);
@@ -262,7 +269,7 @@ export function AccountLogin(props: AccountLoginProps) {
     try {
       await props.onVerifyEmailCode(props.state.challengeId, formatCode(normalizedCode));
     } catch {
-      setLocalError("Something went wrong while verifying the code. Try again.");
+      setLocalError(i18n.t("account.login.verifyError"));
     } finally {
       setPendingAction(null);
     }
@@ -276,7 +283,7 @@ export function AccountLogin(props: AccountLoginProps) {
     try {
       await props.onRequestEmailCode(props.state.email);
     } catch {
-      setLocalError("Something went wrong while sending a new code. Try again.");
+      setLocalError(i18n.t("account.login.newCodeError"));
     } finally {
       setPendingAction(null);
     }
@@ -289,7 +296,7 @@ export function AccountLogin(props: AccountLoginProps) {
     try {
       await props.onRetry();
     } catch {
-      setLocalError("OpenBot still can’t reach the account service.");
+      setLocalError(i18n.t("account.login.serviceUnreachable"));
     } finally {
       setPendingAction(null);
     }
@@ -305,7 +312,7 @@ export function AccountLogin(props: AccountLoginProps) {
       setCodeError(null);
       setIssueVisible(false);
     } catch {
-      setLocalError("OpenBot couldn’t restart sign in. Try again.");
+      setLocalError(i18n.t("account.login.restartError"));
     } finally {
       setPendingAction(null);
     }
@@ -328,28 +335,28 @@ export function AccountLogin(props: AccountLoginProps) {
         >
           <h1 id="account-login-title" class="account-login-title">
             {connecting()
-              ? "Connecting to OpenBot"
+              ? i18n.t("account.login.connecting")
               : unavailable()
-                ? "Service unavailable"
+                ? i18n.t("account.login.unavailable")
                 : verified()
-                  ? "You’re signed in"
+                  ? i18n.t("account.login.signedIn")
                   : codeSent()
-                    ? "Check your inbox"
-                    : "Sign in to OpenBot"}
+                    ? i18n.t("account.login.checkInbox")
+                    : i18n.t("account.login.signIn")}
           </h1>
           <p id="account-login-description" class="account-login-description">
             <Show
               when={challenge() || verified()}
               fallback={
                 connecting()
-                  ? "Starting the account service. This usually takes a moment."
+                  ? i18n.t("account.login.startingService")
                   : unavailable()
-                    ? (currentIssue()?.message ?? "OpenBot can’t reach the account service right now.")
-                    : "We’ll email you a one-time code."
+                    ? (currentIssue()?.message ?? i18n.t("account.login.serviceUnavailable"))
+                    : i18n.t("account.login.emailCode")
               }
             >
               {verified() ? (
-                "Your code was accepted."
+                i18n.t("account.login.codeAccepted")
               ) : (
                 <>
                   We sent a code to <strong>{challenge()?.email}</strong>.
@@ -361,7 +368,7 @@ export function AccountLogin(props: AccountLoginProps) {
           <Show when={connecting()}>
             <div class="account-login-loader" role="status" aria-live="polite">
               <span class="account-login-spinner" aria-hidden="true" />
-              <span>Connecting securely…</span>
+              <span>{i18n.t("account.login.connectingSecurely")}</span>
             </div>
           </Show>
 
@@ -380,7 +387,7 @@ export function AccountLogin(props: AccountLoginProps) {
               disabled={pendingAction() === "retry"}
               onClick={() => void retryConnection()}
             >
-              <Show when={pendingAction() === "retry"} fallback="Try again">
+              <Show when={pendingAction() === "retry"} fallback={i18n.t("account.login.tryAgain")}>
                 <span class="account-login-button-spinner" aria-hidden="true" />
                 Connecting…
               </Show>
@@ -414,7 +421,7 @@ export function AccountLogin(props: AccountLoginProps) {
                       autocapitalize="none"
                       inputmode="email"
                       spellcheck={false}
-                      placeholder="you@example.com"
+                      placeholder={i18n.t("account.login.emailPlaceholder")}
                       maxlength={INPUT_LIMITS.email}
                       value={email()}
                       aria-invalid={emailErrorActive() ? "true" : undefined}
@@ -460,7 +467,9 @@ export function AccountLogin(props: AccountLoginProps) {
                   >
                     <Show when={emailBusy()} fallback={emailSubmitLabel()}>
                       <span class="account-login-button-spinner" aria-hidden="true" />
-                      {pendingAction() === "check" ? "Checking delivery…" : "Sending code…"}
+                      {pendingAction() === "check"
+                        ? i18n.t("account.login.checkingDelivery")
+                        : i18n.t("account.login.sendingCode")}
                     </Show>
                   </Button>
                 </form>
@@ -474,9 +483,9 @@ export function AccountLogin(props: AccountLoginProps) {
                 <OtpInput
                   value={code()}
                   status={otpStatus()}
-                  hint="Enter all 8 characters to continue."
+                  hint={i18n.t("account.login.codeHint")}
                   errorMessage={displayedCodeError()}
-                  successMessage="Verified. Opening OpenBot…"
+                  successMessage={i18n.t("account.login.verified")}
                   disabled={codeNeedsReplacement() || resendBusy()}
                   autofocus
                   onChange={handleCodeInput}
@@ -516,8 +525,8 @@ export function AccountLogin(props: AccountLoginProps) {
                         when={resendBusy()}
                         fallback={
                           resendAvailableIn() > 0
-                            ? `Send a new code in ${formatTimer(resendAvailableIn())}`
-                            : "Send a new code"
+                            ? `${i18n.t("account.login.sendNewCodeIn")} ${formatTimer(resendAvailableIn())}`
+                            : i18n.t("account.login.sendNewCode")
                         }
                       >
                         <span class="account-login-button-spinner" aria-hidden="true" />
@@ -546,11 +555,13 @@ export function AccountLogin(props: AccountLoginProps) {
                         size="sm"
                         disabled={pendingAction() !== null || resendAvailableIn() > 0}
                         loading={resendBusy()}
-                        loadingLabel="Sending…"
+                        loadingLabel={i18n.t("account.login.sending")}
                         onClick={() => void resendCode()}
                       >
                         <RefreshCw size={14} aria-hidden="true" />
-                        {resendAvailableIn() > 0 ? `Resend in ${formatTimer(resendAvailableIn())}` : "Resend code"}
+                        {resendAvailableIn() > 0
+                          ? `${i18n.t("account.login.resendIn")} ${formatTimer(resendAvailableIn())}`
+                          : i18n.t("account.login.resendCode")}
                       </Button>
                     </Show>
                   </div>

@@ -6,6 +6,7 @@
 
 import { Show } from "solid-js";
 import { ContextMenu, FolderPlus } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import { SidebarEmptyState } from "./SidebarEmptyState";
 import { SidebarPinnedGroup } from "./SidebarPinnedGroup";
 import { SidebarSectionList } from "./SidebarSectionList";
@@ -28,10 +29,11 @@ export function SidebarNav() {
     startCreateSection,
     updateSidebarNativeDrag,
   } = useSidebarScope();
+  const i18n = useI18n();
   return (
     <nav
       ref={setAgentListElement}
-      aria-label="Chat list"
+      aria-label={i18n.t("sidebar.chatList")}
       class={["agent-list", scrollFades.classes()]}
       data-sidebar-dragging={draggingKind()}
       onDragOver={updateSidebarNativeDrag}
@@ -58,18 +60,18 @@ export function SidebarNav() {
       </div>
       <Show when={layoutMutable() || props.onToggleArchivedChannels}>
         <ContextMenu.Root modal={false}>
-          <ContextMenu.Trigger class="sidebar-list-context-trigger" aria-label="Sidebar free area" />
+          <ContextMenu.Trigger class="sidebar-list-context-trigger" aria-label={i18n.t("sidebar.freeArea")} />
           <ContextMenu.Portal>
-            <ContextMenu.Content class="agent-context-menu" aria-label="Sidebar actions">
+            <ContextMenu.Content class="agent-context-menu" aria-label={i18n.t("sidebar.actions")}>
               <Show when={layoutMutable()}>
                 <ContextMenu.Item onSelect={() => startCreateSection()}>
                   <FolderPlus class="agent-context-icon size-4" aria-hidden="true" />
-                  <span>New section</span>
+                  <span>{i18n.t("sidebar.newSection")}</span>
                 </ContextMenu.Item>
               </Show>
               <Show when={props.onToggleArchivedChannels}>
                 <ContextMenu.Item onSelect={() => props.onToggleArchivedChannels?.()}>
-                  {props.showingArchivedChannels ? "Show active chats" : "Archived chats"}
+                  {props.showingArchivedChannels ? i18n.t("sidebar.showActiveChats") : i18n.t("sidebar.archivedChats")}
                 </ContextMenu.Item>
               </Show>
             </ContextMenu.Content>

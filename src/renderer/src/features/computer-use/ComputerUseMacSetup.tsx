@@ -27,33 +27,34 @@ import {
   toast,
 } from "../../components/ui";
 import { errorMessage } from "../../error-message";
+import { useI18n } from "../i18n/i18n-context";
 
 export interface ComputerUseMacSetupProps {
   platform: DesktopPlatform;
   variant: "settings" | "compact";
 }
 
-const PERMISSIONS: ReadonlyArray<{
-  id: MacPermissionId;
-  title: string;
-  description: string;
-  icon: typeof Monitor;
-}> = [
-  {
-    id: "screen-recording",
-    title: "Screen Recording",
-    description: "Lets Computer Use see app windows.",
-    icon: Monitor,
-  },
-  {
-    id: "accessibility",
-    title: "Accessibility",
-    description: "Lets Computer Use click and type.",
-    icon: MousePointer2,
-  },
-];
-
 export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
+  const { t } = useI18n();
+  const permissions = (): ReadonlyArray<{
+    id: MacPermissionId;
+    title: string;
+    description: string;
+    icon: typeof Monitor;
+  }> => [
+    {
+      id: "screen-recording",
+      title: t("computerUse.screenRecording"),
+      description: t("computerUse.screenRecordingDescription"),
+      icon: Monitor,
+    },
+    {
+      id: "accessibility",
+      title: t("computerUse.accessibility"),
+      description: t("computerUse.accessibilityDescription"),
+      icon: MousePointer2,
+    },
+  ];
   const desktopApi = window.openbot;
   const [state, setState] = createSignal<ComputerUseMacSetupState | null>(null);
   const [loading, setLoading] = createSignal(false);
@@ -69,7 +70,7 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
       const next = await desktopApi.getComputerUseMacSetupState();
       if (!disposed) setState(next);
     } catch (cause) {
-      if (!disposed) setError(errorMessage(cause, "OpenBot could not check Computer Use."));
+      if (!disposed) setError(errorMessage(cause, t("computerUse.checkError")));
     } finally {
       if (!disposed) setLoading(false);
     }
@@ -84,12 +85,12 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
       if (disposed) return;
       setState(next);
       if (next.status === "available") {
-        toast.success("System Settings opened", {
-          description: "Drag the Computer Use app into the list to finish setup.",
+        toast.success(t("computerUse.systemSettingsOpened"), {
+          description: t("computerUse.systemSettingsDescription"),
         });
       }
     } catch (cause) {
-      if (!disposed) setError(errorMessage(cause, "OpenBot could not open System Settings."));
+      if (!disposed) setError(errorMessage(cause, t("computerUse.openError")));
     } finally {
       if (!disposed) setBusyPermission(null);
     }
@@ -104,7 +105,7 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
   const content = () => (
     <>
       <Show when={loading() && state() === null}>
-        <ItemGroup class="computer-use-card computer-use-loading" aria-label="Checking Computer Use">
+        <ItemGroup class="computer-use-card computer-use-loading" aria-label={t("computerUse.checking")}>
           <For each={[0, 1]}>
             {() => (
               <Item class="computer-use-row">
@@ -131,18 +132,15 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
             <TriangleAlert />
           </AlertIcon>
           <AlertContent>
-            <AlertTitle>Computer Use isn’t available yet</AlertTitle>
+            <AlertTitle>{t("computerUse.unavailableTitle")}</AlertTitle>
             <AlertDescription>
-              {errorMessage(
-                state()?.message ?? error(),
-                "OpenBot could not find the Computer Use helper. Open Computer Use settings to check the setup.",
-              )}
+              {errorMessage(state()?.message ?? error(), t("computerUse.unavailableDescription"))}
             </AlertDescription>
           </AlertContent>
           <AlertActions>
             <Button type="button" variant="outline" size="sm" loading={loading()} onClick={() => void loadState()}>
               <RefreshCw aria-hidden="true" />
-              Try again
+              {t("computerUse.tryAgain")}
             </Button>
           </AlertActions>
         </Alert>
@@ -150,7 +148,7 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
 
       <Show when={state()?.status === "available"}>
         <Show when={props.variant === "settings"}>
-          <SettingsSection title="Computer Use helper">
+          <SettingsSection title={t("computerUse.helper")}>
             <ItemGroup class="settings-modal-card computer-use-card">
               <Item class="settings-modal-row computer-use-helper-row">
                 <ItemMedia class="computer-use-helper-media">
@@ -163,12 +161,12 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
                 </ItemMedia>
                 <ItemContent>
                   <ItemTitle>{state()?.helperName}</ItemTitle>
-                  <ItemDescription>Controls apps for OpenBot.</ItemDescription>
+                  <ItemDescription>{t("computerUse.controlsApps")}</ItemDescription>
                 </ItemContent>
                 <ItemActions>
                   <Badge variant="success-light">
                     <CircleCheck aria-hidden="true" />
-                    Available
+                    {t("computerUse.available")}
                   </Badge>
                 </ItemActions>
               </Item>
@@ -178,10 +176,22 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
 
         <Show
           when={props.variant === "settings"}
-          fallback={<PermissionGroup actionLabel="Set up" busy={busyPermission()} onOpen={openPermission} />}
+          fallback={
+            <PermissionGroup
+              permissions={permissions()}
+              actionLabel={t("computerUse.setUp")}
+              busy={busyPermission()}
+              onOpen={openPermission}
+            />
+          }
         >
-          <SettingsSection title="System permissions" description="Permissions are managed by macOS.">
-            <PermissionGroup actionLabel="Open settings" busy={busyPermission()} onOpen={openPermission} />
+          <SettingsSection title={t("computerUse.systemPermissions")} description={t("computerUse.managedByMacos")}>
+            <PermissionGroup
+              permissions={permissions()}
+              actionLabel={t("computerUse.openSettings")}
+              busy={busyPermission()}
+              onOpen={openPermission}
+            />
           </SettingsSection>
         </Show>
       </Show>
@@ -192,7 +202,7 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
             <Info />
           </AlertIcon>
           <AlertContent>
-            <AlertTitle>Couldn’t open Computer Use setup</AlertTitle>
+            <AlertTitle>{t("computerUse.openError")}</AlertTitle>
             <AlertDescription>{error()}</AlertDescription>
           </AlertContent>
         </Alert>
@@ -208,10 +218,10 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
           <section class="computer-use-compact" aria-labelledby="computer-use-compact-title">
             <header class="computer-use-compact-header">
               <div>
-                <h2 id="computer-use-compact-title">Enable Computer Use</h2>
-                <p>Let OpenBot see and interact with apps on this Mac.</p>
+                <h2 id="computer-use-compact-title">{t("computerUse.setupTitle")}</h2>
+                <p>{t("computerUse.setupDescription")}</p>
               </div>
-              <span>Optional</span>
+              <span>{t("computerUse.optional")}</span>
             </header>
             {content()}
           </section>
@@ -224,13 +234,15 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
 }
 
 function PermissionGroup(props: {
+  permissions: ReadonlyArray<{ id: MacPermissionId; title: string; description: string; icon: typeof Monitor }>;
   actionLabel: string;
   busy: MacPermissionId | null;
   onOpen: (permission: MacPermissionId) => Promise<void>;
 }) {
+  const { t } = useI18n();
   return (
     <ItemGroup class="settings-modal-card computer-use-card computer-use-permission-list">
-      <For each={PERMISSIONS}>
+      <For each={props.permissions}>
         {(permission) => {
           const PermissionIcon = permission.icon;
           return (
@@ -248,7 +260,7 @@ function PermissionGroup(props: {
                   variant="outline"
                   size="sm"
                   loading={props.busy === permission.id}
-                  loadingLabel="Opening…"
+                  loadingLabel={t("computerUse.opening")}
                   disabled={props.busy !== null}
                   onClick={() => void props.onOpen(permission.id)}
                 >

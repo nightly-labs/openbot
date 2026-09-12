@@ -3,16 +3,17 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createStore, For, onCleanup, Show } from "solid-js";
 import { Button, ChevronDown, DropdownMenu, Input, Search, Skeleton, UserAvatar } from "../../components/ui";
 import { errorMessage } from "../../error-message";
+import { useI18n } from "../i18n/i18n-context";
 
 export const CATEGORY_LABELS: Record<SkillCategory, string> = {
-  coding: "Coding",
-  design: "Design",
-  "data-analytics": "Data & Analytics",
-  documents: "Documents",
-  productivity: "Productivity",
-  research: "Research",
-  automation: "Automation",
-  other: "Other",
+  coding: "marketplace.categories.coding",
+  design: "marketplace.categories.design",
+  "data-analytics": "marketplace.categories.dataAnalytics",
+  documents: "marketplace.categories.documents",
+  productivity: "marketplace.categories.productivity",
+  research: "marketplace.categories.research",
+  automation: "marketplace.categories.automation",
+  other: "marketplace.categories.other",
 };
 
 interface CatalogItem {
@@ -44,6 +45,7 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
   icon: (item: T) => JSX.Element;
   onOpen: (item: T) => void | Promise<void>;
 }) {
+  const i18n = useI18n();
   const [state, setState] = createStore<{
     query: string;
     category: SkillCategory | null;
@@ -117,7 +119,7 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
     } catch (error) {
       if (version === requestVersion)
         setState((s) => {
-          s.error = errorMessage(error, "Could not load the marketplace.");
+          s.error = errorMessage(error, i18n.t("settingsMarketplace.loadError"));
         });
     } finally {
       if (version === requestVersion)
@@ -167,14 +169,14 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
               <Button
                 class="skills-marketplace-card-hitarea"
                 variant="ghost"
-                aria-label={`View ${item.name} details`}
+                aria-label={`${i18n.t("settingsMarketplace.viewDetails")} ${item.name}`}
                 onClick={() => void props.onOpen(item)}
               />
               {props.icon(item)}
               <div class="skills-marketplace-card-copy">
                 <div>
                   <h3>{item.name}</h3>
-                  <span>by {item.creatorName}</span>
+                  <span>{`${i18n.t("settingsMarketplace.by")} ${item.creatorName}`}</span>
                 </div>
                 <p>{item.description}</p>
               </div>
@@ -185,10 +187,10 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
     );
   }
   return (
-    <section class="marketplace-catalog" aria-label={`Discover ${props.kind}`}>
+    <section class="marketplace-catalog" aria-label={`${i18n.t("settingsMarketplace.discover")} ${props.kind}`}>
       <Show when={state.loading && !state.featuredLoaded && state.featured.length === 0}>
         <div class="marketplace-featured marketplace-featured-placeholder" aria-hidden="true">
-          <h2>Featured</h2>
+          <h2>{i18n.t("settingsMarketplace.featured")}</h2>
           <div class="marketplace-featured-grid">
             <For each={[0, 1, 2, 3]}>
               {() => (
@@ -205,15 +207,15 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
         </div>
       </Show>
       <Show when={state.featured.length > 0}>
-        <section class="marketplace-featured" aria-label="Featured">
-          <h2>Featured</h2>
+        <section class="marketplace-featured" aria-label={i18n.t("settingsMarketplace.featured")}>
+          <h2>{i18n.t("settingsMarketplace.featured")}</h2>
           <div class="marketplace-featured-grid">
             <For each={state.featured}>
               {(item) => (
                 <Button
                   variant="ghost"
                   class="marketplace-featured-card"
-                  aria-label={`View featured ${item.name}`}
+                  aria-label={`${i18n.t("settingsMarketplace.viewFeatured")} ${item.name}`}
                   onClick={() => void props.onOpen(item)}
                 >
                   <MarketplaceIdentity item={item}>{props.icon(item)}</MarketplaceIdentity>
@@ -230,20 +232,20 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
       <div class="skills-marketplace-search">
         <Search aria-hidden="true" />
         <Input
-          aria-label={`Search ${props.kind}`}
-          placeholder={`Search by creator or ${props.kind === "skills" ? "skill" : "agent"} name`}
+          aria-label={`${i18n.t("settingsMarketplace.search")} ${props.kind}`}
+          placeholder={`${i18n.t("settingsMarketplace.searchPlaceholder")} ${props.kind === "skills" ? "skill" : "agent"}`}
           value={state.query}
           onValueChange={search}
         />
       </div>
-      <nav class="skills-marketplace-categories" aria-label="Categories">
+      <nav class="skills-marketplace-categories" aria-label={i18n.t("settingsMarketplace.categories")}>
         <Button
           size="sm"
           data-active={state.category === null ? "" : undefined}
           aria-pressed={state.category === null ? "true" : "false"}
           onClick={() => selectCategory(null)}
         >
-          All
+          {i18n.t("settingsMarketplace.all")}
         </Button>
         <For each={SKILL_CATEGORIES.slice(0, 4)}>
           {(category) => (
@@ -253,13 +255,15 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
               aria-pressed={state.category === category ? "true" : "false"}
               onClick={() => selectCategory(category)}
             >
-              {CATEGORY_LABELS[category]}
+              {i18n.t(CATEGORY_LABELS[category])}
             </Button>
           )}
         </For>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger class="marketplace-more" aria-label="More categories">
-            {state.category && SKILL_CATEGORIES.indexOf(state.category) >= 4 ? CATEGORY_LABELS[state.category] : "More"}
+            {state.category && SKILL_CATEGORIES.indexOf(state.category) >= 4
+              ? i18n.t(CATEGORY_LABELS[state.category])
+              : i18n.t("settingsMarketplace.more")}
             <ChevronDown />
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
@@ -267,7 +271,7 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
               <For each={SKILL_CATEGORIES.slice(4)}>
                 {(category) => (
                   <DropdownMenu.Item onSelect={() => selectCategory(category)}>
-                    {CATEGORY_LABELS[category]}
+                    {i18n.t(CATEGORY_LABELS[category])}
                   </DropdownMenu.Item>
                 )}
               </For>
@@ -280,7 +284,7 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
           <div role="alert" class="skills-marketplace-state">
             {message()}
             <Button variant="ghost" onClick={() => void load()}>
-              Retry
+              {i18n.t("settingsMarketplace.retry")}
             </Button>
           </div>
         )}
@@ -305,13 +309,19 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
       >
         <Show
           when={state.items.length || state.error}
-          fallback={<div class="skills-marketplace-state">No {props.kind} match this search.</div>}
+          fallback={
+            <div class="skills-marketplace-state">{`${i18n.t("settingsMarketplace.noMatches")} ${props.kind}`}</div>
+          }
         >
           <Show
             when={overview()}
             fallback={
               <section class="skills-marketplace-category-section">
-                <h2>{state.category ? CATEGORY_LABELS[state.category] : "Search results"}</h2>
+                <h2>
+                  {state.category
+                    ? i18n.t(CATEGORY_LABELS[state.category])
+                    : i18n.t("settingsMarketplace.searchResults")}
+                </h2>
                 {rows(state.items)}
               </section>
             }
@@ -321,14 +331,14 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
                 <Show when={state.items.filter((item) => (item.category ?? "other") === category).length}>
                   <section class="skills-marketplace-category-section">
                     <div class="skills-marketplace-section-title">
-                      <h2>{CATEGORY_LABELS[category]}</h2>
+                      <h2>{i18n.t(CATEGORY_LABELS[category])}</h2>
                       <Button
                         variant="ghost"
                         size="sm"
-                        aria-label={`View all ${CATEGORY_LABELS[category]} ${props.kind}`}
+                        aria-label={`${i18n.t("settingsMarketplace.viewAll")} ${i18n.t(CATEGORY_LABELS[category])} ${props.kind}`}
                         onClick={() => selectCategory(category)}
                       >
-                        View all
+                        {i18n.t("settingsMarketplace.viewAllAction")}
                       </Button>
                     </div>
                     {rows(state.items.filter((item) => (item.category ?? "other") === category))}
@@ -344,7 +354,7 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
             loading={state.loadingMore}
             onClick={() => void load(state.category, state.query, state.nextCursor ?? undefined)}
           >
-            Load more
+            {i18n.t("settingsMarketplace.loadMore")}
           </Button>
         </Show>
       </Show>

@@ -7,6 +7,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { onCleanup, Show } from "solid-js";
 import { ChevronDown, Input } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarSectionEditor() {
@@ -19,6 +20,7 @@ export function SidebarSectionEditor() {
     updateSectionEditorName,
   } = useSidebarScope();
   const editor = () => pending.sectionEditor;
+  const i18n = useI18n();
   // The ref callback runs without an owner in Solid 2, so the cleanup has to be registered here, in
   // the component body, or it never runs and `focusSectionName` keeps aiming at a detached input.
   let element: HTMLInputElement | undefined;
@@ -34,7 +36,9 @@ export function SidebarSectionEditor() {
         value={editor()?.name ?? ""}
         onValueChange={updateSectionEditorName}
         maxlength={INPUT_LIMITS.sidebarSectionName}
-        aria-label={editor()?.target.kind === "rename" ? "Rename section" : "New section name"}
+        aria-label={
+          editor()?.target.kind === "rename" ? i18n.t("sidebar.renameSection") : i18n.t("sidebar.newSectionName")
+        }
         aria-invalid={editor()?.error ? "true" : undefined}
         title={editor()?.error ?? undefined}
         disabled={editor()?.saving === true}

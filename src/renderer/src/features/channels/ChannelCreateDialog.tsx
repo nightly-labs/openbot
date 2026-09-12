@@ -15,6 +15,7 @@ import {
   X,
 } from "../../components/ui";
 import { useAgents } from "../agents/agents-context";
+import { useI18n } from "../i18n/i18n-context";
 import { ChannelMemberRow } from "./ChannelMemberRow";
 import { useChannels } from "./channels-context";
 import { emptyChannelDraft, toggleChannelMember } from "./channels-draft";
@@ -27,6 +28,7 @@ import { emptyChannelDraft, toggleChannelMember } from "./channels-draft";
  */
 export function ChannelCreateDialog() {
   const channels = useChannels();
+  const i18n = useI18n();
   const { agentList } = useAgents();
   const channelId = crypto.randomUUID();
   const [draft, setDraft] = createStore<ChannelDraft>(emptyChannelDraft());
@@ -66,8 +68,8 @@ export function ChannelCreateDialog() {
         <Dialog.Overlay class="channel-dialog-backdrop">
           <Dialog.Content class="channel-create-dialog">
             <header class="channel-dialog-header">
-              <Dialog.Title>New channel</Dialog.Title>
-              <IconButton label="Close new channel" variant="ghost" onClick={channels.closeEditor}>
+              <Dialog.Title>{i18n.t("channels.create.title")}</Dialog.Title>
+              <IconButton label={i18n.t("common.closeNewChannel")} variant="ghost" onClick={channels.closeEditor}>
                 <X />
               </IconButton>
             </header>
@@ -90,10 +92,10 @@ export function ChannelCreateDialog() {
                   </Alert>
                 )}
               </Show>
-              <Field label="Channel name">
+              <Field label={i18n.t("channels.fields.name")}>
                 <Input
                   size="lg"
-                  placeholder="Ex: Project Falcon"
+                  placeholder={i18n.t("channels.fields.namePlaceholder")}
                   required
                   value={draft.name}
                   onValueChange={(name) =>
@@ -104,14 +106,14 @@ export function ChannelCreateDialog() {
                 />
               </Field>
               <fieldset class="channel-picker">
-                <legend>Add agents</legend>
+                <legend>{i18n.t("channels.create.addAgents")}</legend>
                 <label class="search-field channel-member-search">
-                  <span class="sr-only">Search agents</span>
+                  <span class="sr-only">{i18n.t("channels.search.label")}</span>
                   <Search class="channel-search-icon" aria-hidden="true" />
                   <Input
                     type="search"
-                    aria-label="Search agents"
-                    placeholder="Search agents"
+                    aria-label={i18n.t("channels.search.label")}
+                    placeholder={i18n.t("channels.search.placeholder")}
                     value={view.search}
                     onValueChange={(search) =>
                       setView((state) => {
@@ -152,9 +154,11 @@ export function ChannelCreateDialog() {
                         <Show when={!agentList().length}>
                           <UsersRound aria-hidden="true" />
                         </Show>
-                        <p>{agentList().length ? "No agents match this search." : "No agents yet"}</p>
+                        <p>
+                          {agentList().length ? i18n.t("channels.empty.noMatches") : i18n.t("channels.empty.noAgents")}
+                        </p>
                         <Show when={!agentList().length}>
-                          <span>Create an agent to add it to this channel.</span>
+                          <span>{i18n.t("channels.empty.createAgent")}</span>
                         </Show>
                       </div>
                     </Show>
@@ -163,7 +167,7 @@ export function ChannelCreateDialog() {
               </fieldset>
               <footer class="channel-editor-footer">
                 <Button type="submit" disabled={channels.state.pending || !draft.name.trim() || !draft.members.length}>
-                  Create
+                  {i18n.t("common.create")}
                 </Button>
               </footer>
             </form>

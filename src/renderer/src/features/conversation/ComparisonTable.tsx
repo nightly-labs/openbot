@@ -1,12 +1,14 @@
 import type { JSX } from "@solidjs/web";
 import { For } from "solid-js";
+import { useI18n } from "../i18n/i18n-context";
 import type { ComparisonTableBlock } from "./DataTable";
 
 export function ComparisonTable(props: { table: ComparisonTableBlock; renderCell?: (text: string) => JSX.Element }) {
+  const i18n = useI18n();
   return (
     <section
       class="message-data-table-scroll message-comparison-table-scroll"
-      aria-label="Comparison table"
+      aria-label={i18n.t("conversation.comparisonTable")}
       tabindex="0"
     >
       <table

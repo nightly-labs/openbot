@@ -30,6 +30,7 @@ import {
   Text,
 } from "../../components/ui";
 import { errorMessage } from "../../error-message";
+import { useI18n } from "../i18n/i18n-context";
 
 /** The provider-key half of the desktop API, narrowed so a test can pass four functions. */
 export interface ProviderKeyApi {
@@ -47,6 +48,7 @@ export interface OpenCodeKeyDialogProps {
 type DialogPhase = "idle" | "loading" | "saving" | "removing";
 
 export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
+  const i18n = useI18n();
   const [key, setKey] = createSignal("");
   const [stored, setStored] = createSignal<ProviderApiKeyStatus>("missing");
   const [phase, setPhase] = createSignal<DialogPhase>("loading");
@@ -62,7 +64,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
     try {
       setStored((await props.api.getProviderApiKeyState("opencode")).status);
     } catch (cause) {
-      setError(errorMessage(cause, "Could not read the saved key."));
+      setError(errorMessage(cause, i18n.t("settings.openCode.readError")));
     } finally {
       setPhase("idle");
     }
@@ -80,7 +82,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
       setKey("");
       props.onClose();
     } catch (cause) {
-      setError(errorMessage(cause, "Could not save the key."));
+      setError(errorMessage(cause, i18n.t("settings.openCode.saveError")));
       setPhase("idle");
     }
   }
@@ -94,14 +96,14 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
       setKey("");
       props.onClose();
     } catch (cause) {
-      setError(errorMessage(cause, "Could not remove the key."));
+      setError(errorMessage(cause, i18n.t("settings.openCode.removeError")));
       setPhase("idle");
     }
   }
 
   function openPage(destination: ExternalDestination): void {
     props.api.openExternal(destination).catch((cause: unknown) => {
-      setError(errorMessage(cause, "Could not open the page."));
+      setError(errorMessage(cause, i18n.t("settings.openCode.openError")));
     });
   }
 
@@ -117,22 +119,20 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
           <Dialog.Content class="opencode-key-dialog" as="section">
             <header class="opencode-key-header">
               <ProviderLogo provider="opencode" class="opencode-key-logo" />
-              <Dialog.Title class="opencode-key-title">Sign in to OpenCode Zen</Dialog.Title>
+              <Dialog.Title class="opencode-key-title">{i18n.t("settings.openCode.title")}</Dialog.Title>
               <Dialog.Description class="opencode-key-description">
-                OpenCode's free models work on this computer with no account. Add a key only to use the paid OpenCode
-                Zen models.
+                {i18n.t("settings.openCode.description")}
               </Dialog.Description>
             </header>
 
             <Show when={stored() === "saved"}>
               <Text class="opencode-key-saved" variant="body-sm" tone="secondary">
-                A key is saved on this computer. Paste a new one to replace it.
+                {i18n.t("settings.openCode.saved")}
               </Text>
             </Show>
             <Show when={stored() === "unreadable"}>
               <Text class="opencode-key-saved" variant="body-sm" tone="secondary">
-                OpenBot could not read the saved key, so OpenCode uses only the free models. Paste the key again, or
-                remove it.
+                {i18n.t("settings.openCode.unreadable")}
               </Text>
             </Show>
 
@@ -144,14 +144,14 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
               }}
             >
               <Field
-                label="OpenCode Zen key"
-                description="OpenBot encrypts the key on this computer and passes it only to the OpenCode CLI."
+                label={i18n.t("settings.openCode.keyLabel")}
+                description={i18n.t("settings.openCode.keyDescription")}
               >
                 <Input
                   type="password"
                   autocomplete="off"
                   spellcheck={false}
-                  placeholder="Paste your key"
+                  placeholder={i18n.t("settings.openCode.placeholder")}
                   value={key()}
                   disabled={busy()}
                   onValueChange={setKey}
@@ -165,7 +165,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                       <OctagonX />
                     </AlertIcon>
                     <AlertContent>
-                      <AlertTitle>OpenCode Zen</AlertTitle>
+                      <AlertTitle>{i18n.t("settings.openCode.title")}</AlertTitle>
                       <AlertDescription>{message()}</AlertDescription>
                     </AlertContent>
                   </Alert>
@@ -177,25 +177,25 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                   type="submit"
                   variant="default"
                   loading={phase() === "saving"}
-                  loadingLabel="Saving…"
+                  loadingLabel={i18n.t("settings.saving")}
                   disabled={busy() || !key().trim()}
                 >
-                  Save key
+                  {i18n.t("settings.openCode.save")}
                 </Button>
                 <Show when={stored() !== "missing"}>
                   <Button
                     type="button"
                     variant="outline"
                     loading={phase() === "removing"}
-                    loadingLabel="Removing…"
+                    loadingLabel={i18n.t("settings.openCode.removing")}
                     disabled={busy()}
                     onClick={() => void remove()}
                   >
-                    Remove key
+                    {i18n.t("settings.openCode.remove")}
                   </Button>
                 </Show>
                 <Button type="button" variant="ghost" disabled={busy()} onClick={props.onClose}>
-                  Cancel
+                  {i18n.t("settings.cancel")}
                 </Button>
               </footer>
             </form>
@@ -203,10 +203,10 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
             <div class="opencode-key-links">
               <Button type="button" variant="outline" size="sm" onClick={() => openPage("opencode-auth")}>
                 <ExternalLink size={13} aria-hidden="true" />
-                Get a key
+                {i18n.t("settings.openCode.getKey")}
               </Button>
               <Button type="button" variant="ghost" size="sm" onClick={() => openPage("opencode-install")}>
-                Learn about OpenCode
+                {i18n.t("settings.openCode.learnMore")}
               </Button>
             </div>
           </Dialog.Content>

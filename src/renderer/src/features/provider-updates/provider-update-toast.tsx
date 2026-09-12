@@ -3,6 +3,7 @@ import type { AgentProviderId } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createRoot, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { Progress, TOAST_DURATION, toast } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import { type ProviderUpdate, type ProviderUpdatePresentation, presentProviderUpdate } from "./provider-update";
 
 /**
@@ -128,9 +129,10 @@ function ProviderUpdateDetail(props: {
  * out of the accessibility tree.
  */
 function ProviderUpdateActionLabel(props: { presentation: ProviderUpdatePresentation }): JSX.Element {
+  const { t } = useI18n();
   return (
     <span class="provider-update-toast-action" data-idle={props.presentation.actionLabel ? undefined : "true"}>
-      {props.presentation.actionLabel}
+      {props.presentation.actionLabel && t(`updates.${props.presentation.actionLabel.toLowerCase()}`)}
     </span>
   );
 }
@@ -247,10 +249,11 @@ function liveToast(provider: AgentProviderId, presentation: ProviderUpdatePresen
 
 /** Open an offer or an explicitly started update. Reports alone never reopen a closed toast. */
 export function showProviderUpdateToast(update: ProviderUpdate, onUpdate: () => void): void {
+  const { t } = useI18n();
   const timer = dismissTimers.get(update.provider);
   if (timer !== undefined) window.clearTimeout(timer);
   dismissTimers.delete(update.provider);
-  const presentation = presentProviderUpdate(update);
+  const presentation = presentProviderUpdate(update, t);
   const live = liveToast(update.provider, presentation);
   live.present(presentation);
   live.setAct(onUpdate);
@@ -280,9 +283,10 @@ export function hideProviderUpdateToast(provider: AgentProviderId): void {
  * own timer never started, and cannot be started now without replacing the notification.
  */
 export function reportProviderUpdateToast(update: ProviderUpdate, onRetry: () => void): void {
+  const { t } = useI18n();
   const live = liveToasts.get(update.provider);
   if (!live) return;
-  const presentation = presentProviderUpdate(update);
+  const presentation = presentProviderUpdate(update, t);
   live.present(presentation);
   live.setAct(onRetry);
   live.setOffer(presentation.updatable ? update.availableVersion : null);

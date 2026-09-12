@@ -1,10 +1,12 @@
 import { Show } from "solid-js";
 import { Button, Dialog } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import { CloseIcon } from "./ConversationIcons";
 import { useConversationViewScope } from "./conversation-scope";
 
 /** @internal Stable HMR boundary for conversation overlays. */
 export function ConversationOverlays() {
+  const i18n = useI18n();
   const { attachmentAction, mediaPreview, setMediaPreview } = useConversationViewScope();
   return (
     <Dialog.Root open={Boolean(mediaPreview())} onOpenChange={(open) => !open && setMediaPreview(null)}>
@@ -18,7 +20,7 @@ export function ConversationOverlays() {
                   variant="ghost"
                   type="button"
                   class="media-close"
-                  aria-label="Close media preview"
+                  aria-label={i18n.t("conversation.media.closePreview")}
                   onClick={() => setMediaPreview(null)}
                 >
                   <CloseIcon />
@@ -38,7 +40,9 @@ export function ConversationOverlays() {
                   />
                 </Show>
                 <Show when={preview().attachment.previewKind === "text"}>
-                  <pre class="media-text">{preview().loading ? "Loading…" : (preview().error ?? preview().text)}</pre>
+                  <pre class="media-text">
+                    {preview().loading ? i18n.t("conversation.loading") : (preview().error ?? preview().text)}
+                  </pre>
                 </Show>
                 <div class="media-caption">
                   <span>{preview().attachment.name}</span>

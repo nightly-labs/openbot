@@ -1,4 +1,5 @@
 import { PanelResizer, savePanelWidth } from "./components/PanelResizer";
+import { useI18n } from "./features/i18n/i18n-context";
 import { useLayout } from "./layout";
 import {
   LEFT_PANEL_COLLAPSE_THRESHOLD,
@@ -18,11 +19,12 @@ import {
  */
 export function WorkspaceLeftPanelResizer() {
   const layout = useLayout();
+  const i18n = useI18n();
 
   return (
     <PanelResizer
       class="left-panel-resizer"
-      label="Resize left sidebar"
+      label={i18n.t("common.resizeLeftSidebar")}
       controls="agent-sidebar"
       direction="left"
       value={layout.leftPanelWidth()}

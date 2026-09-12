@@ -1,5 +1,6 @@
 import type { JSX } from "@solidjs/web";
 import { createSignal, createUniqueId, Show } from "solid-js";
+import { useI18n } from "../features/i18n/i18n-context";
 import { PanelResizer, readPanelWidth, savePanelWidth } from "./PanelResizer";
 import { Button, ChevronRight, FieldContext } from "./ui";
 
@@ -42,11 +43,12 @@ export interface SettingsPanelProps {
 }
 
 export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
+  const i18n = useI18n();
   return (
     <aside id={props.id} class="settings-panel" aria-label={props.label}>
       <PanelResizer
         class="right-panel-resizer"
-        label="Resize right panel"
+        label={i18n.t("common.resizeRightPanel")}
         controls={props.id}
         direction="right"
         value={props.width}
@@ -87,7 +89,7 @@ export interface SettingsPanelHeaderProps {
   onBack?: () => void;
   backLabel?: string;
   onClose: () => void;
-  closeLabel: string;
+  closeLabel?: string;
 }
 
 /**
@@ -96,6 +98,7 @@ export interface SettingsPanelHeaderProps {
  * is what keeps the two panels the same height and the title in the same place.
  */
 export function SettingsPanelHeader(props: SettingsPanelHeaderProps): JSX.Element {
+  const i18n = useI18n();
   return (
     <header class="settings-panel-header">
       <Show when={props.onBack} fallback={<span />}>
@@ -103,7 +106,7 @@ export function SettingsPanelHeader(props: SettingsPanelHeaderProps): JSX.Elemen
           variant="ghost"
           type="button"
           class="settings-panel-nav-button"
-          aria-label={props.backLabel ?? "Back"}
+          aria-label={props.backLabel ?? i18n.t("common.back")}
           onClick={() => props.onBack?.()}
         >
           <SettingsBackIcon />
@@ -114,7 +117,7 @@ export function SettingsPanelHeader(props: SettingsPanelHeaderProps): JSX.Elemen
         variant="ghost"
         type="button"
         class="settings-panel-nav-button"
-        aria-label={props.closeLabel}
+        aria-label={props.closeLabel ?? i18n.t("common.close")}
         onClick={() => props.onClose()}
       >
         <SettingsForwardIcon />

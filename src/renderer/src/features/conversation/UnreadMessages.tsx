@@ -1,4 +1,5 @@
 import { Button } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import { newMessagesLabel, preferredMessageScrollBehavior } from "./MessageNavigation";
 
 export function UnreadMessagesBanner(props: {
@@ -7,6 +8,7 @@ export function UnreadMessagesBanner(props: {
   onJumpToUnread: () => void;
   onMarkRead: () => void;
 }) {
+  const i18n = useI18n();
   const label = () => newMessagesLabel(props.count);
   return (
     <div class="unread-messages-banner" role="status" aria-label={label()}>
@@ -26,17 +28,20 @@ export function UnreadMessagesBanner(props: {
         disabled={props.busy}
         onClick={props.onMarkRead}
       >
-        <span class="unread-messages-mark-read-label">{props.busy ? "Marking…" : "Mark as read"}</span>
+        <span class="unread-messages-mark-read-label">
+          {props.busy ? i18n.t("conversation.unread.marking") : i18n.t("conversation.unread.markAsRead")}
+        </span>
       </Button>
     </div>
   );
 }
 
 export function UnreadMessagesDivider(props: { elementRef?: (element: HTMLDivElement) => void }) {
+  const i18n = useI18n();
   return (
     <div class="unread-messages-divider" ref={props.elementRef}>
-      <hr aria-label="New messages" />
-      <span>NEW</span>
+      <hr aria-label={i18n.t("conversation.unread.newMessages")} />
+      <span>{i18n.t("conversation.unread.new")}</span>
       <hr />
     </div>
   );

@@ -6,6 +6,7 @@ import type {
   DynamicIslandStateChangeReason,
   DynamicIslandViewState,
 } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import { OpenBotDynamicIsland } from "./OpenBotDynamicIsland";
 
 const DEFAULT_NOTCH_WIDTH = 192;
@@ -16,6 +17,7 @@ const DEFAULT_NOTCH_SIZE: DynamicIslandNotchSize = {
 };
 
 export function DynamicIslandSurface() {
+  const { t } = useI18n();
   const query = new URLSearchParams(window.location.search);
   const displayMode = query.get("display") === "island" ? "island" : "notch";
   const notchWidth = readPositivePixelValue(query.get("notch-width"), DEFAULT_NOTCH_WIDTH);
@@ -164,11 +166,11 @@ export function DynamicIslandSurface() {
     };
   });
   return (
-    <main class="dynamic-island-surface" aria-label="OpenBot MacBook notch">
+    <main class="dynamic-island-surface" aria-label={t("dynamicIsland.notch")}>
       <Show when={presentation().mode !== "idle" || preference().idleVisible}>
         <fieldset
           class="dynamic-island-surface-anchor"
-          aria-label="Dynamic Island interaction area"
+          aria-label={t("dynamicIsland.interactionArea")}
           onMouseOver={enterInteraction}
           onMouseOut={leaveInteraction}
           onFocus={beginFocusInteraction}

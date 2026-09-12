@@ -2,6 +2,7 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import { Dialog, IconButton, X } from "../../components/ui";
 import { cx } from "../../components/ui/utils";
+import { useI18n } from "../i18n/i18n-context";
 
 interface SettingsDialogShellProps {
   open: boolean;
@@ -35,6 +36,7 @@ function closeDuration(): number {
 }
 
 export function SettingsDialogShell(props: SettingsDialogShellProps) {
+  const i18n = useI18n();
   const [rendered, setRendered] = createSignal(untrack(() => props.open));
   const [closing, setClosing] = createSignal(false);
   const [canScrollUp, setCanScrollUp] = createSignal(false);
@@ -154,8 +156,8 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
                   <Dialog.Description class="settings-modal-description">{props.description}</Dialog.Description>
                 </div>
                 <IconButton
-                  label={props.closeLabel ?? "Close settings"}
-                  tooltip={props.closeLabel ?? "Close settings"}
+                  label={props.closeLabel ?? i18n.t("settings.close")}
+                  tooltip={props.closeLabel ?? i18n.t("settings.close")}
                   variant="ghost"
                   onClick={() => requestOpenChange(false)}
                 >

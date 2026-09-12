@@ -14,6 +14,7 @@ import {
   SettingsSection,
   SwitchField,
 } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import type { GeneralSettingsValue } from "./app-settings";
 import type { SettingsUpdatesStore } from "./stores/updates-store";
 
@@ -29,13 +30,14 @@ interface SettingsUpdatesTabProps {
 }
 
 export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
+  const i18n = useI18n();
   return (
-    <SettingsSection title="OpenBot updates">
+    <SettingsSection title={i18n.t("settings.updates.title")}>
       <ItemGroup class="settings-modal-card">
         <Item class="settings-modal-row settings-modal-update-track-row">
           <ItemContent>
-            <ItemTitle>Update track</ItemTitle>
-            <ItemDescription>Stable receives tested OpenBot releases.</ItemDescription>
+            <ItemTitle>{i18n.t("settings.updates.track")}</ItemTitle>
+            <ItemDescription>{i18n.t("settings.updates.trackDescription")}</ItemDescription>
           </ItemContent>
           <ItemActions>
             <Select<UpdateTrack>
@@ -48,7 +50,7 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
                 <SelectItem item={selectProps.item}>{selectProps.item.rawValue}</SelectItem>
               )}
             >
-              <SelectTrigger size="sm" aria-label="Update track">
+              <SelectTrigger size="sm" aria-label={i18n.t("settings.updates.track")}>
                 <SelectValue<UpdateTrack>>{(state) => state.selectedOption()}</SelectValue>
               </SelectTrigger>
               <SelectContent mount={props.selectMount} />
@@ -57,8 +59,10 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
         </Item>
         <Item class="settings-modal-row settings-modal-update-row">
           <ItemContent>
-            <ItemTitle>Version {props.store.installedVersion()}</ItemTitle>
-            <ItemDescription>Updates follow the Stable track.</ItemDescription>
+            <ItemTitle>
+              {i18n.t("settings.updates.version")} {props.store.installedVersion()}
+            </ItemTitle>
+            <ItemDescription>{i18n.t("settings.updates.followDescription")}</ItemDescription>
             <ItemDescription class={props.store.messageClass()}>{props.store.message()}</ItemDescription>
           </ItemContent>
           <ItemActions class="settings-modal-update-actions">
@@ -71,15 +75,17 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
               disabled={!props.store.presentation().supported}
               onClick={() => void props.store.runAction()}
             >
-              {props.store.presentation().supported ? props.store.presentation().actionLabel : "Updates unavailable"}
+              {props.store.presentation().supported
+                ? props.store.presentation().actionLabel
+                : i18n.t("settings.updates.unavailable")}
             </Button>
           </ItemActions>
         </Item>
         <SwitchField
           checked={props.value.autoDownloadUpdates}
           onChange={(checked) => props.onUpdateSetting("autoDownloadUpdates", checked)}
-          label="Automatically download updates"
-          description="Download new versions when they become available."
+          label={i18n.t("settings.updates.autoDownload")}
+          description={i18n.t("settings.updates.autoDownloadDescription")}
         />
       </ItemGroup>
     </SettingsSection>

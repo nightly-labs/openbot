@@ -6,6 +6,7 @@
 
 import { Show } from "solid-js";
 import { ArrowDown, ArrowUp, buttonVariants, ChevronDown, ContextMenu, Pencil, Trash2 } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import { SidebarSectionEditor } from "./SidebarSectionEditor";
 import { useSidebarScope } from "./sidebar-scope";
 
@@ -25,6 +26,7 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
     stopSidebarDragging,
     visibleSectionIds,
   } = useSidebarScope();
+  const i18n = useI18n();
   const editing = () => {
     const target = pending.sectionEditor?.target;
     return target?.kind === "rename" && target.sectionId === headerProps.sectionId;
@@ -44,7 +46,7 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
               class: "sidebar-section-toggle sidebar-section-drag-handle",
             })}
             draggable={!layoutMutable() || props.compact ? "false" : "true"}
-            title={!layoutMutable() ? "This host does not support sidebar layout changes." : undefined}
+            title={!layoutMutable() ? i18n.t("sidebar.layoutUnsupported") : undefined}
             aria-expanded={collapsed() ? "false" : "true"}
             aria-controls={`sidebar-section-body-${headerProps.sectionId}`}
             onClick={(event: MouseEvent) => {
@@ -65,23 +67,23 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
           </ContextMenu.Trigger>
           <Show when={layoutMutable()}>
             <ContextMenu.Portal>
-              <ContextMenu.Content class="agent-context-menu" aria-label="Section actions">
+              <ContextMenu.Content class="agent-context-menu" aria-label={i18n.t("sidebar.sectionActions")}>
                 <Show when={custom()}>
                   <ContextMenu.Item onSelect={() => startRenameSection(headerProps.sectionId)}>
                     <Pencil class="agent-context-icon size-4" aria-hidden="true" />
-                    <span>Rename</span>
+                    <span>{i18n.t("common.rename")}</span>
                   </ContextMenu.Item>
                 </Show>
                 <ContextMenu.Item disabled={position() <= 0} onSelect={() => moveSection(headerProps.sectionId, "up")}>
                   <ArrowUp class="agent-context-icon size-4" aria-hidden="true" />
-                  <span>Move up</span>
+                  <span>{i18n.t("sidebar.moveUp")}</span>
                 </ContextMenu.Item>
                 <ContextMenu.Item
                   disabled={position() < 0 || position() >= visibleSectionIds().length - 1}
                   onSelect={() => moveSection(headerProps.sectionId, "down")}
                 >
                   <ArrowDown class="agent-context-icon size-4" aria-hidden="true" />
-                  <span>Move down</span>
+                  <span>{i18n.t("sidebar.moveDown")}</span>
                 </ContextMenu.Item>
                 <Show when={custom()}>
                   <ContextMenu.Separator />
@@ -90,7 +92,7 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
                     onSelect={() => openDelete("section", headerProps.sectionId)}
                   >
                     <Trash2 class="agent-context-icon agent-context-danger-icon size-4" aria-hidden="true" />
-                    <span>Delete</span>
+                    <span>{i18n.t("common.delete")}</span>
                   </ContextMenu.Item>
                 </Show>
               </ContextMenu.Content>

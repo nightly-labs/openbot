@@ -2,6 +2,7 @@ import { ONE_TIME_CODE_ALPHABET, ONE_TIME_CODE_LENGTH } from "@openbot/contracts
 import { createEffect, createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
 import { Input } from "../../components/ui";
 import { prefersReducedMotion } from "../../components/ui/utils";
+import { useI18n } from "../i18n/i18n-context";
 
 export type OtpInputStatus = "idle" | "verifying" | "error" | "success";
 
@@ -18,6 +19,7 @@ interface OtpInputProps {
 }
 
 export function OtpInput(props: OtpInputProps) {
+  const i18n = useI18n();
   const inputId = `openbot-otp-${createUniqueId()}`;
   const messageId = `${inputId}-message`;
   const initialSlots = toSlots(untrack(() => props.value));
@@ -30,9 +32,9 @@ export function OtpInput(props: OtpInputProps) {
   const status = () => props.status ?? "idle";
   const disabled = () => Boolean(props.disabled || status() === "verifying" || status() === "success");
   const message = createMemo(() => {
-    if (status() === "success") return props.successMessage ?? "Verified. Opening OpenBot…";
-    if (status() === "error") return props.errorMessage ?? "That code is incorrect. Try again.";
-    if (status() === "verifying") return "Verifying…";
+    if (status() === "success") return props.successMessage ?? i18n.t("account.login.verified");
+    if (status() === "error") return props.errorMessage ?? i18n.t("account.login.invalidCode");
+    if (status() === "verifying") return i18n.t("account.login.verifying");
     return props.hint;
   });
 
@@ -190,7 +192,7 @@ export function OtpInput(props: OtpInputProps) {
       */}
       <fieldset
         class="otp-input-fieldset"
-        aria-label="One-time code entry"
+        aria-label={i18n.t("account.login.oneTimeCodeEntry")}
         aria-disabled={disabled() ? "true" : undefined}
         onPointerDown={handlePointerDown}
       >
@@ -206,7 +208,7 @@ export function OtpInput(props: OtpInputProps) {
           value=""
           readonly={Boolean(props.disabled || status() === "success")}
           maxlength={ONE_TIME_CODE_LENGTH}
-          aria-label="One-time code"
+          aria-label={i18n.t("account.login.oneTimeCode")}
           aria-invalid={status() === "error" ? "true" : undefined}
           aria-describedby={message() ? messageId : undefined}
           autofocus={props.autofocus}

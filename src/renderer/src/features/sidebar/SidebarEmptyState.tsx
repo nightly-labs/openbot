@@ -7,16 +7,22 @@
 import { Show } from "solid-js";
 import { Button } from "../../components/ui";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { useI18n } from "../i18n/i18n-context";
 import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarEmptyState() {
   const { props, query } = useSidebarScope();
+  const i18n = useI18n();
   return (
     <Show
       when={!query().trim() && props.emptyAction}
       fallback={
         <p class="empty-search">
-          {query().trim() ? "No matches" : props.agents.length ? "No matches" : "No agents yet"}
+          {query().trim()
+            ? i18n.t("sidebar.noMatches")
+            : props.agents.length
+              ? i18n.t("sidebar.noMatches")
+              : i18n.t("sidebar.noAgentsYet")}
         </p>
       }
     >

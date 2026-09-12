@@ -40,6 +40,7 @@ import {
 } from "../../components/ui";
 import { prefersReducedMotion } from "../../components/ui/utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { useI18n } from "../i18n/i18n-context";
 import {
   animateModeLayers,
   type CapturedModeLayerState,
@@ -149,12 +150,12 @@ const STATUS_SHARED_TRAILING: SharedLeadingMotion = {
 
 const OPENBOT_ISLAND_MODE_CONFIG: Record<DynamicIslandPresentation["mode"], OpenBotIslandModeConfig> = {
   idle: {
-    label: "Open OpenBot",
+    label: "dynamicIsland.open",
   },
   working: {
-    label: "OpenBot working status",
+    label: "dynamicIsland.workingStatus",
     badge: {
-      label: "Working",
+      label: "dynamicIsland.working",
       variant: "success-light",
       icon: () => (
         <Spinner
@@ -169,9 +170,9 @@ const OPENBOT_ISLAND_MODE_CONFIG: Record<DynamicIslandPresentation["mode"], Open
     },
   },
   message: {
-    label: "OpenBot chat update",
+    label: "dynamicIsland.chatUpdate",
     badge: {
-      label: "Message",
+      label: "dynamicIsland.message",
       variant: "info-light",
       icon: () => (
         <MessageCircle data-icon="inline-start" class="dynamic-island-surface-status-badge-icon" aria-hidden="true" />
@@ -180,9 +181,9 @@ const OPENBOT_ISLAND_MODE_CONFIG: Record<DynamicIslandPresentation["mode"], Open
     },
   },
   question: {
-    label: "OpenBot question from AI",
+    label: "dynamicIsland.questionFromAi",
     badge: {
-      label: "Questions",
+      label: "dynamicIsland.questions",
       variant: "info-light",
       icon: () => (
         <MessageCircleQuestionMark
@@ -195,10 +196,10 @@ const OPENBOT_ISLAND_MODE_CONFIG: Record<DynamicIslandPresentation["mode"], Open
     },
   },
   approval: {
-    label: "OpenBot approval request",
+    label: "dynamicIsland.approvalRequest",
     ariaLive: "polite",
     badge: {
-      label: "Approval",
+      label: "dynamicIsland.approval",
       variant: "warning-light",
       icon: () => (
         <Check data-icon="inline-start" class="dynamic-island-surface-status-badge-icon" aria-hidden="true" />
@@ -207,10 +208,10 @@ const OPENBOT_ISLAND_MODE_CONFIG: Record<DynamicIslandPresentation["mode"], Open
     },
   },
   takeover: {
-    label: "OpenBot browser takeover",
+    label: "dynamicIsland.browserTakeover",
     ariaLive: "polite",
     badge: {
-      label: "Take over",
+      label: "dynamicIsland.takeOver",
       variant: "warning-light",
       icon: () => (
         <Monitor data-icon="inline-start" class="dynamic-island-surface-status-badge-icon" aria-hidden="true" />
@@ -219,10 +220,10 @@ const OPENBOT_ISLAND_MODE_CONFIG: Record<DynamicIslandPresentation["mode"], Open
     },
   },
   failed: {
-    label: "OpenBot task failed",
+    label: "dynamicIsland.taskFailed",
     ariaLive: "polite",
     badge: {
-      label: "Failed",
+      label: "dynamicIsland.failed",
       variant: "destructive-light",
       icon: () => (
         <OctagonX data-icon="inline-start" class="dynamic-island-surface-status-badge-icon" aria-hidden="true" />
@@ -235,6 +236,7 @@ const OPENBOT_ISLAND_MODE_CONFIG: Record<DynamicIslandPresentation["mode"], Open
 function compactStatusGeometry(
   presentation: DynamicIslandPresentation,
   physicalNotchWidth = STATUS_COMPACT_NOTCH_WIDTH,
+  t?: (key: string, options?: Record<string, string | number>) => string,
 ): StatusCompactGeometry | undefined {
   const mode = statusMode(presentation.mode);
   if (!mode) return undefined;
@@ -246,7 +248,9 @@ function compactStatusGeometry(
 
   const badge = OPENBOT_ISLAND_MODE_CONFIG[mode].badge;
   if (!badge) return undefined;
-  const badgeWidth = Math.ceil(measureCompactText(badge.label, 600) + STATUS_COMPACT_BADGE_CHROME_WIDTH);
+  const badgeWidth = Math.ceil(
+    measureCompactText(t?.(badge.label) ?? badge.label, 600) + STATUS_COMPACT_BADGE_CHROME_WIDTH,
+  );
   const measuredNameWidth = agent ? measureCompactText(agent.name, 600) : 0;
   const notchNameWidth = Math.min(STATUS_COMPACT_NAME_MAX_WIDTH.notch, Math.ceil(measuredNameWidth));
   const islandNameWidth = Math.min(STATUS_COMPACT_NAME_MAX_WIDTH.island, Math.ceil(measuredNameWidth));
@@ -323,6 +327,7 @@ function measureCompactText(text: string, weight: number): number {
 }
 
 export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Element {
+  const { t } = useI18n();
   const initialPresentation = untrack(() => props.presentation);
   const [visiblePresentation, setVisiblePresentation] = createSignal(initialPresentation);
   const config = () => OPENBOT_ISLAND_MODE_CONFIG[visiblePresentation().mode];
@@ -334,7 +339,9 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
   let modeTransitionVersion = 0;
   let modeTransitionFrame: number | undefined;
   let modeTransitionDisposed = false;
-  const compactGeometry = createMemo(() => compactStatusGeometry(compactLayoutPresentation(), props.notchSize?.width));
+  const compactGeometry = createMemo(() =>
+    compactStatusGeometry(compactLayoutPresentation(), props.notchSize?.width, t),
+  );
   const compactWidth = () => {
     const geometry = compactGeometry();
     if (!geometry) return undefined;
@@ -469,7 +476,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
       data-mode-transitioning={modeTransitioning() ? "true" : undefined}
     >
       <DynamicIsland
-        label={`${config().label}${props.displayMode === "island" ? " on external display" : ""}`}
+        label={`${t(config().label)}${props.displayMode === "island" ? t("dynamicIsland.externalDisplay") : ""}`}
         ariaLive={config().ariaLive}
         state={props.state}
         displayMode={props.displayMode}
@@ -673,6 +680,7 @@ function CompactAgentName(props: { name: string; displayMode?: "notch" | "island
 }
 
 function CompactStatusBadge(props: { mode: StatusMode }): JSX.Element {
+  const { t } = useI18n();
   const config = () => OPENBOT_ISLAND_MODE_CONFIG[props.mode].badge;
   return (
     <Show when={config()}>
@@ -685,7 +693,7 @@ function CompactStatusBadge(props: { mode: StatusMode }): JSX.Element {
           aria-hidden="true"
         >
           {badge().icon()}
-          <span class="dynamic-island-surface-status-badge-label">{badge().label}</span>
+          <span class="dynamic-island-surface-status-badge-label">{t(badge().label)}</span>
         </Badge>
       )}
     </Show>

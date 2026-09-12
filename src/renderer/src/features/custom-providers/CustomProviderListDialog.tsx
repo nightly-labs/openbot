@@ -17,6 +17,7 @@ import {
   Trash2,
   X,
 } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 
 interface CustomProviderListDialogProps {
   open: boolean;
@@ -42,6 +43,7 @@ interface CustomProviderListDialogProps {
  * is cheaper to accept than a focus handle on the picker for this one case.
  */
 export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
+  const i18n = useI18n();
   const fades = createScrollFades();
   onSettled(() => fades.stop);
   const busy = () => props.removing !== null;
@@ -51,10 +53,8 @@ export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
       <Dialog.Portal>
         <Dialog.Overlay class="custom-provider-backdrop">
           <Dialog.Content as="section" class="custom-provider-dialog" aria-busy={busy() ? "true" : undefined}>
-            <Dialog.Title class="sr-only">Custom providers</Dialog.Title>
-            <Dialog.Description class="sr-only">
-              The endpoints you have saved. Remove the ones you no longer use.
-            </Dialog.Description>
+            <Dialog.Title class="sr-only">{i18n.t("providers.list.title")}</Dialog.Title>
+            <Dialog.Description class="sr-only">{i18n.t("providers.list.description")}</Dialog.Description>
 
             <header class="custom-provider-header">
               <span class="custom-provider-mark" aria-hidden="true">
@@ -62,13 +62,18 @@ export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
               </span>
               <div class="custom-provider-title">
                 <Heading as="h2" size="md">
-                  Custom providers
+                  {i18n.t("providers.list.title")}
                 </Heading>
                 <Text tone="muted" variant="caption">
-                  Your own model endpoints.
+                  {i18n.t("providers.list.subtitle")}
                 </Text>
               </div>
-              <IconButton class="custom-provider-close" label="Close" variant="ghost" onClick={props.onClose}>
+              <IconButton
+                class="custom-provider-close"
+                label={i18n.t("providers.actions.close")}
+                variant="ghost"
+                onClick={props.onClose}
+              >
                 <X />
               </IconButton>
             </header>
@@ -79,11 +84,11 @@ export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
                   when={props.providers.length > 0}
                   fallback={
                     <Text class="custom-provider-list-empty" tone="muted" variant="caption">
-                      No custom endpoints yet.
+                      {i18n.t("providers.list.empty")}
                     </Text>
                   }
                 >
-                  <ItemGroup surface="subtle" aria-label="Custom endpoints">
+                  <ItemGroup surface="subtle" aria-label={i18n.t("providers.list.endpoints")}>
                     <For each={props.providers}>
                       {(provider) => (
                         <Item>
@@ -100,12 +105,12 @@ export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
                                 <Button
                                   variant="destructive-ghost"
                                   size="sm"
-                                  aria-label={`Delete ${provider.name}`}
+                                  aria-label={i18n.t("providers.actions.delete", { name: provider.name })}
                                   disabled={busy()}
                                   onClick={() => onDelete()(provider)}
                                 >
                                   <Trash2 size={14} aria-hidden="true" />
-                                  Delete
+                                  {i18n.t("providers.actions.deleteShort")}
                                 </Button>
                               </ItemActions>
                             )}
@@ -126,7 +131,7 @@ export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
                   )}
                 </Show>
                 <Button type="button" variant="default" onClick={props.onClose}>
-                  Done
+                  {i18n.t("providers.actions.done")}
                 </Button>
               </footer>
             </div>

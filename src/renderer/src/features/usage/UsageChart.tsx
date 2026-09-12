@@ -12,6 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "../../components/ui/chart";
+import { useI18n } from "../i18n/i18n-context";
 import { UsageProviderMark } from "./UsageProviderMark";
 import {
   type UsageMetric,
@@ -26,22 +27,23 @@ import {
 } from "./usage-format";
 
 export function UsageChart(props: { result: HostAnalytics; metric: UsageMetric }) {
+  const { t } = useI18n();
   const chart = createMemo(() => usageSeries(props.result.providerDaily, props.result.daily, props.metric));
-  const measure = () => (props.metric === "Cost" ? "estimated cost in USD" : "processed tokens");
+  const measure = () => (props.metric === "Cost" ? t("usage.estimatedCostUsd") : t("usage.processedTokens"));
   const formatValue = (value: number) =>
-    props.metric === "Cost" ? usageExactCost(value) : `${usageNumber(value)} tokens`;
+    props.metric === "Cost" ? usageExactCost(value) : `${usageNumber(value)} ${t("usage.tokens").toLowerCase()}`;
   // A host that reports totals but no split still draws one area, and naming it "Total"
   // twice - as its own row and as the sum - would say the same number to itself.
   const named = () => chart().series[0] !== usageTotalSeries;
   return (
-    <ChartContainer label={`Daily ${measure()} by provider. Exact values are available with View daily data.`}>
+    <ChartContainer label={t("usage.chartLabel", { measure: measure() })}>
       <AreaChart
         data={chart().rows}
         margin={{ top: 12, right: 12, bottom: 0, left: 0 }}
         accessibilityLayer
         role="img"
         tabIndex={0}
-        aria-label={`Daily ${measure()} by provider`}
+        aria-label={t("usage.chartAriaLabel", { measure: measure() })}
       >
         <CartesianGrid vertical={false} stroke="var(--openbot-border-strong)" />
         <XAxis

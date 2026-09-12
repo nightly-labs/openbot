@@ -10,18 +10,19 @@ import {
   TriangleAlert,
 } from "../../components/ui";
 import { errorMessage } from "../../error-message";
-
-const PERMISSION_COPY: Record<MacPermissionId, { title: string; icon: typeof Monitor }> = {
-  "screen-recording": { title: "Screen Recording", icon: Monitor },
-  accessibility: { title: "Accessibility", icon: MousePointer2 },
-};
+import { useI18n } from "../i18n/i18n-context";
 
 export function ComputerUseSetupSurface() {
+  const { t } = useI18n();
+  const permissionCopy = (): Record<MacPermissionId, { title: string; icon: typeof Monitor }> => ({
+    "screen-recording": { title: t("computerUse.screenRecording"), icon: Monitor },
+    accessibility: { title: t("computerUse.accessibility"), icon: MousePointer2 },
+  });
   const desktopApi = window.openbot;
   const query = new URLSearchParams(window.location.search);
   const permission: MacPermissionId =
     query.get("permission") === "accessibility" ? "accessibility" : "screen-recording";
-  const copy = PERMISSION_COPY[permission];
+  const copy = permissionCopy()[permission];
   const PermissionIcon = copy.icon;
   const [state, setState] = createSignal<Awaited<ReturnType<typeof window.openbot.getComputerUseMacSetupState>> | null>(
     null,
@@ -41,7 +42,7 @@ export function ComputerUseSetupSurface() {
         if (!disposed) setState(next);
       })
       .catch((cause) => {
-        if (!disposed) setError(errorMessage(cause, "Computer Use could not be loaded."));
+        if (!disposed) setError(errorMessage(cause, t("computerUse.setupError")));
       });
     return () => {
       disposed = true;
@@ -54,7 +55,7 @@ export function ComputerUseSetupSurface() {
     try {
       await desktopApi.revealComputerUseHelper();
     } catch (cause) {
-      setError(errorMessage(cause, "Computer Use could not be shown in Finder."));
+      setError(errorMessage(cause, t("computerUse.finderError")));
     }
   }
 
@@ -69,8 +70,8 @@ export function ComputerUseSetupSurface() {
           <PermissionIcon />
         </span>
         <div>
-          <h1>Add Computer Use to {copy.title}</h1>
-          <p>Drag this app into the list in System Settings.</p>
+          <h1>{t("computerUse.addTo", { permission: copy.title })}</h1>
+          <p>{t("computerUse.dragInstruction")}</p>
         </div>
       </header>
 
@@ -81,10 +82,10 @@ export function ComputerUseSetupSurface() {
             <TriangleAlert aria-hidden="true" />
             <span>
               {error()
-                ? errorMessage(error(), "Could not load Computer Use. Try again.")
+                ? errorMessage(error(), t("computerUse.loadError"))
                 : state()?.message
-                  ? errorMessage(state()?.message, "Could not load Computer Use. Try again.")
-                  : "Loading Computer Use…"}
+                  ? errorMessage(state()?.message, t("computerUse.loadError"))
+                  : t("computerUse.loading")}
             </span>
           </div>
         }
@@ -94,7 +95,7 @@ export function ComputerUseSetupSurface() {
           variant="ghost"
           class={`computer-use-drag-card${dragging() ? " is-dragging" : ""}`}
           draggable="true"
-          aria-label={`Drag ${state()?.helperName ?? "Codex Computer Use"} into System Settings, or press to show it in Finder`}
+          aria-label={t("computerUse.dragLabel", { helper: state()?.helperName ?? t("computerUse.helperFallback") })}
           onClick={() => void reveal()}
           onDragStart={(event) => {
             event.preventDefault();
@@ -102,7 +103,7 @@ export function ComputerUseSetupSurface() {
             setError(null);
             void desktopApi
               .startComputerUseHelperDrag()
-              .catch((cause) => setError(errorMessage(cause, "Computer Use could not be dragged.")))
+              .catch((cause) => setError(errorMessage(cause, t("computerUse.dragError"))))
               .finally(() => setDragging(false));
           }}
           onDragEnd={() => {
@@ -118,7 +119,7 @@ export function ComputerUseSetupSurface() {
             </Show>
           </span>
           <strong>{state()?.helperName}.app</strong>
-          <span>Drag to add</span>
+          <span>{t("computerUse.dragToAdd")}</span>
         </Button>
       </Show>
 
@@ -129,7 +130,7 @@ export function ComputerUseSetupSurface() {
       </Show>
 
       <footer class="computer-use-setup-footer">
-        <p>Can’t drag? Show it in Finder, then use +.</p>
+        <p>{t("computerUse.cantDrag")}</p>
         <div>
           <Button
             type="button"
@@ -139,11 +140,11 @@ export function ComputerUseSetupSurface() {
             onClick={() => void reveal()}
           >
             <FolderOpen aria-hidden="true" />
-            Show in Finder
+            {t("computerUse.showInFinder")}
           </Button>
           <Button type="button" size="sm" onClick={close}>
             <CircleCheck aria-hidden="true" />
-            Done
+            {t("computerUse.done")}
           </Button>
         </div>
       </footer>

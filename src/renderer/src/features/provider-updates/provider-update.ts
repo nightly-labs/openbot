@@ -54,7 +54,10 @@ export function providerUpdateAvailable(runtime: ProviderRuntimeStatus, availabl
   );
 }
 
-export function presentProviderUpdate(update: ProviderUpdate): ProviderUpdatePresentation {
+export function presentProviderUpdate(
+  update: ProviderUpdate,
+  translate: (key: string, options?: Record<string, string | number>) => string = defaultTranslate,
+): ProviderUpdatePresentation {
   const { name, runtime, availableVersion } = update;
   const updatable = providerUpdateAvailable(runtime, availableVersion);
   const busy = runtime.phase === "downloading" || runtime.phase === "finishing";
@@ -64,10 +67,10 @@ export function presentProviderUpdate(update: ProviderUpdate): ProviderUpdatePre
   if (updatable) actionLabel = "Update";
   else if (failed) actionLabel = "Retry";
 
-  let title = `${name} is up to date`;
-  if (updatable) title = `${name} update available`;
-  else if (busy) title = `Updating ${name}`;
-  else if (failed) title = `${name} update failed`;
+  let title = translate("updates.upToDate", { name });
+  if (updatable) title = translate("updates.available", { name });
+  else if (busy) title = translate("updates.updating", { name });
+  else if (failed) title = translate("updates.failed", { name });
 
   return {
     updatable,
@@ -75,9 +78,23 @@ export function presentProviderUpdate(update: ProviderUpdate): ProviderUpdatePre
     failed,
     actionLabel,
     title,
-    detail: updateDetail(update, updatable),
+    detail: updateDetail(update, updatable, translate),
     progress: runtime.phase === "downloading" ? clampProgress(runtime.progress) : null,
   };
+}
+
+function defaultTranslate(key: string, options?: Record<string, string | number>): string {
+  const name = String(options?.name ?? "");
+  return (
+    {
+      "updates.upToDate": `${name} is up to date`,
+      "updates.available": `${name} update available`,
+      "updates.updating": `Updating ${name}`,
+      "updates.failed": `${name} update failed`,
+      "updates.settingUp": "Setting up",
+      "updates.interrupted": "The update was interrupted. Try again.",
+    }[key] ?? key
+  );
 }
 
 /**
@@ -97,12 +114,15 @@ function versionTransition(version: string | null, availableVersion: string | nu
   return `${formatVersion(version)} → ${formatVersion(availableVersion)}`;
 }
 
-function updateDetail(update: ProviderUpdate, updatable: boolean): string {
+function updateDetail(
+  update: ProviderUpdate,
+  updatable: boolean,
+  translate: (key: string, options?: Record<string, string | number>) => string,
+): string {
   const { runtime, availableVersion } = update;
   if (updatable || runtime.phase === "downloading") return versionTransition(runtime.version, availableVersion);
-  if (runtime.phase === "finishing") return "Setting up";
-  if (runtime.phase === "download-error")
-    return errorMessage(runtime.message, "The update was interrupted. Try again.");
+  if (runtime.phase === "finishing") return translate("updates.settingUp");
+  if (runtime.phase === "download-error") return errorMessage(runtime.message, translate("updates.interrupted"));
   return formatVersion(runtime.version ?? availableVersion);
 }
 

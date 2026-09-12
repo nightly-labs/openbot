@@ -17,6 +17,7 @@ import {
   PICKER_PROVIDERS,
 } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
+import { useI18n } from "../features/i18n/i18n-context";
 import { createScrollFades } from "./createScrollFades";
 import {
   customProviderIds,
@@ -80,6 +81,7 @@ const CUSTOM_RAIL = "custom" as const;
 
 const PROVIDERS: readonly RailId[] = [...PICKER_PROVIDERS, CUSTOM_RAIL];
 export function ProviderModelPicker(props: ProviderModelPickerProps) {
+  const { t } = useI18n();
   const [open, setOpen] = createSignal(false);
   const [search, setSearch] = createSignal("");
   const providerButtons = new Map<RailId, HTMLButtonElement>();
@@ -110,15 +112,15 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
 
   const customSummary = () => {
     const count = props.customProviders?.length ?? 0;
-    if (count === 0) return "No endpoints yet";
-    return count === 1 ? "1 endpoint" : `${count} endpoints`;
+    if (count === 0) return t("modelPicker.noEndpoints");
+    return t(count === 1 ? "modelPicker.endpoint" : "modelPicker.endpoints", { count });
   };
   const railSummary = (rail: RailId, status: AgentProviderStatus): string =>
-    rail === CUSTOM_RAIL ? customSummary() : providerSummary(rail, status);
+    rail === CUSTOM_RAIL ? customSummary() : providerSummary(rail, status, t);
   const railHeadingSummary = (rail: RailId, status: AgentProviderStatus): string => {
     if (rail !== CUSTOM_RAIL) return providerHeadingSummary(rail, status);
     // OpenCode is what serves a custom endpoint, so its trouble is this tab's trouble.
-    return status.state === "available" ? customSummary() : providerStatusLabel(status.state);
+    return status.state === "available" ? customSummary() : providerStatusLabel(status.state, t);
   };
 
   createEffect(
@@ -188,7 +190,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
         <Popover.Trigger
           type="button"
           class={["provider-model-trigger", { "provider-model-trigger-field": field() }]}
-          aria-label={`${props.ariaLabel ?? "Agent model"}: ${triggerModelName()}`}
+          aria-label={`${props.ariaLabel ?? t("modelPicker.agentModel")}: ${triggerModelName()}`}
           disabled={props.disabled}
           title={props.disabled ? props.disabledReason : `${railName(activeProvider())} · ${triggerModelName()}`}
           onKeyDown={(event) => {
@@ -198,7 +200,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
           }}
         >
           <Show when={field()}>
-            <span class="provider-model-field-label">{props.label ?? "Model"}</span>
+            <span class="provider-model-field-label">{props.label ?? t("modelPicker.model")}</span>
           </Show>
           <span class="provider-model-trigger-value">
             <ProviderMark provider={activeProvider()} />
@@ -214,7 +216,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
             if (event.key === "Escape") setOpen(false);
           }}
         >
-          <Popover.Title class="sr-only">Choose agent model</Popover.Title>
+          <Popover.Title class="sr-only">{t("modelPicker.choose")}</Popover.Title>
           <Tabs.Root
             value={railProvider()}
             onChange={(value) => {
@@ -225,10 +227,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
             activationMode="automatic"
             class="provider-model-layout"
           >
-            <Tabs.List class="provider-model-rail" aria-label="Model providers">
+            <Tabs.List class="provider-model-rail" aria-label={t("modelPicker.providers")}>
               <For each={PROVIDERS}>
                 {(provider) => {
-                  const status = () => providerAvailability(props.agentStatus, props.modelOptions, provider);
+                  const status = () => providerAvailability(props.agentStatus, props.modelOptions, provider, t);
                   return (
                     <Tabs.Trigger
                       ref={(element) => providerButtons.set(provider, element)}
@@ -311,19 +313,23 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 };
                 const runtimeAction = () => {
                   if (available() || status().connectionState === "connecting") return undefined;
-                  if (runtime()?.phase === "downloading") return "Cancel" as const;
-                  if (runtime()?.phase === "ready") return "Connect" as const;
-                  if (runtime()?.phase === "download-error") return "Retry" as const;
-                  if (runtime()?.phase === "not-downloaded") return "Download" as const;
+                  if (runtime()?.phase === "downloading") return t("modelPicker.cancel");
+                  if (runtime()?.phase === "ready") return t("modelPicker.connect");
+                  if (runtime()?.phase === "download-error") return t("modelPicker.retry");
+                  if (runtime()?.phase === "not-downloaded") return t("modelPicker.download");
                   return undefined;
                 };
                 const runtimeMessage = () => {
                   const runtimeStatus = runtime();
                   if (runtimeStatus?.phase === "downloading") {
-                    return `Downloading ${Math.round(runtimeStatus.progress ?? 0)}%`;
+                    return t("modelPicker.downloading", { percent: Math.round(runtimeStatus.progress ?? 0) });
                   }
-                  if (runtimeStatus?.phase === "finishing") return "Setting up";
-                  return runtimeStatus?.message ?? status().message ?? `${railName(provider)} is unavailable.`;
+                  if (runtimeStatus?.phase === "finishing") return t("modelPicker.settingUp");
+                  return (
+                    runtimeStatus?.message ??
+                    status().message ??
+                    t("modelPicker.unavailable", { provider: railName(provider) })
+                  );
                 };
                 return (
                   <Tabs.Content
@@ -339,7 +345,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                       <Show when={provider === CUSTOM_RAIL && props.onAddCustomProvider}>
                         <Button type="button" size="xs" variant="default" onClick={() => props.onAddCustomProvider?.()}>
                           <Plus />
-                          Add provider
+                          {t("modelPicker.addProvider")}
                         </Button>
                       </Show>
                     </div>
@@ -354,11 +360,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                             <Button
                               type="button"
                               size="xs"
-                              variant={action() === "Download" ? "default" : "outline"}
+                              variant={action() === t("modelPicker.download") ? "default" : "outline"}
                               onClick={() => {
                                 const target = wireProvider(provider);
-                                if (action() === "Cancel") void props.onCancelProviderDownload?.(target);
-                                else if (action() === "Connect") void props.onConnectProvider?.(target);
+                                if (action() === t("modelPicker.cancel")) void props.onCancelProviderDownload?.(target);
+                                else if (action() === t("modelPicker.connect")) void props.onConnectProvider?.(target);
                                 else void props.onDownloadProvider?.(target);
                               }}
                             >
@@ -370,8 +376,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     </Show>
                     <Input
                       class="provider-model-search"
-                      aria-label="Search models"
-                      placeholder="Search models"
+                      aria-label={t("modelPicker.search")}
+                      placeholder={t("modelPicker.search")}
                       value={search()}
                       onValueChange={setSearch}
                     />
@@ -385,14 +391,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 when={provider === CUSTOM_RAIL && !search().trim()}
                                 fallback={
                                   search().trim()
-                                    ? "No models match your search."
-                                    : `No models are available from ${railName(provider)}.`
+                                    ? t("modelPicker.noMatch")
+                                    : t("modelPicker.noModels", { provider: railName(provider) })
                                 }
                               >
-                                <span>
-                                  Add an OpenAI-compatible endpoint — a model server on this computer, or any service
-                                  with a base URL and a key.
-                                </span>
+                                <span>{t("modelPicker.customHelp")}</span>
                               </Show>
                             </div>
                           </Show>
@@ -435,10 +438,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 <span class="provider-model-option-name">
                                   <span>{displayModelName(model.name, model.id)}</span>
                                   <Show when={model.free}>
-                                    <small>Free</small>
+                                    <small>{t("modelPicker.free")}</small>
                                   </Show>
                                   <Show when={model.id === railDefaultModel(provider)}>
-                                    <small>default</small>
+                                    <small>{t("modelPicker.default")}</small>
                                   </Show>
                                 </span>
                                 <Show when={isSelected()}>
@@ -452,7 +455,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     </div>
                     <Show when={effortOptions().length > 0}>
                       <div class="provider-model-effort">
-                        <span>Effort</span>
+                        <span>{t("modelPicker.effort")}</span>
                         <Select<{ id: string; name: string }>
                           class="provider-model-effort-select"
                           options={effortOptions()}
@@ -471,9 +474,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           }}
                           itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.name}</SelectItem>}
                         >
-                          <SelectTrigger size="sm" aria-label="Agent reasoning effort" disabled={!available()}>
+                          <SelectTrigger
+                            size="sm"
+                            aria-label={t("modelPicker.reasoningEffort")}
+                            disabled={!available()}
+                          >
                             <SelectValue<{ id: string; name: string }>>
-                              {(state) => state.selectedOption()?.name ?? "Select effort"}
+                              {(state) => state.selectedOption()?.name ?? t("modelPicker.selectEffort")}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent class="provider-model-effort-content" />
@@ -496,8 +503,8 @@ function wireProvider(rail: RailId): AgentProviderId {
   return rail === CUSTOM_RAIL ? "opencode" : rail;
 }
 
-function railName(rail: RailId): string {
-  return rail === CUSTOM_RAIL ? "Custom" : agentProviderName(rail);
+function railName(rail: RailId, t?: (key: string, options?: Record<string, string | number>) => string): string {
+  return rail === CUSTOM_RAIL ? (t?.("modelPicker.custom") ?? "Custom") : agentProviderName(rail);
 }
 
 /** Nothing is the default on the Custom tab: the user's own endpoints have no shipped starting model. */
@@ -505,7 +512,12 @@ function railDefaultModel(rail: RailId): AgentModelId | null {
   return rail === CUSTOM_RAIL ? null : defaultProviderModel(rail);
 }
 
-function providerAvailability(status: AgentStatus, models: AgentModelOption[], rail: RailId): AgentProviderStatus {
+function providerAvailability(
+  status: AgentStatus,
+  models: AgentModelOption[],
+  rail: RailId,
+  t?: (key: string, options?: Record<string, string | number>) => string,
+): AgentProviderStatus {
   const provider = wireProvider(rail);
   const explicit = status.providers?.find((item) => item.id === provider);
   if (explicit) return explicit;
@@ -517,32 +529,43 @@ function providerAvailability(status: AgentStatus, models: AgentModelOption[], r
     id: provider,
     state: available ? "available" : "error",
     version: null,
-    message: available ? null : `${agentProviderName(provider)} is unavailable.`,
+    message: available
+      ? null
+      : (t?.("modelPicker.unavailable", { provider: agentProviderName(provider) }) ??
+        `${agentProviderName(provider)} is unavailable.`),
   };
 }
-
-function providerSummary(provider: AgentProviderId, status: AgentProviderStatus): string {
+function providerSummary(
+  provider: AgentProviderId,
+  status: AgentProviderStatus,
+  t?: (key: string, options?: Record<string, string | number>) => string,
+): string {
   if (status.state === "available") {
     return status.version
       ? `${status.version} (${agentProviderCliName(provider)})`
       : `${agentProviderCliName(provider)} ready`;
   }
-  return status.message ?? providerStatusLabel(status.state);
+  return status.message ?? providerStatusLabel(status.state, t);
 }
 
-function providerHeadingSummary(provider: AgentProviderId, status: AgentProviderStatus): string {
-  if (status.state === "available") return providerSummary(provider, status);
-  return providerStatusLabel(status.state);
+function providerHeadingSummary(
+  provider: AgentProviderId,
+  status: AgentProviderStatus,
+  t?: (key: string, options?: Record<string, string | number>) => string,
+): string {
+  if (status.state === "available") return providerSummary(provider, status, t);
+  return providerStatusLabel(status.state, t);
 }
 
 function providerStatusLabel(
   state: AgentProviderStatus["state"],
-): "Sign in required" | "Not installed" | "Update required" | "Unavailable" | "Checking" {
-  if (state === "sign-in-required") return "Sign in required";
-  if (state === "not-installed") return "Not installed";
-  if (state === "outdated") return "Update required";
-  if (state === "error") return "Unavailable";
-  return "Checking";
+  t?: (key: string, options?: Record<string, string | number>) => string,
+): string {
+  if (state === "sign-in-required") return t?.("modelPicker.signInRequired") ?? "Sign in required";
+  if (state === "not-installed") return t?.("modelPicker.notInstalled") ?? "Not installed";
+  if (state === "outdated") return t?.("modelPicker.updateRequired") ?? "Update required";
+  if (state === "error") return t?.("modelPicker.unavailable") ?? "Unavailable";
+  return t?.("modelPicker.checking") ?? "Checking";
 }
 
 function displayModelName(name: string | undefined, fallback: string): string {

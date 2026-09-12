@@ -2,8 +2,10 @@ import type { BrowserDisplayState } from "@openbot/contracts/ipc";
 import { render } from "@solidjs/web";
 import { createSignal, onCleanup, onSettled, Show } from "solid-js";
 import "../../styles.css";
+import { useI18n } from "../i18n/i18n-context";
 
 function BrowserPictureInPicture() {
+  const { t } = useI18n();
   const [state, setState] = createSignal<BrowserDisplayState>({ tabs: [], activeTabId: null });
   let surface: HTMLDivElement | undefined;
   let stateRevision = 0;
@@ -56,12 +58,12 @@ function BrowserPictureInPicture() {
   });
 
   return (
-    <aside class="browser-pip-window" aria-label="Browser Picture in Picture">
+    <aside class="browser-pip-window" aria-label={t("browser.pictureInPicture")}>
       <div class="browser-surface browser-pip-surface" ref={surface}>
         <Show when={state().tabs.length === 0}>
           <div class="browser-empty-state">
-            <strong>Open a page</strong>
-            <span>The agent can browse here while it works.</span>
+            <strong>{t("browser.openPage")}</strong>
+            <span>{t("browser.agentBrowsing")}</span>
           </div>
         </Show>
       </div>

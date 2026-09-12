@@ -2,11 +2,13 @@
 
 import { Show } from "solid-js";
 import { Bot, Button, DropdownMenu, Hash, Puzzle } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import { PlusIcon, SidebarToggleIcon } from "./SidebarIcons";
 import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarTopbar() {
   const { props } = useSidebarScope();
+  const i18n = useI18n();
   return (
     <div class="window-drag sidebar-topbar">
       <Button
@@ -14,7 +16,7 @@ export function SidebarTopbar() {
         size="sm"
         type="button"
         class="sidebar-server-name no-drag"
-        aria-label={`Open settings for ${props.serverName}`}
+        aria-label={i18n.t("sidebar.openSettingsFor", { server: props.serverName })}
         aria-hidden={props.compact ? "true" : undefined}
         tabindex={props.compact ? -1 : 0}
         title={props.serverName}
@@ -31,10 +33,10 @@ export function SidebarTopbar() {
             props.compact ? "sidebar-toggle-button" : "sidebar-marketplace-button",
           ]}
           onClick={() => (props.compact ? props.onExpand() : props.onOpenMarketplace())}
-          aria-label={props.compact ? "Expand sidebar" : "Open Marketplace"}
+          aria-label={props.compact ? i18n.t("sidebar.expand") : i18n.t("sidebar.openMarketplace")}
           aria-controls={props.compact ? "agent-sidebar" : undefined}
           aria-expanded={props.compact ? "false" : undefined}
-          title={props.compact ? "Expand sidebar" : "Marketplace"}
+          title={props.compact ? i18n.t("sidebar.expand") : i18n.t("sidebar.marketplace")}
         >
           <Show when={props.compact} fallback={<Puzzle aria-hidden="true" />}>
             <SidebarToggleIcon />
@@ -43,7 +45,7 @@ export function SidebarTopbar() {
         <DropdownMenu.Root placement="bottom-end" gutter={4}>
           <DropdownMenu.Trigger
             class="sidebar-icon-button sidebar-new-button no-drag"
-            aria-label="New agent or channel"
+            aria-label={i18n.t("sidebar.newAgentOrChannel")}
             aria-hidden={props.compact ? "true" : undefined}
             tabindex={props.compact ? -1 : 0}
           >
@@ -53,12 +55,12 @@ export function SidebarTopbar() {
             <DropdownMenu.Content>
               <DropdownMenu.Item onSelect={props.onCreateAgent}>
                 <Bot aria-hidden="true" />
-                New agent
+                {i18n.t("sidebar.newAgent")}
               </DropdownMenu.Item>
               <Show when={props.onCreateChannel}>
                 <DropdownMenu.Item onSelect={() => props.onCreateChannel?.()}>
                   <Hash aria-hidden="true" />
-                  New channel
+                  {i18n.t("sidebar.newChannel")}
                 </DropdownMenu.Item>
               </Show>
             </DropdownMenu.Content>

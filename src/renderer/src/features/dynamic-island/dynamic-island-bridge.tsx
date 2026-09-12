@@ -9,6 +9,7 @@ import { useTurns } from "../../turns";
 import { useAgents } from "../agents/agents-context";
 import { useConversation } from "../conversation/conversation-context";
 import { promptRequestKey } from "../conversation/conversation-keys";
+import { useI18n } from "../i18n/i18n-context";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSelection } from "../servers/server-selection";
 import { useServerSwitch } from "../servers/server-switch";
@@ -42,6 +43,7 @@ import { useDynamicIsland } from "./dynamic-island-context";
  */
 export function DynamicIslandBridge() {
   const platform = usePlatform();
+  const { t } = useI18n();
   const { activeServerId } = useServers();
   const { dynamicIslandCoordinator, publishDynamicIslandPresentation } = useDynamicIsland();
   const { selectServer } = useServerSelection();
@@ -121,8 +123,8 @@ export function DynamicIslandBridge() {
     if (platform.landingPreview) return;
     return window.openbot.dynamicIsland.onAction((action) => {
       void handleDynamicIslandAction(action).catch((error) => {
-        toast.error("Could not open this remote item", {
-          description: errorMessage(error, "Could not open this item. Try again."),
+        toast.error(t("dynamicIsland.openError"), {
+          description: errorMessage(error, t("dynamicIsland.openErrorDescription")),
         });
       });
     });
@@ -185,7 +187,7 @@ export function DynamicIslandBridge() {
       try {
         await window.openbot.agent.acknowledgeFailedTurn({ agentId: action.agentId, turnId: action.turnId });
       } catch (error) {
-        appendUiError(action.agentId, error, "Acknowledge failed", action.serverId);
+        appendUiError(action.agentId, error, t("dynamicIsland.acknowledgeFailed"), action.serverId);
         return;
       }
       setFailedTurns((current) =>

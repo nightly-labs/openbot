@@ -20,6 +20,7 @@ import {
   Smartphone,
   Text,
 } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import type { SettingsMobileConnectStore } from "./stores/mobile-connect-store";
 
 interface SettingsMobileConnectTabProps {
@@ -35,18 +36,17 @@ function devicePlatformLabel(platform: MobileConnectedDevice["platform"]): "iOS"
 }
 
 export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
+  const i18n = useI18n();
   return (
     <SettingsSection
-      title="Connect your phone"
-      description="Scan a one-time code with the OpenBot mobile app to use this account on your phone."
+      title={i18n.t("settings.mobileConnect.title")}
+      description={i18n.t("settings.mobileConnect.description")}
     >
       <ItemGroup class="settings-modal-card settings-mobile-connect-card">
         <Item class="settings-modal-row settings-mobile-connect-action-row">
           <ItemContent>
-            <ItemTitle>Mobile sign-in</ItemTitle>
-            <ItemDescription>
-              The code expires after two minutes and stops working after the first successful scan.
-            </ItemDescription>
+            <ItemTitle>{i18n.t("settings.mobileConnect.signIn")}</ItemTitle>
+            <ItemDescription>{i18n.t("settings.mobileConnect.codeDescription")}</ItemDescription>
             <Show when={props.store.state.connect.error}>
               {(error) => (
                 <ItemDescription class="settings-modal-error" role="alert">
@@ -60,11 +60,13 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
               type="button"
               size="sm"
               loading={props.store.state.connect.busy}
-              loadingLabel="Generating…"
+              loadingLabel={i18n.t("settings.mobileConnect.generating")}
               disabled={!props.canCreateTicket}
               onClick={() => void props.store.createTicket()}
             >
-              {props.store.state.connect.session ? "Generate new code" : "Generate QR code"}
+              {props.store.state.connect.session
+                ? i18n.t("settings.mobileConnect.generateNew")
+                : i18n.t("settings.mobileConnect.generate")}
             </Button>
           </ItemActions>
         </Item>
@@ -84,10 +86,10 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
                       <div class="settings-mobile-connect-expired" role="status">
                         <Smartphone aria-hidden="true" />
                         <Text class="settings-mobile-connect-code-title" variant="body">
-                          This code has expired
+                          {i18n.t("settings.mobileConnect.expired")}
                         </Text>
                         <Text variant="caption" tone="muted">
-                          Generate a new code to connect your phone.
+                          {i18n.t("settings.mobileConnect.generateNewDescription")}
                         </Text>
                       </div>
                     }
@@ -96,7 +98,7 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
                       class="settings-mobile-connect-qr-stage"
                       data-success={session().successDeviceName ? "" : undefined}
                     >
-                      <QrCode value={session().ticket.qrData} label="Mobile Connect sign-in QR code" />
+                      <QrCode value={session().ticket.qrData} label={i18n.t("settings.mobileConnect.qrLabel")} />
                       <Show when={session().successDeviceName}>
                         <div class="settings-mobile-connect-success-mark" aria-hidden="true">
                           <CircleCheck />
@@ -109,13 +111,13 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
                         fallback={
                           <>
                             <Text class="settings-mobile-connect-code-title" variant="body">
-                              Open OpenBot on your phone
+                              {i18n.t("settings.mobileConnect.openOnPhone")}
                             </Text>
                             <Text variant="caption" tone="muted">
-                              Choose Scan QR code and point your camera at this code.
+                              {i18n.t("settings.mobileConnect.scanInstructions")}
                             </Text>
                             <Text class="settings-mobile-connect-expiry" variant="caption" aria-atomic="true">
-                              Expires in {props.store.expiryLabel()}
+                              {`${i18n.t("settings.mobileConnect.expiresIn")} ${props.store.expiryLabel()}`}
                             </Text>
                           </>
                         }
@@ -126,10 +128,10 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
                               class="settings-mobile-connect-code-title settings-mobile-connect-success-title"
                               variant="body"
                             >
-                              Phone connected
+                              {i18n.t("settings.mobileConnect.connected")}
                             </Text>
                             <Text variant="caption" tone="muted" role="status">
-                              {deviceName()} is ready to use OpenBot.
+                              {`${deviceName()} ${i18n.t("settings.mobileConnect.ready")}`}
                             </Text>
                           </>
                         )}
@@ -145,10 +147,10 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
 
       <section class="settings-mobile-devices" aria-labelledby="settings-mobile-devices-title">
         <div class="settings-mobile-devices-heading">
-          <h3 id="settings-mobile-devices-title">Connected devices</h3>
+          <h3 id="settings-mobile-devices-title">{i18n.t("settings.mobileConnect.devices")}</h3>
           <Show when={props.store.state.devices.loading}>
             <Text as="span" variant="caption" tone="muted" role="status">
-              Refreshing…
+              {i18n.t("settings.mobileConnect.refreshing")}
             </Text>
           </Show>
         </div>
@@ -157,11 +159,8 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
             <Info />
           </AlertIcon>
           <AlertContent>
-            <AlertTitle>Disconnecting a device</AlertTitle>
-            <AlertDescription>
-              Access is revoked immediately. The mobile app may keep showing its current screen until it is reopened or
-              brought back from the background.
-            </AlertDescription>
+            <AlertTitle>{i18n.t("settings.mobileConnect.disconnectingTitle")}</AlertTitle>
+            <AlertDescription>{i18n.t("settings.mobileConnect.disconnectingDescription")}</AlertDescription>
           </AlertContent>
         </Alert>
         <div class="settings-mobile-devices-states">
@@ -175,10 +174,10 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
                 <Smartphone aria-hidden="true" />
                 <div>
                   <Text class="settings-mobile-devices-empty-title" variant="body">
-                    No connected devices
+                    {i18n.t("settings.mobileConnect.noDevices")}
                   </Text>
                   <Text variant="caption" tone="muted">
-                    Devices connected with Mobile Connect will appear here.
+                    {i18n.t("settings.mobileConnect.noDevicesDescription")}
                   </Text>
                 </div>
               </div>
@@ -194,10 +193,10 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
                 <table class="settings-mobile-devices-table">
                   <thead>
                     <tr>
-                      <th scope="col">Device</th>
-                      <th scope="col">Platform</th>
-                      <th scope="col">Connected</th>
-                      <th scope="col">Last active</th>
+                      <th scope="col">{i18n.t("settings.mobileConnect.device")}</th>
+                      <th scope="col">{i18n.t("settings.mobileConnect.platform")}</th>
+                      <th scope="col">{i18n.t("settings.mobileConnect.connectedAt")}</th>
+                      <th scope="col">{i18n.t("settings.mobileConnect.lastActive")}</th>
                       <th scope="col">
                         <span class="sr-only">Actions</span>
                       </th>
@@ -222,12 +221,12 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
                               variant="destructive-ghost"
                               size="xs"
                               loading={props.store.state.devices.revokingSessionId === device.sessionId}
-                              loadingLabel="Disconnecting…"
+                              loadingLabel={i18n.t("settings.mobileConnect.disconnecting")}
                               disabled={!props.canRevokeDevice}
-                              aria-label={`Disconnect ${device.name}`}
+                              aria-label={`${i18n.t("settings.mobileConnect.disconnect")} ${device.name}`}
                               onClick={() => void props.store.revokeDevice(device)}
                             >
-                              Disconnect
+                              {i18n.t("settings.mobileConnect.disconnectAction")}
                             </Button>
                           </td>
                         </tr>

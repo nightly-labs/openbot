@@ -26,6 +26,8 @@ import {
 import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "../custom-providers/CustomProviderListDialog";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
+import { useI18n } from "../i18n/i18n-context";
+import { languages } from "../i18n/languages";
 import type { GeneralSettingsValue } from "./app-settings";
 import type { SettingsGeneralStore } from "./stores/general-store";
 
@@ -55,8 +57,13 @@ interface SettingsGeneralTabProps {
   onDeleteCustomProvider?: (id: string) => Promise<CustomProviderRestart>;
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
 }
+interface LanguageOption {
+  code: string;
+  label: string;
+}
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
+  const i18n = useI18n();
   const customProviders = () => props.customProviders ?? [];
   /**
    * Which row holds the check here. Nothing stores it: the whole Settings picker is local state
@@ -76,11 +83,11 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
 
   return (
     <>
-      <SettingsSection title="AI providers">
+      <SettingsSection title={i18n.t("settings.sections.aiProviders")}>
         <ProviderPicker
           value={props.store.selectedProvider()}
           options={props.store.providerOptions()}
-          ariaLabel="AI providers"
+          ariaLabel={i18n.t("settings.sections.aiProviders")}
           embedded
           allowUnavailableSelection
           customProviders={customProviders()}
@@ -128,35 +135,45 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
         </Show>
       </SettingsSection>
 
-      <SettingsSection title="App behavior">
+      <SettingsSection title={i18n.t("settings.sections.appBehavior")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
             checked={props.value.launchAtLogin}
             onChange={(checked) => props.onUpdateSetting("launchAtLogin", checked)}
-            label="Launch OpenBot at login"
-            description="Open the app when you sign in to this computer."
+            label={i18n.t("settings.behavior.launchAtLogin.label")}
+            description={i18n.t("settings.behavior.launchAtLogin.description")}
           />
           <SwitchField
             checked={props.value.keepRunningInBackground}
             onChange={(checked) => props.onUpdateSetting("keepRunningInBackground", checked)}
-            label="Keep OpenBot running in the background"
-            description="Keep active tasks running after you close the window."
+            label={i18n.t("settings.behavior.keepRunningInBackground.label")}
+            description={i18n.t("settings.behavior.keepRunningInBackground.description")}
           />
+
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.language.label")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.language.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <LanguageSettingSelect selectMount={props.selectMount} />
+            </ItemActions>
+          </Item>
         </ItemGroup>
       </SettingsSection>
 
-      <SettingsSection title="Workspace">
+      <SettingsSection title={i18n.t("settings.sections.workspace")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
             checked={props.value.restoreLastWorkspace}
             onChange={(checked) => props.onUpdateSetting("restoreLastWorkspace", checked)}
-            label="Restore the last workspace on launch"
-            description="Open the workspace and tasks from your previous session."
+            label={i18n.t("settings.workspace.restoreLast.label")}
+            description={i18n.t("settings.workspace.restoreLast.description")}
           />
           <Item class="settings-modal-row">
             <ItemContent>
-              <ItemTitle>Open external links in</ItemTitle>
-              <ItemDescription>Choose where links from conversations open.</ItemDescription>
+              <ItemTitle>{i18n.t("settings.workspace.externalLinks.label")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.workspace.externalLinks.description")}</ItemDescription>
             </ItemContent>
             <ItemActions>
               <Select<GeneralSettingsValue["externalLinkTarget"]>
@@ -169,7 +186,7 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
                   <SelectItem item={selectProps.item}>{selectProps.item.rawValue}</SelectItem>
                 )}
               >
-                <SelectTrigger size="sm" aria-label="Open external links in">
+                <SelectTrigger size="sm" aria-label={i18n.t("settings.workspace.externalLinks.label")}>
                   <SelectValue<GeneralSettingsValue["externalLinkTarget"]>>
                     {(state) => state.selectedOption()}
                   </SelectValue>
@@ -181,67 +198,96 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
         </ItemGroup>
       </SettingsSection>
 
-      <SettingsSection title="Notifications">
+      <SettingsSection title={i18n.t("settings.sections.notifications")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
             checked={props.value.desktopNotifications}
             onChange={(checked) => props.onUpdateSetting("desktopNotifications", checked)}
-            label="Desktop notifications"
-            description="Show a notification when an agent needs attention."
+            label={i18n.t("settings.notifications.desktop.label")}
+            description={i18n.t("settings.notifications.desktop.description")}
           />
           <SwitchField
             checked={props.value.taskCompletionSound}
             onChange={(checked) => props.onUpdateSetting("taskCompletionSound", checked)}
-            label="Play a sound when a task finishes"
-            description="Use a short sound for completed tasks."
+            label={i18n.t("settings.notifications.sound.label")}
+            description={i18n.t("settings.notifications.sound.description")}
           />
         </ItemGroup>
       </SettingsSection>
 
       <Show when={props.platform === "darwin"}>
-        <SettingsSection title="MacBook notch">
+        <SettingsSection title={i18n.t("settings.sections.macBookNotch")}>
           <ItemGroup class="settings-modal-card">
             <SwitchField
               checked={props.value.macBookNotch}
               onChange={(checked) => props.onUpdateSetting("macBookNotch", checked)}
-              label="Show status in the MacBook notch"
-              description="Show agent activity and items that need attention at the top of each display."
+              label={i18n.t("settings.notch.show.label")}
+              description={i18n.t("settings.notch.show.description")}
             />
             <SwitchField
               checked={props.value.macBookNotchIdle}
               disabled={!props.value.macBookNotch}
               onChange={(checked) => props.onUpdateSetting("macBookNotchIdle", checked)}
-              label="Show idle island"
-              description="Show the OpenBot logo and greeting when no status is active."
+              label={i18n.t("settings.notch.idle.label")}
+              description={i18n.t("settings.notch.idle.description")}
             />
             <SwitchField
               checked={props.value.macBookNotchAdditionalDisplays}
               disabled={!props.value.macBookNotch}
               onChange={(checked) => props.onUpdateSetting("macBookNotchAdditionalDisplays", checked)}
-              label="Show on additional displays"
-              description="Show Dynamic Island on connected external displays."
+              label={i18n.t("settings.notch.additionalDisplays.label")}
+              description={i18n.t("settings.notch.additionalDisplays.description")}
             />
             <SwitchField
               checked={props.value.macBookNotchHaptics}
               disabled={!props.value.macBookNotch}
               onChange={(checked) => props.onUpdateSetting("macBookNotchHaptics", checked)}
-              label="Haptic feedback"
-              description="Use the Force Touch trackpad to confirm Dynamic Island interactions."
+              label={i18n.t("settings.notch.haptics.label")}
+              description={i18n.t("settings.notch.haptics.description")}
             />
           </ItemGroup>
         </SettingsSection>
       </Show>
 
-      <SettingsSection title="Privacy">
+      <SettingsSection title={i18n.t("settings.sections.privacy")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
             checked={props.value.productAnalytics}
             onChange={(checked) => props.onUpdateSetting("productAnalytics", checked)}
-            label="Share product analytics"
-            description="Send usage and reliability metadata with your account ID and email to OpenBot's self-hosted analytics."
+            label={i18n.t("settings.privacy.analytics.label")}
+            description={i18n.t("settings.privacy.analytics.description")}
           />
         </ItemGroup>
       </SettingsSection>
     </>
+  );
+}
+
+function LanguageSettingSelect(props: { selectMount?: HTMLElement }) {
+  const i18n = useI18n();
+
+  return (
+    <Select<LanguageOption>
+      class="settings-modal-select"
+      options={languages}
+      optionValue="code"
+      optionTextValue="label"
+      value={languages.find((lang) => lang.code === i18n.language())}
+      onChange={(value) => value && void i18n.changeLanguage(value.code)}
+      placement="bottom-end"
+      itemComponent={(selectProps) => (
+        <SelectItem item={selectProps.item}>{selectProps.item.rawValue.label}</SelectItem>
+      )}
+    >
+      <SelectTrigger size="sm" aria-label={i18n.t("settings.language.label")}>
+        <SelectValue<LanguageOption>>
+          {(state) => {
+            const selected = state.selectedOption();
+            return selected ? selected.label : "";
+          }}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent mount={props.selectMount} />
+    </Select>
   );
 }

@@ -1,6 +1,7 @@
 import type { AnalyticsTotals, HostAnalytics } from "@openbot/contracts/ipc";
 import { createMemo, createStore, For, onSettled, Show } from "solid-js";
 import { Button, SlidingTabs } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import { UsageChart } from "./UsageChart";
 import { UsageProviderMark } from "./UsageProviderMark";
 import {
@@ -28,12 +29,13 @@ function Amount(props: { value: number | null; cost?: boolean }) {
 // the measure only: every cost cell carries its currency, and the note under the tables
 // already says a share is of the known amount.
 function BreakdownColumns(props: { label: string }) {
+  const { t } = useI18n();
   return (
     <tr>
       <th scope="col">{props.label}</th>
-      <th scope="col">Cost</th>
-      <th scope="col">Share</th>
-      <th scope="col">Tokens</th>
+      <th scope="col">{t("usage.cost")}</th>
+      <th scope="col">{t("usage.share")}</th>
+      <th scope="col">{t("usage.tokens")}</th>
     </tr>
   );
 }
@@ -56,6 +58,7 @@ export function AgentUsageReport(props: {
   agentLabel: (agentId: string) => UsageAgentLabel;
   onReady: () => void;
 }) {
+  const { t } = useI18n();
   onSettled(() => queueMicrotask(props.onReady));
   // The host report answers "which teammate spent this" first, so the split by agent is
   // the tab that opens.
@@ -81,7 +84,9 @@ export function AgentUsageReport(props: {
     totals().missingUsageTurns > 0 || totals().unpricedRecords > 0 || totals().incompleteRecords > 0;
   const share = (amount: number | null) => {
     const total = cost() ? totals().estimatedCostUsd : totals().processedTokens;
-    return amount === null || total === null ? "Unavailable" : `${(total ? (amount / total) * 100 : 0).toFixed(1)}%`;
+    return amount === null || total === null
+      ? t("usage.unavailable")
+      : `${(total ? (amount / total) * 100 : 0).toFixed(1)}%`;
   };
   let dailyTable: HTMLTableElement | undefined;
   function showDailyData() {
@@ -94,24 +99,27 @@ export function AgentUsageReport(props: {
     <>
       <Show when={!totals().turns && !totals().userMessages && !totals().processedTokens}>
         <p class="agent-usage-notice" role="status">
-          No usage recorded in this range.
+          {t("usage.noUsage")}
         </p>
       </Show>
       <Show when={partial()}>
         <p class="agent-usage-notice" role="status">
-          Partial data · {totals().missingUsageTurns} turns have no reported usage; {totals().unpricedRecords} records
-          have no cost estimate; {totals().incompleteRecords} records have incomplete token data.
+          {t("usage.partialData", {
+            missing: totals().missingUsageTurns,
+            unpriced: totals().unpricedRecords,
+            incomplete: totals().incompleteRecords,
+          })}
         </p>
       </Show>
       <div class="agent-usage-overview">
-        <section class="agent-usage-summary" aria-label="Usage summary">
+        <section class="agent-usage-summary" aria-label={t("usage.summary")}>
           <div>
             <p class="agent-usage-hero">
               <Amount value={cost() ? totals().estimatedCostUsd : totals().processedTokens} cost={cost()} />
             </p>
             <p class="agent-usage-secondary">
-              {usageNumber(totals().sessions)} {totals().sessions === 1 ? "session" : "sessions"} ·{" "}
-              {cost() ? "API estimate · USD" : "Known processed tokens"}
+              {t(totals().sessions === 1 ? "usage.session" : "usage.sessions", { count: totals().sessions })} ·{" "}
+              {cost() ? t("usage.apiEstimate") : t("usage.knownTokens")}
             </p>
           </div>
           <div class="agent-usage-providers">
@@ -144,28 +152,28 @@ export function AgentUsageReport(props: {
             </For>
           </div>
         </section>
-        <section class="agent-usage-trend" aria-label="Daily trend">
+        <section class="agent-usage-trend" aria-label={t("usage.dailyTrend")}>
           <div class="agent-usage-section-header">
-            <h3>Daily {cost() ? "cost" : "tokens"}</h3>
+            <h3>{t("usage.daily", { measure: cost() ? t("usage.cost") : t("usage.tokens") })}</h3>
             <Button variant="ghost" size="xs" onClick={showDailyData}>
-              View daily data
+              {t("usage.viewDaily")}
             </Button>
           </div>
           <UsageChart result={props.result} metric={props.metric} />
         </section>
       </div>
-      <section aria-label="Totals">
-        <h3>Totals</h3>
+      <section aria-label={t("usage.totals")}>
+        <h3>{t("usage.totals")}</h3>
         <dl class="agent-usage-totals">
           <For
             each={[
-              { label: "Processed tokens", value: totals().processedTokens },
-              { label: "Cached input", value: totals().cachedInput },
-              { label: "Uncached input", value: totals().uncachedInput },
-              { label: "Cache creation", value: totals().cacheCreation },
-              { label: "Output", value: totals().output },
-              { label: "User messages", value: totals().userMessages },
-              { label: "Completed assistant messages", value: totals().assistantMessages },
+              { label: t("usage.processedTokens"), value: totals().processedTokens },
+              { label: t("usage.cachedInput"), value: totals().cachedInput },
+              { label: t("usage.uncachedInput"), value: totals().uncachedInput },
+              { label: t("usage.cacheCreation"), value: totals().cacheCreation },
+              { label: t("usage.output"), value: totals().output },
+              { label: t("usage.userMessages"), value: totals().userMessages },
+              { label: t("usage.assistantMessages"), value: totals().assistantMessages },
             ]}
           >
             {(item) => (
@@ -188,11 +196,11 @@ export function AgentUsageReport(props: {
         }
       >
         <div class="agent-usage-section-header">
-          <h3>Breakdown</h3>
-          <SlidingTabs.List aria-label="Usage breakdown">
-            <SlidingTabs.Trigger value="model">Model</SlidingTabs.Trigger>
-            <SlidingTabs.Trigger value="agent">Agent</SlidingTabs.Trigger>
-            <SlidingTabs.Trigger value="day">Day</SlidingTabs.Trigger>
+          <h3>{t("usage.breakdown")}</h3>
+          <SlidingTabs.List aria-label={t("usage.breakdown")}>
+            <SlidingTabs.Trigger value="model">{t("usage.model")}</SlidingTabs.Trigger>
+            <SlidingTabs.Trigger value="agent">{t("usage.agent")}</SlidingTabs.Trigger>
+            <SlidingTabs.Trigger value="day">{t("usage.day")}</SlidingTabs.Trigger>
           </SlidingTabs.List>
         </div>
         {/* Every panel is force-mounted, and the grid slot is what makes the hidden ones
@@ -201,9 +209,9 @@ export function AgentUsageReport(props: {
           <SlidingTabs.Content value="model">
             <div class="agent-usage-table">
               <table>
-                <caption class="sr-only">Usage by model</caption>
+                <caption class="sr-only">{t("usage.byModel")}</caption>
                 <thead>
-                  <BreakdownColumns label="Model" />
+                  <BreakdownColumns label={t("usage.model")} />
                 </thead>
                 <tbody>
                   <For each={models()}>
@@ -213,7 +221,7 @@ export function AgentUsageReport(props: {
                           <span class="agent-usage-model-name">
                             <UsageProviderMark provider={model.provider} />
                             <span>
-                              {model.model || "Unknown model"}
+                              {model.model || t("usage.unknownModel")}
                               {/* The logo carries the provider for a reader who sees it, and the
                                   row stays one line high; the name is still spoken. */}
                               <span class="sr-only">{usageProviderName(model.provider)}</span>
@@ -231,9 +239,9 @@ export function AgentUsageReport(props: {
           <SlidingTabs.Content value="agent">
             <div class="agent-usage-table">
               <table>
-                <caption class="sr-only">Usage by agent</caption>
+                <caption class="sr-only">{t("usage.byAgent")}</caption>
                 <thead>
-                  <BreakdownColumns label="Agent" />
+                  <BreakdownColumns label={t("usage.agent")} />
                 </thead>
                 <tbody>
                   <For each={agents()}>
@@ -256,12 +264,12 @@ export function AgentUsageReport(props: {
           <SlidingTabs.Content value="day">
             <div class="agent-usage-table">
               <table ref={dailyTable} tabindex={-1}>
-                <caption class="sr-only">Daily usage and cost</caption>
+                <caption class="sr-only">{t("usage.dailyUsageCost")}</caption>
                 <thead>
                   <tr>
-                    <th scope="col">Date</th>
-                    <th scope="col">Cost · USD</th>
-                    <th scope="col">Processed tokens</th>
+                    <th scope="col">{t("usage.date")}</th>
+                    <th scope="col">{t("usage.costUsd")}</th>
+                    <th scope="col">{t("usage.processedTokens")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -282,16 +290,14 @@ export function AgentUsageReport(props: {
       </SlidingTabs.Root>
       <footer class="agent-usage-footer">
         <p>
-          Collection started {new Date(props.result.collectionStartedAt).toLocaleDateString()} · Updated{" "}
-          {props.result.updatedAt ? new Date(props.result.updatedAt).toLocaleString() : "never"}
+          {t("usage.collectionUpdated", {
+            started: new Date(props.result.collectionStartedAt).toLocaleDateString(),
+            updated: props.result.updatedAt ? new Date(props.result.updatedAt).toLocaleString() : t("usage.never"),
+          })}
         </p>
         <details>
-          <summary>About these estimates</summary>
-          <p>
-            API-equivalent token cost in USD. This is an estimate, not a subscription charge. Separate tool and media
-            fees are not calculated. Unknown prices and incomplete usage stay unavailable. Shares use known amounts
-            only; partial data can understate totals.
-          </p>
+          <summary>{t("usage.aboutEstimates")}</summary>
+          <p>{t("usage.estimateDescription")}</p>
         </details>
       </footer>
     </>

@@ -2,6 +2,7 @@ import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references"
 import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import type { AgentMessage, AgentProfile } from "../data";
 import { AgentAvatar } from "../features/agents/AgentAvatar";
+import { useI18n } from "../features/i18n/i18n-context";
 import { Combobox, Dialog, Input, Kbd, Search, Tabs } from "./ui";
 
 type SearchTab = "all" | "messages" | "agents";
@@ -50,13 +51,17 @@ function resultSearchText(result: GlobalSearchResult): string {
   );
 }
 
-function resultDescription(result: GlobalSearchResult): string {
+function resultDescription(result: GlobalSearchResult, t: ReturnType<typeof useI18n>["t"]): string {
   if (result.kind === "agent") return result.agent.title || result.agent.preview;
-  const direction = result.message.author === "you" ? `You to ${result.agent.name}` : `${result.agent.name} to you`;
+  const direction =
+    result.message.author === "you"
+      ? t("search.youTo", { name: result.agent.name })
+      : t("search.toYou", { name: result.agent.name });
   return `${direction} · ${result.message.time}`;
 }
 
 export function GlobalSearch(props: GlobalSearchProps) {
+  const { t } = useI18n();
   const [tab, setTab] = createSignal<SearchTab>("all");
   const [query, setQuery] = createSignal("");
   const [messageResults, setMessageResults] = createSignal<GlobalSearchResult[]>([]);
@@ -138,7 +143,7 @@ export function GlobalSearch(props: GlobalSearchProps) {
       <Dialog.Portal>
         <Dialog.Overlay class="global-search-overlay" />
         <Dialog.Content class="global-search-dialog" aria-describedby={undefined}>
-          <Dialog.Title class="sr-only">Search OpenBot</Dialog.Title>
+          <Dialog.Title class="sr-only">{t("search.title")}</Dialog.Title>
           <Combobox.Root<GlobalSearchResult>
             options={results()}
             open={true}
@@ -164,12 +169,12 @@ export function GlobalSearch(props: GlobalSearchProps) {
                     <Combobox.ItemLabel>
                       <span class="global-search-result-title">{resultLabel(result)}</span>
                     </Combobox.ItemLabel>
-                    <span class="global-search-result-description">{resultDescription(result)}</span>
+                    <span class="global-search-result-description">{resultDescription(result, t)}</span>
                   </span>
                   <span class="global-search-result-shortcut" aria-hidden="true">
                     <Show
                       when={index() >= 0 && index() < 9}
-                      fallback={<span>{result.kind === "agent" ? "Agent" : "Message"}</span>}
+                      fallback={<span>{result.kind === "agent" ? t("search.agent") : t("search.message")}</span>}
                     >
                       <Kbd>⌘</Kbd>
                       <Kbd>{index() + 1}</Kbd>
@@ -185,8 +190,8 @@ export function GlobalSearch(props: GlobalSearchProps) {
                 as={Input}
                 ref={(element) => (input = element)}
                 class="global-search-input"
-                aria-label="Search OpenBot"
-                placeholder="Search"
+                aria-label={t("search.label")}
+                placeholder={t("search.placeholder")}
                 autocomplete="off"
                 autocapitalize="none"
                 spellcheck={false}
@@ -216,17 +221,17 @@ export function GlobalSearch(props: GlobalSearchProps) {
               }}
               class="global-search-tabs"
             >
-              <Tabs.List aria-label="Filter results">
-                <Tabs.Trigger value="all">All</Tabs.Trigger>
-                <Tabs.Trigger value="messages">Messages</Tabs.Trigger>
-                <Tabs.Trigger value="agents">Agents</Tabs.Trigger>
+              <Tabs.List aria-label={t("search.filterResults")}>
+                <Tabs.Trigger value="all">{t("search.all")}</Tabs.Trigger>
+                <Tabs.Trigger value="messages">{t("search.messages")}</Tabs.Trigger>
+                <Tabs.Trigger value="agents">{t("search.agents")}</Tabs.Trigger>
               </Tabs.List>
             </Tabs.Root>
 
             <Combobox.Content class="global-search-results">
-              <Combobox.Listbox aria-label="Results" />
+              <Combobox.Listbox aria-label={t("search.results")} />
               <Show when={results().length === 0}>
-                <div class="global-search-empty">No matching messages or agents</div>
+                <div class="global-search-empty">{t("search.empty")}</div>
               </Show>
             </Combobox.Content>
           </Combobox.Root>

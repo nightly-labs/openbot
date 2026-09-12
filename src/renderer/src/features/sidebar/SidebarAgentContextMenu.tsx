@@ -6,6 +6,7 @@
 import { Show } from "solid-js";
 import { ContextMenu, Copy, Pin, PinOff } from "../../components/ui";
 import type { AgentProfile } from "../../data";
+import { useI18n } from "../i18n/i18n-context";
 import { DeleteIcon, EditIcon } from "./SidebarIcons";
 import { SidebarMoveToSubmenu } from "./SidebarMoveToSubmenu";
 import type { SidebarPinnedItem } from "./sidebar-pins";
@@ -13,20 +14,21 @@ import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned: boolean }) {
   const { openDelete, props } = useSidebarScope();
+  const i18n = useI18n();
   const ref = (): SidebarPinnedItem => ({ kind: "agent", id: menuProps.agent.id });
   return (
     <ContextMenu.Portal>
-      <ContextMenu.Content class="agent-context-menu" aria-label="Agent actions">
+      <ContextMenu.Content class="agent-context-menu" aria-label={i18n.t("sidebar.agentActions")}>
         <ContextMenu.Item onSelect={() => (menuProps.pinned ? props.onUnpin(ref()) : props.onPin(ref()))}>
           <Show when={menuProps.pinned} fallback={<Pin class="agent-context-icon size-4" aria-hidden="true" />}>
             <PinOff class="agent-context-icon size-4" aria-hidden="true" />
           </Show>
-          <span>{menuProps.pinned ? "Unpin" : "Pin"}</span>
+          <span>{menuProps.pinned ? i18n.t("common.unpin") : i18n.t("common.pin")}</span>
         </ContextMenu.Item>
         <SidebarMoveToSubmenu chatId={menuProps.agent.id} />
         <ContextMenu.Item onSelect={() => props.onEditAgent(menuProps.agent.id)}>
           <EditIcon />
-          <span>Edit agent</span>
+          <span>{i18n.t("sidebar.editAgent")}</span>
         </ContextMenu.Item>
         <Show when={props.duplicateSupported !== false && props.onDuplicateAgent}>
           <ContextMenu.Item
@@ -34,7 +36,11 @@ export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned
             onSelect={() => void props.onDuplicateAgent?.(menuProps.agent.id).catch(() => undefined)}
           >
             <Copy class="agent-context-icon size-4" aria-hidden="true" />
-            <span>{props.duplicatingAgentIds?.has(menuProps.agent.id) ? "Duplicating…" : "Duplicate agent"}</span>
+            <span>
+              {props.duplicatingAgentIds?.has(menuProps.agent.id)
+                ? i18n.t("sidebar.duplicatingAgent")
+                : i18n.t("sidebar.duplicateAgent")}
+            </span>
           </ContextMenu.Item>
         </Show>
         <ContextMenu.Separator />
@@ -43,7 +49,7 @@ export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned
           onSelect={() => openDelete("agent", menuProps.agent.id)}
         >
           <DeleteIcon />
-          <span>Delete agent</span>
+          <span>{i18n.t("sidebar.deleteAgent")}</span>
         </ContextMenu.Item>
       </ContextMenu.Content>
     </ContextMenu.Portal>

@@ -4,6 +4,7 @@ import type { Element as SolidElement } from "solid-js";
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { Button, Input } from "../../components/ui";
 import { clamp } from "../../components/ui/utils";
+import { useI18n } from "../i18n/i18n-context";
 
 const MESSAGE_TEXT_SELECTOR = ".message-copy[data-selection-message-id]";
 const INTERACTIVE_SELECTOR =
@@ -218,6 +219,7 @@ export function SelectionActionsBar(props: {
   onDismiss: () => void;
   onSend: (messageId: string, body: string) => Promise<boolean>;
 }) {
+  const i18n = useI18n();
   const [prompt, setPrompt] = createSignal("");
   const [expanded, setExpanded] = createSignal(false);
   const [mode, setMode] = createSignal<"idle" | "sending" | "error">("idle");
@@ -385,7 +387,7 @@ export function SelectionActionsBar(props: {
           ref={(element) => (bar = element)}
           class="selection-actions-bar"
           role="toolbar"
-          aria-label="Actions for selected text"
+          aria-label={i18n.t("conversation.selection.actions")}
           style={{ width: barWidth() ? `${barWidth()}px` : undefined }}
         >
           <div
@@ -423,7 +425,7 @@ export function SelectionActionsBar(props: {
                 variant="ghost"
                 type="button"
                 class="selection-actions-icon-button"
-                aria-label="Close selected text actions"
+                aria-label={i18n.t("conversation.selection.close")}
                 onPointerDown={(event) => event.preventDefault()}
                 onClick={props.onDismiss}
               >
@@ -455,8 +457,8 @@ export function SelectionActionsBar(props: {
                 >
                   <Input
                     value={prompt()}
-                    aria-label="Describe edits"
-                    placeholder="Describe edits"
+                    aria-label={i18n.t("conversation.selection.describe")}
+                    placeholder={i18n.t("conversation.selection.describe")}
                     maxlength={maximumInstructionLength()}
                     onValueChange={updatePrompt}
                   />
@@ -527,7 +529,7 @@ export function SelectionActionsBar(props: {
                   variant="ghost"
                   type="button"
                   class="selection-actions-send"
-                  aria-label="Send edit instruction"
+                  aria-label={i18n.t("conversation.selection.send")}
                   tabindex={hasPrompt() ? undefined : -1}
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={() => void submit(prompt())}

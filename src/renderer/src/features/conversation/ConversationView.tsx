@@ -1,4 +1,5 @@
 import { createEffect, Show } from "solid-js";
+import { useI18n } from "../i18n/i18n-context";
 import { useServers } from "../servers/servers-context";
 import { useUsage } from "../usage/usage-context";
 import { ConversationComposer } from "./ConversationComposer";
@@ -16,6 +17,7 @@ export function isDragLeavingConversation(currentTarget: HTMLElement, relatedTar
 }
 
 export function ConversationView(props: ConversationProps) {
+  const i18n = useI18n();
   const scope = createConversationViewScope(props);
   const servers = useServers();
   const usage = useUsage();
@@ -42,7 +44,7 @@ export function ConversationView(props: ConversationProps) {
     <ConversationViewScopeContext value={scope}>
       <main
         ref={setConversationPanelElement}
-        aria-label="Conversation"
+        aria-label={i18n.t("conversation.ariaLabel")}
         onKeyDown={handleChatSearchShortcut}
         class={[
           "conversation-panel",
@@ -72,7 +74,7 @@ export function ConversationView(props: ConversationProps) {
           onSend={sendSelectionInstruction}
         />
         <Show when={dropActive()}>
-          <div class="attachment-drop-overlay">Drop files to attach</div>
+          <div class="attachment-drop-overlay">{i18n.t("conversation.dropFiles")}</div>
         </Show>
         <ConversationHeader />
 

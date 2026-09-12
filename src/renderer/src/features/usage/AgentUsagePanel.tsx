@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui";
+import { useI18n } from "../i18n/i18n-context";
 import { AgentUsageReport } from "./AgentUsageReport";
 import {
   type UsageAgentLabel,
@@ -39,6 +40,7 @@ interface UsageState {
 }
 
 export function AgentUsagePanel(props: AgentUsagePanelProps) {
+  const { t } = useI18n();
   const [state, setState] = createStore<UsageState>({
     range: { ...analyticsRange("range"), agentId: props.agentId },
     agents: [],
@@ -139,14 +141,14 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
   let heading: HTMLHeadingElement | undefined;
   onSettled(() => heading?.focus());
   return (
-    <section class="agent-usage" aria-label="Agent usage">
+    <section class="agent-usage" aria-label={t("usage.agentUsage")}>
       <header class="agent-usage-header">
         <div class="agent-usage-identity">
-          <IconButton variant="ghost" label="Back" onClick={props.onBack}>
+          <IconButton variant="ghost" label={t("usage.back")} onClick={props.onBack}>
             <ArrowLeft />
           </IconButton>
           <h2 ref={heading} tabindex={-1}>
-            Usage <span aria-hidden="true">/</span> <span>{props.hostName}</span>
+            {t("usage.title")} <span aria-hidden="true">/</span> <span>{props.hostName}</span>
           </h2>
         </div>
         <div class="agent-usage-controls">
@@ -169,15 +171,17 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
             }}
             itemComponent={(itemProps) => (
               <SelectItem item={itemProps.item}>
-                {itemProps.item.rawValue === "all" ? "All agents" : agentLabel(itemProps.item.rawValue.slice(6)).name}
+                {itemProps.item.rawValue === "all"
+                  ? t("usage.allAgents")
+                  : agentLabel(itemProps.item.rawValue.slice(6)).name}
               </SelectItem>
             )}
           >
-            <SelectTrigger aria-label="Usage agents" size="sm">
+            <SelectTrigger aria-label={t("usage.agents")} size="sm">
               <SelectValue<string>>
                 {(selection) =>
                   selection.selectedOption() === "all"
-                    ? "All agents"
+                    ? t("usage.allAgents")
                     : agentLabel(selection.selectedOption().slice(6)).name
                 }
               </SelectValue>
@@ -185,7 +189,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
             <SelectContent />
           </Select>
           <UsageSelect
-            label="Usage metric"
+            label={t("usage.metric")}
             options={usageMetrics}
             value={state.metric}
             onChange={(value) => {
@@ -195,7 +199,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
             }}
           />
           <UsageSelect
-            label="Usage period"
+            label={t("usage.period")}
             options={usagePeriods}
             value={state.period}
             onChange={(value) => {
@@ -210,7 +214,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
           />
           <IconButton
             variant="outline"
-            label="Refresh usage"
+            label={t("usage.refresh")}
             disabled={state.phase === "loading"}
             onClick={() => void load()}
           >
@@ -221,20 +225,20 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
       <div ref={reportBody} class="agent-usage-body">
         <Show when={state.phase === "loading"}>
           <div class="agent-usage-loading" role="status">
-            <span>Loading usage…</span>
+            <span>{t("usage.loading")}</span>
             <div class="agent-usage-placeholder" />
           </div>
         </Show>
         <Show when={state.phase === "unsupported"}>
           <p class="agent-usage-notice" role="status">
-            This host does not support agent analytics. Update the host to use this view.
+            {t("usage.unsupported")}
           </p>
         </Show>
         <Show when={state.phase === "error"}>
           <div class="agent-usage-notice">
-            <p role="alert">Could not load usage. Check the connection and date range.</p>
+            <p role="alert">{t("usage.loadFailed")}</p>
             <Button variant="secondary" onClick={() => void load()}>
-              Retry
+              {t("usage.retry")}
             </Button>
           </div>
         </Show>
