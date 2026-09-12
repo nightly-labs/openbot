@@ -274,6 +274,17 @@
   --openbot-control-md: 32px;
   --openbot-control-lg: 36px;
   --openbot-control-xl: 40px;
+  /* The switch follows the same compact pill proportions across desktop and web.
+   * Keep its geometry named so the motion code can measure the same inset and travel
+   * that CSS paints. */
+  --openbot-switch-width: 36px;
+  --openbot-switch-height: 20px;
+  --openbot-switch-thumb: 16px;
+  --openbot-switch-inset: 2px;
+  --openbot-switch-sm-width: 24px;
+  --openbot-switch-sm-height: 14px;
+  --openbot-switch-sm-thumb: 12px;
+  --openbot-switch-sm-inset: 1px;
   /* Unitless on purpose. Lucide icons carry viewBox="0 0 24 24", so CSS stroke-width
    * resolves in user units, not px: a literal 1px paints 1 * (16/24) = 0.67 device px at
    * the 16px default size and reads blurry. 1.5 user units is the 1px the design asks for.
