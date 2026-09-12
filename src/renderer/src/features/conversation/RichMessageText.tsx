@@ -131,10 +131,12 @@ export function RichMessageText(props: RichMessageTextProps) {
           }
           if (part.skill) {
             return (
-              <span class="message-skill-tag">
-                <Puzzle aria-hidden="true" />
+              <span class="skill-chip message-skill-tag">
+                <span class="skill-chip-icon" aria-hidden="true">
+                  <Puzzle />
+                </span>
                 <span class="sr-only">Skill </span>
-                <span>{part.skill.name}</span>
+                <span class="skill-chip-name">{part.skill.name}</span>
               </span>
             );
           }

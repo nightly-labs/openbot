@@ -81,6 +81,8 @@ export interface SubmitSkillInput {
   skillId?: string;
 }
 
+export type InstalledSkillOrigin = "marketplace" | "managed";
+
 export interface InstalledSkill {
   skillId: string;
   slug: string;
@@ -88,6 +90,12 @@ export interface InstalledSkill {
   installedVersion: number;
   availableVersion: number;
   state: InstalledSkillState;
+  /** Missing on older hosts and Team GET payloads; treat as true. */
+  enabled?: boolean;
+  /** Missing on older hosts and Team GET payloads; treat as marketplace. */
+  origin?: InstalledSkillOrigin;
+  /** Missing on older hosts, Team GET payloads, and pre-description lock files. */
+  description?: string;
 }
 
 export interface InstallSkillInput {
@@ -100,6 +108,12 @@ export interface UninstallSkillInput {
   agentId: string;
   skillId: string;
   removeModified?: boolean;
+}
+
+export interface SetEnabledSkillInput {
+  agentId: string;
+  skillId: string;
+  enabled: boolean;
 }
 
 export function isSkillCategory(value: unknown): value is SkillCategory {

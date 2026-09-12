@@ -31,6 +31,7 @@ interface MentionContext {
   query: string;
   start: number;
   end: number;
+  trigger: "@" | "$";
 }
 
 interface PickerPosition {
@@ -96,17 +97,23 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
     return (props.skills ?? []).filter(
       (skill) =>
-        skill.state !== "needs-repair" && (!query || `${skill.name} ${skill.slug}`.toLocaleLowerCase().includes(query)),
+        skill.state !== "needs-repair" &&
+        skill.enabled !== false &&
+        (!query || `${skill.name} ${skill.slug} ${skill.description ?? ""}`.toLocaleLowerCase().includes(query)),
     );
   });
-  const matchingOptions = createMemo<PickerOption[]>(() => [
-    ...matchingAgents().map((agent) => ({ type: "agent" as const, agent })),
-    ...matchingSkills().map((skill) => ({ type: "skill" as const, skill })),
-    ...matchingAttachments().map((attachment) => ({
-      type: "attachment" as const,
-      attachment,
-    })),
-  ]);
+  const matchingOptions = createMemo<PickerOption[]>(() => {
+    const trigger = mention()?.trigger;
+    if (trigger === "$") return matchingSkills().map((skill) => ({ type: "skill" as const, skill }));
+    if (trigger !== "@") return [];
+    return [
+      ...matchingAgents().map((agent) => ({ type: "agent" as const, agent })),
+      ...matchingAttachments().map((attachment) => ({
+        type: "attachment" as const,
+        attachment,
+      })),
+    ];
+  });
   const activePickerValue = createMemo(() => {
     const option = matchingOptions()[activeOption()];
     return option ? new Set([pickerOptionKey(option)]) : new Set<string>();
@@ -159,7 +166,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
     ({ agentId, value, agents, skills, attachments, focusRequest }) => {
       if (!editor) return;
       const attachmentKey = attachments.map((attachment) => `${attachment.id}:${attachment.name}`).join("|");
-      const skillKey = skills.map((skill) => `${skill.skillId}:${skill.name}:${skill.state}`).join("|");
+      const skillKey = skills
+        .map((skill) => `${skill.skillId}:${skill.name}:${skill.state}:${skill.description ?? ""}`)
+        .join("|");
       const contentChanged =
         agentId !== lastAgentId || value !== lastEmittedValue || attachmentKey !== lastAttachmentKey;
       const skillsChanged = skillKey !== lastSkillKey;
@@ -243,12 +252,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
     range.selectNodeContents(editor);
     range.setEnd(selection.anchorNode ?? editor, selection.anchorOffset);
     const beforeCaret = range.toString();
-    const match = beforeCaret.match(/(?:^|\s)@([^@\n]{0,60})$/u);
+    const match = beforeCaret.match(/(?:^|\s)([@$])([^@$\n]{0,60})$/u);
     if (!match) {
       setMention(null);
       return;
     }
-    const query = match[1] ?? "";
+    const trigger = match[1] === "$" ? "$" : "@";
+    const query = match[2] ?? "";
     const bounds = editor.getBoundingClientRect();
     const gutter = 12;
     const width = Math.min(720, bounds.width + 36, window.innerWidth - gutter * 2);
@@ -257,7 +267,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
       left: Math.max(gutter, Math.min(bounds.left, window.innerWidth - width - gutter)),
       width,
     });
-    setMention({ query, start: beforeCaret.length - query.length - 1, end: beforeCaret.length });
+    setMention({ query, start: beforeCaret.length - query.length - 1, end: beforeCaret.length, trigger });
     setActiveOption(0);
   }
 
@@ -533,7 +543,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
           <Listbox.Root<PickerOption>
             as="div"
             class="mention-picker"
-            aria-label="Insert mention"
+            aria-label={mention()?.trigger === "$" ? "Insert skill" : "Insert mention"}
             options={matchingOptions()}
             optionValue={pickerOptionKey}
             optionTextValue={pickerOptionText}
@@ -553,8 +563,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
               const option = item.rawValue;
               const optionIndex = () =>
                 matchingOptions().findIndex((candidate) => pickerOptionKey(candidate) === item.key);
-              const firstSkillIndex = () => matchingAgents().length;
-              const firstAttachmentIndex = () => matchingAgents().length + matchingSkills().length;
+              const firstSkillIndex = () => matchingOptions().findIndex((candidate) => candidate.type === "skill");
+              const firstAttachmentIndex = () =>
+                matchingOptions().findIndex((candidate) => candidate.type === "attachment");
               return (
                 <>
                   <Show when={option.type === "agent" && item.index === 0}>
@@ -574,6 +585,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                       "mention-picker-option",
                       {
                         "mention-picker-file-option": option.type === "attachment",
+                        "mention-picker-skill-option": option.type === "skill",
                         "mention-picker-option-active": activeOption() === optionIndex(),
                       },
                     ]}
@@ -589,14 +601,17 @@ export function ComposerEditor(props: ComposerEditorProps) {
                     ) : (
                       <AttachmentReferenceVisual name={option.attachment.name} />
                     )}
-                    <strong>
-                      {option.type === "agent"
-                        ? option.agent.name
-                        : option.type === "skill"
-                          ? option.skill.name
-                          : option.attachment.name}
-                    </strong>
-                    <span>{option.type === "agent" ? "Agent" : option.type === "skill" ? "Skill" : "File"}</span>
+                    {option.type === "skill" ? (
+                      <span class="mention-picker-skill-copy">
+                        <strong>{option.skill.name}</strong>
+                        <span>{skillDescription(option.skill) ?? "Skill"}</span>
+                      </span>
+                    ) : (
+                      <>
+                        <strong>{option.type === "agent" ? option.agent.name : option.attachment.name}</strong>
+                        <span>{option.type === "agent" ? "Agent" : "File"}</span>
+                      </>
+                    )}
                   </Listbox.Item>
                 </>
               );
@@ -724,17 +739,26 @@ function createSkillToken(skill: InstalledSkill): HTMLSpanElement {
 }
 
 function updateSkillToken(token: HTMLSpanElement, skill: InstalledSkill): void {
-  token.className = "composer-mention-token composer-skill-token";
+  token.className = "composer-mention-token skill-chip";
   token.contentEditable = "false";
   token.dataset.skillId = skill.skillId;
   token.dataset.skillName = skill.name;
-  token.removeAttribute("aria-label");
   token.setAttribute("aria-label", `Skill ${skill.name}`);
-  const icon = Puzzle({ class: "composer-skill-icon" });
+  const iconWrap = document.createElement("span");
+  iconWrap.className = "skill-chip-icon";
+  iconWrap.setAttribute("aria-hidden", "true");
+  const icon = Puzzle({ class: "skill-chip-glyph" });
   if (!(icon instanceof Node)) throw new Error("Puzzle icon did not render to a DOM node");
+  iconWrap.append(icon);
   const name = document.createElement("span");
+  name.className = "skill-chip-name";
   name.textContent = skill.name;
-  token.replaceChildren(icon, name);
+  token.replaceChildren(iconWrap, name);
+}
+
+function skillDescription(skill: InstalledSkill): string | undefined {
+  const description = skill.description?.trim();
+  return description || undefined;
 }
 
 function createUnavailableTagToken(kind: "agent" | "skill", id: string, name: string): HTMLSpanElement {
@@ -763,7 +787,9 @@ function updateUnavailableSkillToken(token: HTMLSpanElement, id: string, name: s
 
 function syncSkillTokens(editor: HTMLDivElement, skills: InstalledSkill[]): void {
   const available = new Map(
-    skills.filter((skill) => skill.state !== "needs-repair").map((skill) => [skill.skillId, skill]),
+    skills
+      .filter((skill) => skill.state !== "needs-repair" && skill.enabled !== false)
+      .map((skill) => [skill.skillId, skill]),
   );
   for (const token of editor.querySelectorAll<HTMLSpanElement>("[data-skill-id]")) {
     const id = token.dataset.skillId;
@@ -801,7 +827,9 @@ function renderEditorValue(
     }
     if (target.startsWith("skill:")) {
       const id = target.slice("skill:".length);
-      const skill = skills.find((candidate) => candidate.skillId === id && candidate.state !== "needs-repair");
+      const skill = skills.find(
+        (candidate) => candidate.skillId === id && candidate.state !== "needs-repair" && candidate.enabled !== false,
+      );
       editor.append(skill ? createSkillToken(skill) : createUnavailableTagToken("skill", id, name));
       cursor = index + match[0].length;
       continue;

@@ -47,6 +47,7 @@ export const IPC_CHANNELS = {
   skillsListInstalled: "skills:list-installed",
   skillsInstall: "skills:install",
   skillsUninstall: "skills:uninstall",
+  skillsSetEnabled: "skills:set-enabled",
   customProvidersList: "custom-providers:list",
   customProvidersSave: "custom-providers:save",
   customProvidersDelete: "custom-providers:delete",

@@ -565,6 +565,7 @@ function decodeInstalledSkill(value: unknown): InstalledSkill {
   if (!isOneOf(["installed", "update-available", "modified", "needs-repair"], state)) {
     throw new Error("Invalid installed skill state.");
   }
+  const description = optionalSkillDescription(item.description);
   return {
     skillId: requiredString(item, "skillId"),
     slug: requiredString(item, "slug"),
@@ -572,7 +573,16 @@ function decodeInstalledSkill(value: unknown): InstalledSkill {
     installedVersion: requiredNumber(item, "installedVersion"),
     availableVersion: requiredNumber(item, "availableVersion"),
     state,
+    ...(item.enabled === false ? { enabled: false } : item.enabled === true ? { enabled: true } : {}),
+    ...(item.origin === "managed" || item.origin === "marketplace" ? { origin: item.origin } : {}),
+    ...(description ? { description } : {}),
   };
+}
+
+function optionalSkillDescription(value: unknown): string | undefined {
+  if (!isString(value)) return undefined;
+  const description = value.trim();
+  return description && description.length <= 500 ? description : undefined;
 }
 
 function decodeInstalledSkillsFromMain(value: unknown): InstalledSkill[] {
@@ -867,6 +877,7 @@ const openbotApi: OpenBotDesktopApi = {
       ipcRenderer.invoke(IPC_CHANNELS.skillsListInstalled, agentId).then(decodeInstalledSkillsFromMain),
     install: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsInstall, input).then(decodeInstalledSkill),
     uninstall: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsUninstall, input).then(decodeVoid),
+    setEnabled: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsSetEnabled, input).then(decodeInstalledSkill),
   },
   hostedSites: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesList).then(decodeHostedSites),

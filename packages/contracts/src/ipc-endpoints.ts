@@ -100,6 +100,7 @@ export const IPC_ENDPOINTS = {
     listInstalled: request(IPC_CHANNELS.skillsListInstalled),
     install: request(IPC_CHANNELS.skillsInstall),
     uninstall: request(IPC_CHANNELS.skillsUninstall),
+    setEnabled: request(IPC_CHANNELS.skillsSetEnabled),
   },
   // No event channel: the renderer is the only writer, and the models a saved endpoint adds arrive
   // through the ready `status` event the provider restart already emits.
