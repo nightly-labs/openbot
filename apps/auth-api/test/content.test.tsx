@@ -72,14 +72,17 @@ function firstArticle(collection: ContentCollection): CollectionArticle {
 
 /**
  * The reader's motion setting. Every other query answers no, which is also how a
- * touch screen answers the hover query. Returns the queries asked, in order.
+ * touch screen answers the hover query. Pass `finePointer` for a desktop mouse.
+ * Returns the queries asked, in order.
  */
-function stubMotionPreference(reduced: boolean): string[] {
+function stubMotionPreference(reduced: boolean, finePointer = false): string[] {
   const asked: string[] = [];
   vi.stubGlobal("matchMedia", (query: string) => {
     asked.push(query);
     return {
-      matches: reduced && query.includes("prefers-reduced-motion"),
+      matches:
+        (reduced && query.includes("prefers-reduced-motion")) ||
+        (finePointer && !reduced && query.includes("hover: hover") && query.includes("pointer: fine")),
       media: query,
       onchange: null,
       addListener: () => {},
@@ -481,6 +484,47 @@ describe("article artwork", () => {
     ));
 
     await waitFor(() => expect(bakedStill(container)).toContain(artPath));
+  });
+
+  it("does not prepare a hover card's shader until the card is near the viewport", async () => {
+    const collection = CONTENT_COLLECTIONS[0];
+    const article = collection?.articles[1];
+    if (!collection || !article) throw new Error("This test needs a collection with a grid article.");
+    const asked = stubMotionPreference(false, true);
+    const approach = stubCardApproach();
+    shaderOpeningFrames.length = 0;
+
+    render(() => (
+      <ArticleGradient
+        mode="hover"
+        hoverTarget={() => document.body}
+        title={article.title}
+        art={{ collection, slug: article.slug, shape: "card" }}
+      />
+    ));
+
+    await waitFor(() => expect(asked.some((query) => query.includes("hover: hover"))).toBe(true));
+    expect(shaderOpeningFrames).toEqual([]);
+
+    await waitFor(() => {
+      approach();
+      expect(shaderOpeningFrames.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("prepares live artwork without waiting for the viewport", async () => {
+    const collection = CONTENT_COLLECTIONS[0];
+    const article = collection?.articles[0];
+    if (!collection || !article) throw new Error("This test needs a collection with a featured article.");
+    stubMotionPreference(false, true);
+    stubCardApproach();
+    shaderOpeningFrames.length = 0;
+
+    render(() => (
+      <ArticleGradient mode="live" title={article.title} art={{ collection, slug: article.slug, shape: "featured" }} />
+    ));
+
+    await waitFor(() => expect(shaderOpeningFrames.length).toBeGreaterThan(0));
   });
 });
 

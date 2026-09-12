@@ -36,12 +36,13 @@ import { cx } from "../../lib/utils";
 // development it answers 404, and the CSS approximation underneath is a handful of
 // coloured blobs that look nothing like the shader's output.
 //
-// So a card that can move draws its own. Before anything is hovered it mounts the
-// shader with the clock stopped, keeps the frame it produced as the still, and lets
-// the context go again. That picture is exact, it is the right shape because it was
-// drawn at the element's own size, and it costs one short-lived context per card.
-// The canvas is revealed only once it has drawn, and it fades in over that same
-// frame, so the handover is never a cut and never a cut to an empty rectangle.
+// So a card that can move draws its own, once it is near the viewport. It mounts
+// the shader with the clock stopped, keeps the frame it produced as the still, and
+// lets the context go again. That picture is exact, it is the right shape because
+// it was drawn at the element's own size, and it costs one short-lived context per
+// card. The canvas is revealed only once it has drawn, and it fades in over that
+// same frame, so the handover is never a cut and never a cut to an empty rectangle.
+// A card still below the fold does not spend that context, or the encode, at all.
 //
 // A card that cannot move — reduced motion, or a screen with no pointer to rest —
 // keeps the baked PNG. With no shader to hand over to there is no cut to avoid,
@@ -89,7 +90,7 @@ const ANIMATION_SPEED = 0.6;
 /** Enough frames for the mount's ResizeObserver to have sized the canvas. */
 const CANVAS_FRAME_BUDGET = 12;
 
-/** Start fetching the baked still before the card is on screen. */
+/** Start the baked still, and the shader still, before the card is on screen. */
 const CARD_ART_ROOT_MARGIN = "400px 0px";
 
 // Priming is serialised across every card on the page. Each one is a WebGL
@@ -251,29 +252,22 @@ export function ArticleGradient(props: ArticleGradientProps) {
   };
 
   onSettled(() => {
-    if (props.art?.shape !== "card" || !host) return;
-    // A browser with no observer cannot tell what is on screen. Load the still:
-    // it is better than the approximation, and a missing file already falls
-    // through to that approximation without drawing a broken image.
-    if (!globalThis.IntersectionObserver) {
-      setCardArtReady(true);
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
-        setCardArtReady(true);
-        observer.disconnect();
-      },
-      { rootMargin: CARD_ART_ROOT_MARGIN },
-    );
-    observer.observe(host);
-    return () => observer.disconnect();
-  });
+    const wantsArt = props.art?.shape === "card";
+    const wantsPrime =
+      motionWelcome() && props.mode === "hover" && !!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
+    // One observer does both jobs a card below the fold must wait on: putting
+    // the PNG URL on, and drawing the exact first frame. Featured artwork skips
+    // this and primes at once.
+    const stopWatching =
+      host && (wantsArt || wantsPrime)
+        ? watchNearViewport(host, () => {
+            if (wantsArt) setCardArtReady(true);
+            if (wantsPrime) void primeStill();
+          })
+        : undefined;
 
-  onSettled(() => {
     // Nothing will move, so the baked still is the whole picture.
-    if (!motionWelcome()) return;
+    if (!motionWelcome()) return stopWatching;
 
     if (props.mode === "live") {
       // The still is painted first and the animation starts from it, so the
@@ -284,20 +278,17 @@ export function ArticleGradient(props: ArticleGradientProps) {
       return () => {
         detached = true;
         disposeShader();
+        stopWatching?.();
       };
     }
 
     // Hover only makes sense where a pointer can rest on something. A touch
     // screen reports a hover that never ends, which would leave a context alive
     // for the rest of the session. Nothing will move here either.
-    if (!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches) return;
+    if (!wantsPrime) return stopWatching;
 
     const element = props.hoverTarget?.();
-    if (!element) return;
-
-    // Paint the first frame now and let the context go again, so a card at rest
-    // shows the picture its animation opens on.
-    void primeStill();
+    if (!element) return stopWatching;
 
     // A pointer that arrives while a stopped mount is still on the element starts
     // that one again rather than building a second.
@@ -327,6 +318,7 @@ export function ArticleGradient(props: ArticleGradientProps) {
       hovered = false;
       detached = true;
       disposeShader();
+      stopWatching?.();
     };
   });
 
@@ -345,4 +337,24 @@ function nextAnimationFrame(): Promise<void> {
   return new Promise((resolve) => {
     requestAnimationFrame(() => resolve());
   });
+}
+
+function watchNearViewport(element: Element, onNear: () => void): () => void {
+  // A browser with no observer cannot tell what is on screen. Do the work: the
+  // still is better than the approximation, and a missing file already falls
+  // through to that approximation without drawing a broken image.
+  if (!globalThis.IntersectionObserver) {
+    onNear();
+    return () => {};
+  }
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      onNear();
+      observer.disconnect();
+    },
+    { rootMargin: CARD_ART_ROOT_MARGIN },
+  );
+  observer.observe(element);
+  return () => observer.disconnect();
 }
