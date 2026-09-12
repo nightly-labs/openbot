@@ -14,6 +14,7 @@ import type {
   SaveCustomProviderInput,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import { createSignal, Show } from "solid-js";
 import {
   Button,
@@ -26,6 +27,7 @@ import {
   Text,
   UserRound,
 } from "../../components/ui";
+import { useI18n } from "../../i18n-context";
 import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
 import type { GeneralSettingsValue } from "./app-settings";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "./OpenCodeKeyDialog";
@@ -81,28 +83,62 @@ export interface SettingsModalProps {
 
 type SettingsTab = "general" | "computer-use" | "profile" | "mobile-connect" | "updates" | "hosted-sites";
 
-type SettingsNavItem = { value: SettingsTab; label: string; icon: typeof Settings };
+/**
+ * A tab holds the keys of its label and its header text, not the text itself. The list is read at
+ * module level, before any component exists to translate it, and a label captured there would keep
+ * the language the app started in.
+ */
+type SettingsNavItem = {
+  value: SettingsTab;
+  titleKey: AppTextKey;
+  descriptionKey: AppTextKey;
+  icon: typeof Settings;
+};
 
 const navItems: ReadonlyArray<SettingsNavItem> = [
-  { value: "general", label: "General", icon: Settings },
-  { value: "computer-use", label: "Computer Use", icon: MousePointer2 },
-  { value: "profile", label: "Profile", icon: UserRound },
-  { value: "mobile-connect", label: "Mobile Connect", icon: Smartphone },
-  { value: "updates", label: "Updates", icon: CircleArrowDown },
-  { value: "hosted-sites", label: "Hosted sites", icon: Globe2 },
+  {
+    value: "general",
+    titleKey: "settings.tab.general.title",
+    descriptionKey: "settings.tab.general.description",
+    icon: Settings,
+  },
+  {
+    value: "computer-use",
+    titleKey: "settings.tab.computerUse.title",
+    descriptionKey: "settings.tab.computerUse.description",
+    icon: MousePointer2,
+  },
+  {
+    value: "profile",
+    titleKey: "settings.tab.profile.title",
+    descriptionKey: "settings.tab.profile.description",
+    icon: UserRound,
+  },
+  {
+    value: "mobile-connect",
+    titleKey: "settings.tab.mobileConnect.title",
+    descriptionKey: "settings.tab.mobileConnect.description",
+    icon: Smartphone,
+  },
+  {
+    value: "updates",
+    titleKey: "settings.tab.updates.title",
+    descriptionKey: "settings.tab.updates.description",
+    icon: CircleArrowDown,
+  },
+  {
+    value: "hosted-sites",
+    titleKey: "settings.tab.hostedSites.title",
+    descriptionKey: "settings.tab.hostedSites.description",
+    icon: Globe2,
+  },
 ];
 
-const tabDetails: Record<SettingsTab, { title: string; description: string }> = {
-  general: { title: "General", description: "Control how OpenBot behaves on this computer." },
-  "computer-use": {
-    title: "Computer Use",
-    description: "Allow OpenBot to see and interact with apps on this Mac.",
-  },
-  profile: { title: "Profile", description: "Manage how you appear in OpenBot." },
-  "mobile-connect": { title: "Mobile Connect", description: "Sign in securely on your phone." },
-  updates: { title: "Updates", description: "Keep OpenBot current on this computer." },
-  "hosted-sites": { title: "Hosted sites", description: "View and manage static sites published by your agents." },
-};
+function navItem(tab: SettingsTab): SettingsNavItem {
+  const found = navItems.find((item) => item.value === tab);
+  if (!found) throw new Error(`Unknown settings tab: ${tab}`);
+  return found;
+}
 
 /**
  * The dialog shell: the tab list, the header, the footer save bar, and one delegation per panel.
@@ -113,6 +149,7 @@ const tabDetails: Record<SettingsTab, { title: string; description: string }> = 
  * draft while another tab is selected.
  */
 export function SettingsModal(props: SettingsModalProps) {
+  const i18n = useI18n();
   const [activeTab, setActiveTab] = createSignal<SettingsTab>("general");
   const [openCodeKeyOpen, setOpenCodeKeyOpen] = createSignal(false);
   let modalElement: HTMLElement | undefined;
@@ -123,8 +160,8 @@ export function SettingsModal(props: SettingsModalProps) {
   const updates = createSettingsUpdatesStore(props);
   const hostedSites = createSettingsHostedSitesStore(props, () => activeTab() === "hosted-sites");
 
-  const title = () => tabDetails[activeTab()].title;
-  const description = () => tabDetails[activeTab()].description;
+  const title = () => i18n.t(navItem(activeTab()).titleKey);
+  const description = () => i18n.t(navItem(activeTab()).descriptionKey);
 
   const tabsProps = {
     get value() {
@@ -173,9 +210,9 @@ export function SettingsModal(props: SettingsModalProps) {
         }
         footer={
           <Show when={profile.nameDirty()}>
-            <section class="settings-modal-save-bar" aria-label="Unsaved changes">
+            <section class="settings-modal-save-bar" aria-label={i18n.t("settings.save.region")}>
               <Text variant="caption" tone="muted">
-                Changes not saved
+                {i18n.t("settings.save.notSaved")}
               </Text>
               <div class="settings-modal-save-actions">
                 <Button
@@ -185,25 +222,25 @@ export function SettingsModal(props: SettingsModalProps) {
                   disabled={profile.state.profile.busy}
                   onClick={profile.resetName}
                 >
-                  Reset
+                  {i18n.t("settings.save.reset")}
                 </Button>
                 <Button
                   type="button"
                   size="sm"
                   variant="default"
                   loading={profile.state.profile.busy}
-                  loadingLabel="Saving…"
+                  loadingLabel={i18n.t("settings.save.saving")}
                   disabled={profile.state.profile.busy}
                   onClick={() => void profile.saveName()}
                 >
-                  Save
+                  {i18n.t("settings.save.save")}
                 </Button>
               </div>
             </section>
           </Show>
         }
         sidebar={
-          <Tabs.List class="settings-modal-nav" aria-label="Settings sections">
+          <Tabs.List class="settings-modal-nav" aria-label={i18n.t("settings.sections.label")}>
             {navItems
               .filter((item) => item.value !== "computer-use" || props.appInfo?.platform === "darwin")
               .map((item) => {
@@ -215,7 +252,7 @@ export function SettingsModal(props: SettingsModalProps) {
                     aria-current={activeTab() === item.value ? "page" : undefined}
                   >
                     <NavIcon aria-hidden="true" />
-                    <span>{item.label}</span>
+                    <span>{i18n.t(item.titleKey)}</span>
                   </Tabs.Trigger>
                 );
               })}

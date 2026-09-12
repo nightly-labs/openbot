@@ -1,9 +1,10 @@
 import { join, resolve } from "node:path";
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
 import { type CentralAuthState, IPC_CHANNELS } from "@openbot/contracts/ipc";
+import { translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
-import { app, type BrowserWindow, dialog, powerMonitor, protocol, screen } from "electron";
+import { app, BrowserWindow, dialog, powerMonitor, protocol, screen } from "electron";
 import { readAppVariant, resolveAppIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
 import { guardDevelopmentOutput } from "./development-output";
@@ -186,6 +187,9 @@ const {
   getHostAnalytics: () => services?.analytics ?? null,
   getRemoteServerManager: () => services?.remoteServers ?? null,
   showMainWindow,
+  // An agent event cannot arrive before the services that raise it, so the fallback stands only so
+  // that this module-level value needs no null check on the notification path.
+  getTranslate: () => services?.language.translate ?? translateFor("en"),
 });
 
 // Resolved once, safely: every `app.setPath("userData", ...)` above has already run.
@@ -257,6 +261,7 @@ function registerIpcHandlers({
   setupFile,
   analyticsPreferenceFile,
   updatePreferenceFile,
+  language,
   agentInitialization,
   sidebarLayout,
   host,
@@ -287,6 +292,7 @@ function registerIpcHandlers({
       updater,
       setupFile,
       analyticsPreferenceFile,
+      language,
       initializeAgent: () => agentInitialization.start(),
       appVariant,
       getMainWindow,
@@ -513,7 +519,17 @@ if (!hasSingleInstanceLock) {
       ) {
         forwardCentralAuth(currentAccount);
       }
-      const { service, sidebarLayout, host, remoteDesktop, remoteServers, updater, dynamicIsland, teamStore } = built;
+      const {
+        service,
+        sidebarLayout,
+        host,
+        remoteDesktop,
+        remoteServers,
+        updater,
+        dynamicIsland,
+        teamStore,
+        language,
+      } = built;
 
       service.on("event", (event) => forwardAgentEvent("local", event));
       sidebarLayout.on("changed", (layout) => forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }));
@@ -534,7 +550,16 @@ if (!hasSingleInstanceLock) {
       // Before the renderer loads: the trust boundary and every protocol it fetches through have to
       // be in place before the first request can arrive.
       registerIpcHandlers(built);
-      configureApplicationMenu(service, updater);
+      configureApplicationMenu(service, updater, language.translate);
+      // One place turns a language change into every visible consequence: the menu is built again
+      // because a native label cannot be changed in place, and every window is told, including the
+      // Dynamic Island, which has no Settings of its own to read the new value from.
+      language.subscribe((preference) => {
+        configureApplicationMenu(service, updater, language.translate);
+        for (const window of BrowserWindow.getAllWindows()) {
+          sendToRenderer(window, IPC_CHANNELS.appLanguagePreference, preference);
+        }
+      });
       await dynamicIsland
         .initialize()
         .catch((error) => logger.error("Unable to initialize Dynamic Island:", toLogValue(error)));

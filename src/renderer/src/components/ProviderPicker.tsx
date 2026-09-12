@@ -7,8 +7,10 @@ import type {
   ProviderRuntimePhase,
   ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
+import type { AppMessages, AppTextKey, AppTranslate } from "@openbot/i18n";
 import { createEffect, createUniqueId, For, Show } from "solid-js";
 import { providerUpdateAvailable, providerVersionLabel } from "../features/provider-updates/provider-update";
+import { useI18n } from "../i18n-context";
 import { Badge, Button, Input, RefreshCw, SlidersHorizontal, Spinner } from "./ui";
 
 export interface ProviderPickerOption {
@@ -77,6 +79,7 @@ export interface ProviderPickerProps {
 }
 
 export function ProviderPicker(props: ProviderPickerProps) {
+  const i18n = useI18n();
   const inputs = new Map<AgentProviderId, HTMLInputElement>();
   const pickerId = createUniqueId();
   const addCustomId = `${pickerId}-custom`;
@@ -84,7 +87,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
   const openCode = () => props.options.find((option) => option.id === "opencode");
   const customReady = () => servesCustomProvider(openCode());
   const endpointCount = () => props.customProviders?.length ?? 0;
-  const endpointCountLabel = () => (endpointCount() === 1 ? "1 endpoint" : `${endpointCount()} endpoints`);
+  const endpointCountLabel = () => i18n.t("provider.endpointCount", { count: endpointCount() });
   /** The count answers a click only where the list can be opened. Elsewhere it stays a badge. */
   const countManageable = () => endpointCount() > 0 && Boolean(props.onManageCustomProviders);
   /** The row is a choice once it has something to run and someone to tell about the choice. */
@@ -128,8 +131,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
         </Show>
         <SlidersHorizontal class="provider-picker-custom-mark" aria-hidden="true" />
         <span class="provider-picker-identity">
-          <span class="provider-picker-name">Custom provider</span>
-          <small class="provider-picker-email">Your own model endpoint</small>
+          <span class="provider-picker-name">{i18n.t("provider.custom.name")}</span>
+          <small class="provider-picker-email">{i18n.t("provider.custom.description")}</small>
         </span>
         <span class="provider-picker-state">
           {/* How many endpoints the row stands for. The row never names them: which one an agent
@@ -148,7 +151,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
               tone={providerStatusTone(engine().state)}
               shape="pill"
             >
-              {providerStatusLabel(engine().state)}
+              {providerStatusLabel(i18n.t, engine().state)}
             </Badge>
           </Show>
         </span>
@@ -162,7 +165,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
             variant="ghost"
             size="xs"
             class="provider-picker-custom-count"
-            aria-label={`Manage ${endpointCountLabel()}`}
+            aria-label={i18n.t("provider.manageEndpoints", { count: endpointCount() })}
             disabled={props.disabled}
             onClick={() => props.onManageCustomProviders?.()}
           >
@@ -176,11 +179,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
             variant="outline"
             size="xs"
             class="provider-picker-install"
-            aria-label="Add custom provider"
+            aria-label={i18n.t("provider.custom.addLabel")}
             disabled={props.disabled || props.refreshingProviders}
             onClick={() => props.onAddCustomProvider?.()}
           >
-            Add
+            {i18n.t("provider.action.add")}
           </Button>
         </Show>
         {/* The same install the OpenCode row offers, and only when that row offers it. */}
@@ -196,11 +199,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
             variant="outline"
             size="xs"
             class="provider-picker-install"
-            aria-label="Install custom provider"
+            aria-label={i18n.t("provider.custom.installLabel")}
             disabled={props.disabled || props.refreshingProviders}
             onClick={() => void props.onInstallProvider?.("opencode")}
           >
-            Install
+            {i18n.t("provider.action.install")}
           </Button>
         </Show>
       </div>
@@ -243,14 +246,16 @@ export function ProviderPicker(props: ProviderPickerProps) {
               variant="ghost"
               size="xs"
               class="provider-picker-refresh"
-              aria-label={props.refreshingProviders ? "Checking providers" : "Refresh providers"}
+              aria-label={
+                props.refreshingProviders ? i18n.t("provider.refreshingLabel") : i18n.t("provider.refreshLabel")
+              }
               loading={props.refreshingProviders}
-              loadingLabel="Checking…"
+              loadingLabel={i18n.t("provider.refreshing")}
               disabled={props.disabled}
               onClick={() => void props.onRefreshProviders?.()}
             >
               <RefreshCw size={13} aria-hidden="true" />
-              Refresh
+              {i18n.t("provider.refresh")}
             </Button>
           </Show>
         </div>
@@ -327,7 +332,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                           tone={providerStatusTone(visualState())}
                           shape="pill"
                         >
-                          {providerStatusLabel(state(), connecting(), runtimeStatus(), updatable())}
+                          {providerStatusLabel(i18n.t, state(), connecting(), runtimeStatus(), updatable())}
                         </Badge>
                       </Show>
                     </span>
@@ -339,22 +344,22 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       {(action) => (
                         <Button
                           type="button"
-                          variant={action() === "Download" ? "default" : "outline"}
+                          variant={action() === "download" ? "default" : "outline"}
                           size="xs"
                           class="provider-picker-install"
-                          aria-label={`${action()} ${option().name}`}
+                          aria-label={i18n.t(PROVIDER_ACTION_LABEL[action()], { name: option().name })}
                           disabled={props.disabled || props.refreshingProviders}
                           onClick={() => {
-                            if (action() === "Cancel") {
+                            if (action() === "cancel") {
                               void props.onCancelProviderDownload?.(option().id);
-                            } else if (["Connect", "Reconnect", "Restart"].includes(action())) {
+                            } else if (action() !== "download" && action() !== "retry") {
                               void props.onConnectProvider?.(option().id);
                             } else {
                               void props.onDownloadProvider?.(option().id);
                             }
                           }}
                         >
-                          {action()}
+                          {i18n.t(PROVIDER_ACTION_TEXT[action()])}
                         </Button>
                       )}
                     </Show>
@@ -367,11 +372,14 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         variant="default"
                         size="xs"
                         class="provider-picker-install"
-                        aria-label={`Update ${option().name} to ${option().availableVersion}`}
+                        aria-label={i18n.t("provider.aria.update", {
+                          name: option().name,
+                          version: option().availableVersion ?? "",
+                        })}
                         disabled={props.disabled || props.refreshingProviders || connecting()}
                         onClick={() => void props.onUpdateProvider?.(option().id)}
                       >
-                        Update
+                        {i18n.t("provider.action.update")}
                       </Button>
                     </Show>
                     <Show
@@ -388,11 +396,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         variant="outline"
                         size="xs"
                         class="provider-picker-install"
-                        aria-label={`Install ${option().name}`}
+                        aria-label={i18n.t("provider.aria.install", { name: option().name })}
                         disabled={props.disabled || props.refreshingProviders}
                         onClick={() => void props.onInstallProvider?.(option().id)}
                       >
-                        Install
+                        {i18n.t("provider.action.install")}
                       </Button>
                     </Show>
                     <Show when={!runtimeStatus() && props.onConnectProvider}>
@@ -401,7 +409,9 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         variant="outline"
                         size="xs"
                         class="provider-picker-install"
-                        aria-label={`${providerActionLabel(state(), connecting())} ${option().name}`}
+                        aria-label={i18n.t(PROVIDER_ACTION_LABEL[providerAction(state(), connecting())], {
+                          name: option().name,
+                        })}
                         aria-busy={connecting() ? "true" : undefined}
                         disabled={props.disabled || props.refreshingProviders}
                         onClick={() => void props.onConnectProvider?.(option().id)}
@@ -409,7 +419,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         <Show when={connecting()}>
                           <Spinner size="sm" />
                         </Show>
-                        {providerActionLabel(state(), connecting())}
+                        {i18n.t(PROVIDER_ACTION_TEXT[providerAction(state(), connecting())])}
                       </Button>
                     </Show>
                     {/* Claude's sign-in is a browser round trip it only needs while signed out.
@@ -431,11 +441,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         variant="outline"
                         size="xs"
                         class="provider-picker-install"
-                        aria-label={`Sign in to ${option().name}`}
+                        aria-label={i18n.t("provider.aria.signIn", { name: option().name })}
                         disabled={props.disabled || props.refreshingProviders}
                         onClick={() => void props.onSignInProvider?.(option().id)}
                       >
-                        Sign in
+                        {i18n.t("provider.action.signIn")}
                       </Button>
                     </Show>
                   </div>
@@ -474,32 +484,39 @@ function providerStatusTone(state: ProviderVisualState): "success" | "warning" |
   return "neutral";
 }
 
+/**
+ * What the badge says, translated where it is drawn.
+ *
+ * A download reports a percentage, which is a number rather than a message, so the caller receives
+ * the text and not a key.
+ */
 function providerStatusLabel(
+  translate: AppTranslate,
   state: AgentProviderState,
   connecting = false,
   runtimeStatus?: ProviderRuntimeStatus,
   updatable = false,
 ): string {
-  if (connecting && state !== "available") return "Connecting";
+  if (connecting && state !== "available") return translate("provider.status.connecting");
   // Ahead of both "Connected" and "Ready": an offer the row does not show is an
   // offer the user never sees, and "ready" is the phase every update starts from.
-  if (updatable) return "Update available";
+  if (updatable) return translate("provider.status.updateAvailable");
   // A download outranks "Connected": an update runs on a provider that is connected already, so
   // reporting the connection instead would hide both the progress the Cancel button reverses and
   // the failure the Retry button beside it answers.
   if (runtimeStatus?.phase === "downloading") {
     return `${Math.round(Math.max(0, Math.min(100, runtimeStatus.progress ?? 0)))}%`;
   }
-  if (runtimeStatus?.phase === "finishing") return "Setting up";
-  if (runtimeStatus?.phase === "download-error") return "Download failed";
-  if (state === "available") return "Connected";
-  if (runtimeStatus?.phase === "not-downloaded") return "Not downloaded";
-  if (runtimeStatus?.phase === "ready") return "Ready";
-  if (state === "sign-in-required") return "Not connected";
-  if (state === "not-installed") return "Not installed";
-  if (state === "outdated") return "Update required";
-  if (state === "error") return "Unavailable";
-  return "Checking";
+  if (runtimeStatus?.phase === "finishing") return translate("provider.status.settingUp");
+  if (runtimeStatus?.phase === "download-error") return translate("provider.status.downloadFailed");
+  if (state === "available") return translate("provider.status.connected");
+  if (runtimeStatus?.phase === "not-downloaded") return translate("provider.status.notDownloaded");
+  if (runtimeStatus?.phase === "ready") return translate("provider.status.ready");
+  if (state === "sign-in-required") return translate("provider.status.notConnected");
+  if (state === "not-installed") return translate("provider.status.notInstalled");
+  if (state === "outdated") return translate("provider.status.updateRequired");
+  if (state === "error") return translate("provider.status.unavailable");
+  return translate("provider.status.checking");
 }
 
 function providerVisualState(
@@ -516,19 +533,46 @@ function providerVisualState(
   return phase ?? state;
 }
 
+/**
+ * What the button on the row does. It is an identifier and not a label: the click handler branches
+ * on it, and a branch that compared translated words would take the wrong one in any language but
+ * English.
+ */
+type ProviderAction = "download" | "cancel" | "connect" | "reconnect" | "restart" | "retry";
+
+const PROVIDER_ACTION_TEXT = {
+  download: "provider.action.download",
+  cancel: "provider.action.cancel",
+  connect: "provider.action.connect",
+  reconnect: "provider.action.reconnect",
+  restart: "provider.action.restart",
+  retry: "provider.action.retry",
+} as const satisfies Record<ProviderAction, AppTextKey>;
+
+/** The name a screen reader reads. It repeats the provider, because a list of rows that all say
+ * "Connect" names nothing. */
+const PROVIDER_ACTION_LABEL = {
+  download: "provider.aria.download",
+  cancel: "provider.aria.cancel",
+  connect: "provider.aria.connect",
+  reconnect: "provider.aria.reconnect",
+  restart: "provider.aria.restart",
+  retry: "provider.aria.retry",
+} as const satisfies Record<ProviderAction, keyof AppMessages>;
+
 function providerRuntimeAction(
   state: AgentProviderState,
   connecting: boolean,
   runtimeStatus?: ProviderRuntimeStatus,
-): "Download" | "Cancel" | "Connect" | "Reconnect" | "Restart" | "Retry" | undefined {
+): ProviderAction | undefined {
   if (!runtimeStatus) return;
-  if (runtimeStatus.phase === "not-downloaded") return "Download";
-  if (runtimeStatus.phase === "downloading") return "Cancel";
-  if (runtimeStatus.phase === "ready") return providerActionLabel(state, connecting);
-  if (runtimeStatus.phase === "download-error") return "Retry";
+  if (runtimeStatus.phase === "not-downloaded") return "download";
+  if (runtimeStatus.phase === "downloading") return "cancel";
+  if (runtimeStatus.phase === "ready") return providerAction(state, connecting);
+  if (runtimeStatus.phase === "download-error") return "retry";
 }
 
-function providerActionLabel(state: AgentProviderState, connecting: boolean): "Connect" | "Reconnect" | "Restart" {
-  if (connecting) return "Restart";
-  return state === "available" ? "Reconnect" : "Connect";
+function providerAction(state: AgentProviderState, connecting: boolean): ProviderAction {
+  if (connecting) return "restart";
+  return state === "available" ? "reconnect" : "connect";
 }

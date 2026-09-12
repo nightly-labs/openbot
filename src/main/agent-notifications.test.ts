@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import type { AgentEvent, AgentSummary } from "@openbot/contracts/ipc";
+import { translateFor } from "@openbot/i18n";
 import { describe, expect, it } from "vitest";
 import { notificationForAgentEvent } from "./agent-notifications";
 
@@ -23,8 +24,9 @@ const agent = {
 } satisfies AgentSummary;
 
 describe("notificationForAgentEvent", () => {
+  const translate = translateFor("en");
   it("surfaces completed work and prompts for enabled agents", () => {
-    expect(notificationForAgentEvent(completed("completed"), [agent])).toEqual({
+    expect(notificationForAgentEvent(completed("completed"), [agent], translate)).toEqual({
       title: "Chief",
       body: "Finished working.",
       silent: true,
@@ -40,14 +42,17 @@ describe("notificationForAgentEvent", () => {
           questions: [],
         },
         [agent],
+        translate,
       ),
     ).toEqual({ title: "Chief", body: "Needs your input." });
   });
 
   it("ignores disabled agents, non-successful turns, and unrelated events", () => {
-    expect(notificationForAgentEvent(completed("failed"), [agent])).toBeNull();
-    expect(notificationForAgentEvent(completed("completed"), [{ ...agent, notifications: false }])).toBeNull();
-    expect(notificationForAgentEvent({ type: "agents-changed", agents: [] }, [agent])).toBeNull();
+    expect(notificationForAgentEvent(completed("failed"), [agent], translate)).toBeNull();
+    expect(
+      notificationForAgentEvent(completed("completed"), [{ ...agent, notifications: false }], translate),
+    ).toBeNull();
+    expect(notificationForAgentEvent({ type: "agents-changed", agents: [] }, [agent], translate)).toBeNull();
   });
 });
 
