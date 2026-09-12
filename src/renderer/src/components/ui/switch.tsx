@@ -156,7 +156,7 @@ function SwitchMotionControl(props: SwitchMotionControlProps): JSX.Element {
     if (!cancelled && activeDrag.moved) context.setIsChecked(activeDrag.progress >= 0.5);
     drag = undefined;
     setDragging(false);
-    if (activeDrag.moved) suppressClick = true;
+    suppressClick = !cancelled && activeDrag.moved;
     setDragProgress(undefined);
 
     if (control?.hasPointerCapture?.(event.pointerId)) control.releasePointerCapture?.(event.pointerId);
@@ -202,6 +202,8 @@ function SwitchMotionControl(props: SwitchMotionControlProps): JSX.Element {
       data-dragging={dragging() ? "" : undefined}
       class="ui-switch-control"
       onPointerDown={(event) => {
+        suppressClick = false;
+        if (event.button !== 0) return;
         props.setPointerFocus(true);
         event.preventDefault();
         if (context.inputRef()?.disabled || context.inputRef()?.readOnly) return;

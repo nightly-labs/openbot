@@ -207,6 +207,44 @@ describe("UI primitives", () => {
     expect(onChange).toHaveBeenCalledWith(true);
   });
 
+  it("clears drag click suppression after pointer cancellation", async () => {
+    const onChange = vi.fn();
+    render(() => <SwitchField label="Notifications" onChange={onChange} />);
+
+    const input = screen.getByRole("switch", { name: "Notifications" });
+    const control = mockSwitchLayout();
+    await fireEvent.pointerDown(control, { clientX: 102, pointerId: 1 });
+    await fireEvent.pointerMove(control, { clientX: 112, pointerId: 1 });
+    await fireEvent.pointerCancel(control, { clientX: 112, pointerId: 1 });
+
+    expect(input).not.toBeChecked();
+    expect(onChange).not.toHaveBeenCalled();
+
+    await fireEvent.click(control);
+
+    expect(input).toBeChecked();
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it("ignores non-primary pointer buttons", async () => {
+    const onChange = vi.fn();
+    render(() => <SwitchField label="Notifications" onChange={onChange} />);
+
+    const input = screen.getByRole("switch", { name: "Notifications" });
+    const control = mockSwitchLayout();
+    await fireEvent.pointerDown(control, { button: 1, clientX: 102, pointerId: 1 });
+    await fireEvent.pointerMove(control, { button: 1, clientX: 112, pointerId: 1 });
+    await fireEvent.pointerUp(control, { button: 1, clientX: 112, pointerId: 1 });
+
+    expect(input).not.toBeChecked();
+    expect(onChange).not.toHaveBeenCalled();
+
+    await fireEvent.click(control);
+
+    expect(input).toBeChecked();
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
   it("exposes invalid switch state and field description", async () => {
     render(() => (
       <SwitchField
