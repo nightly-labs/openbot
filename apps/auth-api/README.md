@@ -35,6 +35,22 @@ bun run env:validate:prod
 
 Commit `.env.production`. Never commit `.env.keys` or `.env.dev`.
 
+## Article artwork
+
+The `/news` and `/guides` cards and social images come from a WebGL shader. A
+Worker has no WebGL and a CI runner has no GPU, so the images are drawn on a
+developer's machine and committed in `content-art/`. After you add an article or
+change a title, run this and commit the folder:
+
+```bash
+bun run api:images
+```
+
+It draws only the images whose inputs changed and deletes images that no
+article uses. `content-art/manifest.json` records a hash of the inputs of each
+image. The build compares those hashes with the articles and fails when an image
+is missing, out of date, or belongs to no article.
+
 ## Email delivery
 
 Private Email SMTP is the primary delivery method. Use a separate app password.

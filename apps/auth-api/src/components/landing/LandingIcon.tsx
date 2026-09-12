@@ -1,6 +1,6 @@
 import { Match, Switch } from "solid-js";
 
-export type LandingIconName = "arrow-up-right" | "chevron-down" | "contact" | "download" | "heart";
+export type LandingIconName = "arrow-right" | "arrow-up-right" | "chevron-down" | "contact" | "download" | "heart";
 
 export interface LandingIconProps {
   name: LandingIconName;
@@ -34,6 +34,10 @@ export function LandingIcon(props: LandingIconProps) {
         </Match>
         <Match when={props.name === "chevron-down"}>
           <path d="m6 9 6 6 6-6" />
+        </Match>
+        <Match when={props.name === "arrow-right"}>
+          <path d="M4 12h16" />
+          <path d="m14 6 6 6-6 6" />
         </Match>
         <Match when={props.name === "arrow-up-right"}>
           <path d="M7 17 17 7" />

@@ -803,9 +803,12 @@ describe.sequential("AgentService: routines", () => {
 
   it("does not fail or replay a turn whose start response times out after lifecycle events", async () => {
     process.env.OPENBOT_FAKE_AUTO_COMPLETE = "Finished despite the late response";
-    process.env.OPENBOT_FAKE_TURN_START_RESPONSE_DELAY = "250";
+    // Auto-complete is 20ms. The RPC timeout has to land after that, and before
+    // the delayed start response. 75ms vs 250ms loses that order when CI load
+    // delays the fake CLI, and the wait then never sees completed.
+    process.env.OPENBOT_FAKE_TURN_START_RESPONSE_DELAY = "1500";
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 75);
+    service = new AgentService(store, mailbox, fakeBrowser(), 400);
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();

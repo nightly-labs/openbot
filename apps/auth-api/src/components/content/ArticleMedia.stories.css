@@ -1,0 +1,27 @@
+/* Story-only. The in-article mount stays on `.post-mount`; this is the product-shot
+   treatment from the marketing frame: the card gradient is the whole stage, and the
+   screenshot sits on it with room around it. */
+
+.story-product-shot {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: clamp(28px, 8vw, 96px);
+  overflow: hidden;
+  background: var(--openbot-bg-canvas);
+}
+
+.story-product-shot-window {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 1080px);
+  height: auto;
+  border-radius: 16px;
+  outline: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.18),
+    0 8px 24px rgba(0, 0, 0, 0.28),
+    0 28px 64px rgba(0, 0, 0, 0.38);
+}

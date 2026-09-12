@@ -72,6 +72,7 @@
     "postinstall": "install-electron && bun run --cwd apps/mobile setup:skia",
     "api:start": "bun run --cwd apps/auth-api start",
     "api:build": "bun run --cwd apps/auth-api build",
+    "api:images": "bun run --cwd apps/auth-api images",
     "api:deploy": "bun run --cwd apps/auth-api deploy",
     "api:deploy:test": "bun run --cwd apps/auth-api deploy:test",
     "sites:deploy": "bun run --cwd apps/site-router deploy",

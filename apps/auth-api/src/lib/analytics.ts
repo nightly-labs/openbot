@@ -19,11 +19,30 @@ interface LandingAnalyticsEvents {
 }
 
 type LandingEventName = keyof LandingAnalyticsEvents;
-type LandingPlacement = "header" | "hero" | "download_section" | "footer" | "other";
+type LandingPlacement =
+  | "header"
+  | "hero"
+  | "download_section"
+  | "footer"
+  | "content_index"
+  | "content_article"
+  | "other";
+
+const LANDING_PLACEMENTS = [
+  "header",
+  "hero",
+  "download_section",
+  "footer",
+  "content_index",
+  "content_article",
+  "other",
+] as const satisfies readonly LandingPlacement[];
 /** The platforms the landing page can send a visitor to a download for. */
 type LandingDownloadPlatform = "linux" | "macos" | "windows";
 type LandingDestination =
   | "download_section"
+  | "news"
+  | "guides"
   | "contact"
   | "repository"
   | "releases"
@@ -36,7 +55,7 @@ type LandingDestination =
   | "codex"
   | "claude";
 
-type LandingScreenPath = "/" | "/join";
+type LandingScreenPath = "/" | "/join" | "/news" | "/guides";
 
 type OpenPanelClient = Pick<OpenPanel, "setGlobalProperties" | "track"> & {
   trackScreenView: (path: LandingScreenPath) => ReturnType<OpenPanelBase["track"]>;
@@ -62,6 +81,9 @@ const DOWNLOAD_PLATFORMS_BY_HREF = new Map<string, LandingDownloadPlatform>([
 
 const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [OPENBOT_LINKS.download, "download_section"],
+  [OPENBOT_LINKS.downloadFromOtherPage, "download_section"],
+  [OPENBOT_LINKS.news, "news"],
+  [OPENBOT_LINKS.guides, "guides"],
   [OPENBOT_LINKS.contact, "contact"],
   [OPENBOT_LINKS.repository, "repository"],
   [OPENBOT_LINKS.releases, "releases"],
@@ -98,16 +120,20 @@ export class LandingAnalytics {
     this.#productionBuild = productionBuild;
   }
 
-  start(document: Document, hostname: string): () => void {
+  /**
+   * `screenPath` separates the marketing surfaces that share this listener. The
+   * click handling is the same on all of them; only the reported screen differs.
+   */
+  start(document: Document, hostname: string, screenPath: LandingScreenPath = "/"): () => void {
     if (isLikelyAutomation(document.defaultView?.navigator)) return () => undefined;
     if (!this.#ensureClient(hostname)) return () => undefined;
     this.#client?.setGlobalProperties({
       ...landingAttribution(document, hostname),
     });
-    this.#screenView("/");
+    this.#screenView(screenPath);
     this.#track("landing_viewed", {});
     const handleClick = (event: MouseEvent) => this.#handleClick(event);
-    return this.#replaceClickListener(document, handleClick, "/");
+    return this.#replaceClickListener(document, handleClick, screenPath);
   }
 
   startJoin(
@@ -231,9 +257,7 @@ function isSafeLandingProperty(name: LandingEventName, key: string, value: unkno
   if (key === "action") return isOneOf(["view", "open_app", "download"] as const, value);
   if (key === "valid_invite") return name === "join_page_action" && isBoolean(value);
   if (key === "platform") return value === "macos" || value === "windows";
-  if (key === "placement") {
-    return isOneOf(["header", "hero", "download_section", "footer", "other"] as const, value);
-  }
+  if (key === "placement") return isOneOf(LANDING_PLACEMENTS, value);
   if (key === "destination") return [...LINK_DESTINATIONS.values()].some((destination) => destination === value);
   return false;
 }
@@ -324,6 +348,10 @@ function landingPlacement(link: HTMLAnchorElement): LandingPlacement {
   if (link.closest(".landing-hero")) return "hero";
   if (link.closest(".landing-download")) return "download_section";
   if (link.closest(".landing-footer")) return "footer";
+  // Without these, every link inside an article body reports "other", which makes
+  // the article pages indistinguishable from each other in the report.
+  if (link.closest(".post-index")) return "content_index";
+  if (link.closest(".post-article")) return "content_article";
   return "other";
 }
 
