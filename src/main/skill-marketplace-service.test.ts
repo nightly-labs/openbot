@@ -100,6 +100,7 @@ describe("SkillMarketplaceService", () => {
 
     await expect(service.install({ agentId: agent.id, skillId: "skill-1" })).resolves.toMatchObject({
       state: "installed",
+      description: "Writes release notes.",
     });
     await expect(
       readFile(join(agent.workspacePath, ".agents", "skills", "release-notes", "SKILL.md"), "utf8"),
@@ -113,7 +114,7 @@ describe("SkillMarketplaceService", () => {
     await writeFile(join(agent.workspacePath, ".agents", "skills", "release-notes", "SKILL.md"), "locally changed");
     requests.length = 0;
     await expect(service.listInstalledForChatTags(agent.id)).resolves.toEqual([
-      expect.objectContaining({ state: "modified" }),
+      expect.objectContaining({ state: "modified", description: "Writes release notes." }),
     ]);
     expect(requests).toEqual([]);
     await expect(service.listInstalled(agent.id)).resolves.toEqual([expect.objectContaining({ state: "modified" })]);

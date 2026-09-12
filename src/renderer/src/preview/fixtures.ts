@@ -232,7 +232,7 @@ export const STORY_CONVERSATION_MESSAGES: ConversationMessage[] = [
     id: "message-user-1",
     author: "user",
     source: "user",
-    text: "Can you turn the latest notes into a short plan and tag @Research for the source check?",
+    text: "Use @[Release notes](skill:skill-release-notes) to turn the latest notes into a short plan and tag @Research for the source check.",
     createdAt: "2026-08-19T09:42:00.000Z",
     status: "completed",
   },
@@ -658,12 +658,25 @@ export const STORY_MARKETPLACE_SKILL_DETAILS: Record<string, MarketplaceSkillDet
 export const STORY_INSTALLED_SKILLS: Record<string, InstalledSkill[]> = {
   chief: [
     {
+      skillId: "openbot-site-hosting",
+      slug: "openbot-site-hosting",
+      name: "openbot-site-hosting",
+      installedVersion: 1,
+      availableVersion: 1,
+      state: "installed",
+      enabled: true,
+      origin: "managed",
+    },
+    {
       skillId: "skill-release-notes",
       slug: "release-notes",
       name: "Release notes",
       installedVersion: 4,
       availableVersion: 4,
       state: "installed",
+      enabled: true,
+      origin: "marketplace",
+      description: "Turns a range of commits into a changelog a reader outside the team can follow.",
     },
     {
       skillId: "skill-inbox-triage",
@@ -672,6 +685,20 @@ export const STORY_INSTALLED_SKILLS: Record<string, InstalledSkill[]> = {
       installedVersion: 1,
       availableVersion: 1,
       state: "modified",
+      enabled: true,
+      origin: "marketplace",
+      description: "Sorts a morning inbox into what needs a reply today and what can wait.",
+    },
+    {
+      skillId: "skill-source-check",
+      slug: "source-check",
+      name: "Source check",
+      installedVersion: 2,
+      availableVersion: 3,
+      state: "update-available",
+      enabled: false,
+      origin: "marketplace",
+      description: "Follows every citation in a draft and flags the ones that do not say what is claimed.",
     },
   ],
   research: [
@@ -682,6 +709,7 @@ export const STORY_INSTALLED_SKILLS: Record<string, InstalledSkill[]> = {
       installedVersion: 2,
       availableVersion: 3,
       state: "update-available",
+      description: "Follows every citation in a draft and flags the ones that do not say what is claimed.",
     },
   ],
 };

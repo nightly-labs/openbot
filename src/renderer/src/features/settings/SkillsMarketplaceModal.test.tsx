@@ -73,6 +73,7 @@ describe("SkillsMarketplaceModal", () => {
       listInstalled: vi.fn(async () => []),
       install: vi.fn(),
       uninstall: vi.fn(),
+      setEnabled: vi.fn(),
     };
     window.openbot = { ...window.openbot, skills };
     window.openbot.marketplaceAgents = {

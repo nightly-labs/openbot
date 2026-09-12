@@ -141,6 +141,7 @@ export interface MockOpenBotOptions {
   updateStatus?: UpdateStatus;
   memories?: Record<string, AgentMemory[]>;
   routines?: Record<string, Routine[]>;
+  installedSkills?: Record<string, InstalledSkill[]>;
   customProviders?: CustomProviderSummary[];
 }
 
@@ -276,7 +277,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let agentCounter = agents.length;
   const marketplaceSkills = clone(STORY_MARKETPLACE_SKILLS);
   let skillSubmissions = clone(STORY_SKILL_SUBMISSIONS);
-  const installedSkills = new Map(Object.entries(clone(STORY_INSTALLED_SKILLS)));
+  const installedSkills = new Map(Object.entries(clone(options.installedSkills ?? STORY_INSTALLED_SKILLS)));
   let hostedSites = clone(STORY_HOSTED_SITES);
   // The same two endpoints the model-picker stories invent, so preview shows one list everywhere.
   let customProviders = clone(
@@ -786,6 +787,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       install: async ({ agentId, skillId }) => {
         const skill = marketplaceSkills.find((candidate) => candidate.id === skillId);
         if (!skill) throw new Error("Skill not found");
+        const previous = readInstalledSkills(agentId).find((item) => item.skillId === skillId);
         const installed: InstalledSkill = {
           skillId: skill.id,
           slug: skill.slug,
@@ -793,6 +795,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           installedVersion: skill.version,
           availableVersion: skill.version,
           state: "installed",
+          enabled: previous?.enabled !== false,
+          origin: previous?.origin ?? "marketplace",
+          description: skill.description,
         };
         installedSkills.set(agentId, [
           ...readInstalledSkills(agentId).filter((item) => item.skillId !== skillId),
@@ -801,10 +806,24 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(installed);
       },
       uninstall: async ({ agentId, skillId }) => {
+        const skill = readInstalledSkills(agentId).find((item) => item.skillId === skillId);
+        if (skill?.origin === "managed") throw new Error("This skill is managed by OpenBot.");
         installedSkills.set(
           agentId,
           readInstalledSkills(agentId).filter((item) => item.skillId !== skillId),
         );
+      },
+      setEnabled: async ({ agentId, skillId, enabled }) => {
+        const current = readInstalledSkills(agentId);
+        const skill = current.find((item) => item.skillId === skillId);
+        if (!skill) throw new Error("Skill not found.");
+        if (skill.origin === "managed") throw new Error("This skill is managed by OpenBot.");
+        const next: InstalledSkill = { ...skill, enabled };
+        installedSkills.set(
+          agentId,
+          current.map((item) => (item.skillId === skillId ? next : item)),
+        );
+        return clone(next);
       },
     },
     hostedSites: {

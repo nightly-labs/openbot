@@ -143,6 +143,7 @@ import type {
   MarketplaceSkillDetail,
   MarketplaceSkillPage,
   MarketplaceSkillQuery,
+  SetEnabledSkillInput,
   SkillPackagePreview,
   SkillSubmission,
   SubmitSkillInput,
@@ -411,6 +412,7 @@ export interface SkillsDesktopApi {
   listInstalled: (agentId: string) => Promise<InstalledSkill[]>;
   install: (input: InstallSkillInput) => Promise<InstalledSkill>;
   uninstall: (input: UninstallSkillInput) => Promise<void>;
+  setEnabled: (input: SetEnabledSkillInput) => Promise<InstalledSkill>;
 }
 
 export interface HostedSitesDesktopApi {

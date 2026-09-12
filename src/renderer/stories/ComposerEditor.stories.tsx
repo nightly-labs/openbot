@@ -59,6 +59,7 @@ const installedSkills: InstalledSkill[] = [
     installedVersion: 1,
     availableVersion: 1,
     state: "installed",
+    description: "Turns a range of commits into a changelog a reader outside the team can follow.",
   },
 ];
 
@@ -122,6 +123,37 @@ export const MentionPicker: Story = {
     await expect(sales).toHaveClass("mention-picker-option-active");
     await userEvent.keyboard("{Enter}");
     await expect(editor.querySelector('[data-mention-id="sales"]')).not.toBeNull();
+    await expect(storyArgs.onSubmit).not.toHaveBeenCalled();
+  },
+};
+
+export const SkillPicker: Story = {
+  args: {
+    skills: installedSkills,
+  },
+  render: (storyArgs) => {
+    const [value, setValue] = createSignal(storyArgs.value);
+    return <ComposerEditor {...storyArgs} value={value()} onValueChange={setValue} onSubmit={storyArgs.onSubmit} />;
+  },
+  play: async ({ args: storyArgs, canvas, userEvent }) => {
+    const editor = canvas.getByRole("textbox", { name: "Message Chief" });
+    await userEvent.click(editor);
+    editor.textContent = "$";
+    const textNode = editor.firstChild;
+    if (!textNode) throw new Error("Composer editor did not create a text node");
+    const selectionRange = document.createRange();
+    selectionRange.setStart(textNode, textNode.textContent?.length ?? 0);
+    selectionRange.collapse(true);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(selectionRange);
+    editor.dispatchEvent(new Event("input", { bubbles: true }));
+    const picker = await within(document.body).findByRole("listbox", { name: "Insert skill" });
+    await expect(picker).toBeInTheDocument();
+    await expect(within(document.body).getByRole("option", { name: "Release Notes Skill" })).toBeInTheDocument();
+    await userEvent.keyboard("{Enter}");
+    await expect(editor.querySelector('[data-skill-id="skill-release-notes"]')).not.toBeNull();
+    await expect(editor).toHaveTextContent("Release Notes");
     await expect(storyArgs.onSubmit).not.toHaveBeenCalled();
   },
 };
