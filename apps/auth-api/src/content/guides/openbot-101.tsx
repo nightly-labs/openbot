@@ -76,12 +76,18 @@ export function OpenBot101() {
 
       <h2>Install it, then connect a provider</h2>
       <p>
-        OpenBot supports macOS 13 or newer on Apple silicon, and Windows 10 or newer on x64. Take the installer from{" "}
+        OpenBot supports macOS 13 or newer on Apple silicon, Windows 10 or newer on x64, and x64 Linux as an AppImage.
+        Take the installer from{" "}
         <a href={OPENBOT_LINKS.releases} target="_blank" rel={EXTERNAL_LINK_REL}>
           GitHub Releases
         </a>
         . The Windows preview is not code-signed yet, so Windows can warn about an unknown publisher; check the release
-        checksum before you run it.
+        checksum before you run it. On Ubuntu 23.10 or newer and on Debian 13, the AppImage needs an AppArmor profile
+        before it starts;{" "}
+        <a href={OPENBOT_LINKS.documentation} target="_blank" rel={EXTERNAL_LINK_REL}>
+          the README
+        </a>{" "}
+        gives the two commands that install it.
       </p>
       <p>
         Then give it a provider. In onboarding, in Settings or in the model picker, select a provider and press{" "}
