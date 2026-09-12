@@ -35,6 +35,7 @@ import { skillIpcHandlers } from "./ipc/skill-handlers";
 import { teamIpcHandlers } from "./ipc/team-handlers";
 import { updateIpcHandlers } from "./ipc/update-handlers";
 import { voiceIpcHandlers } from "./ipc/voice-handlers";
+import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
   configureApplicationMenu,
@@ -480,11 +481,14 @@ if (!hasSingleInstanceLock) {
         (policy) => app.setActivationPolicy(policy),
         () => app.dock?.show() ?? Promise.resolve(),
       );
-      // Linux registers the scheme through xdg-settings, which matters when the AppImage runs
-      // without a package manager having installed its desktop entry. Windows gets the scheme from
-      // the NSIS installer instead.
+      // Linux registers the scheme through xdg-settings, which can only name a desktop entry that
+      // exists, so an AppImage writes its own first. Windows gets the scheme from the NSIS installer
+      // instead.
+      await installLinuxDesktopEntry({ platform: process.platform, environment: process.env, iconPath: appIconPath });
       if (process.platform === "darwin" || process.platform === "linux") {
-        app.setAsDefaultProtocolClient("openbot");
+        if (!app.setAsDefaultProtocolClient("openbot")) {
+          logger.warn("Unable to register the openbot:// scheme. Invitation links will not open OpenBot.");
+        }
       }
       if (process.platform === "darwin") app.dock?.setIcon(appIconPath);
       configureContentSecurityPolicy();

@@ -441,6 +441,26 @@ jobs:
       - name: Build AppImage
         run: bun run dist:linux
 
+      # Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor, which is the same
+      # restriction the shipped profile answers for an installed AppImage. The verifier starts the
+      # unpacked build from the workspace, so that path needs its own profile, and the SUID helper
+      # needs the ownership a package manager would give it. The sandbox stays on either way:
+      # `--no-sandbox` would make the launch check prove nothing about a real install.
+      - name: Permit the Electron sandbox for the verification build
+        run: |
+          set -euo pipefail
+          sudo chown root:root dist/linux-unpacked/chrome-sandbox
+          sudo chmod 4755 dist/linux-unpacked/chrome-sandbox
+          sudo tee /etc/apparmor.d/openbot-verify >/dev/null <<PROFILE
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile openbot-verify "$GITHUB_WORKSPACE/dist/linux-unpacked/openbot" flags=(unconfined) {
+            userns,
+          }
+          PROFILE
+          sudo apparmor_parser -r /etc/apparmor.d/openbot-verify
+
       - name: Verify packaged application metadata and launch
         run: xvfb-run -a bun run verify:package:linux --require-update-metadata
 

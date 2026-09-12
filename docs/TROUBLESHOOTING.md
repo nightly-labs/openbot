@@ -128,8 +128,8 @@ remove `~/.codex` or `~/.claude` unless you intentionally want to manage CLI log
 ## Uninstall
 
 Quit OpenBot. On macOS remove `OpenBot.app` from Applications; on Windows use the installer's
-uninstaller; on Linux delete the AppImage, and `/etc/apparmor.d/openbot` if you installed the
-profile. If you also want to remove local OpenBot
+uninstaller; on Linux delete the AppImage, `~/.local/share/applications/openbot.desktop`, and
+`/etc/apparmor.d/openbot` if you installed the profile. If you also want to remove local OpenBot
 data, follow the reset steps above. Agent CLIs and their data are independent and are not removed
 with OpenBot.
 
