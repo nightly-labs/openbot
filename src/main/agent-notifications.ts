@@ -1,4 +1,5 @@
 import type { AgentEvent, AgentSummary } from "@openbot/contracts/ipc";
+import type { AppTranslate } from "@openbot/i18n";
 
 export interface AgentNotificationContent {
   title: string;
@@ -6,7 +7,11 @@ export interface AgentNotificationContent {
   silent?: boolean;
 }
 
-export function notificationForAgentEvent(event: AgentEvent, agents: AgentSummary[]): AgentNotificationContent | null {
+export function notificationForAgentEvent(
+  event: AgentEvent,
+  agents: AgentSummary[],
+  translate: AppTranslate,
+): AgentNotificationContent | null {
   if (event.type !== "turn-completed" && event.type !== "prompt" && event.type !== "approval") {
     return null;
   }
@@ -16,11 +21,11 @@ export function notificationForAgentEvent(event: AgentEvent, agents: AgentSummar
   if (!agent?.notifications) return null;
 
   if (event.type === "prompt") {
-    return { title: agent.name, body: "Needs your input." };
+    return { title: agent.name, body: translate("notification.needsInput") };
   }
   if (event.type === "approval") {
-    return { title: agent.name, body: "Needs your approval." };
+    return { title: agent.name, body: translate("notification.needsApproval") };
   }
   if (event.status !== "completed") return null;
-  return { title: agent.name, body: "Finished working.", silent: true };
+  return { title: agent.name, body: translate("notification.finished"), silent: true };
 }

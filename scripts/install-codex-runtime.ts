@@ -9,12 +9,12 @@ import { rejectNonRegularFiles, sha256 } from "./remote-desktop-runtime-release"
 
 const logger = createOpenBotLogger("install-codex-runtime");
 
-export type CodexRuntimeTarget = "darwin-arm64" | "win32-x64";
+export type CodexRuntimeTarget = "darwin-arm64" | "linux-x64" | "win32-x64";
 
 const packageManifestSchema = z.object({
   layoutVersion: z.literal(1),
   version: z.string(),
-  target: z.enum(["aarch64-apple-darwin", "x86_64-pc-windows-msvc"]),
+  target: z.enum(["aarch64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-musl"]),
   variant: z.literal("codex"),
   entrypoint: z.string(),
   resourcesDir: z.literal("codex-resources"),
@@ -75,17 +75,26 @@ export async function installCodexRuntime(
   return "installed";
 }
 
+/** The `target` the Codex package manifest carries for each runtime target OpenBot ships. */
+const CODEX_MANIFEST_TARGETS = {
+  "darwin-arm64": "aarch64-apple-darwin",
+  "linux-x64": "x86_64-unknown-linux-musl",
+  "win32-x64": "x86_64-pc-windows-msvc",
+} as const satisfies Record<CodexRuntimeTarget, string>;
+
 export function codexRuntimeTarget(
   platform: string = process.platform,
   architecture: string = process.arch,
 ): CodexRuntimeTarget {
   const target = `${platform}-${architecture}`;
-  if (target === "darwin-arm64" || target === "win32-x64") return target;
+  if (target === "darwin-arm64" || target === "linux-x64" || target === "win32-x64") return target;
   throw new Error(`Unsupported bundled Codex target: ${target}`);
 }
 
 export function codexRuntimePath(root: string, target: CodexRuntimeTarget): string {
-  return target === "darwin-arm64" ? join(root, "mac", "arm64") : join(root, "win", "x64");
+  if (target === "darwin-arm64") return join(root, "mac", "arm64");
+  if (target === "linux-x64") return join(root, "linux", "x64");
+  return join(root, "win", "x64");
 }
 
 export async function verifyCodexRuntime(
@@ -95,7 +104,7 @@ export async function verifyCodexRuntime(
 ): Promise<void> {
   const artifact = lock.codex.artifacts[target];
   const manifest = packageManifestSchema.parse(JSON.parse(await readFile(join(root, "codex-package.json"), "utf8")));
-  const expectedTarget = target === "darwin-arm64" ? "aarch64-apple-darwin" : "x86_64-pc-windows-msvc";
+  const expectedTarget = CODEX_MANIFEST_TARGETS[target];
   if (
     manifest.version !== lock.codex.version ||
     manifest.target !== expectedTarget ||

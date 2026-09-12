@@ -1,6 +1,7 @@
 import { fireEvent, render, waitFor } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HeroDownloadSelector } from "../src/components/landing/HeroDownloadSelector";
+import { DOWNLOAD_PLATFORMS } from "../src/lib/download-platforms";
 import { OPENBOT_DOWNLOAD_LINKS } from "../src/lib/landing-links";
 
 function setPlatform(platform: string): void {
@@ -12,6 +13,7 @@ const AVAILABLE_PLATFORM_CASES: ReadonlyArray<
 > = [
   ["MacIntel", "macos", "Download for macOS"],
   ["Win32", "windows", "Download for Windows"],
+  ["Linux x86_64", "linux", "Download for Linux"],
 ];
 
 describe("HeroDownloadSelector", () => {
@@ -48,11 +50,16 @@ describe("HeroDownloadSelector", () => {
     expect(view.queryByRole("menu")).not.toBeInTheDocument();
   });
 
-  it("shows the Linux state immediately after Linux detection", async () => {
-    setPlatform("Linux x86_64");
+  it("offers every platform in the menu", async () => {
+    setPlatform("MacIntel");
     const view = render(() => <HeroDownloadSelector />);
+    const trigger = view.getByRole("button", { name: "Choose download platform" });
 
-    await waitFor(() => expect(view.getByText("Linux coming soon")).toBeInTheDocument());
-    expect(view.queryByRole("link", { name: "Linux coming soon" })).not.toBeInTheDocument();
+    await fireEvent.click(trigger);
+    await waitFor(() => view.getByRole("menu", { name: "Download platforms" }));
+    for (const [, platform] of AVAILABLE_PLATFORM_CASES) {
+      const item = view.getByRole("menuitem", { name: `${DOWNLOAD_PLATFORMS[platform].label}Available` });
+      expect(item).toHaveAttribute("href", OPENBOT_DOWNLOAD_LINKS[platform]);
+    }
   });
 });

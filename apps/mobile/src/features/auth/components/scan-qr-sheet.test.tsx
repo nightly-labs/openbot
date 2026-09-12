@@ -1,13 +1,15 @@
 import { fireEvent, screen } from "@testing-library/dom";
-import { act, type PropsWithChildren, useRef } from "react";
+import { act, type PropsWithChildren, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScanQrSheet } from "./scan-qr-sheet";
 
 const native = vi.hoisted(() => {
-  const camera: { ready?: () => void; scan?: (event: { data: string }) => void } = {};
+  const camera: { ready?: () => void; fail?: () => void; scan?: (event: { data: string }) => void } = {};
   return {
     finishMotion: () => {},
+    motionStarted: vi.fn(),
+    cameraStarted: vi.fn(),
     back: new Set<() => boolean>(),
     appState: new Set<(state: string) => void>(),
     permission: { granted: true, canAskAgain: true },
@@ -49,6 +51,7 @@ vi.mock("react-native-reanimated", () => ({
   useAnimatedStyle: () => ({}),
   withTiming: (target: number) => target,
   withSpring: (_target: number, _config: { duration: number }, done: (finished: boolean) => void) => {
+    native.motionStarted();
     native.finishMotion = () => done(true);
     return 0;
   },
@@ -61,10 +64,16 @@ vi.mock("expo-camera", () => ({
   CameraView: ({
     onBarcodeScanned,
     onCameraReady,
+    onMountError,
   }: {
     onBarcodeScanned?: (event: { data: string }) => void;
     onCameraReady?: () => void;
+    onMountError?: () => void;
   }) => {
+    useEffect(() => {
+      native.cameraStarted();
+    }, []);
+    native.camera.fail = onMountError;
     native.camera.scan = onBarcodeScanned;
     native.camera.ready = onCameraReady;
     return <div role="img" aria-label="Camera preview" />;
@@ -110,6 +119,8 @@ const container = document.createElement("div");
 document.body.append(container);
 let root = createRoot(container);
 beforeEach(() => {
+  native.motionStarted.mockClear();
+  native.cameraStarted.mockClear();
   native.permission = { granted: true, canAskAgain: true };
   native.requestPermission.mockClear();
   native.openSettings.mockClear();
@@ -135,14 +146,19 @@ async function renderSheet(onScan: (data: string) => Promise<void> = async () =>
 }
 
 async function finishMotion() {
+  await act(() => native.camera.ready?.());
   await act(() => native.finishMotion());
 }
 
 describe("scanner sheet lifecycle", () => {
-  it("warms the camera during opening, enables scanning on completion and stops before closing", async () => {
-    const { onClose } = await renderSheet();
+  it("prepares the camera before opening and stops before closing", async () => {
+    const onScan = vi.fn(async () => {});
+    const { onClose } = await renderSheet(onScan);
     expect(screen.getByRole("img", { name: "Camera preview" })).toBeTruthy();
-    expect(native.camera.scan).toBeUndefined();
+    expect(native.motionStarted).not.toHaveBeenCalled();
+    expect(native.camera.scan).toBeTypeOf("function");
+    await act(() => native.camera.scan?.({ data: "code-during-opening" }));
+    expect(onScan).not.toHaveBeenCalled();
     await finishMotion();
     expect(screen.getByRole("img", { name: "Camera preview" })).toBeTruthy();
     expect(native.camera.scan).toBeTypeOf("function");
@@ -188,11 +204,20 @@ describe("scanner sheet lifecycle", () => {
     await act(() => rejectScan(new Error("Code expired")));
     expect(screen.getByText("Code expired")).toBeTruthy();
     await act(() => fireEvent.click(screen.getByRole("button", { name: "Scan again" })));
+    expect(native.cameraStarted).toHaveBeenCalledTimes(1);
     await act(() => native.camera.scan?.({ data: "next-code" }));
     expect(onScan).toHaveBeenLastCalledWith("next-code");
     await act(() => fireEvent.click(screen.getByRole("button", { name: "Close scanner" })));
     await finishMotion();
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("restarts the camera when retrying a camera startup failure", async () => {
+    await renderSheet();
+    await act(() => native.camera.fail?.());
+    await finishMotion();
+    await act(() => fireEvent.click(screen.getByRole("button", { name: "Scan again" })));
+    expect(native.cameraStarted).toHaveBeenCalledTimes(2);
   });
 
   it.each([true, false])("handles camera permission with canAskAgain=%s", async (canAskAgain) => {

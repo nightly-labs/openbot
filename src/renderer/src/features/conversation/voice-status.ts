@@ -1,3 +1,4 @@
+import type { AppInfo } from "@openbot/contracts/ipc";
 import { errorMessage } from "../../error-message";
 export type VoicePhase = "idle" | "preparing" | "requesting" | "recording" | "transcribing";
 
@@ -7,6 +8,15 @@ export function voiceButtonLabel(phase: VoicePhase) {
   if (phase === "requesting") return "Requesting microphone access";
   if (phase === "transcribing") return "Transcribing voice prompt";
   return "Create prompt with voice";
+}
+
+/**
+ * Whether this build can transcribe at all. The whisper binary is prepared for macOS and Windows
+ * only, so the Linux package ships without one and the composer offers no microphone rather than a
+ * control that always fails.
+ */
+export function voiceSupported(platform: AppInfo["platform"] | undefined): boolean {
+  return platform !== "linux";
 }
 
 export function formatVoiceDuration(totalSeconds: number): string {

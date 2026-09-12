@@ -14,6 +14,13 @@
         "installedBytes": 310000000,
         "executable": "bin/codex"
       },
+      "linux-x64": {
+        "asset": "codex-package-x86_64-unknown-linux-musl.tar.gz",
+        "assetSha256": "a822187e1a2420c61c5926721bfbd878701ed95547c9bb0d4de4498a16ba1821",
+        "downloadBytes": 126196303,
+        "installedBytes": 360000000,
+        "executable": "bin/codex"
+      },
       "win32-x64": {
         "asset": "codex-package-x86_64-pc-windows-msvc.tar.gz",
         "assetSha256": "a6ef3442cb12766a88b39311d79244289e4f9763e2c53ff4fbebc2cb653cc5f3",
@@ -39,6 +46,16 @@
         "installedBytes": 250000000,
         "executable": "claude",
         "platformDirectory": "mac"
+      },
+      "linux-x64": {
+        "package": "@anthropic-ai/claude-agent-sdk-linux-x64",
+        "asset": "claude-agent-sdk-linux-x64-0.3.263.tgz",
+        "assetSha256": "f07fcb22da213dae5c03bdc01c37f4cc0588441e1128220102fdeb8f25f4dd63",
+        "binarySha256": "26d020351e8112f4006790f3cfce43b4c9df0c1bb1d0e542364d64151b81d5ba",
+        "downloadBytes": 96941292,
+        "installedBytes": 250000000,
+        "executable": "claude",
+        "platformDirectory": "linux"
       },
       "win32-x64": {
         "package": "@anthropic-ai/claude-agent-sdk-win32-x64",
@@ -69,6 +86,16 @@
         "executable": "opencode",
         "platformDirectory": "mac"
       },
+      "linux-x64": {
+        "package": "opencode-linux-x64",
+        "asset": "opencode-linux-x64-1.18.30.tgz",
+        "assetSha256": "aa31a7e68ce5c73cba302c6a4f31c2e308398db125e49d3dbea32f61862fe6de",
+        "binarySha256": "87bd160e053af86b5b409daabf71f8dc05bbc3a2a3a5f563f36011cdf706a999",
+        "downloadBytes": 60202013,
+        "installedBytes": 200000000,
+        "executable": "opencode",
+        "platformDirectory": "linux"
+      },
       "win32-x64": {
         "package": "opencode-windows-x64",
         "asset": "opencode-windows-x64-1.18.30.tgz",
@@ -97,6 +124,14 @@
         "installedBytes": 150000000,
         "executable": "grok",
         "platformDirectory": "mac"
+      },
+      "linux-x64": {
+        "asset": "grok-1.0.22-linux-x86_64",
+        "assetSha256": "ad2510e8d7edcfe04fbdd25fa0f19dd1fb5babc8b238532b06e4bf3548d210ad",
+        "downloadBytes": 156995968,
+        "installedBytes": 170000000,
+        "executable": "grok",
+        "platformDirectory": "linux"
       },
       "win32-x64": {
         "asset": "grok-1.0.22-windows-x86_64.exe",

@@ -3,6 +3,7 @@ import solidPlugin from "@solidjs/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/solid-start/plugin/vite";
 import { defineConfig, type Plugin } from "vite";
+import { contentImages } from "./content-images";
 import { developmentNetworkRequestAllowed } from "./dev-network-access";
 import { rendererPreviewAlias } from "./renderer-preview-alias";
 import { readLocalRuntimeVars } from "./src/server/runtime-env";
@@ -14,6 +15,13 @@ export default defineConfig(({ command }) => {
       alias: {
         "@openbot/renderer-preview": rendererPreviewAlias,
       },
+    },
+    build: {
+      // A caption file has to stay a file. It is small enough for Vite to fold
+      // into the bundle as a `data:` URL, and a text track fetched from one is
+      // cross-origin to the page that asks for it, so the player drops it and the
+      // video plays with no captions at all. Everything else keeps the default.
+      assetsInlineLimit: (file) => (file.endsWith(".vtt") ? false : undefined),
     },
     server: {
       host: readApiHost(process.env.OPENBOT_API_HOST),
@@ -35,6 +43,7 @@ export default defineConfig(({ command }) => {
       // unsupported. Let Vite handle the final CSS bundle until that upstream
       // parser false positive is fixed.
       tailwindcss({ optimize: false }),
+      contentImages(),
     ],
   };
 });

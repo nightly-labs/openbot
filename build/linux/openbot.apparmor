@@ -1,0 +1,23 @@
+# AppArmor profile that lets the OpenBot AppImage create the unprivileged user namespace that its
+# Electron sandbox is built on.
+#
+# Ubuntu 23.10 and later, and Debian 13, restrict unprivileged user namespaces by default. Without
+# a profile the sandbox cannot start and OpenBot exits during launch. This profile is the answer,
+# never `--no-sandbox`: switching the sandbox off would remove the boundary between a renderer and
+# the rest of the computer, which is the reason the boundary exists.
+#
+# Install it as root, then reload AppArmor:
+#
+#   sudo install -m 0644 openbot.apparmor /etc/apparmor.d/openbot
+#   sudo systemctl reload apparmor
+#
+# The attachment path below covers the usual places to keep an AppImage. If you keep yours
+# somewhere else, edit the path to match before you install the profile.
+
+abi <abi/4.0>,
+include <tunables/global>
+
+profile openbot "/{home/*/{Applications,Desktop,Downloads,.local/bin},opt/OpenBot}/OpenBot*.AppImage" flags=(unconfined) {
+  userns,
+  include if exists <local/openbot>
+}

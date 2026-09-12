@@ -6,7 +6,7 @@ import type { AgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import { parseClaudeVersion, parseCodexVersion, parseGrokVersion, parseOpencodeVersion } from "../backend/cli";
 import { assertSafeArchive, extractArchive, rejectNonRegularFiles, sha256File } from "./provider-runtime-archive";
 
-export type RuntimeTarget = "darwin-arm64" | "win32-x64";
+export type RuntimeTarget = "darwin-arm64" | "linux-x64" | "win32-x64";
 
 export interface RuntimeSpec {
   provider: ManagedProviderId;
@@ -138,7 +138,7 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedProviderId, ProviderRun
             })}\n`,
           ),
         ]);
-        if (spec.target === "darwin-arm64") await chmod(join(staging, "bin", artifact.executable), 0o755);
+        if (spec.target !== "win32-x64") await chmod(join(staging, "bin", artifact.executable), 0o755);
       } finally {
         await rm(extracted, { recursive: true, force: true });
       }
@@ -206,7 +206,7 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedProviderId, ProviderRun
             })}\n`,
           ),
         ]);
-        if (spec.target === "darwin-arm64") await chmod(join(staging, "bin", artifact.executable), 0o755);
+        if (spec.target !== "win32-x64") await chmod(join(staging, "bin", artifact.executable), 0o755);
       } finally {
         await rm(extracted, { recursive: true, force: true });
       }
@@ -259,7 +259,7 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedProviderId, ProviderRun
           })}\n`,
         ),
       ]);
-      if (spec.target === "darwin-arm64") await chmod(join(staging, "bin", spec.executableName), 0o755);
+      if (spec.target !== "win32-x64") await chmod(join(staging, "bin", spec.executableName), 0o755);
     },
     verify: async (root, spec, lock) => {
       const executable = join(root, "bin", spec.executableName);

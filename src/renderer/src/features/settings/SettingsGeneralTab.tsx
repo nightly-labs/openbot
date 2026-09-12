@@ -5,6 +5,7 @@ import type {
   CustomProviderSummary,
   SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import { createSignal, Show } from "solid-js";
 import { ProviderPicker } from "../../components/ProviderPicker";
 import {
@@ -23,13 +24,24 @@ import {
   SwitchField,
   Text,
 } from "../../components/ui";
+import { useI18n } from "../../i18n-context";
 import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "../custom-providers/CustomProviderListDialog";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
 import type { GeneralSettingsValue } from "./app-settings";
+import { LanguageSelect } from "./LanguageSelect";
 import type { SettingsGeneralStore } from "./stores/general-store";
 
 const linkTargetOptions: GeneralSettingsValue["externalLinkTarget"][] = ["Default browser", "OpenBot"];
+
+/**
+ * The saved value is the English name, because it is what `app-settings.ts` persists and what the
+ * main process compares against. Only the label a reader sees is translated.
+ */
+const LINK_TARGET_KEYS = {
+  "Default browser": "settings.externalLinks.defaultBrowser",
+  OpenBot: "settings.externalLinks.openbot",
+} as const satisfies Record<GeneralSettingsValue["externalLinkTarget"], AppTextKey>;
 
 interface SettingsGeneralTabProps {
   store: SettingsGeneralStore;
@@ -57,6 +69,9 @@ interface SettingsGeneralTabProps {
 }
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
+  const i18n = useI18n();
+  const linkTargetLabel = (value: GeneralSettingsValue["externalLinkTarget"] | undefined) =>
+    value === undefined ? "" : i18n.t(LINK_TARGET_KEYS[value]);
   const customProviders = () => props.customProviders ?? [];
   /**
    * Which row holds the check here. Nothing stores it: the whole Settings picker is local state
@@ -76,11 +91,11 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
 
   return (
     <>
-      <SettingsSection title="AI providers">
+      <SettingsSection title={i18n.t("settings.providers.title")}>
         <ProviderPicker
           value={props.store.selectedProvider()}
           options={props.store.providerOptions()}
-          ariaLabel="AI providers"
+          ariaLabel={i18n.t("settings.providers.title")}
           embedded
           allowUnavailableSelection
           customProviders={customProviders()}
@@ -128,35 +143,44 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
         </Show>
       </SettingsSection>
 
-      <SettingsSection title="App behavior">
+      <SettingsSection title={i18n.t("settings.appBehavior.title")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
             checked={props.value.launchAtLogin}
             onChange={(checked) => props.onUpdateSetting("launchAtLogin", checked)}
-            label="Launch OpenBot at login"
-            description="Open the app when you sign in to this computer."
+            label={i18n.t("settings.launchAtLogin.title")}
+            description={i18n.t("settings.launchAtLogin.description")}
           />
           <SwitchField
             checked={props.value.keepRunningInBackground}
             onChange={(checked) => props.onUpdateSetting("keepRunningInBackground", checked)}
-            label="Keep OpenBot running in the background"
-            description="Keep active tasks running after you close the window."
+            label={i18n.t("settings.keepRunning.title")}
+            description={i18n.t("settings.keepRunning.description")}
           />
         </ItemGroup>
       </SettingsSection>
 
-      <SettingsSection title="Workspace">
+      <SettingsSection title={i18n.t("settings.workspace.title")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
             checked={props.value.restoreLastWorkspace}
             onChange={(checked) => props.onUpdateSetting("restoreLastWorkspace", checked)}
-            label="Restore the last workspace on launch"
-            description="Open the workspace and tasks from your previous session."
+            label={i18n.t("settings.restoreWorkspace.title")}
+            description={i18n.t("settings.restoreWorkspace.description")}
           />
           <Item class="settings-modal-row">
             <ItemContent>
-              <ItemTitle>Open external links in</ItemTitle>
-              <ItemDescription>Choose where links from conversations open.</ItemDescription>
+              <ItemTitle>{i18n.t("settings.language.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.language.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <LanguageSelect value={i18n.language()} onChange={i18n.changeLanguage} mount={props.selectMount} />
+            </ItemActions>
+          </Item>
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.externalLinks.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.externalLinks.description")}</ItemDescription>
             </ItemContent>
             <ItemActions>
               <Select<GeneralSettingsValue["externalLinkTarget"]>
@@ -166,12 +190,12 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
                 onChange={(value) => value && props.onUpdateSetting("externalLinkTarget", value)}
                 placement="bottom-end"
                 itemComponent={(selectProps) => (
-                  <SelectItem item={selectProps.item}>{selectProps.item.rawValue}</SelectItem>
+                  <SelectItem item={selectProps.item}>{linkTargetLabel(selectProps.item.rawValue)}</SelectItem>
                 )}
               >
-                <SelectTrigger size="sm" aria-label="Open external links in">
+                <SelectTrigger size="sm" aria-label={i18n.t("settings.externalLinks.title")}>
                   <SelectValue<GeneralSettingsValue["externalLinkTarget"]>>
-                    {(state) => state.selectedOption()}
+                    {(state) => linkTargetLabel(state.selectedOption())}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent mount={props.selectMount} />
@@ -181,64 +205,64 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
         </ItemGroup>
       </SettingsSection>
 
-      <SettingsSection title="Notifications">
+      <SettingsSection title={i18n.t("settings.notifications.title")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
             checked={props.value.desktopNotifications}
             onChange={(checked) => props.onUpdateSetting("desktopNotifications", checked)}
-            label="Desktop notifications"
-            description="Show a notification when an agent needs attention."
+            label={i18n.t("settings.desktopNotifications.title")}
+            description={i18n.t("settings.desktopNotifications.description")}
           />
           <SwitchField
             checked={props.value.taskCompletionSound}
             onChange={(checked) => props.onUpdateSetting("taskCompletionSound", checked)}
-            label="Play a sound when a task finishes"
-            description="Use a short sound for completed tasks."
+            label={i18n.t("settings.taskSound.title")}
+            description={i18n.t("settings.taskSound.description")}
           />
         </ItemGroup>
       </SettingsSection>
 
       <Show when={props.platform === "darwin"}>
-        <SettingsSection title="MacBook notch">
+        <SettingsSection title={i18n.t("settings.notch.title")}>
           <ItemGroup class="settings-modal-card">
             <SwitchField
               checked={props.value.macBookNotch}
               onChange={(checked) => props.onUpdateSetting("macBookNotch", checked)}
-              label="Show status in the MacBook notch"
-              description="Show agent activity and items that need attention at the top of each display."
+              label={i18n.t("settings.notch.show.title")}
+              description={i18n.t("settings.notch.show.description")}
             />
             <SwitchField
               checked={props.value.macBookNotchIdle}
               disabled={!props.value.macBookNotch}
               onChange={(checked) => props.onUpdateSetting("macBookNotchIdle", checked)}
-              label="Show idle island"
-              description="Show the OpenBot logo and greeting when no status is active."
+              label={i18n.t("settings.notch.idle.title")}
+              description={i18n.t("settings.notch.idle.description")}
             />
             <SwitchField
               checked={props.value.macBookNotchAdditionalDisplays}
               disabled={!props.value.macBookNotch}
               onChange={(checked) => props.onUpdateSetting("macBookNotchAdditionalDisplays", checked)}
-              label="Show on additional displays"
-              description="Show Dynamic Island on connected external displays."
+              label={i18n.t("settings.notch.displays.title")}
+              description={i18n.t("settings.notch.displays.description")}
             />
             <SwitchField
               checked={props.value.macBookNotchHaptics}
               disabled={!props.value.macBookNotch}
               onChange={(checked) => props.onUpdateSetting("macBookNotchHaptics", checked)}
-              label="Haptic feedback"
-              description="Use the Force Touch trackpad to confirm Dynamic Island interactions."
+              label={i18n.t("settings.notch.haptics.title")}
+              description={i18n.t("settings.notch.haptics.description")}
             />
           </ItemGroup>
         </SettingsSection>
       </Show>
 
-      <SettingsSection title="Privacy">
+      <SettingsSection title={i18n.t("settings.privacy.title")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
             checked={props.value.productAnalytics}
             onChange={(checked) => props.onUpdateSetting("productAnalytics", checked)}
-            label="Share product analytics"
-            description="Send usage and reliability metadata with your account ID and email to OpenBot's self-hosted analytics."
+            label={i18n.t("settings.analytics.title")}
+            description={i18n.t("settings.analytics.description")}
           />
         </ItemGroup>
       </SettingsSection>

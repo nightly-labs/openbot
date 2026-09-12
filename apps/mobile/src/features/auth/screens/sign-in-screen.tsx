@@ -22,23 +22,32 @@ export function SignInScreen() {
   const root = useRef<View>(null);
   const button = useRef<View>(null);
   const measuring = useRef(false);
+  const [preparingScanner, setPreparingScanner] = useState(false);
   const [origin, setOrigin] = useState<ScannerOrigin | null>(null);
+  const animationActive = isFocused && !preparingScanner && !origin;
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const closeScanner = useCallback(() => {
     setOrigin(null);
+    setPreparingScanner(false);
     measuring.current = false;
   }, []);
 
   function openScanner() {
     if (measuring.current || origin || !root.current || !button.current) return;
     measuring.current = true;
+    setPreparingScanner(true);
     root.current.measureInWindow((rootX, rootY) => {
-      button.current?.measureInWindow((x, y, width, height) => {
+      if (!button.current) {
+        closeScanner();
+        return;
+      }
+      button.current.measureInWindow((x, y, width, height) => {
         if (width <= 0 || height <= 0) {
-          measuring.current = false;
+          closeScanner();
           return;
         }
         setOrigin({ x: x - rootX, y: y - rootY, width, height });
+        setPreparingScanner(false);
       });
     });
   }
@@ -62,10 +71,10 @@ export function SignInScreen() {
         bounces={false}
         showsVerticalScrollIndicator={false}
       >
-        <PixelBlastBackground active={isFocused && !origin} />
+        <PixelBlastBackground active={animationActive} />
         <View className="z-10 w-full max-w-72 items-center gap-8">
           <View className="items-center gap-5">
-            <AppLogo size={56} animation={isFocused && !origin ? "blink" : "none"} interactive={isFocused && !origin} />
+            <AppLogo size={56} animation={animationActive ? "blink" : "none"} interactive={animationActive} />
             <View className="items-center gap-3">
               <Typography.Heading
                 type="h2"

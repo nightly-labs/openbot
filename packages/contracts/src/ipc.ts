@@ -1,4 +1,5 @@
 export * from "./agent-providers";
+export * from "./app-language";
 export * from "./ipc-agent-analytics";
 export * from "./ipc-agent-events";
 export * from "./ipc-agent-identity";

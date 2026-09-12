@@ -7,15 +7,18 @@ The mobile workflow is separate from the desktop tag release described below.
 OpenBot updates are published through GitHub Releases and installed with `electron-updater`.
 macOS requires every auto-updatable build to be signed with a Developer ID Application certificate.
 The release workflow also notarizes and staples the macOS application before publishing it. Windows
-x64 releases are currently unsigned, so Windows can show an Unknown publisher or SmartScreen warning.
-Both platforms must pass before one release is published. A release also requires the pinned Sunshine
-and Moonlight Web runtime artifacts. GitHub Actions downloads those artifacts, checks SHA-256, and
+x64 and Linux x64 releases are currently unsigned, so Windows can show an Unknown publisher or
+SmartScreen warning and the Linux AppImage carries no signature.
+All three platforms must pass before one release is published. A release also requires the pinned
+Sunshine and Moonlight Web runtime artifacts. GitHub Actions downloads those artifacts, checks SHA-256, and
 verifies their native executables as part of the final OpenBot package. Release packages are not built
 on a developer machine.
 
 Codex, Claude, and Grok runtimes are optional downloads. They are not part of the application package.
-Release CI downloads the pinned macOS and Windows provider artifacts as control artifacts. It checks
-their SHA-256 values, versions, licenses, and vendor signatures without copying them into OpenBot.
+Release CI downloads the pinned macOS, Windows, and Linux provider artifacts as control artifacts. It
+checks their SHA-256 values, versions, licenses, and vendor signatures without copying them into
+OpenBot. Linux has no code-signature contract to check, so its provider artifacts are verified by
+SHA-256 and version only.
 
 ## One-time GitHub setup
 
@@ -159,10 +162,13 @@ The workflow:
 3. runs the complete offline repository check;
 4. builds signed and notarized ARM64 DMG and ZIP artifacts on a GitHub macOS runner;
 5. builds an unsigned Windows x64 NSIS installer on a GitHub Windows runner;
-6. verifies both unpacked applications, update metadata, included runtimes, provider control artifacts,
-   licenses, checksums, platform signing contracts, launch behavior, and update artifact size limits;
-7. generates SPDX SBOMs and GitHub build-provenance attestations for both platforms;
-8. publishes one non-draft GitHub Release only after both platform jobs pass.
+6. builds an unsigned Linux x64 AppImage on a GitHub Ubuntu 24.04 runner, with the launch check under
+   `xvfb-run`;
+7. verifies all three unpacked applications, update metadata, included runtimes, provider control
+   artifacts, licenses, checksums, platform signing contracts, launch behavior, and update artifact
+   size limits;
+8. generates SPDX SBOMs and GitHub build-provenance attestations for all three platforms;
+9. publishes one non-draft GitHub Release only after all three platform jobs pass.
 
 Users can verify a downloaded artifact with
 `gh attestation verify <file> --repo NorbertBodziony/openbot`.
@@ -172,17 +178,18 @@ download automatically while **Automatically download updates** is on, which is 
 persisted per user in `openbot-update-preference-v1.json`; with the setting off, a download starts
 only on a user action. The account popover shows the current state and lets the user download an
 available version, then restart into it. The restart action appears as
-soon as the download completes on both platforms, and neither platform installs without that
+soon as the download completes, and no platform installs without that
 explicit action, because `autoInstallOnAppQuit` stays off so shutdown preparation always runs. Every
 stage the user waits on is bounded by a timeout and recorded in `logs/update/update.log`, so a failed
 check, download, or restart reports an actionable error and can be retried in place.
 
-The Whisper executable is part of the application. The `ggml-medium-q5_0.bin` model is not part of an
-application or update artifact. OpenBot downloads the pinned model on first voice use, checks its size
+The Whisper executable is part of the macOS and Windows applications. Linux ships no Whisper binary
+and no remote desktop runtime, so voice prompts and remote desktop report themselves as unavailable
+there. The `ggml-medium-q5_0.bin` model is not part of an application or update artifact. OpenBot downloads the pinned model on first voice use, checks its size
 and SHA-256, and keeps the verified file in the user data directory for later offline use.
 
-The release workflow stops if the macOS update ZIP or Windows NSIS installer is larger than 700 MiB,
-or if the DMG is larger than 750 MiB. It also stops if update metadata has a wrong size or SHA-512, if
+The release workflow stops if the macOS update ZIP, the Windows NSIS installer, or the Linux AppImage
+is larger than 700 MiB, or if the DMG is larger than 750 MiB. It also stops if update metadata has a wrong size or SHA-512, if
 the Whisper model is present, or if the application contains a second native Claude runtime.
 
 If a release is bad, publish a newer patch version. Do not replace an already published version with
@@ -200,17 +207,20 @@ Before creating the first tag or any later release:
 0. run the Team API compatibility matrix for every protocol that remains in the adapter registry. The matrix must cover an older client with the new host, the new client with an older host, matching versions, no shared protocol, capability omission, unknown optional events, and malformed known events. Do not reduce this matrix because a protocol is old or because many application versions separate the peers. Confirm that each supported protocol still has unchanged client and host fixtures;
 
 1. run `bun run release:preflight` and resolve every reported release-secret or repository gate;
-2. confirm the `release` environment contains all six macOS secrets above; Windows remains unsigned;
+2. confirm the `release` environment contains all six macOS secrets above; Windows and Linux remain
+   unsigned;
 3. confirm the production `/join` page and Apple association file pass the deployment checks in CI;
 4. run `bun install --frozen-lockfile` and `bun run check` from a clean clone;
-5. run `bun run package:verify` on macOS; Windows packaging and launch verification run on the release
-   runner;
+5. run `bun run package:verify` on macOS; Windows and Linux packaging and launch verification run on
+   the release runners;
 6. confirm that the lock file contains all six provider artifacts, their download and install sizes,
    and that their install checks pass;
 7. smoke-test sign-in/setup, chat streaming, queues, attachments, agent messaging, browser control,
    context compaction, and the update popover;
-8. on macOS ARM64 and Windows x64, update from the last public version and confirm check, download,
-   preparation, explicit restart, new version, local agents, conversations, and queues;
+8. on macOS ARM64, Windows x64, and Linux x64, update from the last public version and confirm check,
+   download, preparation, explicit restart, new version, local agents, conversations, and queues. A
+   Linux build only auto-updates when it runs from the AppImage, which the runtime reports through
+   `APPIMAGE`;
 9. test first voice use, download progress, retry after a stopped download, transcription, and cached
    offline use;
 10. build a signed and notarized canary and test an update from the official `0.1.21` application on
@@ -219,8 +229,12 @@ Before creating the first tag or any later release:
     the new version, and can run three provider downloads with restricted memory;
 12. on Windows 10 and 11 x64, confirm that normal exit, restart, and sign-out do not start NSIS, while
     `Restart and install` does start it;
-13. confirm `CHANGELOG.md` describes the version and the working tree is clean;
-14. create and push the version commit and tag only after CI passes on `main`.
+13. on Ubuntu 24.04 x64 with the AppArmor profile from `build/linux/openbot.apparmor` installed,
+    confirm the AppImage starts with the sandbox on, that `xdg-open 'openbot://join?...'` focuses the
+    running application, that a provider downloads in-app, that the server rail is drawn, and that the
+    microphone control is absent;
+14. confirm `CHANGELOG.md` describes the version and the working tree is clean;
+15. create and push the version commit and tag only after CI passes on `main`.
 
 The macOS ZIP must be smaller than 800,000,000 bytes and smaller than the official `0.1.21` ZIP.
 Do not publish when either size gate fails, the `0.1.21` canary update crashes, or Windows starts NSIS

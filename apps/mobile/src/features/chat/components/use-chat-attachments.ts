@@ -14,6 +14,13 @@ import { Alert, Keyboard } from "react-native";
 import { attachmentSizeBucket } from "@/features/analytics/events";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 
+export interface ChatCameraOrigin {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface ChatAttachment extends RemoteFileUpload {
   id: string;
   size: number;
@@ -28,6 +35,7 @@ function base64(bytes: Uint8Array) {
 
 export function useChatAttachments() {
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraOrigin, setCameraOrigin] = useState<ChatCameraOrigin>();
   const [items, setItems] = useState<ChatAttachment[]>([]);
   const itemsRef = useRef<ChatAttachment[]>([]);
   const sequence = useRef(0);
@@ -68,11 +76,12 @@ export function useChatAttachments() {
     if (!result.canceled) for (const asset of result.assets) await addFile(asset.uri, asset.name);
     else mobileAnalytics.track("attachment_action", { action: "select", result: "cancelled", attachment_count: 0 });
   }
-  async function openCamera() {
+  async function openCamera(origin?: ChatCameraOrigin) {
     if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error("You can attach up to 10 files.");
     if (!(await ImagePicker.requestCameraPermissionsAsync()).granted)
       throw new Error("Allow camera access in Settings to take a photo.");
     Keyboard.dismiss();
+    setCameraOrigin(origin);
     setCameraOpen(true);
   }
   async function choosePhotos() {
@@ -125,13 +134,14 @@ export function useChatAttachments() {
     items,
     preparing,
     cameraOpen,
+    cameraOrigin,
     closeCamera: () => setCameraOpen(false),
     addPhoto: async (uri: string) => {
       await addFile(uri, "photo.jpg");
       setCameraOpen(false);
     },
     choosePhotos: () => report(choosePhotos),
-    takePhoto: () => report(openCamera),
+    takePhoto: (origin?: ChatCameraOrigin) => report(() => openCamera(origin)),
     chooseFiles: () => report(chooseFiles),
     paste,
     remove: (id: string) => {

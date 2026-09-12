@@ -720,6 +720,12 @@ describe("supportsInstalledUpdates", () => {
     ["win32", true],
     ["linux", false],
   ] as const)("returns %s support as %s", (platform, expected) => {
-    expect(supportsInstalledUpdates(platform)).toBe(expected);
+    expect(supportsInstalledUpdates(platform, {})).toBe(expected);
+  });
+
+  // Only the AppImage runtime can replace itself, and `APPIMAGE` is how it says it is the one running.
+  it("supports a Linux build only when it runs from an AppImage", () => {
+    expect(supportsInstalledUpdates("linux", { APPIMAGE: "/tmp/OpenBot-0.8.0-x64.AppImage" })).toBe(true);
+    expect(supportsInstalledUpdates("linux", { APPIMAGE: "  " })).toBe(false);
   });
 });

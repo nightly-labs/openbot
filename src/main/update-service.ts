@@ -129,7 +129,18 @@ const DEFAULT_PHASE_TIMEOUTS: Record<UpdateBusyPhase, number> = {
   installing: 300_000,
 };
 
-export function supportsInstalledUpdates(platform: NodeJS.Platform): boolean {
+/**
+ * Whether the installed app can replace itself in place.
+ *
+ * Linux is conditional: electron-updater can only self-update an AppImage, and the AppImage runtime
+ * is the thing that says so, through `APPIMAGE`. An unpacked or repackaged Linux build has nothing
+ * to write back to, so it reports no updates rather than failing at install time.
+ */
+export function supportsInstalledUpdates(
+  platform: NodeJS.Platform,
+  environment: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (platform === "linux") return Boolean(environment.APPIMAGE?.trim());
   return platform === "darwin" || platform === "win32";
 }
 

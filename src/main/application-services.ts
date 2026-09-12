@@ -60,6 +60,7 @@ import { performDynamicIslandCriticalAction } from "./dynamic-island-actions";
 import { DynamicIslandWindowController } from "./dynamic-island-window";
 import { HostService } from "./host-service";
 import { HostedSiteDesktopService } from "./hosted-site-service";
+import { LanguageService } from "./language-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
   createDynamicIslandWindow,
@@ -96,6 +97,7 @@ import { VoiceTranscriptionService } from "./voice-transcription-service";
 const logger = createOpenBotLogger("application-services");
 const SETUP_FILE = "openbot-setup-v2.json";
 const ANALYTICS_PREFERENCE_FILE = "openbot-analytics-preference-v1.json";
+const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
 const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
 const BROWSER_STATE_FILE = "openbot-browser-state-v1.json";
@@ -161,6 +163,7 @@ export interface ApplicationServices {
   setupFile: string;
   analyticsPreferenceFile: string;
   updatePreferenceFile: string;
+  language: LanguageService;
   agentInitialization: AgentInitializationGate;
   sidebarLayout: SidebarLayoutStore;
   host: HostService;
@@ -340,6 +343,13 @@ export async function createApplicationServices({
   const updatePreferenceFile = join(app.getPath("userData"), UPDATE_PREFERENCE_FILE);
   const setupState = await readSetupState(setupFile);
   const analyticsPreference = await readAnalyticsPreference(analyticsPreferenceFile);
+  // Loaded before the first window and before the application menu is built, so every native
+  // surface draws in the saved language on the first frame rather than switching after startup.
+  const language = new LanguageService({
+    path: join(app.getPath("userData"), LANGUAGE_PREFERENCE_FILE),
+    systemLocale: app.getLocale(),
+  });
+  await language.load();
   const updatePreference = await readUpdatePreference(updatePreferenceFile);
   const providerRuntimes = new ProviderRuntimeManager({
     root: join(app.getPath("userData"), "provider-runtimes"),
@@ -646,7 +656,9 @@ export async function createApplicationServices({
     beforeInstall: prepareForUpdateInstall,
     platform: process.platform,
     logDirectory: join(app.getPath("userData"), "logs", "update"),
-    shipItDirectory: join(homedir(), "Library", "Caches", "app.openbot.desktop.ShipIt"),
+    // Squirrel.Mac only. The path is meaningless under a Linux or Windows home directory.
+    shipItDirectory:
+      process.platform === "darwin" ? join(homedir(), "Library", "Caches", "app.openbot.desktop.ShipIt") : undefined,
   });
   teardown.push(TEARDOWN_ORDER.updater, "the update service", () => updater.stop());
 
@@ -661,6 +673,7 @@ export async function createApplicationServices({
     setupFile,
     analyticsPreferenceFile,
     updatePreferenceFile,
+    language,
     agentInitialization: new AgentInitializationGate(() => service.initialize()),
     sidebarLayout,
     host,

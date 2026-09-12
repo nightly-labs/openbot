@@ -402,6 +402,9 @@ export function installOpenbotStub(): void {
       getSetupState: vi.fn().mockResolvedValue({ completed: true, preferredProvider: "codex" }),
       getAnalyticsPreference: vi.fn().mockResolvedValue({ enabled: true }),
       setAnalyticsPreference: vi.fn(async ({ enabled }) => ({ enabled })),
+      getAppLanguagePreference: vi.fn().mockResolvedValue({ language: "system" }),
+      setAppLanguagePreference: vi.fn(async ({ language }) => ({ language })),
+      onAppLanguagePreference: vi.fn(() => () => undefined),
       dynamicIsland: {
         getPreference: vi.fn().mockResolvedValue({
           enabled: true,

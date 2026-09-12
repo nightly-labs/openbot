@@ -1,4 +1,5 @@
 import { AppLogo, PlatformLogo, ProviderLogo } from "@openbot/brand";
+import { Link } from "@tanstack/solid-router";
 import { onSettled } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
 import { EXTERNAL_LINK_REL, OPENBOT_LINKS } from "../../lib/landing-links";
@@ -33,6 +34,12 @@ export function LandingPage() {
         </a>
 
         <nav class="landing-navigation" aria-label="Primary navigation">
+          <Link class="landing-header-link" to="/news">
+            News
+          </Link>
+          <Link class="landing-header-link" to="/guides">
+            Guides
+          </Link>
           <Button
             href={OPENBOT_LINKS.contact}
             target="_blank"
@@ -43,18 +50,6 @@ export function LandingPage() {
             class="landing-header-contact"
           >
             Contact
-          </Button>
-          <Button
-            href={OPENBOT_LINKS.repository}
-            target="_blank"
-            rel={EXTERNAL_LINK_REL}
-            variant="secondary"
-            size="sm"
-            icon="github"
-            class="landing-button-glass landing-header-github"
-            aria-label="Open OpenBot on GitHub"
-          >
-            <span class="landing-header-github-label">GitHub</span>
           </Button>
           <Button href={OPENBOT_LINKS.download} variant="primary" size="sm" icon="download">
             Download
