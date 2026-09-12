@@ -2,18 +2,10 @@
 // is in the server's HTML rather than arriving after hydration.
 
 import type { ArticleBody } from "../body";
-import { GiveAnAgentItsFirstTask } from "./give-an-agent-its-first-task";
-import { HostATeamServer } from "./host-a-team-server";
-import { InstallOpenBotOnMacos } from "./install-openbot-on-macos";
-import { ScheduleARoutine } from "./schedule-a-routine";
-import { StartAChannelForTwoAgents } from "./start-a-channel-for-two-agents";
-import { SwitchAnAgentBetweenProviders } from "./switch-an-agent-between-providers";
+import { OpenBot101 } from "./openbot-101";
+import { WriteAGuideForOpenBot } from "./write-a-guide-for-openbot";
 
 export const GUIDE_BODIES: Readonly<Record<string, ArticleBody>> = {
-  "install-openbot-on-macos": InstallOpenBotOnMacos,
-  "give-an-agent-its-first-task": GiveAnAgentItsFirstTask,
-  "switch-an-agent-between-providers": SwitchAnAgentBetweenProviders,
-  "start-a-channel-for-two-agents": StartAChannelForTwoAgents,
-  "schedule-a-routine": ScheduleARoutine,
-  "host-a-team-server": HostATeamServer,
+  "openbot-101": OpenBot101,
+  "write-a-guide-for-openbot": WriteAGuideForOpenBot,
 };

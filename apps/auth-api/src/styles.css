@@ -2081,6 +2081,16 @@ a {
   padding-left: 22px;
 }
 
+/* Tailwind preflight removes every list marker. Prose is the one place that needs
+   them back: without a number, a list of steps reads as unrelated paragraphs. */
+.post-prose ul {
+  list-style: disc;
+}
+
+.post-prose ol {
+  list-style: decimal;
+}
+
 .post-prose li {
   margin: 0 0 8px;
 }
