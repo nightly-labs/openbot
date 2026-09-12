@@ -8,7 +8,7 @@ import type { UpdateBusyPhase } from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase, UPDATE_BUSY_PHASES } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UpdateCancellationToken, UpdateCheckOutcome } from "./update-service";
-import { pruneShipItLogs, supportsInstalledUpdates, UpdateService } from "./update-service";
+import { isValidSemver, pruneShipItLogs, supportsInstalledUpdates, UpdateService } from "./update-service";
 
 const CHECK_TIMEOUT = 1_000;
 const CHECK_INTERVAL = 10_000;
@@ -106,6 +106,13 @@ afterEach(() => {
 });
 
 describe("UpdateService", () => {
+  it("accepts only complete SemVer application versions", () => {
+    expect(isValidSemver("0.0.0")).toBe(true);
+    expect(isValidSemver("1.2.3-beta.1+build.7")).toBe(true);
+    expect(isValidSemver("0.0")).toBe(false);
+    expect(isValidSemver("01.2.3")).toBe(false);
+  });
+
   it("exposes restart as soon as the macOS download finishes", async () => {
     const updater = new FakeUpdater();
     makeUpdateAvailable(updater);
