@@ -648,7 +648,9 @@ export async function createApplicationServices({
     beforeInstall: prepareForUpdateInstall,
     platform: process.platform,
     logDirectory: join(app.getPath("userData"), "logs", "update"),
-    shipItDirectory: join(homedir(), "Library", "Caches", "app.openbot.desktop.ShipIt"),
+    // Squirrel.Mac only. The path is meaningless under a Linux or Windows home directory.
+    shipItDirectory:
+      process.platform === "darwin" ? join(homedir(), "Library", "Caches", "app.openbot.desktop.ShipIt") : undefined,
   });
   teardown.push(TEARDOWN_ORDER.updater, "the update service", () => updater.stop());
 

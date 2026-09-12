@@ -1,5 +1,6 @@
 import { type ChildProcess, execFile } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -17,6 +18,13 @@ interface VoiceTranscriptionEvents {
   modelStatus: [status: VoiceModelStatus];
 }
 
+/**
+ * What the renderer is told when the build carries no whisper binary at all. Linux packages ship
+ * without one, so this is the whole of voice on that platform: a stated limit, not a download that
+ * spends half a gigabyte on a model nothing can read.
+ */
+const RUNTIME_UNAVAILABLE_MESSAGE = "Local voice transcription is not available on this platform.";
+
 interface VoiceTranscriptionServiceOptions {
   resourcesRoot: string;
   modelPath: string;
@@ -27,12 +35,16 @@ interface VoiceTranscriptionServiceOptions {
 export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEvents> {
   private activeChild: ChildProcess | null = null;
   private busy = false;
-  private readonly resourcesRoot: string;
+  private readonly executable: string;
   private readonly model: VoiceModelService;
 
   constructor(options: VoiceTranscriptionServiceOptions) {
     super();
-    this.resourcesRoot = options.resourcesRoot;
+    this.executable = join(
+      options.resourcesRoot,
+      "bin",
+      process.platform === "win32" ? "whisper-cli.exe" : "whisper-cli",
+    );
     this.model = new VoiceModelService({
       modelPath: options.modelPath,
       downloadUrl: options.modelDownloadUrl,
@@ -42,24 +54,22 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
   }
 
   getModelStatus(): Promise<VoiceModelStatus> {
-    return this.model.getStatus();
+    return this.runtimeMissing() ?? this.model.getStatus();
   }
 
   prepareModel(): Promise<VoiceModelStatus> {
-    return this.model.prepare();
+    return this.runtimeMissing() ?? this.model.prepare();
   }
 
   async transcribe(audio: Uint8Array): Promise<VoiceTranscriptionResult> {
     if (this.busy) throw new Error("A voice transcription is already in progress.");
     this.busy = true;
     let temporaryRoot: string | undefined;
-    const executable = join(
-      this.resourcesRoot,
-      "bin",
-      process.platform === "win32" ? "whisper-cli.exe" : "whisper-cli",
-    );
-    const modelStatus = await this.model.prepare();
-    if (modelStatus.phase !== "ready") throw new Error(modelStatus.message ?? "The voice model is unavailable.");
+    const modelStatus = await this.prepareModel();
+    if (modelStatus.phase !== "ready") {
+      this.busy = false;
+      throw new Error(modelStatus.message ?? "The voice model is unavailable.");
+    }
     const model = this.model.modelPath;
     const startedAt = Date.now();
 
@@ -68,7 +78,7 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
       const inputPath = join(temporaryRoot, "recording.wav");
       const outputPath = join(temporaryRoot, "transcript");
       await writeFile(inputPath, audio);
-      await this.run(executable, [
+      await this.run(this.executable, [
         "--model",
         model,
         "--file",
@@ -101,6 +111,17 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     this.model.shutdown();
     this.activeChild?.kill();
     this.activeChild = null;
+  }
+
+  /**
+   * The error status for a build with no whisper binary, or `null` when one is present. Returned as
+   * a resolved promise so the callers stay one-liners over the model service they otherwise wrap.
+   */
+  private runtimeMissing(): Promise<VoiceModelStatus> | null {
+    if (existsSync(this.executable)) return null;
+    const status: VoiceModelStatus = { phase: "error", progress: null, message: RUNTIME_UNAVAILABLE_MESSAGE };
+    this.emit("modelStatus", status);
+    return Promise.resolve(status);
   }
 
   private run(executable: string, arguments_: string[]): Promise<void> {

@@ -43,10 +43,11 @@ export const DOWNLOAD_PLATFORMS: Record<DownloadPlatform, DownloadPlatformDetail
   linux: {
     id: "linux",
     label: "Linux",
-    status: "Coming soon",
-    description: "Native Linux build in progress",
-    action: "Linux coming soon",
-    available: false,
+    status: "Available",
+    description: "x64 · AppImage",
+    action: "Download for Linux",
+    available: true,
+    href: OPENBOT_DOWNLOAD_LINKS.linux,
   },
 };
 

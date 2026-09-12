@@ -10,7 +10,7 @@ export type LandingAcquisitionSource = "direct" | "search" | "social" | "github"
 
 interface LandingAnalyticsEvents {
   landing_viewed: Record<string, never>;
-  landing_download_clicked: { platform: "macos" | "windows"; placement: LandingPlacement };
+  landing_download_clicked: { platform: LandingDownloadPlatform; placement: LandingPlacement };
   landing_link_clicked: { destination: LandingDestination; placement: LandingPlacement };
   join_page_action:
     | { action: "view"; valid_invite: boolean }
@@ -20,6 +20,8 @@ interface LandingAnalyticsEvents {
 
 type LandingEventName = keyof LandingAnalyticsEvents;
 type LandingPlacement = "header" | "hero" | "download_section" | "footer" | "other";
+/** The platforms the landing page can send a visitor to a download for. */
+type LandingDownloadPlatform = "linux" | "macos" | "windows";
 type LandingDestination =
   | "download_section"
   | "contact"
@@ -50,6 +52,13 @@ function createOpenPanelClient(options: OpenPanelOptions): OpenPanelClient {
     trackScreenView: (path) => OpenPanelBase.prototype.track.call(client, "screen_view", { __path: path }),
   };
 }
+
+/** The download route each platform uses, reversed so a click can name the platform it asked for. */
+const DOWNLOAD_PLATFORMS_BY_HREF = new Map<string, LandingDownloadPlatform>([
+  [OPENBOT_DOWNLOAD_LINKS.macos, "macos"],
+  [OPENBOT_DOWNLOAD_LINKS.windows, "windows"],
+  [OPENBOT_DOWNLOAD_LINKS.linux, "linux"],
+]);
 
 const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [OPENBOT_LINKS.download, "download_section"],
@@ -181,12 +190,9 @@ export class LandingAnalytics {
     if (!link) return;
     const placement = landingPlacement(link);
     const href = link.getAttribute("href") ?? "";
-    if (href === OPENBOT_DOWNLOAD_LINKS.macos) {
-      this.#track("landing_download_clicked", { platform: "macos", placement });
-      return;
-    }
-    if (href === OPENBOT_DOWNLOAD_LINKS.windows) {
-      this.#track("landing_download_clicked", { platform: "windows", placement });
+    const downloadPlatform = DOWNLOAD_PLATFORMS_BY_HREF.get(href);
+    if (downloadPlatform) {
+      this.#track("landing_download_clicked", { platform: downloadPlatform, placement });
       return;
     }
     const destination = LINK_DESTINATIONS.get(href);

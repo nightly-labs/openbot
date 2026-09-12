@@ -242,9 +242,11 @@ function bundledProviderExecutable(
   const targetPlatform =
     platform === "darwin" && architecture === "arm64"
       ? "mac"
-      : platform === "win32" && architecture === "x64"
-        ? "win"
-        : null;
+      : platform === "linux" && architecture === "x64"
+        ? "linux"
+        : platform === "win32" && architecture === "x64"
+          ? "win"
+          : null;
   if (!targetPlatform) return null;
 
   const executable = platform === "win32" ? `${provider}.exe` : provider;
@@ -333,14 +335,15 @@ async function collectCandidates(command: AgentProviderId, configuredPath: strin
     }
     candidates.push(...windowsFallbackPaths(command));
   } else {
+    const loginShell = loginShellCommand();
     try {
-      const { stdout } = await execFileAsync("/bin/zsh", ["-lic", `command -v ${command}`], {
+      const { stdout } = await execFileAsync(loginShell.command, [...loginShell.args, `command -v ${command}`], {
         timeout: 5_000,
         maxBuffer: 64 * 1024,
       });
       if (stdout.trim()) candidates.push(stdout.trim());
     } catch {
-      // Packaged macOS apps often have a restricted PATH; known locations are checked next.
+      // Packaged apps often start with a restricted PATH; known locations are checked next.
     }
     candidates.push(...posixFallbackPaths(command));
   }
@@ -380,12 +383,31 @@ export function windowsFallbackPaths(
   return paths;
 }
 
+/**
+ * The shell that answers `command -v`. It has to be a login shell, because that is what reads the
+ * profile a version manager appends its `PATH` to, and a packaged app inherits none of it.
+ *
+ * macOS keeps `/bin/zsh`: it is the default login shell and is always present. Linux cannot assume
+ * zsh is installed at all, so it prefers the user's own `$SHELL` and falls back to `/bin/sh`. The
+ * `-i` flag goes with it, because `sh` is not required to accept an interactive non-tty invocation
+ * and dash exits rather than running the command.
+ */
+export function loginShellCommand(
+  platform: NodeJS.Platform = process.platform,
+  environment: NodeJS.ProcessEnv = process.env,
+): { command: string; args: string[] } {
+  if (platform !== "linux") return { command: "/bin/zsh", args: ["-lic"] };
+  const preferred = environment.SHELL?.trim();
+  if (!preferred) return { command: "/bin/sh", args: ["-lc"] };
+  return { command: preferred, args: preferred.endsWith("/sh") ? ["-lc"] : ["-lic"] };
+}
+
 export function posixFallbackPaths(command: AgentProviderId, userHome = homedir()): string[] {
   const paths = [posix.join(userHome, ".local", "bin", command)];
   if (command === "claude") paths.push(posix.join(userHome, ".claude", "local", "claude"));
   if (command === "opencode") paths.push(posix.join(userHome, ".opencode", "bin", "opencode"));
   if (command === "grok") paths.push(posix.join(userHome, ".grok", "bin", "grok"));
-  paths.push(`/opt/homebrew/bin/${command}`, `/usr/local/bin/${command}`);
+  paths.push(`/opt/homebrew/bin/${command}`, `/usr/local/bin/${command}`, `/usr/bin/${command}`);
   return paths;
 }
 

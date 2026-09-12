@@ -27,6 +27,7 @@ files:
   - LICENSE
   - NOTICE
   - "!node_modules/@anthropic-ai/claude-agent-sdk-darwin-*/**/*"
+  - "!node_modules/@anthropic-ai/claude-agent-sdk-linux-*/**/*"
   - "!node_modules/@anthropic-ai/claude-agent-sdk-win32-*/**/*"
 extraResources:
   - from: resources/managed-skills
@@ -45,10 +46,9 @@ extraResources:
     to: licenses/OpenAI-Whisper-LICENSE
   - from: build/licenses/whisper.cpp-LICENSE
     to: licenses/whisper.cpp-LICENSE
-  - from: .openbot-build/whisper/bin
-    to: whisper/bin
-  - from: build/remote-desktop-runtime
-    to: remote-desktop-runtime
+# Voice and remote desktop are prepared for macOS and Windows only, so their resources are listed
+# under each of those platforms instead of here. electron-builder merges the root and platform
+# lists, so both still get them, while the Linux build has no missing `from` to fail on.
 directories:
   output: dist
 mac:
@@ -64,6 +64,10 @@ mac:
       to: icons/icon-dev-macos-safe-area.png
     - from: build/icon-preview-macos-safe-area.png
       to: icons/icon-preview-macos-safe-area.png
+    - from: .openbot-build/whisper/bin
+      to: whisper/bin
+    - from: build/remote-desktop-runtime
+      to: remote-desktop-runtime
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.inherit.plist
   darkModeSupport: true
@@ -81,8 +85,28 @@ mac:
         - arm64
 win:
   icon: build/icon-production.ico
+  extraResources:
+    - from: .openbot-build/whisper/bin
+      to: whisper/bin
+    - from: build/remote-desktop-runtime
+      to: remote-desktop-runtime
   target:
     - target: nsis
+      arch:
+        - x64
+linux:
+  category: Development
+  icon: build/icon-production.png
+  synopsis: A local-first multi-agent desktop workspace.
+  extraResources:
+    - from: build/linux/openbot.apparmor
+      to: linux/openbot.apparmor
+  # Electron takes its Linux app id from `desktopName` in package.json, and the window manager
+  # matches a running window to the launcher through `StartupWMClass`. Syncing the two from one
+  # value is what makes the taskbar icon group with the window it belongs to.
+  syncDesktopName: true
+  target:
+    - target: AppImage
       arch:
         - x64
 dmg:

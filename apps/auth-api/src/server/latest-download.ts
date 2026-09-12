@@ -1,15 +1,20 @@
 import { OPENBOT_LINKS } from "../lib/landing-links";
 
-export type AvailableDownloadPlatform = "macos" | "windows";
+export type AvailableDownloadPlatform = "linux" | "macos" | "windows";
 
 interface DownloadManifestConfig {
-  extension: ".dmg" | ".exe";
-  manifest: "latest-mac.yml" | "latest.yml";
+  /**
+   * Compared against a lowercased asset name, so it must be lowercase itself. The Linux asset is
+   * published as `.AppImage`.
+   */
+  extension: ".appimage" | ".dmg" | ".exe";
+  manifest: "latest-linux.yml" | "latest-mac.yml" | "latest.yml";
 }
 
 const RELEASES_BASE_URL = "https://github.com/NorbertBodziony/openbot/releases";
 
 const DOWNLOAD_MANIFESTS: Record<AvailableDownloadPlatform, DownloadManifestConfig> = {
+  linux: { extension: ".appimage", manifest: "latest-linux.yml" },
   macos: { extension: ".dmg", manifest: "latest-mac.yml" },
   windows: { extension: ".exe", manifest: "latest.yml" },
 };
