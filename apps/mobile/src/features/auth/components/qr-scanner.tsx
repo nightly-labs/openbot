@@ -14,7 +14,10 @@ import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } 
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
-type ScanState = { status: "idle" } | { status: "connecting" } | { status: "error"; message: string };
+type ScanState =
+  | { status: "idle" }
+  | { status: "connecting" }
+  | { status: "error"; source: "camera" | "connection"; message: string };
 const QR_SCANNER_SETTINGS: CameraViewProps["barcodeScannerSettings"] = { barcodeTypes: ["qr"] };
 
 function ScannerStatus({ scanState, onRetry }: { scanState: ScanState; onRetry: () => void }) {
@@ -152,6 +155,7 @@ export function QrScanner({
     } catch (error) {
       setScanState({
         status: "error",
+        source: "connection",
         message: errorMessage(error, "OpenBot could not connect this phone."),
       });
     } finally {
@@ -260,7 +264,7 @@ export function QrScanner({
             key={cameraAttempt}
             onCameraReady={onPreviewReady}
             onMountError={() => {
-              setScanState({ status: "error", message: "Could not start the camera. Try again." });
+              setScanState({ status: "error", source: "camera", message: "Could not start the camera. Try again." });
               onPreviewReady?.();
             }}
             // Expo enables native scanning from the presence of this callback.
@@ -280,7 +284,9 @@ export function QrScanner({
           <ScannerStatus
             scanState={scanState}
             onRetry={() => {
-              setCameraAttempt((attempt) => attempt + 1);
+              if (scanState.status === "error" && scanState.source === "camera") {
+                setCameraAttempt((attempt) => attempt + 1);
+              }
               scanLocked.current = false;
               setScanState({ status: "idle" });
             }}
