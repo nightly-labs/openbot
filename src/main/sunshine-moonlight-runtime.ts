@@ -8,7 +8,7 @@ import type { PeerCertificate } from "node:tls";
 import type { RemoteDesktopDisplay, RemoteDesktopIceServer } from "@openbot/contracts/ipc";
 import { z } from "zod";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
-import { stopRemoteProcess } from "./remote-diagnostics";
+import { createRemoteDiagnosticStream, stopRemoteProcess } from "./remote-diagnostics";
 
 const MOONLIGHT_USER_HEADER = "X-OpenBot-Remote-User";
 const MOONLIGHT_STREAMER_SLOTS = 4;
@@ -466,11 +466,13 @@ export class SunshineMoonlightRuntime {
       // Sunshine writes to both streams and they interleave, so each keeps its own carry-over: one
       // shared between them would join a line neither printed and miss the one that matters.
       const saidCaptureDenied = createScreenCaptureDenialWatcher();
+      const diagnostics = createRemoteDiagnosticStream((message) => this.#options.onDiagnostic?.(source, message));
       stream?.on("data", (chunk) => {
         const message = chunk.toString("utf8");
         if (source === "sunshine" && saidCaptureDenied(message)) this.#screenCaptureDenied = true;
-        this.#options.onDiagnostic?.(source, message);
+        diagnostics.push(message);
       });
+      stream?.once("end", () => diagnostics.flush());
     }
   }
 }

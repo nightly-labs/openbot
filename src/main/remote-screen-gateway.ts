@@ -41,6 +41,7 @@ interface RemoteScreenGatewayOptions {
   runtimePaths: RemoteDesktopRuntimePaths | null;
   runtimeStateDirectory: string;
   getRuntimeCredentials: () => Promise<{ username: string; password: string }>;
+  authenticateSession: (token: string) => { sessionId: string } | null;
   getDisplays?: () => RemoteDesktopDisplay[];
   getIceServers: () => Promise<RemoteDesktopIceServer[]>;
   createRuntime?: (options: ConstructorParameters<typeof SunshineMoonlightRuntime>[0]) => RemoteScreenRuntime;
@@ -403,6 +404,7 @@ export class RemoteScreenGateway {
         upstream.close();
       };
       client.once("close", close);
+      client.once("error", close);
       upstream.once("close", close);
       upstream.once("error", () => client.close(1011, "Moonlight stream failed"));
     });
@@ -556,8 +558,18 @@ export class RemoteScreenGateway {
   }
 
   #viewerAuthorized(request: IncomingMessage, session: ManagedRemoteScreenSession): boolean {
-    const remoteSession = request.headers["x-openbot-webrtc-session"];
-    if (remoteSession === session.teamSessionId) return true;
+    const authorization = request.headers.authorization;
+    if (authorization?.startsWith("Bearer ")) {
+      const token = authorization.slice(7);
+      const authenticated = token.length <= 512 ? this.#options.authenticateSession(token) : null;
+      return authenticated?.sessionId === session.teamSessionId;
+    }
+    const origin = request.headers.origin;
+    const requiresOrigin =
+      request.headers.upgrade?.toLowerCase() === "websocket" || (request.method !== "GET" && request.method !== "HEAD");
+    if ((requiresOrigin || origin !== undefined) && origin !== new URL(session.snapshot.viewerUrl).origin) {
+      return false;
+    }
     const cookie = parseCookie(request.headers.cookie, VIEWER_COOKIE);
     return Boolean(cookie && session.viewerCookieHash && safeHashEqual(secretHash(cookie), session.viewerCookieHash));
   }
@@ -614,6 +626,7 @@ function sendViewer(
 }
 
 function allowedMoonlightPath(path: string): boolean {
+  if (path.startsWith("//")) return false;
   if (path === "/api/authenticate" || path === "/api/role") return true;
   if (
     path === "/" ||

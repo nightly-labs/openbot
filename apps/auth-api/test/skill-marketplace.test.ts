@@ -13,6 +13,24 @@ function archive(files: Record<string, string>): Uint8Array {
 }
 
 describe("skill marketplace archives", () => {
+  it("rejects a ZIP64 entry without its required extra field", () => {
+    // Central directory, ZIP64 end record, locator, and end record. The compressed
+    // size requests ZIP64, but the central directory has no ZIP64 extra field.
+    const bytes = new Uint8Array(162);
+    const view = new DataView(bytes.buffer);
+    view.setUint32(0, 0x02014b50, true);
+    view.setUint32(20, 0xffffffff, true);
+    view.setUint32(64, 0x06064b50, true);
+    view.setUint32(96, 1, true);
+    view.setUint32(120, 0x07064b50, true);
+    view.setUint32(128, 64, true);
+    view.setUint32(140, 0x06054b50, true);
+    view.setUint16(148, 0xffff, true);
+    expect(() => inspectSkillArchive(bytes)).toThrowError(
+      expect.objectContaining<Partial<SkillMarketplaceError>>({ code: "invalid_archive" }),
+    );
+  });
+
   it("parses a skill directory and strips one ZIP wrapper", () => {
     const result = inspectSkillArchive(
       archive({

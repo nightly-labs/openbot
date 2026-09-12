@@ -21,6 +21,42 @@ afterEach(async () => {
 });
 
 describe("RemoteScreenGateway", () => {
+  it("requires an active bearer credential for the screen's team session", async () => {
+    const credentials = new Map([
+      ["member-a-token", { sessionId: "team-member-a" }],
+      ["member-b-token", { sessionId: "team-member-b" }],
+    ]);
+    const gateway = createGateway({ authenticateSession: (token) => credentials.get(token) ?? null });
+    const { origin, close } = await serveGateway(gateway);
+    try {
+      const session = await createSession(gateway, origin);
+      const url = `${origin}/v1/remote-screen/sessions/${session.id}/moonlight/config.js`;
+      const spoofed = await fetch(url, { headers: { "X-OpenBot-WebRTC-Session": "team-member-a" } });
+      expect(spoofed.status).toBe(401);
+      const otherMember = await fetch(url, { headers: { Authorization: "Bearer member-b-token" } });
+      expect(otherMember.status).toBe(401);
+      const allowed = await fetch(url, { headers: { Authorization: "Bearer member-a-token" } });
+      expect(allowed.status).toBe(200);
+      credentials.delete("member-a-token");
+      const revoked = await fetch(url, { headers: { Authorization: "Bearer member-a-token" } });
+      expect(revoked.status).toBe(401);
+
+      const client = new webSockets.WebSocket(
+        `${origin.replace(/^http/, "ws")}/v1/remote-screen/sessions/${session.id}/stream`,
+        { headers: { "X-OpenBot-WebRTC-Session": "team-member-a" } },
+      );
+      await expect(
+        new Promise<void>((resolve, reject) => {
+          client.once("open", resolve);
+          client.once("error", reject);
+        }),
+      ).rejects.toThrow("401");
+    } finally {
+      await gateway.stop();
+      await close();
+    }
+  });
+
   it.each(["darwin", "win32"] as const)(
     "allows a %s host with runtime components to create a session",
     async (platform) => {
@@ -66,15 +102,39 @@ describe("RemoteScreenGateway", () => {
     expect(first.status).toBe(204);
     expect(first.headers.get("set-cookie")).toContain("openbotRemoteViewer=");
     const viewerCookie = first.headers.get("set-cookie")?.split(";")[0] ?? "";
-    for (const blockedPath of ["admin.html", "index.html", "api/host/stream"]) {
+    for (const blockedPath of [
+      "admin.html",
+      "index.html",
+      "api/host/stream",
+      "/127.0.0.1/private",
+      "//example.com/private",
+    ]) {
       const blocked = await fetch(`${origin}/v1/remote-screen/sessions/${session.id}/moonlight/${blockedPath}`, {
-        headers: { Cookie: viewerCookie },
+        headers: { Cookie: viewerCookie, Origin: origin },
       });
       expect(blocked.status).toBe(404);
     }
+    const crossOriginState = await fetch(`${origin}/v1/remote-screen/sessions/${session.id}/viewer-state`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: viewerCookie, Origin: "https://attacker.example" },
+      body: JSON.stringify({ sessionId: session.id, state: "connected" }),
+    });
+    expect(crossOriginState.status).toBe(401);
+    for (const originHeaders of [{}, { Origin: "https://attacker.example" }]) {
+      const client = new webSockets.WebSocket(
+        `${origin.replace(/^http/, "ws")}/v1/remote-screen/sessions/${session.id}/stream`,
+        { headers: { Cookie: viewerCookie, ...originHeaders } },
+      );
+      await expect(
+        new Promise<void>((resolve, reject) => {
+          client.once("open", resolve);
+          client.once("error", reject);
+        }),
+      ).rejects.toThrow("401");
+    }
     const state = await fetch(`${origin}/v1/remote-screen/sessions/${session.id}/viewer-state`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: viewerCookie },
+      headers: { "Content-Type": "application/json", Cookie: viewerCookie, Origin: origin },
       body: JSON.stringify({
         source: "openbot-moonlight",
         type: "viewer-state",
@@ -198,12 +258,15 @@ describe("RemoteScreenGateway", () => {
     const upstreamMessage = new Promise<string>((resolve) => {
       upstreamWebSockets.once("connection", (socket) => socket.once("message", (data) => resolve(data.toString())));
     });
-    const gateway = createGateway({ runtimeBaseUrl: `http://127.0.0.1:${upstreamAddress.port}` });
+    const gateway = createGateway({
+      runtimeBaseUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+      authenticateSession: (token) => (token === "member-a-token" ? { sessionId: "team-member-a" } : null),
+    });
     const { origin, close } = await serveGateway(gateway);
     const session = await createSession(gateway, origin);
     const client = new webSockets.WebSocket(
       `${origin.replace(/^http/, "ws")}/v1/remote-screen/sessions/${session.id}/stream`,
-      { headers: { "X-OpenBot-WebRTC-Session": "team-member-a" } },
+      { headers: { Authorization: "Bearer member-a-token" } },
     );
     await new Promise<void>((resolve, reject) => {
       client.once("open", resolve);
@@ -213,7 +276,13 @@ describe("RemoteScreenGateway", () => {
     client.send(init);
 
     await expect(upstreamMessage).resolves.toBe(init);
-    client.close();
+    const protocolClosed = new Promise<number>((resolve) => client.once("close", resolve));
+    client.send("invalid unmasked frame", { mask: false });
+    await expect(protocolClosed).resolves.toBe(1002);
+    const stillAvailable = await fetch(`${origin}/v1/remote-screen/sessions/${session.id}/moonlight/config.js`, {
+      headers: { Authorization: "Bearer member-a-token" },
+    });
+    expect(stillAvailable.status).toBe(200);
     await gateway.stop();
     upstreamWebSockets.close();
     await close();
@@ -252,7 +321,7 @@ describe("RemoteScreenGateway", () => {
     const clients = sessions.map(
       (session, index) =>
         new webSockets.WebSocket(`${origin.replace(/^http/, "ws")}/v1/remote-screen/sessions/${session.id}/stream`, {
-          headers: { Cookie: cookies[index] },
+          headers: { Cookie: cookies[index], Origin: origin },
         }),
     );
     await Promise.all(
@@ -275,7 +344,7 @@ describe("RemoteScreenGateway", () => {
     const firstIndex = firstSlot - 1;
     const connected = await fetch(`${origin}/v1/remote-screen/sessions/${sessions[firstIndex]?.id}/viewer-state`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: cookies[firstIndex] },
+      headers: { "Content-Type": "application/json", Cookie: cookies[firstIndex], Origin: origin },
       body: JSON.stringify({
         source: "openbot-moonlight",
         type: "viewer-state",
@@ -347,9 +416,11 @@ function createGateway(
     runtimeBaseUrl?: string;
     selectDisplay?: (displayId: string) => Promise<void>;
     screenCaptureDenied?: () => boolean;
+    authenticateSession?: (token: string) => { sessionId: string } | null;
   } = {},
 ): RemoteScreenGateway {
   return new RemoteScreenGateway({
+    authenticateSession: options.authenticateSession ?? (() => null),
     platform: options.platform ?? "darwin",
     unattended: true,
     runtimePaths:

@@ -433,7 +433,6 @@ export class TeamWebRtcHostPeer {
             : "1",
         "OpenBot-App-Version": this.#appVersion,
         "OpenBot-Capabilities": [...this.#peerCapabilities].join(","),
-        ...(this.#localSessionId ? { "X-OpenBot-WebRTC-Session": this.#localSessionId } : {}),
       },
       body:
         input.method === "GET"
@@ -608,7 +607,7 @@ export class TeamWebRtcHostPeer {
   async #handleDesktopSignal(data: string | ArrayBuffer): Promise<void> {
     await this.#sessionPreparation;
     const peerId = this.#peerId;
-    if (!peerId || !this.#localApiPort || !this.#localSessionId) return;
+    if (!peerId || !this.#localApiPort || !this.#localSessionToken) return;
     if (!isString(data)) {
       const frame = decodeRemoteDesktopSignalBinary(data);
       if (frame.streamId !== this.#desktopStreamId || this.#desktopSocket?.readyState !== webSockets.WebSocket.OPEN)
@@ -636,7 +635,7 @@ export class TeamWebRtcHostPeer {
       }
       this.#closeDesktopSocket();
       const socket = new webSockets.WebSocket(url, {
-        headers: { "X-OpenBot-WebRTC-Session": this.#localSessionId },
+        headers: { Authorization: `Bearer ${this.#localSessionToken}` },
       });
       this.#desktopSocket = socket;
       this.#desktopStreamId = control.streamId;

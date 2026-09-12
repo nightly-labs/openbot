@@ -31,6 +31,7 @@ const clientCount = z.coerce
   .parse(process.env.OPENBOT_REMOTE_E2E_CLIENTS ?? "1");
 const stateDirectory = await mkdtemp(join(tmpdir(), "openbot-remote-browser-e2e-"));
 const gateway = new RemoteScreenGateway({
+  authenticateSession: () => null,
   platform: process.platform === "darwin" || process.platform === "win32" ? process.platform : "linux",
   unattended: false,
   runtimePaths,

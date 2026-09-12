@@ -1,5 +1,11 @@
 import { appendFile, mkdir, rename, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { redactText } from "@openbot/logging";
+import { createDiagnosticStream } from "../backend/stderr-diagnostics";
+
+export function createRemoteDiagnosticStream(emit: (message: string) => void) {
+  return createDiagnosticStream({ redact: redactText, emit: (message) => emit(`${message}\n`) });
+}
 
 export async function appendRemoteDiagnosticLog(
   directory: string,
@@ -14,11 +20,7 @@ export async function appendRemoteDiagnosticLog(
   } catch {
     // A missing diagnostic file does not need rotation.
   }
-  const clean = Buffer.from(message)
-    .toString("utf8")
-    .replace(/(?:Bearer\s+|token[=: ]+)[A-Za-z0-9._-]{8,}/giu, "[redacted]")
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/giu, "[redacted-email]")
-    .slice(0, 8_000);
+  const clean = redactText(Buffer.from(message).toString("utf8")).slice(0, 8_000);
   if (clean) await appendFile(path, clean, { encoding: "utf8", mode: 0o600 });
 }
 

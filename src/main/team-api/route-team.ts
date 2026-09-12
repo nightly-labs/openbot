@@ -154,9 +154,9 @@ export async function routeTeam(
     requireAdmin(member);
     const revokedSessionId = pathIdentifier(sessionMatch[1], "sessionId");
     await store.revokeSession(revokedSessionId);
-    await onSessionRevoked?.(revokedSessionId);
     await remoteScreen?.revokeTeamSession(revokedSessionId);
     refreshPresence();
+    await onSessionRevoked?.(revokedSessionId);
     return empty(204);
   }
 

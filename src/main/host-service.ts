@@ -160,6 +160,7 @@ export class HostService extends EventEmitter<HostEvents> {
     this.#status = initialHostStatus(options.store.getIdentity(), options.unattended ?? false);
     const logDirectory = options.logDirectory;
     this.#remoteScreen = new RemoteScreenGateway({
+      authenticateSession: (token) => options.store.authenticateSession(token),
       platform: options.platform ?? normalizeRemoteDesktopPlatform(process.platform),
       unattended: options.unattended ?? false,
       runtimePaths: options.remoteDesktopRuntimePaths ?? null,
@@ -810,10 +811,10 @@ export class HostService extends EventEmitter<HostEvents> {
   }
 
   async revokeSession(sessionId: string): Promise<void> {
-    await this.#revokeWebRtcSession(sessionId);
     await this.#options.store.revokeSession(sessionId);
     await this.#remoteScreen.revokeTeamSession(sessionId);
     this.#api.refreshPresence();
+    await this.#revokeWebRtcSession(sessionId);
   }
 
   async #revokeWebRtcSession(sessionId: string): Promise<void> {

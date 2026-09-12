@@ -35,6 +35,7 @@ async function createHostService(
       | "revokeRemoteInvite"
       | "remoteControlPlaneUrl"
       | "sendTeamInviteEmail"
+      | "endRemoteSession"
     >
   > = {},
 ): Promise<{
@@ -103,6 +104,20 @@ type RemoteInvite = Awaited<ReturnType<NonNullable<HostOptions["createRemoteInvi
 describe("HostService account binding", () => {
   const first = { id: "account-a", email: "a@example.com", name: "A", avatarUrl: null };
   const second = { id: "account-b", email: "b@example.com", name: "B", avatarUrl: null };
+
+  it("revokes local credentials when the cloud session service fails", async () => {
+    const { service, store } = await createHostService({
+      endRemoteSession: async () => {
+        throw new Error("Cloud unavailable");
+      },
+    });
+    await store.configure("Studio", "owner", "correct horse battery");
+    const session = await store.login("owner", "correct horse battery");
+    const authenticated = store.authenticateSession(session.sessionToken);
+    if (!authenticated) throw new Error("Expected an authenticated session");
+    await expect(service.revokeSession(authenticated.sessionId)).rejects.toThrow("Cloud unavailable");
+    expect(store.authenticateSession(session.sessionToken)).toBeNull();
+  });
 
   it("uses the local caller for channels without requiring a cloud account", async () => {
     const { service, announce } = await createHostService();

@@ -3,6 +3,7 @@
 // Remote control and the Remote Desktop upgrade: `src/main/team-api/route-remote-screen.ts`, plus
 // the upgrade handler that answers before any of it.
 
+import { createOpenBotLogger } from "@openbot/logging";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createTeamApiFixture,
@@ -73,7 +74,14 @@ describe("TeamApiServer remote screen", () => {
       revokeTeamSession: vi.fn(async () => undefined),
       revokeMember: vi.fn(async () => undefined),
     };
-    const { base } = await start({ remoteScreen });
+    const { base } = await start({
+      remoteScreen,
+      onSessionRevoked: async () => {
+        expect(remoteScreen.revokeTeamSession).toHaveBeenCalled();
+        throw new Error("Cloud unavailable");
+      },
+      logger: createOpenBotLogger("test", () => undefined),
+    });
 
     const outsider = await fetch(`${base}/v1/remote-screen/sessions`, { method: "POST" });
     expect(outsider.status).toBe(401);
@@ -99,6 +107,17 @@ describe("TeamApiServer remote screen", () => {
     );
 
     const owner = await store.login("owner", "correct horse battery");
+    const secondSession = await store.login("alice", "a secure team password");
+    const authenticated = store.authenticateSession(secondSession.sessionToken);
+    if (!authenticated) throw new Error("Expected an authenticated session");
+    const revoked = await fetch(`${base}/v1/team/sessions/${authenticated.sessionId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${owner.sessionToken}` },
+    });
+    expect(revoked.status).toBe(500);
+    expect(store.authenticateSession(secondSession.sessionToken)).toBeNull();
+    expect(remoteScreen.revokeTeamSession).toHaveBeenCalledWith(authenticated.sessionId);
+
     const disabled = await fetch(`${base}/v1/team/members/${joined.member.id}`, {
       method: "PATCH",
       headers: {

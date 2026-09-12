@@ -21,6 +21,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebSocketServer } from "ws";
 import opencodeAgents from "../../packages/contracts/src/team-protocol/fixtures/v4/host-http-response.json";
 import { createRemoteFileReceiver } from "../../packages/team-client/src/file-download";
+import { encodeRemoteDesktopSignalControl } from "./remote-desktop-signal";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
@@ -125,8 +126,21 @@ describe("TeamWebRtcHostGateway", () => {
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify(request.url === "/v1/agents/research/usage" ? scopedUsage : {}));
     });
+    const desktopSessions: string[] = [];
+    let onDesktopClosed: () => void = () => undefined;
+    const desktopClosed = new Promise<void>((resolve) => {
+      onDesktopClosed = resolve;
+    });
     const eventsServer = new WebSocketServer({ server: localServer });
-    eventsServer.on("connection", (socket) => {
+    eventsServer.on("connection", (socket, request) => {
+      if (request.url?.startsWith("/v1/remote-screen/")) {
+        socket.once("close", onDesktopClosed);
+        const token = request.headers.authorization?.match(/^Bearer (.+)$/u)?.[1];
+        const session = token ? store.authenticateSession(token) : null;
+        if (session) desktopSessions.push(session.sessionId);
+        else socket.close(4401, "Authentication required");
+        return;
+      }
       socket.on("message", (data) => {
         const event = decodeTeamProtocolV1ClientEvent(JSON.parse(data.toString()));
         if (event.type === "agent-event-scope") eventScopes.push(event);
@@ -259,6 +273,19 @@ describe("TeamWebRtcHostGateway", () => {
     );
     await vi.waitFor(() => expect(eventScopes).toHaveLength(1));
     expect(eventScopes[0]?.capabilities).toEqual([]);
+    bridge.emit(
+      "data",
+      "peer-1",
+      "desktop",
+      encodeRemoteDesktopSignalControl({
+        type: "open",
+        streamId: "screen-1",
+        path: "/v1/remote-screen/sessions/screen-1/stream",
+      }),
+    );
+    await vi.waitFor(() => expect(desktopSessions).toEqual(["session-1"]));
+    bridge.emit("data", "peer-1", "desktop", encodeRemoteDesktopSignalControl({ type: "close", streamId: "screen-1" }));
+    await desktopClosed;
     bridge.emit(
       "data",
       "peer-1",
