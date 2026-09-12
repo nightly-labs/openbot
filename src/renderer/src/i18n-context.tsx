@@ -26,27 +26,57 @@ export interface I18nValue {
  */
 function createI18nValue(): I18nValue {
   const [language, setLanguage] = createSignal<AppLanguage>(DEFAULT_APP_LANGUAGE);
+  // The last value the main process confirmed, which is what a failed write falls back to. The
+  // displayed language runs ahead of it while a write is in flight.
+  let confirmed: AppLanguage = DEFAULT_APP_LANGUAGE;
+  // Counts the choices made, so a reply that is no longer the latest one cannot move the screen.
+  // Two quick choices whose writes both fail would otherwise leave the screen on the first of them
+  // while the saved preference, the menu and the notifications read in the confirmed language.
+  let latestRequest = 0;
+  // How many writes are in flight. While one is, the screen already shows the newest choice, and a
+  // value arriving from main is older than it.
+  let pending = 0;
   // `navigator.language` is the renderer's view of the same value `app.getLocale()` gives main.
   const locale = createMemo<TranslatedLocale>(() => resolveLocale(language(), navigator.language));
   const translate = createMemo(() => translateFor(locale()));
   const t: AppTranslate = (key, ...params) => translate()(key, ...params);
 
+  function confirm(next: AppLanguage): void {
+    confirmed = next;
+    if (pending === 0) setLanguage(next);
+  }
+
   /** Set optimistically so the screen turns at once, and reverted if main refuses the write. */
   function changeLanguage(next: AppLanguage): void {
-    const previous = language();
+    const request = ++latestRequest;
+    pending += 1;
     setLanguage(next);
     void window.openbot
       .setAppLanguagePreference({ language: next })
-      .then((preference) => setLanguage(preference.language))
-      .catch(() => setLanguage(previous));
+      .then((preference) => {
+        confirmed = preference.language;
+        if (request === latestRequest) setLanguage(preference.language);
+      })
+      .catch(() => {
+        if (request === latestRequest) setLanguage(confirmed);
+      })
+      .finally(() => {
+        pending -= 1;
+      });
   }
 
   onSettled(() => {
     void window.openbot
       .getAppLanguagePreference()
-      .then((preference) => setLanguage(preference.language))
+      .then((preference) => {
+        // A choice made before the read answered is newer than the saved value it reports, which
+        // `confirm` already respects.
+        confirm(preference.language);
+      })
       .catch(() => undefined);
-    return window.openbot.onAppLanguagePreference((preference) => setLanguage(preference.language));
+    // The main process is the owner, so what it sends is confirmed by definition - including the
+    // echo of a change made in this window.
+    return window.openbot.onAppLanguagePreference((preference) => confirm(preference.language));
   });
 
   return { language, locale, t, changeLanguage };
