@@ -515,7 +515,7 @@ describe("MailboxStore", () => {
         mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         previewKind: "none",
       },
-      { name: "message.eml", mimeType: "message/rfc822", previewKind: "none" },
+      { name: "message.eml", mimeType: "message/rfc822", previewKind: "text" },
     ]);
 
     const archive = join(root, "bundle.zip");
