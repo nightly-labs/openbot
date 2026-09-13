@@ -126,7 +126,10 @@ that made it is gone, never because a live one is part-way through making it. Wh
 claim reads the destination again, so a copy a sibling committed in the meantime is adopted and
 never moved, and reads what it moved aside once more before replacing it: neither the claim nor the
 reading before the move is a promise about the moment of the move, so a runtime that verifies goes
-back where it was found and is adopted. Nothing that verifies is ever replaced. A claim as old as an abandoned stage is recovered by moving it away and reading who it
+back where it was found and is adopted. Nothing that verifies is ever replaced. An install that
+cannot be read back after it is committed is taken away the same way, and for the same reason: it
+is moved first, read where nothing else can reach it, and put back if it verifies, because the
+reading that rejected it can have failed only because a sibling was replacing the path as it ran. A claim as old as an abandoned stage is recovered by moving it away and reading who it
 names: the rename is atomic, so what it moved is that instance's alone to read, and only the claim
 whose name was read is the abandoned one. The name is read before the age, so the two cannot come
 from different directories: a claim on the path is only ever replaced by a newer one, so an age that
