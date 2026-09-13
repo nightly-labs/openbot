@@ -739,33 +739,51 @@ async function renameIfVacant(from: string, to: string): Promise<boolean> {
  * made it is gone, never because a live one is part-way through making it.
  *
  * A claim older than a staging directory is one a killed instance left behind, and age is the only
- * evidence available, the same reason the sweep uses it. Clearing it is itself a race two instances
- * could both win by reading the same old timestamp, so it is cleared by moving it away: whichever
- * rename finds it still there is the only one that goes on, and an instance whose claim is taken
- * this way is shut out by `holdsClaim` before it touches the destination.
+ * evidence available, the same reason the sweep uses it. Recovering it is itself a race two
+ * instances could both enter by reading the same old timestamp, so it is recovered by moving it
+ * away and reading who it names: the rename is atomic, so whatever it moved is this instance's
+ * alone to look at, and only the claim whose age was read is the abandoned one. Anything else was
+ * made in between, by an instance that recovered the path first, and this instance takes nothing.
  */
 async function takeLock(lock: string): Promise<string | null> {
   const claim = `${process.pid}-${randomBytes(4).toString("hex")}`;
   if (await holdLock(lock, claim)) return claim;
-  if (!(await abandonedClaim(lock))) return null;
-  const abandoned = join(dirname(lock), `.replaced-claim-${randomBytes(4).toString("hex")}`);
-  if (!(await renameIfPresent(lock, abandoned))) return null;
-  await rm(abandoned, { recursive: true, force: true }).catch(() => undefined);
+  const abandoned = await abandonedClaim(lock);
+  if (abandoned === null) return null;
+  const aside = join(dirname(lock), `.replaced-claim-${randomBytes(4).toString("hex")}`);
+  if (!(await renameIfPresent(lock, aside))) return null;
+  const moved = await readClaim(aside);
+  await rm(aside, { recursive: true, force: true }).catch(() => undefined);
+  // The instance whose fresh claim this moved is shut out by `holdsClaim` before it touches the
+  // destination, so the path is left to whoever takes it next, and this attempt is not it.
+  if (moved !== abandoned) return null;
   return (await holdLock(lock, claim)) ? claim : null;
 }
 
-/** Whether a claim is old enough to be one a killed instance left behind. */
-async function abandonedClaim(lock: string): Promise<boolean> {
+/**
+ * The claim a lock old enough to be abandoned names, or `null` when no claim there is abandoned.
+ *
+ * The empty string is a claim directory that names no one: nothing this manager makes, so either an
+ * instance was killed between the two steps of an older build's acquisition, or the claim file was
+ * lost. It is recovered like any other abandoned claim.
+ */
+async function abandonedClaim(lock: string): Promise<string | null> {
   const held = await stat(lock)
     .then((value) => value.mtimeMs)
     .catch(() => null);
-  return held === null || held <= Date.now() - STALE_STAGING_MS;
+  if (held === null || held > Date.now() - STALE_STAGING_MS) return null;
+  return await readClaim(lock);
+}
+
+/** Who a claim names, and the empty string when it names no one. */
+async function readClaim(lock: string): Promise<string> {
+  const held = await readFile(join(lock, "claim"), "utf8").catch(() => null);
+  return held?.trim() ?? "";
 }
 
 /** Whether the claim on the path is still the one this attempt made. */
 async function holdsClaim(lock: string, claim: string): Promise<boolean> {
-  const held = await readFile(join(lock, "claim"), "utf8").catch(() => null);
-  return held?.trim() === claim;
+  return (await readClaim(lock)) === claim;
 }
 
 /** Puts a claim on the path in one move, or reports that another instance is already there. */

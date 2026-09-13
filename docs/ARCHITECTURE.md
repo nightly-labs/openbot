@@ -124,18 +124,29 @@ in one step, which the filesystem grants to one instance at a time; the path the
 without naming an owner. That is what makes age evidence: a claim reads old only when the instance
 that made it is gone, never because a live one is part-way through making it. Whoever holds the
 claim reads the destination again, so a copy a sibling committed in the meantime is adopted and
-never moved. A claim as old as an abandoned stage is taken over by moving it away, and the instance
-whose claim was moved is shut out before it touches the destination, because the holder reads the
-claim again immediately before it moves anything and releases it only while it is still the one
-that attempt made. The sweep leaves claims alone: it holds none itself, and would otherwise be one
-more unsynchronised writer of the path the claim exists to serialise.
+never moved. A claim as old as an abandoned stage is recovered by moving it away and reading who it
+names: the rename is atomic, so what it moved is that instance's alone to read, and only the claim
+whose age was read is the abandoned one. A claim made in between belongs to an instance that recovered the
+path first, and the instance that moved it takes nothing. The holder reads the claim again
+immediately before it moves anything and releases it only while it is still the one that attempt
+made, so an instance that lost its claim stops at the destination rather than after it. The sweep
+leaves claims alone: it holds none itself, and would otherwise be one more unsynchronised writer of
+the path the claim exists to serialise.
+
+One thing the store cannot defend is an installed version, while released builds still carry the
+manager this one replaces: their collector keeps the version they pin and the highest other one, and
+deletes the rest whenever they start, reading no timestamps. A development instance running a
+version in between loses it and downloads it again. The alternative -- a store of its own, filled by
+copying every verified runtime across -- would keep a second copy of each CLI on every computer for
+as long as both managers exist, which is the cost this store was made to remove, and the exposure
+ends with the first release that carries the age rule.
 
 An update that finds the version already in the store skips the transfer, not the activation: the
 agent service has to be given the executable either way. Staging directories carry the pid and a
 random suffix and are swept by age, never by name, so a sibling's install is not collected while it
-runs. The manager stamps each version it takes into use
--- the pinned one it verified, and the older one it falls back to until the pinned one arrives --
-and collection keeps anything stamped within a month, so a version another instance or another
+runs. The manager stamps each version it takes into use -- the pinned one it verified, and the older
+one it falls back to until the pinned one arrives -- and collection keeps anything stamped within a
+month, so a version another instance or another
 worktree's pin still runs is not removed; a collection that fails, as it does on Windows for an open
 binary, never stops startup.
 
