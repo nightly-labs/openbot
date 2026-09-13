@@ -36,6 +36,15 @@ const MAX_METADATA_BYTES = 4 * 1024 * 1024;
 const STALE_STAGING_MS = 6 * 60 * 60 * 1000;
 /** How long an unused version directory is kept, for the same reason: a sibling may still run it. */
 const VERSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+/**
+ * How many times a commit re-reads a destination another instance is replacing.
+ *
+ * Each pass ends in one of three ways - this instance committed, it adopted what is there, or the
+ * destination moved under it - and only the third goes round again. Three is enough for the moves a
+ * sibling makes for one version; a store that keeps answering that way is broken, not busy, and
+ * failing says so rather than looping.
+ */
+const COMMIT_ATTEMPTS = 3;
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type PartialMetadata = { url: string; etag: string | null; expectedBytes: number };
@@ -267,10 +276,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     const installRoot = this.#installRoot(spec);
     try {
       await verifyInstalledRuntime(installRoot, spec, this.#lock);
-      // The one record a sibling instance can read: this version is in use, so its collector must
-      // leave it alone. Best effort -- a store on a read-only volume still works, it only ages.
-      const now = new Date();
-      await utimes(installRoot, now, now).catch(() => undefined);
+      await this.#stampInUse(installRoot);
       return readyStatus(spec.version);
     } catch {
       return { ...emptyStatus(), version: await this.#previousVersion(spec) };
@@ -306,9 +312,21 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       .sort((a, b) => b.localeCompare(a, "en", { numeric: true }));
     for (const version of versions) {
       const executable = await stat(join(targetRoot, version, "bin", spec.executableName)).catch(() => null);
-      if (executable?.isFile()) return version;
+      if (!executable?.isFile()) continue;
+      // This is the CLI the agent service runs until the pinned one arrives, so it is in use and
+      // the collector in every other instance has to leave it alone. A worktree that pins a newer
+      // version would otherwise take it away while this one is running from it.
+      await this.#stampInUse(join(targetRoot, version));
+      return version;
     }
     return null;
+  }
+
+  /** The one record a sibling instance can read: this version is in use, so keep it. */
+  async #stampInUse(installRoot: string): Promise<void> {
+    const now = new Date();
+    // Best effort -- a store on a read-only volume still works, it only ages.
+    await utimes(installRoot, now, now).catch(() => undefined);
   }
 
   /**
@@ -440,28 +458,35 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * it half removed.
    */
   async #commit(staging: string, destination: string, spec: RuntimeSpec): Promise<boolean> {
-    if (await renameIfVacant(staging, destination)) return true;
-    if (
-      await verifyInstalledRuntime(destination, spec, this.#lock).then(
-        () => true,
-        () => false,
-      )
-    ) {
-      return false;
+    // Each pass reads the destination again, because a sibling replacing the same damaged copy can
+    // move it, fill it, or take it away between any two steps below. Whatever it did, the next pass
+    // sees the result: a verified install is adopted, and only what is still damaged is replaced.
+    for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt += 1) {
+      if (await renameIfVacant(staging, destination)) return true;
+      if (await this.#verifies(destination, spec)) return false;
+      // Beside the staging directories, not beside the version ones: that is where the sweep looks,
+      // and `#removeOldVersions` reads everything in the target root as a version.
+      const aside = join(
+        this.#providerRoot(spec.provider),
+        `.replaced-${spec.target}-${spec.version}-${randomBytes(4).toString("hex")}`,
+      );
+      // A destination that has already gone is a sibling holding it aside for its own replacement.
+      // Its copy lands in a moment; go round and adopt it rather than race it.
+      if (!(await renameIfPresent(destination, aside))) continue;
+      try {
+        if (await renameIfVacant(staging, destination)) return true;
+      } finally {
+        await rm(aside, { recursive: true, force: true }).catch(() => undefined);
+      }
     }
-    // Beside the staging directories, not beside the version ones: that is where the sweep looks,
-    // and `#removeOldVersions` reads everything in the target root as a version.
-    const aside = join(
-      this.#providerRoot(spec.provider),
-      `.replaced-${spec.target}-${spec.version}-${randomBytes(4).toString("hex")}`,
+    throw new Error("The runtime could not be installed because another instance is replacing it.");
+  }
+
+  async #verifies(installRoot: string, spec: RuntimeSpec): Promise<boolean> {
+    return await verifyInstalledRuntime(installRoot, spec, this.#lock).then(
+      () => true,
+      () => false,
     );
-    await rename(destination, aside);
-    try {
-      await rename(staging, destination);
-    } finally {
-      await rm(aside, { recursive: true, force: true }).catch(() => undefined);
-    }
-    return true;
   }
 
   async #downloadSmallFile(url: string, expectedSha256: string): Promise<Uint8Array> {
@@ -654,6 +679,17 @@ async function renameIfVacant(from: string, to: string): Promise<boolean> {
     return true;
   } catch (error) {
     if (isOccupiedError(error)) return false;
+    throw error;
+  }
+}
+
+/** Moves `from` onto `to`, or reports that another instance already took `from` away. */
+async function renameIfPresent(from: string, to: string): Promise<boolean> {
+  try {
+    await rename(from, to);
+    return true;
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
     throw error;
   }
 }

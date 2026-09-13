@@ -504,6 +504,31 @@ describe("ProviderRuntimeManager", () => {
     expect((await readdir(join(root, "grok", "darwin-arm64"))).sort()).toEqual(["1.0.19", "1.0.21"]);
   });
 
+  it("keeps the fallback version an instance with an older pin still runs", async () => {
+    const root = await temporaryRoot();
+    const targetRoot = join(root, "grok", "darwin-arm64");
+    const fallback = join(targetRoot, "1.0.20");
+    const spare = join(targetRoot, "1.0.21");
+    for (const version of [fallback, spare]) {
+      await mkdir(join(version, "bin"), { recursive: true });
+      await writeFile(join(version, "bin", "grok"), `#!/bin/sh\necho ${basename(version)}\n`);
+    }
+    await aged(fallback, VERSION_AGE_MS);
+    const lock = parseAgentRuntimeLock(structuredClone(lockValue));
+    lock.grok.version = "1.0.21";
+    // A worktree one pin behind: 1.0.20 is the CLI its agent service runs until 1.0.21 is installed.
+    const behind = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64", lock });
+    const ahead = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
+
+    expect((await behind.initialize()).providers.grok.version).toBe("1.0.20");
+    await ahead.initialize();
+
+    // The other instance collects by its own reckoning, where 1.0.20 is neither the pinned version
+    // nor its own spare. What the first instance left on the directory is the only thing that says
+    // the version is in use, and a CLI removed under a running agent cannot be started again.
+    await expect(access(join(fallback, "bin", "grok"))).resolves.toBeUndefined();
+  });
+
   it.skipIf(process.platform === "win32")("starts when an old version cannot be collected", async () => {
     // The portable stand-in for Windows, where the binary a sibling instance runs refuses to be
     // removed. Housekeeping must never be what stops the app from starting.
