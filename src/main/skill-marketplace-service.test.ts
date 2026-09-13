@@ -118,10 +118,20 @@ describe("SkillMarketplaceService", () => {
 
     const claudeSkill = join(agent.workspacePath, ".claude", "skills", "release-notes", "SKILL.md");
     await writeFile(claudeSkill, "Claude edits");
+    const agentsReference = join(
+      agent.workspacePath,
+      ".agents",
+      "skills",
+      "release-notes",
+      "references",
+      "template.md",
+    );
+    await rm(agentsReference);
     await expect(service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })).rejects.toThrow(
       "local changes",
     );
     await expect(readFile(claudeSkill, "utf8")).resolves.toBe("Claude edits");
+    await writeFile(agentsReference, "Template");
     await writeFile(claudeSkill, skillContents);
     await service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false });
     await mkdir(dirname(claudeSkill), { recursive: true });
@@ -149,5 +159,12 @@ describe("SkillMarketplaceService", () => {
       service.uninstall({ agentId: agent.id, skillId: "skill-1", removeModified: true }),
     ).resolves.toBeUndefined();
     expect(refreshedAgents).toEqual([agent.id, agent.id, agent.id, agent.id]);
+    await service.install({ agentId: agent.id, skillId: "skill-1" });
+    await service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false });
+    await mkdir(dirname(claudeSkill), { recursive: true });
+    await writeFile(claudeSkill, "Unowned files after disable");
+    await service.uninstall({ agentId: agent.id, skillId: "skill-1" });
+    await expect(readFile(claudeSkill, "utf8")).resolves.toBe("Unowned files after disable");
+    await expect(service.listInstalled(agent.id)).resolves.toEqual([]);
   });
 });

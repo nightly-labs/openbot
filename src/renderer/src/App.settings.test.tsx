@@ -15,8 +15,12 @@ import {
 
 describe("OpenBot connected desktop shell", () => {
   it("opens the marketplace from skill settings and returns to skills", async () => {
+    // Load the real lazy panels before measuring their visible behavior under CI load.
+    await import("./features/conversation/AgentSettingsPanel");
+    await import("./features/settings/SkillsMarketplaceModal");
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
+    await waitFor(() => expect(window.openbot.agent.listInstalledSkills).toHaveBeenCalled());
     await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
     await fireEvent.click(await screen.findByRole("button", { name: /^Skills/ }));
     await fireEvent.click((await screen.findAllByRole("button", { name: "Add from marketplace" }))[0]);

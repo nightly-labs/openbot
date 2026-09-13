@@ -327,7 +327,7 @@ export class SkillMarketplaceService {
       throw new Error("This skill has local changes. Confirm removal to delete them.");
     }
     for (const target of [
-      ...targetDirectories(agent.workspacePath, entry.slug),
+      ...(entry.enabled === false ? [] : targetDirectories(agent.workspacePath, entry.slug)),
       disabledDirectory(agent.workspacePath, entry.slug),
     ]) {
       await rm(target, { recursive: true, force: true });
@@ -546,6 +546,7 @@ async function installedState(workspace: string, entry: LockEntry): Promise<"ins
   const roots =
     entry.enabled === false ? [disabledDirectory(workspace, entry.slug)] : targetDirectories(workspace, entry.slug);
   let complete = 0;
+  let missing = false;
   for (const target of roots) {
     if (!(await pathExists(target))) continue;
     complete += 1;
@@ -558,13 +559,14 @@ async function installedState(workspace: string, entry: LockEntry): Promise<"ins
     for (const [name, hash] of Object.entries(entry.files)) {
       try {
         if (sha256(new Uint8Array(await readFile(join(target, name)))) !== hash) return "modified";
-      } catch {
-        return "needs-repair";
+      } catch (error) {
+        if (!isDynamicRecord(error) || error.code !== "ENOENT") return "modified";
+        missing = true;
       }
     }
   }
   const expected = entry.enabled === false ? 1 : 2;
-  return complete === expected ? "installed" : "needs-repair";
+  return complete === expected && !missing ? "installed" : "needs-repair";
 }
 
 function lockPath(workspace: string): string {
