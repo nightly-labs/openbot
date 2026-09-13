@@ -519,6 +519,17 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       // Aside rather than deleted, because a sibling reading the atomic path must never find it
       // half removed, and gone already means an instance without this lock took it.
       if (!(await renameIfPresent(destination, aside))) return "moved";
+      // Read once more, now that it is somewhere nothing else can change it. The claim says no
+      // other instance may move this destination, and the reading above says this one was damaged;
+      // both were true when they were read, and neither is a promise about the moment of the move.
+      // What was moved is therefore examined rather than trusted: a runtime that verifies is an
+      // install a sibling committed in between, so it goes back where the sibling left it and is
+      // adopted. Nothing that verifies is ever replaced, whatever the claim said.
+      if (await this.#verifies(aside, spec)) {
+        if (await renameIfVacant(aside, destination)) return "adopted";
+        await rm(aside, { recursive: true, force: true }).catch(() => undefined);
+        return "moved";
+      }
       try {
         if (await renameIfVacant(staging, destination)) return "committed";
       } finally {

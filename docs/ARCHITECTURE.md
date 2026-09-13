@@ -124,7 +124,9 @@ in one step, which the filesystem grants to one instance at a time; the path the
 without naming an owner. That is what makes age evidence: a claim reads old only when the instance
 that made it is gone, never because a live one is part-way through making it. Whoever holds the
 claim reads the destination again, so a copy a sibling committed in the meantime is adopted and
-never moved. A claim as old as an abandoned stage is recovered by moving it away and reading who it
+never moved, and reads what it moved aside once more before replacing it: neither the claim nor the
+reading before the move is a promise about the moment of the move, so a runtime that verifies goes
+back where it was found and is adopted. Nothing that verifies is ever replaced. A claim as old as an abandoned stage is recovered by moving it away and reading who it
 names: the rename is atomic, so what it moved is that instance's alone to read, and only the claim
 whose name was read is the abandoned one. The name is read before the age, so the two cannot come
 from different directories: a claim on the path is only ever replaced by a newer one, so an age that
