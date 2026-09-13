@@ -45,8 +45,15 @@ const VERSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
  * failing says so rather than looping.
  */
 const COMMIT_ATTEMPTS = 3;
-/** Everything a commit leaves beside the version directories, and the sweep collects by age. */
-const STAGING_PREFIXES = [".installing-", ".replaced-", ".locking-"];
+/**
+ * What the sweep collects by age beside the version directories.
+ *
+ * A claim is not on the list. Removing one is how an instance takes a destination over, and the
+ * sweep holds no claim itself, so it would be one more unsynchronised writer of the very path the
+ * claim exists to serialise. `takeLock` clears an abandoned claim, and what it leaves behind while
+ * it does carries the `.replaced-` prefix.
+ */
+const STAGING_PREFIXES = [".installing-", ".replaced-"];
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type PartialMetadata = { url: string; etag: string | null; expectedBytes: number };
@@ -488,7 +495,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     spec: RuntimeSpec,
   ): Promise<"committed" | "adopted" | "moved"> {
     const lock = join(this.#providerRoot(spec.provider), `.locking-${spec.target}-${spec.version}`);
-    if (!(await takeLock(lock))) return "moved";
+    const claim = await takeLock(lock);
+    if (!claim) return "moved";
     try {
       if (await this.#verifies(destination, spec)) return "adopted";
       // Beside the staging directories, not beside the version ones: that is where the sweep looks,
@@ -507,7 +515,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       }
       return "moved";
     } finally {
-      await rm(lock, { recursive: true, force: true }).catch(() => undefined);
+      await releaseLock(lock, claim);
     }
   }
 
@@ -710,31 +718,47 @@ async function renameIfVacant(from: string, to: string): Promise<boolean> {
 }
 
 /**
- * Claims the right to replace one destination, or reports that another instance holds it.
+ * Claims the right to replace one destination, and answers with the claim, or `null` when another
+ * instance holds it.
  *
  * `mkdir` without `recursive` is the claim: the filesystem answers `EEXIST` to everyone but the
  * first, on every platform and across users, with no daemon and nothing to clean up but a
- * directory. A lock older than a staging directory is one a killed instance left behind, and age is
- * the only evidence available -- the same reason the sweep uses it -- so it is taken over.
+ * directory. A claim older than a staging directory is one a killed instance left behind, and age
+ * is the only evidence available -- the same reason the sweep uses it. Clearing that one is itself
+ * a race two instances could both win by reading the same old timestamp, so it is cleared by moving
+ * it away: whichever rename finds it still there is the only one that goes on to claim the path.
  */
-async function takeLock(lock: string): Promise<boolean> {
-  if (await mkdirExclusive(lock)) return true;
+async function takeLock(lock: string): Promise<string | null> {
+  const claim = `${process.pid}-${randomBytes(4).toString("hex")}`;
+  if (await holdLock(lock, claim)) return claim;
   const held = await stat(lock)
     .then((value) => value.mtimeMs)
     .catch(() => null);
-  if (held !== null && held > Date.now() - STALE_STAGING_MS) return false;
-  await rm(lock, { recursive: true, force: true }).catch(() => undefined);
-  return await mkdirExclusive(lock);
+  if (held !== null && held > Date.now() - STALE_STAGING_MS) return null;
+  const abandoned = join(dirname(lock), `.replaced-claim-${randomBytes(4).toString("hex")}`);
+  if (!(await renameIfPresent(lock, abandoned))) return null;
+  await rm(abandoned, { recursive: true, force: true }).catch(() => undefined);
+  return (await holdLock(lock, claim)) ? claim : null;
 }
 
-async function mkdirExclusive(path: string): Promise<boolean> {
+async function holdLock(lock: string, claim: string): Promise<boolean> {
   try {
-    await mkdir(path);
-    return true;
+    await mkdir(lock);
   } catch (error) {
     if (isOccupiedError(error)) return false;
     throw error;
   }
+  // Written inside the claim, so the release can tell this attempt's claim from the one an instance
+  // that recovered it made -- and so the directory's own age is the moment the claim was taken.
+  await writeFile(join(lock, "claim"), `${claim}\n`, { mode: 0o600 });
+  return true;
+}
+
+/** Removes the claim only while it is still this attempt's. */
+async function releaseLock(lock: string, claim: string): Promise<void> {
+  const held = await readFile(join(lock, "claim"), "utf8").catch(() => null);
+  if (held?.trim() !== claim) return;
+  await rm(lock, { recursive: true, force: true }).catch(() => undefined);
 }
 
 /** Moves `from` onto `to`, or reports that another instance already took `from` away. */

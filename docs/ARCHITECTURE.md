@@ -116,7 +116,11 @@ commit that finds the destination occupied verifies it and adopts it instead of 
 only a destination that fails verification is moved aside. That replacement is claimed first, with
 a lock directory beside the staging ones that `mkdir` grants to one instance at a time: whoever
 holds it reads the destination again, so a copy a sibling committed in the meantime is adopted and
-never moved. A lock as old as an abandoned stage is one a killed instance left, and is taken over. An update that finds the version already in the store skips
+never moved. A claim as old as an abandoned stage is one a killed instance
+left; it is taken over by moving it away, so two instances that read the same old timestamp cannot
+both recover it, and a claim is released only while it is still the one that attempt made. The
+sweep leaves claims alone: it holds none itself, and would otherwise be one more unsynchronised
+writer of the path the claim exists to serialise. An update that finds the version already in the store skips
 the transfer, not the activation: the agent service has to be given the executable either way.
 Staging directories carry the pid and a random suffix and are swept by age, never by name, so a
 sibling's install is not collected while it runs. The manager stamps each version it takes into use
