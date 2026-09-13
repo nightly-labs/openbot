@@ -355,16 +355,16 @@ export class SkillMarketplaceService {
         await installedSkillDescription(agent.workspacePath, entry),
       );
     }
-    if (
-      !input.enabled &&
-      entry.skillId.startsWith("local-skill-") &&
-      (await installedState(agent.workspacePath, entry)) === "modified"
-    ) {
+    if (!input.enabled && (await installedState(agent.workspacePath, entry)) === "modified") {
       throw new Error("This skill has local changes. Save or reconcile both provider copies before disabling it.");
     }
     if (input.enabled) {
       const stash = disabledDirectory(agent.workspacePath, entry.slug);
       if (!(await pathExists(stash))) throw new Error("This skill needs repair before it can be enabled.");
+      for (const target of targetDirectories(agent.workspacePath, entry.slug)) {
+        if (await pathExists(target))
+          throw new Error("This skill's provider folder is occupied. Move or reconcile its files before enabling it.");
+      }
       const files = await readSkillFiles(stash);
       await replaceTargets(agent.workspacePath, entry.slug, files);
       await rm(stash, { recursive: true, force: true });

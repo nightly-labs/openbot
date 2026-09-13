@@ -1,9 +1,9 @@
 // @vitest-environment node
 
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { zipSync } from "fflate";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -116,6 +116,22 @@ describe("SkillMarketplaceService", () => {
     expect(requests).toContain("POST /v1/skills/skill-1/install");
     expect(refreshedAgents).toEqual([agent.id]);
 
+    const claudeSkill = join(agent.workspacePath, ".claude", "skills", "release-notes", "SKILL.md");
+    await writeFile(claudeSkill, "Claude edits");
+    await expect(service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })).rejects.toThrow(
+      "local changes",
+    );
+    await expect(readFile(claudeSkill, "utf8")).resolves.toBe("Claude edits");
+    await writeFile(claudeSkill, skillContents);
+    await service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false });
+    await mkdir(dirname(claudeSkill), { recursive: true });
+    await writeFile(claudeSkill, "New user files");
+    await expect(service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: true })).rejects.toThrow(
+      "occupied",
+    );
+    await expect(readFile(claudeSkill, "utf8")).resolves.toBe("New user files");
+    await rm(dirname(claudeSkill), { recursive: true });
+    await service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: true });
     await writeFile(join(agent.workspacePath, ".agents", "skills", "release-notes", "SKILL.md"), "locally changed");
     requests.length = 0;
     await expect(service.listInstalledForChatTags(agent.id)).resolves.toEqual([
@@ -132,6 +148,6 @@ describe("SkillMarketplaceService", () => {
     await expect(
       service.uninstall({ agentId: agent.id, skillId: "skill-1", removeModified: true }),
     ).resolves.toBeUndefined();
-    expect(refreshedAgents).toEqual([agent.id, agent.id]);
+    expect(refreshedAgents).toEqual([agent.id, agent.id, agent.id, agent.id]);
   });
 });

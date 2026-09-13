@@ -1,3 +1,4 @@
+import { useSettings } from "../settings/settings-context";
 import { useConversationController } from "./conversation-controller-context";
 import { useConversationViewScope } from "./conversation-scope";
 
@@ -16,6 +17,7 @@ import { createEffect, createSignal, Loading, lazy, onSettled, Show } from "soli
 /** @internal Stable HMR boundary for conversation panels. */
 export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButtonElement) => void }) {
   const controller = useConversationController();
+  const { skillsMarketplaceOpen, setSkillsMarketplaceOpen } = useSettings();
   const {
     agentReady,
     activateBrowserTab,
@@ -176,6 +178,8 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
         {(agent) => (
           <Loading>
             <AgentSettingsPanel
+              skillsMarketplaceOpen={skillsMarketplaceOpen()}
+              onAddFromMarketplace={props.server?.kind === "local" ? () => setSkillsMarketplaceOpen(true) : undefined}
               skillsMode={props.server?.kind === "local" ? "mutable" : "readonly"}
               onCreateSkill={
                 props.server?.kind === "local" &&

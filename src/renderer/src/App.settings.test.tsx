@@ -14,6 +14,16 @@ import {
 } from "./app-test-harness";
 
 describe("OpenBot connected desktop shell", () => {
+  it("opens the marketplace from skill settings and returns to skills", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^Skills/ }));
+    await fireEvent.click((await screen.findAllByRole("button", { name: "Add from marketplace" }))[0]);
+    expect(await screen.findByRole("heading", { name: "Marketplace" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Close marketplace" }));
+    expect((await screen.findAllByRole("button", { name: "Add from marketplace" }))[0]).toBeEnabled();
+  });
   beforeEach(() => {
     installOpenbotStub();
   });
