@@ -191,7 +191,8 @@ provider logs are outside the OpenBot application database and its daily mainten
 - `~/Library/Application Support/OpenBot` contains the OpenBot SQLite database, agent metadata,
   conversations, message queues, direct messages, reactions, read state, attachment drafts and
   indexes, team configuration, local team members and sessions, the shared browser profile, cookies,
-  and application preferences.
+  application preferences, and the provider CLIs OpenBot downloads. The downloaded CLIs are kept in
+  one store for the whole computer, which no other profile data shares.
 - The local team configuration contains team member profiles, password hashes and salts when local
   password sign-in is used, invite and session token hashes, and the team identity key pair.
 - `~/.codex` is owned by Codex CLI and contains its login and thread data. OpenBot does not copy or

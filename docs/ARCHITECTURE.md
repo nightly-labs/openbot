@@ -103,6 +103,22 @@ CLI resolution prefers an explicit `OPENBOT_*_PATH`, then the installed managed 
 automatically discovered system CLI. Updates never run the system CLI's updater. An explicit path
 suppresses managed update offers. Startup uses the same selection and reads the executable's version.
 
+Installed runtimes live in one store per computer, `appData/OpenBot/provider-runtimes`, which is the
+path the packaged app always used: its `userData` is `appData/OpenBot`. Development profiles differ
+per renderer port and per `--isolated` worktree, so a store inside `userData` started empty in each
+one, fell back to the user's own CLI, and offered and downloaded the pinned copy again. An explicit
+`--user-data-dir` still keeps its own store, so automation and packaged smoke checks stay
+self-contained. Partial downloads stay in the profile: two instances appending to one `.partial`
+would interleave their bytes.
+
+Several instances can therefore write to one store. Installing a pinned version is idempotent, so a
+commit that finds the destination occupied verifies it and adopts it instead of replacing it, and
+only a destination that fails verification is moved aside. Staging directories carry the pid and a
+random suffix and are swept by age, never by name, so a sibling's install is not collected while it
+runs. `#inspect` stamps each version it verifies, and collection keeps anything stamped within a
+month, so a version another instance or another worktree's pin still runs is not removed; a
+collection that fails, as it does on Windows for an open binary, never stops startup.
+
 ## Agent communication policy
 
 The shared developer instructions keep routine teammate exchanges internal by default. Agents

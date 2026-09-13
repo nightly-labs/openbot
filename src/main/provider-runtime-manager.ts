@@ -1,9 +1,9 @@
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { createWriteStream } from "node:fs";
-import { access, mkdir, readdir, readFile, rename, rm, stat, statfs, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { access, mkdir, readdir, readFile, rename, rm, stat, statfs, utimes, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { finished } from "node:stream/promises";
 import { promisify } from "node:util";
 import {
@@ -24,6 +24,18 @@ const execFileAsync = promisify(execFile);
 const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
 const FREE_SPACE_HEADROOM = 100_000_000;
 const MAX_METADATA_BYTES = 4 * 1024 * 1024;
+/**
+ * How long a leftover staging or replaced directory is left alone.
+ *
+ * The store is shared by every profile on this computer, so a sweep cannot assume the only writer
+ * is this process: a sibling instance may be part-way through a 144 MB install. Age is the test,
+ * not the pid on the name -- pids are reused, `kill(pid, 0)` across users answers `EPERM`, and
+ * Windows does not agree with either. Six hours is far beyond any install and still collects what
+ * a crashed instance left behind.
+ */
+const STALE_STAGING_MS = 6 * 60 * 60 * 1000;
+/** How long an unused version directory is kept, for the same reason: a sibling may still run it. */
+const VERSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type PartialMetadata = { url: string; etag: string | null; expectedBytes: number };
@@ -33,7 +45,17 @@ interface ProviderRuntimeManagerEvents {
 }
 
 export interface ProviderRuntimeManagerOptions {
+  /** The installed runtimes, shared by every profile on this computer. See `providerRuntimeRoot`. */
   root: string;
+  /**
+   * Where partial downloads are written, `<root>/.downloads` by default.
+   *
+   * The caller points this inside the profile so two instances cannot append to one `.partial`:
+   * `createWriteStream` in append mode would interleave their bytes, and the result passes neither
+   * the size nor the checksum test. Resume therefore stays what it always was -- same profile, same
+   * file, across restarts -- while the expensive installed tree is what the computer shares.
+   */
+  downloadRoot?: string;
   platform?: NodeJS.Platform;
   architecture?: string;
   fetchImpl?: Fetch;
@@ -42,8 +64,28 @@ export interface ProviderRuntimeManagerOptions {
   updateRuntime?: (provider: ManagedProviderId, install: () => Promise<string>) => Promise<void>;
 }
 
+/**
+ * Where the downloaded provider CLIs live: one store for the whole computer, not one per profile.
+ *
+ * `appData/OpenBot` is exactly what Electron gives the packaged app as `userData` on macOS, Windows
+ * and Linux, so this is the path released builds already use and nothing has to be migrated. What
+ * it changes is development, where every renderer port and every `--isolated` worktree gets a
+ * profile of its own: each one used to start with an empty store, resolve the user's own CLI
+ * instead, and offer -- and download -- the pinned copy again.
+ *
+ * An explicit `--user-data-dir` is the exception. That switch is asked for so a profile is
+ * self-contained: automation and packaged smoke checks delete one directory to get a clean machine,
+ * and two isolated runs must not reach into each other.
+ */
+export function providerRuntimeRoot(input: { appData: string; userDataOverride: string }): string {
+  const override = input.userDataOverride.trim();
+  if (override) return join(resolve(override), "provider-runtimes");
+  return join(input.appData, "OpenBot", "provider-runtimes");
+}
+
 export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerEvents> {
   readonly #root: string;
+  readonly #downloads: string;
   readonly #target: RuntimeTarget | null;
   readonly #fetch: Fetch;
   readonly #lock: AgentRuntimeLock;
@@ -61,6 +103,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   constructor(options: ProviderRuntimeManagerOptions) {
     super();
     this.#root = options.root;
+    this.#downloads = options.downloadRoot ?? join(options.root, ".downloads");
     this.#updateRuntime =
       options.updateRuntime ??
       (async (_provider, install) => {
@@ -90,7 +133,9 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     await Promise.all(PROVIDERS.map((provider) => this.#inspect(provider)));
     const target = this.#target;
     if (target) {
-      await Promise.all(
+      // Settled, not all: collecting an old version is housekeeping, and a version another instance
+      // still runs refuses to be removed on Windows. Neither may stop the app from starting.
+      await Promise.allSettled(
         PROVIDERS.map((provider) => this.#removeOldVersions(runtimeSpec(provider, target, this.#lock))),
       );
     }
@@ -152,6 +197,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     if (configuredCliPath(provider))
       throw new Error("Remove the explicit CLI path override before updating in OpenBot.");
     if (this.#statuses[provider].phase === "ready" || this.#tasks.has(provider)) return this.getStatus();
+    // A sibling instance may have installed this version while the offer sat on screen. Reading the
+    // shared store again turns that into a status refresh rather than a second download of the same
+    // bytes.
+    const installed = await this.#inspect(provider);
+    if (installed.phase === "ready") {
+      this.#setStatus(provider, installed);
+      return this.getStatus();
+    }
 
     const spec = runtimeSpec(provider, this.#target, this.#lock);
     const controller = new AbortController();
@@ -203,15 +256,21 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     await Promise.allSettled(this.#tasks.values());
   }
 
-  async #inspect(provider: ManagedProviderId): Promise<void> {
-    if (!this.#target) return;
+  async #inspect(provider: ManagedProviderId): Promise<ProviderRuntimeStatus> {
+    if (!this.#target) return this.#statuses[provider];
     const spec = runtimeSpec(provider, this.#target, this.#lock);
+    const installRoot = this.#installRoot(spec);
     try {
-      await verifyInstalledRuntime(this.#installRoot(spec), spec, this.#lock);
+      await verifyInstalledRuntime(installRoot, spec, this.#lock);
+      // The one record a sibling instance can read: this version is in use, so its collector must
+      // leave it alone. Best effort -- a store on a read-only volume still works, it only ages.
+      const now = new Date();
+      await utimes(installRoot, now, now).catch(() => undefined);
       this.#statuses[provider] = readyStatus(spec.version);
     } catch {
       this.#statuses[provider] = { ...emptyStatus(), version: await this.#previousVersion(spec) };
     }
+    return this.#statuses[provider];
   }
 
   // Keep the last installed version available while the pinned replacement is downloaded.
@@ -304,8 +363,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   async #install(spec: RuntimeSpec, downloadedPath: string): Promise<void> {
-    const staging = join(this.#providerRoot(spec.provider), `.installing-${spec.target}-${spec.version}`);
-    await rm(staging, { recursive: true, force: true });
+    // Named for this attempt, so two instances installing the same version cannot share a directory
+    // and the sweep can tell a live stage from an abandoned one by its age alone.
+    const staging = join(
+      this.#providerRoot(spec.provider),
+      `.installing-${spec.target}-${spec.version}-${process.pid}-${randomBytes(4).toString("hex")}`,
+    );
     await mkdir(staging, { recursive: true });
     let committed = false;
     try {
@@ -319,16 +382,54 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       await verifyInstalledRuntime(staging, spec, this.#lock);
       const destination = this.#installRoot(spec);
       await mkdir(dirname(destination), { recursive: true });
-      await rm(destination, { recursive: true, force: true });
-      await rename(staging, destination);
-      committed = true;
+      committed = await this.#commit(staging, destination, spec);
       await verifyInstalledRuntime(destination, spec, this.#lock);
     } catch (error) {
+      // Only what this instance put there. A directory it adopted belongs to the sibling that
+      // installed it, and that sibling is entitled to keep running from it.
       if (committed) await rm(this.#installRoot(spec), { recursive: true, force: true });
       throw error;
     } finally {
       await rm(staging, { recursive: true, force: true });
     }
+  }
+
+  /**
+   * Moves a verified stage into place, and returns whether this instance is the one that put it
+   * there.
+   *
+   * On a store the whole computer shares, the destination can appear between the check and the
+   * move. Deleting it first -- what this used to do -- would take away the directory a sibling had
+   * just committed and may already be running, and on Windows would fail outright while that binary
+   * is open. So the rename comes first and an occupied destination is examined: a version pinned by
+   * the lock has one set of bytes, checked twice over by then, so a destination that verifies is
+   * the same install and is adopted rather than replaced. Only one that does not verify is moved
+   * aside, and aside rather than deleted, because a sibling reading the atomic path must never find
+   * it half removed.
+   */
+  async #commit(staging: string, destination: string, spec: RuntimeSpec): Promise<boolean> {
+    if (await renameIfVacant(staging, destination)) return true;
+    if (
+      await verifyInstalledRuntime(destination, spec, this.#lock).then(
+        () => true,
+        () => false,
+      )
+    ) {
+      return false;
+    }
+    // Beside the staging directories, not beside the version ones: that is where the sweep looks,
+    // and `#removeOldVersions` reads everything in the target root as a version.
+    const aside = join(
+      this.#providerRoot(spec.provider),
+      `.replaced-${spec.target}-${spec.version}-${randomBytes(4).toString("hex")}`,
+    );
+    await rename(destination, aside);
+    try {
+      await rename(staging, destination);
+    } finally {
+      await rm(aside, { recursive: true, force: true }).catch(() => undefined);
+    }
+    return true;
   }
 
   async #downloadSmallFile(url: string, expectedSha256: string): Promise<Uint8Array> {
@@ -353,6 +454,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   async #requireDiskSpace(spec: RuntimeSpec): Promise<void> {
+    // Measured on the store, which is where the installed copy lands. The partial can be told to
+    // live elsewhere; in practice both are under the user's home, on one volume.
     const available = await this.#availableDiskBytes();
     const existing = await fileSize(this.#partialPath(spec));
     const required = Math.max(0, spec.downloadBytes - existing) + spec.installedBytes + FREE_SPACE_HEADROOM;
@@ -390,7 +493,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   #downloadRoot(): string {
-    return join(this.#root, ".downloads");
+    return this.#downloads;
   }
 
   #partialPath(spec: RuntimeSpec): string {
@@ -408,18 +511,44 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     ]);
   }
 
+  /**
+   * Collects the working directories a crashed install left behind, and only those.
+   *
+   * Age is the whole test. A sibling instance may be part-way through staging the same version
+   * right now, and removing its directory would fail its install for no reason.
+   */
   async #removeAbandonedStaging(): Promise<void> {
+    const stale = Date.now() - STALE_STAGING_MS;
     for (const provider of PROVIDERS) {
       const root = this.#providerRoot(provider);
       const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
       await Promise.all(
         entries
-          .filter((entry) => entry.isDirectory() && entry.name.startsWith(".installing-"))
-          .map((entry) => rm(join(root, entry.name), { recursive: true, force: true })),
+          .filter(
+            (entry) =>
+              entry.isDirectory() && (entry.name.startsWith(".installing-") || entry.name.startsWith(".replaced-")),
+          )
+          .map(async (entry) => {
+            const path = join(root, entry.name);
+            const modified = await stat(path)
+              .then((value) => value.mtimeMs)
+              .catch(() => Number.POSITIVE_INFINITY);
+            if (modified > stale) return;
+            await rm(path, { recursive: true, force: true }).catch(() => undefined);
+          }),
       );
     }
   }
 
+  /**
+   * Collects versions no one has any use for.
+   *
+   * Rank alone decided this when the store belonged to one profile. It is now the computer's, and
+   * another instance -- the released app beside a development build, or a worktree whose lock pins
+   * a different version -- may be running from a directory this build ranks last. `#inspect` stamps
+   * whatever it verifies on every start, so a version in use anywhere stays recent, and only a tree
+   * nothing has opened for a month is collected.
+   */
   async #removeOldVersions(spec: RuntimeSpec): Promise<void> {
     const targetRoot = join(this.#providerRoot(spec.provider), spec.target);
     const entries = await readdir(targetRoot, { withFileTypes: true }).catch(() => []);
@@ -435,10 +564,20 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         .reverse()
         .slice(0, 1),
     ]);
+    const stale = Date.now() - VERSION_RETENTION_MS;
     await Promise.all(
       versions
         .filter((version) => !keep.has(version))
-        .map((version) => rm(join(targetRoot, version), { recursive: true, force: true })),
+        .map(async (version) => {
+          const path = join(targetRoot, version);
+          const modified = await stat(path)
+            .then((value) => value.mtimeMs)
+            .catch(() => Number.POSITIVE_INFINITY);
+          if (modified > stale) return;
+          // Caught, not thrown: a running binary refuses to be removed on Windows, and housekeeping
+          // must never be what stops the app from starting.
+          await rm(path, { recursive: true, force: true }).catch(() => undefined);
+        }),
     );
   }
 }
@@ -468,6 +607,28 @@ async function verifyInstalledRuntime(root: string, spec: RuntimeSpec, lock: Age
   if (descriptor.parseVersion(stdout) !== spec.version) {
     throw new Error("Provider runtime returned an unexpected version.");
   }
+}
+
+/**
+ * Moves `from` onto `to`, or reports that something already occupies `to`.
+ *
+ * POSIX answers an occupied directory with `ENOTEMPTY` or `EEXIST`; Windows answers with `EEXIST`,
+ * `EPERM` or `EACCES`, the last two also when a file inside it is open. Every one of them means the
+ * same thing here -- the caller has to look at what is there -- and anything else is a real fault.
+ */
+async function renameIfVacant(from: string, to: string): Promise<boolean> {
+  try {
+    await rename(from, to);
+    return true;
+  } catch (error) {
+    if (isOccupiedError(error)) return false;
+    throw error;
+  }
+}
+
+function isOccupiedError(error: unknown): boolean {
+  if (!(error instanceof Error) || !("code" in error) || !isString(error.code)) return false;
+  return ["ENOTEMPTY", "EEXIST", "EPERM", "EACCES"].includes(error.code);
 }
 
 async function streamResponse(

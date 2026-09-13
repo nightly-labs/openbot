@@ -72,7 +72,7 @@ import {
 } from "./main-window";
 import { ManagedSkillService } from "./managed-skill-service";
 import { ProviderCredentialStore } from "./provider-credential-store";
-import { ProviderRuntimeManager } from "./provider-runtime-manager";
+import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
@@ -352,8 +352,22 @@ export async function createApplicationServices({
   });
   await language.load();
   const updatePreference = await readUpdatePreference(updatePreferenceFile);
+  /*
+   * The installed CLIs are the computer's, the partial downloads are this profile's.
+   *
+   * Development gives every renderer port and every `--isolated` worktree a `userData` of its own,
+   * so a store kept there started empty each time: OpenBot fell back to the user's own CLI, offered
+   * the pinned version against it, and downloaded 144 MB again for a profile that would be replaced
+   * by the next port. The packaged app's `userData` is `appData/OpenBot` already, so the shared
+   * store is the path it always used. The switch is read here rather than imported from the entry
+   * point, which this file may not reach into; both readers read the same immutable value.
+   */
   const providerRuntimes = new ProviderRuntimeManager({
-    root: join(app.getPath("userData"), "provider-runtimes"),
+    root: providerRuntimeRoot({
+      appData: app.getPath("appData"),
+      userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
+    }),
+    downloadRoot: join(app.getPath("userData"), "provider-runtimes", ".downloads"),
     updateRuntime: async (provider, install) => {
       await service.updateProviderCli(provider, install);
     },

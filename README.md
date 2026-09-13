@@ -182,7 +182,7 @@ Seed the approved OpenBot team catalog locally with `bun run marketplace:seed:lo
 
 | Command | Purpose |
 | --- | --- |
-| `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`, and `--isolated` gives the worktree a profile of its own keyed to its path instead of the shared `OpenBot Dev` one. |
+| `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`, and `--isolated` gives the worktree a profile of its own keyed to its path instead of the shared `OpenBot Dev` one. An isolated profile still shares the computer's provider CLI store, so it does not download the pinned CLIs again. |
 | `bun run preview` | Preview the built Electron client with the green preview icon. |
 | `bun run mobile:go` | Start the mobile app in Expo Go and clear the Metro cache. |
 | `bun mobile:ios` | Build and launch the iOS simulator app without RocketSim. |
@@ -261,7 +261,8 @@ and on the next connection attempt. Remote revocation completes when the account
 
 For manual team testing, `bun run dev:test-client` starts a complete two-client harness. The second
 client uses the isolated `OpenBot Dev Test Client` profile and renderer port 5174. `dev:reset` also
-removes that profile and the legacy `OpenBot Dev Host` profile. Press `Ctrl+C` in the runner terminal
+removes that profile and the legacy `OpenBot Dev Host` profile. It does not remove the downloaded
+provider CLIs, which the whole computer shares. Press `Ctrl+C` in the runner terminal
 to stop only the processes started by that runner, or run `bun run dev:stop` from the worktree once
 that terminal is gone. Never stop a dev stack with `pkill -f electron` or `pkill -f bun`: on a
 machine running several worktrees those kill the other checkouts' work mid-write, which is what
@@ -329,6 +330,10 @@ video formats, export as MP3 or MOV, or attach a text transcript. Remote hosts m
   conversations, provider session bindings, queues, reactions, and attachment indexes.
 - Electron `userData/legacy-backup-v1` — unchanged copies of imported `bots.json` and
   `mailbox.json` files, when these files existed before the SQLite migration.
+- `~/Library/Application Support/OpenBot/provider-runtimes` — the provider CLIs OpenBot downloads
+  and pins. One store for the whole computer, outside any one profile, so every development profile
+  and the packaged app read the same download. `--user-data-dir` keeps the store in that directory
+  instead, so an explicitly named profile stays self-contained.
 - `~/.codex` — login and thread history managed exclusively by Codex CLI.
 - `~/.claude` — login and session history managed exclusively by Claude CLI.
 - `~/.grok` — login and session history managed exclusively by Grok CLI.

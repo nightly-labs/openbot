@@ -68,6 +68,9 @@ async function main(): Promise<void> {
 
   logger.info("Seed-owned transfer files were removed. Other shared files were not changed.");
   logger.info("Agent workspaces, ~/.codex, and ~/.claude were not changed.");
+  // The downloaded provider CLIs are the computer's now, not this profile's, so a reset no longer
+  // takes them. Say so: it used to cost a fresh download of every one of them.
+  logger.info("Downloaded provider CLIs were not changed.");
 }
 
 function isMissing(error: unknown): error is NodeJS.ErrnoException {

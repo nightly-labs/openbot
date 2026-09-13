@@ -2,14 +2,26 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { access, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  access,
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { MANAGED_RUNTIME_PROVIDERS, type ProviderRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import lockValue from "../../native-runtime.lock.json";
 import { parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
-import { ProviderRuntimeManager } from "./provider-runtime-manager";
+import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
 
 const roots: string[] = [];
 
@@ -440,6 +452,149 @@ describe("ProviderRuntimeManager", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("keeps one store for every profile on this computer", () => {
+    // An exact path, because it is what every profile has to agree on to share one download. In
+    // development each renderer port and each worktree gets a `userData` of its own; the packaged
+    // app's is `appData/OpenBot`, so this is the path released builds already use.
+    const appData = join("/home", "someone", ".config");
+    expect(providerRuntimeRoot({ appData, userDataOverride: "" })).toBe(join(appData, "OpenBot", "provider-runtimes"));
+    expect(providerRuntimeRoot({ appData, userDataOverride: "   " })).toBe(
+      join(appData, "OpenBot", "provider-runtimes"),
+    );
+  });
+
+  it("keeps the store inside a user data directory the caller named", () => {
+    const override = join("/tmp", "openbot-automation");
+    expect(providerRuntimeRoot({ appData: "/home/someone/.config", userDataOverride: `${override} ` })).toBe(
+      join(override, "provider-runtimes"),
+    );
+  });
+
+  it("keeps a staging directory another instance is still writing", async () => {
+    const root = await temporaryRoot();
+    const live = join(root, "grok", ".installing-darwin-arm64-1.0.22-999-abcd1234");
+    const abandoned = join(root, "grok", ".installing-darwin-arm64-1.0.22-998-deadbeef");
+    const replaced = join(root, "grok", ".replaced-darwin-arm64-1.0.22-c0ffee11");
+    await Promise.all([live, abandoned, replaced].map((path) => mkdir(path, { recursive: true })));
+    await aged(abandoned);
+    await aged(replaced);
+    const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
+
+    await manager.initialize();
+
+    expect((await readdir(join(root, "grok"))).sort()).toEqual([basename(live)]);
+  });
+
+  it("keeps a version directory another instance still uses", async () => {
+    const root = await temporaryRoot();
+    const kept = join(root, "grok", "darwin-arm64", "1.0.19");
+    const collected = join(root, "grok", "darwin-arm64", "1.0.20");
+    await Promise.all([kept, collected].map((path) => mkdir(path, { recursive: true })));
+    // 1.0.21 is the newest older version, so it is kept by rank and says nothing about age.
+    await mkdir(join(root, "grok", "darwin-arm64", "1.0.21"), { recursive: true });
+    await aged(collected, VERSION_AGE_MS);
+    const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
+
+    await manager.initialize();
+
+    expect((await readdir(join(root, "grok", "darwin-arm64"))).sort()).toEqual(["1.0.19", "1.0.21"]);
+  });
+
+  it.skipIf(process.platform === "win32")("starts when an old version cannot be collected", async () => {
+    // The portable stand-in for Windows, where the binary a sibling instance runs refuses to be
+    // removed. Housekeeping must never be what stops the app from starting.
+    const root = await temporaryRoot();
+    const targetRoot = join(root, "grok", "darwin-arm64");
+    const collected = join(targetRoot, "1.0.20");
+    await mkdir(collected, { recursive: true });
+    await mkdir(join(targetRoot, "1.0.21"), { recursive: true });
+    await aged(collected, VERSION_AGE_MS);
+    await chmod(targetRoot, 0o500);
+    const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
+
+    try {
+      const snapshot = await manager.initialize();
+      expect(snapshot.providers.grok).toMatchObject({ phase: "not-downloaded", availableVersion: null });
+      await expect(access(collected)).resolves.toBeUndefined();
+    } finally {
+      await chmod(targetRoot, 0o700);
+    }
+  });
+
+  it("adopts the runtime a sibling instance installed first", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    let release: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const sibling = siblingManager(root, fixture, join(root, "downloads-b"));
+    const heldManager = siblingManager(root, fixture, join(root, "downloads-a"), held);
+    await Promise.all([sibling.initialize(), heldManager.initialize()]);
+
+    const waiting = heldManager.downloadAndWait("grok");
+    await waitFor(heldManager, (snapshot) => snapshot.providers.grok.phase === "downloading");
+    await sibling.downloadAndWait("grok");
+    const installed = sibling.executablePath("grok");
+    if (!installed) throw new Error("The managed Grok path is missing.");
+    const committed = (await stat(installed)).ino;
+    release?.();
+    await waiting;
+
+    for (const manager of [sibling, heldManager]) {
+      expect(manager.getStatus().providers.grok).toMatchObject({ phase: "ready", version: "1.0.22" });
+    }
+    // The same file, not an identical one. A sibling already running this binary holds it open, and
+    // on Windows would refuse to let it be replaced, so the second install has to adopt what is
+    // there rather than take it away and put its own copy back.
+    expect((await stat(installed)).ino).toBe(committed);
+    expect(await readFile(installed, "utf8")).toBe(new TextDecoder().decode(fixture.executable));
+    expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
+  });
+
+  it("replaces an installed version that no longer verifies", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    const destination = join(root, "grok", "darwin-arm64", "1.0.22", "bin", "grok");
+    await mkdir(dirname(destination), { recursive: true });
+    await writeFile(destination, "#!/bin/sh\necho 1.0.22\n");
+    const manager = siblingManager(root, fixture, join(root, ".downloads"));
+    expect((await manager.initialize()).providers.grok.phase).toBe("not-downloaded");
+
+    await manager.downloadAndWait("grok");
+
+    expect(await readFile(destination, "utf8")).toBe(new TextDecoder().decode(fixture.executable));
+    expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
+  });
+
+  it("keeps partial transfers out of the store the computer shares", async () => {
+    const root = await temporaryRoot();
+    const downloadRoot = join(await temporaryRoot(), "profile-downloads");
+    const lock = parseAgentRuntimeLock(structuredClone(lockValue));
+    lock.grok.artifacts["darwin-arm64"].downloadBytes = 64_000;
+    const manager = new ProviderRuntimeManager({
+      root,
+      downloadRoot,
+      platform: "darwin",
+      architecture: "arm64",
+      lock,
+      fetchImpl: async () => slowResponse(new Uint8Array(64_000)),
+    });
+    await manager.initialize();
+    const partial = join(downloadRoot, `grok-darwin-arm64-${lock.grok.version}.partial`);
+    const transferring = waitFor(manager, (snapshot) => (snapshot.providers.grok.progress ?? 0) > 0);
+
+    await manager.download("grok");
+    await transferring;
+
+    await expect(access(partial)).resolves.toBeUndefined();
+    expect(await readdir(root)).not.toContain(".downloads");
+
+    await manager.cancel("grok");
+    await expect(access(partial)).rejects.toThrow();
+    await manager.stop();
+  });
+
   it("rejects an archive that contains a link", async () => {
     const root = await temporaryRoot();
     const source = join(root, "unsafe-source");
@@ -666,9 +821,9 @@ function slowResponse(value: Uint8Array): Response {
 }
 
 function grokFixture(): {
-  executable: Uint8Array;
-  license: Uint8Array;
-  notices: Uint8Array;
+  executable: Uint8Array<ArrayBuffer>;
+  license: Uint8Array<ArrayBuffer>;
+  notices: Uint8Array<ArrayBuffer>;
   lock: ReturnType<typeof parseAgentRuntimeLock>;
 } {
   const executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.22\n${"# runtime\n".repeat(1_000)}`);
@@ -681,6 +836,38 @@ function grokFixture(): {
   lock.grok.licenseSha256 = digest(license);
   lock.grok.noticesSha256 = digest(notices);
   return { executable, license, notices, lock };
+}
+
+/** Six hours is the staging threshold and thirty days the version one; both are cleared here. */
+const STAGING_AGE_MS = 7 * 60 * 60 * 1000;
+const VERSION_AGE_MS = 31 * 24 * 60 * 60 * 1000;
+
+async function aged(path: string, age = STAGING_AGE_MS): Promise<void> {
+  const when = new Date(Date.now() - age);
+  await utimes(path, when, when);
+}
+
+/** A manager on a store it shares with another, with a profile download directory of its own. */
+function siblingManager(
+  root: string,
+  fixture: ReturnType<typeof grokFixture>,
+  downloadRoot: string,
+  held?: Promise<void>,
+): ProviderRuntimeManager {
+  return new ProviderRuntimeManager({
+    root,
+    downloadRoot,
+    platform: "darwin",
+    architecture: "arm64",
+    lock: fixture.lock,
+    fetchImpl: async (input) => {
+      const url = String(input);
+      if (url.endsWith("/LICENSE")) return new Response(fixture.license);
+      if (url.endsWith("/THIRD-PARTY-NOTICES")) return new Response(fixture.notices);
+      await held;
+      return chunkedResponse(fixture.executable, 1_024);
+    },
+  });
 }
 
 function waitFor(
