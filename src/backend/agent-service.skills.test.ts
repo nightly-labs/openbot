@@ -91,13 +91,13 @@ describe.sequential("local skill provider tools", () => {
         id: "local-skill-11111111-1111-4111-8111-111111111111",
         slug: "weekly-summary",
         name: "Weekly summary",
-        description: "Summarize the week",
+        description: "Summarize the week. password=synthetic-description-secret",
         category: "productivity" as const,
         creatorName: "Local",
         version: 1,
         installs: 0,
         featured: false,
-        iconUrl: null,
+        iconUrl: "data:image/png;base64,c3ludGhldGljLWljb24=",
         updatedAt: new Date().toISOString(),
         versionId: "revision-1",
         bundleSha256: "hash",
@@ -116,6 +116,9 @@ describe.sequential("local skill provider tools", () => {
         );
         const serialized = JSON.stringify(response.result);
         expect(serialized).not.toContain("synthetic-skill-secret");
+        expect(serialized).not.toContain("synthetic-description-secret");
+        expect(serialized).not.toContain("data:image");
+        if (tool === "list_local_skills") expect(serialized).not.toContain("instructions");
         expect(serialized).not.toContain("synthetic-example-secret");
         expect(serialized).toContain("[redacted]");
         expect(serialized).toContain(skill.id);
@@ -131,12 +134,15 @@ describe.sequential("local skill provider tools", () => {
         availableVersion: 2,
         state: "installed",
       });
-      await callOpenBotTool(client, threadId, "create_skill", { sourcePath: "draft" });
-      await callOpenBotTool(client, threadId, "revise_skill", {
+      const created = await callOpenBotTool(client, threadId, "create_skill", { sourcePath: "draft" });
+      expect(JSON.stringify(created.result)).not.toContain("data:image");
+      const revised = await callOpenBotTool(client, threadId, "revise_skill", {
         skillId: skill.id,
         expectedRevision: 1,
         sourcePath: "draft",
       });
+      expect(JSON.stringify(revised.result)).not.toContain("data:image");
+      expect(skill.iconUrl).toContain("data:image");
       await callOpenBotTool(client, threadId, "install_local_skill", { skillId: skill.id, revision: 2 });
       expect(events()).toEqual([
         { action: "created", skillId: skill.id, revision: 1, skillName: skill.name },

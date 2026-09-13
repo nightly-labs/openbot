@@ -56,6 +56,26 @@ export const LOCAL_SKILL_TOOL_DEFINITIONS = [
   },
 ];
 
+function skillToolSummary(skill: MarketplaceSkillDetail) {
+  return {
+    id: skill.id,
+    slug: skill.slug,
+    name: skill.name,
+    description: skill.description,
+    version: skill.version,
+    updatedAt: skill.updatedAt,
+  };
+}
+
+function skillToolDetail(skill: MarketplaceSkillDetail) {
+  return {
+    ...skillToolSummary(skill),
+    files: skill.files,
+    instructions: skill.instructions,
+    ...(skill.examplePrompt ? { examplePrompt: skill.examplePrompt } : {}),
+  };
+}
+
 export async function runLocalSkillTool(
   api: LocalSkillTools,
   agentId: string,
@@ -67,15 +87,15 @@ export async function runLocalSkillTool(
     case "create_skill": {
       const skill = await api.create({ agentId, ...createSkillSchema.parse(args) });
       onChanged?.({ action: "created", skillId: skill.id, revision: skill.version, skillName: skill.name });
-      return skill;
+      return skillToolDetail(skill);
     }
     case "revise_skill": {
       const skill = await api.revise({ agentId, ...reviseSkillSchema.parse(args) });
       onChanged?.({ action: "revised", skillId: skill.id, revision: skill.version, skillName: skill.name });
-      return skill;
+      return skillToolDetail(skill);
     }
     case "read_local_skill":
-      return api.get(readSkillSchema.parse(args));
+      return skillToolDetail(await api.get(readSkillSchema.parse(args)));
     case "install_local_skill": {
       const skill = await api.install({ agentId, ...installLocalSkillSchema.parse(args) });
       onChanged?.({
@@ -87,7 +107,7 @@ export async function runLocalSkillTool(
       return skill;
     }
     case "list_local_skills":
-      return api.list();
+      return (await api.list()).map(skillToolSummary);
     default:
       throw new Error("Unknown local skill tool.");
   }
