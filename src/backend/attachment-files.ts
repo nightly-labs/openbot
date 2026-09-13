@@ -503,7 +503,10 @@ function attachmentMetadata(
     ? "image"
     : mimeType === "application/pdf"
       ? "pdf"
-      : mimeType.startsWith("text/") || mimeType === "application/json"
+      : // An email is RFC 822 text, so the lightbox shows it with the text branch. `text` is a
+        // released wire value, and only a server that advertises the eml capability sends an
+        // email at all, so no shipped adapter sees a changed meaning.
+        mimeType.startsWith("text/") || mimeType === "application/json" || mimeType === "message/rfc822"
         ? "text"
         : "none";
   return { kind: previewKind === "image" ? "image" : "file", mimeType, previewKind };
