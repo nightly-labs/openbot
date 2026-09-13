@@ -126,7 +126,9 @@ that made it is gone, never because a live one is part-way through making it. Wh
 claim reads the destination again, so a copy a sibling committed in the meantime is adopted and
 never moved. A claim as old as an abandoned stage is recovered by moving it away and reading who it
 names: the rename is atomic, so what it moved is that instance's alone to read, and only the claim
-whose age was read is the abandoned one. A claim made in between belongs to an instance that recovered the
+whose name was read is the abandoned one. The name is read before the age, so the two cannot come
+from different directories: a claim on the path is only ever replaced by a newer one, so an age that
+reads old belongs to the directory the name came from, or to one it already replaced. A claim made in between belongs to an instance that recovered the
 path first, and the instance that moved it takes nothing. The holder reads the claim again
 immediately before it moves anything and releases it only while it is still the one that attempt
 made, so an instance that lost its claim stops at the destination rather than after it. The sweep

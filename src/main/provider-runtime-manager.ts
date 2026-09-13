@@ -763,16 +763,24 @@ async function takeLock(lock: string): Promise<string | null> {
 /**
  * The claim a lock old enough to be abandoned names, or `null` when no claim there is abandoned.
  *
+ * The name is read before the age, and that order is the whole guarantee. A claim on the path can
+ * only be replaced by a newer one, so an age read after the name can be old only if the directory
+ * the name came from is the one the age describes, or one it already replaced. Reading the age
+ * first would let the two come from different directories: the age of the abandoned claim, and the
+ * name of the claim an instance made while recovering it, which is how two instances end up holding
+ * the same path. Reading an older name than the path now has costs one attempt and nothing else.
+ *
  * The empty string is a claim directory that names no one: nothing this manager makes, so either an
  * instance was killed between the two steps of an older build's acquisition, or the claim file was
  * lost. It is recovered like any other abandoned claim.
  */
 async function abandonedClaim(lock: string): Promise<string | null> {
+  const named = await readClaim(lock);
   const held = await stat(lock)
     .then((value) => value.mtimeMs)
     .catch(() => null);
   if (held === null || held > Date.now() - STALE_STAGING_MS) return null;
-  return await readClaim(lock);
+  return named;
 }
 
 /** Who a claim names, and the empty string when it names no one. */
