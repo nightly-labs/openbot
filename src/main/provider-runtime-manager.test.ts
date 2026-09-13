@@ -89,7 +89,7 @@ describe("ProviderRuntimeManager", () => {
     const installed = manager.executablePath("grok");
     if (!installed) throw new Error("The managed Grok path is missing.");
     expect(await readFile(installed, "utf8")).toBe(new TextDecoder().decode(executable));
-    expect((await readdir(join(root, "grok"))).some((entry) => entry.startsWith(".installing-"))).toBe(false);
+    expect((await readdir(join(root, "grok"))).some((entry) => entry.startsWith(".staging-"))).toBe(false);
   });
 
   it.each(["9.0.0", "invalid-version", "1.0.21"])(
@@ -476,17 +476,41 @@ describe("ProviderRuntimeManager", () => {
 
   it("keeps a staging directory another instance is still writing", async () => {
     const root = await temporaryRoot();
-    const live = join(root, "grok", ".installing-darwin-arm64-1.0.22-999-abcd1234");
-    const abandoned = join(root, "grok", ".installing-darwin-arm64-1.0.22-998-deadbeef");
+    const live = join(root, "grok", ".staging-darwin-arm64-1.0.22-999-abcd1234");
+    const abandoned = join(root, "grok", ".staging-darwin-arm64-1.0.22-998-deadbeef");
     const replaced = join(root, "grok", ".replaced-darwin-arm64-1.0.22-c0ffee11");
-    await Promise.all([live, abandoned, replaced].map((path) => mkdir(path, { recursive: true })));
-    await aged(abandoned);
-    await aged(replaced);
+    // What a released build, whose manager stages under the older name, left in the shared store.
+    const released = join(root, "grok", ".installing-darwin-arm64-1.0.22");
+    await Promise.all([live, abandoned, replaced, released].map((path) => mkdir(path, { recursive: true })));
+    await Promise.all([abandoned, replaced, released].map((path) => aged(path)));
     const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
 
     await manager.initialize();
 
     expect((await readdir(join(root, "grok"))).sort()).toEqual([basename(live)]);
+  });
+
+  it("stages an install where a released build's cleanup does not look", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    let staged: Promise<string[]> = Promise.resolve([]);
+    const manager = siblingManager(root, fixture, {
+      downloadRoot: join(root, ".downloads"),
+      // The licence is read while the stage is on disk, which is the only moment its name is
+      // visible from outside the manager.
+      onFetch: (url) => {
+        if (url.endsWith("/LICENSE")) staged = readdir(join(root, "grok"));
+      },
+    });
+    await manager.initialize();
+
+    await manager.downloadAndWait("grok");
+
+    // Released builds share this store, and the manager they carry deletes every `.installing-`
+    // directory when it starts, whatever its age and whoever is filling it.
+    expect((await staged).filter((entry) => entry.startsWith("."))).toEqual([
+      expect.stringMatching(/^\.staging-darwin-arm64-1\.0\.22-/),
+    ]);
   });
 
   it("keeps a version directory another instance still uses", async () => {
@@ -654,7 +678,7 @@ describe("ProviderRuntimeManager", () => {
     const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
     await manager.initialize();
     // The claim a sibling instance holds while it puts its own copy in place of the damaged one.
-    await mkdir(join(root, "grok", ".locking-darwin-arm64-1.0.22"), { recursive: true });
+    await heldClaim(join(root, "grok", ".locking-darwin-arm64-1.0.22"), "4242-c0ffee11");
 
     await expect(manager.downloadAndWait("grok")).rejects.toThrow(/another instance/);
 
@@ -673,8 +697,28 @@ describe("ProviderRuntimeManager", () => {
     // An instance killed while it held the claim. Age is the only evidence there is that no one is
     // coming back for it, so the store must not stay unwritable because of it.
     const lock = join(root, "grok", ".locking-darwin-arm64-1.0.22");
-    await mkdir(lock, { recursive: true });
+    await heldClaim(lock, "4242-c0ffee11");
     await aged(lock);
+
+    await manager.downloadAndWait("grok");
+
+    expect(await readFile(destination, "utf8")).toBe(new TextDecoder().decode(fixture.executable));
+    expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
+  });
+
+  // Windows refuses to move a directory onto another, even an empty one, so there the unfinished
+  // claim is cleared by age like any other.
+  it.skipIf(process.platform === "win32")("replaces a damaged runtime when a claim was never finished", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    const destination = join(root, "grok", "darwin-arm64", "1.0.22", "bin", "grok");
+    await mkdir(dirname(destination), { recursive: true });
+    await writeFile(destination, "#!/bin/sh\necho 1.0.22\n");
+    const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
+    await manager.initialize();
+    // A claim directory with no claim in it names no owner, so it can only be what an instance
+    // killed part-way through making one left. The store must not stay unwritable because of it.
+    await mkdir(join(root, "grok", ".locking-darwin-arm64-1.0.22"), { recursive: true });
 
     await manager.downloadAndWait("grok");
 
@@ -738,7 +782,7 @@ describe("ProviderRuntimeManager", () => {
 
     expect(snapshot.providers.codex.message).toContain("link or special file");
     const providerEntries = await readdir(join(root, "runtimes", "codex")).catch(() => []);
-    expect(providerEntries.some((entry) => entry.startsWith(".installing-"))).toBe(false);
+    expect(providerEntries.some((entry) => entry.startsWith(".staging-"))).toBe(false);
   });
 
   it("installs each provider under its own name and version", async () => {
@@ -816,7 +860,7 @@ describe("ProviderRuntimeManager", () => {
 
     const entries = await readdir(join(root, "opencode")).catch(() => []);
     expect(entries).not.toContain("darwin-arm64");
-    expect(entries.some((entry) => entry.startsWith(".installing-"))).toBe(false);
+    expect(entries.some((entry) => entry.startsWith(".staging-"))).toBe(false);
   });
 
   it.each([
@@ -956,6 +1000,12 @@ function grokFixture(): {
 /** Six hours is the staging threshold and thirty days the version one; both are cleared here. */
 const STAGING_AGE_MS = 7 * 60 * 60 * 1000;
 const VERSION_AGE_MS = 31 * 24 * 60 * 60 * 1000;
+
+/** The claim an instance leaves on a path while it replaces the runtime there. */
+async function heldClaim(lock: string, claim: string): Promise<void> {
+  await mkdir(lock, { recursive: true });
+  await writeFile(join(lock, "claim"), `${claim}\n`);
+}
 
 async function aged(path: string, age = STAGING_AGE_MS): Promise<void> {
   const when = new Date(Date.now() - age);

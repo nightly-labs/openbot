@@ -48,12 +48,18 @@ const COMMIT_ATTEMPTS = 3;
 /**
  * What the sweep collects by age beside the version directories.
  *
+ * `.installing-` is on the list for what it leaves, not for what this build writes. Released builds
+ * carry the manager this one replaces, whose own sweep deletes every `.installing-` directory it
+ * finds, whatever its age and whoever is filling it. They share this store, and their sweep cannot
+ * be changed, so a stage this build makes is named out of its reach; the prefix stays here only to
+ * collect what those builds abandon.
+ *
  * A claim is not on the list. Removing one is how an instance takes a destination over, and the
  * sweep holds no claim itself, so it would be one more unsynchronised writer of the very path the
  * claim exists to serialise. `takeLock` clears an abandoned claim, and what it leaves behind while
  * it does carries the `.replaced-` prefix.
  */
-const STAGING_PREFIXES = [".installing-", ".replaced-"];
+const STAGING_PREFIXES = [".staging-", ".installing-", ".replaced-"];
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type PartialMetadata = { url: string; etag: string | null; expectedBytes: number };
@@ -423,10 +429,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
 
   async #install(spec: RuntimeSpec, downloadedPath: string): Promise<void> {
     // Named for this attempt, so two instances installing the same version cannot share a directory
-    // and the sweep can tell a live stage from an abandoned one by its age alone.
+    // and the sweep can tell a live stage from an abandoned one by its age alone. The prefix is not
+    // the one released builds sweep without looking at the age: see `STAGING_PREFIXES`.
     const staging = join(
       this.#providerRoot(spec.provider),
-      `.installing-${spec.target}-${spec.version}-${process.pid}-${randomBytes(4).toString("hex")}`,
+      `.staging-${spec.target}-${spec.version}-${process.pid}-${randomBytes(4).toString("hex")}`,
     );
     await mkdir(staging, { recursive: true });
     let committed = false;
@@ -725,12 +732,17 @@ async function renameIfVacant(from: string, to: string): Promise<boolean> {
  * Claims the right to replace one destination, and answers with the claim, or `null` when another
  * instance holds it.
  *
- * `mkdir` without `recursive` is the claim: the filesystem answers `EEXIST` to everyone but the
- * first, on every platform and across users, with no daemon and nothing to clean up but a
- * directory. A claim older than a staging directory is one a killed instance left behind, and age
- * is the only evidence available -- the same reason the sweep uses it. Clearing that one is itself
- * a race two instances could both win by reading the same old timestamp, so it is cleared by moving
- * it away: whichever rename finds it still there is the only one that goes on to claim the path.
+ * A claim is a directory built away from the path and moved onto it: the filesystem refuses a move
+ * onto a directory that has anything in it, on every platform and across users, and the claim it
+ * carries is inside it before the move, so the path never exists without naming its owner. That is
+ * what makes the age below evidence of anything -- a claim reads old only when the instance that
+ * made it is gone, never because a live one is part-way through making it.
+ *
+ * A claim older than a staging directory is one a killed instance left behind, and age is the only
+ * evidence available, the same reason the sweep uses it. Clearing it is itself a race two instances
+ * could both win by reading the same old timestamp, so it is cleared by moving it away: whichever
+ * rename finds it still there is the only one that goes on, and an instance whose claim is taken
+ * this way is shut out by `holdsClaim` before it touches the destination.
  */
 async function takeLock(lock: string): Promise<string | null> {
   const claim = `${process.pid}-${randomBytes(4).toString("hex")}`;
@@ -738,16 +750,6 @@ async function takeLock(lock: string): Promise<string | null> {
   if (!(await abandonedClaim(lock))) return null;
   const abandoned = join(dirname(lock), `.replaced-claim-${randomBytes(4).toString("hex")}`);
   if (!(await renameIfPresent(lock, abandoned))) return null;
-  // Read again, now that the directory is somewhere no one else is looking. A claim that is fresh
-  // by this point is not the abandoned one at all: another instance recovered it first and made its
-  // own, between the age above and this move. Put it back and leave the path to the instance that
-  // holds it.
-  if (!(await abandonedClaim(abandoned))) {
-    if (!(await renameIfVacant(abandoned, lock))) {
-      await rm(abandoned, { recursive: true, force: true }).catch(() => undefined);
-    }
-    return null;
-  }
   await rm(abandoned, { recursive: true, force: true }).catch(() => undefined);
   return (await holdLock(lock, claim)) ? claim : null;
 }
@@ -766,17 +768,15 @@ async function holdsClaim(lock: string, claim: string): Promise<boolean> {
   return held?.trim() === claim;
 }
 
+/** Puts a claim on the path in one move, or reports that another instance is already there. */
 async function holdLock(lock: string, claim: string): Promise<boolean> {
-  try {
-    await mkdir(lock);
-  } catch (error) {
-    if (isOccupiedError(error)) return false;
-    throw error;
-  }
-  // Written inside the claim, so the release can tell this attempt's claim from the one an instance
-  // that recovered it made -- and so the directory's own age is the moment the claim was taken.
-  await writeFile(join(lock, "claim"), `${claim}\n`, { mode: 0o600 });
-  return true;
+  // Under the swept prefix, so an instance killed between these two steps leaves nothing permanent.
+  const staging = join(dirname(lock), `.replaced-claim-${randomBytes(4).toString("hex")}`);
+  await mkdir(staging, { recursive: true });
+  await writeFile(join(staging, "claim"), `${claim}\n`, { mode: 0o600 });
+  if (await renameIfVacant(staging, lock)) return true;
+  await rm(staging, { recursive: true, force: true }).catch(() => undefined);
+  return false;
 }
 
 /** Removes the claim only while it is still this attempt's. */

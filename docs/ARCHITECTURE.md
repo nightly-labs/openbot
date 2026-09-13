@@ -111,22 +111,29 @@ one, fell back to the user's own CLI, and offered and downloaded the pinned copy
 self-contained. Partial downloads stay in the profile: two instances appending to one `.partial`
 would interleave their bytes.
 
-Several instances can therefore write to one store. Installing a pinned version is idempotent, so a
-commit that finds the destination occupied verifies it and adopts it instead of replacing it, and
-only a destination that fails verification is moved aside. That replacement is claimed first, with
-a lock directory beside the staging ones that `mkdir` grants to one instance at a time: whoever
-holds it reads the destination again, so a copy a sibling committed in the meantime is adopted and
-never moved. A claim as old as an abandoned stage is one a killed instance
-left; it is taken over by moving it away and reading its age once more where nothing else can reach
-it, so an instance that recovered it first, in the moment between, gets its claim put back rather
-than taken. The holder reads the claim again before it moves anything, and releases it only while
-it is still the one that attempt made, so an instance that lost the claim stops before the
-destination rather than after it. The
-sweep leaves claims alone: it holds none itself, and would otherwise be one more unsynchronised
-writer of the path the claim exists to serialise. An update that finds the version already in the store skips
-the transfer, not the activation: the agent service has to be given the executable either way.
-Staging directories carry the pid and a random suffix and are swept by age, never by name, so a
-sibling's install is not collected while it runs. The manager stamps each version it takes into use
+Several instances can therefore write to one store, and they do not all carry this manager: a
+released build sweeps every `.installing-` directory it finds when it starts, whatever its age and
+whoever is filling it, so this build stages under `.staging-` and keeps the older prefix only to
+collect what those builds abandon.
+
+Installing a pinned version is idempotent, so a commit that finds the destination occupied verifies
+it and adopts it instead of replacing it, and only a destination that fails verification is moved
+aside. That replacement is claimed first, with a lock directory beside the staging ones. The claim
+is built away from the path, with the name of its owner already inside it, and moved onto the path
+in one step, which the filesystem grants to one instance at a time; the path therefore never exists
+without naming an owner. That is what makes age evidence: a claim reads old only when the instance
+that made it is gone, never because a live one is part-way through making it. Whoever holds the
+claim reads the destination again, so a copy a sibling committed in the meantime is adopted and
+never moved. A claim as old as an abandoned stage is taken over by moving it away, and the instance
+whose claim was moved is shut out before it touches the destination, because the holder reads the
+claim again immediately before it moves anything and releases it only while it is still the one
+that attempt made. The sweep leaves claims alone: it holds none itself, and would otherwise be one
+more unsynchronised writer of the path the claim exists to serialise.
+
+An update that finds the version already in the store skips the transfer, not the activation: the
+agent service has to be given the executable either way. Staging directories carry the pid and a
+random suffix and are swept by age, never by name, so a sibling's install is not collected while it
+runs. The manager stamps each version it takes into use
 -- the pinned one it verified, and the older one it falls back to until the pinned one arrives --
 and collection keeps anything stamped within a month, so a version another instance or another
 worktree's pin still runs is not removed; a collection that fails, as it does on Windows for an open
