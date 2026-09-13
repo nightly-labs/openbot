@@ -11,6 +11,13 @@ describe("buildContentSecurityPolicy", () => {
     expect(policy).not.toContain("localhost");
   });
 
+  it("lets the renderer play an attachment recording, but only from the attachment schemes", () => {
+    const policy = buildContentSecurityPolicy(true);
+
+    expect(policy).toContain("media-src 'self' blob: openbot-attachment: openbot-remote-attachment:");
+    expect(policy).not.toContain("media-src 'self' blob: openbot-attachment: openbot-remote-attachment: https:");
+  });
+
   it("keeps local development sources", () => {
     const policy = buildContentSecurityPolicy(false, "ws://192.168.1.143:3101/v1/signal");
 
