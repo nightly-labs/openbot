@@ -605,6 +605,40 @@ describe("ProviderRuntimeManager", () => {
     expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
   });
 
+  it("keeps a sibling's runtime when the copy it adopted cannot be activated", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    let release: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const sibling = siblingManager(root, fixture, { downloadRoot: join(root, "downloads-b") });
+    const heldManager = siblingManager(root, fixture, {
+      downloadRoot: join(root, "downloads-a"),
+      held,
+      updateRuntime: async (_provider, install) => {
+        await install();
+        throw new Error("Grok rejected the credentials.");
+      },
+    });
+    await Promise.all([sibling.initialize(), heldManager.initialize()]);
+
+    const waiting = expect(heldManager.downloadAndWait("grok")).rejects.toThrow("Grok rejected the credentials.");
+    await waitFor(heldManager, (snapshot) => snapshot.providers.grok.phase === "downloading");
+    await sibling.downloadAndWait("grok");
+    const installed = sibling.executablePath("grok");
+    if (!installed) throw new Error("The managed Grok path is missing.");
+    release?.();
+
+    await waiting;
+
+    // The rejected-artifact rule takes away what this instance wrote. It wrote nothing here: the
+    // sibling committed the version first, so the store holds the sibling's install, and the
+    // sibling is running its CLI from it.
+    expect(await readFile(installed, "utf8")).toBe(new TextDecoder().decode(fixture.executable));
+    expect(sibling.getStatus().providers.grok).toMatchObject({ phase: "ready", version: "1.0.22" });
+  });
+
   it("puts the runtime a sibling instance left in the store into use", async () => {
     const root = await temporaryRoot();
     const fixture = grokFixture();

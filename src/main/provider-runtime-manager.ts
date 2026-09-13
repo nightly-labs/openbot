@@ -350,15 +350,16 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * A `null` signal means the bytes are in the store already, because a sibling instance put them
    * there: there is nothing to transfer, only the swap. An install this instance made and could not
    * activate is removed, so the rejected artifact is not selected on the next start; one a sibling
-   * made is left where it is, because the sibling is using it.
+   * made is left where it is, because the sibling is using it. A transfer is not what decides that:
+   * a sibling can commit the same version while this instance is still downloading it, and what is
+   * then in the store is the sibling's install, adopted rather than written.
    */
   async #activate(spec: RuntimeSpec, signal: AbortSignal | null): Promise<void> {
     let installed = false;
     try {
       await this.#updateRuntime(spec.provider, async () => {
         if (signal) {
-          await this.#runDownload(spec, signal);
-          installed = true;
+          installed = await this.#runDownload(spec, signal);
           await this.#removePartial(spec);
         }
         return join(this.#installRoot(spec), "bin", spec.executableName);
@@ -371,7 +372,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     }
   }
 
-  async #runDownload(spec: RuntimeSpec, signal: AbortSignal): Promise<void> {
+  /** Answers whether this instance is the one that put the install in the store. */
+  async #runDownload(spec: RuntimeSpec, signal: AbortSignal): Promise<boolean> {
     await mkdir(this.#downloadRoot(), { recursive: true });
     await this.#requireDiskSpace(spec);
     const partialPath = this.#partialPath(spec);
@@ -424,10 +426,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       throw new Error("The runtime download failed its integrity check.");
     }
 
-    await this.#install(spec, partialPath);
+    return await this.#install(spec, partialPath);
   }
 
-  async #install(spec: RuntimeSpec, downloadedPath: string): Promise<void> {
+  /** Answers whether this instance committed the install, or adopted the one it found. */
+  async #install(spec: RuntimeSpec, downloadedPath: string): Promise<boolean> {
     // Named for this attempt, so two instances installing the same version cannot share a directory
     // and the sweep can tell a live stage from an abandoned one by its age alone. The prefix is not
     // the one released builds sweep without looking at the age: see `STAGING_PREFIXES`.
@@ -450,6 +453,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       await mkdir(dirname(destination), { recursive: true });
       committed = await this.#commit(staging, destination, spec);
       await verifyInstalledRuntime(destination, spec, this.#lock);
+      return committed;
     } catch (error) {
       // Only what this instance put there. A directory it adopted belongs to the sibling that
       // installed it, and that sibling is entitled to keep running from it.
