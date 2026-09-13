@@ -456,9 +456,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
     }
 
     /*
-     * The editor writes every plain character itself. Letting the browser write some of them and
-     * this handler write the rest raced: a native insert that landed a task late, or one reported
-     * with a composition input type, was read as "no native input" and the character went in twice.
+     * Every plain character takes the same road: this handler cancels the key and asks the browser
+     * to insert the text. Letting the default action write some characters and this handler write
+     * the rest raced, and a native insert that landed a task late, or one reported with a
+     * composition input type, was read as "no native input" and the character went in twice.
      * A composing key still goes to the browser, which owns the composition buffer.
      */
     const printableKey =
@@ -896,11 +897,28 @@ function serializeNode(node: Node): string {
   return node.tagName === "DIV" || node.tagName === "P" ? `${content}\n` : content;
 }
 
+/*
+ * Writes through the browser's own editing command, so the change joins the undo stack: Ctrl+Z
+ * still takes typing back, and still restores text a keystroke replaced. A range edit writes
+ * nothing there. The command needs the caret inside this editor, and jsdom has no such command,
+ * so it reports what it did and `insertPlainText` keeps a range edit for both cases.
+ */
+function insertTextThroughBrowser(editor: HTMLDivElement, text: string): boolean {
+  // The command answers a newline with a block split, which serializes as two line breaks.
+  if (text.includes("\n") || typeof document.execCommand !== "function") return false;
+  const selection = window.getSelection();
+  const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+  if (!range || !editor.contains(range.commonAncestorContainer)) return false;
+  return document.execCommand("insertText", false, text);
+}
+
 function insertPlainText(editor: HTMLDivElement, text: string): void {
+  if (insertTextThroughBrowser(editor, text)) return;
   /*
    * The browser leaves a placeholder `<br>` behind when it empties the editable, and drops it only
-   * when it writes text itself. This editor writes the text, so it drops the placeholder: left in
-   * place beside the new text, it would serialize as a line break the user never typed.
+   * when it writes text itself. The range edit below writes the text instead, so it drops the
+   * placeholder: left in place beside the new text, it would serialize as a line break the user
+   * never typed.
    */
   if (!editor.textContent) editor.querySelector(":scope > br:last-child")?.remove();
   const selection = window.getSelection();
