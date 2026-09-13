@@ -52,6 +52,7 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
     handleRoutineSettingsRequest,
     sidebarFilePreview,
     settingsOpen,
+    skillSettingsRequest,
     routineSettingsRequest,
     settingsModel,
     settingsProvider,
@@ -233,6 +234,7 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
               onUpdateAgent={props.onUpdateAgent}
               onUpdateRuntimeSettings={updateRuntimeSettings}
               onSetAgentAvatar={props.onSetAgentAvatar}
+              skillSelectionRequest={skillSettingsRequest()?.agentId === agent().id ? skillSettingsRequest() : null}
               routineSelectionRequest={
                 routineSettingsRequest()?.agentId === agent().id ? routineSettingsRequest() : null
               }

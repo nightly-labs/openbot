@@ -65,7 +65,12 @@ import type {
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_RUNTIME_TEXT_LIMIT, defaultProviderModel, isMessageReaction } from "@openbot/contracts/ipc";
+import {
+  AGENT_RUNTIME_TEXT_LIMIT,
+  defaultProviderModel,
+  isMessageReaction,
+  skillConversationEventItemType,
+} from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
@@ -1737,10 +1742,36 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!senderAgentId) throw new Error("The sending OpenBot agent is unknown.");
 
     if (LOCAL_SKILL_TOOL_DEFINITIONS.some((tool) => tool.name === params.tool)) {
-      if (!this.localSkillTools) throw new Error("Local skill tools are unavailable.");
-      return openBotToolResult(
-        await runLocalSkillTool(this.localSkillTools(), senderAgentId, params.tool, params.arguments),
-      );
+      try {
+        if (!this.localSkillTools) throw new Error("Local skill tools are unavailable.");
+        return openBotToolResult(
+          await runLocalSkillTool(this.localSkillTools(), senderAgentId, params.tool, params.arguments, (event) => {
+            this.#conversation.withConversationTransaction(senderAgentId, ({ snapshot }) => {
+              snapshot.messages.push({
+                id: randomUUID(),
+                turnId: params.turnId,
+                author: "system",
+                source: "system",
+                status: "completed",
+                createdAt: new Date().toISOString(),
+                itemType: skillConversationEventItemType(event),
+                text: redactText(event.skillName),
+              });
+              return {
+                result: undefined,
+                snapshot: this.#store.database.persistConversation(snapshot, `skill.${event.action}`, event),
+              };
+            });
+          }),
+        );
+      } catch (error) {
+        return {
+          success: false,
+          contentItems: [
+            { type: "inputText", text: redactText(error instanceof Error ? error.message : String(error)) },
+          ],
+        };
+      }
     }
 
     const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);

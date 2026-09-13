@@ -307,3 +307,11 @@
     filter: blur(var(--sliding-tabs-content-blur));
   }
 }
+
+.agent-local-library:not(.agent-skill-detail) {
+  gap: var(--openbot-space-0-5);
+  padding: 0;
+}
+.agent-local-skill-row:has(.agent-skill-update) {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}

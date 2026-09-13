@@ -5,6 +5,7 @@ import { installedSkillsRequestKey } from "../installed-skills-source";
 
 export interface SkillsStoreDeps {
   props: ConversationProps;
+  settingsOpen: () => boolean;
 }
 
 export function createSkillsStore(deps: SkillsStoreDeps) {
@@ -31,8 +32,12 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
     },
   );
   createEffect(
-    () => `${installedSkillsSource()}\0${installedSkillsRetry()}`,
-    (source) => {
+    () => ({
+      source: `${installedSkillsSource()}\0${installedSkillsRetry()}`,
+      activeTurnId: deps.props.activeTurnId,
+      settingsOpen: deps.settingsOpen(),
+    }),
+    ({ source }) => {
       const request = ++installedSkillsRequest;
       const [serverId, agentId, support, visibility] = source.split("\0");
       if (!agentId) {

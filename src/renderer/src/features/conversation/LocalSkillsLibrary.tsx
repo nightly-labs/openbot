@@ -1,9 +1,12 @@
 import type { InstalledSkill, MarketplaceSkillDetail } from "@openbot/contracts/ipc";
 import { createEffect, createSignal, createStore, For, onSettled, Show } from "solid-js";
 import { SkillPreview } from "../../components/SkillPreview";
-import { Button, Puzzle, Switch } from "../../components/ui";
+import { Button, Switch } from "../../components/ui";
+
+import { SkillGlyph } from "./SkillGlyph";
 
 export function LocalSkillsLibrary(props: {
+  initialSkillId?: string;
   agentId: string;
   disabled?: boolean;
   installed: InstalledSkill[];
@@ -29,13 +32,19 @@ export function LocalSkillsLibrary(props: {
     error: "",
   });
   createEffect(
-    () => [props.agentId, reload()] as const,
+    () => [props.agentId, reload(), props.initialSkillId] as const,
     () => {
       let disposed = false;
       setState((current) => ({ ...current, loading: true, error: "", selected: null }));
       void window.openbot.skills.localList().then(
         (skills) => {
-          if (!disposed) setState((current) => ({ ...current, skills, loading: false }));
+          if (!disposed)
+            setState((current) => ({
+              ...current,
+              skills,
+              loading: false,
+              selected: skills.find((skill) => skill.id === props.initialSkillId) ?? null,
+            }));
         },
         () => {
           if (!disposed) setState((current) => ({ ...current, error: "Could not load local skills.", loading: false }));
@@ -140,27 +149,36 @@ export function LocalSkillsLibrary(props: {
           </Button>
         </Show>
       </Show>
-      <Show when={!state.loading} fallback={<p role="status">Loading local skills…</p>}>
+      <Show
+        when={!state.loading}
+        fallback={
+          <p role="status" class="agent-memory-state">
+            Loading local skills…
+          </p>
+        }
+      >
         <Show
           when={state.selected}
           fallback={
             <>
               <Show when={state.skills.length === 0 && !state.error}>
-                <p>No local skills yet.</p>
+                <p class="agent-memory-state">No local skills yet.</p>
               </Show>
               <For each={state.skills}>
                 {(skill) => (
-                  <div class="agent-local-skill-row">
+                  <div
+                    class={[
+                      "agent-skill-row agent-local-skill-row",
+                      !props.installed.some((item) => item.skillId === skill.id && item.enabled !== false) &&
+                        "agent-skill-row-disabled",
+                    ]}
+                  >
                     <Button
                       variant="ghost"
                       class="agent-skill-open"
                       onClick={() => setState((current) => ({ ...current, selected: skill, error: "" }))}
                     >
-                      <span class="agent-skill-icon" aria-hidden="true">
-                        <Show when={skill.iconUrl} fallback={<Puzzle />}>
-                          {(url) => <img src={url()} alt="" />}
-                        </Show>
-                      </span>
+                      <SkillGlyph iconUrl={skill.iconUrl} />
                       <span class="agent-skill-copy">
                         <span class="agent-skill-title">
                           <strong>{skill.name}</strong>
@@ -168,6 +186,26 @@ export function LocalSkillsLibrary(props: {
                         <small>{skill.description}</small>
                       </span>
                     </Button>
+                    <Show
+                      when={props.installed.some(
+                        (item) =>
+                          item.skillId === skill.id &&
+                          item.installedVersion < skill.version &&
+                          item.state !== "modified" &&
+                          item.state !== "needs-repair",
+                      )}
+                    >
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        class="agent-skill-update"
+                        aria-label={`Update ${skill.name}`}
+                        disabled={state.busy || props.disabled}
+                        onClick={() => void install(skill)}
+                      >
+                        Update
+                      </Button>
+                    </Show>
                     <Switch
                       aria-label={`Enable ${skill.name}`}
                       checked={props.installed.some((item) => item.skillId === skill.id && item.enabled !== false)}

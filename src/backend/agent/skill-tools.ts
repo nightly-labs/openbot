@@ -5,6 +5,7 @@ import type {
   LocalSkillRevisionInput,
   MarketplaceSkillDetail,
   ReviseLocalSkillInput,
+  SkillConversationEvent,
 } from "@openbot/contracts/ipc";
 import { z } from "zod";
 
@@ -55,16 +56,36 @@ export const LOCAL_SKILL_TOOL_DEFINITIONS = [
   },
 ];
 
-export async function runLocalSkillTool(api: LocalSkillTools, agentId: string, tool: string, args: unknown) {
+export async function runLocalSkillTool(
+  api: LocalSkillTools,
+  agentId: string,
+  tool: string,
+  args: unknown,
+  onChanged?: (event: SkillConversationEvent) => void,
+) {
   switch (tool) {
-    case "create_skill":
-      return api.create({ agentId, ...createSkillSchema.parse(args) });
-    case "revise_skill":
-      return api.revise({ agentId, ...reviseSkillSchema.parse(args) });
+    case "create_skill": {
+      const skill = await api.create({ agentId, ...createSkillSchema.parse(args) });
+      onChanged?.({ action: "created", skillId: skill.id, revision: skill.version, skillName: skill.name });
+      return skill;
+    }
+    case "revise_skill": {
+      const skill = await api.revise({ agentId, ...reviseSkillSchema.parse(args) });
+      onChanged?.({ action: "revised", skillId: skill.id, revision: skill.version, skillName: skill.name });
+      return skill;
+    }
     case "read_local_skill":
       return api.get(readSkillSchema.parse(args));
-    case "install_local_skill":
-      return api.install({ agentId, ...installLocalSkillSchema.parse(args) });
+    case "install_local_skill": {
+      const skill = await api.install({ agentId, ...installLocalSkillSchema.parse(args) });
+      onChanged?.({
+        action: "installed",
+        skillId: skill.skillId,
+        revision: skill.installedVersion,
+        skillName: skill.name,
+      });
+      return skill;
+    }
     case "list_local_skills":
       return api.list();
     default:

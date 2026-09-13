@@ -77,6 +77,7 @@ interface AgentSettingsPanelProps {
     updates: AgentRuntimeSettingsPatch,
   ) => Promise<boolean>;
   onSetAgentAvatar: (agentId: string, image: AvatarImageInput | null) => Promise<void>;
+  skillSelectionRequest?: { skillId: string } | null;
   routineSelectionRequest?: RoutineSelectionRequest | null;
   onRoutineSelectionRequestHandled?: (nonce: number) => void;
   onOpenRoutineRun?: (messageId: string) => void;
@@ -299,6 +300,16 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.routines.open = true;
         });
       }
+    },
+  );
+
+  createEffect(
+    () => props.skillSelectionRequest,
+    (request) => {
+      if (request)
+        setDraft((state) => {
+          state.skills.open = true;
+        });
     },
   );
 
@@ -865,6 +876,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       />
       <Show when={skillsMode() !== "hidden"}>
         <AgentSkillsModal
+          selectionRequest={props.skillSelectionRequest}
           agentId={props.agent.id}
           agentName={props.agent.name}
           open={draft.skills.open}

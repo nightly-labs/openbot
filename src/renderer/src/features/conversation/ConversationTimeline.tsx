@@ -76,6 +76,7 @@ export function ConversationTimeline() {
     openMoreMessageId,
     openReactionMessageId,
     openRoutineSettings,
+    openSkillSettings,
     openSharedFile,
     openWorkspaceFile,
     previewAttachment,
@@ -266,6 +267,7 @@ export function ConversationTimeline() {
                         <Show when={message()?.actionMarker ?? initialActionMarker}>
                           {(marker) => (
                             <ChatActionMarker
+                              onOpenSkill={props.server?.id === "local" ? openSkillSettings : undefined}
                               marker={marker()}
                               agents={props.agents}
                               announce={animateEntrance}
@@ -340,6 +342,7 @@ export function ConversationTimeline() {
                           <Show when={message()?.routine && message()?.actionMarker}>
                             {(marker) => (
                               <ChatActionMarker
+                                onOpenSkill={props.server?.id === "local" ? openSkillSettings : undefined}
                                 marker={marker()}
                                 agents={props.agents}
                                 announce={animateEntrance}

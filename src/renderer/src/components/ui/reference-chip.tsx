@@ -15,7 +15,7 @@ export function ReferenceChip(props: {
   kind: "agent" | "skill";
   class?: string;
   style?: JSX.CSSProperties;
-  onClick?: () => void;
+  onClick?: (event: MouseEvent) => void;
 }) {
   const content = () => (
     <>
@@ -47,7 +47,7 @@ export function ReferenceChip(props: {
         style={props.style}
         title={props.name}
         aria-label={`Open ${props.kind} ${props.name}`}
-        onClick={() => props.onClick?.()}
+        onClick={(event) => props.onClick?.(event)}
       >
         {content()}
       </Button>

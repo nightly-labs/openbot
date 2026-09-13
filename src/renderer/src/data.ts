@@ -14,6 +14,7 @@ import type {
   QueueDeliveryStatus,
   RoutineConversationEvent,
   RoutineRunConversationEvent,
+  SkillConversationEvent,
 } from "@openbot/contracts/ipc";
 
 /**
@@ -36,6 +37,7 @@ export type ChatActionMarkerStatus =
 export type AgentDeliveryMarkerStatus = Exclude<ChatActionMarkerStatus, "needs-attention">;
 
 export type ChatActionMarkerModel =
+  | (SkillConversationEvent & { kind: "skill-lifecycle"; timestamp: string })
   | {
       kind: "agent-message";
       direction: "incoming" | "outgoing";

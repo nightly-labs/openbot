@@ -15,6 +15,7 @@ import {
   MarkerContent,
   MarkerIcon,
   MessageCircle,
+  Puzzle,
   TriangleAlert,
   X,
 } from "../../components/ui";
@@ -26,6 +27,7 @@ interface ChatActionMarkerProps {
   marker: ChatActionMarkerModel;
   agents: AgentProfile[];
   announce?: boolean;
+  onOpenSkill?: (skill: { skillId: string }) => void;
   routineAvailable?: boolean;
   onSelectAgent: (agentId: string) => void;
   onOpenRoutine?: (routine: { routineId: string; name: string }) => void;
@@ -82,6 +84,17 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
         </Show>
         <Show when={props.marker.kind === "hosted-site" && props.marker}>
           {(marker) => <HostedSiteTarget marker={marker()} onOpenHostedSite={props.onOpenHostedSite} />}
+        </Show>
+        <Show when={props.marker.kind === "skill-lifecycle" && props.marker}>
+          {(marker) => (
+            <ActionTarget
+              available={Boolean(props.onOpenSkill)}
+              actionLabel={`Open skill ${marker().skillName}`}
+              name={marker().skillName}
+              icon={Puzzle}
+              onOpen={props.onOpenSkill ? () => props.onOpenSkill?.({ skillId: marker().skillId }) : undefined}
+            />
+          )}
         </Show>
         <time class="chat-action-marker-time" datetime={props.marker.timestamp}>
           {formatMarkerTime(props.marker.timestamp)}
@@ -241,13 +254,37 @@ function RoutineTarget(props: {
   available: boolean;
   onOpenRoutine?: (routine: { routineId: string; name: string }) => void;
 }) {
-  const interactive = () => props.available && Boolean(props.onOpenRoutine);
+  return (
+    <ActionTarget
+      name={props.routineName}
+      icon={props.icon ?? CalendarClock}
+      status={props.status}
+      available={props.available}
+      actionLabel={`Open routine ${props.routineName}`}
+      onOpen={
+        props.onOpenRoutine
+          ? () => props.onOpenRoutine?.({ routineId: props.routineId, name: props.routineName })
+          : undefined
+      }
+    />
+  );
+}
+
+function ActionTarget(props: {
+  name: string;
+  icon: ReturnType<typeof statusIcon>;
+  status?: ChatActionMarkerStatus;
+  available: boolean;
+  actionLabel: string;
+  onOpen?: () => void;
+}) {
+  const interactive = () => props.available && Boolean(props.onOpen);
   const content = (
     <>
       <MarkerIcon>
-        <Dynamic component={props.icon ?? CalendarClock} aria-hidden="true" />
+        <Dynamic component={props.icon} aria-hidden="true" />
       </MarkerIcon>
-      <span class="chat-action-target-name">{props.routineName}</span>
+      <span class="chat-action-target-name">{props.name}</span>
     </>
   );
   return (
@@ -266,8 +303,8 @@ function RoutineTarget(props: {
         variant="ghost"
         type="button"
         class={`chat-action-target${props.status ? ` chat-action-target-status-${props.status}` : ""}`}
-        aria-label={`Open routine ${props.routineName}`}
-        onClick={() => props.onOpenRoutine?.({ routineId: props.routineId, name: props.routineName })}
+        aria-label={props.actionLabel}
+        onClick={() => props.onOpen?.()}
       >
         {content}
       </Button>
@@ -277,6 +314,8 @@ function RoutineTarget(props: {
 
 function markerLabel(marker: ChatActionMarkerModel): string {
   if (marker.kind === "unavailable") return marker.label;
+  if (marker.kind === "skill-lifecycle")
+    return { created: "Created skill", revised: "Revised skill", installed: "Installed skill" }[marker.action];
   if (marker.kind === "agent-message") return marker.direction === "outgoing" ? "Messaged" : "Message from";
   if (marker.kind === "routine-lifecycle") {
     return marker.action === "created"
@@ -332,6 +371,7 @@ function agentTargetsStyle(agents: Array<AgentProfile | undefined>): string | un
 function markerAccessibleLabel(marker: ChatActionMarkerModel, agents: AgentProfile[]): string {
   const label = markerLabel(marker);
   if (marker.kind === "unavailable") return label;
+  if (marker.kind === "skill-lifecycle") return `${label}, ${marker.skillName}`;
   if (marker.kind === "agent-message") {
     const agentLabel =
       marker.direction === "incoming"

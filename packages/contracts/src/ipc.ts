@@ -33,3 +33,5 @@ export * from "./ipc-skills";
 export * from "./ipc-team-host";
 export * from "./ipc-voice";
 export * from "./mobile-connect";
+
+export * from "./skill-conversation-events";

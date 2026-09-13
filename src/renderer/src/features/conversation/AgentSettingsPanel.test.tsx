@@ -13,6 +13,37 @@ afterEach(() => {
 });
 
 describe("AgentSettingsPanel", () => {
+  it("opens a requested skill in the existing management modal", async () => {
+    mock = createMockOpenBot();
+    window.openbot = mock.api;
+    render(() => (
+      <AgentSkillsModal
+        open
+        agentId="chief"
+        agentName="Chief"
+        selectionRequest={{ skillId: "skill-release-notes" }}
+        onOpenChange={vi.fn()}
+        onCountChange={vi.fn()}
+      />
+    ));
+    const toggle = await screen.findByRole("switch", { name: "Enable Release notes" });
+    expect(await screen.findByRole("region", { name: "Release notes preview" })).toBeInTheDocument();
+    await fireEvent.click(toggle);
+    await waitFor(() => expect(toggle).not.toBeChecked());
+  });
+  it("keeps keyboard focus on the skill switch after saving", async () => {
+    mock = createMockOpenBot();
+    window.openbot = mock.api;
+    render(() => (
+      <AgentSkillsModal open agentId="chief" agentName="Chief" onOpenChange={vi.fn()} onCountChange={vi.fn()} />
+    ));
+    const toggle = await screen.findByRole("switch", { name: "Enable Release notes" });
+    toggle.focus();
+    await fireEvent.click(toggle);
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Enable Release notes" })).not.toBeChecked());
+    expect(screen.getByRole("switch", { name: "Enable Release notes" })).toHaveFocus();
+  });
+
   it("enables a library skill for this agent and shares its state across filters", async () => {
     mock = createMockOpenBot();
     window.openbot = mock.api;
@@ -118,6 +149,7 @@ describe("AgentSettingsPanel", () => {
     render(() => (
       <AgentSkillsModal open agentId="chief" agentName="Chief" onOpenChange={vi.fn()} onCountChange={vi.fn()} />
     ));
+    await fireEvent.click(await screen.findByRole("tab", { name: "Local" }));
     await fireEvent.click(await screen.findByRole("button", { name: "Update Weekly summary" }));
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Update Weekly summary" })).not.toBeInTheDocument(),

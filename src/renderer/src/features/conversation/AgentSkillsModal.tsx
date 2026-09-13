@@ -11,7 +11,6 @@ import {
   DropdownMenu,
   Ellipsis,
   IconButton,
-  Puzzle,
   SlidingTabs,
   Store,
   Switch,
@@ -20,11 +19,13 @@ import {
 } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 import { LocalSkillsLibrary } from "./LocalSkillsLibrary";
+import { SkillGlyph } from "./SkillGlyph";
 import { SkillLibraryToolbar } from "./SkillLibraryToolbar";
 
 export type AgentSkillsMode = "mutable" | "readonly" | "hidden";
 
 interface AgentSkillsModalProps {
+  selectionRequest?: { skillId: string } | null;
   agentId: string;
   agentName: string;
   open: boolean;
@@ -91,6 +92,12 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
       if (request !== listRequest || agentId !== props.agentId || !props.open) return;
       setSkills(next);
       props.onCountChange(next.length);
+      const targetId = props.selectionRequest?.skillId;
+      if (showLoading && targetId) {
+        const target = next.find((skill) => skill.skillId === targetId);
+        if (target) await openDetail(target);
+        else setFilter("local");
+      }
     } catch (caught) {
       if (request === listRequest) setError(errorMessage(caught, "Could not load skills."));
     } finally {
@@ -99,7 +106,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
   }
 
   createEffect(
-    () => [props.open, props.agentId, skillsMode()] as const,
+    () => [props.open, props.agentId, skillsMode(), props.selectionRequest] as const,
     ([open]) => {
       closeDetail();
       if (!open) {
@@ -374,6 +381,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                         when={!libraryOpen()}
                         fallback={
                           <LocalSkillsLibrary
+                            initialSkillId={props.selectionRequest?.skillId}
                             agentId={props.agentId}
                             installed={skills()}
                             disabled={loading() || savingId() !== null}
@@ -439,11 +447,11 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                     data-page-id="1"
                                     onScroll={scrollFades.measure}
                                   >
-                                    <For each={visibleSkills()}>
+                                    <For each={visibleSkills()} keyed={(skill) => skill.skillId}>
                                       {(skill) => (
                                         <div
                                           class={
-                                            isEnabled(skill)
+                                            isEnabled(skill())
                                               ? "agent-skill-row"
                                               : "agent-skill-row agent-skill-row-disabled"
                                           }
@@ -452,52 +460,54 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                             type="button"
                                             variant="ghost"
                                             class="agent-skill-open"
-                                            onClick={() => void openDetail(skill)}
+                                            onClick={() => void openDetail(skill())}
                                           >
-                                            <SkillGlyph iconUrl={catalog()[skill.skillId]?.iconUrl ?? null} />
+                                            <SkillGlyph iconUrl={catalog()[skill().skillId]?.iconUrl ?? null} />
                                             <div class="agent-skill-copy">
                                               <div class="agent-skill-title">
-                                                <strong>{skill.name}</strong>
+                                                <strong>{skill().name}</strong>
                                               </div>
-                                              <small>{catalog()[skill.skillId]?.description ?? skillMeta(skill)}</small>
+                                              <small>
+                                                {catalog()[skill().skillId]?.description ?? skillMeta(skill())}
+                                              </small>
                                             </div>
                                           </Button>
                                           <Show when={mutable()}>
-                                            <Show when={skill.state === "update-available"}>
+                                            <Show when={skill().state === "update-available"}>
                                               <Button
                                                 size="sm"
                                                 variant="ghost"
                                                 class="agent-skill-update"
-                                                aria-label={`Update ${skill.name}`}
+                                                aria-label={`Update ${skill().name}`}
                                                 disabled={savingId() !== null}
-                                                onClick={() => void install(skill, false)}
+                                                onClick={() => void install(skill(), false)}
                                               >
                                                 Update
                                               </Button>
                                             </Show>
                                             <SkillMoreMenu
-                                              skill={skill}
-                                              disabled={savingId() === skill.skillId}
+                                              skill={skill()}
+                                              disabled={savingId() === skill().skillId}
                                               onUpdate={() =>
-                                                skill.state === "modified"
-                                                  ? requestReplace(skill)
-                                                  : void install(skill, false)
+                                                skill().state === "modified"
+                                                  ? requestReplace(skill())
+                                                  : void install(skill(), false)
                                               }
                                               onRepair={() =>
-                                                skill.state === "modified"
-                                                  ? requestReplace(skill)
-                                                  : void install(skill, false)
+                                                skill().state === "modified"
+                                                  ? requestReplace(skill())
+                                                  : void install(skill(), false)
                                               }
-                                              onUninstall={() => requestRemove(skill)}
+                                              onUninstall={() => requestRemove(skill())}
                                               triggerRef={(element) => {
                                                 confirmationTrigger = element;
                                               }}
                                             />
                                             <Switch
-                                              aria-label={`Enable ${skill.name}`}
-                                              checked={isEnabled(skill)}
-                                              disabled={savingId() === skill.skillId}
-                                              onChange={(enabled) => void setEnabled(skill, enabled)}
+                                              aria-label={`Enable ${skill().name}`}
+                                              checked={isEnabled(skill())}
+                                              disabled={savingId() === skill().skillId}
+                                              onChange={(enabled) => void setEnabled(skill(), enabled)}
                                             />
                                           </Show>
                                         </div>
@@ -639,19 +649,6 @@ function SkillMoreMenu(props: {
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
-  );
-}
-
-function SkillGlyph(props: { iconUrl: string | null }) {
-  const [failedUrl, setFailedUrl] = createSignal<string | null>(null);
-  const iconUrl = () => (props.iconUrl && failedUrl() !== props.iconUrl ? props.iconUrl : null);
-
-  return (
-    <span class="agent-skill-icon" aria-hidden="true">
-      <Show when={iconUrl()} fallback={<Puzzle />} keyed>
-        {(url) => <img src={url} alt="" onError={() => setFailedUrl(url)} />}
-      </Show>
-    </span>
   );
 }
 
