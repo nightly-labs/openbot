@@ -473,6 +473,16 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       // A destination that has already gone is a sibling holding it aside for its own replacement.
       // Its copy lands in a moment; go round and adopt it rather than race it.
       if (!(await renameIfPresent(destination, aside))) continue;
+      // What was moved aside is read once more, now that nothing else can reach it. A sibling that
+      // replaced the same damaged copy between the check above and this move put a good install
+      // there, and it is holding this path open: put it back and adopt it, rather than throw away
+      // the install another instance is running.
+      if (await this.#verifies(aside, spec)) {
+        if (await renameIfVacant(aside, destination)) return false;
+        // Another instance filled the path in the meantime. Its copy is read on the next pass.
+        await rm(aside, { recursive: true, force: true }).catch(() => undefined);
+        continue;
+      }
       try {
         if (await renameIfVacant(staging, destination)) return true;
       } finally {
