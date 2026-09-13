@@ -182,6 +182,8 @@ describe("AgentSettingsPanel", () => {
   it.each([false, true])("enables a skill before Try and handles failure=%s", async (fails) => {
     mock = createMockOpenBot();
     window.openbot = mock.api;
+    const detail = await mock.api.skills.get("skill-source-check");
+    vi.spyOn(mock.api.skills, "get").mockResolvedValue({ ...detail, version: 2 });
     const enable = vi.spyOn(mock.api.skills, "setEnabled");
     if (fails) enable.mockRejectedValue(new Error("Could not enable the skill."));
     const onTry = vi.fn();
@@ -210,6 +212,26 @@ describe("AgentSettingsPanel", () => {
       expect(screen.getByRole("switch", { name: "Enable Source check" })).toBeChecked();
       expect(onClose).toHaveBeenCalledWith(false);
     }
+  });
+
+  it("requires an update before trying a different preview version", async () => {
+    mock = createMockOpenBot();
+    window.openbot = mock.api;
+    const onTrySkill = vi.fn();
+    render(() => (
+      <AgentSkillsModal
+        open
+        agentId="chief"
+        agentName="Chief"
+        onOpenChange={vi.fn()}
+        onCountChange={vi.fn()}
+        onTrySkill={onTrySkill}
+      />
+    ));
+    await fireEvent.click(await screen.findByRole("button", { name: /^Source check/ }));
+    expect(await screen.findByText("Update this skill to try this version.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try skill" })).toBeDisabled();
+    expect(onTrySkill).not.toHaveBeenCalled();
   });
 
   it("updates a skill from its chip without opening the detail", async () => {

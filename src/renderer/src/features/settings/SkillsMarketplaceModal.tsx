@@ -1236,6 +1236,7 @@ function SkillDetailView(props: {
     props.targetAgentId &&
     props.installed &&
     props.installed.enabled !== false &&
+    props.installed.installedVersion === props.skill.version &&
     props.installed.state !== "needs-repair" &&
     !props.busy;
   return (
@@ -1266,7 +1267,9 @@ function SkillDetailView(props: {
               ? "Enable this skill in agent settings to try it."
               : props.installed.state === "needs-repair"
                 ? "Repair this skill in agent settings to try it."
-                : "The agent composer is unavailable."
+                : props.installed.installedVersion !== props.skill.version
+                  ? "Update this skill to try this version."
+                  : "The agent composer is unavailable."
         }
       />
       <p class="marketplace-detail-creator">By {props.skill.creatorName}</p>

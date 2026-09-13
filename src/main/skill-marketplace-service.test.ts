@@ -142,6 +142,7 @@ describe("SkillMarketplaceService", () => {
     await expect(readFile(join(gitMetadata, "HEAD"), "utf8")).resolves.toBe("ref: refs/heads/main");
     await rm(gitMetadata, { recursive: true });
     await service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false });
+    expect(await service.listPublishable(agent.id)).toEqual([]);
     await mkdir(dirname(claudeSkill), { recursive: true });
     await writeFile(claudeSkill, "New user files");
     await expect(service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: true })).rejects.toThrow(
@@ -150,6 +151,9 @@ describe("SkillMarketplaceService", () => {
     await expect(readFile(claudeSkill, "utf8")).resolves.toBe("New user files");
     await rm(dirname(claudeSkill), { recursive: true });
     await service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: true });
+    expect(await service.listPublishable(agent.id)).toEqual([
+      expect.objectContaining({ skillId: "skill-1", version: 1 }),
+    ]);
     await writeFile(join(agent.workspacePath, ".agents", "skills", "release-notes", "SKILL.md"), "locally changed");
     requests.length = 0;
     await expect(service.listInstalledForChatTags(agent.id)).resolves.toEqual([

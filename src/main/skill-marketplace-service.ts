@@ -204,6 +204,7 @@ export class SkillMarketplaceService {
     const lock = await readLock(agent.workspacePath);
     const result: MarketplaceAgentSkill[] = [];
     for (const entry of Object.values(lock.skills)) {
+      if (entry.enabled === false) continue;
       if (entry.skillId.startsWith("local-skill-"))
         throw new Error("Publish local skills separately before publishing this agent.");
       const state = await installedState(agent.workspacePath, entry);

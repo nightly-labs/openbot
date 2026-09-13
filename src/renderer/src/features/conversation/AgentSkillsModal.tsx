@@ -543,6 +543,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                         onTry={
                                           mutable() &&
                                           skill().state !== "needs-repair" &&
+                                          skill().installedVersion === current().version &&
                                           savingId() !== skill().skillId &&
                                           props.onTrySkill
                                             ? async () => {
@@ -566,7 +567,9 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                             ? "Remote skills are read-only."
                                             : skill().state === "needs-repair"
                                               ? "Repair this skill to try it."
-                                              : "The agent composer is unavailable."
+                                              : skill().installedVersion !== current().version
+                                                ? "Update this skill to try this version."
+                                                : "The agent composer is unavailable."
                                         }
                                       />
                                     )}

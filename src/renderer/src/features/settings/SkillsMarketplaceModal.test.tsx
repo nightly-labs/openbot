@@ -91,13 +91,13 @@ describe("SkillsMarketplaceModal", () => {
     };
   });
 
-  it("tries only an installed skill for the selected agent", async () => {
+  it.each([1, 2])("tries only a matching installed version %s for the selected agent", async (version) => {
     const installed: InstalledSkill = {
       skillId: "release-notes",
       slug: "release-notes",
       name: "Release Notes",
-      installedVersion: 1,
-      availableVersion: 1,
+      installedVersion: version,
+      availableVersion: 2,
       state: "installed",
       enabled: true,
     };
@@ -124,6 +124,12 @@ describe("SkillsMarketplaceModal", () => {
     ));
     fireEvent.click(screen.getByRole("button", { name: "Skills" }));
     fireEvent.click(await screen.findByRole("button", { name: "View Release Notes details" }));
+    if (version !== 2) {
+      expect(await screen.findByText("Update this skill to try this version.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Try skill" })).toBeDisabled();
+      expect(onTrySkill).not.toHaveBeenCalled();
+      return;
+    }
     await waitFor(() => expect(screen.getByRole("button", { name: "Try skill" })).toBeEnabled());
     fireEvent.change(screen.getByRole("combobox", { name: "Install to" }), { target: { value: "research" } });
     await waitFor(() => expect(screen.getByRole("button", { name: "Try skill" })).toBeDisabled());

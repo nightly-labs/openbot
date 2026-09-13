@@ -21,7 +21,7 @@ export interface LocalSkillTools {
   create(input: CreateLocalSkillInput): Promise<MarketplaceSkillDetail>;
   revise(input: ReviseLocalSkillInput): Promise<MarketplaceSkillDetail>;
   list(): Promise<MarketplaceSkillDetail[]>;
-  get(input: LocalSkillRevisionInput): Promise<MarketplaceSkillDetail>;
+  get(input: LocalSkillRevisionInput): Promise<MarketplaceSkillDetail & { archivePath: string }>;
   install(input: LocalSkillRevisionInput & { agentId: string; revision: number }): Promise<InstalledSkill>;
 }
 
@@ -94,8 +94,10 @@ export async function runLocalSkillTool(
       onChanged?.({ action: "revised", skillId: skill.id, revision: skill.version, skillName: skill.name });
       return skillToolDetail(skill);
     }
-    case "read_local_skill":
-      return skillToolDetail(await api.get(readSkillSchema.parse(args)));
+    case "read_local_skill": {
+      const skill = await api.get(readSkillSchema.parse(args));
+      return { ...skillToolDetail(skill), archivePath: skill.archivePath };
+    }
     case "install_local_skill": {
       const skill = await api.install({ agentId, ...installLocalSkillSchema.parse(args) });
       onChanged?.({

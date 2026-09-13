@@ -105,7 +105,8 @@ describe.sequential("local skill provider tools", () => {
         instructions: "Summarize the week. password=synthetic-skill-secret",
         examplePrompt: "Use api_key=synthetic-example-secret",
       };
-      vi.mocked(api.get).mockResolvedValue(skill);
+      const archivePath = "/local-skills/saved-revision/bundle.zip";
+      vi.mocked(api.get).mockResolvedValue({ ...skill, archivePath });
       vi.mocked(api.list).mockResolvedValue([skill]);
       for (const tool of ["read_local_skill", "list_local_skills"]) {
         const response = await callOpenBotTool(
@@ -119,6 +120,7 @@ describe.sequential("local skill provider tools", () => {
         expect(serialized).not.toContain("synthetic-description-secret");
         expect(serialized).not.toContain("data:image");
         if (tool === "list_local_skills") expect(serialized).not.toContain("instructions");
+        else expect(serialized).toContain(archivePath);
         expect(serialized).not.toContain("synthetic-example-secret");
         expect(serialized).toContain("[redacted]");
         expect(serialized).toContain(skill.id);
