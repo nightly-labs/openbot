@@ -241,7 +241,9 @@ const FALLBACK_MODELS: AgentModelOption[] = [
     id: "gpt-5.6-luna",
     name: "GPT-5.6 Luna",
     description: "Fast and efficient for everyday agent work.",
-    defaultReasoningEffort: "medium",
+    // `DEFAULT_REASONING_EFFORT`, not the `medium` the Codex CLI reports: this is the model a new
+    // agent starts on, and the two have to say the same thing.
+    defaultReasoningEffort: "low",
     supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
   },
   {

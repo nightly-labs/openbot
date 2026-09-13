@@ -83,9 +83,11 @@ describe.sequential("AgentService: queue", () => {
       auth: { kind: "chatgpt", email: "codex@example.com" },
       cliVersion: "0.144.1",
     });
+    // The store default, which is what a new agent on the default provider keeps: `low`, not the
+    // `medium` the Codex CLI reports for every GPT-5.6 model.
     await expect(service.createAgent(CREATE_AGENT_INPUT)).resolves.toMatchObject({
       model: "gpt-5.6-luna",
-      reasoningEffort: "medium",
+      reasoningEffort: "low",
     });
     // Setup can record a model beside the provider, which is how a custom endpoint becomes the
     // default: it is a model of the CLI that runs it, so only the model names it.
