@@ -5,6 +5,13 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+### Changed
+
+- Start a new agent on low reasoning effort. Codex CLI reports `medium` for every GPT-5.6 model,
+  which buys little on GPT-5.6 Luna, the model a new agent starts on, and costs a wait on every
+  turn. An agent whose effort you already set is not moved, and every effort stays available in the
+  picker.
+
 ## [0.8.0] - 2026-09-11
 
 ### Added

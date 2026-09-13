@@ -1469,7 +1469,7 @@ describe.sequential("AgentService: providers", () => {
       if (!params) throw new Error("The fake turn request has no parameters.");
       expect(params).toMatchObject({
         model: "gpt-5.6-luna",
-        effort: "medium",
+        effort: "low",
         approvalPolicy: "on-request",
         sandboxPolicy: { type: "dangerFullAccess" },
       });

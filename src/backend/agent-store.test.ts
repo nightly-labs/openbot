@@ -53,7 +53,7 @@ describe("AgentStore", () => {
     expect(chief.description).toBe("");
     expect(chief.preview).toBe("No messages yet");
     expect(chief.model).toBe("gpt-5.6-luna");
-    expect(chief.reasoningEffort).toBe("medium");
+    expect(chief.reasoningEffort).toBe("low");
     expect(sales.workspacePath).toBe(join(home, "OpenBot", "Agents", "sales-outbound"));
     expect(store.sharedRoot).toBe(join(home, "OpenBot", "Shared"));
     expect(chief.workspacePath).not.toBe(sales.workspacePath);
@@ -488,7 +488,10 @@ describe("AgentStore", () => {
       provider: "claude",
       // The default of the provider the profile names, not the default of a new agent, which is Codex.
       model: "claude-sonnet-5",
-      reasoningEffort: "medium",
+      // The effort has no per-provider default, so an unreadable one is repaired to the one value
+      // there is. It is the floor of the range, which is the safe direction for a repair: it costs
+      // thinking on the next turn rather than money the user did not ask to spend.
+      reasoningEffort: "low",
       avatarSeed: "chief",
       avatarHue: null,
     });
@@ -497,7 +500,7 @@ describe("AgentStore", () => {
     // Written back at once, so the next launch reads a profile it accepts instead of repairing again.
     expect(repaired.database.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
       model: "claude-sonnet-5",
-      reasoningEffort: "medium",
+      reasoningEffort: "low",
       avatarSeed: "chief",
       avatarHue: null,
     });

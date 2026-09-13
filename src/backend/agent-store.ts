@@ -89,7 +89,10 @@ const LEGACY_AVATAR_COLORS = [
 export const NEW_AGENT_PREVIEW = "No messages yet";
 export const DEFAULT_AGENT_MODEL: AgentModelId = "gpt-5.6-luna";
 export const DEFAULT_AGENT_PROVIDER: AgentProviderId = "codex";
-export const DEFAULT_REASONING_EFFORT: AgentReasoningEffort = "medium";
+// A provider CLI reports the effort its own configuration uses -- Codex says `medium` for every
+// GPT-5.6 model -- which is not the one this product leads with: a new agent starts on the fast
+// model, where the extra thinking buys little and costs a visible wait on every turn.
+export const DEFAULT_REASONING_EFFORT: AgentReasoningEffort = "low";
 
 // These three strings are history, not vocabulary. The first is the file a release before the move to
 // SQLite wrote its state into, and is only ever read: renaming it means that file is never found and the
