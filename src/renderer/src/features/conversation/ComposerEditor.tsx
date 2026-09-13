@@ -568,7 +568,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
       />
       <Show when={pickerOpen()}>
         <Portal mount={pickerFrame().mount}>
-          <div class="mention-picker" style={{ "--mention-picker-bottom": `${pickerFrame().bottom}px` }}>
+          <div
+            class="mention-picker"
+            style={{
+              "--mention-picker-bottom": `${pickerFrame().bottom}px`,
+              "--mention-picker-rows": matchingOptions().length,
+            }}
+          >
             <Listbox.Root<PickerOption>
               as="div"
               ref={pickerFades.bind}

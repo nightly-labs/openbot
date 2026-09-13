@@ -6176,6 +6176,9 @@ button.chat-action-target:active,
 .mention-picker {
   --mention-picker-overlap: 14px;
   --mention-picker-side-inset: calc(var(--openbot-space-1-5) + 12px);
+  --mention-picker-row-height: 29px;
+  --mention-picker-gutter: 5px;
+  --mention-picker-visible-rows: 7;
 
   position: absolute;
   z-index: 10;
@@ -6200,12 +6203,25 @@ button.chat-action-target:active,
   display: grid;
   /* A plain auto track grows to the widest row, which would push the badges out of view. */
   grid-template-columns: minmax(0, 1fr);
-  max-height: 213px;
+  /*
+   * Every row is the same height, so the list can state the height its rows need instead of
+   * leaving it to the content. A length on both sides of the change is what lets the panel
+   * travel to its new size while the query narrows, rather than jump to it.
+   */
+  height: calc(var(--mention-picker-rows, 0) * var(--mention-picker-row-height) + 2 * var(--mention-picker-gutter));
+  max-height: calc(
+    var(--mention-picker-visible-rows) *
+    var(--mention-picker-row-height) +
+    2 *
+    var(--mention-picker-gutter)
+  );
   overflow-y: auto;
   /* An even inset all round: the row's own 8px carries the rest of the gap beside the text. */
-  padding: 5px;
+  padding: var(--mention-picker-gutter);
   overscroll-behavior: contain;
   scrollbar-width: none;
+  transition: height var(--openbot-duration-normal) var(--openbot-ease-out);
+  will-change: height;
 }
 
 .mention-picker-list::-webkit-scrollbar {
@@ -6227,7 +6243,8 @@ button.chat-action-target:active,
 .mention-picker-option {
   display: flex;
   width: 100%;
-  height: 29px;
+  /* The list computes its own height from this one, so the two must not drift apart. */
+  height: var(--mention-picker-row-height);
   align-items: center;
   gap: 7px;
   border: 0;
@@ -7020,6 +7037,7 @@ button.chat-action-target:active,
   .agent-row-agent-status-responded,
   .agent-row-agent-status-unread,
   .mention-picker,
+  .mention-picker-list,
   .settings-panel {
     animation: none;
     transition: none;
