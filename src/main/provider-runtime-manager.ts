@@ -45,6 +45,8 @@ const VERSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
  * failing says so rather than looping.
  */
 const COMMIT_ATTEMPTS = 3;
+/** Everything a commit leaves beside the version directories, and the sweep collects by age. */
+const STAGING_PREFIXES = [".installing-", ".replaced-", ".locking-"];
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type PartialMetadata = { url: string; etag: string | null; expectedBytes: number };
@@ -458,38 +460,55 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * it half removed.
    */
   async #commit(staging: string, destination: string, spec: RuntimeSpec): Promise<boolean> {
-    // Each pass reads the destination again, because a sibling replacing the same damaged copy can
-    // move it, fill it, or take it away between any two steps below. Whatever it did, the next pass
-    // sees the result: a verified install is adopted, and only what is still damaged is replaced.
+    // Each pass reads the destination again, because a sibling can fill it or replace it between
+    // any two steps below. Whatever it did, the next pass sees the result: a verified install is
+    // adopted, and only what is still damaged is replaced.
     for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt += 1) {
       if (await renameIfVacant(staging, destination)) return true;
       if (await this.#verifies(destination, spec)) return false;
+      const outcome = await this.#replaceUnderLock(staging, destination, spec);
+      if (outcome !== "moved") return outcome === "committed";
+    }
+    throw new Error("The runtime could not be installed because another instance is replacing it.");
+  }
+
+  /**
+   * Replaces a damaged destination, while this instance alone is allowed to.
+   *
+   * Two instances that both read the same damaged directory would otherwise both replace it, and
+   * the second would take away the install the first had just committed and may already be running.
+   * The lock makes the read and the move one step: whoever holds it reads the destination again,
+   * and a destination that verifies by then is a sibling's install, which is adopted, never moved.
+   * Answers `moved` when the path changed under this instance or the lock is held elsewhere -- both
+   * mean read it again.
+   */
+  async #replaceUnderLock(
+    staging: string,
+    destination: string,
+    spec: RuntimeSpec,
+  ): Promise<"committed" | "adopted" | "moved"> {
+    const lock = join(this.#providerRoot(spec.provider), `.locking-${spec.target}-${spec.version}`);
+    if (!(await takeLock(lock))) return "moved";
+    try {
+      if (await this.#verifies(destination, spec)) return "adopted";
       // Beside the staging directories, not beside the version ones: that is where the sweep looks,
       // and `#removeOldVersions` reads everything in the target root as a version.
       const aside = join(
         this.#providerRoot(spec.provider),
         `.replaced-${spec.target}-${spec.version}-${randomBytes(4).toString("hex")}`,
       );
-      // A destination that has already gone is a sibling holding it aside for its own replacement.
-      // Its copy lands in a moment; go round and adopt it rather than race it.
-      if (!(await renameIfPresent(destination, aside))) continue;
-      // What was moved aside is read once more, now that nothing else can reach it. A sibling that
-      // replaced the same damaged copy between the check above and this move put a good install
-      // there, and it is holding this path open: put it back and adopt it, rather than throw away
-      // the install another instance is running.
-      if (await this.#verifies(aside, spec)) {
-        if (await renameIfVacant(aside, destination)) return false;
-        // Another instance filled the path in the meantime. Its copy is read on the next pass.
-        await rm(aside, { recursive: true, force: true }).catch(() => undefined);
-        continue;
-      }
+      // Aside rather than deleted, because a sibling reading the atomic path must never find it
+      // half removed, and gone already means an instance without this lock took it.
+      if (!(await renameIfPresent(destination, aside))) return "moved";
       try {
-        if (await renameIfVacant(staging, destination)) return true;
+        if (await renameIfVacant(staging, destination)) return "committed";
       } finally {
         await rm(aside, { recursive: true, force: true }).catch(() => undefined);
       }
+      return "moved";
+    } finally {
+      await rm(lock, { recursive: true, force: true }).catch(() => undefined);
     }
-    throw new Error("The runtime could not be installed because another instance is replacing it.");
   }
 
   async #verifies(installRoot: string, spec: RuntimeSpec): Promise<boolean> {
@@ -591,10 +610,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
       await Promise.all(
         entries
-          .filter(
-            (entry) =>
-              entry.isDirectory() && (entry.name.startsWith(".installing-") || entry.name.startsWith(".replaced-")),
-          )
+          .filter((entry) => entry.isDirectory() && STAGING_PREFIXES.some((prefix) => entry.name.startsWith(prefix)))
           .map(async (entry) => {
             const path = join(root, entry.name);
             const modified = await stat(path)
@@ -686,6 +702,34 @@ async function verifyInstalledRuntime(root: string, spec: RuntimeSpec, lock: Age
 async function renameIfVacant(from: string, to: string): Promise<boolean> {
   try {
     await rename(from, to);
+    return true;
+  } catch (error) {
+    if (isOccupiedError(error)) return false;
+    throw error;
+  }
+}
+
+/**
+ * Claims the right to replace one destination, or reports that another instance holds it.
+ *
+ * `mkdir` without `recursive` is the claim: the filesystem answers `EEXIST` to everyone but the
+ * first, on every platform and across users, with no daemon and nothing to clean up but a
+ * directory. A lock older than a staging directory is one a killed instance left behind, and age is
+ * the only evidence available -- the same reason the sweep uses it -- so it is taken over.
+ */
+async function takeLock(lock: string): Promise<boolean> {
+  if (await mkdirExclusive(lock)) return true;
+  const held = await stat(lock)
+    .then((value) => value.mtimeMs)
+    .catch(() => null);
+  if (held !== null && held > Date.now() - STALE_STAGING_MS) return false;
+  await rm(lock, { recursive: true, force: true }).catch(() => undefined);
+  return await mkdirExclusive(lock);
+}
+
+async function mkdirExclusive(path: string): Promise<boolean> {
+  try {
+    await mkdir(path);
     return true;
   } catch (error) {
     if (isOccupiedError(error)) return false;

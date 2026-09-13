@@ -113,8 +113,10 @@ would interleave their bytes.
 
 Several instances can therefore write to one store. Installing a pinned version is idempotent, so a
 commit that finds the destination occupied verifies it and adopts it instead of replacing it, and
-only a destination that fails verification is moved aside, and a destination that moves under the
-commit is read again rather than raced. An update that finds the version already in the store skips
+only a destination that fails verification is moved aside. That replacement is claimed first, with
+a lock directory beside the staging ones that `mkdir` grants to one instance at a time: whoever
+holds it reads the destination again, so a copy a sibling committed in the meantime is adopted and
+never moved. A lock as old as an abandoned stage is one a killed instance left, and is taken over. An update that finds the version already in the store skips
 the transfer, not the activation: the agent service has to be given the executable either way.
 Staging directories carry the pid and a random suffix and are swept by age, never by name, so a
 sibling's install is not collected while it runs. The manager stamps each version it takes into use

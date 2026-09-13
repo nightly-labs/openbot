@@ -645,6 +645,43 @@ describe("ProviderRuntimeManager", () => {
     expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
   });
 
+  it("leaves a damaged runtime to the instance already replacing it", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    const destination = join(root, "grok", "darwin-arm64", "1.0.22", "bin", "grok");
+    await mkdir(dirname(destination), { recursive: true });
+    await writeFile(destination, "#!/bin/sh\necho 1.0.22\n");
+    const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
+    await manager.initialize();
+    // The claim a sibling instance holds while it puts its own copy in place of the damaged one.
+    await mkdir(join(root, "grok", ".locking-darwin-arm64-1.0.22"), { recursive: true });
+
+    await expect(manager.downloadAndWait("grok")).rejects.toThrow(/another instance/);
+
+    // Untouched: the sibling is entitled to finish, and the install it commits is the one both use.
+    expect(await readFile(destination, "utf8")).toBe("#!/bin/sh\necho 1.0.22\n");
+  });
+
+  it("replaces a damaged runtime when the instance that claimed it is gone", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    const destination = join(root, "grok", "darwin-arm64", "1.0.22", "bin", "grok");
+    await mkdir(dirname(destination), { recursive: true });
+    await writeFile(destination, "#!/bin/sh\necho 1.0.22\n");
+    const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
+    await manager.initialize();
+    // An instance killed while it held the claim. Age is the only evidence there is that no one is
+    // coming back for it, so the store must not stay unwritable because of it.
+    const lock = join(root, "grok", ".locking-darwin-arm64-1.0.22");
+    await mkdir(lock, { recursive: true });
+    await aged(lock);
+
+    await manager.downloadAndWait("grok");
+
+    expect(await readFile(destination, "utf8")).toBe(new TextDecoder().decode(fixture.executable));
+    expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
+  });
+
   it("keeps partial transfers out of the store the computer shares", async () => {
     const root = await temporaryRoot();
     const downloadRoot = join(await temporaryRoot(), "profile-downloads");
