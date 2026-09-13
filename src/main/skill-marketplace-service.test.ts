@@ -133,6 +133,14 @@ describe("SkillMarketplaceService", () => {
     await expect(readFile(claudeSkill, "utf8")).resolves.toBe("Claude edits");
     await writeFile(agentsReference, "Template");
     await writeFile(claudeSkill, skillContents);
+    const gitMetadata = join(agent.workspacePath, ".agents", "skills", "release-notes", ".git");
+    await mkdir(gitMetadata);
+    await writeFile(join(gitMetadata, "HEAD"), "ref: refs/heads/main");
+    await expect(service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })).rejects.toThrow(
+      "local changes",
+    );
+    await expect(readFile(join(gitMetadata, "HEAD"), "utf8")).resolves.toBe("ref: refs/heads/main");
+    await rm(gitMetadata, { recursive: true });
     await service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false });
     await mkdir(dirname(claudeSkill), { recursive: true });
     await writeFile(claudeSkill, "New user files");

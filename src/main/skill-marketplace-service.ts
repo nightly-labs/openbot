@@ -485,7 +485,6 @@ async function readSkillFiles(root: string): Promise<Record<string, Uint8Array>>
   const files: Record<string, Uint8Array> = {};
   async function visit(directory: string): Promise<void> {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
-      if (entry.name === ".git" || entry.name === "node_modules" || entry.name === ".DS_Store") continue;
       const path = join(directory, entry.name);
       if (entry.isSymbolicLink()) throw new Error("Skill packages cannot contain symbolic links.");
       if (entry.isDirectory()) await visit(path);

@@ -126,6 +126,47 @@ describe.sequential("local skill provider tools", () => {
         { action: "revised", skillId: skill.id, revision: 2, skillName: skill.name },
         { action: "installed", skillId: skill.id, revision: 2, skillName: skill.name },
       ]);
+      await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+      const actor = { id: "human", name: "Alex" };
+      await service.channels.command(
+        {
+          type: "save",
+          channelId: "skills-channel",
+          operationId: "create",
+          draft: {
+            name: "Skills",
+            title: "",
+            instructions: "Test skills",
+            members: [{ agentId: "chief" }],
+            leadAgentId: "chief",
+          },
+        },
+        actor,
+      );
+      await service.channels.command(
+        {
+          type: "send",
+          channelId: "skills-channel",
+          operationId: "send",
+          text: "Create a skill",
+          recipientAgentId: "chief",
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      );
+      await waitFor(() => service?.channels.store.tasks("skills-channel")[0]?.state === "completed");
+      const execution = service.channels.store.context("skills-channel", "chief");
+      const session = store.database.activeProviderSession(execution.threadId, provider);
+      if (!session) throw new Error("Channel session did not start.");
+      await callOpenBotTool(client, session.externalSessionId, "create_skill", { sourcePath: "channel-draft" });
+      expect(events()).toHaveLength(3);
+      expect(
+        store.database
+          .readConversation("chief", execution.threadId)
+          .messages.map(skillConversationEvent)
+          .filter(Boolean),
+      ).toEqual([{ action: "created", skillId: skill.id, revision: 1, skillName: skill.name }]);
     },
   );
 });

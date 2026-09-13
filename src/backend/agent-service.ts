@@ -1746,22 +1746,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         if (!this.localSkillTools) throw new Error("Local skill tools are unavailable.");
         return openBotToolResult(
           await runLocalSkillTool(this.localSkillTools(), senderAgentId, params.tool, params.arguments, (event) => {
-            this.#conversation.withConversationTransaction(senderAgentId, ({ snapshot }) => {
-              snapshot.messages.push({
-                id: randomUUID(),
-                turnId: params.turnId,
-                author: "system",
-                source: "system",
-                status: "completed",
-                createdAt: new Date().toISOString(),
-                itemType: skillConversationEventItemType(event),
-                text: redactText(event.skillName),
-              });
-              return {
-                result: undefined,
-                snapshot: this.#store.database.persistConversation(snapshot, `skill.${event.action}`, event),
-              };
+            const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
+            const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
+            snapshot.messages.push({
+              id: randomUUID(),
+              turnId: params.turnId,
+              author: "system",
+              source: "system",
+              status: "completed",
+              createdAt: new Date().toISOString(),
+              itemType: skillConversationEventItemType(event),
+              text: redactText(event.skillName),
             });
+            const persisted = this.#store.database.persistConversation(snapshot, `skill.${event.action}`, event);
+            this.#conversation.setSnapshot(senderAgentId, persisted);
+            this.#conversation.publishConversation(persisted);
           }),
         );
       } catch (error) {
