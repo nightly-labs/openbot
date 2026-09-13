@@ -187,15 +187,15 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       timezone: "UTC",
       schedule: { kind: "daily", time: "09:00" },
     });
-    await service.testRoutine({ agentId: agent.id, routineId: routine.id });
-    await service.testRoutine({ agentId: agent.id, routineId: routine.id });
-    await waitFor(() => service?.listQueue(agent.id).deliveries.some((delivery) => delivery.status === "queued"));
-    const queued = service.listQueue(agent.id).deliveries.find((delivery) => delivery.status === "queued");
-    if (!queued) throw new Error("The queued routine delivery is missing.");
-    const queuedRun = service
-      .listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })
-      .find((run) => run.deliveryId === queued.id);
-    if (!queuedRun) throw new Error("The queued routine run is missing.");
+    const runningRun = await service.testRoutine({ agentId: agent.id, routineId: routine.id });
+    await waitFor(() =>
+      service
+        ?.listQueue(agent.id)
+        .deliveries.some((delivery) => delivery.id === runningRun.deliveryId && delivery.status === "running"),
+    );
+    const queuedRun = await service.testRoutine({ agentId: agent.id, routineId: routine.id });
+    const queued = service.listQueue(agent.id).deliveries.find((delivery) => delivery.id === queuedRun.deliveryId);
+    if (queued?.status !== "queued") throw new Error("The queued routine delivery is missing.");
     const appendConversationMessage = store.database.appendConversationMessage.bind(store.database);
     let rejectCancellationMarker = true;
     vi.spyOn(store.database, "appendConversationMessage").mockImplementation((input) => {
