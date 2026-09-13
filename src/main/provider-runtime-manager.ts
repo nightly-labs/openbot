@@ -505,6 +505,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         this.#providerRoot(spec.provider),
         `.replaced-${spec.target}-${spec.version}-${randomBytes(4).toString("hex")}`,
       );
+      // The claim is read once more against the one thing that can have displaced it: an instance
+      // recovering it as abandoned. Whoever holds the claim by now is the one entitled to move the
+      // destination, and this instance stops before touching it rather than after.
+      if (!(await holdsClaim(lock, claim))) return "moved";
       // Aside rather than deleted, because a sibling reading the atomic path must never find it
       // half removed, and gone already means an instance without this lock took it.
       if (!(await renameIfPresent(destination, aside))) return "moved";
@@ -731,14 +735,35 @@ async function renameIfVacant(from: string, to: string): Promise<boolean> {
 async function takeLock(lock: string): Promise<string | null> {
   const claim = `${process.pid}-${randomBytes(4).toString("hex")}`;
   if (await holdLock(lock, claim)) return claim;
+  if (!(await abandonedClaim(lock))) return null;
+  const abandoned = join(dirname(lock), `.replaced-claim-${randomBytes(4).toString("hex")}`);
+  if (!(await renameIfPresent(lock, abandoned))) return null;
+  // Read again, now that the directory is somewhere no one else is looking. A claim that is fresh
+  // by this point is not the abandoned one at all: another instance recovered it first and made its
+  // own, between the age above and this move. Put it back and leave the path to the instance that
+  // holds it.
+  if (!(await abandonedClaim(abandoned))) {
+    if (!(await renameIfVacant(abandoned, lock))) {
+      await rm(abandoned, { recursive: true, force: true }).catch(() => undefined);
+    }
+    return null;
+  }
+  await rm(abandoned, { recursive: true, force: true }).catch(() => undefined);
+  return (await holdLock(lock, claim)) ? claim : null;
+}
+
+/** Whether a claim is old enough to be one a killed instance left behind. */
+async function abandonedClaim(lock: string): Promise<boolean> {
   const held = await stat(lock)
     .then((value) => value.mtimeMs)
     .catch(() => null);
-  if (held !== null && held > Date.now() - STALE_STAGING_MS) return null;
-  const abandoned = join(dirname(lock), `.replaced-claim-${randomBytes(4).toString("hex")}`);
-  if (!(await renameIfPresent(lock, abandoned))) return null;
-  await rm(abandoned, { recursive: true, force: true }).catch(() => undefined);
-  return (await holdLock(lock, claim)) ? claim : null;
+  return held === null || held <= Date.now() - STALE_STAGING_MS;
+}
+
+/** Whether the claim on the path is still the one this attempt made. */
+async function holdsClaim(lock: string, claim: string): Promise<boolean> {
+  const held = await readFile(join(lock, "claim"), "utf8").catch(() => null);
+  return held?.trim() === claim;
 }
 
 async function holdLock(lock: string, claim: string): Promise<boolean> {
@@ -756,8 +781,7 @@ async function holdLock(lock: string, claim: string): Promise<boolean> {
 
 /** Removes the claim only while it is still this attempt's. */
 async function releaseLock(lock: string, claim: string): Promise<void> {
-  const held = await readFile(join(lock, "claim"), "utf8").catch(() => null);
-  if (held?.trim() !== claim) return;
+  if (!(await holdsClaim(lock, claim))) return;
   await rm(lock, { recursive: true, force: true }).catch(() => undefined);
 }
 
