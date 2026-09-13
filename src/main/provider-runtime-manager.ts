@@ -197,14 +197,6 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     if (configuredCliPath(provider))
       throw new Error("Remove the explicit CLI path override before updating in OpenBot.");
     if (this.#statuses[provider].phase === "ready" || this.#tasks.has(provider)) return this.getStatus();
-    // A sibling instance may have installed this version while the offer sat on screen. Reading the
-    // shared store again turns that into a status refresh rather than a second download of the same
-    // bytes.
-    const installed = await this.#inspect(provider);
-    if (installed.phase === "ready") {
-      this.#setStatus(provider, installed);
-      return this.getStatus();
-    }
 
     const spec = runtimeSpec(provider, this.#target, this.#lock);
     const controller = new AbortController();
@@ -216,7 +208,9 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       message: null,
       version: this.#statuses[provider].version,
     });
-    const task = this.#updateManagedRuntime(spec, controller.signal)
+    // The task is registered without an await between it and the guard above, so a second request
+    // for the same provider finds it and joins it instead of starting a download of its own.
+    const task = this.#updateProviderRuntime(spec, controller.signal)
       .catch((error: unknown) => {
         this.#controllers.delete(provider);
         this.#tasks.delete(provider);
@@ -259,6 +253,17 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   async #inspect(provider: ManagedProviderId): Promise<ProviderRuntimeStatus> {
     if (!this.#target) return this.#statuses[provider];
     const spec = runtimeSpec(provider, this.#target, this.#lock);
+    this.#statuses[provider] = await this.#readStore(spec);
+    return this.#statuses[provider];
+  }
+
+  /**
+   * What the store on disk says about a provider, without recording it.
+   *
+   * An update reads the store after it holds the download slot, and must not overwrite the
+   * "downloading" state it published to get there. Only `#inspect` records what this returns.
+   */
+  async #readStore(spec: RuntimeSpec): Promise<ProviderRuntimeStatus> {
     const installRoot = this.#installRoot(spec);
     try {
       await verifyInstalledRuntime(installRoot, spec, this.#lock);
@@ -266,11 +271,29 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       // leave it alone. Best effort -- a store on a read-only volume still works, it only ages.
       const now = new Date();
       await utimes(installRoot, now, now).catch(() => undefined);
-      this.#statuses[provider] = readyStatus(spec.version);
+      return readyStatus(spec.version);
     } catch {
-      this.#statuses[provider] = { ...emptyStatus(), version: await this.#previousVersion(spec) };
+      return { ...emptyStatus(), version: await this.#previousVersion(spec) };
     }
-    return this.#statuses[provider];
+  }
+
+  /**
+   * One update, from the single look at the shared store to the activation that ends it.
+   *
+   * A sibling instance may have installed this version while the offer sat on screen. That is a
+   * reason to skip the transfer, not the activation: the agent service still runs the old CLI, and
+   * a status of `ready` without the swap leaves the offer on screen with no way to answer it.
+   */
+  async #updateProviderRuntime(spec: RuntimeSpec, signal: AbortSignal): Promise<void> {
+    const installed = await this.#readStore(spec);
+    if (installed.phase === "ready") {
+      await this.#activate(spec, null);
+      return;
+    }
+    if (this.#stopping) throw new Error("OpenBot is closing.");
+    signal.throwIfAborted();
+    this.#setStatus(spec.provider, { phase: "downloading", progress: 0, message: null, version: installed.version });
+    await this.#activate(spec, signal);
   }
 
   // Keep the last installed version available while the pinned replacement is downloaded.
@@ -288,19 +311,28 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     return null;
   }
 
-  async #updateManagedRuntime(spec: RuntimeSpec, signal: AbortSignal): Promise<void> {
+  /**
+   * Hands the pinned executable to the agent service, which swaps it into its running clients.
+   *
+   * A `null` signal means the bytes are in the store already, because a sibling instance put them
+   * there: there is nothing to transfer, only the swap. An install this instance made and could not
+   * activate is removed, so the rejected artifact is not selected on the next start; one a sibling
+   * made is left where it is, because the sibling is using it.
+   */
+  async #activate(spec: RuntimeSpec, signal: AbortSignal | null): Promise<void> {
     let installed = false;
     try {
       await this.#updateRuntime(spec.provider, async () => {
-        await this.#runDownload(spec, signal);
-        installed = true;
-        await this.#removePartial(spec);
+        if (signal) {
+          await this.#runDownload(spec, signal);
+          installed = true;
+          await this.#removePartial(spec);
+        }
         return join(this.#installRoot(spec), "bin", spec.executableName);
       });
       this.#setStatus(spec.provider, readyStatus(spec.version));
       this.emit("ready", spec.provider);
     } catch (error) {
-      // A failed activation must not select the rejected artifact on the next app start.
       if (installed) await rm(this.#installRoot(spec), { recursive: true, force: true });
       throw error;
     }

@@ -21,7 +21,11 @@ import { MANAGED_RUNTIME_PROVIDERS, type ProviderRuntimeSnapshot } from "@openbo
 import { afterEach, describe, expect, it, vi } from "vitest";
 import lockValue from "../../native-runtime.lock.json";
 import { parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
-import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
+import {
+  ProviderRuntimeManager,
+  type ProviderRuntimeManagerOptions,
+  providerRuntimeRoot,
+} from "./provider-runtime-manager";
 
 const roots: string[] = [];
 
@@ -528,8 +532,8 @@ describe("ProviderRuntimeManager", () => {
     const held = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const sibling = siblingManager(root, fixture, join(root, "downloads-b"));
-    const heldManager = siblingManager(root, fixture, join(root, "downloads-a"), held);
+    const sibling = siblingManager(root, fixture, { downloadRoot: join(root, "downloads-b") });
+    const heldManager = siblingManager(root, fixture, { downloadRoot: join(root, "downloads-a"), held });
     await Promise.all([sibling.initialize(), heldManager.initialize()]);
 
     const waiting = heldManager.downloadAndWait("grok");
@@ -552,13 +556,62 @@ describe("ProviderRuntimeManager", () => {
     expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
   });
 
+  it("puts the runtime a sibling instance left in the store into use", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    const activated: string[] = [];
+    const fetched: string[] = [];
+    const adopter = siblingManager(root, fixture, {
+      downloadRoot: join(root, "downloads-b"),
+      onFetch: (url) => fetched.push(url),
+      updateRuntime: async (_provider, install) => {
+        activated.push(await install());
+      },
+    });
+    // This instance starts before the store holds the version, the way a running app does when the
+    // offer appears; the sibling installs it while the offer waits on screen.
+    await adopter.initialize();
+    const installer = siblingManager(root, fixture, { downloadRoot: join(root, "downloads-a") });
+    await installer.initialize();
+    await installer.downloadAndWait("grok");
+
+    await adopter.downloadAndWait("grok");
+
+    // The whole point of the second instance's update: the agent service swaps its running clients
+    // onto the pinned executable. Reporting "ready" without it left the old CLI in use, and the
+    // offer on screen with no way left to answer it.
+    expect(activated).toEqual([join(root, "grok", "darwin-arm64", "1.0.22", "bin", "grok")]);
+    expect(fetched).toEqual([]);
+    expect(adopter.getStatus().providers.grok).toMatchObject({ phase: "ready", version: "1.0.22" });
+  });
+
+  it("transfers once when two requests arrive together", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    const fetched: string[] = [];
+    const manager = siblingManager(root, fixture, {
+      downloadRoot: join(root, ".downloads"),
+      onFetch: (url) => fetched.push(url),
+    });
+    await manager.initialize();
+
+    // Two presses of Update, or an update and the agent service asking for the same CLI. The second
+    // has to find the first task rather than start a transfer of its own over the same file.
+    const [first, second] = await Promise.all([manager.download("grok"), manager.download("grok")]);
+    await manager.downloadAndWait("grok");
+
+    expect(first.providers.grok.phase).toBe("downloading");
+    expect(second.providers.grok.phase).toBe("downloading");
+    expect(fetched.filter((url) => !url.endsWith("/LICENSE") && !url.endsWith("/THIRD-PARTY-NOTICES"))).toHaveLength(1);
+  });
+
   it("replaces an installed version that no longer verifies", async () => {
     const root = await temporaryRoot();
     const fixture = grokFixture();
     const destination = join(root, "grok", "darwin-arm64", "1.0.22", "bin", "grok");
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, "#!/bin/sh\necho 1.0.22\n");
-    const manager = siblingManager(root, fixture, join(root, ".downloads"));
+    const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
     expect((await manager.initialize()).providers.grok.phase).toBe("not-downloaded");
 
     await manager.downloadAndWait("grok");
@@ -847,24 +900,36 @@ async function aged(path: string, age = STAGING_AGE_MS): Promise<void> {
   await utimes(path, when, when);
 }
 
+interface SiblingOptions {
+  /** Each instance keeps its partial transfers in a directory of its own. */
+  downloadRoot: string;
+  /** Holds the executable response, so another instance can commit while this one waits. */
+  held?: Promise<void>;
+  /** The swap the agent service makes for its running clients. */
+  updateRuntime?: ProviderRuntimeManagerOptions["updateRuntime"];
+  /** Counts what was asked for, to tell a skipped transfer from a repeated one. */
+  onFetch?: (url: string) => void;
+}
+
 /** A manager on a store it shares with another, with a profile download directory of its own. */
 function siblingManager(
   root: string,
   fixture: ReturnType<typeof grokFixture>,
-  downloadRoot: string,
-  held?: Promise<void>,
+  options: SiblingOptions,
 ): ProviderRuntimeManager {
   return new ProviderRuntimeManager({
     root,
-    downloadRoot,
+    downloadRoot: options.downloadRoot,
     platform: "darwin",
     architecture: "arm64",
     lock: fixture.lock,
+    updateRuntime: options.updateRuntime,
     fetchImpl: async (input) => {
       const url = String(input);
+      options.onFetch?.(url);
       if (url.endsWith("/LICENSE")) return new Response(fixture.license);
       if (url.endsWith("/THIRD-PARTY-NOTICES")) return new Response(fixture.notices);
-      await held;
+      await options.held;
       return chunkedResponse(fixture.executable, 1_024);
     },
   });
