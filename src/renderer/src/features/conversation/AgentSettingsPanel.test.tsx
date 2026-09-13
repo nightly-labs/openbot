@@ -226,6 +226,63 @@ describe("AgentSettingsPanel", () => {
     expect(screen.getByRole("switch", { name: "Enable Source check" })).not.toBeChecked();
   });
 
+  it("requires confirmation before replacing a modified skill", async () => {
+    mock = createMockOpenBot();
+    window.openbot = mock.api;
+    const installed = await mock.api.skills.listInstalled("chief");
+    const original = installed.find((item) => item.skillId === "skill-release-notes");
+    if (!original) throw new Error("Missing skill fixture");
+    const skill = { ...original, state: "modified" as const };
+    vi.spyOn(mock.api.skills, "listInstalled").mockResolvedValue([skill]);
+    const install = vi.spyOn(mock.api.skills, "install");
+    render(() => (
+      <AgentSkillsModal open agentId="chief" agentName="Chief" onOpenChange={vi.fn()} onCountChange={vi.fn()} />
+    ));
+    await fireEvent.pointerDown(await screen.findByRole("button", { name: `More for ${skill.name}` }), { button: 0 });
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Repair" }), { button: 0 });
+    const confirm = await screen.findByRole("dialog", { name: "Replace local changes?" });
+    expect(install).not.toHaveBeenCalled();
+    await fireEvent.click(within(confirm).getByRole("button", { name: "Replace skill" }));
+    await waitFor(() =>
+      expect(install).toHaveBeenCalledWith({ agentId: "chief", skillId: skill.skillId, replaceModified: true }),
+    );
+  });
+
+  it("does not read this computer's library for a remote local skill", async () => {
+    mock = createMockOpenBot();
+    window.openbot = mock.api;
+    const skill = (await mock.api.skills.localList())[0];
+    vi.spyOn(mock.api.agent, "listInstalledSkills").mockResolvedValue([
+      {
+        skillId: skill.id,
+        slug: skill.slug,
+        name: skill.name,
+        installedVersion: 1,
+        availableVersion: 1,
+        state: "installed",
+      },
+    ]);
+    const localGet = vi.spyOn(mock.api.skills, "localGet");
+    const localList = vi.spyOn(mock.api.skills, "localList");
+    render(() => (
+      <AgentSkillsModal
+        open
+        skillsMode="readonly"
+        agentId="remote-chief"
+        agentName="Chief"
+        onOpenChange={vi.fn()}
+        onCountChange={vi.fn()}
+      />
+    ));
+    await fireEvent.click(await screen.findByRole("button", { name: /^Weekly summary/ }));
+    expect(
+      await screen.findByText("This local skill is stored on the host. Open its details on that computer."),
+    ).toBeInTheDocument();
+    expect(localGet).not.toHaveBeenCalled();
+    expect(localList).not.toHaveBeenCalled();
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+  });
+
   it("preserves settings after a failed save and a visit to Usage", async () => {
     mock = createMockOpenBot();
     window.openbot = mock.api;

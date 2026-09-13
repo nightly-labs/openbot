@@ -184,6 +184,32 @@ export const RemoteReadOnly: Story = {
   },
 };
 
+export const RemoteLocalDetail: Story = {
+  render: () => (
+    <AgentSkillsStory
+      skills={[
+        {
+          skillId: "local-skill-11111111-1111-4111-8111-111111111111",
+          slug: "weekly-summary",
+          name: "Weekly summary",
+          installedVersion: 1,
+          availableVersion: 1,
+          state: "installed",
+        },
+      ]}
+      skillsMode="readonly"
+    />
+  ),
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(await canvas.findByRole("button", { name: /Skills/ }));
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("button", { name: /^Weekly summary/ }));
+    await expect(
+      await body.findByText("This local skill is stored on the host. Open its details on that computer."),
+    ).toBeVisible();
+  },
+};
+
 export const RemoveConfirm: Story = {
   render: () => (
     <AgentSkillsStory skills={STORY_INSTALLED_SKILLS.chief ?? []} onAddFromMarketplace={addFromMarketplace} />

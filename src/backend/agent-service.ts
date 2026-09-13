@@ -1744,7 +1744,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (LOCAL_SKILL_TOOL_DEFINITIONS.some((tool) => tool.name === params.tool)) {
       try {
         if (!this.localSkillTools) throw new Error("Local skill tools are unavailable.");
-        return openBotToolResult(
+        const result = openBotToolResult(
           await runLocalSkillTool(this.localSkillTools(), senderAgentId, params.tool, params.arguments, (event) => {
             const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
             const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
@@ -1763,6 +1763,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             this.#conversation.publishConversation(persisted);
           }),
         );
+        return {
+          ...result,
+          contentItems: result.contentItems.map((item) => ({ ...item, text: redactText(item.text) })),
+        };
       } catch (error) {
         return {
           success: false,

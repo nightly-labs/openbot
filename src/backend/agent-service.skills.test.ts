@@ -102,8 +102,25 @@ describe.sequential("local skill provider tools", () => {
         versionId: "revision-1",
         bundleSha256: "hash",
         files: ["SKILL.md"],
-        instructions: "Summarize the week.",
+        instructions: "Summarize the week. password=synthetic-skill-secret",
+        examplePrompt: "Use api_key=synthetic-example-secret",
       };
+      vi.mocked(api.get).mockResolvedValue(skill);
+      vi.mocked(api.list).mockResolvedValue([skill]);
+      for (const tool of ["read_local_skill", "list_local_skills"]) {
+        const response = await callOpenBotTool(
+          client,
+          threadId,
+          tool,
+          tool === "read_local_skill" ? { skillId: skill.id } : {},
+        );
+        const serialized = JSON.stringify(response.result);
+        expect(serialized).not.toContain("synthetic-skill-secret");
+        expect(serialized).not.toContain("synthetic-example-secret");
+        expect(serialized).toContain("[redacted]");
+        expect(serialized).toContain(skill.id);
+      }
+      expect(skill.instructions).toContain("synthetic-skill-secret");
       create.mockResolvedValue(skill);
       vi.mocked(api.revise).mockResolvedValue({ ...skill, version: 2 });
       vi.mocked(api.install).mockResolvedValue({

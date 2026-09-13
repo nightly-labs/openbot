@@ -96,7 +96,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
       if (showLoading && targetId) {
         const target = next.find((skill) => skill.skillId === targetId);
         if (target) await openDetail(target);
-        else setFilter("local");
+        else if (mutable()) setFilter("local");
       }
     } catch (caught) {
       if (request === listRequest) setError(errorMessage(caught, "Could not load skills."));
@@ -125,7 +125,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     try {
       const [marketplace, local] = await Promise.allSettled([
         window.openbot.skills.list({ limit: 50 }),
-        window.openbot.skills.localList(),
+        mutable() ? window.openbot.skills.localList() : Promise.resolve([]),
       ]);
       const page = {
         skills: [
@@ -156,6 +156,10 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setDetail(null);
     setDetailLoading(true);
     setError(null);
+    if (!mutable() && skill.skillId.startsWith("local-skill-")) {
+      setDetailLoading(false);
+      return;
+    }
     try {
       const next = skill.skillId.startsWith("local-skill-")
         ? await window.openbot.skills.localGet({ skillId: skill.skillId, revision: skill.installedVersion })
@@ -524,6 +528,11 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                   data-page-id="2"
                                   onScroll={scrollFades.measure}
                                 >
+                                  <Show when={!mutable() && skill().skillId.startsWith("local-skill-")}>
+                                    <p class="agent-memory-state" role="status">
+                                      This local skill is stored on the host. Open its details on that computer.
+                                    </p>
+                                  </Show>
                                   <Show when={detailLoading()}>
                                     <p class="agent-memory-state">Loading details…</p>
                                   </Show>
@@ -639,7 +648,7 @@ function SkillMoreMenu(props: {
           <Show when={props.skill.state === "update-available"}>
             <DropdownMenu.Item onSelect={props.onUpdate}>Update</DropdownMenu.Item>
           </Show>
-          <Show when={props.skill.state === "needs-repair"}>
+          <Show when={props.skill.state === "needs-repair" || props.skill.state === "modified"}>
             <DropdownMenu.Item onSelect={props.onRepair}>Repair</DropdownMenu.Item>
           </Show>
           <DropdownMenu.Item class="ui-action-menu-danger" onSelect={props.onUninstall}>
@@ -683,7 +692,7 @@ function confirmTitle(request: ConfirmRequest | null) {
 function confirmBody(request: ConfirmRequest | null) {
   if (!request) return "";
   if (request.kind === "replace") {
-    return "Updating this skill replaces the local files with the marketplace package. Your edits in this skill folder will be lost.";
+    return "Updating this skill replaces the local files with the latest skill package. Your edits in this skill folder will be lost.";
   }
   if (request.skill.state === "modified") {
     return "This skill has local changes in the agent workspace. Remove deletes those files. Original chat messages stay.";
