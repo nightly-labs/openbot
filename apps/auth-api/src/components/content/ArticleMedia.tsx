@@ -294,12 +294,10 @@ function ArticleFigure(props: {
       <Show when={props.mountOn} fallback={body()}>
         {(title) => (
           <div ref={mount} class="post-mount" data-pad={pad()}>
-            {/* Hover rather than live. A body can hold several pictures, and a
-                live gradient is a WebGL context held for as long as the article
-                is open; a browser keeps only a dozen or so of those. Nothing is
-                lost by waiting: the mount is behind a picture, so a reader who
-                never rests a pointer on it never had much of it to see. */}
-            <ArticleGradient title={title()} mode="hover" hoverTarget={() => mount} />
+            {/* Keep the article's mounted backgrounds moving with the hero. The
+                gradient still falls back to its baked or CSS frame, and the
+                live mode respects the reader's reduced-motion preference. */}
+            <ArticleGradient title={title()} mode="live" />
             {body()}
           </div>
         )}

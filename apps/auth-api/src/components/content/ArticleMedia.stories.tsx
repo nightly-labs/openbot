@@ -99,8 +99,8 @@ export const ProductShot: Story = {
 
 /**
  * How a mounted screenshot reads on a real article page: the same header, title,
- * hero artwork and column as /guides/openbot-101, with the card gradient around
- * the pictures. Rest a pointer on a mount to start the animation.
+ * hero artwork and column as /guides/openbot-101, with the article gradient moving
+ * around the pictures.
  */
 export const InTheArticle: Story = {
   render: () => (

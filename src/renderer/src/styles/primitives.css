@@ -839,28 +839,35 @@
 }
 
 .ui-switch {
+  --ui-switch-thumb-size: var(--openbot-switch-thumb);
+  --ui-switch-inset: var(--openbot-switch-inset);
+  --ui-switch-travel: calc(var(--openbot-switch-width) - var(--ui-switch-thumb-size) - (var(--ui-switch-inset) * 2));
   position: relative;
   z-index: 0;
-  width: 32px;
-  height: 18.4px;
+  width: var(--openbot-switch-width);
+  height: var(--openbot-switch-height);
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--openbot-radius-pill);
   outline: none;
-  background: var(--openbot-border-strong);
-  box-shadow: 0 1px 2px var(--openbot-shadow-ring);
+  background: var(--openbot-bg-control);
+  box-shadow:
+    inset 0 0 0 1px var(--openbot-border-strong),
+    0 1px 2px var(--openbot-shadow-ring);
   transition:
     background-color var(--openbot-duration-hover) ease,
-    border-color var(--openbot-duration-hover) ease,
     box-shadow var(--openbot-duration-hover) ease,
     opacity var(--openbot-duration-hover) ease;
 }
 
 .ui-switch[data-size="sm"] {
-  width: 24px;
-  height: 14px;
+  --ui-switch-thumb-size: var(--openbot-switch-sm-thumb);
+  --ui-switch-inset: var(--openbot-switch-sm-inset);
+  --ui-switch-travel: calc(var(--openbot-switch-sm-width) - var(--ui-switch-thumb-size) - (var(--ui-switch-inset) * 2));
+  width: var(--openbot-switch-sm-width);
+  height: var(--openbot-switch-sm-height);
 }
 
 .ui-switch[data-checked] {
@@ -868,17 +875,14 @@
 }
 
 .ui-switch[data-invalid] {
-  border-color: var(--openbot-danger-border);
   box-shadow: 0 0 0 3px var(--openbot-danger-focus);
 }
 
 .ui-switch:not([data-pointer-focus]):has(.ui-switch-input:focus-visible) {
-  border-color: var(--openbot-border-focus);
   box-shadow: var(--openbot-focus-ring);
 }
 
 .ui-switch[data-invalid]:not([data-pointer-focus]):has(.ui-switch-input:focus-visible) {
-  border-color: var(--openbot-danger-border);
   box-shadow: 0 0 0 3px var(--openbot-danger-focus);
 }
 
@@ -925,34 +929,38 @@
   inset: 0;
   display: flex;
   align-items: center;
+  overflow: hidden;
   border-radius: inherit;
   cursor: pointer;
 }
 
+.ui-switch-control[data-dragging] {
+  cursor: grabbing;
+}
+
 .ui-switch-thumb {
-  width: 16px;
-  height: 16px;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: var(--ui-switch-thumb-size);
+  height: var(--ui-switch-thumb-size);
   display: block;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-text-primary);
   box-shadow: 0 1px 2px var(--openbot-shadow-ring);
-  transition:
-    background-color var(--openbot-duration-hover) ease,
-    transform var(--openbot-duration-normal) var(--openbot-ease-out);
-}
-
-.ui-switch[data-size="sm"] .ui-switch-thumb {
-  width: 12px;
-  height: 12px;
+  transform: translate3d(
+      calc(var(--ui-switch-inset) + (var(--ui-switch-position, 0) * var(--ui-switch-travel))),
+      -50%,
+      0
+    )
+    scale(var(--ui-switch-scale-x, 1), var(--ui-switch-scale-y, 1));
+  transform-origin: center;
+  will-change: transform;
+  transition: background-color var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
 .ui-switch-thumb[data-checked] {
-  transform: translateX(14px);
   background: var(--openbot-text-on-light);
-}
-
-.ui-switch[data-size="sm"] .ui-switch-thumb[data-checked] {
-  transform: translateX(10px);
 }
 
 .ui-switch[data-disabled] {

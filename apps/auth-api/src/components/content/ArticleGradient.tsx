@@ -6,10 +6,10 @@ import { motionWelcome } from "../../lib/motion";
 import { cx } from "../../lib/utils";
 
 // Three layers, cheapest first: a CSS gradient that server-renders, the PNG baked
-// at build time over it, and — for the featured card, or for a card under the
-// pointer — a live WebGL canvas over both. Each layer is an improvement on the one
-// below, so any of them failing leaves something that still looks like the
-// article's artwork.
+// at build time over it, and — for the featured card, article artwork, or a card
+// under the pointer — a live WebGL canvas over both. Each layer is an improvement
+// on the one below, so any of them failing leaves something that still looks like
+// the article's artwork.
 //
 // The two still layers are two backgrounds of one element rather than an <img>.
 // A background that fails to load falls through to the layer below it without
@@ -27,7 +27,8 @@ import { cx } from "../../lib/utils";
 // The reason for the staging is context budget. A browser allows on the order of
 // eight to sixteen live WebGL contexts and drops the oldest without warning past
 // that. The index page shows one featured card and a grid, so "live" is used once
-// and everything else waits to be hovered. At most two contexts exist at a time.
+// and everything else waits to be hovered. Article pages keep their artwork live;
+// the page is short, and the visible article backgrounds share that motion.
 //
 // The still has to be the animation's own first frame, or the moment the shader
 // arrives is a cut between two different pictures. The baked PNG is drawn from
@@ -36,7 +37,7 @@ import { cx } from "../../lib/utils";
 // development it answers 404, and the CSS approximation underneath is a handful of
 // coloured blobs that look nothing like the shader's output.
 //
-// So a card that can move draws its own, once it is near the viewport. It mounts
+// So a hover card that can move draws its own, once it is near the viewport. It mounts
 // the shader with the clock stopped, keeps the frame it produced as the still, and
 // lets the context go again. That picture is exact, it is the right shape because
 // it was drawn at the element's own size, and it costs one short-lived context per
@@ -44,7 +45,7 @@ import { cx } from "../../lib/utils";
 // same frame, so the handover is never a cut and never a cut to an empty rectangle.
 // A card still below the fold does not spend that context, or the encode, at all.
 //
-// A card that cannot move — reduced motion, or a screen with no pointer to rest —
+// An artwork frame that cannot move — reduced motion, or a screen with no pointer to rest —
 // keeps the baked PNG. With no shader to hand over to there is no cut to avoid,
 // and drawing it again would spend a context and an image encode on every card.
 
