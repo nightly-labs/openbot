@@ -451,9 +451,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       committed = await this.#commit(staging, destination, spec);
       await verifyInstalledRuntime(destination, spec, this.#lock);
     } catch (error) {
-      // Only what this instance put there. A directory it adopted belongs to the sibling that
-      // installed it, and that sibling is entitled to keep running from it.
-      if (committed) await rm(this.#installRoot(spec), { recursive: true, force: true });
+      // Only what this instance put there, and only while it is still what it put there. A
+      // directory it adopted belongs to the sibling that installed it, and so does one that
+      // verifies by now: the reading above can fail because a sibling was replacing the
+      // destination as it ran, and what a sibling puts there is another copy of the same pinned
+      // version. Reporting a failed install is the cost of that; taking the runtime away is not.
+      if (committed && !(await this.#verifies(this.#installRoot(spec), spec))) {
+        await rm(this.#installRoot(spec), { recursive: true, force: true });
+      }
       throw error;
     } finally {
       await rm(staging, { recursive: true, force: true });
