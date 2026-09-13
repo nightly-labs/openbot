@@ -451,18 +451,38 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       committed = await this.#commit(staging, destination, spec);
       await verifyInstalledRuntime(destination, spec, this.#lock);
     } catch (error) {
-      // Only what this instance put there, and only while it is still what it put there. A
-      // directory it adopted belongs to the sibling that installed it, and so does one that
-      // verifies by now: the reading above can fail because a sibling was replacing the
-      // destination as it ran, and what a sibling puts there is another copy of the same pinned
-      // version. Reporting a failed install is the cost of that; taking the runtime away is not.
-      if (committed && !(await this.#verifies(this.#installRoot(spec), spec))) {
-        await rm(this.#installRoot(spec), { recursive: true, force: true });
-      }
+      // Only what this instance put there. A directory it adopted belongs to the sibling that
+      // installed it, and that sibling is entitled to keep running from it.
+      if (committed) await this.#discardRejected(spec);
       throw error;
     } finally {
       await rm(staging, { recursive: true, force: true });
     }
+  }
+
+  /**
+   * Takes away an install this instance committed and could not then read back.
+   *
+   * A reading and a delete are two steps, and on a store the whole computer shares the path can
+   * change between them: the reading that sent this instance here can fail because a sibling was
+   * replacing the destination while it ran, and by the time a delete follows, the sibling's own
+   * copy can be there. So nothing is read in place and nothing is deleted in place. What is there
+   * is moved away first, which the filesystem grants to one instance at a time, and read where
+   * nothing else can reach it: a runtime that verifies is a sibling's install and goes back where
+   * the sibling left it. Only what does not verify is removed, and by then this instance is the
+   * only one that can see it.
+   */
+  async #discardRejected(spec: RuntimeSpec): Promise<void> {
+    const installRoot = this.#installRoot(spec);
+    const aside = join(
+      this.#providerRoot(spec.provider),
+      `.replaced-${spec.target}-${spec.version}-${randomBytes(4).toString("hex")}`,
+    );
+    if (!(await renameIfPresent(installRoot, aside))) return;
+    if (await this.#verifies(aside, spec)) {
+      if (await renameIfVacant(aside, installRoot)) return;
+    }
+    await rm(aside, { recursive: true, force: true }).catch(() => undefined);
   }
 
   /**
