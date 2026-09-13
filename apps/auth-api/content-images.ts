@@ -127,12 +127,11 @@ export function contentImageKey(job: ContentImageJob): string {
   return digest.slice(0, 32);
 }
 
-// Read from this app's manifest rather than the installed package, because the
-// library does not export its own package.json. The version is pinned exactly
-// there, so the two cannot disagree.
+// The shader version is pinned in the workspace catalog. Hash the resolved
+// version so moving a dependency into the catalog does not invalidate artwork.
 function shadersVersion(): string {
-  const manifest: { dependencies?: Record<string, string> } = require("./package.json");
-  return manifest.dependencies?.["@paper-design/shaders"] ?? "unknown";
+  const manifest: { workspaces: { catalog: Record<string, string> } } = require("../../package.json");
+  return manifest.workspaces.catalog["@paper-design/shaders"] ?? "unknown";
 }
 
 /** Each way the committed artwork differs from the articles. Empty when it matches. */
