@@ -117,6 +117,14 @@ describe("SkillMarketplaceService", () => {
     expect(refreshedAgents).toEqual([agent.id]);
 
     const claudeSkill = join(agent.workspacePath, ".claude", "skills", "release-notes", "SKILL.md");
+    const agentsSkill = join(agent.workspacePath, ".agents", "skills", "release-notes", "SKILL.md");
+    await rm(agentsSkill);
+    await expect(service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })).rejects.toThrow(
+      "This skill needs repair before it can be disabled.",
+    );
+    await expect(readFile(claudeSkill, "utf8")).resolves.toBe(skillContents);
+    expect((await service.listInstalled(agent.id))[0].enabled).not.toBe(false);
+    await writeFile(agentsSkill, skillContents);
     await writeFile(claudeSkill, "Claude edits");
     const agentsReference = join(
       agent.workspacePath,

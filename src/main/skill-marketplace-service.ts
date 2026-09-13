@@ -356,8 +356,11 @@ export class SkillMarketplaceService {
         await installedSkillDescription(agent.workspacePath, entry),
       );
     }
-    if (!input.enabled && (await installedState(agent.workspacePath, entry)) === "modified") {
-      throw new Error("This skill has local changes. Save or reconcile both provider copies before disabling it.");
+    if (!input.enabled) {
+      const state = await installedState(agent.workspacePath, entry);
+      if (state === "modified")
+        throw new Error("This skill has local changes. Save or reconcile both provider copies before disabling it.");
+      if (state === "needs-repair") throw new Error("This skill needs repair before it can be disabled.");
     }
     if (input.enabled) {
       const stash = disabledDirectory(agent.workspacePath, entry.slug);
