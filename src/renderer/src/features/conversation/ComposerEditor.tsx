@@ -118,7 +118,15 @@ export function ComposerEditor(props: ComposerEditorProps) {
     content: string;
   } | null>(null);
   const attachmentTooltipId = `composer-file-tooltip-${createUniqueId()}`;
-  const [pickerFrame, setPickerFrame] = createSignal<PickerFrame>({ mount: undefined, bottom: 0 });
+  /*
+   * Measured again on every keystroke, and almost always the same two values. Without this
+   * comparison each measurement is a new object, which moves the picker to a new portal and
+   * replays its entrance animation: the panel appears to jump for each character typed.
+   */
+  const [pickerFrame, setPickerFrame] = createSignal<PickerFrame>(
+    { mount: undefined, bottom: 0 },
+    { equals: (previous, next) => previous.mount === next.mount && previous.bottom === next.bottom },
+  );
   const matchingAgents = createMemo(() => {
     const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
     return props.agents.filter(
