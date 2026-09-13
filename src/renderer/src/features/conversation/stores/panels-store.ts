@@ -1,4 +1,4 @@
-import type { AttachmentSummary, BrowserBounds } from "@openbot/contracts/ipc";
+import { type AttachmentSummary, type BrowserBounds, canPreviewAttachment } from "@openbot/contracts/ipc";
 import { createMemo, createSignal } from "solid-js";
 import { errorMessage } from "../../../error-message";
 import type { ConversationProps, MediaPreview, RightPanelMode, SidebarFilePreview } from "../conversation-types";
@@ -92,7 +92,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   }
 
   async function previewAttachment(attachment: AttachmentSummary) {
-    if (!attachment.previewUrl || attachment.previewKind === "none") return;
+    if (!attachment.previewUrl || !canPreviewAttachment(attachment)) return;
     deps.setMediaPreview({
       attachment,
       text: null,

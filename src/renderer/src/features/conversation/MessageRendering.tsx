@@ -1,5 +1,5 @@
 import type { AttachmentSummary, InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
-import { MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
+import { canPreviewAttachment, MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { type BubbleVariant, Button, DropdownMenu } from "../../components/ui";
 import { prefersReducedMotion } from "../../components/ui/utils";
@@ -209,7 +209,7 @@ export function MessageBody(props: {
       onSelectAgent={props.onSelectAgent}
       onOpenLink={props.onOpenLink}
       onOpenAttachment={(attachment) =>
-        attachment.previewKind === "none" ? props.onAttachmentAction(attachment, "open") : props.onPreview(attachment)
+        !canPreviewAttachment(attachment) ? props.onAttachmentAction(attachment, "open") : props.onPreview(attachment)
       }
       onOpenSharedFile={props.onOpenSharedFile}
       onOpenWorkspaceFile={props.onOpenWorkspaceFile}
@@ -240,7 +240,7 @@ export function MessageBody(props: {
                 onSelectAgent={props.onSelectAgent}
                 onOpenLink={props.onOpenLink}
                 onOpenAttachment={(attachment) =>
-                  attachment.previewKind === "none"
+                  !canPreviewAttachment(attachment)
                     ? props.onAttachmentAction(attachment, "open")
                     : props.onPreview(attachment)
                 }
@@ -284,7 +284,7 @@ export function MessageBody(props: {
                         onSelectAgent={props.onSelectAgent}
                         onOpenLink={props.onOpenLink}
                         onOpenAttachment={(attachment) =>
-                          attachment.previewKind === "none"
+                          !canPreviewAttachment(attachment)
                             ? props.onAttachmentAction(attachment, "open")
                             : props.onPreview(attachment)
                         }
@@ -308,7 +308,7 @@ export function MessageBody(props: {
                       onSelectAgent={props.onSelectAgent}
                       onOpenLink={props.onOpenLink}
                       onOpenAttachment={(attachment) =>
-                        attachment.previewKind === "none"
+                        !canPreviewAttachment(attachment)
                           ? props.onAttachmentAction(attachment, "open")
                           : props.onPreview(attachment)
                       }

@@ -61,6 +61,7 @@ import {
   isDynamicIslandNotchSize,
   isDynamicIslandPreference,
   isDynamicIslandPresentation,
+  isFilePreviewKind,
   isQueuedMessageReceipt,
   isQueueSnapshot,
   isRoutine,
@@ -315,11 +316,7 @@ function decodeFilePreview(value: unknown): FilePreview {
     !isString(preview.name) ||
     !isNumber(preview.size) ||
     !isString(preview.mimeType) ||
-    (preview.previewKind !== "markdown" &&
-      preview.previewKind !== "text" &&
-      preview.previewKind !== "image" &&
-      preview.previewKind !== "pdf" &&
-      preview.previewKind !== "none") ||
+    !isFilePreviewKind(preview.previewKind) ||
     (preview.bytes !== null && !(preview.bytes instanceof Uint8Array))
   ) {
     throw new Error("Invalid file preview response.");

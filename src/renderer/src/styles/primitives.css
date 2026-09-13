@@ -1934,10 +1934,6 @@ button.ui-bubble-content {
   background: var(--openbot-danger-soft);
 }
 
-.ui-bubble:focus-within > .ui-bubble-content {
-  border-color: var(--openbot-border-focus);
-}
-
 .ui-bubble-reactions {
   position: absolute;
   z-index: 1;

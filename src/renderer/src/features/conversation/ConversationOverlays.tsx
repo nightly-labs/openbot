@@ -1,3 +1,4 @@
+import { playableMediaKind } from "@openbot/contracts/attachment-files";
 import { Show } from "solid-js";
 import { Button, Dialog } from "../../components/ui";
 import { CloseIcon } from "./ConversationIcons";
@@ -36,6 +37,19 @@ export function ConversationOverlays() {
                     title={preview().attachment.name}
                     src={preview().attachment.previewUrl ?? ""}
                   />
+                </Show>
+                {/* Media keeps `previewKind: "none"` on the wire, because the frozen Team API
+                    attachment validators accept only image, pdf, text, and none. The MIME type
+                    carries the kind instead. */}
+                <Show when={playableMediaKind(preview().attachment.mimeType) === "audio"}>
+                  <audio class="media-audio" controls src={preview().attachment.previewUrl ?? ""}>
+                    <track kind="captions" />
+                  </audio>
+                </Show>
+                <Show when={playableMediaKind(preview().attachment.mimeType) === "video"}>
+                  <video class="media-video" controls src={preview().attachment.previewUrl ?? ""}>
+                    <track kind="captions" />
+                  </video>
                 </Show>
                 <Show when={preview().attachment.previewKind === "text"}>
                   <pre class="media-text">{preview().loading ? "Loading…" : (preview().error ?? preview().text)}</pre>

@@ -1,4 +1,5 @@
 import { IMAGE_ATTACHMENT_ACCEPT, supportedAttachmentExtensions } from "@openbot/contracts/attachment-files";
+import { canPreviewAttachment } from "@openbot/contracts/ipc";
 import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
@@ -206,9 +207,9 @@ export function ConversationComposer() {
               }}
               onSubmit={submitComposer}
               onOpenAttachment={(attachment) =>
-                attachment.previewKind === "none"
-                  ? attachmentAction(attachment, "open")
-                  : void previewAttachment(attachment)
+                canPreviewAttachment(attachment)
+                  ? void previewAttachment(attachment)
+                  : attachmentAction(attachment, "open")
               }
             />
           </div>

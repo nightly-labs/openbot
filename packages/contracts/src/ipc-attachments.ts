@@ -1,3 +1,4 @@
+import { playableMediaKind } from "./attachment-files";
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { isDynamicRecord, isNumber, isOneOf } from "./runtime-values";
@@ -27,6 +28,15 @@ export function isAttachmentSummary(value: unknown): value is AttachmentSummary 
     isOneOf(["image", "pdf", "text", "none"] as const, value.previewKind) &&
     (value.previewUrl === null || isBoundedString(value.previewUrl, INPUT_LIMITS.avatarUrl))
   );
+}
+
+/**
+ * Whether a surface can show the attachment itself, instead of opening it in another application.
+ * Audio and video keep `previewKind: "none"` on the wire, because the released Team API validators
+ * accept only image, pdf, text, and none. The MIME type carries the kind instead.
+ */
+export function canPreviewAttachment(attachment: AttachmentSummary): boolean {
+  return attachment.previewKind !== "none" || playableMediaKind(attachment.mimeType) !== null;
 }
 
 export type DraftAttachment = AttachmentSummary;
@@ -65,7 +75,16 @@ export interface OpenWorkspaceFileInput {
   path: string;
 }
 
-export type FilePreviewKind = "markdown" | "text" | "image" | "pdf" | "none";
+// Wider than AttachmentPreviewKind on purpose: FilePreview never crosses the Team API, so it can
+// gain kinds that the frozen v1-v4 attachment validators would reject. The preload boundary decodes
+// against this list, so a new kind must be added here to reach the renderer.
+export const FILE_PREVIEW_KINDS = ["markdown", "text", "image", "pdf", "audio", "video", "none"] as const;
+
+export type FilePreviewKind = (typeof FILE_PREVIEW_KINDS)[number];
+
+export function isFilePreviewKind(value: unknown): value is FilePreviewKind {
+  return isOneOf(FILE_PREVIEW_KINDS, value);
+}
 
 export interface FilePreview {
   name: string;

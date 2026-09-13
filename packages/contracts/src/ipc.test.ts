@@ -4,6 +4,8 @@ import {
   AGENT_RUNTIME_ATTENTION_LIMIT,
   AGENT_RUNTIME_TEXT_LIMIT,
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
+  type AttachmentSummary,
+  canPreviewAttachment,
   decodeChannel,
   hostedSiteConversationEvent,
   hostedSiteConversationEventItemType,
@@ -22,6 +24,7 @@ import {
   isCustomProviderResult,
   isCustomProviderSummary,
   isDynamicIslandAction,
+  isFilePreviewKind,
   isHostedSiteConversationEventUrl,
   isMessageReaction,
   isQueuedMessageReceipt,
@@ -725,6 +728,38 @@ describe("renderer-to-main boundary guards", () => {
     expect(isAttachmentSummary(attachment)).toBe(true);
     expect(isAttachmentSummary({ ...attachment, kind: "video" })).toBe(false);
     expect(isAttachmentSummary({ ...attachment, previewKind: "html" })).toBe(false);
+  });
+
+  it("lets a surface show media that the wire reports as unpreviewable", () => {
+    const recording: AttachmentSummary = {
+      id: "attachment-2",
+      name: "standup.mp3",
+      size: 4096,
+      kind: "file",
+      mimeType: "audio/mpeg",
+      previewKind: "none",
+      previewUrl: null,
+    };
+    expect(canPreviewAttachment(recording)).toBe(true);
+    expect(canPreviewAttachment({ ...recording, name: "demo.mov", mimeType: "video/quicktime" })).toBe(true);
+    expect(
+      canPreviewAttachment({ ...recording, name: "notes.pdf", mimeType: "application/pdf", previewKind: "pdf" }),
+    ).toBe(true);
+    expect(
+      canPreviewAttachment({
+        ...recording,
+        name: "plan.xlsx",
+        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }),
+    ).toBe(false);
+  });
+
+  it("accepts every file preview kind that the panel can show, and nothing else", () => {
+    for (const kind of ["markdown", "text", "image", "pdf", "audio", "video", "none"]) {
+      expect(isFilePreviewKind(kind)).toBe(true);
+    }
+    expect(isFilePreviewKind("html")).toBe(false);
+    expect(isFilePreviewKind(undefined)).toBe(false);
   });
 
   it("validates the usage windows inside an account usage limit", () => {

@@ -380,6 +380,31 @@
     -10px 0 28px var(--openbot-accent-soft);
 }
 
+/* transitions.dev panel reveal for the file preview. The panel enters from
+   the right edge, so it travels on X. `.browser-panel` declares its own
+   transition later in the cascade than the `.t-panel-slide` snippet, so both
+   property lists are restated here at a higher specificity. */
+.file-preview-panel.t-panel-slide {
+  --panel-translate-x: 24px;
+  --panel-translate-y: 0px;
+
+  transition:
+    transform var(--panel-close-dur) var(--panel-ease),
+    opacity var(--panel-close-dur) var(--panel-ease),
+    filter var(--panel-close-dur) var(--panel-ease),
+    border-color var(--openbot-duration-slow) ease,
+    box-shadow var(--openbot-duration-slow) ease;
+}
+
+.file-preview-panel.t-panel-slide[data-open="true"] {
+  transition:
+    transform var(--panel-open-dur) var(--panel-ease),
+    opacity var(--panel-open-dur) var(--panel-ease),
+    filter var(--panel-open-dur) var(--panel-ease),
+    border-color var(--openbot-duration-slow) ease,
+    box-shadow var(--openbot-duration-slow) ease;
+}
+
 .file-preview-header {
   display: flex;
   height: 39px;
@@ -460,6 +485,20 @@
   height: 100%;
   border: 0;
   background: var(--openbot-bg-canvas);
+}
+
+.file-preview-audio {
+  display: block;
+  width: calc(100% - 40px);
+  margin: 20px;
+}
+
+.file-preview-video {
+  display: block;
+  width: 100%;
+  max-height: 100%;
+  background: var(--openbot-bg-canvas);
+  object-fit: contain;
 }
 
 .file-preview-unsupported {
@@ -7143,10 +7182,6 @@ button.chat-action-target:active,
   background: var(--openbot-bg-canvas);
 }
 
-.question-prompt-bubble:focus-within > .ui-bubble-content {
-  border-color: var(--openbot-border);
-}
-
 .question-prompt-complete {
   min-width: 0;
   display: grid;
@@ -7693,6 +7728,18 @@ button.chat-action-target:active,
   border: 0;
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-surface-light);
+}
+
+.media-audio {
+  width: min(560px, calc(100vw - 78px));
+}
+
+.media-video {
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 140px);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-canvas);
+  object-fit: contain;
 }
 
 .media-text {
