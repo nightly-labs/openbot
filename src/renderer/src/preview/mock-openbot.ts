@@ -33,6 +33,7 @@ import type {
   DirectTypingRealtimeEvent,
   DynamicIslandPreference,
   DynamicIslandPresentation,
+  FilePreview,
   HostedSiteSummary,
   HostStatus,
   InstalledSkill,
@@ -77,6 +78,7 @@ import {
   SIDEBAR_UNASSIGNED_SECTION_ID,
 } from "@openbot/contracts/ipc";
 import browserTakeoverPreviewUrl from "../../stories/assets/browser-takeover-preview.svg";
+import { filePreviewForPath } from "../../stories/file-previews";
 import {
   STORY_AGENT_STATUS,
   STORY_AGENT_SUBMISSIONS,
@@ -190,6 +192,23 @@ export interface MockOpenBotControls {
   emitHostStatus: (status: HostStatus) => void;
   emitRemoteDesktopSessions: (sessions: RemoteDesktopSession[]) => void;
   dispose: () => void;
+}
+
+/**
+ * The preview build has no main process to read a file, so it answers with the same fixtures that
+ * the file preview stories use. A path with no fixture keeps the unsupported shape, which is what
+ * the panel shows for a kind it cannot render.
+ */
+function mockFilePreview(path: string, fallbackName: string): FilePreview {
+  return (
+    filePreviewForPath(path) ?? {
+      name: path.split("/").at(-1) ?? fallbackName,
+      size: 0,
+      mimeType: "application/octet-stream",
+      previewKind: "none",
+      bytes: null,
+    }
+  );
 }
 
 function clone<T>(value: T): T {
@@ -1328,20 +1347,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       openAttachment: async (_input: OpenAttachmentInput) => undefined,
       openSharedFile: async (_input: OpenSharedFileInput) => undefined,
       openWorkspaceFile: async (_input: OpenWorkspaceFileInput) => undefined,
-      previewSharedFile: async (input: OpenSharedFileInput) => ({
-        name: input.path.split("/").at(-1) ?? "shared-file",
-        size: 0,
-        mimeType: "application/octet-stream",
-        previewKind: "none",
-        bytes: null,
-      }),
-      previewWorkspaceFile: async (input: OpenWorkspaceFileInput) => ({
-        name: input.path.split("/").at(-1) ?? "workspace-file",
-        size: 0,
-        mimeType: "application/octet-stream",
-        previewKind: "none",
-        bytes: null,
-      }),
+      previewSharedFile: async (input: OpenSharedFileInput) => mockFilePreview(input.path, "shared-file"),
+      previewWorkspaceFile: async (input: OpenWorkspaceFileInput) => mockFilePreview(input.path, "workspace-file"),
       sendMessage: async (input: SendMessageInput) => {
         const messageId = `mock-message-${messageCounter++}`;
         const deliveryId = `mock-delivery-${messageCounter++}`;
