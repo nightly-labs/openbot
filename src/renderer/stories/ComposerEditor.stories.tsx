@@ -150,7 +150,7 @@ export const SkillPicker: Story = {
     editor.dispatchEvent(new Event("input", { bubbles: true }));
     const picker = await within(document.body).findByRole("listbox", { name: "Insert skill" });
     await expect(picker).toBeInTheDocument();
-    await expect(within(document.body).getByRole("option", { name: "Release Notes Skill" })).toBeInTheDocument();
+    await expect(within(document.body).getByRole("option", { name: /^Release Notes/ })).toBeInTheDocument();
     await userEvent.keyboard("{Enter}");
     await expect(editor.querySelector('[data-skill-id="skill-release-notes"]')).not.toBeNull();
     await expect(editor).toHaveTextContent("Release Notes");

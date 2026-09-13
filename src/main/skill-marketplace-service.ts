@@ -541,6 +541,22 @@ async function writeFiles(root: string, files: Record<string, Uint8Array>): Prom
   }
 }
 
+async function hasUnexpectedSkillFiles(root: string, expected: Record<string, string>): Promise<boolean> {
+  const paths = Object.keys(expected);
+  async function visit(directory: string): Promise<boolean> {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      const name = relative(root, path).replaceAll("\\", "/");
+      if (entry.isSymbolicLink()) return true;
+      if (entry.isDirectory()) {
+        if (!paths.some((expectedPath) => expectedPath.startsWith(`${name}/`)) || (await visit(path))) return true;
+      } else if (!entry.isFile() || !(name in expected)) return true;
+    }
+    return false;
+  }
+  return visit(root);
+}
+
 async function installedState(workspace: string, entry: LockEntry): Promise<"installed" | "modified" | "needs-repair"> {
   const roots =
     entry.enabled === false ? [disabledDirectory(workspace, entry.slug)] : targetDirectories(workspace, entry.slug);
@@ -550,8 +566,7 @@ async function installedState(workspace: string, entry: LockEntry): Promise<"ins
     if (!(await pathExists(target))) continue;
     complete += 1;
     try {
-      const files = await readSkillFiles(target);
-      if (Object.keys(files).some((name) => !(name in entry.files))) return "modified";
+      if (await hasUnexpectedSkillFiles(target, entry.files)) return "modified";
     } catch {
       return "modified";
     }

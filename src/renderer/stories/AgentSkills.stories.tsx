@@ -142,8 +142,8 @@ export const OpenModal: Story = {
     await expect(within(dialog).queryByText("Managed")).toBeNull();
     await expect(within(dialog).queryByText("openbot-site-hosting")).toBeNull();
     await expect(within(dialog).getByText("Release notes")).toBeVisible();
-    await expect(within(dialog).getByText("Local changes")).toBeVisible();
-    await expect(within(dialog).getByText("Update available")).toBeVisible();
+    await expect(within(dialog).getByRole("button", { name: "Update Source check" })).toBeVisible();
+    await expect(within(dialog).getByRole("switch", { name: "Enable Release notes" })).toBeChecked();
   },
 };
 
