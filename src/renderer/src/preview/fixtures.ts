@@ -671,6 +671,17 @@ export const STORY_MARKETPLACE_SKILL_DETAILS: Record<string, MarketplaceSkillDet
 export const STORY_INSTALLED_SKILLS: Record<string, InstalledSkill[]> = {
   chief: [
     {
+      skillId: "openbot-skill-creator",
+      slug: "openbot-skill-creator",
+      name: "openbot-skill-creator",
+      description: "Create or revise a reusable local OpenBot skill.",
+      installedVersion: 1,
+      availableVersion: 1,
+      state: "installed",
+      enabled: true,
+      origin: "managed",
+    },
+    {
       skillId: "openbot-site-hosting",
       slug: "openbot-site-hosting",
       name: "openbot-site-hosting",

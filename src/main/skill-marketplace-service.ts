@@ -22,6 +22,7 @@ import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbo
 import { parse as parseYaml } from "yaml";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { LocalSkillLibrary } from "./local-skill-library";
+import { listManagedSkillsForChat } from "./managed-skill-service";
 import { archiveDirectory, inspectArchive, normalizedFiles } from "./skill-package";
 
 const DRAFT_LIFETIME_MS = 30 * 60 * 1000;
@@ -156,7 +157,7 @@ export class SkillMarketplaceService {
   async listInstalledForChatTags(agentId: string): Promise<InstalledSkill[]> {
     const agent = this.requireAgent(agentId);
     const lock = await readLock(agent.workspacePath);
-    const installed: InstalledSkill[] = [];
+    const installed: InstalledSkill[] = await listManagedSkillsForChat(agent);
     for (const entry of Object.values(lock.skills)) {
       if (entry.enabled === false) continue;
       installed.push(

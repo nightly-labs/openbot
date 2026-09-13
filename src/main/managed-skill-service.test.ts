@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
-import { ManagedSkillService } from "./managed-skill-service";
+import { listManagedSkillsForChat, ManagedSkillService } from "./managed-skill-service";
 
 const roots: string[] = [];
 
@@ -17,8 +17,14 @@ describe("managed site hosting skill", () => {
     roots.push(root);
     const workspace = join(root, "workspace");
     await mkdir(workspace);
+    await expect(listManagedSkillsForChat(agent(workspace))).resolves.toEqual([]);
     const source = join(process.cwd(), "resources/managed-skills/openbot-skill-creator/SKILL.md");
     await new ManagedSkillService(source, undefined, undefined, "openbot-skill-creator").syncAgent(agent(workspace));
+    for (const provider of ["codex", "claude"] as const) {
+      await expect(listManagedSkillsForChat({ ...agent(workspace), provider })).resolves.toEqual([
+        expect.objectContaining({ skillId: "openbot-skill-creator", origin: "managed", enabled: true }),
+      ]);
+    }
     for (const provider of [".agents", ".claude"]) {
       const content = await readFile(join(workspace, provider, "skills/openbot-skill-creator/SKILL.md"), "utf8");
       expect(content).toContain("create_skill");

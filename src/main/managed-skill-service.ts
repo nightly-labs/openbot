@@ -1,7 +1,9 @@
-import { lstat, mkdir, readFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import type { AgentSummary } from "@openbot/contracts/ipc";
+import type { AgentSummary, InstalledSkill } from "@openbot/contracts/ipc";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { parse as parseYaml } from "yaml";
 
 const MANAGED_SKILL_SLUG = "openbot-site-hosting";
 const OWNERSHIP_MARKER = ".openbot-managed.json";
@@ -229,4 +231,51 @@ function isMissingFileError(error: unknown): boolean {
 
 function isFileExistsError(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "EEXIST";
+}
+
+/** Read only OpenBot-owned skills from the active provider's skill folder. */
+export async function listManagedSkillsForChat(agent: AgentSummary): Promise<InstalledSkill[]> {
+  const root = await realpath(agent.workspacePath);
+  const directory = join(root, agent.provider === "claude" ? ".claude" : ".agents", "skills");
+  const skills: InstalledSkill[] = [];
+  try {
+    await verifySafeDirectory(root, directory);
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      try {
+        const folder = join(directory, entry.name);
+        await verifySafeDirectory(root, folder);
+        const marker = join(folder, OWNERSHIP_MARKER);
+        const file = join(folder, "SKILL.md");
+        await rejectSymlink(marker);
+        await rejectSymlink(file);
+        if (
+          (await optionalText(marker)) !== `${JSON.stringify({ managedBy: "openbot", slug: entry.name, version: 1 })}\n`
+        )
+          continue;
+        const content = await readFile(file, "utf8");
+        const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u.exec(content)?.[1];
+        if (!frontmatter) continue;
+        const metadata = parseYaml(frontmatter);
+        if (!isDynamicRecord(metadata) || metadata.name !== entry.name || typeof metadata.description !== "string")
+          continue;
+        skills.push({
+          skillId: entry.name,
+          slug: entry.name,
+          name: entry.name,
+          description: metadata.description,
+          installedVersion: 1,
+          availableVersion: 1,
+          enabled: true,
+          state: "installed",
+          origin: "managed",
+        });
+      } catch {
+        /* Missing or invalid managed files are not selectable. */
+      }
+    }
+  } catch {
+    /* The workspace can have no managed skills yet. */
+  }
+  return skills;
 }
