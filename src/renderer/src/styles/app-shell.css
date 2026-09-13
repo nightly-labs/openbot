@@ -3080,8 +3080,7 @@ textarea {
 .agent-setup-card,
 .provider-model-panel,
 .provider-model-rail,
-.avatar-editor,
-.mention-picker {
+.avatar-editor {
   border-color: var(--openbot-border);
   background: var(--openbot-bg-surface);
   color: var(--openbot-text-primary);

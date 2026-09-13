@@ -1,5 +1,6 @@
 .reference-chip,
-.composer-mention-token.reference-chip {
+/* Every composer token, including the ones for a reference whose agent or skill is gone. */
+.composer-mention-token {
   display: inline-flex;
   box-sizing: border-box;
   min-width: 0;

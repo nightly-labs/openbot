@@ -8,15 +8,21 @@ import type {
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { Portal } from "@solidjs/web";
-import { createEffect, createSignal, onCleanup, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, onSettled, type ParentProps, Show } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { clipboardFiles } from "../../preload/clipboard-files";
 import type { AgentMessage as RendererAgentMessage } from "../src/data";
+import { AuthProvider } from "../src/features/account/account-context";
 import { Conversation, createConversationController } from "../src/features/conversation/Conversation";
 import { BrowserTakeoverCard } from "../src/features/conversation/ConversationPrompts";
 import { ConversationView } from "../src/features/conversation/ConversationView";
 import { ConversationControllerProvider } from "../src/features/conversation/conversation-controller-context";
+import { SetupProvider } from "../src/features/onboarding/onboarding-context";
+import { ServersProvider } from "../src/features/servers/servers-context";
+import { SettingsProvider } from "../src/features/settings/settings-context";
+import { UsageProvider } from "../src/features/usage/usage-context";
+import { PlatformProvider } from "../src/platform";
 import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
 import {
   STORY_AGENT_STATUS,
@@ -739,37 +745,57 @@ const promptChatMessages: RendererAgentMessage[] = [
   },
 ];
 
+type QueueDeliveryFixture = QueueSnapshot["deliveries"][number];
+
+const queuedDelivery: QueueDeliveryFixture = {
+  id: "queued-1",
+  messageId: "queued-message-1",
+  recipientAgentId: "chief",
+  sender: { kind: "user" },
+  text: "Add a final checklist.",
+  attachments: [],
+  replyToMessageId: null,
+  status: "queued",
+  position: 1,
+  turnId: null,
+  error: null,
+  createdAt: "2026-08-19T10:00:00.000Z",
+};
+
+/**
+ * The panel shows what waits behind the work that runs now, so `presentQueueDeliveries` returns
+ * nothing for a queue with no running delivery. Every queue fixture carries this one.
+ */
+const runningDelivery: QueueDeliveryFixture = {
+  ...queuedDelivery,
+  id: "queued-running",
+  messageId: "queued-message-running",
+  text: "Draft the rollout notes.",
+  status: "running",
+  position: 0,
+  turnId: "turn-active",
+  createdAt: "2026-08-19T09:59:00.000Z",
+};
+
 const queue: QueueSnapshot = {
   agentId: "chief",
-  deliveries: [
-    {
-      id: "queued-1",
-      messageId: "queued-message-1",
-      recipientAgentId: "chief",
-      sender: { kind: "user" },
-      text: "Add a final checklist.",
-      attachments: [],
-      replyToMessageId: null,
-      status: "queued",
-      position: 1,
-      turnId: null,
-      error: null,
-      createdAt: "2026-08-19T10:00:00.000Z",
-    },
-  ],
+  deliveries: [queuedDelivery, runningDelivery],
 };
 
 function queueWithItems(count: number, text = "Add the final checklist and verify the rollout notes"): QueueSnapshot {
   return {
     ...queue,
-    deliveries: Array.from({ length: count }, (_, index) => ({
-      ...queue.deliveries[0],
-      id: `queued-${index + 1}`,
-      messageId: `queued-message-${index + 1}`,
-      text: index === 0 ? text : `${text} — item ${index + 1}`,
-      position: index + 1,
-      createdAt: `2026-08-19T10:0${index}:00.000Z`,
-    })),
+    deliveries: [
+      ...Array.from({ length: count }, (_, index) => ({
+        ...queuedDelivery,
+        id: `queued-${index + 1}`,
+        messageId: `queued-message-${index + 1}`,
+        text: index === 0 ? text : `${text} — item ${index + 1}`,
+        position: index + 1,
+        createdAt: `2026-08-19T10:0${index}:00.000Z`,
+      })),
+      runningDelivery,
+    ],
   };
 }
 
@@ -785,12 +811,37 @@ const queueReferenceMessages = [
 
 const referenceQueue: QueueSnapshot = {
   ...queue,
-  deliveries: queueWithItems(queueReferenceMessages.length).deliveries.map((delivery, index) => ({
-    ...delivery,
-    text: queueReferenceMessages[index],
-    attachments: index === 2 ? [queuePreviewAttachments[0]] : index === 3 ? [queuePreviewAttachments[1]] : [],
-  })),
+  deliveries: [
+    ...queueWithItems(queueReferenceMessages.length)
+      .deliveries.filter((delivery) => delivery.status === "queued")
+      .map((delivery, index) => ({
+        ...delivery,
+        text: queueReferenceMessages[index],
+        attachments: index === 2 ? [queuePreviewAttachments[0]] : index === 3 ? [queuePreviewAttachments[1]] : [],
+      })),
+    runningDelivery,
+  ],
 };
+
+/**
+ * The domains `ConversationView` and its panels read through `use*()`, nested in the order
+ * `app-providers.tsx` uses. Each one talks to the mocked `window.openbot` the story installs.
+ */
+function StoryAppProviders(props: ParentProps) {
+  return (
+    <PlatformProvider>
+      <AuthProvider>
+        <SetupProvider>
+          <SettingsProvider>
+            <ServersProvider>
+              <UsageProvider>{props.children}</UsageProvider>
+            </ServersProvider>
+          </SettingsProvider>
+        </SetupProvider>
+      </AuthProvider>
+    </PlatformProvider>
+  );
+}
 
 function MockedConversation(props: {
   args: Parameters<typeof Conversation>[0];
@@ -881,19 +932,21 @@ function MockedConversation(props: {
   });
   return (
     <div ref={setStoryFrameElement} class="conversation-story-frame">
-      <ConversationControllerProvider controller={controller}>
-        <ConversationView
-          {...props.args}
-          messages={props.messages ?? props.args.messages}
-          unreadCount={unreadCount()}
-          firstUnreadMessageId={firstUnreadMessageId()}
-          onMarkRead={async () => {
-            await props.args.onMarkRead();
-            setUnreadCount(0);
-            setFirstUnreadMessageId(null);
-          }}
-        />
-      </ConversationControllerProvider>
+      <StoryAppProviders>
+        <ConversationControllerProvider controller={controller}>
+          <ConversationView
+            {...props.args}
+            messages={props.messages ?? props.args.messages}
+            unreadCount={unreadCount()}
+            firstUnreadMessageId={firstUnreadMessageId()}
+            onMarkRead={async () => {
+              await props.args.onMarkRead();
+              setUnreadCount(0);
+              setFirstUnreadMessageId(null);
+            }}
+          />
+        </ConversationControllerProvider>
+      </StoryAppProviders>
       <Show when={props.takeoverStateGallery && takeoverGalleryMount()}>
         <Portal mount={takeoverGalleryMount() ?? undefined}>
           <div class="browser-takeover-story-states">
@@ -1479,7 +1532,7 @@ export const SevenQueuedMessages: Story = {
             attachments: [],
             replyToMessageId,
             status: "queued",
-            position: current.deliveries.length + 1,
+            position: current.deliveries.filter((delivery) => delivery.status === "queued").length + 1,
             turnId: null,
             error: null,
             createdAt: new Date().toISOString(),
@@ -1519,8 +1572,12 @@ export const SevenQueuedMessagesInteractions: Story = {
     expect(composer.dispatchEvent(paddingPointerDown)).toBe(false);
     await waitFor(() => expect(editor).toHaveFocus());
 
-    const firstRow = canvasElement.querySelector<HTMLFieldSetElement>(".agent-queue-item");
-    if (!firstRow) throw new Error("Queue row is missing.");
+    // The panel mounts from an effect, so the first row arrives after the composer takes focus.
+    const firstRow = await waitFor(() => {
+      const row = canvasElement.querySelector<HTMLFieldSetElement>(".agent-queue-item");
+      if (!row) throw new Error("Queue row is missing.");
+      return row;
+    });
 
     fireEvent.keyDown(firstRow, { key: "ArrowDown", altKey: true });
     await waitFor(() =>
@@ -1581,7 +1638,7 @@ export const EditingQueuedMessage: Story = {
   args: {
     queue: {
       ...queue,
-      deliveries: [{ ...queue.deliveries[0], attachments: STORY_ATTACHMENTS }],
+      deliveries: [{ ...queuedDelivery, attachments: STORY_ATTACHMENTS }, runningDelivery],
     },
     activeTurnId: "turn-active",
   },

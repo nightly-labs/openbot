@@ -6153,25 +6153,12 @@ button.chat-action-target:active,
   pointer-events: none;
 }
 
-.composer-mention-token {
-  display: inline-flex;
-  height: 20px;
-  align-items: center;
-  gap: 4px;
-  margin: 0 1px;
-  border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-border);
-  padding: 0 6px 0 3px;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-sm);
-  line-height: 18px;
-  vertical-align: top;
-  white-space: nowrap;
-}
-
-.composer-tag-unavailable {
+/* The box comes from `.reference-chip`; this token only loses the chip fill and gains the outline. */
+.composer-mention-token.composer-tag-unavailable {
   border: 1px dashed var(--openbot-border-strong);
   background: transparent;
+  /* No leading icon, so the left inset matches the right one. */
+  padding-left: var(--openbot-space-1-5);
   color: var(--openbot-text-muted);
 }
 
@@ -6181,98 +6168,100 @@ button.chat-action-target:active,
   user-select: none;
 }
 
-.composer-mention-avatar {
-  display: inline-grid;
-  width: 15px;
-  height: 15px;
-  flex: 0 0 auto;
-  place-items: center;
-}
-
-.composer-mention-avatar > svg {
-  display: block;
-  width: 128%;
-  height: 128%;
-  overflow: visible;
-  translate: 0 -2px;
-}
-
+/*
+ * Hangs off the composer's top edge inside `.composer-wrap`, like `.agent-queue-panel`: the
+ * composer paints over the overlap, so the panel grows out from under the input. The bottom comes
+ * from the composer's measured height, which changes as the input grows.
+ */
 .mention-picker {
-  position: fixed;
-  z-index: 200;
-  display: grid;
-  max-height: 254px;
-  gap: 1px;
-  overflow-y: auto;
-  border: 1px solid var(--openbot-border-strong);
+  --mention-picker-overlap: 14px;
+  --mention-picker-side-inset: calc(var(--openbot-space-1-5) + 12px);
+
+  position: absolute;
+  z-index: 10;
+  right: var(--mention-picker-side-inset);
+  bottom: calc(var(--mention-picker-bottom, 0px) - var(--mention-picker-overlap));
+  left: var(--mention-picker-side-inset);
+  border: 1px solid var(--openbot-queue-border);
   border-radius: var(--openbot-radius-lg);
-  background: var(--openbot-bg-canvas);
-  padding: 7px;
-  box-shadow: 0 16px 34px var(--openbot-shadow-popover-ambient);
-  animation: mention-picker-in var(--openbot-duration-normal) cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  background: var(--openbot-queue-surface);
+  padding-bottom: var(--mention-picker-overlap);
+  color: var(--openbot-queue-text);
+  box-shadow: none;
+  transform-origin: bottom center;
+  animation: mention-picker-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/*
+ * The scroll lives on the list, not the panel, so the scroll fade masks the rows and leaves the
+ * panel border and background whole. The scrollbar stays hidden: the fade carries the same news.
+ */
+.mention-picker-list {
+  display: grid;
+  /* A plain auto track grows to the widest row, which would push the badges out of view. */
+  grid-template-columns: minmax(0, 1fr);
+  max-height: 213px;
+  overflow-y: auto;
+  /* An even inset all round: the row's own 8px carries the rest of the gap beside the text. */
+  padding: 5px;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.mention-picker-list::-webkit-scrollbar {
+  display: none;
 }
 
 @keyframes mention-picker-in {
   from {
     opacity: 0;
-    transform: translateY(4px) scale(0.99);
+    transform: translateY(5px) scaleY(0.94);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0) scaleY(1);
   }
 }
 
+/* The queue panel's row rhythm and colors: a 29px row, a small leading glyph, muted trailing text. */
 .mention-picker-option {
   display: flex;
   width: 100%;
-  height: 38px;
+  height: 29px;
   align-items: center;
-  gap: 9px;
+  gap: 7px;
   border: 0;
   border-radius: var(--openbot-radius-md);
   background: transparent;
-  padding: 5px 9px;
-  color: var(--openbot-text-primary);
+  padding: 0 8px;
+  color: var(--openbot-queue-text);
   text-align: left;
 }
 
-.mention-picker-section {
-  padding: 5px 9px 3px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  line-height: 14px;
-  text-transform: uppercase;
-}
-
 .mention-picker-file-option .attachment-reference-visual {
-  width: 23px;
-  height: 23px;
+  width: 20px;
+  height: 20px;
 }
 
 .mention-picker-option:hover,
 .mention-picker-option-active {
-  background: var(--openbot-bg-surface);
+  background: var(--openbot-hover);
 }
 
 .mention-picker-option .agent-avatar {
   --agent-avatar-optical-offset: -2px;
 
-  width: 23px;
-  height: 23px;
+  width: 20px;
+  height: 20px;
 }
 
 .mention-picker-skill-icon {
   display: grid;
-  width: 23px;
-  height: 23px;
+  width: 20px;
+  height: 20px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-accent-soft);
-  color: var(--openbot-accent-hover);
+  color: var(--openbot-queue-action);
 }
 
 .mention-picker-skill-icon > svg {
@@ -6280,38 +6269,9 @@ button.chat-action-target:active,
   height: 15px;
 }
 
-.mention-picker-skill-option {
-  height: auto;
-  min-height: 38px;
-  align-items: center;
-  padding-top: 6px;
-  padding-bottom: 6px;
-}
-
-.mention-picker-skill-copy {
-  display: grid;
+.mention-picker-option > strong {
   min-width: 0;
-  flex: 1;
-  gap: 1px;
-}
-
-.mention-picker-skill-copy strong {
-  margin: 0;
-}
-
-.mention-picker-skill-copy > span {
-  min-width: 0;
-  overflow: hidden;
-  margin: 0;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: 16px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mention-picker-option strong {
-  min-width: 0;
+  flex: 0 1 auto;
   overflow: hidden;
   font-size: var(--openbot-text-lg);
   font-weight: 500;
@@ -6320,11 +6280,21 @@ button.chat-action-target:active,
   white-space: nowrap;
 }
 
-.mention-picker-option > span:last-child:not(.mention-picker-skill-copy) {
-  margin-left: auto;
-  color: var(--openbot-text-muted);
+.mention-picker-description {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  color: var(--openbot-queue-action);
   font-size: var(--openbot-text-md);
   line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mention-picker-badge {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--openbot-queue-action);
 }
 
 .composer-attachments {
@@ -6619,13 +6589,19 @@ button.chat-action-target:active,
 .agent-queue-panel {
   --queue-row-height: 29px;
   --queue-composer-overlap: 14px;
+  /* The leading glyph fills its column, so this inset is the gap the eye sees on the left. */
+  --queue-row-inset-start: 13px;
+  /* The trailing buttons are 26px boxes around 16px glyphs, so 5px of the gap is already in them. */
+  --queue-row-inset-end: 8px;
+  /* What stays between the panel edge and a row's hover fill, the same on all four sides. */
+  --queue-row-gutter: 5px;
 
   position: relative;
   z-index: 10;
   overflow: visible;
   margin: 0 12px calc(-1 * var(--queue-composer-overlap));
   border: 1px solid var(--openbot-queue-border);
-  border-radius: var(--openbot-radius-xl) var(--openbot-radius-xl) var(--openbot-radius-lg) var(--openbot-radius-lg);
+  border-radius: var(--openbot-radius-lg);
   background: var(--openbot-queue-surface);
   padding-bottom: var(--queue-composer-overlap);
   box-shadow: none;
@@ -6656,9 +6632,10 @@ button.chat-action-target:active,
 }
 
 .agent-queue-panel-list {
-  max-height: 212px;
+  /* Seven rows, then the list scrolls. */
+  max-height: calc(7 * var(--queue-row-height) + 2 * var(--queue-row-gutter));
   overflow-y: auto;
-  padding: 5px 13px 4px;
+  padding: var(--queue-row-gutter) var(--queue-row-inset-end) var(--queue-row-gutter) var(--queue-row-inset-start);
   overscroll-behavior: contain;
 }
 
@@ -6704,10 +6681,12 @@ button.chat-action-target:active,
   will-change: transform;
 }
 
+/* The fill reaches past the row to the gutter, which the two insets above leave unequal. */
 .agent-queue-item::before {
   position: absolute;
   z-index: 0;
-  inset: -2px -8px;
+  inset: 0 calc(var(--queue-row-gutter) - var(--queue-row-inset-end)) 0
+    calc(var(--queue-row-gutter) - var(--queue-row-inset-start));
   border-radius: var(--openbot-radius-md);
   background: transparent;
   content: "";
@@ -7040,6 +7019,7 @@ button.chat-action-target:active,
   .agent-row-thinking-dots i,
   .agent-row-agent-status-responded,
   .agent-row-agent-status-unread,
+  .mention-picker,
   .settings-panel {
     animation: none;
     transition: none;

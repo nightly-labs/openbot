@@ -61,7 +61,81 @@ const installedSkills: InstalledSkill[] = [
     state: "installed",
     description: "Turns a range of commits into a changelog a reader outside the team can follow.",
   },
+  {
+    skillId: "skill-transitions-polish",
+    slug: "transitions-polish",
+    name: "Transitions Polish",
+    installedVersion: 2,
+    availableVersion: 2,
+    state: "installed",
+    origin: "local",
+    description: "Polish and refine existing motion against the transitions.dev method.",
+  },
+  {
+    skillId: "skill-site-hosting",
+    slug: "openbot-site-hosting",
+    name: "Site Hosting",
+    installedVersion: 1,
+    availableVersion: 1,
+    state: "installed",
+    origin: "managed",
+  },
+  {
+    skillId: "skill-shadcn-to-zaidan",
+    slug: "shadcn-to-zaidan",
+    name: "Shadcn To Zaidan",
+    installedVersion: 3,
+    availableVersion: 3,
+    state: "installed",
+    origin: "marketplace",
+    description: "Port and sync shadcn-style React components, blocks and examples onto Zaidan.",
+  },
 ];
+
+const longDescriptionSkill: InstalledSkill = {
+  skillId: "skill-incident-review",
+  slug: "incident-review",
+  name: "Incident Review",
+  installedVersion: 1,
+  availableVersion: 1,
+  state: "installed",
+  origin: "local",
+  description:
+    "Collects the timeline, the alerts and the chat around an incident, then writes the review the team reads the next morning, with the contributing causes, the repair work and the owner of each follow-up item.",
+};
+
+/** Writes a picker trigger into the contenteditable and puts the caret after it. */
+function typePickerTrigger(editor: HTMLElement, trigger: string): void {
+  editor.textContent = trigger;
+  const textNode = editor.firstChild;
+  if (!textNode) throw new Error("Composer editor did not create a text node");
+  const selectionRange = document.createRange();
+  selectionRange.setStart(textNode, textNode.textContent?.length ?? 0);
+  selectionRange.collapse(true);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(selectionRange);
+  editor.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+/**
+ * The picker grows out of the top edge of the composer, so a picker story keeps empty room above
+ * the composer. A compact composer holds the editor in the middle grid column, and the picker
+ * stretches back out to the edges of the composer.
+ */
+function composerFrame(storyArgs: Parameters<typeof ComposerEditor>[0], options: { width: string; compact?: boolean }) {
+  const [value, setValue] = createSignal(storyArgs.value);
+  // The picker hangs off the composer inside `.composer-wrap`, the way the conversation renders it.
+  return (
+    <div class="composer-wrap" style={{ width: options.width, "margin-top": "260px" }}>
+      <div class="composer" data-compact={options.compact ? "" : undefined}>
+        <div class="composer-input-label">
+          <ComposerEditor {...storyArgs} value={value()} onValueChange={setValue} onSubmit={storyArgs.onSubmit} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const meta = {
   title: "Conversation/ComposerEditor",
@@ -97,23 +171,11 @@ export const Disabled: Story = {
 };
 
 export const MentionPicker: Story = {
-  render: (storyArgs) => {
-    const [value, setValue] = createSignal(storyArgs.value);
-    return <ComposerEditor {...storyArgs} value={value()} onValueChange={setValue} onSubmit={storyArgs.onSubmit} />;
-  },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
   play: async ({ args: storyArgs, canvas, userEvent }) => {
     const editor = canvas.getByRole("textbox", { name: "Message Chief" });
     await userEvent.click(editor);
-    editor.textContent = "@";
-    const textNode = editor.firstChild;
-    if (!textNode) throw new Error("Composer editor did not create a text node");
-    const selectionRange = document.createRange();
-    selectionRange.setStart(textNode, textNode.textContent?.length ?? 0);
-    selectionRange.collapse(true);
-    const selection = window.getSelection();
-    selection?.removeAllRanges();
-    selection?.addRange(selectionRange);
-    editor.dispatchEvent(new Event("input", { bubbles: true }));
+    typePickerTrigger(editor, "@");
     const picker = await within(document.body).findByRole("listbox", { name: "Insert mention" });
     await expect(picker).toBeInTheDocument();
     const research = within(document.body).getByRole("option", { name: "Research Agent" });
@@ -131,23 +193,11 @@ export const SkillPicker: Story = {
   args: {
     skills: installedSkills,
   },
-  render: (storyArgs) => {
-    const [value, setValue] = createSignal(storyArgs.value);
-    return <ComposerEditor {...storyArgs} value={value()} onValueChange={setValue} onSubmit={storyArgs.onSubmit} />;
-  },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
   play: async ({ args: storyArgs, canvas, userEvent }) => {
     const editor = canvas.getByRole("textbox", { name: "Message Chief" });
     await userEvent.click(editor);
-    editor.textContent = "$";
-    const textNode = editor.firstChild;
-    if (!textNode) throw new Error("Composer editor did not create a text node");
-    const selectionRange = document.createRange();
-    selectionRange.setStart(textNode, textNode.textContent?.length ?? 0);
-    selectionRange.collapse(true);
-    const selection = window.getSelection();
-    selection?.removeAllRanges();
-    selection?.addRange(selectionRange);
-    editor.dispatchEvent(new Event("input", { bubbles: true }));
+    typePickerTrigger(editor, "$");
     const picker = await within(document.body).findByRole("listbox", { name: "Insert skill" });
     await expect(picker).toBeInTheDocument();
     await expect(within(document.body).getByRole("option", { name: /^Release Notes/ })).toBeInTheDocument();
@@ -158,21 +208,40 @@ export const SkillPicker: Story = {
   },
 };
 
+export const SkillPickerLongDescription: Story = {
+  args: {
+    skills: [longDescriptionSkill, ...installedSkills],
+  },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
+  play: async ({ canvas, userEvent }) => {
+    const editor = canvas.getByRole("textbox", { name: "Message Chief" });
+    await userEvent.click(editor);
+    typePickerTrigger(editor, "$");
+    const picker = await within(document.body).findByRole("listbox", { name: "Insert skill" });
+    await expect(within(picker).getByRole("option", { name: /^Incident Review/ })).toBeInTheDocument();
+  },
+};
+
+export const CompactComposerPicker: Story = {
+  args: {
+    skills: installedSkills,
+  },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "360px", compact: true }),
+  play: async ({ canvas, userEvent }) => {
+    const editor = canvas.getByRole("textbox", { name: "Message Chief" });
+    await userEvent.click(editor);
+    typePickerTrigger(editor, "$");
+    const picker = await within(document.body).findByRole("listbox", { name: "Insert skill" });
+    await expect(within(picker).getByRole("option", { name: /^Site Hosting/ })).toBeInTheDocument();
+  },
+};
+
 export const FileReferencePicker: Story = {
   args: {
     attachments: referencedFiles,
     onOpenAttachment: fn(),
   },
-  render: (storyArgs) => {
-    const [value, setValue] = createSignal(storyArgs.value);
-    return (
-      <div class="composer" style={{ width: "480px" }}>
-        <div class="composer-input-label">
-          <ComposerEditor {...storyArgs} value={value()} onValueChange={setValue} onSubmit={storyArgs.onSubmit} />
-        </div>
-      </div>
-    );
-  },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
   play: async ({ args: storyArgs, canvas, userEvent }) => {
     const editor = canvas.getByRole("textbox", { name: "Message Chief" });
     await userEvent.click(editor);

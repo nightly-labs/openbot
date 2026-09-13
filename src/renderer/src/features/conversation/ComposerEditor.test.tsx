@@ -382,6 +382,35 @@ describe("ComposerEditor", () => {
     expect(editor).not.toHaveTextContent("Turns merged work into clear release notes.");
   });
 
+  it("labels each skill option with where the skill came from", async () => {
+    const local: InstalledSkill = {
+      skillId: "transitions-polish",
+      slug: "transitions-polish",
+      name: "Transitions Polish",
+      installedVersion: 1,
+      availableVersion: 1,
+      state: "installed",
+      origin: "local",
+    };
+    const withoutOrigin: InstalledSkill = {
+      skillId: "release-notes",
+      slug: "release-notes",
+      name: "Release Notes",
+      installedVersion: 1,
+      availableVersion: 1,
+      state: "installed",
+    };
+    const { editor } = renderComposer([], "", [], [local, withoutOrigin]);
+    editor.textContent = "$";
+    placeCaretAtEnd(editor);
+    await fireEvent.input(editor);
+
+    await screen.findByRole("listbox", { name: "Insert skill" });
+    expect(screen.getByText("Custom")).toBeInTheDocument();
+    // A host older than the origin field reports no origin, and the marketplace is the fallback.
+    expect(screen.getByText("Marketplace")).toBeInTheDocument();
+  });
+
   it("keeps $ skill queries out of the @ mention picker", async () => {
     const research = testAgent("research", "Research");
     const skill: InstalledSkill = {

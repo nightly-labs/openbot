@@ -2,15 +2,17 @@ import { attachmentReferenceIds, serializeAttachmentReference } from "@openbot/c
 import { chatTagReferences, serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DraftAttachment, InstalledSkill } from "@openbot/contracts/ipc";
-import { Portal } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, createUniqueId, Show } from "solid-js";
+import { Dynamic, Portal } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, createUniqueId, onCleanup, Show } from "solid-js";
 import { createStaticAvatarSvg } from "../../bloub-avatar";
-import { Listbox, Puzzle } from "../../components/ui";
+import { createScrollFades } from "../../components/createScrollFades";
+import { Badge, Bot, File, Folder, Listbox, Puzzle, ShieldCheck, Store } from "../../components/ui";
 import { referenceChipClasses } from "../../components/ui/reference-chip";
 import { usesTouchLayout } from "../../components/ui/utils";
 import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
+import { formatFileSize } from "./AttachmentCards";
 import { AttachmentReferenceVisual, appendAttachmentReferenceVisual } from "./AttachmentReference";
 
 interface ComposerEditorProps {
@@ -26,6 +28,8 @@ interface ComposerEditorProps {
   onValueChange: (value: string) => void;
   onSubmit: () => void;
   onOpenAttachment?: (attachment: DraftAttachment) => void;
+  /** Told when the mention picker opens or closes, so the queue panel can give up the same space. */
+  onPickerOpenChange?: (open: boolean) => void;
 }
 
 interface MentionContext {
@@ -35,10 +39,15 @@ interface MentionContext {
   trigger: "@" | "$";
 }
 
-interface PickerPosition {
+/**
+ * Where the picker hangs, and from which element. Like the queue panel, it is a child of
+ * `.composer-wrap` that hangs from the composer's top edge, so the composer paints over its
+ * bottom and it grows out from under the input. `mount` is undefined for an editor rendered
+ * without a composer around it, which leaves the panel where Solid puts an unmounted portal.
+ */
+interface PickerFrame {
+  mount: HTMLElement | undefined;
   bottom: number;
-  left: number;
-  width: number;
 }
 
 const MENTION_PATTERN = /@\[([^\]]+)]\(([^)]+)\)/g;
@@ -65,6 +74,42 @@ function pickerOptionText(option: PickerOption): string {
   return option.type === "skill" ? `${option.skill.name} Skill` : `${option.attachment.name} File`;
 }
 
+function pickerOptionName(option: PickerOption): string {
+  if (option.type === "agent") return option.agent.name;
+  return option.type === "skill" ? option.skill.name : option.attachment.name;
+}
+
+function pickerOptionDescription(option: PickerOption): string | undefined {
+  if (option.type === "attachment") return formatFileSize(option.attachment.size);
+  if (option.type === "skill") return skillDescription(option.skill);
+  return option.agent.description.trim() || option.agent.title.trim() || undefined;
+}
+
+/** Hangs the picker off the composer's top edge, inside the wrap the queue panel also sits in. */
+function measurePickerFrame(editor: HTMLElement): PickerFrame {
+  const wrap = editor.closest(".composer-wrap");
+  const composer = editor.closest(".composer");
+  if (!(wrap instanceof HTMLElement) || !composer) return { mount: undefined, bottom: 0 };
+  return { mount: wrap, bottom: wrap.getBoundingClientRect().bottom - composer.getBoundingClientRect().top };
+}
+
+/*
+ * The badge carries the option type, and for a skill where it came from. Every row in a skill list
+ * is a skill, so the badge names only the source.
+ */
+function pickerOptionBadge(option: PickerOption): { label: string; icon: typeof Puzzle } {
+  if (option.type === "agent") return { label: "Agent", icon: Bot };
+  if (option.type === "attachment") return { label: "File", icon: File };
+  switch (option.skill.origin ?? "marketplace") {
+    case "local":
+      return { label: "Custom", icon: Folder };
+    case "managed":
+      return { label: "System", icon: ShieldCheck };
+    default:
+      return { label: "Marketplace", icon: Store };
+  }
+}
+
 export function ComposerEditor(props: ComposerEditorProps) {
   const [mention, setMention] = createSignal<MentionContext | null>(null);
   const [activeOption, setActiveOption] = createSignal(0);
@@ -73,11 +118,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
     content: string;
   } | null>(null);
   const attachmentTooltipId = `composer-file-tooltip-${createUniqueId()}`;
-  const [pickerPosition, setPickerPosition] = createSignal<PickerPosition>({
-    bottom: 0,
-    left: 0,
-    width: 0,
-  });
+  const [pickerFrame, setPickerFrame] = createSignal<PickerFrame>({ mount: undefined, bottom: 0 });
   const matchingAgents = createMemo(() => {
     const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
     return props.agents.filter(
@@ -119,7 +160,21 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const option = matchingOptions()[activeOption()];
     return option ? new Set([pickerOptionKey(option)]) : new Set<string>();
   });
+  const pickerOpen = createMemo(() => mention() !== null && matchingOptions().length > 0);
+  createEffect(
+    () => pickerOpen(),
+    (open) => {
+      props.onPickerOpenChange?.(open);
+    },
+  );
   const pickerOptionElements = new Map<string, HTMLElement>();
+  const pickerFades = createScrollFades();
+  onCleanup(pickerFades.stop);
+  // The list has no scrollbar, so the fade is the only sign that more options wait below it.
+  createEffect(
+    () => matchingOptions().length,
+    () => pickerFades.remeasure(),
+  );
   let editor: HTMLDivElement | undefined;
   let lastAgentId: string | undefined;
   let lastAttachmentKey = "";
@@ -127,9 +182,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
   let lastEmittedValue = "";
   let lastFocusRequest = 0;
   let isComposing = false;
-  let nextPrintableKeyId = 0;
-  let manualPrintableInput = false;
-  const pendingPrintableKeys = new Map<number, string>();
   const attachmentTokenActions: AttachmentTokenActions = {
     tooltipId: attachmentTooltipId,
     open: (attachment, keepTooltip = false) => {
@@ -223,25 +275,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
     editor.scrollTop = editor.scrollHeight;
   }
 
-  function acknowledgeNativePrintableInput(event: InputEvent) {
-    if (event.inputType !== "insertText" || !event.data) return;
-    let matchingKeyId: number | undefined;
-    for (const [keyId, key] of pendingPrintableKeys) {
-      if (key === event.data) matchingKeyId = keyId;
-    }
-    if (matchingKeyId !== undefined) pendingPrintableKeys.delete(matchingKeyId);
-  }
-
-  function schedulePrintableInputFallback(key: string) {
-    const keyId = ++nextPrintableKeyId;
-    pendingPrintableKeys.set(keyId, key);
-    window.setTimeout(() => {
-      if (!pendingPrintableKeys.delete(keyId) || !editor || editor.ownerDocument.activeElement !== editor) return;
-      manualPrintableInput = true;
-      insertPrintableKey(key);
-    }, 0);
-  }
-
   function updateMention() {
     if (!editor) return;
     const selection = window.getSelection();
@@ -260,14 +293,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
     }
     const trigger = match[1] === "$" ? "$" : "@";
     const query = match[2] ?? "";
-    const bounds = editor.getBoundingClientRect();
-    const gutter = 12;
-    const width = Math.min(720, bounds.width + 36, window.innerWidth - gutter * 2);
-    setPickerPosition({
-      bottom: window.innerHeight - bounds.top + 10,
-      left: Math.max(gutter, Math.min(bounds.left, window.innerWidth - width - gutter)),
-      width,
-    });
+    setPickerFrame(measurePickerFrame(editor));
     setMention({ query, start: beforeCaret.length - query.length - 1, end: beforeCaret.length, trigger });
     setActiveOption(0);
   }
@@ -429,14 +455,17 @@ export function ComposerEditor(props: ComposerEditorProps) {
       return;
     }
 
-    const printableKey = event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.isComposing;
+    /*
+     * The editor writes every plain character itself. Letting the browser write some of them and
+     * this handler write the rest raced: a native insert that landed a task late, or one reported
+     * with a composition input type, was read as "no native input" and the character went in twice.
+     * A composing key still goes to the browser, which owns the composition buffer.
+     */
+    const printableKey =
+      event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.isComposing && !isComposing;
     if (printableKey) {
-      if (manualPrintableInput) {
-        event.preventDefault();
-        insertPrintableKey(event.key);
-      } else {
-        schedulePrintableInputFallback(event.key);
-      }
+      event.preventDefault();
+      insertPrintableKey(event.key);
       return;
     }
 
@@ -518,8 +547,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         aria-multiline="true"
         spellcheck="true"
         onFocus={() => ensureEditorSelection(true)}
-        onInput={(event) => {
-          acknowledgeNativePrintableInput(event);
+        onInput={() => {
           emitValue();
           updateMention();
         }}
@@ -533,51 +561,40 @@ export function ComposerEditor(props: ComposerEditorProps) {
         }}
         onPaste={handlePaste}
         onBlur={() => {
-          pendingPrintableKeys.clear();
-          manualPrintableInput = false;
           isComposing = false;
           window.setTimeout(() => setMention(null), 100);
         }}
       />
-      <Portal>
-        <Show when={mention() && matchingOptions().length > 0}>
-          <Listbox.Root<PickerOption>
-            as="div"
-            class="mention-picker"
-            aria-label={mention()?.trigger === "$" ? "Insert skill" : "Insert mention"}
-            options={matchingOptions()}
-            optionValue={pickerOptionKey}
-            optionTextValue={pickerOptionText}
-            selectionMode="single"
-            disallowEmptySelection={true}
-            allowDuplicateSelectionEvents={true}
-            shouldUseVirtualFocus={true}
-            shouldFocusOnHover={true}
-            shouldSelectOnPressUp={true}
-            value={activePickerValue()}
-            onChange={(keys) => {
-              const key = keys.values().next().value;
-              const option = matchingOptions().find((candidate) => pickerOptionKey(candidate) === key);
-              if (option) insertOption(option);
-            }}
-            renderItem={(item) => {
-              const option = item.rawValue;
-              const optionIndex = () =>
-                matchingOptions().findIndex((candidate) => pickerOptionKey(candidate) === item.key);
-              const firstSkillIndex = () => matchingOptions().findIndex((candidate) => candidate.type === "skill");
-              const firstAttachmentIndex = () =>
-                matchingOptions().findIndex((candidate) => candidate.type === "attachment");
-              return (
-                <>
-                  <Show when={option.type === "agent" && item.index === 0}>
-                    <div class="mention-picker-section">Agents</div>
-                  </Show>
-                  <Show when={option.type === "skill" && item.index === firstSkillIndex()}>
-                    <div class="mention-picker-section">Skills</div>
-                  </Show>
-                  <Show when={option.type === "attachment" && item.index === firstAttachmentIndex()}>
-                    <div class="mention-picker-section">Files</div>
-                  </Show>
+      <Show when={pickerOpen()}>
+        <Portal mount={pickerFrame().mount}>
+          <div class="mention-picker" style={{ "--mention-picker-bottom": `${pickerFrame().bottom}px` }}>
+            <Listbox.Root<PickerOption>
+              as="div"
+              ref={pickerFades.bind}
+              class={["mention-picker-list", pickerFades.classes()]}
+              onScroll={pickerFades.measure}
+              aria-label={mention()?.trigger === "$" ? "Insert skill" : "Insert mention"}
+              options={matchingOptions()}
+              optionValue={pickerOptionKey}
+              optionTextValue={pickerOptionText}
+              selectionMode="single"
+              disallowEmptySelection={true}
+              allowDuplicateSelectionEvents={true}
+              shouldUseVirtualFocus={true}
+              shouldFocusOnHover={true}
+              shouldSelectOnPressUp={true}
+              value={activePickerValue()}
+              onChange={(keys) => {
+                const key = keys.values().next().value;
+                const option = matchingOptions().find((candidate) => pickerOptionKey(candidate) === key);
+                if (option) insertOption(option);
+              }}
+              renderItem={(item) => {
+                const option = item.rawValue;
+                const optionIndex = () =>
+                  matchingOptions().findIndex((candidate) => pickerOptionKey(candidate) === item.key);
+                const badge = pickerOptionBadge(option);
+                return (
                   <Listbox.Item
                     ref={(element) => pickerOptionElements.set(pickerOptionKey(option), element)}
                     item={item}
@@ -586,11 +603,14 @@ export function ComposerEditor(props: ComposerEditorProps) {
                       "mention-picker-option",
                       {
                         "mention-picker-file-option": option.type === "attachment",
-                        "mention-picker-skill-option": option.type === "skill",
                         "mention-picker-option-active": activeOption() === optionIndex(),
                       },
                     ]}
-                    onPointerDown={(event) => event.preventDefault()}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      // The composer focuses its editor on any pointerdown that is not a control.
+                      event.stopPropagation();
+                    }}
                     onMouseEnter={() => setActiveOption(optionIndex())}
                   >
                     {option.type === "agent" ? (
@@ -602,29 +622,21 @@ export function ComposerEditor(props: ComposerEditorProps) {
                     ) : (
                       <AttachmentReferenceVisual name={option.attachment.name} />
                     )}
-                    {option.type === "skill" ? (
-                      <span class="mention-picker-skill-copy">
-                        <strong>{option.skill.name}</strong>
-                        <span>{skillDescription(option.skill) ?? "Skill"}</span>
-                      </span>
-                    ) : (
-                      <>
-                        <strong>{option.type === "agent" ? option.agent.name : option.attachment.name}</strong>
-                        <span>{option.type === "agent" ? "Agent" : "File"}</span>
-                      </>
-                    )}
+                    <strong>{pickerOptionName(option)}</strong>
+                    <Show when={pickerOptionDescription(option)}>
+                      {(description) => <span class="mention-picker-description">{description()}</span>}
+                    </Show>
+                    <Badge class="mention-picker-badge" variant="ghost">
+                      <Dynamic component={badge.icon} aria-hidden="true" />
+                      {badge.label}
+                    </Badge>
                   </Listbox.Item>
-                </>
-              );
-            }}
-            style={{
-              bottom: `${pickerPosition().bottom}px`,
-              left: `${pickerPosition().left}px`,
-              width: `${pickerPosition().width}px`,
-            }}
-          />
-        </Show>
-      </Portal>
+                );
+              }}
+            />
+          </div>
+        </Portal>
+      </Show>
       <Show when={attachmentTooltip()}>
         {(activeTooltip) => (
           <AnchoredTooltip id={attachmentTooltipId} anchor={activeTooltip().anchor} content={activeTooltip().content} />
@@ -885,6 +897,12 @@ function serializeNode(node: Node): string {
 }
 
 function insertPlainText(editor: HTMLDivElement, text: string): void {
+  /*
+   * The browser leaves a placeholder `<br>` behind when it empties the editable, and drops it only
+   * when it writes text itself. This editor writes the text, so it drops the placeholder: left in
+   * place beside the new text, it would serialize as a line break the user never typed.
+   */
+  if (!editor.textContent) editor.querySelector(":scope > br:last-child")?.remove();
   const selection = window.getSelection();
   let range: Range;
   const selectedRange = selection?.rangeCount ? selection.getRangeAt(0) : null;

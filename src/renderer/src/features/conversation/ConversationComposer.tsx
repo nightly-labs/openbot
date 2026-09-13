@@ -4,7 +4,7 @@ import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
-import { For, Loading, lazy, Show } from "solid-js";
+import { createSignal, For, Loading, lazy, Show } from "solid-js";
 import {
   ArrowUp,
   Button,
@@ -69,6 +69,9 @@ export function ConversationComposer() {
     voiceModelProgress,
   } = useConversationViewScope();
   const platform = usePlatform();
+  const [pickerOpen, setPickerOpen] = createSignal(false);
+  // The mention picker grows out of the same edge as the queue, so only one of them holds it.
+  const queueVisible = () => queuePanelVisible() && !pickerOpen();
   const voiceAvailable = () => voiceSupported(platform.appInfo()?.platform);
   const attachmentAccept = () => {
     const server = props.server;
@@ -86,12 +89,12 @@ export function ConversationComposer() {
       <div class="composer-wrap">
         <div
           class="agent-queue-slot"
-          data-open={queuePanelVisible() ? "true" : "false"}
-          aria-hidden={queuePanelVisible() ? undefined : "true"}
-          inert={queuePanelVisible() ? undefined : true}
+          data-open={queueVisible() ? "true" : "false"}
+          aria-hidden={queueVisible() ? undefined : "true"}
+          inert={queueVisible() ? undefined : true}
         >
           <div class="agent-queue-slot-inner">
-            <Show when={queuePanelVisible()}>
+            <Show when={queueVisible()}>
               <Loading>
                 <QueuePanel
                   deliveries={presentedQueueDeliveries()}
@@ -206,6 +209,7 @@ export function ConversationComposer() {
                 updateTeamTyping(text);
               }}
               onSubmit={submitComposer}
+              onPickerOpenChange={setPickerOpen}
               onOpenAttachment={(attachment) =>
                 canPreviewAttachment(attachment)
                   ? void previewAttachment(attachment)
