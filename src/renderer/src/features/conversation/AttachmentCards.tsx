@@ -1,4 +1,4 @@
-import type { AttachmentSummary } from "@openbot/contracts/ipc";
+import { type AttachmentSummary, canPreviewAttachment } from "@openbot/contracts/ipc";
 import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { Button } from "../../components/ui";
 import { AnchoredTooltip } from "./AnchoredTooltip";
@@ -32,7 +32,7 @@ export function AttachmentCards(props: {
                 variant="ghost"
                 type="button"
                 class="attachment-preview-button"
-                disabled={attachment.previewKind === "none"}
+                disabled={!canPreviewAttachment(attachment)}
                 aria-label={`Preview ${attachment.name}`}
                 onClick={() => props.onPreview(attachment)}
               >

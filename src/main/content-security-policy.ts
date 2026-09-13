@@ -13,6 +13,9 @@ export function buildContentSecurityPolicy(packaged: boolean, developmentSignalU
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: openbot-attachment: openbot-remote-attachment: openbot-avatar: openbot-remote-avatar: openbot-server-logo: openbot-remote-server-logo: https:${developmentImageSources}`,
     "font-src 'self' data:",
+    // The lightbox plays a recording from the attachment scheme, and the preview panel plays one
+    // from an object URL of the bytes that the main process sent. Neither matches `default-src`.
+    "media-src 'self' blob: openbot-attachment: openbot-remote-attachment:",
     `connect-src 'self' openbot-attachment: openbot-remote-attachment: https://analytics.openbot.run ws://127.0.0.1:* wss://*.openbot.run${developmentSources}`,
     "object-src 'none'",
     `frame-src 'self' openbot-attachment: openbot-remote-attachment: https://*.openbot.run${developmentFrameSources}`,

@@ -23,6 +23,7 @@ describe("RichMessageText tooltips", () => {
             installedVersion: 1,
             availableVersion: 1,
             state: "installed",
+            description: "Turns merged work into clear release notes.",
           },
         ]}
         onSelectAgent={vi.fn()}
@@ -32,6 +33,7 @@ describe("RichMessageText tooltips", () => {
 
     expect(screen.getByText("Skill")).toBeInTheDocument();
     expect(screen.getByText("Release Notes")).toBeInTheDocument();
+    expect(screen.queryByText("Turns merged work into clear release notes.")).not.toBeInTheDocument();
     expect(screen.getByText("Unavailable agent")).toBeInTheDocument();
     expect(screen.getByText("Former")).toBeInTheDocument();
   });

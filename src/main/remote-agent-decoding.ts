@@ -146,6 +146,7 @@ export function decodeInstalledSkillsFromHost(value: unknown): InstalledSkill[] 
     if (!isOneOf(["installed", "update-available", "modified", "needs-repair"] as const, state)) {
       throw new Error("Invalid installed skill state.");
     }
+    const description = optionalSkillDescription(skill.description);
     return {
       skillId: requiredString(skill, "skillId"),
       slug: requiredString(skill, "slug"),
@@ -153,8 +154,17 @@ export function decodeInstalledSkillsFromHost(value: unknown): InstalledSkill[] 
       installedVersion: requiredNumber(skill, "installedVersion"),
       availableVersion: requiredNumber(skill, "availableVersion"),
       state,
+      ...(skill.enabled === false ? { enabled: false } : skill.enabled === true ? { enabled: true } : {}),
+      ...(skill.origin === "managed" || skill.origin === "marketplace" ? { origin: skill.origin } : {}),
+      ...(description ? { description } : {}),
     };
   });
+}
+
+function optionalSkillDescription(value: unknown): string | undefined {
+  if (!isString(value)) return undefined;
+  const description = value.trim();
+  return description && description.length <= 500 ? description : undefined;
 }
 
 export function decodeAgentMemory(value: unknown): AgentMemory {

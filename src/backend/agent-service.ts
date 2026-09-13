@@ -65,7 +65,12 @@ import type {
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_RUNTIME_TEXT_LIMIT, defaultProviderModel, isMessageReaction } from "@openbot/contracts/ipc";
+import {
+  AGENT_RUNTIME_TEXT_LIMIT,
+  defaultProviderModel,
+  isMessageReaction,
+  skillConversationEventItemType,
+} from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
@@ -97,6 +102,7 @@ import { type RoutineMutationOptions, RoutineScheduler } from "./agent/routine-s
 import { type OpenBotToolResponse, openBotToolResult } from "./agent/routine-tools";
 import { fitRuntimeSnapshot } from "./agent/runtime-snapshot";
 import { type AgentSidebar, handleSidebarTool } from "./agent/sidebar-tools";
+import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./agent/skill-tools";
 import { isDynamicToolCall, isRequestTimeout, providerForAgent, providerLabel } from "./agent/thread-items";
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
@@ -224,6 +230,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
      * renderer or the database.
      */
     credentials: ProviderClientContext = NO_PROVIDER_CREDENTIALS,
+    private readonly localSkillTools?: () => LocalSkillTools,
   ) {
     super();
     this.#store = store;
@@ -1733,6 +1740,42 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   async #handleOpenBotTool(params: DynamicToolCallParams): Promise<OpenBotToolResponse> {
     const senderAgentId = this.#conversation.agentForThread(params.threadId);
     if (!senderAgentId) throw new Error("The sending OpenBot agent is unknown.");
+
+    if (LOCAL_SKILL_TOOL_DEFINITIONS.some((tool) => tool.name === params.tool)) {
+      try {
+        if (!this.localSkillTools) throw new Error("Local skill tools are unavailable.");
+        const result = openBotToolResult(
+          await runLocalSkillTool(this.localSkillTools(), senderAgentId, params.tool, params.arguments, (event) => {
+            const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
+            const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
+            snapshot.messages.push({
+              id: randomUUID(),
+              turnId: params.turnId,
+              author: "system",
+              source: "system",
+              status: "completed",
+              createdAt: new Date().toISOString(),
+              itemType: skillConversationEventItemType(event),
+              text: redactText(event.skillName),
+            });
+            const persisted = this.#store.database.persistConversation(snapshot, `skill.${event.action}`, event);
+            this.#conversation.setSnapshot(senderAgentId, persisted);
+            this.#conversation.publishConversation(persisted);
+          }),
+        );
+        return {
+          ...result,
+          contentItems: result.contentItems.map((item) => ({ ...item, text: redactText(item.text) })),
+        };
+      } catch (error) {
+        return {
+          success: false,
+          contentItems: [
+            { type: "inputText", text: redactText(error instanceof Error ? error.message : String(error)) },
+          ],
+        };
+      }
+    }
 
     const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
     const channelId = this.channels.store.channelForThread(executionThreadId);

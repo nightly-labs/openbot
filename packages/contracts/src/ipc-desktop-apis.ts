@@ -138,11 +138,15 @@ import type {
 } from "./ipc-routines";
 import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
 import type {
+  CreateLocalSkillInput,
   InstalledSkill,
   InstallSkillInput,
+  LocalSkillRevisionInput,
   MarketplaceSkillDetail,
   MarketplaceSkillPage,
   MarketplaceSkillQuery,
+  ReviseLocalSkillInput,
+  SetEnabledSkillInput,
   SkillPackagePreview,
   SkillSubmission,
   SubmitSkillInput,
@@ -403,6 +407,12 @@ export interface VoiceDesktopApi {
 }
 
 export interface SkillsDesktopApi {
+  localList: () => Promise<MarketplaceSkillDetail[]>;
+  localGet: (input: LocalSkillRevisionInput) => Promise<MarketplaceSkillDetail>;
+  localCreate: (input: CreateLocalSkillInput) => Promise<MarketplaceSkillDetail>;
+  localRevise: (input: ReviseLocalSkillInput) => Promise<MarketplaceSkillDetail>;
+  localInstall: (input: LocalSkillRevisionInput & { agentId: string; revision: number }) => Promise<InstalledSkill>;
+
   list: (query?: MarketplaceSkillQuery) => Promise<MarketplaceSkillPage>;
   get: (skillId: string) => Promise<MarketplaceSkillDetail>;
   listMine: () => Promise<SkillSubmission[]>;
@@ -411,6 +421,7 @@ export interface SkillsDesktopApi {
   listInstalled: (agentId: string) => Promise<InstalledSkill[]>;
   install: (input: InstallSkillInput) => Promise<InstalledSkill>;
   uninstall: (input: UninstallSkillInput) => Promise<void>;
+  setEnabled: (input: SetEnabledSkillInput) => Promise<InstalledSkill>;
 }
 
 export interface HostedSitesDesktopApi {

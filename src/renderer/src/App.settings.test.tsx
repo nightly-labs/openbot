@@ -14,8 +14,54 @@ import {
 } from "./app-test-harness";
 
 describe("OpenBot connected desktop shell", () => {
+  it("opens the marketplace from skill settings and returns to skills", async () => {
+    // Load the real lazy panels before measuring their visible behavior under CI load.
+    await import("./features/conversation/AgentSettingsPanel");
+    await import("./features/settings/SkillsMarketplaceModal");
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await waitFor(() => expect(window.openbot.agent.listInstalledSkills).toHaveBeenCalled());
+    await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^Skills/ }));
+    await fireEvent.click((await screen.findAllByRole("button", { name: "Add from marketplace" }))[0]);
+    expect(await screen.findByRole("heading", { name: "Marketplace" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Close marketplace" }));
+    expect((await screen.findAllByRole("button", { name: "Add from marketplace" }))[0]).toBeEnabled();
+  });
   beforeEach(() => {
     installOpenbotStub();
+  });
+
+  it("refreshes skill suggestions after settings closes", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await waitFor(() => expect(window.openbot.agent.listInstalledSkills).toHaveBeenCalled());
+    await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
+    await screen.findByRole("textbox", { name: "Agent name" });
+    vi.mocked(window.openbot.agent.listInstalledSkills).mockResolvedValue([
+      {
+        skillId: "local-skill-smoke",
+        slug: "smoke",
+        name: "Smoke checklist",
+        origin: "local",
+        installedVersion: 1,
+        availableVersion: 1,
+        enabled: true,
+        state: "installed",
+      },
+    ]);
+    vi.mocked(window.openbot.agent.listInstalledSkills).mockClear();
+    await fireEvent.click(screen.getByRole("button", { name: "Close details" }));
+    await waitFor(() => expect(window.openbot.agent.listInstalledSkills).toHaveBeenCalledWith("chief"));
+    const editor = screen.getByRole("textbox", { name: "Message Chief" });
+    editor.textContent = "$Smoke";
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    window.getSelection()?.removeAllRanges();
+    window.getSelection()?.addRange(range);
+    await fireEvent.input(editor);
+    expect(await screen.findByRole("listbox", { name: "Insert skill" })).toHaveTextContent("Smoke checklist");
   });
 
   it("opens the dock surfaces and closes them from their own controls", async () => {

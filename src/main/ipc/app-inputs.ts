@@ -15,6 +15,7 @@ import type {
   SaveSetupInput,
   SetAnalyticsPreferenceInput,
   SetAppLanguagePreferenceInput,
+  SetEnabledSkillInput,
   SubmitMarketplaceAgentInput,
   SubmitSkillInput,
   UninstallSkillInput,
@@ -184,6 +185,17 @@ export function parseUninstallSkill(input: unknown): UninstallSkillInput {
     agentId: requireString(input.agentId, "agentId"),
     skillId: requireString(input.skillId, "skillId"),
     ...(input.removeModified === true ? { removeModified: true } : {}),
+  };
+}
+
+export function parseSetEnabledSkill(input: unknown): SetEnabledSkillInput {
+  if (!isObject(input)) throw new Error("Invalid skill enablement.");
+  const enabled = optionalBoolean(input.enabled, "enabled");
+  if (enabled === undefined) throw new Error("Invalid skill enablement.");
+  return {
+    agentId: requireString(input.agentId, "agentId"),
+    skillId: requireString(input.skillId, "skillId"),
+    enabled,
   };
 }
 

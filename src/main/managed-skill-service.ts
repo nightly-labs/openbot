@@ -1,11 +1,12 @@
-import { lstat, mkdir, readFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import type { AgentSummary } from "@openbot/contracts/ipc";
+import type { AgentSummary, InstalledSkill } from "@openbot/contracts/ipc";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { parse as parseYaml } from "yaml";
 
 const MANAGED_SKILL_SLUG = "openbot-site-hosting";
 const OWNERSHIP_MARKER = ".openbot-managed.json";
-const OWNERSHIP_CONTENT = `${JSON.stringify({ managedBy: "openbot", slug: MANAGED_SKILL_SLUG, version: 1 })}\n`;
 
 const logger = createOpenBotLogger("managed-skill-service");
 
@@ -25,6 +26,7 @@ export class ManagedSkillService {
     private readonly reportFailure: (target: string, error: unknown) => void = (target, error) => {
       logger.error(`OpenBot could not synchronize the managed skill at ${target}.`, toLogValue(error));
     },
+    private readonly slug = MANAGED_SKILL_SLUG,
   ) {}
 
   async syncAll(agents: AgentSummary[]): Promise<void> {
@@ -35,7 +37,9 @@ export class ManagedSkillService {
       this.reportFailure(this.sourcePath, error);
       return;
     }
-    const results = await Promise.allSettled(agents.map((agent) => syncTargets(agent.workspacePath, content)));
+    const results = await Promise.allSettled(
+      agents.map((agent) => syncTargets(agent.workspacePath, content, this.slug)),
+    );
     for (let index = 0; index < results.length; index += 1) {
       const result = results[index];
       if (result.status === "fulfilled") {
@@ -48,7 +52,7 @@ export class ManagedSkillService {
 
   async syncAgent(agent: AgentSummary): Promise<void> {
     try {
-      this.reportResult(await syncTargets(agent.workspacePath, await this.content()));
+      this.reportResult(await syncTargets(agent.workspacePath, await this.content(), this.slug));
     } catch (error) {
       this.reportFailure(agent.workspacePath, error);
     }
@@ -57,7 +61,7 @@ export class ManagedSkillService {
   private async content(): Promise<string> {
     if (this.#content !== null) return this.#content;
     const content = await readFile(this.sourcePath, "utf8");
-    if (!content.startsWith("---\nname: openbot-site-hosting\n")) {
+    if (!content.startsWith(`---\nname: ${this.slug}\n`)) {
       throw new Error("The managed site hosting skill is invalid.");
     }
     this.#content = content;
@@ -70,17 +74,19 @@ export class ManagedSkillService {
   }
 }
 
-async function syncTargets(workspacePath: string, content: string): Promise<SyncTargetsResult> {
+async function syncTargets(workspacePath: string, content: string, slug: string): Promise<SyncTargetsResult> {
   const workspaceRoot = await realpath(resolve(workspacePath));
   const targets = [
-    join(workspacePath, ".agents", "skills", MANAGED_SKILL_SLUG, "SKILL.md"),
-    join(workspacePath, ".claude", "skills", MANAGED_SKILL_SLUG, "SKILL.md"),
+    join(workspacePath, ".agents", "skills", slug, "SKILL.md"),
+    join(workspacePath, ".claude", "skills", slug, "SKILL.md"),
   ];
   const resolvedTargets = [
-    join(workspaceRoot, ".agents", "skills", MANAGED_SKILL_SLUG, "SKILL.md"),
-    join(workspaceRoot, ".claude", "skills", MANAGED_SKILL_SLUG, "SKILL.md"),
+    join(workspaceRoot, ".agents", "skills", slug, "SKILL.md"),
+    join(workspaceRoot, ".claude", "skills", slug, "SKILL.md"),
   ];
-  const results = await Promise.allSettled(resolvedTargets.map((target) => syncTarget(workspaceRoot, target, content)));
+  const results = await Promise.allSettled(
+    resolvedTargets.map((target) => syncTarget(workspaceRoot, target, content, slug)),
+  );
   const collisions: string[] = [];
   const failures: SyncTargetsResult["failures"] = [];
   for (let index = 0; index < results.length; index += 1) {
@@ -93,14 +99,20 @@ async function syncTargets(workspacePath: string, content: string): Promise<Sync
   return { collisions, failures };
 }
 
-async function syncTarget(workspaceRoot: string, target: string, content: string): Promise<"synced" | "collision"> {
+async function syncTarget(
+  workspaceRoot: string,
+  target: string,
+  content: string,
+  slug: string,
+): Promise<"synced" | "collision"> {
+  const ownershipContent = `${JSON.stringify({ managedBy: "openbot", slug, version: 1 })}\n`;
   const parent = dirname(target);
   await ensureSafeDirectory(workspaceRoot, parent);
   const marker = join(parent, OWNERSHIP_MARKER);
   await rejectSymlink(target);
   await rejectSymlink(marker);
   if (await fileExists(target)) {
-    if ((await optionalText(marker)) !== OWNERSHIP_CONTENT) return "collision";
+    if ((await optionalText(marker)) !== ownershipContent) return "collision";
     await atomicWrite(workspaceRoot, target, content);
     return "synced";
   }
@@ -112,7 +124,7 @@ async function syncTarget(workspaceRoot: string, target: string, content: string
     throw error;
   }
   try {
-    await atomicWrite(workspaceRoot, marker, OWNERSHIP_CONTENT);
+    await atomicWrite(workspaceRoot, marker, ownershipContent);
   } catch (error) {
     await verifySafeDirectory(workspaceRoot, parent)
       .then(() => unlink(target))
@@ -219,4 +231,51 @@ function isMissingFileError(error: unknown): boolean {
 
 function isFileExistsError(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "EEXIST";
+}
+
+/** Read only OpenBot-owned skills from the active provider's skill folder. */
+export async function listManagedSkillsForChat(agent: AgentSummary): Promise<InstalledSkill[]> {
+  const root = await realpath(agent.workspacePath);
+  const directory = join(root, agent.provider === "claude" ? ".claude" : ".agents", "skills");
+  const skills: InstalledSkill[] = [];
+  try {
+    await verifySafeDirectory(root, directory);
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      try {
+        const folder = join(directory, entry.name);
+        await verifySafeDirectory(root, folder);
+        const marker = join(folder, OWNERSHIP_MARKER);
+        const file = join(folder, "SKILL.md");
+        await rejectSymlink(marker);
+        await rejectSymlink(file);
+        if (
+          (await optionalText(marker)) !== `${JSON.stringify({ managedBy: "openbot", slug: entry.name, version: 1 })}\n`
+        )
+          continue;
+        const content = await readFile(file, "utf8");
+        const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u.exec(content)?.[1];
+        if (!frontmatter) continue;
+        const metadata = parseYaml(frontmatter);
+        if (!isDynamicRecord(metadata) || metadata.name !== entry.name || typeof metadata.description !== "string")
+          continue;
+        skills.push({
+          skillId: entry.name,
+          slug: entry.name,
+          name: entry.name,
+          description: metadata.description,
+          installedVersion: 1,
+          availableVersion: 1,
+          enabled: true,
+          state: "installed",
+          origin: "managed",
+        });
+      } catch {
+        /* Missing or invalid managed files are not selectable. */
+      }
+    }
+  } catch {
+    /* The workspace can have no managed skills yet. */
+  }
+  return skills;
 }

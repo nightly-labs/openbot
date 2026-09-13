@@ -3,6 +3,7 @@ import {
   hostedSiteConversationEvent,
   routineConversationEvent,
   routineRunConversationEvent,
+  skillConversationEvent,
 } from "@openbot/contracts/ipc";
 import type { AgentDeliveryMarkerStatus, AgentMessage, AgentProfile, ChatActionMarkerModel } from "./data";
 import { cleanAgentMessageText } from "./features/agents/agent-message-text";
@@ -206,6 +207,8 @@ function chatActionMarker(
       replyToMessageId: message.exchange.replyToMessageId,
     };
   }
+  const skillEvent = skillConversationEvent(message);
+  if (skillEvent) return { ...skillEvent, kind: "skill-lifecycle", timestamp: message.createdAt };
   if (routineEvent) {
     return {
       kind: "routine-lifecycle",

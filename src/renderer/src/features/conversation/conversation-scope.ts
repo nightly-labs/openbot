@@ -128,6 +128,8 @@ export function createConversationViewScope(props: ConversationProps) {
     },
   });
   const {
+    skillSettingsRequest,
+    openSkillSettings,
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,
@@ -147,7 +149,7 @@ export function createConversationViewScope(props: ConversationProps) {
     openSidebarFileExternally,
     closeSidebarFilePreview,
   } = panels;
-  const skills = createSkillsStore({ props });
+  const skills = createSkillsStore({ props, settingsOpen });
   const { installedSkills } = skills;
   const composer = createComposerStore({
     props,
@@ -980,6 +982,8 @@ export function createConversationViewScope(props: ConversationProps) {
     reorderPresentedQueue,
     replyTarget,
     replyToMessage,
+    skillSettingsRequest,
+    openSkillSettings,
     routineSettingsRequest,
     updateRuntimeSettings,
     scheduleUnreadDividerVisibilityUpdate,

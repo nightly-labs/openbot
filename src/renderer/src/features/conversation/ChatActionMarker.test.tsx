@@ -6,6 +6,26 @@ import { ChatActionMarker } from "./ChatActionMarker";
 const agents: AgentProfile[] = [agent("research", "Research"), agent("sales", "Sales")];
 
 describe("ChatActionMarker", () => {
+  it("routes skill chips to settings", async () => {
+    const onOpenSkill = vi.fn();
+    render(() => (
+      <ChatActionMarker
+        marker={{
+          kind: "skill-lifecycle",
+          action: "revised",
+          skillId: "local-skill-test",
+          revision: 2,
+          skillName: "Release notes",
+          timestamp: "2026-09-13T12:00:00Z",
+        }}
+        agents={agents}
+        onSelectAgent={vi.fn()}
+        onOpenSkill={onOpenSkill}
+      />
+    ));
+    await fireEvent.click(screen.getByRole("button", { name: "Open skill Release notes" }));
+    expect(onOpenSkill).toHaveBeenCalledWith({ skillId: "local-skill-test" });
+  });
   it("lists each target state for a multi-agent message", async () => {
     render(() => (
       <ChatActionMarker

@@ -119,7 +119,7 @@ export interface DesktopAnalyticsEvents {
   };
   marketplace_action: {
     entity: "skill" | "agent";
-    action: "view" | "install" | "update" | "uninstall" | "publish";
+    action: "view" | "install" | "update" | "uninstall" | "publish" | "enable" | "disable";
     result: AnalyticsResult;
     failure_code?: string;
   };
@@ -316,7 +316,7 @@ const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
   browser_action: ["open", "activate", "reload", "close"],
   remote_desktop_action: ["connect", "disconnect", "select_display"],
   update_action: ["check", "download", "install"],
-  marketplace_action: ["view", "install", "update", "uninstall", "publish"],
+  marketplace_action: ["view", "install", "update", "uninstall", "publish", "enable", "disable"],
   memory_action: ["create", "update", "delete", "clear"],
   provider_action: [
     "connect_started",

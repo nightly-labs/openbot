@@ -2,6 +2,7 @@ import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { createMemo, Loading, Show } from "solid-js";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
+import { useConversationController } from "./features/conversation/conversation-controller-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
@@ -102,7 +103,9 @@ function PermissionsReview(props: AccountProps) {
  */
 function SkillsMarketplace() {
   const { skillsMarketplaceOpen, setSkillsMarketplaceOpen } = useSettings();
-  const { agentList, activeAgent } = useAgents();
+  const { agentList, activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
+  const controller = useConversationController();
+  const { selectAgent } = useNavigation();
   const { activeServer } = useServers();
   const { openInstalledMarketplaceAgent } = useServerSelection();
   const local = createMemo(() => activeServer()?.kind === "local");
@@ -115,6 +118,23 @@ function SkillsMarketplace() {
           agents={local() ? agentList() : []}
           activeAgentId={local() ? (activeAgent()?.id ?? "") : ""}
           onOpenChange={setSkillsMarketplaceOpen}
+          onTrySkill={
+            local() &&
+            agentStatus().phase === "ready" &&
+            !controller.submitting() &&
+            !controller.selectionSending() &&
+            controller.voicePhase() === "idle" &&
+            !controller.editingDeliveryId() &&
+            !(agentSetupOpen() && creatingAgent())
+              ? (agentId, skill) => {
+                  const server = activeServer();
+                  if (server?.kind !== "local" || !agentList().some((agent) => agent.id === agentId)) return;
+                  selectAgent(agentId);
+                  controller.appendSkillExample({ serverId: server.id, agentId }, skill);
+                  setSkillsMarketplaceOpen(false);
+                }
+              : undefined
+          }
           onAgentInstalled={openInstalledMarketplaceAgent}
         />
       </Loading>

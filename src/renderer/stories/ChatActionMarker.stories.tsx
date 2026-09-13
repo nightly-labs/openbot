@@ -1,7 +1,9 @@
+import { createSignal } from "solid-js";
 import { expect, fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { Heading, Text } from "../src/components/ui";
 import type { AgentProfile, ChatActionMarkerModel } from "../src/data";
+import { AgentSkillsModal } from "../src/features/conversation/AgentSkillsModal";
 import { ChatActionMarker } from "../src/features/conversation/ChatActionMarker";
 
 const agents: AgentProfile[] = [agent("research", "Research"), agent("sales", "Sales")];
@@ -46,6 +48,7 @@ export const AllStates: Story = {
           agents={agents}
           onSelectAgent={onSelectAgent}
         />
+        <SkillMarkers />
         {routineStatuses.map((status) => (
           <ChatActionMarker
             marker={routineMarker(status)}
@@ -274,3 +277,36 @@ export const MessageDates: Story = {
     </main>
   ),
 };
+
+function SkillMarkers() {
+  const [selected, setSelected] = createSignal<{ skillId: string } | null>(null);
+  return (
+    <>
+      {(["created", "revised", "installed"] as const).map((action) => (
+        <ChatActionMarker
+          marker={{
+            kind: "skill-lifecycle",
+            action,
+            skillId: "skill-release-notes",
+            revision: 2,
+            skillName: "Release notes",
+            timestamp: "2026-09-13T12:00:00Z",
+          }}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onOpenSkill={setSelected}
+        />
+      ))}
+      <AgentSkillsModal
+        open={Boolean(selected())}
+        selectionRequest={selected()}
+        agentId="chief"
+        agentName="Chief"
+        onOpenChange={(open) => {
+          if (!open) setSelected(null);
+        }}
+        onCountChange={() => {}}
+      />
+    </>
+  );
+}

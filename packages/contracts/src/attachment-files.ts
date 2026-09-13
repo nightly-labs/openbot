@@ -123,6 +123,11 @@ export function attachmentMimeTypeForName(name: string) {
       return "video/quicktime";
     case "pdf":
       return "application/pdf";
+    // SVG is not in ATTACHMENT_FILE_EXTENSIONS, so it cannot be attached: an attachment with an
+    // `image/*` type becomes `kind: "image"` and reaches the provider as a raster image block.
+    // The file preview panel previews any workspace file, so it still needs the type.
+    case "svg":
+      return "image/svg+xml";
     case "eml":
       return "message/rfc822";
     case "doc":
@@ -155,4 +160,15 @@ export function attachmentMimeTypeForName(name: string) {
     default:
       return isSupportedAttachmentName(name) ? "text/plain" : "application/octet-stream";
   }
+}
+
+/**
+ * The media kinds a browser can play. Attachments keep `previewKind: "none"` on the wire, because
+ * the released Team API v1-v4 validators accept only image, pdf, text, and none. The renderer reads
+ * the MIME type instead, which is already a free string in those protocols.
+ */
+export function playableMediaKind(mimeType: string): "audio" | "video" | null {
+  if (mimeType.startsWith("audio/")) return "audio";
+  if (mimeType.startsWith("video/")) return "video";
+  return null;
 }

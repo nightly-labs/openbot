@@ -33,6 +33,7 @@ export interface MarketplaceSkillDetail extends MarketplaceSkillSummary {
   bundleSha256: string;
   files: string[];
   instructions: string;
+  examplePrompt?: string;
 }
 
 export interface MarketplaceSkillPage {
@@ -81,6 +82,8 @@ export interface SubmitSkillInput {
   skillId?: string;
 }
 
+export type InstalledSkillOrigin = "marketplace" | "managed" | "local";
+
 export interface InstalledSkill {
   skillId: string;
   slug: string;
@@ -88,6 +91,12 @@ export interface InstalledSkill {
   installedVersion: number;
   availableVersion: number;
   state: InstalledSkillState;
+  /** Missing on older hosts and Team GET payloads; treat as true. */
+  enabled?: boolean;
+  /** Missing on older hosts and Team GET payloads; treat as marketplace. */
+  origin?: InstalledSkillOrigin;
+  /** Missing on older hosts, Team GET payloads, and pre-description lock files. */
+  description?: string;
 }
 
 export interface InstallSkillInput {
@@ -102,8 +111,27 @@ export interface UninstallSkillInput {
   removeModified?: boolean;
 }
 
+export interface SetEnabledSkillInput {
+  agentId: string;
+  skillId: string;
+  enabled: boolean;
+}
+
 export function isSkillCategory(value: unknown): value is SkillCategory {
   return isOneOf(SKILL_CATEGORIES, value);
 }
 
 import { isOneOf } from "./runtime-values";
+
+export interface CreateLocalSkillInput {
+  agentId: string;
+  sourcePath: string;
+}
+export interface ReviseLocalSkillInput extends CreateLocalSkillInput {
+  skillId: string;
+  expectedRevision: number;
+}
+export interface LocalSkillRevisionInput {
+  skillId: string;
+  revision?: number;
+}

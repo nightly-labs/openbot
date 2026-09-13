@@ -33,11 +33,13 @@ import type {
   DirectTypingRealtimeEvent,
   DynamicIslandPreference,
   DynamicIslandPresentation,
+  FilePreview,
   HostedSiteSummary,
   HostStatus,
   InstalledSkill,
   InviteSummary,
   JoinServerInput,
+  MarketplaceSkillDetail,
   OpenAttachmentInput,
   OpenBotDesktopApi,
   OpenSharedFileInput,
@@ -77,6 +79,7 @@ import {
   SIDEBAR_UNASSIGNED_SECTION_ID,
 } from "@openbot/contracts/ipc";
 import browserTakeoverPreviewUrl from "../../stories/assets/browser-takeover-preview.svg";
+import { filePreviewForPath } from "../../stories/file-previews";
 import {
   STORY_AGENT_STATUS,
   STORY_AGENT_SUBMISSIONS,
@@ -141,6 +144,8 @@ export interface MockOpenBotOptions {
   updateStatus?: UpdateStatus;
   memories?: Record<string, AgentMemory[]>;
   routines?: Record<string, Routine[]>;
+  localSkills?: MarketplaceSkillDetail[];
+  installedSkills?: Record<string, InstalledSkill[]>;
   customProviders?: CustomProviderSummary[];
 }
 
@@ -190,6 +195,23 @@ export interface MockOpenBotControls {
   emitHostStatus: (status: HostStatus) => void;
   emitRemoteDesktopSessions: (sessions: RemoteDesktopSession[]) => void;
   dispose: () => void;
+}
+
+/**
+ * The preview build has no main process to read a file, so it answers with the same fixtures that
+ * the file preview stories use. A path with no fixture keeps the unsupported shape, which is what
+ * the panel shows for a kind it cannot render.
+ */
+function mockFilePreview(path: string, fallbackName: string): FilePreview {
+  return (
+    filePreviewForPath(path) ?? {
+      name: path.split("/").at(-1) ?? fallbackName,
+      size: 0,
+      mimeType: "application/octet-stream",
+      previewKind: "none",
+      bytes: null,
+    }
+  );
 }
 
 function clone<T>(value: T): T {
@@ -275,8 +297,22 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const usageTargetKey = usageTarget ? `${usageTarget.provider}:${usageTarget.model}` : null;
   let agentCounter = agents.length;
   const marketplaceSkills = clone(STORY_MARKETPLACE_SKILLS);
+  const localSkills = clone(
+    options.localSkills ?? [
+      {
+        ...STORY_MARKETPLACE_SKILL_DETAILS["skill-release-notes"],
+        id: "local-skill-11111111-1111-4111-8111-111111111111",
+        name: "Weekly summary",
+        slug: "weekly-summary",
+        creatorName: "Local",
+        version: 1,
+        versionId: "1",
+      },
+    ],
+  );
+  const localRevisions = new Map(localSkills.map((skill) => [`${skill.id}:${skill.version}`, skill]));
   let skillSubmissions = clone(STORY_SKILL_SUBMISSIONS);
-  const installedSkills = new Map(Object.entries(clone(STORY_INSTALLED_SKILLS)));
+  const installedSkills = new Map(Object.entries(clone(options.installedSkills ?? STORY_INSTALLED_SKILLS)));
   let hostedSites = clone(STORY_HOSTED_SITES);
   // The same two endpoints the model-picker stories invent, so preview shows one list everywhere.
   let customProviders = clone(
@@ -742,6 +778,62 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     skills: {
+      localList: async () => clone(localSkills),
+      localGet: async ({ skillId, revision }) => {
+        const skill = revision
+          ? localRevisions.get(`${skillId}:${revision}`)
+          : localSkills.find((item) => item.id === skillId);
+        if (!skill) throw new Error("Local skill not found.");
+        return clone(skill);
+      },
+      localCreate: async ({ agentId, sourcePath }) => {
+        const name = sourcePath.split("/").at(-1) || "New skill";
+        const skill = {
+          ...STORY_MARKETPLACE_SKILL_DETAILS["skill-release-notes"],
+          id: `local-skill-${crypto.randomUUID()}`,
+          name,
+          slug: name,
+          creatorName: "Local",
+          version: 1,
+          versionId: "1",
+        };
+        localSkills.push(skill);
+        localRevisions.set(`${skill.id}:1`, skill);
+        await api.skills.localInstall({ agentId, skillId: skill.id, revision: 1 });
+        return clone(skill);
+      },
+      localRevise: async ({ skillId, expectedRevision }) => {
+        const index = localSkills.findIndex((item) => item.id === skillId);
+        const current = localSkills[index];
+        if (!current || current.version !== expectedRevision)
+          throw new Error("The skill changed. Read its latest revision before revising it.");
+        const skill = { ...current, version: expectedRevision + 1, versionId: String(expectedRevision + 1) };
+        localSkills[index] = skill;
+        localRevisions.set(`${skill.id}:${skill.version}`, skill);
+        return clone(skill);
+      },
+      localInstall: async ({ agentId, skillId, revision }) => {
+        const skill = await api.skills.localGet({ skillId, revision });
+        const previous = readInstalledSkills(agentId).find((item) => item.skillId === skillId);
+        if (previous?.state === "modified")
+          throw new Error("This skill has local changes. Confirm replacement to continue.");
+        const installed: InstalledSkill = {
+          skillId,
+          name: skill.name,
+          slug: skill.slug,
+          installedVersion: revision,
+          availableVersion: revision,
+          state: "installed",
+          origin: "local",
+          enabled: previous?.enabled !== false,
+          description: skill.description,
+        };
+        installedSkills.set(agentId, [
+          ...readInstalledSkills(agentId).filter((item) => item.skillId !== skillId),
+          installed,
+        ]);
+        return clone(installed);
+      },
       list: async (query) => {
         const matches = marketplaceSkills.filter(
           (skill) =>
@@ -757,6 +849,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         });
       },
       get: async (skillId) => {
+        if (skillId.startsWith("local-skill-")) return api.skills.localGet({ skillId });
         const detail = STORY_MARKETPLACE_SKILL_DETAILS[skillId];
         if (!detail) throw new Error("Skill not found");
         return clone(detail);
@@ -782,10 +875,30 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         skillSubmissions = [submission, ...skillSubmissions];
         return clone(submission);
       },
-      listInstalled: async (agentId) => clone(readInstalledSkills(agentId)),
+      listInstalled: async (agentId) =>
+        clone(
+          readInstalledSkills(agentId).map((skill) => {
+            const latest = localSkills.find((item) => item.id === skill.skillId);
+            return latest
+              ? {
+                  ...skill,
+                  availableVersion: latest.version,
+                  state:
+                    skill.state === "installed" && latest.version > skill.installedVersion
+                      ? "update-available"
+                      : skill.state,
+                }
+              : skill;
+          }),
+        ),
       install: async ({ agentId, skillId }) => {
+        if (skillId.startsWith("local-skill-")) {
+          const skill = await api.skills.localGet({ skillId });
+          return api.skills.localInstall({ agentId, skillId, revision: skill.version });
+        }
         const skill = marketplaceSkills.find((candidate) => candidate.id === skillId);
         if (!skill) throw new Error("Skill not found");
+        const previous = readInstalledSkills(agentId).find((item) => item.skillId === skillId);
         const installed: InstalledSkill = {
           skillId: skill.id,
           slug: skill.slug,
@@ -793,6 +906,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           installedVersion: skill.version,
           availableVersion: skill.version,
           state: "installed",
+          enabled: previous?.enabled !== false,
+          origin: previous?.origin ?? "marketplace",
+          description: skill.description,
         };
         installedSkills.set(agentId, [
           ...readInstalledSkills(agentId).filter((item) => item.skillId !== skillId),
@@ -801,10 +917,24 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(installed);
       },
       uninstall: async ({ agentId, skillId }) => {
+        const skill = readInstalledSkills(agentId).find((item) => item.skillId === skillId);
+        if (skill?.origin === "managed") throw new Error("This skill is managed by OpenBot.");
         installedSkills.set(
           agentId,
           readInstalledSkills(agentId).filter((item) => item.skillId !== skillId),
         );
+      },
+      setEnabled: async ({ agentId, skillId, enabled }) => {
+        const current = readInstalledSkills(agentId);
+        const skill = current.find((item) => item.skillId === skillId);
+        if (!skill) throw new Error("Skill not found.");
+        if (skill.origin === "managed") throw new Error("This skill is managed by OpenBot.");
+        const next: InstalledSkill = { ...skill, enabled };
+        installedSkills.set(
+          agentId,
+          current.map((item) => (item.skillId === skillId ? next : item)),
+        );
+        return clone(next);
       },
     },
     hostedSites: {
@@ -1328,20 +1458,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       openAttachment: async (_input: OpenAttachmentInput) => undefined,
       openSharedFile: async (_input: OpenSharedFileInput) => undefined,
       openWorkspaceFile: async (_input: OpenWorkspaceFileInput) => undefined,
-      previewSharedFile: async (input: OpenSharedFileInput) => ({
-        name: input.path.split("/").at(-1) ?? "shared-file",
-        size: 0,
-        mimeType: "application/octet-stream",
-        previewKind: "none",
-        bytes: null,
-      }),
-      previewWorkspaceFile: async (input: OpenWorkspaceFileInput) => ({
-        name: input.path.split("/").at(-1) ?? "workspace-file",
-        size: 0,
-        mimeType: "application/octet-stream",
-        previewKind: "none",
-        bytes: null,
-      }),
+      previewSharedFile: async (input: OpenSharedFileInput) => mockFilePreview(input.path, "shared-file"),
+      previewWorkspaceFile: async (input: OpenWorkspaceFileInput) => mockFilePreview(input.path, "workspace-file"),
       sendMessage: async (input: SendMessageInput) => {
         const messageId = `mock-message-${messageCounter++}`;
         const deliveryId = `mock-delivery-${messageCounter++}`;

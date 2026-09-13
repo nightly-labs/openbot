@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
+import { attachmentMimeTypeForName, playableMediaKind } from "@openbot/contracts/attachment-files";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import type { FilePreview } from "@openbot/contracts/ipc";
 
@@ -11,7 +11,10 @@ function previewKind(name: string, mimeType: string): FilePreview["previewKind"]
   if (/\.(md|markdown)$/iu.test(name)) return "markdown";
   if (mimeType.startsWith("image/")) return "image";
   if (mimeType === "application/pdf") return "pdf";
-  if (mimeType.startsWith("text/") || mimeType === "application/json") return "text";
+  const media = playableMediaKind(mimeType);
+  if (media) return media;
+  // An email is RFC 822 text. The panel shows the headers and the body without a parser.
+  if (mimeType.startsWith("text/") || mimeType === "application/json" || mimeType === "message/rfc822") return "text";
   return "none";
 }
 

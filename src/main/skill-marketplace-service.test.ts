@@ -1,9 +1,9 @@
 // @vitest-environment node
 
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { zipSync } from "fflate";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -61,6 +61,7 @@ describe("SkillMarketplaceService", () => {
             bundleSha256: hash,
             files: ["SKILL.md", "references/template.md"],
             instructions: "Writes release notes.",
+            examplePrompt: "Write notes for the latest commits.",
           });
         if (path.endsWith("/content")) {
           return new Response(Uint8Array.from(bundle).buffer, {
@@ -98,8 +99,13 @@ describe("SkillMarketplaceService", () => {
       },
     );
 
+    await expect(service.get("skill-1")).resolves.toMatchObject({
+      examplePrompt: "Write notes for the latest commits.",
+    });
+
     await expect(service.install({ agentId: agent.id, skillId: "skill-1" })).resolves.toMatchObject({
       state: "installed",
+      description: "Writes release notes.",
     });
     await expect(
       readFile(join(agent.workspacePath, ".agents", "skills", "release-notes", "SKILL.md"), "utf8"),
@@ -110,10 +116,56 @@ describe("SkillMarketplaceService", () => {
     expect(requests).toContain("POST /v1/skills/skill-1/install");
     expect(refreshedAgents).toEqual([agent.id]);
 
+    const claudeSkill = join(agent.workspacePath, ".claude", "skills", "release-notes", "SKILL.md");
+    const agentsSkill = join(agent.workspacePath, ".agents", "skills", "release-notes", "SKILL.md");
+    await rm(agentsSkill);
+    await expect(service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })).rejects.toThrow(
+      "This skill needs repair before it can be disabled.",
+    );
+    await expect(readFile(claudeSkill, "utf8")).resolves.toBe(skillContents);
+    expect((await service.listInstalled(agent.id))[0].enabled).not.toBe(false);
+    await writeFile(agentsSkill, skillContents);
+    await writeFile(claudeSkill, "Claude edits");
+    const agentsReference = join(
+      agent.workspacePath,
+      ".agents",
+      "skills",
+      "release-notes",
+      "references",
+      "template.md",
+    );
+    await rm(agentsReference);
+    await expect(service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })).rejects.toThrow(
+      "local changes",
+    );
+    await expect(readFile(claudeSkill, "utf8")).resolves.toBe("Claude edits");
+    await writeFile(agentsReference, "Template");
+    await writeFile(claudeSkill, skillContents);
+    const gitMetadata = join(agent.workspacePath, ".agents", "skills", "release-notes", ".git");
+    await mkdir(gitMetadata);
+    await writeFile(join(gitMetadata, "HEAD"), "ref: refs/heads/main");
+    await expect(service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })).rejects.toThrow(
+      "local changes",
+    );
+    await expect(readFile(join(gitMetadata, "HEAD"), "utf8")).resolves.toBe("ref: refs/heads/main");
+    await rm(gitMetadata, { recursive: true });
+    await service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false });
+    expect(await service.listPublishable(agent.id)).toEqual([]);
+    await mkdir(dirname(claudeSkill), { recursive: true });
+    await writeFile(claudeSkill, "New user files");
+    await expect(service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: true })).rejects.toThrow(
+      "occupied",
+    );
+    await expect(readFile(claudeSkill, "utf8")).resolves.toBe("New user files");
+    await rm(dirname(claudeSkill), { recursive: true });
+    await service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: true });
+    expect(await service.listPublishable(agent.id)).toEqual([
+      expect.objectContaining({ skillId: "skill-1", version: 1 }),
+    ]);
     await writeFile(join(agent.workspacePath, ".agents", "skills", "release-notes", "SKILL.md"), "locally changed");
     requests.length = 0;
     await expect(service.listInstalledForChatTags(agent.id)).resolves.toEqual([
-      expect.objectContaining({ state: "modified" }),
+      expect.objectContaining({ state: "modified", description: "Writes release notes." }),
     ]);
     expect(requests).toEqual([]);
     await expect(service.listInstalled(agent.id)).resolves.toEqual([expect.objectContaining({ state: "modified" })]);
@@ -126,6 +178,13 @@ describe("SkillMarketplaceService", () => {
     await expect(
       service.uninstall({ agentId: agent.id, skillId: "skill-1", removeModified: true }),
     ).resolves.toBeUndefined();
-    expect(refreshedAgents).toEqual([agent.id, agent.id]);
+    expect(refreshedAgents).toEqual([agent.id, agent.id, agent.id, agent.id]);
+    await service.install({ agentId: agent.id, skillId: "skill-1" });
+    await service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false });
+    await mkdir(dirname(claudeSkill), { recursive: true });
+    await writeFile(claudeSkill, "Unowned files after disable");
+    await service.uninstall({ agentId: agent.id, skillId: "skill-1" });
+    await expect(readFile(claudeSkill, "utf8")).resolves.toBe("Unowned files after disable");
+    await expect(service.listInstalled(agent.id)).resolves.toEqual([]);
   });
 });

@@ -102,13 +102,15 @@ protocol.registerSchemesAsPrivileged([
     scheme: "openbot-app",
     privileges: { standard: true, secure: true, supportFetchAPI: true },
   },
+  // `stream` lets an <audio> or <video> element play a file from the scheme: without it the
+  // element cannot make the range requests that playback needs.
   {
     scheme: "openbot-attachment",
-    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
   },
   {
     scheme: "openbot-remote-attachment",
-    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
   },
   {
     scheme: "openbot-avatar",

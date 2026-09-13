@@ -9,6 +9,8 @@ const PANEL_STORAGE_KEY = "openbot:browser-panel-width";
 const PANEL_MIN = 220;
 const PANEL_MAX = 1600;
 const TEXT_LIMIT = 1_000_000;
+/** Kinds the panel hands to the browser as an object URL instead of decoding itself. */
+const BLOB_PREVIEW_KINDS = new Set<FilePreview["previewKind"]>(["image", "pdf", "audio", "video"]);
 
 interface FilePreviewPanelProps {
   preview: FilePreview;
@@ -29,6 +31,9 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
     readPanelWidth(PANEL_STORAGE_KEY, defaultPanelWidth(), PANEL_MIN, PANEL_MAX),
   );
   const [previewUrl, setPreviewUrl] = createSignal<string | null>(null);
+  // The panel mounts when a file opens, so it has to paint its closed state
+  // first. Two frames guarantee that paint before the open state applies.
+  const [revealed, setRevealed] = createSignal(false);
   let currentPreviewUrl: string | null = null;
   const text = createMemo(() => {
     if (!props.preview.bytes || (props.preview.previewKind !== "text" && props.preview.previewKind !== "markdown")) {
@@ -49,7 +54,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
     (preview) => {
       if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
       currentPreviewUrl = null;
-      if (!preview.bytes || (preview.previewKind !== "image" && preview.previewKind !== "pdf")) {
+      if (!preview.bytes || !BLOB_PREVIEW_KINDS.has(preview.previewKind)) {
         setPreviewUrl(null);
         return;
       }
@@ -62,12 +67,27 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
     if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
   });
 
+  const revealPanel = () => {
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        setRevealed(true);
+      });
+    });
+    onCleanup(() => cancelAnimationFrame(frame));
+  };
+
   const resizeDefaultPanel = () => {
     setPanelWidth(Math.round(Math.min(props.maxWidth(), Math.max(PANEL_MIN, defaultPanelWidth()))));
   };
 
   return (
-    <aside id="file-preview-panel" class="browser-panel file-preview-panel" aria-label="File preview">
+    <aside
+      ref={revealPanel}
+      id="file-preview-panel"
+      class="browser-panel file-preview-panel t-panel-slide"
+      data-open={revealed() ? "true" : "false"}
+      aria-label="File preview"
+    >
       <PanelResizer
         class="right-panel-resizer"
         label="Resize file preview"
@@ -133,6 +153,18 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         </Show>
         <Show when={props.preview.previewKind === "pdf" && previewUrl()}>
           <iframe class="file-preview-pdf" title={props.preview.name} src={previewUrl() ?? ""} />
+        </Show>
+        <Show when={props.preview.previewKind === "audio" && previewUrl()}>
+          <audio class="file-preview-audio" controls src={previewUrl() ?? ""}>
+            {/* A file on the user's computer carries no caption track. The empty element declares
+                that, which browsers ignore, and keeps the media-caption rule satisfied. */}
+            <track kind="captions" />
+          </audio>
+        </Show>
+        <Show when={props.preview.previewKind === "video" && previewUrl()}>
+          <video class="file-preview-video" controls src={previewUrl() ?? ""}>
+            <track kind="captions" />
+          </video>
         </Show>
         <Show when={props.preview.previewKind === "none"}>
           <div class="file-preview-unsupported">

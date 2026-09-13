@@ -358,7 +358,32 @@ describe("ComposerEditor", () => {
     expect(screen.queryByRole("listbox", { name: "Insert mention" })).toBeNull();
   });
 
-  it("searches installed skills in the unified picker and inserts a typed skill token", async () => {
+  it("searches installed skills with $ and inserts a typed skill token", async () => {
+    const skill: InstalledSkill = {
+      skillId: "release-notes",
+      slug: "release-notes",
+      name: "Release Notes",
+      installedVersion: 1,
+      availableVersion: 1,
+      state: "installed",
+      description: "Turns merged work into clear release notes.",
+    };
+    const { editor, onValueChange } = renderComposer([], "", [], [skill]);
+    editor.textContent = "$release";
+    placeCaretAtEnd(editor);
+    await fireEvent.input(editor);
+
+    await screen.findByRole("listbox", { name: "Insert skill" });
+    await fireEvent.keyDown(editor, { key: "Enter" });
+
+    expect(onValueChange).toHaveBeenLastCalledWith("@[Release Notes](skill:release-notes) ");
+    expect(editor.querySelector('[data-skill-id="release-notes"]')).not.toBeNull();
+    expect(editor).toHaveTextContent("Release Notes");
+    expect(editor).not.toHaveTextContent("Turns merged work into clear release notes.");
+  });
+
+  it("keeps $ skill queries out of the @ mention picker", async () => {
+    const research = testAgent("research", "Research");
     const skill: InstalledSkill = {
       skillId: "release-notes",
       slug: "release-notes",
@@ -367,15 +392,20 @@ describe("ComposerEditor", () => {
       availableVersion: 1,
       state: "installed",
     };
-    const { editor, onValueChange } = renderComposer([], "", [], [skill]);
-    editor.textContent = "@release";
+    const { editor } = renderComposer([], "", [research], [skill]);
+    editor.textContent = "@";
     placeCaretAtEnd(editor);
     await fireEvent.input(editor);
 
-    await fireEvent.keyDown(editor, { key: "Enter" });
+    await screen.findByRole("option", { name: "Research Agent" });
+    expect(screen.queryByRole("option", { name: "Release Notes Skill" })).toBeNull();
 
-    expect(onValueChange).toHaveBeenLastCalledWith("@[Release Notes](skill:release-notes) ");
-    expect(editor.querySelector('[data-skill-id="release-notes"]')).not.toBeNull();
+    editor.textContent = "$";
+    placeCaretAtEnd(editor);
+    await fireEvent.input(editor);
+
+    await screen.findByRole("option", { name: "Release Notes Skill" });
+    expect(screen.queryByRole("option", { name: "Research Agent" })).toBeNull();
   });
 
   it("round-trips encoded semantic tag names and ids", async () => {
@@ -425,7 +455,7 @@ describe("ComposerEditor", () => {
     ));
     const editor = screen.getByRole("textbox", { name: "Loading skills" });
     editor.focus();
-    editor.textContent = "@release";
+    editor.textContent = "$release";
     placeCaretAtEnd(editor);
     await fireEvent.input(editor);
 

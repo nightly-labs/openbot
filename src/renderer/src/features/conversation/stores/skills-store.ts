@@ -5,6 +5,7 @@ import { installedSkillsRequestKey } from "../installed-skills-source";
 
 export interface SkillsStoreDeps {
   props: ConversationProps;
+  settingsOpen: () => boolean;
 }
 
 export function createSkillsStore(deps: SkillsStoreDeps) {
@@ -30,44 +31,45 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
       }
     },
   );
-  createEffect(
-    () => `${installedSkillsSource()}\0${installedSkillsRetry()}`,
-    (source) => {
-      const request = ++installedSkillsRequest;
-      const [serverId, agentId, support, visibility] = source.split("\0");
-      if (!agentId) {
-        installedSkillsSourceId = undefined;
-        failedInstalledSkillsAttempt = undefined;
-        setInstalledSkills([]);
-        return;
-      }
-      if (visibility === "hidden") return;
-      const sourceId = `${serverId}\0${agentId}`;
-      if (installedSkillsSourceId !== sourceId) {
-        installedSkillsSourceId = sourceId;
-        setInstalledSkills([]);
-      }
-      if (support === "unsupported") {
-        failedInstalledSkillsAttempt = undefined;
-        setInstalledSkills([]);
-        return;
-      }
-      const connectionSequence = untrack(() => deps.props.server?.connectionSequence) ?? 0;
-      failedInstalledSkillsAttempt = undefined;
-      void window.openbot.agent
-        .listInstalledSkills(agentId)
-        .then((skills) => {
-          if (request !== installedSkillsRequest) return;
-          failedInstalledSkillsAttempt = undefined;
-          setInstalledSkills(skills);
-        })
-        .catch(() => {
-          if (request !== installedSkillsRequest) return;
-          failedInstalledSkillsAttempt = { serverId, sourceId, connectionSequence };
-          // Preserve an already loaded same-agent catalog when a refresh fails.
-        });
-    },
+  const refreshKey = createMemo(
+    () =>
+      `${installedSkillsSource()}\0${installedSkillsRetry()}\0${deps.props.activeTurnId ?? ""}\0${deps.settingsOpen()}`,
   );
+  createEffect(refreshKey, (source) => {
+    const request = ++installedSkillsRequest;
+    const [serverId, agentId, support, visibility] = source.split("\0");
+    if (!agentId) {
+      installedSkillsSourceId = undefined;
+      failedInstalledSkillsAttempt = undefined;
+      setInstalledSkills([]);
+      return;
+    }
+    if (visibility === "hidden") return;
+    const sourceId = `${serverId}\0${agentId}`;
+    if (installedSkillsSourceId !== sourceId) {
+      installedSkillsSourceId = sourceId;
+      setInstalledSkills([]);
+    }
+    if (support === "unsupported") {
+      failedInstalledSkillsAttempt = undefined;
+      setInstalledSkills([]);
+      return;
+    }
+    const connectionSequence = untrack(() => deps.props.server?.connectionSequence) ?? 0;
+    failedInstalledSkillsAttempt = undefined;
+    void window.openbot.agent
+      .listInstalledSkills(agentId)
+      .then((skills) => {
+        if (request !== installedSkillsRequest) return;
+        failedInstalledSkillsAttempt = undefined;
+        setInstalledSkills(skills);
+      })
+      .catch(() => {
+        if (request !== installedSkillsRequest) return;
+        failedInstalledSkillsAttempt = { serverId, sourceId, connectionSequence };
+        // Preserve an already loaded same-agent catalog when a refresh fails.
+      });
+  });
 
   return {
     installedSkills,

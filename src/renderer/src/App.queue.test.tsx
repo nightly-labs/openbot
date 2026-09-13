@@ -442,7 +442,7 @@ describe("OpenBot connected desktop shell", () => {
       configurable: true,
       value: { writeText },
     });
-    vi.mocked(window.openbot.agent.listInstalledSkills).mockResolvedValueOnce([
+    vi.mocked(window.openbot.agent.listInstalledSkills).mockResolvedValue([
       {
         skillId: "skill-1",
         slug: "release-notes",

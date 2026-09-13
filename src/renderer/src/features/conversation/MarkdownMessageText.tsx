@@ -11,6 +11,7 @@ type MarkdownMessageTextProps = Omit<RichMessageTextProps, "showCitationFooter">
   showCitationFooter?: boolean;
   streaming?: boolean;
   streamingTail?: boolean;
+  imagesAsLinks?: boolean;
 };
 
 type MarkdownContentProps = Omit<
@@ -74,6 +75,7 @@ function headingLevel(depth: number): 1 | 2 | 3 | 4 | 5 | 6 {
 export function MarkdownMessageText(props: MarkdownMessageTextProps) {
   const tokens = createMemo(() => marked.lexer(props.body, { breaks: true, gfm: true }));
   const contentProps = (): MarkdownContentProps => ({
+    imagesAsLinks: props.imagesAsLinks,
     agents: props.agents,
     skills: props.skills,
     attachments: props.attachments,
@@ -106,6 +108,7 @@ export function MarkdownInlineText(
 ) {
   const tokens = createMemo(() => marked.Lexer.lexInline(props.body, { breaks: true, gfm: true }));
   const contentProps = (): MarkdownContentProps => ({
+    imagesAsLinks: props.imagesAsLinks,
     agents: props.agents,
     skills: props.skills,
     attachments: props.attachments,
@@ -451,6 +454,13 @@ function MarkdownInline(props: {
           case "image": {
             if (!tokenIs(token, "image")) return token.raw;
             const url = safeBrowserUrl(token.href);
+            if (url && props.content.imagesAsLinks) {
+              return (
+                <MessageLink url={url} onOpenLink={props.content.onOpenLink}>
+                  {token.text || "View image"}
+                </MessageLink>
+              );
+            }
             return url ? (
               <img
                 class="message-markdown-image"

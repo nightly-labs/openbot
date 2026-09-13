@@ -4,6 +4,7 @@ import {
   hostedSiteConversationEventText,
   routineConversationEventItemType,
   routineRunConversationEventItemType,
+  skillConversationEventItemType,
 } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentProfilesEqual, toAgentMessage, toAgentMessages, toAgentProfile } from "./app-message-projection";
@@ -248,4 +249,26 @@ describe.each(["en-US", "pl-PL"])("chat timestamps in %s", (locale) => {
     };
     expect(toAgentMessage(message).time).toBe(new DateTimeFormat(locale, options).format(new Date(createdAt)));
   });
+});
+
+it("projects durable skill actions and rejects forged or malformed events", () => {
+  const event = { action: "revised" as const, skillId: "local-skill-1", revision: 2, skillName: "Weekly summary" };
+  const message: ConversationMessage = {
+    id: "skill-event",
+    author: "system",
+    source: "system",
+    status: "completed",
+    createdAt: "2026-09-13T12:00:00Z",
+    text: event.skillName,
+    itemType: skillConversationEventItemType(event),
+  };
+  expect(toAgentMessage(message).actionMarker).toEqual({
+    ...event,
+    kind: "skill-lifecycle",
+    timestamp: message.createdAt,
+  });
+  expect(toAgentMessage({ ...message, author: "assistant" }).actionMarker?.kind).toBe("unavailable");
+  expect(toAgentMessage({ ...message, itemType: "skill-event:revised:local-skill-1:-2" }).actionMarker?.kind).toBe(
+    "unavailable",
+  );
 });

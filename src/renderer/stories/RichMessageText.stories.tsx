@@ -1,10 +1,11 @@
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
+import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import type { MessageCitation } from "../src/data";
 import { RichMessageText } from "../src/features/conversation/RichMessageText";
-import { STORY_AGENTS, STORY_ATTACHMENTS } from "./fixtures";
+import { STORY_AGENTS, STORY_ATTACHMENTS, STORY_INSTALLED_SKILLS } from "./fixtures";
 
 const args: Parameters<typeof RichMessageText>[0] = {
   body: "Ask @Research to review https://openbot.run/docs before the launch.",
@@ -83,6 +84,20 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const LinksAndMentions: Story = {};
+
+export const SkillChip: Story = {
+  args: {
+    body: `Use ${serializeChatTagReference("skill", "Release notes", "skill-release-notes")} to turn the latest notes into a short plan.`,
+    skills: STORY_INSTALLED_SKILLS.chief,
+  },
+};
+
+export const AgentAndSkillChips: Story = {
+  args: {
+    body: `Ask @Research to use ${serializeChatTagReference("skill", "Release notes", "skill-release-notes")} for the next release.`,
+    skills: STORY_INSTALLED_SKILLS.chief,
+  },
+};
 
 export const InlineCitations: Story = {
   args: {

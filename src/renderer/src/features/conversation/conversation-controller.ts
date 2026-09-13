@@ -1,7 +1,15 @@
-import type { AgentModelId, AgentProviderId, AgentReasoningEffort, BrowserBounds } from "@openbot/contracts/ipc";
+import type {
+  AgentModelId,
+  AgentProviderId,
+  AgentReasoningEffort,
+  BrowserBounds,
+  MarketplaceSkillDetail,
+} from "@openbot/contracts/ipc";
 import { createSignal, onCleanup } from "solid-js";
 import type { AgentActivityPresentation } from "./AgentActivity";
 import type { ChatSearchMatch } from "./chat-search";
+import { appendSkillCreationRequest, appendSkillExample, EMPTY_DRAFT } from "./composer-draft";
+import { composerDraftKey } from "./conversation-keys";
 import type {
   ComposerDraft,
   ConversationProps,
@@ -150,6 +158,16 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
   });
 
   return {
+    startSkillCreation(target: { serverId: string; agentId: string }) {
+      const key = composerDraftKey(target);
+      setDrafts((current) => ({ ...current, [key]: appendSkillCreationRequest(current[key] ?? EMPTY_DRAFT) }));
+      setComposerFocusRequest((value) => value + 1);
+    },
+    appendSkillExample(target: { serverId: string; agentId: string }, skill: MarketplaceSkillDetail) {
+      const key = composerDraftKey(target);
+      setDrafts((current) => ({ ...current, [key]: appendSkillExample(current[key] ?? EMPTY_DRAFT, skill) }));
+      setComposerFocusRequest((value) => value + 1);
+    },
     stopComposerTyping,
     drafts,
     setDrafts,

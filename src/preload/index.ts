@@ -61,6 +61,7 @@ import {
   isDynamicIslandNotchSize,
   isDynamicIslandPreference,
   isDynamicIslandPresentation,
+  isFilePreviewKind,
   isQueuedMessageReceipt,
   isQueueSnapshot,
   isRoutine,
@@ -315,11 +316,7 @@ function decodeFilePreview(value: unknown): FilePreview {
     !isString(preview.name) ||
     !isNumber(preview.size) ||
     !isString(preview.mimeType) ||
-    (preview.previewKind !== "markdown" &&
-      preview.previewKind !== "text" &&
-      preview.previewKind !== "image" &&
-      preview.previewKind !== "pdf" &&
-      preview.previewKind !== "none") ||
+    !isFilePreviewKind(preview.previewKind) ||
     (preview.bytes !== null && !(preview.bytes instanceof Uint8Array))
   ) {
     throw new Error("Invalid file preview response.");
@@ -515,6 +512,9 @@ function decodeSkillDetail(value: unknown): MarketplaceSkillDetail {
     bundleSha256: requiredString(item, "bundleSha256"),
     files: item.files,
     instructions: requiredString(item, "instructions"),
+    ...(isString(item.examplePrompt) && item.examplePrompt.trim().length <= 1000
+      ? { examplePrompt: item.examplePrompt.trim() }
+      : {}),
   };
 }
 
@@ -565,6 +565,7 @@ function decodeInstalledSkill(value: unknown): InstalledSkill {
   if (!isOneOf(["installed", "update-available", "modified", "needs-repair"], state)) {
     throw new Error("Invalid installed skill state.");
   }
+  const description = optionalSkillDescription(item.description);
   return {
     skillId: requiredString(item, "skillId"),
     slug: requiredString(item, "slug"),
@@ -572,7 +573,18 @@ function decodeInstalledSkill(value: unknown): InstalledSkill {
     installedVersion: requiredNumber(item, "installedVersion"),
     availableVersion: requiredNumber(item, "availableVersion"),
     state,
+    ...(item.enabled === false ? { enabled: false } : item.enabled === true ? { enabled: true } : {}),
+    ...(item.origin === "managed" || item.origin === "marketplace" || item.origin === "local"
+      ? { origin: item.origin }
+      : {}),
+    ...(description ? { description } : {}),
   };
+}
+
+function optionalSkillDescription(value: unknown): string | undefined {
+  if (!isString(value)) return undefined;
+  const description = value.trim();
+  return description && description.length <= 500 ? description : undefined;
 }
 
 function decodeInstalledSkillsFromMain(value: unknown): InstalledSkill[] {
@@ -858,6 +870,15 @@ const openbotApi: OpenBotDesktopApi = {
     },
   },
   skills: {
+    localList: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.skillsLocalList).then((value) => {
+        if (!Array.isArray(value)) throw new Error("Invalid local skill list.");
+        return value.map(decodeSkillDetail);
+      }),
+    localGet: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsLocalGet, input).then(decodeSkillDetail),
+    localCreate: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsLocalCreate, input).then(decodeSkillDetail),
+    localRevise: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsLocalRevise, input).then(decodeSkillDetail),
+    localInstall: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsLocalInstall, input).then(decodeInstalledSkill),
     list: (query) => ipcRenderer.invoke(IPC_CHANNELS.skillsList, query ?? null).then(decodeSkillPage),
     get: (skillId) => ipcRenderer.invoke(IPC_CHANNELS.skillsGet, skillId).then(decodeSkillDetail),
     listMine: () => ipcRenderer.invoke(IPC_CHANNELS.skillsListMine).then(decodeSubmissions),
@@ -867,6 +888,7 @@ const openbotApi: OpenBotDesktopApi = {
       ipcRenderer.invoke(IPC_CHANNELS.skillsListInstalled, agentId).then(decodeInstalledSkillsFromMain),
     install: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsInstall, input).then(decodeInstalledSkill),
     uninstall: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsUninstall, input).then(decodeVoid),
+    setEnabled: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsSetEnabled, input).then(decodeInstalledSkill),
   },
   hostedSites: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesList).then(decodeHostedSites),

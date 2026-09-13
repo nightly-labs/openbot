@@ -13,6 +13,7 @@ const storyAgents: Array<Pick<AgentSummary, "id" | "name" | "marketplaceSource">
 
 function SkillsMarketplaceModalStory(props: {
   initialOpen: boolean;
+  detailState?: "fallback" | "long";
   catalogState?: "empty" | "loading" | "loading-transition" | "missing-images" | "four-featured";
 }) {
   const catalogState = untrack(() => props.catalogState);
@@ -56,6 +57,18 @@ function SkillsMarketplaceModalStory(props: {
       };
     };
   }
+  const getDetail = mock.api.skills.get;
+  mock.api.skills.get = async (id) => {
+    const detail = await getDetail(id);
+    if (props.detailState === "fallback") return { ...detail, examplePrompt: undefined };
+    if (props.detailState === "long")
+      return {
+        ...detail,
+        examplePrompt: "Review the latest commits and explain the impact of each change. ".repeat(10),
+        instructions: `## What it does\n\n${"- Check the commits and linked issues.\n".repeat(20)}`,
+      };
+    return detail;
+  };
   window.openbot = mock.api;
   onCleanup(() => {
     mock.dispose();
@@ -79,6 +92,7 @@ function SkillsMarketplaceModalStory(props: {
           onOpenChange={setOpen}
           agents={storyAgents}
           activeAgentId={storyAgents[0]?.id ?? ""}
+          onTrySkill={fn()}
           onAgentInstalled={fn()}
         />
       </main>
@@ -189,4 +203,13 @@ export const FourFeatured: Story = {
   play: async ({ userEvent }) => {
     await userEvent.click(await within(document.body).findByRole("button", { name: "Skills" }));
   },
+};
+
+export const FallbackSkillDetail: Story = {
+  ...SkillDetail,
+  render: () => <SkillsMarketplaceModalStory initialOpen detailState="fallback" />,
+};
+export const LongSkillDetail: Story = {
+  ...SkillDetail,
+  render: () => <SkillsMarketplaceModalStory initialOpen detailState="long" />,
 };

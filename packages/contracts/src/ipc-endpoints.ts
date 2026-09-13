@@ -92,6 +92,12 @@ export const IPC_ENDPOINTS = {
     closeMacPermissionSetup: request(IPC_CHANNELS.computerUseCloseMacPermissionSetup),
   },
   skills: {
+    localList: request(IPC_CHANNELS.skillsLocalList),
+    localGet: request(IPC_CHANNELS.skillsLocalGet),
+    localCreate: request(IPC_CHANNELS.skillsLocalCreate),
+    localRevise: request(IPC_CHANNELS.skillsLocalRevise),
+    localInstall: request(IPC_CHANNELS.skillsLocalInstall),
+
     list: request(IPC_CHANNELS.skillsList),
     get: request(IPC_CHANNELS.skillsGet),
     listMine: request(IPC_CHANNELS.skillsListMine),
@@ -100,6 +106,7 @@ export const IPC_ENDPOINTS = {
     listInstalled: request(IPC_CHANNELS.skillsListInstalled),
     install: request(IPC_CHANNELS.skillsInstall),
     uninstall: request(IPC_CHANNELS.skillsUninstall),
+    setEnabled: request(IPC_CHANNELS.skillsSetEnabled),
   },
   // No event channel: the renderer is the only writer, and the models a saved endpoint adds arrive
   // through the ready `status` event the provider restart already emits.

@@ -1,4 +1,4 @@
-import type { AttachmentSummary, BrowserBounds } from "@openbot/contracts/ipc";
+import { type AttachmentSummary, type BrowserBounds, canPreviewAttachment } from "@openbot/contracts/ipc";
 import { createMemo, createSignal } from "solid-js";
 import { errorMessage } from "../../../error-message";
 import type { ConversationProps, MediaPreview, RightPanelMode, SidebarFilePreview } from "../conversation-types";
@@ -29,6 +29,15 @@ export interface PanelsStoreDeps {
 }
 
 export function createPanelsStore(deps: PanelsStoreDeps) {
+  const [skillSettingsRequest, setSkillSettingsRequest] = createSignal<{ agentId: string; skillId: string } | null>(
+    null,
+  );
+  function openSkillSettings(skill: { skillId: string }): void {
+    const agentId = deps.props.agent?.id;
+    if (!agentId || deps.props.server?.id !== "local") return;
+    setSkillSettingsRequest({ agentId, skillId: skill.skillId });
+    setActiveRightPanel("settings", agentId);
+  }
   const [routineSettingsRequest, setRoutineSettingsRequest] = createSignal<RoutineSettingsRequest | null>(null);
   let routineSettingsRequestNonce = 0;
 
@@ -43,6 +52,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   function setActiveRightPanel(mode: RightPanelMode, agentId = deps.props.agent?.id) {
     if (!agentId) return;
     if (mode !== "settings") {
+      setSkillSettingsRequest(null);
       setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
     }
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
@@ -92,7 +102,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   }
 
   async function previewAttachment(attachment: AttachmentSummary) {
-    if (!attachment.previewUrl || attachment.previewKind === "none") return;
+    if (!attachment.previewUrl || !canPreviewAttachment(attachment)) return;
     deps.setMediaPreview({
       attachment,
       text: null,
@@ -183,6 +193,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   }
 
   return {
+    skillSettingsRequest,
+    openSkillSettings,
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,

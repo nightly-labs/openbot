@@ -28,6 +28,31 @@ describe("file previews", () => {
     expect(mimeTypeForName("Dockerfile")).toBe("text/plain");
   });
 
+  it("classifies playable media, SVG, and email so the panel can show them", () => {
+    expect(filePreviewFromBytes("interview.mp3", new Uint8Array([1]))).toMatchObject({
+      mimeType: "audio/mpeg",
+      previewKind: "audio",
+    });
+    expect(filePreviewFromBytes("demo.mov", new Uint8Array([1]))).toMatchObject({
+      mimeType: "video/quicktime",
+      previewKind: "video",
+    });
+    expect(filePreviewFromBytes("diagram.svg", new Uint8Array([1]))).toMatchObject({
+      mimeType: "image/svg+xml",
+      previewKind: "image",
+    });
+    expect(filePreviewFromBytes("thread.eml", new Uint8Array([1]))).toMatchObject({
+      mimeType: "message/rfc822",
+      previewKind: "text",
+    });
+  });
+
+  it("keeps the bytes for every kind it can show", () => {
+    for (const name of ["interview.mp3", "demo.mov", "diagram.svg", "thread.eml"]) {
+      expect(filePreviewFromBytes(name, new Uint8Array([1])).bytes).not.toBeNull();
+    }
+  });
+
   it("does not transfer bytes for unsupported local files", async () => {
     const directory = await mkdtemp(join(tmpdir(), "openbot-file-preview-"));
     temporaryDirectories.push(directory);

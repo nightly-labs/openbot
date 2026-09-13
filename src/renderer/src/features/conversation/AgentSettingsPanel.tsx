@@ -8,6 +8,7 @@ import type {
   AvatarHue,
   AvatarImageInput,
   CustomProviderSummary,
+  MarketplaceSkillDetail,
   ProviderRuntimeStatus,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -26,7 +27,6 @@ import {
 } from "../../components/SettingsPanel";
 import {
   Button,
-  ChevronRight,
   Input,
   Popover,
   Select,
@@ -42,6 +42,7 @@ import { errorMessage } from "../../error-message";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
+import { AgentSkillsModal, type AgentSkillsMode, userAssignedSkills } from "./AgentSkillsModal";
 import { agentMemoriesPort } from "./memories-port";
 import { agentRoutinesPort } from "./routines-port";
 
@@ -76,10 +77,18 @@ interface AgentSettingsPanelProps {
     updates: AgentRuntimeSettingsPatch,
   ) => Promise<boolean>;
   onSetAgentAvatar: (agentId: string, image: AvatarImageInput | null) => Promise<void>;
+  skillSelectionRequest?: { skillId: string } | null;
   routineSelectionRequest?: RoutineSelectionRequest | null;
   onRoutineSelectionRequestHandled?: (nonce: number) => void;
   onOpenRoutineRun?: (messageId: string) => void;
+  skillsMode?: AgentSkillsMode;
+  skillsMarketplaceOpen?: boolean;
+  onCreateSkill?: () => void;
+  onTrySkill?: (skill: MarketplaceSkillDetail) => void;
+  onAddFromMarketplace?: (agentId: string) => void;
 }
+
+export type { AgentSkillsMode };
 
 /** The three free-text fields of the panel, each with a flag for edits made since the last save. */
 interface AgentTextFields {
@@ -109,6 +118,7 @@ interface AgentSettingsDraft {
   memories: { count: number; open: boolean };
   notifications: boolean;
   routines: { count: number; open: boolean };
+  skills: { count: number; open: boolean; reopenAfterMarketplace: boolean };
   runtime: AgentRuntimeSettings;
   saveError: string | null;
 }
@@ -129,6 +139,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     memories: { count: 0, open: false },
     notifications: true,
     routines: { count: 0, open: false },
+    skills: { count: 0, open: false, reopenAfterMarketplace: false },
     runtime: { model: "gpt-5.6-luna", provider: props.agent.provider, reasoningEffort: "medium" },
     saveError: null,
   });
@@ -143,6 +154,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
 
   const memoriesPort = createMemo(() => agentMemoriesPort(props.agent.id, props.agent.name));
   const routinesPort = createMemo(() => agentRoutinesPort(props.agent.id));
+  const skillsMode = () => props.skillsMode ?? "mutable";
+  let lastSkillsMarketplaceOpen = props.skillsMarketplaceOpen === true;
   const selectedModel = createMemo(() =>
     props.modelOptions.find(
       (option) => option.provider === draft.runtime.provider && option.id === draft.runtime.model,
@@ -218,6 +231,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.avatar.pickerOpen = false;
           state.memories.open = false;
           state.routines.open = false;
+          state.skills.open = false;
+          state.skills.reopenAfterMarketplace = false;
         }
       });
       if (agentChanged) {
@@ -237,7 +252,43 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               state.routines.count = items.length;
             });
           });
+        void loadSkillsCount(agent.id);
       }
+    },
+  );
+
+  async function loadSkillsCount(agentId: string): Promise<void> {
+    if (skillsMode() === "hidden") {
+      setDraft((state) => {
+        state.skills.count = 0;
+      });
+      return;
+    }
+    try {
+      const items =
+        skillsMode() === "readonly"
+          ? await window.openbot.agent.listInstalledSkills(agentId)
+          : await window.openbot.skills.listInstalled(agentId);
+      setDraft((state) => {
+        state.skills.count = userAssignedSkills(items).length;
+      });
+    } catch {
+      setDraft((state) => {
+        state.skills.count = 0;
+      });
+    }
+  }
+
+  createEffect(
+    () => props.skillsMarketplaceOpen === true,
+    (open) => {
+      if (lastSkillsMarketplaceOpen && !open && draft.skills.reopenAfterMarketplace) {
+        setDraft((state) => {
+          state.skills.reopenAfterMarketplace = false;
+          state.skills.open = true;
+        });
+      }
+      lastSkillsMarketplaceOpen = open;
     },
   );
 
@@ -249,6 +300,16 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.routines.open = true;
         });
       }
+    },
+  );
+
+  createEffect(
+    () => props.skillSelectionRequest,
+    (request) => {
+      if (request)
+        setDraft((state) => {
+          state.skills.open = true;
+        });
     },
   );
 
@@ -666,12 +727,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             />
           </SettingsField>
           <SettingsLinkGroup>
-            {/* Usage opens beside its own trigger, so this row keeps the button it is anchored
-                to. It also carries no count, which is why it is not a `SettingsLinkRow`. */}
-            <Button variant="ghost" class="settings-link" onClick={(event) => props.onOpenUsage(event.currentTarget)}>
-              Usage
-              <ChevronRight />
-            </Button>
+            <SettingsLinkRow label="Usage" onClick={props.onOpenUsage} />
             <SettingsLinkRow
               label="Memories"
               value={`${draft.memories.count} saved`}
@@ -681,6 +737,17 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 })
               }
             />
+            <Show when={skillsMode() !== "hidden"}>
+              <SettingsLinkRow
+                label="Skills"
+                value={`${draft.skills.count} assigned`}
+                onClick={() =>
+                  setDraft((state) => {
+                    state.skills.open = true;
+                  })
+                }
+              />
+            </Show>
             <SettingsLinkRow
               label="Routines"
               value={`${draft.routines.count} configured`}
@@ -807,6 +874,38 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           })
         }
       />
+      <Show when={skillsMode() !== "hidden"}>
+        <AgentSkillsModal
+          selectionRequest={props.skillSelectionRequest}
+          agentId={props.agent.id}
+          agentName={props.agent.name}
+          open={draft.skills.open}
+          skillsMode={skillsMode()}
+          onCreateSkill={props.onCreateSkill}
+          onTrySkill={props.onTrySkill}
+          onAddFromMarketplace={
+            props.onAddFromMarketplace
+              ? (agentId) => {
+                  setDraft((state) => {
+                    state.skills.reopenAfterMarketplace = true;
+                    state.skills.open = false;
+                  });
+                  props.onAddFromMarketplace?.(agentId);
+                }
+              : undefined
+          }
+          onOpenChange={(open) =>
+            setDraft((state) => {
+              state.skills.open = open;
+            })
+          }
+          onCountChange={(count) =>
+            setDraft((state) => {
+              state.skills.count = count;
+            })
+          }
+        />
+      </Show>
     </SettingsPanel>
   );
 }

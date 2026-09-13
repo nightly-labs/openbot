@@ -63,6 +63,7 @@ export interface SkillArchivePreview {
   slug: string;
   files: string[];
   instructions: string;
+  examplePrompt?: string;
 }
 
 export class SkillMarketplace {
@@ -152,6 +153,7 @@ export class SkillMarketplace {
       bundleSha256: row.bundle_sha256,
       files: parseFiles(row.files_json),
       instructions: preview.instructions,
+      ...(preview.examplePrompt ? { examplePrompt: preview.examplePrompt } : {}),
     };
   }
 
@@ -168,6 +170,7 @@ export class SkillMarketplace {
       bundleSha256: row.bundle_sha256,
       files: parseFiles(row.files_json),
       instructions: preview.instructions,
+      ...(preview.examplePrompt ? { examplePrompt: preview.examplePrompt } : {}),
     };
   }
 
@@ -518,7 +521,9 @@ export function inspectSkillArchive(bytes: Uint8Array): SkillArchivePreview {
   return { ...metadata, slug: slugify(metadata.name), files: normalized.map(([name]) => name).sort() };
 }
 
-function parseSkillMetadata(text: string): { name: string; description: string; instructions: string } {
+function parseSkillMetadata(
+  text: string,
+): Pick<SkillArchivePreview, "name" | "description" | "instructions" | "examplePrompt"> {
   const match = text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u);
   if (!match) throw new SkillMarketplaceError(400, "invalid_skill", "SKILL.md must begin with YAML frontmatter.");
   let value: unknown;
@@ -537,7 +542,14 @@ function parseSkillMetadata(text: string): { name: string; description: string; 
       "SKILL.md needs a name and description within marketplace limits.",
     );
   }
-  return { name, description, instructions: text.slice(match[0].length).trim() };
+  const example = value["example-prompt"];
+  const examplePrompt = isString(example) ? example.trim() : "";
+  return {
+    name,
+    description,
+    instructions: text.slice(match[0].length).trim(),
+    ...(examplePrompt && examplePrompt.length <= 1_000 ? { examplePrompt } : {}),
+  };
 }
 
 function validateArchivePath(name: string): void {
