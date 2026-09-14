@@ -53,7 +53,10 @@ interface Entry {
   readChannels: Set<string>;
   valid: boolean;
   writes: number;
+  historyReads: Map<string, number>;
 }
+
+export class ChannelHistoryRefreshError extends Error {}
 
 /** Channel events are invalidations. Keep one read in flight and one trailing read per host. */
 export class MobileChannelStore {
@@ -86,6 +89,7 @@ export class MobileChannelStore {
         readChannels: new Set(),
         valid: true,
         writes: 0,
+        historyReads: new Map(),
       };
       this.entries.set(serverId, entry);
     }
@@ -217,6 +221,7 @@ export class MobileChannelStore {
             if (!entry.observed.has(id) || (listedIds && !listedIds.has(id))) return;
             const current = entry.state.pages.get(id);
             if (current && page.channel.revision < current.channel.revision) return;
+            entry.historyReads.set(id, (entry.historyReads.get(id) ?? 0) + 1);
             const merged = mergeLatestChannelPage(current, page);
             if (merged === current) return;
             const nextPages = new Map(entry.state.pages);
@@ -237,6 +242,13 @@ export class MobileChannelStore {
       entry.pending = null;
     });
     return entry.pending;
+  }
+  async refreshHistory(serverId: string, channelId: string) {
+    const entry = this.entry(serverId);
+    const before = entry.historyReads.get(channelId) ?? 0;
+    await this.refresh(serverId, channelId);
+    if (!entry.valid || !entry.state.pages.has(channelId) || (entry.historyReads.get(channelId) ?? 0) <= before)
+      throw new ChannelHistoryRefreshError("The message was sent, but chat history could not refresh.");
   }
   async older(serverId: string, channelId: string) {
     const entry = this.entry(serverId);
@@ -296,8 +308,11 @@ export class MobileChannelStore {
             : [...entry.state.channels, summary],
         });
       }
-      const refresh = this.refresh(serverId);
-      if (options?.waitForRefresh) await refresh;
+      if (options?.waitForRefresh && command.type === "send") await this.refreshHistory(serverId, result.id);
+      else {
+        const refresh = this.refresh(serverId);
+        if (options?.waitForRefresh) await refresh;
+      }
     }
     return result;
   }

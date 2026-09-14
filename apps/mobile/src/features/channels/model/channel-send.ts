@@ -1,7 +1,8 @@
 import type { ChannelCommand, ChannelMember } from "@openbot/contracts/ipc";
 import type { ChatAttachment } from "@/features/chat/components/use-chat-attachments";
+import type { ChatHistoryReceipt } from "../../chat/model/chat-messages";
 import { channelRecipient } from "./channel-draft";
-import type { MobileChannelStore } from "./channel-store";
+import { ChannelHistoryRefreshError, type MobileChannelStore } from "./channel-store";
 
 type SendCommand = Extract<ChannelCommand, { type: "send" }>;
 
@@ -21,7 +22,23 @@ export class ChannelSend {
     files: ChatAttachment[],
     replyToMessageId: string | null,
     members: ChannelMember[],
-  ): Promise<null> {
+  ): Promise<ChatHistoryReceipt | null> {
+    const recipientAgentId = channelRecipient(text, members);
+    const previous = this.failed;
+    const sameOperation =
+      previous &&
+      previous.text === text &&
+      previous.replyToMessageId === replyToMessageId &&
+      previous.recipientAgentId === recipientAgentId &&
+      previous.attachmentDraftIds.length === files.length &&
+      files.every((file, index) => this.uploaded.get(file.id) === previous.attachmentDraftIds[index]);
+    if (previous && !sameOperation) {
+      // The host may have consumed these drafts before the old response was lost.
+      for (const [key, id] of this.uploaded) {
+        if (previous.attachmentDraftIds.includes(id)) this.uploaded.delete(key);
+      }
+      this.failed = null;
+    }
     const ids: string[] = [];
     for (const file of files) {
       let id = this.uploaded.get(file.id);
@@ -31,32 +48,29 @@ export class ChannelSend {
       }
       ids.push(id);
     }
-    const recipientAgentId = channelRecipient(text, members);
-    const previous = this.failed;
     const command: SendCommand = {
       type: "send",
       channelId: this.channelId,
-      operationId:
-        previous &&
-        previous.text === text &&
-        previous.replyToMessageId === replyToMessageId &&
-        previous.recipientAgentId === recipientAgentId &&
-        JSON.stringify(previous.attachmentDraftIds) === JSON.stringify(ids)
-          ? previous.operationId
-          : this.operationId(),
+      operationId: sameOperation ? previous.operationId : this.operationId(),
       text,
       recipientAgentId,
       replyToMessageId,
       attachmentDraftIds: ids,
     };
     this.failed = command;
-    await this.store.command(this.serverId, command, { waitForRefresh: true });
+    let historyPending = false;
+    try {
+      await this.store.command(this.serverId, command, { waitForRefresh: true });
+    } catch (error) {
+      if (!(error instanceof ChannelHistoryRefreshError)) throw error;
+      historyPending = true;
+    }
     this.failed = null;
     for (const [key, id] of this.uploaded) {
       this.uploaded.delete(key);
       if (!ids.includes(id)) void this.store.discard(this.serverId, id).catch(() => undefined);
     }
-    return null;
+    return historyPending ? { refreshHistory: () => this.store.refreshHistory(this.serverId, this.channelId) } : null;
   }
 
   dispose() {

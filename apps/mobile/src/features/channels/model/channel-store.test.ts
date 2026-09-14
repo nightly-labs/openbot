@@ -446,6 +446,58 @@ describe("channel data in the shared chat", () => {
     expect(discard).not.toHaveBeenCalled();
   });
 
+  it("re-uploads consumed attachment drafts when an uncertain send is edited", async () => {
+    const { store } = fixture(async () => [channel]);
+    let uploads = 0;
+    const upload = vi.spyOn(store, "upload").mockImplementation(async () => ({
+      id: `upload-${++uploads}`,
+      name: "note.txt",
+      mimeType: "text/plain",
+      size: 1,
+      kind: "file",
+      previewKind: "none",
+      previewUrl: null,
+    }));
+    const command = vi
+      .spyOn(store, "command")
+      .mockRejectedValueOnce(new Error("Disconnected"))
+      .mockResolvedValue(channel);
+    let operation = 0;
+    const sender = new ChannelSend(store, "host-one", channel.id, () => `op-${++operation}`);
+    const file = { id: "file", name: "note.txt", mimeType: "text/plain", size: 1, base64: "eA==" };
+    await expect(sender.send("First", [file], null, channel.members)).rejects.toThrow("Disconnected");
+    await sender.send("Edited", [file], null, channel.members);
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect(command.mock.calls.map((call) => call[1])).toMatchObject([
+      { operationId: "op-1", attachmentDraftIds: ["upload-1"] },
+      { operationId: "op-2", attachmentDraftIds: ["upload-2"] },
+    ]);
+  });
+
+  it("returns a history-only retry after acceptance and keeps it pending through failed reads", async () => {
+    let failRead = false;
+    const { store, calls } = fixture(async (path) => {
+      if (path === CHANNEL_ROUTES.list) return [channel];
+      if (path === CHANNEL_ROUTES.command) return channel;
+      if (failRead) throw new Error("Offline");
+      return page(1, 2);
+    });
+    const stop = store.observe("host-one", channel.id);
+    await store.refresh("host-one");
+    const cached = store.get("host-one").pages.get(channel.id);
+    failRead = true;
+    const sender = new ChannelSend(store, "host-one", channel.id, () => "accepted");
+    const receipt = await sender.send("Hello", [], null, channel.members);
+    expect(receipt).not.toBeNull();
+    if (!receipt) throw new Error("Expected a pending history receipt");
+    expect(store.get("host-one").pages.get(channel.id)).toBe(cached);
+    await expect(receipt.refreshHistory()).rejects.toThrow("chat history could not refresh");
+    failRead = false;
+    await receipt.refreshHistory();
+    expect(calls.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.command)).toHaveLength(1);
+    stop();
+  });
+
   it("uses a new operation when the restored draft changes", async () => {
     const { store } = fixture(async () => [channel]);
     const command = vi

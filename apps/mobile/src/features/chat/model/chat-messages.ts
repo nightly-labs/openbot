@@ -156,3 +156,8 @@ export function projectChannelMessages(messages: ChannelMessage[], memberId: str
       return message;
     });
 }
+
+/** The host accepted a send, but its transcript still needs a successful read. */
+export interface ChatHistoryReceipt {
+  refreshHistory: () => Promise<void>;
+}

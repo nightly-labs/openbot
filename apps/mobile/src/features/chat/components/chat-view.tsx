@@ -2,7 +2,7 @@ import { userErrorMessage } from "@openbot/user-errors";
 import { useQueryClient } from "@tanstack/react-query";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { router, useIsFocused } from "expo-router";
-import { Typography } from "heroui-native";
+import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ArrowDown } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,6 +31,7 @@ import type { MobileAgentActivity } from "@/features/workspace/model/agent-activ
 import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
+import type { ChatHistoryReceipt } from "../model/chat-messages";
 import type { ChatTarget } from "../model/chat-target";
 import { retainConfirmedAttachments } from "../model/upload-chat-attachments";
 import { ChatCameraPanel } from "./chat-camera-panel";
@@ -56,7 +57,11 @@ export interface ChatViewProps {
   olderLoading: boolean;
   olderError: boolean;
   loadOlder: () => void;
-  send: (body: string, files: ChatAttachment[], replyToMessageId: string | null) => Promise<string | null>;
+  send: (
+    body: string,
+    files: ChatAttachment[],
+    replyToMessageId: string | null,
+  ) => Promise<string | null | ChatHistoryReceipt>;
   needsAction?: boolean;
   notice?: string;
 }
@@ -116,6 +121,8 @@ export function ChatView({
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<{ agentId: string; message: string } | null>(null);
   const [sending, setSending] = useState(false);
+  const [historyReceipt, setHistoryReceipt] = useState<ChatHistoryReceipt | null>(null);
+  const [refreshingHistory, setRefreshingHistory] = useState(false);
   const [sendRetryVersion, setSendRetryVersion] = useState(0);
   const [composerGestureHeight, setComposerGestureHeight] = useState(0);
   const sendingRef = useRef(false);
@@ -204,6 +211,22 @@ export function ChatView({
     [handleLeaveConversation, attachments.cameraOpen],
   );
 
+  async function retryAcceptedHistory() {
+    if (!historyReceipt || refreshingHistory) return;
+    setRefreshingHistory(true);
+    try {
+      await historyReceipt.refreshHistory();
+      submittedFiles.current = [];
+      setPendingMessage(null);
+      setHistoryReceipt(null);
+      setSendError(null);
+    } catch (error) {
+      setSendError({ agentId: target.id, message: userErrorMessage(error, "Could not refresh chat history.") });
+    } finally {
+      setRefreshingHistory(false);
+    }
+  }
+
   function sendMessage(value: string): void {
     if (!serverOnline || !canSend || sendingRef.current || pendingMessage) return;
     const body = value.trim();
@@ -255,7 +278,9 @@ export function ChatView({
     void (async () => {
       try {
         const serverId = await send(body, files, submittedReply?.id ?? null);
-        if (serverId) {
+        if (serverId && typeof serverId === "object") {
+          setHistoryReceipt(serverId);
+        } else if (serverId) {
           setMessageAliases((current) => new Map(current).set(serverId, localId));
           setPendingMessage((current) => (current?.message.id === localId ? { ...current, serverId } : current));
         } else {
@@ -400,6 +425,20 @@ export function ChatView({
                 <Typography.Paragraph accessibilityRole="alert" className="bg-background px-4 py-2 text-danger-text">
                   {sendError.message}
                 </Typography.Paragraph>
+              ) : null}
+              {historyReceipt ? (
+                <View className="bg-background px-4 py-2">
+                  <Typography.Paragraph className="text-muted">
+                    Message sent. Refresh history to show it.
+                  </Typography.Paragraph>
+                  <Button
+                    variant="tertiary"
+                    isDisabled={!serverOnline || refreshingHistory}
+                    onPress={() => void retryAcceptedHistory()}
+                  >
+                    <Button.Label>{refreshingHistory ? "Refreshing…" : "Refresh history"}</Button.Label>
+                  </Button>
+                </View>
               ) : null}
               {notice ? (
                 <Typography.Paragraph className="bg-background px-4 py-2 text-muted">{notice}</Typography.Paragraph>

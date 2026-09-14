@@ -448,11 +448,28 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const handleTeamEvent = useCallback(
     (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
       if (removedServers.current.has(serverId)) return;
-      if (event.type === "channels-changed") {
-        void channelStore.refresh(serverId, event.channelId);
+      if (
+        event.type === "channels-changed" ||
+        event.type === "channel-memories-changed" ||
+        event.type === "channel-routines-changed"
+      ) {
+        if (event.type === "channels-changed") void channelStore.refresh(serverId, event.channelId);
         void queryClient.invalidateQueries({
-          queryKey: ["channel-info", session.apiUrl, session.user.id, sessionScope, serverId, event.channelId],
-          refetchType: "none",
+          queryKey: [
+            "channel-info",
+            session.apiUrl,
+            session.user.id,
+            sessionScope,
+            serverId,
+            event.channelId,
+            ...(event.type === "channel-memories-changed"
+              ? ["memories"]
+              : event.type === "channel-routines-changed"
+                ? ["routines"]
+                : []),
+          ],
+          // Message streaming also emits channels-changed. Only settings events need an immediate settings read.
+          refetchType: event.type === "channels-changed" ? "none" : "active",
         });
         return;
       }
