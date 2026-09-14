@@ -13,6 +13,11 @@ interface SettingsDialogShellProps {
   children: JSX.Element;
   class?: string;
   footer?: JSX.Element;
+  /**
+   * Content the shell places over the end of the panel, such as an error toast. It is the caller's
+   * to position, and the caller sets `--settings-modal-floating-space` on the modal element with its
+   * height, so the panel keeps its last control above it.
+   */
   floatingContent?: JSX.Element;
   closeLabel?: string;
   onContentElement?: (element: HTMLElement) => void;

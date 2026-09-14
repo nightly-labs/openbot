@@ -191,7 +191,13 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const [busy, setBusy] = createSignal<string | null>(null);
   /** A clock, not panel state: it retires an invite row as its `expiresAt` passes. */
   const [now, setNow] = createSignal(Date.now());
-  let modalElement: HTMLElement | undefined;
+  const [modalElement, setModalElement] = createSignal<HTMLElement | undefined>();
+  /**
+   * The height of the error toast, or 0 while no toast is shown. The panel reserves this much
+   * room at its end: the toast floats over the bottom of the panel, so without the reserve it
+   * covers - and swallows the clicks of - whatever the open panel puts last.
+   */
+  const [toastHeight, setToastHeight] = createSignal(0);
   let logoInput: HTMLInputElement | undefined;
   let nameInput: HTMLInputElement | undefined;
   let removeMemberTrigger: HTMLElement | undefined;
@@ -223,6 +229,23 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     (trimmedName() !== panels.identity.savedName ||
       panels.identity.logo !== undefined ||
       panels.identity.logoUrl !== panels.identity.savedLogoUrl);
+  /** Publishes the reserve to the shell stylesheet, which spends it as the panel's end padding. */
+  createEffect(
+    () => ({ element: modalElement(), height: toastHeight() }),
+    ({ element, height }) => {
+      element?.style.setProperty("--settings-modal-floating-space", `${height}px`);
+    },
+  );
+  /** Follows the toast, which grows with the length of the sentence the failure produced. */
+  function measureToast(element: HTMLElement): void {
+    const observer = new ResizeObserver(() => setToastHeight(element.offsetHeight));
+    observer.observe(element);
+    setToastHeight(element.offsetHeight);
+    onCleanup(() => {
+      observer.disconnect();
+      setToastHeight(0);
+    });
+  }
   // Both save bars dock in the same place, so the toast has to lift for either one. It is
   // `position: absolute` over the footer: without this it covers the bar and swallows its clicks.
   const saveBarDocked = () =>
@@ -543,10 +566,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         contentKey={`${props.server.id}:${section()}`}
         closeLabel="Close server settings"
         restoreFocusTarget={props.restoreFocusTarget}
-        onContentElement={(element) => (modalElement = element)}
+        onContentElement={(element) => setModalElement(element)}
         floatingContent={
           <Show when={props.loadError}>
             <Alert
+              ref={measureToast}
               class="server-settings-error-toast"
               data-with-save-bar={saveBarDocked() ? "" : undefined}
               tone="danger"
@@ -692,7 +716,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               <ServerMcpPanel
                 servers={servers()}
                 canManage={canManage()}
-                menuMount={modalElement}
+                menuMount={modalElement()}
                 onDetailChange={setMcpDetail}
                 onSave={(config) => props.onSaveMcpServer?.(config) ?? Promise.resolve()}
                 onRemove={(id) => props.onRemoveMcpServer?.(id) ?? Promise.resolve()}
@@ -1231,7 +1255,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             <Show when={canManage() && actionsAvailable()}>
               <MemberActionsMenu
                 member={member}
-                mount={modalElement}
+                mount={modalElement()}
                 onRoleChange={(role) =>
                   void run(`member:${member.id}`, () => props.onUpdateMember({ memberId: member.id, role }))
                 }
