@@ -1,7 +1,7 @@
 import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show } from "solid-js";
 import { PanelResizer, readPanelWidth, savePanelWidth } from "../../components/PanelResizer";
-import { Button, ChevronRight, Monitor, Plus, Skeleton, X } from "../../components/ui";
+import { Button, ChevronRight, Maximize2, Monitor, Plus, Skeleton, X } from "../../components/ui";
 
 const BROWSER_PANEL_STORAGE_KEY = "openbot:browser-preview-panel-width";
 const BROWSER_PANEL_MIN = 220;
@@ -203,6 +203,10 @@ export function BrowserPreviewCard(props: {
               />
             )}
           </Show>
+          <span class="browser-preview-open-label" aria-hidden="true">
+            <Maximize2 />
+            Open
+          </span>
         </span>
         <span class="browser-preview-title" title={title()}>
           {title()}

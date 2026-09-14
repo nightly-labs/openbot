@@ -8259,6 +8259,7 @@ button.chat-action-target:active,
 }
 
 .browser-preview-image {
+  position: relative;
   width: 100%;
   aspect-ratio: 16 / 10;
   display: flex;
@@ -8284,6 +8285,31 @@ button.chat-action-target:active,
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--openbot-text-sm);
+}
+
+.browser-preview-open-label {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  line-height: 1;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.browser-preview-open-label > svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.browser-preview-open:hover .browser-preview-open-label {
+  opacity: 1;
 }
 
 .browser-preview-close {
