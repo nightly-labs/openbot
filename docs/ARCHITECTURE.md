@@ -546,7 +546,13 @@ production `openbot.run` hostname. Landing and invitation events carry a bounded
 A recognized `utm_source` tag takes precedence over the referring domain. Exact domain and
 subdomain matches select known platforms; URL paths and substring matches do not. Unrecognized
 platforms use `unknown`. No referral signal retains the coarse `direct` category, which does
-not prove a visitor typed the address. Raw campaign tags are never transmitted.
+not prove a visitor typed the address.
+
+`landingCampaignPath` rebuilds the reported screen path with only the five allowlisted `utm_*` tags,
+lowercased and bounded to 64 safe characters; every other parameter and the hash are dropped by
+construction. The path travels on every event of the page load, not only `screen_view`, because
+OpenPanel reads campaign attribution from whichever event creates the session, and the two events
+are sent concurrently.
 See [PRIVACY.md](../PRIVACY.md) for the data boundary.
 
 The OpenPanel Growth dashboard uses a session funnel from `landing_viewed` to

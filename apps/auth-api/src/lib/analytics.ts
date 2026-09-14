@@ -1,5 +1,5 @@
 import { isBoolean, isOneOf } from "@openbot/contracts/runtime-values";
-import { OpenPanel, OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
+import { OpenPanel, OpenPanelBase, type OpenPanelOptions, type TrackProperties } from "@openpanel/web";
 import { OPENBOT_DOWNLOAD_LINKS, OPENBOT_LINKS } from "./landing-links";
 
 export const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
@@ -57,17 +57,24 @@ type LandingDestination =
 
 type LandingScreenPath = "/" | "/join" | "/news" | "/guides";
 
-type OpenPanelClient = Pick<OpenPanel, "setGlobalProperties" | "track"> & {
-  trackScreenView: (path: LandingScreenPath) => ReturnType<OpenPanelBase["track"]>;
+type OpenPanelClient = Pick<OpenPanel, "setGlobalProperties"> & {
+  track: (name: string, properties: TrackProperties, path: string) => ReturnType<OpenPanelBase["track"]>;
+  trackScreenView: (path: string) => ReturnType<OpenPanelBase["track"]>;
 };
 
 type ClientFactory = (options: OpenPanelOptions) => OpenPanelClient;
 
+/**
+ * `OpenPanel.track` replaces `__path` with its own `lastPath`, which stays empty because screen
+ * tracking is disabled here. The base method only merges the given properties, so both calls use it
+ * and pass the reported path explicitly.
+ */
 function createOpenPanelClient(options: OpenPanelOptions): OpenPanelClient {
   const client = new OpenPanel(options);
   return {
     setGlobalProperties: (properties) => client.setGlobalProperties(properties),
-    track: (name, properties) => client.track(name, properties),
+    track: (name, properties, path) =>
+      OpenPanelBase.prototype.track.call(client, name, { ...properties, __path: path }),
     trackScreenView: (path) => OpenPanelBase.prototype.track.call(client, "screen_view", { __path: path }),
   };
 }
@@ -113,6 +120,7 @@ export class LandingAnalytics {
   readonly #productionBuild: boolean;
   #client: OpenPanelClient | null = null;
   #lastScreenPath: LandingScreenPath | null = null;
+  #campaignPath = "/";
   readonly #clickCleanup = new WeakMap<Document, (replacement: boolean) => void>();
 
   constructor(createClient: ClientFactory = createOpenPanelClient, productionBuild = import.meta.env.PROD) {
@@ -127,6 +135,7 @@ export class LandingAnalytics {
   start(document: Document, hostname: string, screenPath: LandingScreenPath = "/"): () => void {
     if (isLikelyAutomation(document.defaultView?.navigator)) return () => undefined;
     if (!this.#ensureClient(hostname)) return () => undefined;
+    this.#campaignPath = landingCampaignPath(screenPath, document.location.href);
     this.#client?.setGlobalProperties({
       ...landingAttribution(document, hostname),
     });
@@ -143,6 +152,7 @@ export class LandingAnalytics {
   ): () => void {
     if (isLikelyAutomation(document.defaultView?.navigator)) return () => undefined;
     if (!this.#ensureClient(hostname)) return () => undefined;
+    this.#campaignPath = landingCampaignPath("/join", document.location.href);
     this.#client?.setGlobalProperties({
       ...landingAttribution(document, hostname),
     });
@@ -228,7 +238,7 @@ export class LandingAnalytics {
   #screenView(path: LandingScreenPath): void {
     if (this.#lastScreenPath === path) return;
     try {
-      const result = this.#client?.trackScreenView(path);
+      const result = this.#client?.trackScreenView(this.#campaignPath);
       if (result instanceof Promise) void result.catch(() => undefined);
       this.#lastScreenPath = path;
     } catch {
@@ -245,7 +255,7 @@ export class LandingAnalytics {
             value !== undefined && allowed.some((item) => item === key) && isSafeLandingProperty(name, key, value),
         ),
       );
-      const result = this.#client?.track(name, sanitized);
+      const result = this.#client?.track(name, sanitized, this.#campaignPath);
       if (result instanceof Promise) void result.catch(() => undefined);
     } catch {
       // Analytics must never change landing-page behavior.
@@ -265,6 +275,33 @@ function isSafeLandingProperty(name: LandingEventName, key: string, value: unkno
 export function isLikelyAutomation(navigator: Pick<Navigator, "userAgent" | "webdriver"> | null | undefined): boolean {
   if (!navigator) return false;
   return navigator.webdriver || /(?:bot|crawler|spider|headless|lighthouse|preview)/iu.test(navigator.userAgent);
+}
+
+const CAMPAIGN_PARAMETERS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"] as const;
+/**
+ * Campaign tags are marketer-authored labels. A value that is not a bounded lowercase label is
+ * dropped instead of truncated, so no free text can escape through a campaign link.
+ */
+const SAFE_CAMPAIGN_VALUE = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
+
+/**
+ * OpenPanel reads campaign attribution from the query of the reported path, so the allowlisted tags
+ * must travel with the path. Every other parameter and the hash are dropped by construction.
+ */
+export function landingCampaignPath(screenPath: LandingScreenPath, href: string): string {
+  let search: URLSearchParams;
+  try {
+    search = new URL(href).searchParams;
+  } catch {
+    return screenPath;
+  }
+  const campaign = new URLSearchParams();
+  for (const key of CAMPAIGN_PARAMETERS) {
+    const value = search.get(key)?.trim().toLowerCase() ?? "";
+    if (SAFE_CAMPAIGN_VALUE.test(value)) campaign.set(key, value);
+  }
+  const query = campaign.toString();
+  return query ? `${screenPath}?${query}` : screenPath;
 }
 
 // OpenPanel expects a URL. Keep only the domain, never credentials, ports or URL contents.

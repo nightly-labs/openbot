@@ -51,8 +51,11 @@ emit host lifecycle events again. Agent/host token and cost reports remain separ
 Analytics events do not contain message or direct-message text, prompts, replies, generated content,
 search queries, embedded-browser URLs or page titles, file names, local paths, commands, raw error
 messages, or local identifiers for agents, threads, turns, messages, servers, and team members.
-Website page views do not contain query parameters, hashes, or invitation values. Session replay and
-automatic interaction capture are disabled.
+Website page views carry the five standard campaign tags `utm_source`, `utm_medium`, `utm_campaign`,
+`utm_content`, and `utm_term` when a visitor arrives through a campaign link. Each tag is sent only
+as a lowercase label of at most 64 characters made of letters, digits, dots, hyphens, and
+underscores; any other value is dropped rather than shortened. No other query parameter, hash, or
+invitation value is sent. Session replay and automatic interaction capture are disabled.
 
 When a user signs in, OpenPanel receives the OpenBot account ID and normalized account email so UI
 actions can be associated with the account that started them. The email is stored on the OpenPanel
@@ -62,8 +65,8 @@ not emit the lifecycle again. Sign-in attempts and website activity remain anony
 has been verified. Landing-page attribution includes an allowlisted source category, an allowlisted
 platform name (or unknown), and the referring domain when available. A recognized utm_source tag
 takes precedence over the referring domain for platform classification; unrecognized tags are not
-sent. Attribution excludes referrer paths, query parameters, fragments, credentials, ports, and raw
-campaign URLs. Referrals from openbot.run and its subdomains are omitted. OpenPanel can also derive
+sent. Attribution excludes referrer paths, query parameters, fragments, credentials, ports, and
+campaign URLs other than the allowlisted tags described above. Referrals from openbot.run and its subdomains are omitted. OpenPanel can also derive
 session, device, browser, operating-system, network, and approximate geographic metadata from a
 request. The analytics service runs on OpenBot's self-hosted infrastructure and receives events
 through `analytics.openbot.run`.

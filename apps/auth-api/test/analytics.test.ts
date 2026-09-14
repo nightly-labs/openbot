@@ -5,6 +5,7 @@ import {
   isLikelyAutomation,
   LandingAnalytics,
   landingAttribution,
+  landingCampaignPath,
   landingReferrer,
   OPENPANEL_API_URL,
   shouldEnableLandingAnalytics,
@@ -30,6 +31,7 @@ describe("landing analytics", () => {
       trackScreenView: vi.fn(),
     };
     const createClient = vi.fn((_options: unknown) => client);
+    window.history.replaceState({}, "", "/?utm_source=Twitter&utm_medium=ad&utm_campaign=mutli");
     const analytics = new LandingAnalytics(createClient, true);
     const cleanup = analytics.start(document, "openbot.run");
 
@@ -53,18 +55,44 @@ describe("landing analytics", () => {
       environment: "production",
       event_schema_version: 7,
     });
+    const campaignPath = "/?utm_source=twitter&utm_medium=ad&utm_campaign=mutli";
     expect(client.trackScreenView).toHaveBeenCalledOnce();
-    expect(client.trackScreenView).toHaveBeenCalledWith("/");
-    expect(client.track).toHaveBeenNthCalledWith(1, "landing_viewed", {});
-    expect(client.track).toHaveBeenNthCalledWith(2, "landing_link_clicked", {
-      destination: "contact",
-      placement: "header",
-    });
-    expect(client.track).toHaveBeenNthCalledWith(3, "landing_download_clicked", {
-      platform: "macos",
-      placement: "download_section",
-    });
+    expect(client.trackScreenView).toHaveBeenCalledWith(campaignPath);
+    expect(client.track).toHaveBeenNthCalledWith(1, "landing_viewed", {}, campaignPath);
+    expect(client.track).toHaveBeenNthCalledWith(
+      2,
+      "landing_link_clicked",
+      { destination: "contact", placement: "header" },
+      campaignPath,
+    );
+    expect(client.track).toHaveBeenNthCalledWith(
+      3,
+      "landing_download_clicked",
+      { platform: "macos", placement: "download_section" },
+      campaignPath,
+    );
     expect(client.track).toHaveBeenCalledTimes(3);
+  });
+
+  it("reports only bounded, lowercase campaign tags in the screen path", () => {
+    expect(landingCampaignPath("/", "https://openbot.run/?utm_source=Twitter&utm_medium=ad&utm_campaign=mutli")).toBe(
+      "/?utm_source=twitter&utm_medium=ad&utm_campaign=mutli",
+    );
+    expect(
+      landingCampaignPath("/", "https://openbot.run/?utm_source=Twitter&utm_medium=ad&utm_campaign=mutli_free"),
+    ).toBe("/?utm_source=twitter&utm_medium=ad&utm_campaign=mutli_free");
+    // Key order follows the allowlist, not the link, so one campaign is one report row.
+    expect(landingCampaignPath("/", "https://openbot.run/?utm_campaign=mutli&utm_source=twitter")).toBe(
+      "/?utm_source=twitter&utm_campaign=mutli",
+    );
+    expect(landingCampaignPath("/news", "https://openbot.run/news")).toBe("/news");
+    expect(landingCampaignPath("/", "not a url")).toBe("/");
+    expect(landingCampaignPath("/", `https://openbot.run/?utm_term=${"a".repeat(65)}&utm_content=has%20space`)).toBe(
+      "/",
+    );
+    expect(
+      landingCampaignPath("/join", "https://openbot.run/join?invite=private-token&utm_source=twitter#secret"),
+    ).toBe("/join?utm_source=twitter");
   });
 
   it("does not create a client outside production", () => {
@@ -79,6 +107,7 @@ describe("landing analytics", () => {
       <a id="open" href="openbot://join?invite=private">Open app</a>
       <a id="download" href="/download/macos">Download</a>
     `;
+    window.history.replaceState({}, "", "/join");
     const client = { setGlobalProperties: vi.fn(), track: vi.fn(), trackScreenView: vi.fn() };
     const analytics = new LandingAnalytics(() => client, true);
     const cleanup = analytics.startJoin(document, "openbot.run", { validInvite: true, platform: "macos" });
@@ -88,12 +117,19 @@ describe("landing analytics", () => {
     cleanup();
     document.querySelector<HTMLElement>("#open")?.click();
 
-    expect(client.track).toHaveBeenNthCalledWith(1, "join_page_action", { action: "view", valid_invite: true });
-    expect(client.track).toHaveBeenNthCalledWith(2, "join_page_action", { action: "open_app" });
-    expect(client.track).toHaveBeenNthCalledWith(3, "join_page_action", {
-      action: "download",
-      platform: "macos",
-    });
+    expect(client.track).toHaveBeenNthCalledWith(
+      1,
+      "join_page_action",
+      { action: "view", valid_invite: true },
+      "/join",
+    );
+    expect(client.track).toHaveBeenNthCalledWith(2, "join_page_action", { action: "open_app" }, "/join");
+    expect(client.track).toHaveBeenNthCalledWith(
+      3,
+      "join_page_action",
+      { action: "download", platform: "macos" },
+      "/join",
+    );
     expect(client.track).toHaveBeenCalledTimes(3);
     expect(client.trackScreenView).toHaveBeenCalledOnce();
     expect(client.trackScreenView).toHaveBeenCalledWith("/join");
@@ -103,6 +139,7 @@ describe("landing analytics", () => {
 
   it("replaces an existing document listener instead of double tracking clicks", () => {
     document.body.innerHTML = '<a id="open" href="openbot://join">Open app</a>';
+    window.history.replaceState({}, "", "/join");
     const client = { setGlobalProperties: vi.fn(), track: vi.fn(), trackScreenView: vi.fn() };
     const analytics = new LandingAnalytics(() => client, true);
     analytics.startJoin(document, "openbot.run", { validInvite: false, platform: "windows" });
@@ -112,9 +149,9 @@ describe("landing analytics", () => {
     cleanup();
 
     expect(client.track.mock.calls.filter(([name]) => name === "join_page_action")).toEqual([
-      ["join_page_action", { action: "view", valid_invite: false }],
-      ["join_page_action", { action: "view", valid_invite: true }],
-      ["join_page_action", { action: "open_app" }],
+      ["join_page_action", { action: "view", valid_invite: false }, "/join"],
+      ["join_page_action", { action: "view", valid_invite: true }, "/join"],
+      ["join_page_action", { action: "open_app" }, "/join"],
     ]);
     expect(client.trackScreenView).toHaveBeenCalledOnce();
 
@@ -126,7 +163,11 @@ describe("landing analytics", () => {
   });
 
   it("sends a safe anonymous screen view again after the invitation route remounts", async () => {
-    window.history.replaceState({}, "", "/join?invite=private-token#secret");
+    window.history.replaceState(
+      {},
+      "",
+      "/join?invite=private-token&utm_source=Twitter&utm_medium=ad&utm_campaign=mutli#secret",
+    );
     const requests: unknown[] = [];
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       requests.push(JSON.parse(String(init?.body)));
@@ -152,7 +193,9 @@ describe("landing analytics", () => {
         isDynamicRecord(screenViewRequest) && isDynamicRecord(screenViewRequest.payload)
           ? screenViewRequest.payload
           : null;
-      expect(payload).toMatchObject({ properties: expect.objectContaining({ __path: "/join" }) });
+      expect(payload).toMatchObject({
+        properties: expect.objectContaining({ __path: "/join?utm_source=twitter&utm_medium=ad&utm_campaign=mutli" }),
+      });
       expect(payload).not.toHaveProperty("profileId");
       expect(JSON.stringify(requests)).not.toContain("private-token");
       expect(JSON.stringify(requests)).not.toContain("#secret");

@@ -18,11 +18,12 @@ Every event has these low-cardinality properties:
 
 - `surface`: `desktop`, `desktop_host`, or `landing`;
 - `environment`: currently `production` only;
-- `event_schema_version`: the integer schema generation, currently `5`;
+- `event_schema_version`: the integer schema generation, currently `7`;
 - `app_version` and `platform` on desktop surfaces;
-- `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`.
+- `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`;
+- `source_platform` on landing surfaces: an allowlisted platform name, or `unknown`.
 
-Reports must filter to `event_schema_version = 5`. Generation 5 renames the product agent throughout: the
+Reports must filter to `event_schema_version = 7`. Generation 5 renames the product agent throughout: the
 `origin` property reports `agent` where generation 4 reported `bot`, so the two generations cannot be
 combined in one report. Historical events remain available but must not
 be mixed into current conversion or reliability metrics.
@@ -82,7 +83,7 @@ lifecycle. A malformed preference fails closed; a missing preference uses the do
 | `reaction_action` | Are reactions used? | Reaction operation completed |
 | `maintenance_action` | Can accounts export data and diagnostics? | Export reported a saved artifact |
 | `hosted_site_action` | Can accounts publish, replace, and delete Hosted Sites? | A terminal Hosted Site operation result; site metadata is never sent |
-| `screen_view` | Which public website routes are viewed in a session? | One safe view for `/` or `/join`, without a query or hash |
+| `screen_view` | Which public website routes are viewed in a session? | One safe view for `/`, `/join`, `/news`, or `/guides`, with allowlisted campaign tags and no hash |
 | `landing_viewed` | How much qualified landing traffic arrives? | Non-automation production page view |
 | `landing_download_clicked` | Which safe channel/placement drives downloads? | Allowlisted download link clicked |
 | `landing_link_clicked` | Which public resources are useful? | Allowlisted public link clicked |
@@ -96,8 +97,11 @@ non-finite, negative, or implausibly large inputs. Failure codes are static and 
 
 Never send message content, prompts, answers, generated content, search terms, arbitrary URLs,
 referrers, file names, local paths, commands, tokens, invitation values, raw errors, or local
-identifiers. Website screen views use only the fixed paths `/` and `/join`. Session replay and
-automatic interaction capture remain disabled.
+identifiers. Website events use only the fixed paths `/`, `/join`, `/news`, and `/guides`, followed
+by the allowlisted campaign tags `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, and
+`utm_term`. `landingCampaignPath` lowercases each tag and accepts at most 64 characters from
+`[a-z0-9._-]`; a value outside that shape is dropped, not shortened, and no other query parameter or
+hash is ever included. Session replay and automatic interaction capture remain disabled.
 
 ## Required dashboards
 
@@ -111,15 +115,31 @@ automatic interaction capture remain disabled.
    segment only by coarse acquisition source, placement, and platform.
 5. Reliability: failed outcomes, safe failure codes, P90/P99 durations, and update/provider health.
 
-Every dashboard must filter by the intended `surface` and `event_schema_version = 5`. Website bounce
+Every dashboard must filter by the intended `surface` and `event_schema_version = 7`. Website bounce
 uses OpenPanel's standard single-`screen_view` definition. Do not emit synthetic screen views to
 change it; use the engaged-session report for meaningful landing activity.
+
+## Campaign attribution and processing delay
+
+OpenPanel takes `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, and `utm_term` from the
+query of the reported path on the event that creates the session. The landing surface sends two
+events concurrently on the first page load, so the path carries the campaign tags on every event and
+attribution does not depend on which request arrives first.
+
+Sessions are written through OpenPanel's session buffer, which flushes in batches on an interval.
+Campaign rows therefore appear after that flush rather than immediately; events are buffered, never
+dropped. Attribution is recorded once per session: a visitor who arrives without campaign tags and
+navigates to a campaign link later stays on the original session's attribution, and sessions that
+were recorded before this behavior shipped are not re-attributed.
 
 ## Quality checks
 
 - Anonymous SDK requests must not contain `profileId` after any account was identified.
 - Every identified profile request contains the central account ID and normalized email.
-- Website `screen_view` events contain only `/` or `/join` and never an invitation query or hash.
+- Website `screen_view` events contain only an allowlisted path and allowlisted campaign tags, never
+  an invitation query or a hash.
+- A campaign link produces a session whose `utm_source`, `utm_medium`, and `utm_campaign` match the
+  link, instead of `Direct / Not set`.
 - A duplicate host turn start produces one `system_turn_started` event.
 - A known stored turn origin wins over a completion payload whose origin is `unknown`.
 - `system_turn_completed` never exceeds starts for the same reporting window without a documented
