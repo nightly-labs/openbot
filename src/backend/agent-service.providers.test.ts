@@ -294,6 +294,52 @@ describe.sequential("AgentService: providers", () => {
     expect(client.requests.filter((request) => request.method === "thread/start")).toHaveLength(2);
   });
 
+  it("gives Codex its MCP servers and replaces the session when the set changes", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    const startService = async () => {
+      const next = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+      await next.initialize();
+      return next;
+    };
+    service = await startService();
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+    expect(paramsRecord(client.requests.find((request) => request.method === "thread/start")?.params)?.config).toBe(
+      undefined,
+    );
+
+    // Codex ignores the configuration on resume, so a new MCP server has to force a new session.
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["ready"],
+        env: [{ key: "TOKEN", value: "secret" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    await service.stop();
+    service = await startService();
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    const starts = client.requests.filter((request) => request.method === "thread/start");
+    expect(starts).toHaveLength(2);
+    expect(paramsRecord(starts[1]?.params)?.config).toEqual({
+      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: { TOKEN: "secret" } } },
+    });
+  });
+
   it("deletes unloaded pending handoffs for active and retired sessions with their agent", async () => {
     const { store, mailbox } = stores(root);
     let rejectTurn = false;

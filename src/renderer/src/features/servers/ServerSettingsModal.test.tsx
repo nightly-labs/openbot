@@ -161,6 +161,51 @@ describe("ServerSettingsModal", () => {
     },
   );
 
+  // `mcpServers` gates the tab and the panel together, so the prop is the whole feature gate: a
+  // member of a remote server is never handed one and never sees a tab that would answer 403.
+  it("shows the MCP tab only when a caller supplies the list", async () => {
+    render(() => <ServerSettingsModal {...props()} />);
+    expect(screen.queryByRole("tab", { name: "MCP" })).not.toBeInTheDocument();
+  });
+
+  it("reports entering and leaving the MCP tab so the connections last only while it is open", async () => {
+    const onMcpVisibilityChange = vi.fn();
+    render(() => (
+      <ServerSettingsModal
+        {...props({
+          mcpServers: [
+            {
+              config: {
+                id: "mcp-1",
+                name: "Filesystem",
+                transport: "stdio",
+                enabled: true,
+                command: "npx",
+                args: [],
+                env: [],
+                envPassthrough: [],
+                workingDirectory: "",
+                url: "",
+                headers: [],
+              },
+              state: "connected",
+              toolCount: 4,
+              error: null,
+            },
+          ],
+          onMcpVisibilityChange,
+        })}
+      />
+    ));
+
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    await waitFor(() => expect(onMcpVisibilityChange).toHaveBeenCalledWith(true));
+    expect(await screen.findByText("Filesystem")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("tab", { name: "General" }));
+    await waitFor(() => expect(onMcpVisibilityChange).toHaveBeenLastCalledWith(false));
+  });
+
   it("saves the first local identity without publishing it", async () => {
     const onSaveIdentity = vi.fn(async () => undefined);
     const onSetPublished = vi.fn(async () => undefined);
@@ -249,7 +294,8 @@ describe("ServerSettingsModal", () => {
 
     await fireEvent.input(name, { target: { value: "" } });
     expect(screen.queryByText("Enter at least 6 characters.")).not.toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
+    // The bar shrinks back into the bottom edge before it leaves, so this waits for the close.
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument());
     expect(name).not.toHaveAttribute("aria-invalid");
 
     await fireEvent.input(name, { target: { value: "Tiny" } });

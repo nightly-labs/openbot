@@ -204,6 +204,14 @@ export const IPC_CHANNELS = {
   serversDirectTyping: "servers:direct-typing",
   serversEvent: "servers:event",
   serversInvite: "servers:invite",
+  // MCP servers. Status pushes ride `agentEvent`, which already carries the server id, so these
+  // are all requests: `status-open` and `status-close` only say whether the panel is watching.
+  serversListMcpServers: "servers:mcp:list",
+  serversSaveMcpServer: "servers:mcp:save",
+  serversRemoveMcpServer: "servers:mcp:remove",
+  serversSetMcpServerEnabled: "servers:mcp:set-enabled",
+  serversOpenMcpStatus: "servers:mcp:status-open",
+  serversCloseMcpStatus: "servers:mcp:status-close",
   hostGetStatus: "host:get-status",
   hostConfigure: "host:configure",
   hostUpdateIdentity: "host:update-identity",

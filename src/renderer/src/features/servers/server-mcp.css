@@ -1,0 +1,154 @@
+/*
+ * The MCP section of the server settings modal. The list rows and the form both sit inside the
+ * shared settings shell, so this file only carries what the primitives do not: the row line that
+ * pairs a name with its status badge, the repeatable-row grids, and the panel-level save bar.
+ */
+
+/*
+ * The list and the form are the two pages of a page-slide, so they share one grid cell. Each page
+ * keeps the column layout the panel used to hold, which is what keeps the form's save bar at the
+ * bottom of the panel.
+ */
+.server-mcp-panel {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  min-height: 100%;
+}
+
+.server-mcp-panel.t-page-slide .t-page {
+  position: static;
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-6);
+  min-width: 0;
+}
+
+/*
+ * Only the entering page is mounted, so its starting style is where the entry comes from. The
+ * selector has to out-rank `.t-page-slide[data-page][data-page-id]` in transitions.css, which also
+ * describes the page that is on screen: a starting style only wins a tie, not a lower specificity.
+ */
+@starting-style {
+  .settings-modal .server-mcp-panel.t-page-slide .t-page[data-page-id] {
+    opacity: 0;
+    transform: translateX(var(--t-page-from-x));
+    filter: blur(var(--page-blur));
+  }
+}
+
+.server-mcp-section {
+  min-width: 0;
+}
+
+.server-mcp-error {
+  display: block;
+  margin-bottom: var(--openbot-space-2);
+}
+
+.server-mcp-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  border: 1px dashed var(--openbot-border);
+  border-radius: var(--openbot-radius-card);
+  padding: var(--openbot-space-8) var(--openbot-space-6);
+  text-align: center;
+}
+
+/*
+ * `.ui-button` leaves an icon at the lucide default of 24px, which towers over the label beside it.
+ * The panel's buttons take the shared icon size and stroke, the way the other labelled icon buttons
+ * in the app do.
+ */
+.server-mcp-panel .ui-button > svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.server-mcp-list {
+  min-width: 0;
+}
+
+.server-mcp-row-icon {
+  color: var(--openbot-text-muted);
+}
+
+.server-mcp-row[data-disabled] .server-mcp-row-icon,
+.server-mcp-row[data-disabled] .ui-item-content {
+  opacity: 0.55;
+}
+
+.server-mcp-row-title {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.server-mcp-row-menu {
+  min-width: 180px;
+}
+
+/* Form */
+
+.server-mcp-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: var(--openbot-space-6);
+  min-width: 0;
+}
+
+.server-mcp-transport-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-6);
+  min-width: 0;
+}
+
+/* A fieldset so the legend names the group; the browser default frame is not wanted here. */
+.server-mcp-repeat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  min-width: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.server-mcp-repeat-legend {
+  padding: 0;
+}
+
+.server-mcp-repeat-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.server-mcp-repeat-row-pair {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.server-mcp-repeat-add {
+  justify-content: center;
+  width: 100%;
+}
+
+/* The modal footer belongs to the General tab, so the form carries its own bar at its foot. */
+@media (max-width: 520px) {
+  .server-mcp-repeat-row-pair {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .server-mcp-repeat-row-pair > .ui-input:first-child {
+    grid-column: 1 / -1;
+  }
+}

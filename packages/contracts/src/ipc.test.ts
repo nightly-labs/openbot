@@ -7,6 +7,7 @@ import {
   type AttachmentSummary,
   canPreviewAttachment,
   decodeChannel,
+  decodeMcpServerEntries,
   hostedSiteConversationEvent,
   hostedSiteConversationEventItemType,
   hostedSiteConversationEventText,
@@ -26,6 +27,9 @@ import {
   isDynamicIslandAction,
   isFilePreviewKind,
   isHostedSiteConversationEventUrl,
+  isMcpServerConfig,
+  isMcpServerEntry,
+  isMcpServerStatus,
   isMessageReaction,
   isQueuedMessageReceipt,
   isQueueSnapshot,
@@ -901,5 +905,58 @@ describe("renderer-to-main boundary guards", () => {
     expect(isCustomProviderResult({ providers: [{ ...summary, apiKey: "sk-live" }], restart: "restarted" })).toBe(
       false,
     );
+  });
+});
+
+describe("MCP server contracts", () => {
+  const config = {
+    id: "mcp-1",
+    name: "Filesystem",
+    transport: "stdio",
+    enabled: true,
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-filesystem"],
+    env: [{ key: "TOKEN", value: "secret" }],
+    envPassthrough: ["HOME"],
+    workingDirectory: "",
+    url: "",
+    headers: [],
+  };
+  const entry = { config, state: "connected", toolCount: 4, error: null };
+
+  it("accepts a configuration, an entry and a status", () => {
+    expect(isMcpServerConfig(config)).toBe(true);
+    expect(isMcpServerEntry(entry)).toBe(true);
+    expect(isMcpServerStatus({ id: "mcp-1", state: "failed", toolCount: 0, error: "Command not found: npx" })).toBe(
+      true,
+    );
+  });
+
+  it("rejects an over-long name, an unknown transport and a non-string env value", () => {
+    expect(isMcpServerConfig({ ...config, name: "n".repeat(INPUT_LIMITS.mcpServerName + 1) })).toBe(false);
+    expect(isMcpServerConfig({ ...config, transport: "websocket" })).toBe(false);
+    expect(isMcpServerConfig({ ...config, env: [{ key: "TOKEN", value: 7 }] })).toBe(false);
+    expect(isMcpServerConfig({ ...config, args: "npx" })).toBe(false);
+  });
+
+  it("rejects an unknown state and a negative tool count on an entry", () => {
+    expect(isMcpServerEntry({ ...entry, state: "ready" })).toBe(false);
+    expect(isMcpServerEntry({ ...entry, toolCount: -1 })).toBe(false);
+    expect(isMcpServerEntry({ config, state: "connected", toolCount: 0 })).toBe(false);
+  });
+
+  // The list decoder is what a remote host's reply goes through, so it has to fail closed rather
+  // than hand a malformed row on to the panel.
+  it("decodes a list and throws on anything else", () => {
+    expect(decodeMcpServerEntries([entry])).toHaveLength(1);
+    expect(() => decodeMcpServerEntries(entry)).toThrow();
+    expect(() => decodeMcpServerEntries([{ ...entry, state: "ready" }])).toThrow();
+    expect(() => decodeMcpServerEntries(new Array(INPUT_LIMITS.mcpServers + 1).fill(entry))).toThrow();
+  });
+
+  it("carries no configuration on a status", () => {
+    // The reason the two types are separate: a status rides a broadcast event, and a configuration
+    // holds env values and headers.
+    expect(isMcpServerStatus(entry)).toBe(false);
   });
 });

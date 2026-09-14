@@ -41,8 +41,11 @@ import type {
   HostAnalyticsInput,
   ListChannelRoutineRunsInput,
   ListRoutineRunsInput,
+  McpServerConfig,
+  McpServerEntry,
   QueuedMessageReceipt,
   QueueSnapshot,
+  RemoveMcpServerInput,
   ReorderQueueInput,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
@@ -51,7 +54,9 @@ import type {
   RoutineRun,
   SaveAgentProfileInput,
   SaveAgentProfileResult,
+  SaveMcpServerInput,
   SendMessageInput,
+  SetMcpServerEnabledInput,
   SetMessageReactionInput,
   SidebarLayoutSnapshot,
   SidebarSection,
@@ -115,6 +120,8 @@ import type { BundledProviderExecutables } from "./cli";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "./conversation-read-store";
 import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
+import { McpServerStore } from "./mcp-server-store";
+import { McpStatusMonitor } from "./mcp-status-monitor";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { RoutineTimer } from "./routine-timer";
@@ -188,6 +195,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #routines: RoutineScheduler;
   readonly #routineTimer: RoutineTimer;
   readonly #channelRoutines: ChannelRoutineScheduler;
+  readonly #mcpServers: McpServerStore;
+  readonly #mcpStatus: McpStatusMonitor;
   readonly #providers: ProviderRuntime;
   readonly #prepareAgentWorkspace: (agent: AgentSummary) => Promise<void>;
   readonly #hostedSites: HostedSiteCoordinator;
@@ -448,6 +457,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       memories: this.#memories,
       compaction: this.#compaction,
+      // Read at each spawn, not now: the store is built further down this constructor.
+      mcpServers: () => this.enabledMcpServers(),
       hooks: {
         logRecovery: (agentId, provider, outcome) =>
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
@@ -542,6 +553,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitError: (code, error) => this.#emitError(code, error),
         excludedChannels: () => new Set(),
       },
+    });
+    this.#mcpServers = new McpServerStore(store.database);
+    this.#mcpStatus = new McpStatusMonitor({
+      configs: () => this.#mcpServers.list(),
+      emit: (statuses) => this.#emit({ type: "mcp-servers-changed", statuses }),
     });
     this.#drain = new DrainScheduler({
       channels: this.channels,
@@ -765,6 +781,56 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   listChannelRoutineRuns(input: ListChannelRoutineRunsInput): ChannelRoutineRun[] {
     return this.#channelRoutines.listRuns(input);
+  }
+
+  /**
+   * The MCP servers this machine holds, each with the connection the panel last made. When no panel
+   * is watching there is no connection to report, so an enabled server reads as `connecting`.
+   */
+  listMcpServers(): McpServerEntry[] {
+    const statuses = this.#mcpStatus.statuses();
+    return this.#mcpServers.list().map((config) => {
+      const status = statuses.get(config.id);
+      return {
+        config,
+        state: status?.state ?? (config.enabled ? "connecting" : "disabled"),
+        toolCount: status?.toolCount ?? 0,
+        error: status?.error ?? null,
+      };
+    });
+  }
+
+  saveMcpServer(input: SaveMcpServerInput): McpServerEntry[] {
+    const saved = this.#mcpServers.save(input.config);
+    this.#mcpStatus.reprobe(saved.id);
+    return this.listMcpServers();
+  }
+
+  removeMcpServer(input: RemoveMcpServerInput): McpServerEntry[] {
+    this.#mcpServers.remove(input.mcpServerId);
+    this.#mcpStatus.reprobe(input.mcpServerId);
+    return this.listMcpServers();
+  }
+
+  setMcpServerEnabled(input: SetMcpServerEnabledInput): McpServerEntry[] {
+    this.#mcpServers.setEnabled(input.mcpServerId, input.enabled);
+    this.#mcpStatus.reprobe(input.mcpServerId);
+    return this.listMcpServers();
+  }
+
+  /** The settings panel starts watching. Connections last only as long as the panel is open. */
+  openMcpStatus(): McpServerEntry[] {
+    this.#mcpStatus.open();
+    return this.listMcpServers();
+  }
+
+  closeMcpStatus(): Promise<void> {
+    return this.#mcpStatus.close();
+  }
+
+  /** What the providers are given at spawn. They connect for themselves; the monitor is not used. */
+  enabledMcpServers(): McpServerConfig[] {
+    return this.#mcpServers.listEnabled();
   }
 
   listModels(): AgentModelOption[] {
@@ -1342,6 +1408,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   async stop(): Promise<void> {
     this.#stopping = true;
     const channelStop = this.channels.stop();
+    const mcpStop = this.#mcpStatus.stop();
     this.#initialized = false;
     this.#routineTimer.dispose();
     this.#hostedSites.dispose();
@@ -1367,7 +1434,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#drain.dispose();
     this.#browser.clearControls();
     await Promise.all(clients.map((client) => client.stop().catch(() => undefined)));
-    await channelStop;
+    await Promise.all([channelStop, mcpStop]);
     await Promise.allSettled(this.#drain.pendingTasks());
     await Promise.allSettled(this.#images.pendingPromises());
     this.#images.dispose();

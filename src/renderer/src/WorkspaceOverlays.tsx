@@ -1,4 +1,5 @@
-import type { CentralAuthUser } from "@openbot/contracts/ipc";
+import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
+import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
 import { createMemo, Loading, Show } from "solid-js";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
@@ -6,6 +7,7 @@ import { useConversationController } from "./features/conversation/conversation-
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
+import { serverSupportsCapability } from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServers } from "./features/servers/servers-context";
@@ -189,7 +191,19 @@ function ServerSettings() {
     updateServerMember,
     removeServerMember,
     revokeServerInvite,
+    serverSettingsMcp,
+    watchMcpServers,
+    saveMcpServer,
+    removeMcpServer,
+    setMcpServerEnabled,
   } = useServerSettings();
+
+  /**
+   * The gate on the whole feature: the tab and the panel both hang off `mcpServers`. A remote host
+   * answers 403 to a `member` and 400 without the capability, so neither ever sees the section.
+   */
+  const canUseMcp = (server: ServerSummary) =>
+    server.kind === "local" || (serverSupportsCapability(server, MCP_SERVERS_CAPABILITY) && server.role !== "member");
 
   return (
     <Show when={serverSettingsTarget()}>
@@ -213,6 +227,11 @@ function ServerSettings() {
             onUpdateMember={updateServerMember}
             onRemoveMember={removeServerMember}
             onRevokeInvite={revokeServerInvite}
+            mcpServers={canUseMcp(server()) ? serverSettingsMcp() : undefined}
+            onMcpVisibilityChange={(visible) => void watchMcpServers(visible)}
+            onSaveMcpServer={saveMcpServer}
+            onRemoveMcpServer={removeMcpServer}
+            onSetMcpServerEnabled={setMcpServerEnabled}
           />
         </Loading>
       )}

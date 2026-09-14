@@ -7,6 +7,13 @@ import type { AgentStore } from "../agent-store";
 import { BROWSER_DYNAMIC_TOOLS } from "../browser-tools";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
+import {
+  type CodexMcpServer,
+  codexMcpServers,
+  type McpServerSource,
+  mcpFingerprintValues,
+  usableMcpServers,
+} from "../mcp-provider-shapes";
 import { OPENBOT_DYNAMIC_TOOLS } from "../openbot-tools";
 import { decodeRecordResponse, decodeThreadResponse, getString, type ResponseDecoder } from "../protocol";
 import type { AgentMemories } from "./agent-memories";
@@ -28,6 +35,11 @@ export interface ThreadLifecycleOptions {
   memories: AgentMemories;
   compaction: ContextCompaction;
   hooks: ThreadLifecycleHooks;
+  /**
+   * The enabled MCP servers. Only Codex is served from here: it takes its list in the `thread/start`
+   * configuration, while Claude and the ACP clients read the same source themselves at spawn.
+   */
+  mcpServers?: McpServerSource;
 }
 
 /**
@@ -47,6 +59,7 @@ export class ThreadLifecycle {
   readonly #memories: AgentMemories;
   readonly #compaction: ContextCompaction;
   readonly #hooks: ThreadLifecycleHooks;
+  readonly #mcpServers: McpServerSource;
   readonly #pendingHandoffs = new Map<string, string>();
   readonly #pendingRuntimeRefreshes = new Set<string>();
 
@@ -57,6 +70,7 @@ export class ThreadLifecycle {
     this.#memories = options.memories;
     this.#compaction = options.compaction;
     this.#hooks = options.hooks;
+    this.#mcpServers = options.mcpServers ?? (() => []);
   }
 
   refreshAgentRuntime(agentId: string): void {
@@ -149,6 +163,7 @@ export class ThreadLifecycle {
     const response = await client.request(
       "thread/start",
       {
+        ...(await this.codexConfig(client)),
         model: agent.model,
         effort: agent.reasoningEffort,
         cwd: agent.workspacePath,
@@ -213,9 +228,28 @@ export class ThreadLifecycle {
     return join(this.toolManifestDirectory(), createHash("sha256").update(sessionId).digest("hex"));
   }
 
+  /**
+   * Codex takes its MCP servers in the thread configuration rather than as dynamic tools, and only
+   * stdio ones - see `codexMcpServers`. Every other provider gets nothing here.
+   */
+  private async codexConfig(
+    client: AgentClient,
+  ): Promise<{ config?: { mcp_servers: Record<string, CodexMcpServer> } }> {
+    if (client.provider !== "codex") return {};
+    const servers = codexMcpServers(await usableMcpServers(this.#mcpServers()));
+    return Object.keys(servers).length > 0 ? { config: { mcp_servers: servers } } : {};
+  }
+
+  /**
+   * What a stored manifest is compared against. The MCP set is folded in by name and transport
+   * only: Codex ignores a changed configuration on resume, so a changed set has to force a
+   * replacement session, and this string is written to a file on disk.
+   */
   private toolFingerprint(): string {
     return createHash("sha256")
-      .update(JSON.stringify([...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS]))
+      .update(
+        JSON.stringify([[...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS], mcpFingerprintValues(this.#mcpServers())]),
+      )
       .digest("hex");
   }
 
@@ -240,6 +274,7 @@ export class ThreadLifecycle {
       sandbox: "danger-full-access",
       developerInstructions: developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id)),
       ...(client.provider === "codex" ? {} : { dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS] }),
+      ...(await this.codexConfig(client)),
     };
 
     try {

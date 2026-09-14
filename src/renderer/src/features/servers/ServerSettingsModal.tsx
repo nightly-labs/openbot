@@ -21,10 +21,12 @@ import {
   AlertIcon,
   AlertTitle,
   Badge,
+  Blocks,
   Button,
   buttonVariants,
   Card,
   Check,
+  ChevronRight,
   CopyButton,
   DropdownMenu,
   Ellipsis,
@@ -63,8 +65,10 @@ import {
 } from "../../components/ui";
 import { truncateMiddle } from "../../components/ui/utils";
 import { errorMessage } from "../../error-message";
-import { SettingsDialogShell } from "../settings/SettingsDialogShell";
+import { SaveBarDock, SettingsDialogShell } from "../settings/SettingsDialogShell";
 import { teamMemberName } from "../team/TeamPersonAvatar";
+import type { McpServerConfig, McpServerEntry } from "./mcp-servers";
+import { type McpPanelDetail, ServerMcpPanel } from "./ServerMcpPanel";
 import { serverSupportsCapability } from "./server-capabilities";
 
 export interface ServerSettingsModalProps {
@@ -85,9 +89,24 @@ export interface ServerSettingsModalProps {
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
   onRemoveMember: (memberId: string) => Promise<void>;
   onRevokeInvite: (inviteId: string) => Promise<void>;
+  /**
+   * The MCP section appears only when a caller supplies these. A caller that cannot manage MCP
+   * servers - a remote host without the capability, or a `member` account - passes nothing, and
+   * then neither the tab nor the panel exists.
+   */
+  mcpServers?: McpServerEntry[];
+  onSaveMcpServer?: (config: McpServerConfig) => Promise<void>;
+  onRemoveMcpServer?: (id: string) => Promise<void>;
+  onSetMcpServerEnabled?: (id: string, enabled: boolean) => Promise<void>;
+  /**
+   * Fired when the MCP section becomes visible, and again when it stops being visible, including
+   * on close. MCP connections live only while the section is open, so this is what opens and
+   * closes them.
+   */
+  onMcpVisibilityChange?: (visible: boolean) => void;
 }
 
-type Section = "general" | "members" | "desktop";
+type Section = "general" | "members" | "desktop" | "mcp";
 type InviteMode = "link" | "email";
 type InviteRole = Exclude<TeamRole, "owner">;
 
@@ -97,6 +116,10 @@ const sections: Record<Section, { title: string; description: string }> = {
   general: { title: "General", description: "Manage this server’s identity and published access." },
   members: { title: "Members", description: "Invite people and manage access to this server." },
   desktop: { title: "Remote desktop", description: "Configure or connect to this server’s desktop." },
+  mcp: {
+    title: "MCP",
+    description: "Connect MCP servers and choose which ones this server’s agents can use.",
+  },
 };
 
 /**
@@ -162,6 +185,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     members: { removeId: null, search: "" },
   });
   const [section, setSection] = createSignal<Section>("general");
+  /** Set while the MCP panel shows a form, so the header reads `MCP › Connect to a custom MCP`. */
+  const [mcpDetail, setMcpDetail] = createSignal<McpPanelDetail | null>(null);
   /** The key of the one action in flight, gating every panel at once rather than belonging to any. */
   const [busy, setBusy] = createSignal<string | null>(null);
   /** A clock, not panel state: it retires an invite row as its `expiresAt` passes. */
@@ -198,6 +223,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     (trimmedName() !== panels.identity.savedName ||
       panels.identity.logo !== undefined ||
       panels.identity.logoUrl !== panels.identity.savedLogoUrl);
+  // Both save bars dock in the same place, so the toast has to lift for either one. It is
+  // `position: absolute` over the footer: without this it covers the bar and swallows its clicks.
+  const saveBarDocked = () =>
+    (section() === "general" && identityDirty()) || (section() === "mcp" && Boolean(mcpDetail()?.saveBar()));
   const activeInvites = createMemo(() =>
     props.invites.filter((item) => item.usedAt === null && Date.parse(item.expiresAt) > now()),
   );
@@ -262,6 +291,20 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           state.identity.nameShaking = false;
         });
       }
+    },
+  );
+
+  /**
+   * The latch keeps the first run from reporting a section nobody has left yet, so a close is
+   * only ever reported after an open.
+   */
+  let mcpSectionVisible = false;
+  createEffect(
+    () => props.open && section() === "mcp" && Boolean(props.mcpServers),
+    (visible) => {
+      if (visible === mcpSectionVisible) return;
+      mcpSectionVisible = visible;
+      props.onMcpVisibilityChange?.(visible);
     },
   );
 
@@ -460,7 +503,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     orientation: "vertical" as const,
     activationMode: "automatic" as const,
     onChange(value: string) {
-      if (value === "general" || value === "members" || value === "desktop") setSection(value);
+      if (value === "general" || value === "members" || value === "desktop" || value === "mcp") setSection(value);
     },
   };
 
@@ -486,7 +529,19 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         class="server-settings-modal-shell"
         open={props.open}
         onOpenChange={props.onOpenChange}
-        title={sections[section()].title}
+        title={
+          <Show when={section() === "mcp" && mcpDetail()} fallback={sections[section()].title}>
+            {(detail) => (
+              <span class="settings-modal-crumbs">
+                <Button type="button" variant="ghost" class="settings-modal-crumb-parent" onClick={detail().back}>
+                  {sections.mcp.title}
+                </Button>
+                <ChevronRight class="settings-modal-crumb-separator" aria-hidden="true" />
+                <span class="settings-modal-crumb-current">{detail().title}</span>
+              </span>
+            )}
+          </Show>
+        }
         description={sections[section()].description}
         contentKey={`${props.server.id}:${section()}`}
         closeLabel="Close server settings"
@@ -496,7 +551,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           <Show when={props.loadError}>
             <Alert
               class="server-settings-error-toast"
-              data-with-save-bar={section() === "general" && identityDirty() ? "" : undefined}
+              data-with-save-bar={saveBarDocked() ? "" : undefined}
               tone="danger"
               role="alert"
             >
@@ -523,29 +578,82 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           </Show>
         }
         footer={
-          <Show when={section() === "general" && identityDirty()}>
-            <section class="settings-modal-save-bar" aria-label="Unsaved changes">
-              <Text variant="caption" tone="muted">
-                Changes not saved
-              </Text>
-              <div class="settings-modal-save-actions">
-                <Button type="button" size="sm" variant="ghost" disabled={Boolean(busy())} onClick={resetIdentity}>
-                  Reset
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="default"
-                  loading={busy() === "identity"}
-                  loadingLabel="Saving…"
-                  disabled={Boolean(busy())}
-                  onClick={() => void saveIdentity()}
-                >
-                  Save
-                </Button>
-              </div>
-            </section>
-          </Show>
+          <>
+            {/* The MCP form's save bar belongs to the dialog, not to the panel: the footer sits
+                outside the scroll area, so the bar stays on screen and spans the whole panel. It
+                appears only once the form holds a change, the way the General tab's bar does. */}
+            <Show when={section() === "mcp" ? mcpDetail() : null}>
+              {(detail) => (
+                <SaveBarDock value={detail().saveBar()}>
+                  {(bar) => (
+                    <section class="settings-modal-save-bar" aria-label="Unsaved MCP changes">
+                      <Show
+                        when={bar().failed}
+                        fallback={
+                          <Text variant="caption" tone="muted">
+                            {bar().message}
+                          </Text>
+                        }
+                      >
+                        <Text variant="caption" tone="danger" role="alert">
+                          {bar().message}
+                        </Text>
+                      </Show>
+                      <div class="settings-modal-save-actions">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={bar().resetDisabled}
+                          onClick={detail().reset}
+                        >
+                          Reset
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="default"
+                          loading={bar().saving}
+                          loadingLabel="Saving…"
+                          disabled={bar().saveDisabled}
+                          onClick={detail().save}
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    </section>
+                  )}
+                </SaveBarDock>
+              )}
+            </Show>
+            {/* `true` while the identity form is dirty: the dock only needs to know that there is
+                something to show, so the bar's own markup stays as it was. */}
+            <SaveBarDock value={section() === "general" && identityDirty() ? true : null}>
+              {() => (
+                <section class="settings-modal-save-bar" aria-label="Unsaved changes">
+                  <Text variant="caption" tone="muted">
+                    Changes not saved
+                  </Text>
+                  <div class="settings-modal-save-actions">
+                    <Button type="button" size="sm" variant="ghost" disabled={Boolean(busy())} onClick={resetIdentity}>
+                      Reset
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="default"
+                      loading={busy() === "identity"}
+                      loadingLabel="Saving…"
+                      disabled={Boolean(busy())}
+                      onClick={() => void saveIdentity()}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </section>
+              )}
+            </SaveBarDock>
+          </>
         }
         sidebar={
           <Tabs.List class="settings-modal-nav" aria-label="Server settings sections">
@@ -563,6 +671,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <span>Remote desktop</span>
               </Tabs.Trigger>
             </Show>
+            <Show when={props.mcpServers}>
+              <Tabs.Trigger class="settings-modal-nav-item" value="mcp">
+                <Blocks aria-hidden="true" />
+                <span>MCP</span>
+              </Tabs.Trigger>
+            </Show>
           </Tabs.List>
         }
       >
@@ -575,6 +689,21 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Tabs.Content value="desktop" class="settings-modal-tab-panel server-settings-panel" data-tab="desktop">
           <DesktopPanel />
         </Tabs.Content>
+        <Show when={props.mcpServers}>
+          {(servers) => (
+            <Tabs.Content value="mcp" class="settings-modal-tab-panel server-settings-panel" data-tab="mcp">
+              <ServerMcpPanel
+                servers={servers()}
+                canManage={canManage()}
+                menuMount={modalElement}
+                onDetailChange={setMcpDetail}
+                onSave={(config) => props.onSaveMcpServer?.(config) ?? Promise.resolve()}
+                onRemove={(id) => props.onRemoveMcpServer?.(id) ?? Promise.resolve()}
+                onSetEnabled={(id, enabled) => props.onSetMcpServerEnabled?.(id, enabled) ?? Promise.resolve()}
+              />
+            </Tabs.Content>
+          )}
+        </Show>
       </SettingsDialogShell>
 
       <AlertDialog.Root

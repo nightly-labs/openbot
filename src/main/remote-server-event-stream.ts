@@ -1,4 +1,5 @@
 import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
+import { mcpEvent } from "@openbot/contracts/team-protocol/mcp-v1";
 import { decodeTeamProtocolV4BaseCurrentEvent } from "@openbot/contracts/team-protocol/v4-base-adapter";
 // The live event channel for HTTPS servers, and the reconnect policy both transports share.
 //
@@ -367,9 +368,9 @@ export class RemoteEventStream {
           }
           try {
             const value = JSON.parse(message.data);
-            const channel = channelEvent(value);
-            const decoded = channel
-              ? { kind: "known" as const, event: channel }
+            const optional = channelEvent(value) ?? mcpEvent(value);
+            const decoded = optional
+              ? { kind: "known" as const, event: optional }
               : decodeTeamProtocolV4BaseCurrentEvent(value);
             if (decoded.kind === "unknown") return;
             if (decoded.kind === "invalid") {

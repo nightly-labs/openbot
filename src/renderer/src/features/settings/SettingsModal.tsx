@@ -31,7 +31,7 @@ import { useI18n } from "../../i18n-context";
 import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
 import type { GeneralSettingsValue } from "./app-settings";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "./OpenCodeKeyDialog";
-import { SettingsDialogShell } from "./SettingsDialogShell";
+import { SaveBarDock, SettingsDialogShell } from "./SettingsDialogShell";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
 import { SettingsHostedSitesTab } from "./SettingsHostedSitesTab";
 import { SettingsMobileConnectTab } from "./SettingsMobileConnectTab";
@@ -209,35 +209,37 @@ export function SettingsModal(props: SettingsModalProps) {
           </Show>
         }
         footer={
-          <Show when={profile.nameDirty()}>
-            <section class="settings-modal-save-bar" aria-label={i18n.t("settings.save.region")}>
-              <Text variant="caption" tone="muted">
-                {i18n.t("settings.save.notSaved")}
-              </Text>
-              <div class="settings-modal-save-actions">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  disabled={profile.state.profile.busy}
-                  onClick={profile.resetName}
-                >
-                  {i18n.t("settings.save.reset")}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="default"
-                  loading={profile.state.profile.busy}
-                  loadingLabel={i18n.t("settings.save.saving")}
-                  disabled={profile.state.profile.busy}
-                  onClick={() => void profile.saveName()}
-                >
-                  {i18n.t("settings.save.save")}
-                </Button>
-              </div>
-            </section>
-          </Show>
+          <SaveBarDock value={profile.nameDirty() ? true : null}>
+            {() => (
+              <section class="settings-modal-save-bar" aria-label={i18n.t("settings.save.region")}>
+                <Text variant="caption" tone="muted">
+                  {i18n.t("settings.save.notSaved")}
+                </Text>
+                <div class="settings-modal-save-actions">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={profile.state.profile.busy}
+                    onClick={profile.resetName}
+                  >
+                    {i18n.t("settings.save.reset")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="default"
+                    loading={profile.state.profile.busy}
+                    loadingLabel={i18n.t("settings.save.saving")}
+                    disabled={profile.state.profile.busy}
+                    onClick={() => void profile.saveName()}
+                  >
+                    {i18n.t("settings.save.save")}
+                  </Button>
+                </div>
+              </section>
+            )}
+          </SaveBarDock>
         }
         sidebar={
           <Tabs.List class="settings-modal-nav" aria-label={i18n.t("settings.sections.label")}>

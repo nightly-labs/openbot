@@ -4,6 +4,7 @@ export { default as ArrowRight } from "lucide-solid/icons/arrow-right";
 export { default as ArrowUp } from "lucide-solid/icons/arrow-up";
 export { default as Bell } from "lucide-solid/icons/bell";
 export { default as BellOff } from "lucide-solid/icons/bell-off";
+export { default as Blocks } from "lucide-solid/icons/blocks";
 export { default as Bot } from "lucide-solid/icons/bot";
 export { default as Brain } from "lucide-solid/icons/brain";
 export { default as CalendarClock } from "lucide-solid/icons/calendar-clock";

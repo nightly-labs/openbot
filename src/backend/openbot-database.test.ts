@@ -127,6 +127,7 @@ describe("OpenBotDatabase", () => {
       { version: 17 },
       { version: 18 },
       { version: 19 },
+      { version: 20 },
     ]);
     database.close();
   });
@@ -975,6 +976,7 @@ describe("OpenBotDatabase", () => {
       { version: 17 },
       { version: 18 },
       { version: 19 },
+      { version: 20 },
     ]);
     expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     migrated.close();
@@ -1042,7 +1044,7 @@ describe("OpenBotDatabase", () => {
       ALTER TABLE projection_provider_sessions_v18 RENAME TO projection_provider_sessions;
       CREATE INDEX provider_sessions_thread
         ON projection_provider_sessions(thread_id, provider, state);
-      DELETE FROM schema_migrations WHERE version = 19;
+      DELETE FROM schema_migrations WHERE version IN (19, 20);
       PRAGMA foreign_keys = ON;
     `);
     legacy.close();
@@ -1070,9 +1072,52 @@ describe("OpenBotDatabase", () => {
         .get(),
     ).toMatchObject({ sql: expect.stringContaining("'opencode'") });
     expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 19,
+      version: 20,
     });
     migrated.close();
+  });
+
+  it("adds the MCP server projection to a version 19 database and keeps its rows", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-db-v19-"));
+    roots.push(root);
+    const database = new OpenBotDatabase(root);
+    await database.initialize();
+    const agent = testAgent();
+    database.replaceAgents("agents-import", [agent], "agents.imported");
+    database.close();
+
+    // A version 19 database: the table migration 20 creates is not there, and neither is its row.
+    const legacy = new DatabaseSync(database.path);
+    legacy.exec(`
+      DROP TABLE projection_mcp_servers;
+      DELETE FROM schema_migrations WHERE version = 20;
+    `);
+    legacy.close();
+
+    const migrated = new OpenBotDatabase(root);
+    await migrated.initialize();
+    expect(migrated.listAgents().map((summary) => summary.id)).toEqual([agent.id]);
+    migrated.connection
+      .prepare(
+        `INSERT INTO projection_mcp_servers
+           (mcp_server_id, name, transport, enabled, command, args_json, env_json, env_passthrough_json,
+            working_directory, url, headers_json, position, created_at, updated_at)
+         VALUES ('mcp-1', 'Filesystem', 'stdio', 1, 'npx', '[]', '[]', '[]', '', '', '[]', 0,
+           '2026-09-14T10:00:00.000Z', '2026-09-14T10:00:00.000Z')`,
+      )
+      .run();
+    migrated.close();
+
+    // Re-running is a no-op: the row the user already has survives a second start.
+    const reopened = new OpenBotDatabase(root);
+    await reopened.initialize();
+    expect(reopened.connection.prepare("SELECT name FROM projection_mcp_servers").all()).toEqual([
+      { name: "Filesystem" },
+    ]);
+    expect(reopened.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
+      version: 20,
+    });
+    reopened.close();
   });
 
   it("adds post-v4 agent memory and routine projections", async () => {
@@ -1126,6 +1171,7 @@ describe("OpenBotDatabase", () => {
       { version: 17 },
       { version: 18 },
       { version: 19 },
+      { version: 20 },
     ]);
     migrated.close();
   });
@@ -1203,6 +1249,7 @@ describe("OpenBotDatabase", () => {
       { version: 17 },
       { version: 18 },
       { version: 19 },
+      { version: 20 },
     ]);
     retried.close();
   });

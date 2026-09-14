@@ -14,7 +14,8 @@ export function serverSupportsCapability(
     (capability === "channel-chats-v1" ||
       capability === "channel-delete-v1" ||
       capability === "agent-duplication" ||
-      capability === "model-scoped-usage") &&
+      capability === "model-scoped-usage" ||
+      capability === "mcp-servers-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;

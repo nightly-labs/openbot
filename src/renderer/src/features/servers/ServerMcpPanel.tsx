@@ -1,0 +1,748 @@
+import type { JSX } from "@solidjs/web";
+import { createMemo, createStore, For, Show } from "solid-js";
+import {
+  AlertDialog,
+  Badge,
+  Blocks,
+  Button,
+  buttonVariants,
+  DropdownMenu,
+  Ellipsis,
+  Field,
+  IconButton,
+  Input,
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+  Pencil,
+  Plus,
+  SettingsSection,
+  SlidingTabs,
+  Switch,
+  Text,
+  Trash2,
+} from "../../components/ui";
+import {
+  emptyMcpConfig,
+  type McpServerConfig,
+  type McpServerEntry,
+  mcpConfigChanged,
+  mcpConfigDraft,
+  mcpConfigErrors,
+  mcpConfigIsValid,
+  mcpStatusLabel,
+  mcpStatusVariant,
+  normalizeMcpConfig,
+} from "./mcp-servers";
+
+/**
+ * The state of the form's save bar. The dialog reads it inside its own footer, so every read tracks
+ * the panel's store and the bar stays current without the panel reporting the form again.
+ */
+export interface McpPanelSaveBar {
+  message: string;
+  /** True when `message` reports a failed save rather than the state of the draft. */
+  failed: boolean;
+  saving: boolean;
+  resetDisabled: boolean;
+  saveDisabled: boolean;
+}
+
+/** What the form view is, so the dialog header can name it and the dialog footer can hold its save bar. */
+export interface McpPanelDetail {
+  title: string;
+  back: () => void;
+  /** `null` while the form matches what is stored, so the dialog holds no save bar. */
+  saveBar: () => McpPanelSaveBar | null;
+  save: () => void;
+  reset: () => void;
+}
+
+export interface ServerMcpPanelProps {
+  servers: McpServerEntry[];
+  canManage: boolean;
+  /** The dialog element the row menus portal into, so a menu is not clipped by the modal. */
+  menuMount?: HTMLElement;
+  /** Reports the form view, so the header shows a breadcrumb instead of the panel holding a back row. */
+  onDetailChange?: (detail: McpPanelDetail | null) => void;
+  onSave: (config: McpServerConfig) => Promise<void>;
+  onRemove: (id: string) => Promise<void>;
+  onSetEnabled: (id: string, enabled: boolean) => Promise<void>;
+}
+
+/**
+ * One record rather than a signal each: opening the form writes `view`, `editingId`, `draft` and
+ * `touched` together, and going back rewrites the same four, so they are one concern.
+ */
+interface McpPanelState {
+  view: "list" | "form";
+  /** `null` in the form view means the user is connecting a new server. */
+  editingId: string | null;
+  draft: McpServerConfig;
+  /** What the draft started as, so the panel can tell an edit from an untouched form. */
+  baseline: McpServerConfig;
+  /** Gates the error copy until the user has tried to save or left a field. */
+  touched: boolean;
+  removeId: string | null;
+  /** The key of the one action in flight, gating the whole panel rather than any one row. */
+  busy: string | null;
+  error: string;
+}
+
+const CONNECT_TITLE = "Connect to a custom MCP";
+const EDIT_TITLE = "Edit MCP server";
+
+export function ServerMcpPanel(props: ServerMcpPanelProps) {
+  const [state, setState] = createStore<McpPanelState>({
+    view: "list",
+    editingId: null,
+    draft: emptyMcpConfig(),
+    baseline: emptyMcpConfig(),
+    touched: false,
+    removeId: null,
+    busy: null,
+    error: "",
+  });
+  let removeTrigger: HTMLElement | undefined;
+
+  const errors = createMemo(() => mcpConfigErrors(state.draft));
+  const visible = (key: "name" | "command" | "url") => (state.touched ? errors()[key] : undefined);
+  const removeEntry = createMemo(() => props.servers.find((entry) => entry.config.id === state.removeId) ?? null);
+  const disabled = () => !props.canManage || state.busy !== null;
+
+  async function run(key: string, action: () => Promise<void>): Promise<boolean> {
+    if (state.busy !== null) return false;
+    setState((current) => {
+      current.busy = key;
+      current.error = "";
+    });
+    try {
+      await action();
+      return true;
+    } catch (error) {
+      setState((current) => {
+        current.error = error instanceof Error ? error.message : "That change could not be saved.";
+      });
+      return false;
+    } finally {
+      setState((current) => {
+        current.busy = null;
+      });
+    }
+  }
+
+  function openForm(entry: McpServerEntry | null): void {
+    const draft = entry ? mcpConfigDraft(entry.config) : emptyMcpConfig();
+    setState((current) => {
+      current.view = "form";
+      current.editingId = entry?.config.id ?? null;
+      current.draft = draft;
+      // A copy, not the same object: the form edits `draft` in place, and the baseline has to hold still.
+      current.baseline = mcpConfigDraft(draft);
+      current.touched = false;
+      current.error = "";
+    });
+    // Read from the entry, not the store: a store write is not visible to a read in the same tick.
+    props.onDetailChange?.({
+      title: entry ? EDIT_TITLE : CONNECT_TITLE,
+      back: backToList,
+      saveBar,
+      save: () => void save(),
+      reset: resetForm,
+    });
+  }
+
+  function backToList(): void {
+    props.onDetailChange?.(null);
+    setState((current) => {
+      current.view = "list";
+      current.editingId = null;
+      current.touched = false;
+      current.error = "";
+    });
+  }
+
+  async function save(): Promise<void> {
+    setState((current) => {
+      current.touched = true;
+    });
+    if (!mcpConfigIsValid(state.draft)) return;
+    // The draft's empty id stays empty: the store mints the id on insert, and a client-minted one
+    // reads to it as an edit of a row that is not there.
+    const config = normalizeMcpConfig(state.draft);
+    const saved = await run("save", () => props.onSave(config));
+    if (saved) backToList();
+  }
+
+  /** Puts the form back to what is stored, the way the General tab's save bar resets its fields. */
+  function resetForm(): void {
+    setState((current) => {
+      current.draft = mcpConfigDraft(current.baseline);
+      current.touched = false;
+      current.error = "";
+    });
+  }
+
+  /**
+   * The dialog footer calls this while it renders, so each field is a live read of the store. It
+   * answers `null` while the form still matches what is stored, which is what keeps the save bar
+   * off screen until there is something to save.
+   */
+  function saveBar(): McpPanelSaveBar | null {
+    if (!mcpConfigChanged(state.draft, state.baseline)) return null;
+    return {
+      message: state.error || "Changes not saved",
+      failed: Boolean(state.error),
+      saving: state.busy === "save",
+      resetDisabled: state.busy !== null,
+      saveDisabled: disabled() || (state.touched && !mcpConfigIsValid(state.draft)),
+    };
+  }
+
+  function listView() {
+    return (
+      <SettingsSection
+        class="server-mcp-section"
+        title="MCP servers"
+        description="Model Context Protocol servers give this server’s agents extra tools."
+        actions={
+          <Show when={props.servers.length > 0}>
+            <Button type="button" size="sm" variant="outline" disabled={disabled()} onClick={() => openForm(null)}>
+              <Plus aria-hidden="true" />
+              Connect a custom MCP
+            </Button>
+          </Show>
+        }
+      >
+        <Show when={state.error}>
+          <Text class="server-mcp-error" variant="caption" tone="danger" role="alert">
+            {state.error}
+          </Text>
+        </Show>
+        <Show
+          when={props.servers.length > 0}
+          fallback={
+            <div class="server-mcp-empty">
+              <Text variant="caption" tone="muted">
+                No MCP servers yet.
+              </Text>
+              <Button type="button" variant="outline" disabled={disabled()} onClick={() => openForm(null)}>
+                <Plus aria-hidden="true" />
+                Connect a custom MCP
+              </Button>
+            </div>
+          }
+        >
+          <ItemGroup class="server-mcp-list">
+            {/* Keyed by id, so a status or enabled change updates the row that is already on screen.
+                A row that remounts would drop the switch mid-animation. */}
+            <For each={props.servers} keyed={(entry) => entry.config.id}>
+              {(entry) => (
+                <Item class="server-mcp-row" data-disabled={entry().config.enabled ? undefined : ""}>
+                  <ItemMedia class="server-mcp-row-icon">
+                    <Blocks aria-hidden="true" />
+                  </ItemMedia>
+                  <ItemContent>
+                    <div class="server-mcp-row-title">
+                      <ItemTitle>{entry().config.name}</ItemTitle>
+                      <Badge variant={mcpStatusVariant(entry())}>{mcpStatusLabel(entry())}</Badge>
+                    </div>
+                    <Show when={entry().state === "failed" && entry().error}>
+                      <ItemDescription>{entry().error}</ItemDescription>
+                    </Show>
+                  </ItemContent>
+                  <ItemActions>
+                    <Switch
+                      aria-label={`Enable ${entry().config.name}`}
+                      checked={entry().config.enabled}
+                      disabled={disabled()}
+                      onChange={(enabled) =>
+                        void run(`enable:${entry().config.id}`, () => props.onSetEnabled(entry().config.id, enabled))
+                      }
+                    />
+                    <McpRowMenu
+                      name={entry().config.name}
+                      mount={props.menuMount}
+                      disabled={disabled()}
+                      onEdit={() => openForm(entry())}
+                      onRemove={(trigger) => {
+                        removeTrigger = trigger;
+                        setState((current) => {
+                          current.removeId = entry().config.id;
+                        });
+                      }}
+                    />
+                  </ItemActions>
+                </Item>
+              )}
+            </For>
+          </ItemGroup>
+        </Show>
+      </SettingsSection>
+    );
+  }
+
+  function formView() {
+    return (
+      <SlidingTabs.Root
+        class="server-mcp-form"
+        value={state.draft.transport}
+        onChange={(value) => {
+          if (value !== "stdio" && value !== "http") return;
+          setState((current) => {
+            current.draft.transport = value;
+          });
+        }}
+      >
+        {/* The dialog header already names the view, so this section only labels the group. */}
+        <SettingsSection
+          class="server-mcp-section"
+          title="Details"
+          description="Name this server and choose how OpenBot reaches it."
+          actions={
+            <SlidingTabs.List aria-label="Transport">
+              <SlidingTabs.Trigger value="stdio">STDIO</SlidingTabs.Trigger>
+              <SlidingTabs.Trigger value="http">Streamable HTTP</SlidingTabs.Trigger>
+            </SlidingTabs.List>
+          }
+        >
+          <Field label="Name" error={visible("name")}>
+            <Input
+              size="md"
+              placeholder="MCP server name"
+              value={state.draft.name}
+              disabled={disabled()}
+              onValueChange={(value) =>
+                setState((current) => {
+                  current.draft.name = value;
+                })
+              }
+              onBlur={() =>
+                setState((current) => {
+                  current.touched = true;
+                })
+              }
+            />
+          </Field>
+        </SettingsSection>
+
+        <SlidingTabs.ContentSlot>
+          <SlidingTabs.Content value="stdio" class="server-mcp-transport-panel">
+            <SettingsSection class="server-mcp-section" title="Launch">
+              <Field label="Command to launch" error={visible("command")}>
+                <Input
+                  size="md"
+                  placeholder="openai-dev-mcp serve-sqlite"
+                  value={state.draft.command}
+                  disabled={disabled()}
+                  onValueChange={(value) =>
+                    setState((current) => {
+                      current.draft.command = value;
+                    })
+                  }
+                  onBlur={() =>
+                    setState((current) => {
+                      current.touched = true;
+                    })
+                  }
+                />
+              </Field>
+
+              <McpRowList
+                label="Arguments"
+                addLabel="Add argument"
+                disabled={disabled()}
+                onAdd={() =>
+                  setState((current) => {
+                    current.draft.args.push("");
+                  })
+                }
+              >
+                <For each={state.draft.args} keyed={false}>
+                  {(value, index) => (
+                    <div class="server-mcp-repeat-row">
+                      <Input
+                        size="md"
+                        aria-label={`Argument ${index + 1}`}
+                        value={value()}
+                        disabled={disabled()}
+                        onValueChange={(next) =>
+                          setState((current) => {
+                            current.draft.args[index] = next;
+                          })
+                        }
+                      />
+                      <IconButton
+                        type="button"
+                        variant="ghost"
+                        label={`Remove argument ${index + 1}`}
+                        disabled={disabled()}
+                        onClick={() =>
+                          setState((current) => {
+                            current.draft.args.splice(index, 1);
+                          })
+                        }
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </IconButton>
+                    </div>
+                  )}
+                </For>
+              </McpRowList>
+
+              <McpRowList
+                label="Environment variables"
+                addLabel="Add environment variable"
+                disabled={disabled()}
+                onAdd={() =>
+                  setState((current) => {
+                    current.draft.env.push({ key: "", value: "" });
+                  })
+                }
+              >
+                <For each={state.draft.env} keyed={false}>
+                  {(pair, index) => (
+                    <div class="server-mcp-repeat-row server-mcp-repeat-row-pair">
+                      <Input
+                        size="md"
+                        placeholder="Key"
+                        aria-label={`Environment variable ${index + 1} key`}
+                        value={pair().key}
+                        disabled={disabled()}
+                        onValueChange={(next) =>
+                          setState((current) => {
+                            current.draft.env[index].key = next;
+                          })
+                        }
+                      />
+                      <Input
+                        size="md"
+                        placeholder="Value"
+                        aria-label={`Environment variable ${index + 1} value`}
+                        value={pair().value}
+                        disabled={disabled()}
+                        onValueChange={(next) =>
+                          setState((current) => {
+                            current.draft.env[index].value = next;
+                          })
+                        }
+                      />
+                      <IconButton
+                        type="button"
+                        variant="ghost"
+                        label={`Remove environment variable ${index + 1}`}
+                        disabled={disabled()}
+                        onClick={() =>
+                          setState((current) => {
+                            current.draft.env.splice(index, 1);
+                          })
+                        }
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </IconButton>
+                    </div>
+                  )}
+                </For>
+              </McpRowList>
+
+              <McpRowList
+                label="Environment variable passthrough"
+                addLabel="Add variable"
+                disabled={disabled()}
+                onAdd={() =>
+                  setState((current) => {
+                    current.draft.envPassthrough.push("");
+                  })
+                }
+              >
+                <For each={state.draft.envPassthrough} keyed={false}>
+                  {(value, index) => (
+                    <div class="server-mcp-repeat-row">
+                      <Input
+                        size="md"
+                        aria-label={`Passthrough variable ${index + 1}`}
+                        value={value()}
+                        disabled={disabled()}
+                        onValueChange={(next) =>
+                          setState((current) => {
+                            current.draft.envPassthrough[index] = next;
+                          })
+                        }
+                      />
+                      <IconButton
+                        type="button"
+                        variant="ghost"
+                        label={`Remove passthrough variable ${index + 1}`}
+                        disabled={disabled()}
+                        onClick={() =>
+                          setState((current) => {
+                            current.draft.envPassthrough.splice(index, 1);
+                          })
+                        }
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </IconButton>
+                    </div>
+                  )}
+                </For>
+              </McpRowList>
+
+              <Field label="Working directory">
+                <Input
+                  size="md"
+                  placeholder="~/code"
+                  value={state.draft.workingDirectory}
+                  disabled={disabled()}
+                  onValueChange={(value) =>
+                    setState((current) => {
+                      current.draft.workingDirectory = value;
+                    })
+                  }
+                />
+              </Field>
+            </SettingsSection>
+          </SlidingTabs.Content>
+
+          <SlidingTabs.Content value="http" class="server-mcp-transport-panel">
+            <SettingsSection class="server-mcp-section" title="Endpoint">
+              <Field label="Server URL" error={visible("url")}>
+                <Input
+                  size="md"
+                  type="url"
+                  placeholder="https://mcp.example.com/mcp"
+                  value={state.draft.url}
+                  disabled={disabled()}
+                  onValueChange={(value) =>
+                    setState((current) => {
+                      current.draft.url = value;
+                    })
+                  }
+                  onBlur={() =>
+                    setState((current) => {
+                      current.touched = true;
+                    })
+                  }
+                />
+              </Field>
+
+              <McpRowList
+                label="Headers"
+                addLabel="Add header"
+                disabled={disabled()}
+                onAdd={() =>
+                  setState((current) => {
+                    current.draft.headers.push({ key: "", value: "" });
+                  })
+                }
+              >
+                <For each={state.draft.headers} keyed={false}>
+                  {(pair, index) => (
+                    <div class="server-mcp-repeat-row server-mcp-repeat-row-pair">
+                      <Input
+                        size="md"
+                        placeholder="Key"
+                        aria-label={`Header ${index + 1} key`}
+                        value={pair().key}
+                        disabled={disabled()}
+                        onValueChange={(next) =>
+                          setState((current) => {
+                            current.draft.headers[index].key = next;
+                          })
+                        }
+                      />
+                      <Input
+                        size="md"
+                        placeholder="Value"
+                        aria-label={`Header ${index + 1} value`}
+                        value={pair().value}
+                        disabled={disabled()}
+                        onValueChange={(next) =>
+                          setState((current) => {
+                            current.draft.headers[index].value = next;
+                          })
+                        }
+                      />
+                      <IconButton
+                        type="button"
+                        variant="ghost"
+                        label={`Remove header ${index + 1}`}
+                        disabled={disabled()}
+                        onClick={() =>
+                          setState((current) => {
+                            current.draft.headers.splice(index, 1);
+                          })
+                        }
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </IconButton>
+                    </div>
+                  )}
+                </For>
+              </McpRowList>
+            </SettingsSection>
+          </SlidingTabs.Content>
+        </SlidingTabs.ContentSlot>
+      </SlidingTabs.Root>
+    );
+  }
+
+  return (
+    <div class="server-mcp-panel t-page-slide" data-page={state.view === "form" ? "2" : "1"}>
+      {/* The list and the form are the two pages of one flow: the form enters from the right, and
+          the list comes back from the left. Only the entering page is mounted, so the panel CSS
+          gives it an entry state through `@starting-style`. */}
+      <Show
+        when={state.view === "list"}
+        fallback={
+          <div class="t-page" data-page-id="2">
+            {formView()}
+          </div>
+        }
+      >
+        <div class="t-page" data-page-id="1">
+          {listView()}
+        </div>
+      </Show>
+
+      <AlertDialog.Root
+        open={Boolean(removeEntry())}
+        onOpenChange={(open) => {
+          if (!open && state.busy === null)
+            setState((current) => {
+              current.removeId = null;
+            });
+        }}
+      >
+        <Show when={removeEntry()}>
+          {(entry) => (
+            <AlertDialog.Portal>
+              <AlertDialog.Overlay class="server-settings-confirm-backdrop">
+                <AlertDialog.Content
+                  class="server-settings-confirm-dialog"
+                  onCloseAutoFocus={(event) => {
+                    event.preventDefault();
+                    queueMicrotask(() => removeTrigger?.focus({ preventScroll: true }));
+                  }}
+                >
+                  <span class="server-settings-confirm-icon" aria-hidden="true">
+                    <Trash2 />
+                  </span>
+                  <AlertDialog.Title>Remove {entry().config.name}?</AlertDialog.Title>
+                  <AlertDialog.Description>
+                    Its tools stop being offered to this server’s agents. The configuration is not kept.
+                  </AlertDialog.Description>
+                  <div class="server-settings-confirm-actions">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={state.busy !== null}
+                      onClick={() =>
+                        setState((current) => {
+                          current.removeId = null;
+                        })
+                      }
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      loading={state.busy === `remove:${entry().config.id}`}
+                      loadingLabel="Removing…"
+                      onClick={() =>
+                        void run(`remove:${entry().config.id}`, async () => {
+                          await props.onRemove(entry().config.id);
+                          setState((current) => {
+                            current.removeId = null;
+                          });
+                        })
+                      }
+                    >
+                      Remove MCP server
+                    </Button>
+                  </div>
+                </AlertDialog.Content>
+              </AlertDialog.Overlay>
+            </AlertDialog.Portal>
+          )}
+        </Show>
+      </AlertDialog.Root>
+    </div>
+  );
+}
+
+/**
+ * The frame the four repeatable lists share: a named group, its rows, and the button that appends
+ * one. The rows differ - a single value or a key/value pair - so each caller supplies its own `For`.
+ */
+function McpRowList(props: {
+  label: string;
+  addLabel: string;
+  disabled: boolean;
+  onAdd: () => void;
+  children: JSX.Element;
+}) {
+  return (
+    <fieldset class="server-mcp-repeat">
+      <legend class="server-mcp-repeat-legend">
+        <Text variant="caption" tone="muted">
+          {props.label}
+        </Text>
+      </legend>
+      {props.children}
+      <Button
+        type="button"
+        class="server-mcp-repeat-add"
+        variant="ghost"
+        size="sm"
+        disabled={props.disabled}
+        onClick={props.onAdd}
+      >
+        <Plus aria-hidden="true" />
+        {props.addLabel}
+      </Button>
+    </fieldset>
+  );
+}
+
+function McpRowMenu(props: {
+  name: string;
+  mount?: HTMLElement;
+  disabled: boolean;
+  onEdit: () => void;
+  onRemove: (trigger: HTMLElement) => void;
+}) {
+  let triggerElement: HTMLElement | undefined;
+  return (
+    <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
+      <DropdownMenu.Trigger
+        ref={(element) => (triggerElement = element)}
+        class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} ui-icon-button`}
+        aria-label={`Actions for ${props.name}`}
+        disabled={props.disabled}
+      >
+        <Ellipsis aria-hidden="true" />
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal mount={props.mount}>
+        <DropdownMenu.Content class="server-mcp-row-menu">
+          <DropdownMenu.Item onSelect={() => props.onEdit()}>
+            <Pencil aria-hidden="true" />
+            Edit
+          </DropdownMenu.Item>
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item
+            class="ui-action-menu-danger"
+            onSelect={() => triggerElement && props.onRemove(triggerElement)}
+          >
+            <Trash2 aria-hidden="true" />
+            Remove
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+}

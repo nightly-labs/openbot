@@ -74,7 +74,9 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   composedCustomModelId,
+  createMcpServerId,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
+  normalizeMcpConfig,
   SIDEBAR_PEOPLE_SECTION_ID,
   SIDEBAR_UNASSIGNED_SECTION_ID,
 } from "@openbot/contracts/ipc";
@@ -97,6 +99,7 @@ import {
   STORY_MARKETPLACE_AGENTS,
   STORY_MARKETPLACE_SKILL_DETAILS,
   STORY_MARKETPLACE_SKILLS,
+  STORY_MCP_SERVERS,
   STORY_MODELS,
   STORY_PRESENCE,
   STORY_REMOTE_DESKTOP_SESSION,
@@ -240,6 +243,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let dynamicIslandPresentation: DynamicIslandPresentation = { serverId: "local", mode: "idle" };
   const agentStatus = clone(options.agentStatus ?? STORY_AGENT_STATUS);
   let agents = clone(options.agents ?? STORY_AGENT_SUMMARIES);
+  let mcpServers = clone(STORY_MCP_SERVERS);
   let sidebarLayout: SidebarLayoutSnapshot = {
     revision: 0,
     sections: [],
@@ -393,6 +397,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const memories = new Map<string, AgentMemory[]>(Object.entries(clone(options.memories ?? {})));
   const routines = new Map<string, Routine[]>(Object.entries(clone(options.routines ?? {})));
   const routineRuns = new Map<string, RoutineRun[]>();
+
+  /** The panel keeps its list live from this event, so the mock has to push it after each change. */
+  function publishMcpStatuses(): void {
+    emitAgentEvent({
+      type: "mcp-servers-changed",
+      statuses: mcpServers.map(({ config, state, toolCount, error }) => ({ id: config.id, state, toolCount, error })),
+    });
+  }
 
   function emitAgentEvent(event: AgentEvent): void {
     emit(agentListeners, event);
@@ -1172,6 +1184,40 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listAgents: async () => clone(agents),
       listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
       ...createMockChannels(emitAgentEvent, (agentId) => agents.find((entry) => entry.id === agentId)?.name ?? agentId),
+      listMcpServers: async () => clone(mcpServers),
+      saveMcpServer: async ({ config }) => {
+        const normalized = normalizeMcpConfig(config);
+        const existing = mcpServers.findIndex((entry) => entry.config.id === normalized.id);
+        if (existing < 0) {
+          const id = normalized.id || createMcpServerId();
+          mcpServers = [
+            ...mcpServers,
+            { config: { ...normalized, id }, state: "connecting", toolCount: 0, error: null },
+          ];
+        } else {
+          mcpServers = mcpServers.map((entry, index) =>
+            index === existing ? { ...entry, config: normalized } : entry,
+          );
+        }
+        publishMcpStatuses();
+        return clone(mcpServers);
+      },
+      removeMcpServer: async ({ mcpServerId }) => {
+        mcpServers = mcpServers.filter((entry) => entry.config.id !== mcpServerId);
+        publishMcpStatuses();
+        return clone(mcpServers);
+      },
+      setMcpServerEnabled: async ({ mcpServerId, enabled }) => {
+        mcpServers = mcpServers.map((entry) =>
+          entry.config.id === mcpServerId
+            ? { ...entry, config: { ...entry.config, enabled }, state: enabled ? "connected" : "disabled" }
+            : entry,
+        );
+        publishMcpStatuses();
+        return clone(mcpServers);
+      },
+      openMcpStatus: async () => clone(mcpServers),
+      closeMcpStatus: async () => {},
       getSidebarLayout: async () => clone(sidebarLayout),
       mutateSidebarLayout: async (action) => {
         sidebarLayout = applySidebarLayoutAction(sidebarLayout, action);

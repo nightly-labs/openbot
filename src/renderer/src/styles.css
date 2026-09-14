@@ -26,6 +26,7 @@
 @import "./features/settings/settings-hosted-sites.css";
 @import "./features/computer-use/computer-use.css";
 @import "./features/servers/server-settings-modal.css";
+@import "./features/servers/server-mcp.css";
 @import "./features/settings/skills-marketplace.css";
 @import "./features/provider-updates/provider-updates.css";
 @import "./features/custom-providers/custom-providers.css";
@@ -85,6 +86,9 @@
   --shake-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --revert-hold: 3000ms;
   --revert-dur: 280ms;
+  --acc-expand: 250ms;
+  --acc-collapse: 250ms;
+  --acc-ease: cubic-bezier(0.22, 1, 0.36, 1);
   font-family: var(--openbot-font-sans);
   font-synthesis: none;
   text-rendering: geometricPrecision;

@@ -27,11 +27,13 @@ import { channelEvent, channelResponse, isChannelRoute } from "@openbot/contract
 import {
   CHANNEL_DELETE_CAPABILITY,
   isTeamCurrentCapability,
+  MCP_SERVERS_CAPABILITY,
   supportsTeamSemanticTags,
   TEAM_AGENT_ACTIVITY_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
   type TeamCurrentCapability,
 } from "@openbot/contracts/team-protocol/current";
+import { isMcpRoute, mcpEvent, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_PROTOCOL_V1,
@@ -74,6 +76,7 @@ import { routeBrowser } from "./team-api/route-browser";
 import { routeChannels } from "./team-api/route-channels";
 import { routeDirect } from "./team-api/route-direct";
 import { routeFiles } from "./team-api/route-files";
+import { routeMcpServers } from "./team-api/route-mcp";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
 import { routeTeam } from "./team-api/route-team";
 import { TeamStoreError } from "./team-store";
@@ -523,6 +526,7 @@ export class TeamApiServer {
       if ((await this.#routeBrowser(context)) === "handled") return;
       if ((await this.#routeFiles(context)) === "handled") return;
       if ((await routeChannels(context, this.#options.channels, this.#options.agents)) === "handled") return;
+      if ((await routeMcpServers(context, this.#options.mcpServers)) === "handled") return;
       if ((await this.#routeAgents(context)) === "handled") return;
 
       // The only 404 in the Team API.
@@ -649,9 +653,13 @@ export class TeamApiServer {
       let queueInvalidation: string | undefined;
       let outgoing: string;
       const channel = channelEvent(event);
+      const mcp = mcpEvent(event);
       if (channel) {
         if (!connection.capabilities.has("channel-chats-v1")) continue;
         outgoing = JSON.stringify(channel);
+      } else if (mcp) {
+        if (!connection.capabilities.has(MCP_SERVERS_CAPABILITY)) continue;
+        outgoing = JSON.stringify(mcp);
       } else if (event.type === "conversation" && supportsRuntimeSnapshots) {
         conversationInvalidation ??=
           encodeEvent({
@@ -1033,11 +1041,13 @@ export class TeamApiServer {
     const visibleValue = status < 400 && route.hiddenAgentIds ? legacyProviderView(value, route.hiddenAgentIds) : value;
     const body = isChannelRoute(route.path)
       ? JSON.stringify(channelResponse(route.path, status, visibleValue))
-      : route.protocol === TEAM_PROTOCOL_V4
-        ? encodeTeamProtocolV4CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
-        : route.protocol === TEAM_PROTOCOL_V3
-          ? encodeTeamProtocolV3CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
-          : encodeTeamProtocolV1CurrentHttpResponse(route.method, route.path, status, visibleValue, options);
+      : isMcpRoute(route.path)
+        ? JSON.stringify(mcpResponse(route.path, status, visibleValue))
+        : route.protocol === TEAM_PROTOCOL_V4
+          ? encodeTeamProtocolV4CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
+          : route.protocol === TEAM_PROTOCOL_V3
+            ? encodeTeamProtocolV3CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
+            : encodeTeamProtocolV1CurrentHttpResponse(route.method, route.path, status, visibleValue, options);
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     response.end(`${body}\n`);
     return "handled";
@@ -1047,11 +1057,14 @@ export class TeamApiServer {
     return {
       appVersion: this.#options.appVersion ?? "0.0.0",
       protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V4 },
-      capabilities: TEAM_CURRENT_CAPABILITIES.filter(
-        (capability) =>
-          (capability !== "channel-chats-v1" && capability !== CHANNEL_DELETE_CAPABILITY) ||
-          this.#options.channels !== undefined,
-      ),
+      capabilities: TEAM_CURRENT_CAPABILITIES.filter((capability) => {
+        if (capability === "channel-chats-v1" || capability === CHANNEL_DELETE_CAPABILITY)
+          return this.#options.channels !== undefined;
+        // Advertised only when this host can serve it: a client that negotiated it gets a route,
+        // and one that did not never shows the panel.
+        if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
+        return true;
+      }),
     };
   }
 
@@ -1167,6 +1180,8 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
     event.type === "channel-routines-changed"
   )
     return "channel-chats-v1";
+  // Without this arm the event would reach every peer: `null` means "send to everyone".
+  if (event.type === "mcp-servers-changed") return MCP_SERVERS_CAPABILITY;
   if (event.type === "turn-progress") return TEAM_AGENT_ACTIVITY_CAPABILITY;
   if (event.type === "runtime-snapshot") return "agent-runtime-snapshots";
   if (event.type === "sidebar-layout-changed") return "sidebar-layout";

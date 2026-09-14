@@ -23,6 +23,7 @@ import { redactText } from "@openbot/logging";
 import type { AgentProvider } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
+import { acpMcpServers, type McpServerSource, usableMcpServers } from "./mcp-provider-shapes";
 import {
   type AccountRateLimitsReadResult,
   type AppServerNotification,
@@ -102,6 +103,11 @@ export interface AcpProviderOptions {
    * while those run and this process would still answer on it.
    */
   servesModel?(modelId: string): boolean;
+  /**
+   * The user's own MCP servers, read at spawn. OpenBot's bridge servers are appended after these,
+   * so a configuration can never displace the tools the agent depends on.
+   */
+  mcpServers?: McpServerSource;
   authenticate?(connection: ClientSideConnection, initialization: InitializeResponse): Promise<void>;
   readRateLimits?(connection: ClientSideConnection): Promise<AccountRateLimitsReadResult>;
 }
@@ -357,18 +363,21 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       let id: string;
       let configOptions: SessionConfigOption[];
       let currentModelId: string | null;
+      // OpenBot's bridge servers last: all providers key MCP servers by name, so a user
+      // configuration that reached one of those names would take the agent's own tools away.
+      const mcpServers = [...acpMcpServers(await usableMcpServers(this.options.mcpServers?.() ?? [])), ...mcp.servers];
       if (resume && requestedThreadId) {
         const response = await connection.loadSession({
           sessionId: requestedThreadId,
           cwd,
           additionalDirectories,
-          mcpServers: mcp.servers,
+          mcpServers,
         });
         id = requestedThreadId;
         configOptions = response.configOptions ?? [];
         currentModelId = currentModelFromSessionSetup(response);
       } else {
-        const response = await connection.newSession({ cwd, additionalDirectories, mcpServers: mcp.servers });
+        const response = await connection.newSession({ cwd, additionalDirectories, mcpServers });
         id = response.sessionId;
         configOptions = response.configOptions ?? [];
         currentModelId = currentModelFromSessionSetup(response);

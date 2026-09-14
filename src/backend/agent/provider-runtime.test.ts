@@ -215,7 +215,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       null,
       null,
       null,
-      { apiKey: () => storedKey, customProviders: () => [] },
+      { apiKey: () => storedKey, customProviders: () => [], mcpServers: () => [] },
     );
     await service.initialize();
     return service
@@ -284,7 +284,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       null,
       null,
       null,
-      { apiKey: () => storedKey, customProviders: () => [] },
+      { apiKey: () => storedKey, customProviders: () => [], mcpServers: () => [] },
     );
     await service.initialize();
 
@@ -807,11 +807,44 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("logs a provider's MCP server failure and raises the provider's own failures", async () => {
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider);
-      clients.set(provider, client);
-      return client;
-    });
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+      {},
+      async () => undefined,
+      null,
+      null,
+      null,
+      {
+        apiKey: () => null,
+        customProviders: () => [],
+        // A server OpenBot configured. The user asked for this one here, so its failure is theirs
+        // to fix and must stay visible.
+        mcpServers: () => [
+          {
+            id: "mcp-1",
+            name: "Filesystem",
+            transport: "stdio",
+            enabled: true,
+            command: "/bin/echo",
+            args: [],
+            env: [],
+            envPassthrough: [],
+            workingDirectory: "",
+            url: "",
+            headers: [],
+          },
+        ],
+      },
+    );
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
@@ -827,10 +860,13 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
     client.emit("diagnostic", "ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed");
     client.emit("diagnostic", "ERROR the provider failed to reach the model endpoint");
+    // Named in this app's own settings, so the user can act on it and has to be told.
+    client.emit("diagnostic", "Failed to spawn MCP server 'Filesystem': Command not found");
 
-    await waitFor(() => events.some((event) => event.type === "error"));
+    await waitFor(() => events.filter((event) => event.type === "error").length === 2);
     expect(events.filter((event) => event.type === "error")).toEqual([
       expect.objectContaining({ message: "ERROR the provider failed to reach the model endpoint" }),
+      expect.objectContaining({ message: "Failed to spawn MCP server 'Filesystem': Command not found" }),
     ]);
   });
 
@@ -1244,7 +1280,7 @@ describe.sequential("ProviderRuntime: custom provider reload", () => {
       null,
       null,
       null,
-      { apiKey: () => null, customProviders: () => endpoints },
+      { apiKey: () => null, customProviders: () => endpoints, mcpServers: () => [] },
     );
     return { service, store };
   }

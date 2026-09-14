@@ -64,10 +64,13 @@ const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
  * list. That belongs in the log, not in an error the user is asked to read.
  *
  * OpenBot's own bridge servers carry its name, and stay visible: a failure there is a failure of
- * this app.
+ * this app. So does a server this app configured - the user asked for it here, and the reason it
+ * does not start is something only they can fix. `configuredNames` is what separates the two: a
+ * server the user configured in their own provider files is still nobody's failure but theirs.
  */
-export function isMcpSubsystemDiagnostic(message: string): boolean {
+export function isMcpSubsystemDiagnostic(message: string, configuredNames: readonly string[] = []): boolean {
   if (/openbot/i.test(message)) return false;
+  if (configuredNames.some((name) => name && message.includes(name))) return false;
   return /\b(mcp|rmcp)\b/i.test(message);
 }
 
@@ -1437,7 +1440,12 @@ export class ProviderRuntime implements ProviderPort {
     this.#hooks.bindClient(client);
     client.on("diagnostic", (message) => {
       if (!/error|failed|warning/i.test(message)) return;
-      if (isMcpSubsystemDiagnostic(message)) {
+      if (
+        isMcpSubsystemDiagnostic(
+          message,
+          this.#credentials.mcpServers().map((config) => config.name),
+        )
+      ) {
         logger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });
         return;
       }

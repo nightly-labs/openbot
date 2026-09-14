@@ -34,6 +34,7 @@ import {
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
   decodeChannelSummaries,
+  decodeMcpServerEntries,
   decodeOptionalAgentAnalytics,
   decodeOptionalHostAnalytics,
   decodeSaveAgentProfileResult,
@@ -968,6 +969,19 @@ const openbotApi: OpenBotDesktopApi = {
     testChannelRoutine: (input) => invokeAgent(IPC_CHANNELS.agentTestChannelRoutine, input, decodeChannelRoutineRun),
     listChannelRoutineRuns: (input) =>
       invokeAgent(IPC_CHANNELS.agentListChannelRoutineRuns, input, decodeChannelRoutineRuns),
+    // `invokeAgentForServer`, never `invokeAgent`: the settings modal can be open for a server the
+    // user has not switched to, and `invokeAgent` would pin the selected one.
+    listMcpServers: (serverId) =>
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversListMcpServers, null, decodeMcpServerEntries),
+    saveMcpServer: (input, serverId) =>
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversSaveMcpServer, input, decodeMcpServerEntries),
+    removeMcpServer: (input, serverId) =>
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversRemoveMcpServer, input, decodeMcpServerEntries),
+    setMcpServerEnabled: (input, serverId) =>
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversSetMcpServerEnabled, input, decodeMcpServerEntries),
+    openMcpStatus: (serverId) =>
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversOpenMcpStatus, null, decodeMcpServerEntries),
+    closeMcpStatus: (serverId) => invokeAgentForServer(serverId, IPC_CHANNELS.serversCloseMcpStatus, null, decodeVoid),
     readConversation: (agentId) => invokeAgent(IPC_CHANNELS.agentReadConversation, agentId, decodeConversation),
     readConversationPage: (input, serverId = selectedServerId) =>
       invokeAgentForServer(serverId, IPC_CHANNELS.agentReadConversationPage, input, decodeConversationPageFromMain),

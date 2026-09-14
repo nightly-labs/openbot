@@ -52,6 +52,22 @@ export const INPUT_LIMITS = {
   browserTabs: 25,
   browserCoordinate: 100_000,
   browserDimension: 16_384,
+  // MCP server configuration. `identifier` covers the id and `path` covers the working directory.
+  // The two value bounds are equal today and kept apart on purpose: an environment value and an
+  // HTTP header are different things, and only one of them has a protocol that bounds it.
+  mcpServers: 32,
+  mcpServerName: 80,
+  mcpCommand: 4_096,
+  mcpArgs: 64,
+  mcpArgValue: 4_096,
+  mcpEnvVariables: 64,
+  mcpEnvName: 255,
+  mcpEnvValue: 8_192,
+  mcpHeaders: 32,
+  mcpHeaderValue: 8_192,
+  mcpUrl: 2_048,
+  mcpToolCount: 10_000,
+  mcpErrorText: 2_000,
   teamMembers: 100,
   activeInvites: 100,
   sessionsPerMember: 10,

@@ -1,0 +1,174 @@
+import { execFile } from "node:child_process";
+import { isAbsolute } from "node:path";
+import { promisify } from "node:util";
+import { isReservedMcpServerName, type McpServerConfig } from "@openbot/contracts/ipc";
+import { loginShellCommand } from "./cli";
+
+const execFileAsync = promisify(execFile);
+
+/** Where a provider client reads the enabled configurations at spawn. */
+export type McpServerSource = () => readonly McpServerConfig[];
+
+/** A configuration with its stdio command resolved, or the reason it cannot start. */
+export type UsableMcpServer =
+  | { config: McpServerConfig; command: string; error?: undefined }
+  | { config: McpServerConfig; command?: undefined; error: string };
+
+/**
+ * The enabled configurations a provider can actually be given.
+ *
+ * Two jobs, both of which have to happen exactly once and before anything else reads the list:
+ *
+ * - A configuration that takes one of OpenBot's own bridge names is dropped. All four providers key
+ *   MCP servers by name, so `openbot` here would displace the bridge the agent depends on.
+ * - A stdio command is resolved to an absolute path. Claude and Codex spawn with no shell, so a bare
+ *   `npx` fails in the provider even though a probe using the SDK's default environment succeeded.
+ *   Resolving here, and probing the resolved value, keeps the panel's answer and the agent's answer
+ *   the same. An unresolvable command is reported as failed rather than sent.
+ */
+export async function usableMcpServers(configs: readonly McpServerConfig[]): Promise<UsableMcpServer[]> {
+  const candidates = configs.filter((config) => config.enabled && !isReservedMcpServerName(config.name));
+  return Promise.all(
+    candidates.map(async (config) => {
+      if (config.transport !== "stdio") return { config, command: "" };
+      const command = await resolveMcpCommand(config.command);
+      if (!command) return { config, error: `Command not found: ${config.command}` };
+      return { config, command };
+    }),
+  );
+}
+
+/**
+ * An absolute path for a command name, or `null` when the machine has none. A command the user
+ * already wrote as a path is taken as written: it is their statement of which build to run.
+ */
+export async function resolveMcpCommand(command: string): Promise<string | null> {
+  const trimmed = command.trim();
+  if (!trimmed) return null;
+  if (isAbsolute(trimmed) || trimmed.startsWith(".")) return trimmed;
+  try {
+    if (process.platform === "win32") {
+      const { stdout } = await execFileAsync("where.exe", [trimmed], { timeout: 5_000, maxBuffer: 64 * 1024 });
+      return stdout.split(/\r?\n/u)[0]?.trim() || null;
+    }
+    // A login shell, because a packaged app starts with a restricted PATH - the same reason
+    // `collectCandidates` in `cli.ts` uses one.
+    const shell = loginShellCommand();
+    const { stdout } = await execFileAsync(shell.command, [...shell.args, `command -v ${trimmed}`], {
+      timeout: 5_000,
+      maxBuffer: 64 * 1024,
+    });
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The environment a stdio MCP server starts with, beyond the provider's own.
+ *
+ * `envPassthrough` is spent here and nowhere else: it names the variables this machine already
+ * holds that the server needs, such as `HOME`. The configuration's own pairs are applied last, so
+ * a user's explicit value always wins over an inherited one.
+ */
+export function mcpEnvironment(config: McpServerConfig): Record<string, string> {
+  const environment: Record<string, string> = {};
+  for (const name of config.envPassthrough) {
+    const value = process.env[name];
+    if (value !== undefined) environment[name] = value;
+  }
+  for (const pair of config.env) environment[pair.key] = pair.value;
+  return environment;
+}
+
+/** Claude reads a record keyed by name. Its stdio entry takes `cwd`; its http entry takes headers. */
+export type ClaudeMcpServer =
+  | { type: "stdio"; command: string; args: string[]; env: Record<string, string>; cwd?: string }
+  | { type: "http"; url: string; headers: Record<string, string> };
+
+export function claudeMcpServers(servers: readonly UsableMcpServer[]): Record<string, ClaudeMcpServer> {
+  const record: Record<string, ClaudeMcpServer> = {};
+  for (const server of servers) {
+    if (server.error !== undefined) continue;
+    const { config } = server;
+    record[config.name] =
+      config.transport === "stdio"
+        ? {
+            type: "stdio",
+            command: server.command,
+            args: [...config.args],
+            env: mcpEnvironment(config),
+            ...(config.workingDirectory ? { cwd: config.workingDirectory } : {}),
+          }
+        : { type: "http", url: config.url, headers: headerRecord(config) };
+  }
+  return record;
+}
+
+/** ACP reads an array, and its environment and headers are `{ name, value }` pairs, not records. */
+export type AcpMcpServer =
+  | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }> }
+  | { type: "http"; name: string; url: string; headers: Array<{ name: string; value: string }> };
+
+export function acpMcpServers(servers: readonly UsableMcpServer[]): AcpMcpServer[] {
+  const entries: AcpMcpServer[] = [];
+  for (const server of servers) {
+    if (server.error !== undefined) continue;
+    const { config } = server;
+    if (config.transport === "stdio") {
+      entries.push({
+        name: config.name,
+        command: server.command,
+        args: [...config.args],
+        env: Object.entries(mcpEnvironment(config)).map(([name, value]) => ({ name, value })),
+      });
+    } else {
+      entries.push({
+        type: "http",
+        name: config.name,
+        url: config.url,
+        headers: config.headers.map((pair) => ({ name: pair.key, value: pair.value })),
+      });
+    }
+  }
+  return entries;
+}
+
+/**
+ * Codex reads `config.mcp_servers`, a record keyed by name, which `profile-generation.ts` already
+ * writes to disable the user's own servers.
+ *
+ * **stdio only.** The record's http shape could not be confirmed against the pinned Codex
+ * app-server, and a guessed key name would fail silently at the next turn, so an http server is
+ * left out of the Codex payload instead. Every other provider still gets it.
+ */
+export type CodexMcpServer = { command: string; args: string[]; env: Record<string, string> };
+
+export function codexMcpServers(servers: readonly UsableMcpServer[]): Record<string, CodexMcpServer> {
+  const record: Record<string, CodexMcpServer> = {};
+  for (const server of servers) {
+    if (server.error !== undefined || server.config.transport !== "stdio") continue;
+    record[server.config.name] = {
+      command: server.command,
+      args: [...server.config.args],
+      env: mcpEnvironment(server.config),
+    };
+  }
+  return record;
+}
+
+/**
+ * What the Codex tool manifest records about the MCP set: names and transports, never a command,
+ * an environment value or a header. The manifest is a file on disk, and a changed set has to force
+ * a replacement session because Codex ignores the configuration on resume.
+ */
+export function mcpFingerprintValues(configs: readonly McpServerConfig[]): string[] {
+  return configs
+    .filter((config) => config.enabled && !isReservedMcpServerName(config.name))
+    .map((config) => `${config.name}:${config.transport}`)
+    .sort();
+}
+
+function headerRecord(config: McpServerConfig): Record<string, string> {
+  return Object.fromEntries(config.headers.map((pair) => [pair.key, pair.value]));
+}

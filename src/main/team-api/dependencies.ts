@@ -99,6 +99,15 @@ export type TeamApiAgents = TeamApiAgentMethods & {
   off: (event: "event", listener: (event: AgentEvent) => void) => void;
 };
 
+/**
+ * The MCP half of `AgentService`, kept as its own option rather than folded into `TeamApiAgents`:
+ * its presence is what `#protocolSupport` advertises the capability on, exactly as `channels` is.
+ */
+export type TeamApiMcpServers = Pick<
+  AgentService,
+  "listMcpServers" | "saveMcpServer" | "removeMcpServer" | "setMcpServerEnabled"
+>;
+
 export type TeamApiMailbox = Pick<MailboxStore, "resolveAttachment">;
 export type TeamApiSidebarLayout = Pick<
   SidebarLayoutStore,
@@ -136,6 +145,7 @@ export type TeamApiRemoteScreen = Pick<
 
 export interface TeamApiOptions {
   channels?: ChannelService;
+  mcpServers?: TeamApiMcpServers;
   appVersion?: string;
   store: TeamStore;
   agents: TeamApiAgents;
