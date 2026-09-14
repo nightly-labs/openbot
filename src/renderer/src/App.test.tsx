@@ -1388,34 +1388,43 @@ describe("OpenBot connected desktop shell", () => {
     expect(await screen.findByRole("button", { name: "Sign in to ChatGPT" })).toBeVisible();
   });
 
-  it("states a spent plan window above the composer when the runtime reports one", async () => {
+  it("states a spent plan window above the composer, and drops it when the window ends", async () => {
+    const resetsAt = Math.floor(Date.now() / 1_000) + 3_600;
+    vi.mocked(window.openbot.agent.getUsage).mockResolvedValue({
+      limits: [{ id: "codex", primary: { usedPercent: 100, windowDurationMins: 300, resetsAt }, secondary: null }],
+    });
+
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
 
-    emitAgentEvent?.({
-      type: "usage-changed",
-      usage: {
-        limits: [
-          { id: "codex", primary: { usedPercent: 64, windowDurationMins: 300, resetsAt: null }, secondary: null },
-        ],
-      },
-    });
-    // Below the line the provider still takes the turn, so nothing stands above the composer yet.
-    expect(screen.queryByText("Usage limit reached")).not.toBeInTheDocument();
-
-    emitAgentEvent?.({
-      type: "usage-changed",
-      usage: {
-        limits: [
-          { id: "codex", primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: null }, secondary: null },
-        ],
-      },
-    });
-
     expect(await screen.findByText("Usage limit reached")).toBeVisible();
-    // The window carries no reset, so the card names the way out the model picker gives instead.
-    expect(screen.getByText("You used all of your ChatGPT limit. Select a different model to continue.")).toBeVisible();
     // The composer still takes a draft, so the user can write while they wait for the reset.
     expect(screen.getByRole("textbox", { name: "Message Chief" })).toBeInTheDocument();
+
+    // The window ends with nobody sending, so the reading the provider gave is spent and stale.
+    vi.mocked(window.openbot.agent.getUsage).mockResolvedValue({
+      limits: [
+        {
+          id: "codex",
+          primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: Math.floor(Date.now() / 1_000) - 60 },
+          secondary: null,
+        },
+      ],
+    });
+    emitAgentEvent?.({ type: "usage-changed", usage: { limits: [] } });
+
+    await waitFor(() => expect(screen.queryByText("Usage limit reached")).not.toBeInTheDocument());
+  });
+
+  it("leaves the composer alone below the plan limit", async () => {
+    vi.mocked(window.openbot.agent.getUsage).mockResolvedValue({
+      limits: [{ id: "codex", primary: { usedPercent: 64, windowDurationMins: 300, resetsAt: null }, secondary: null }],
+    });
+
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalled());
+
+    expect(screen.queryByText("Usage limit reached")).not.toBeInTheDocument();
   });
 });

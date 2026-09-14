@@ -62,18 +62,6 @@ const Auth = createSimpleContext({
       data: AccountUsage | null;
       refreshRevision: number;
     }>({ targetKey: null, data: null, refreshRevision: 0 });
-    /**
-     * The last plan windows the runtime pushed, and the agent they were read for.
-     *
-     * Separate from `accountUsageState`, which is the dock's reading: the dock asks for a
-     * model-scoped answer and only when the user can see it, while this arrives by itself after a
-     * turn. Keeping the two apart stops an account-wide push from overwriting a model-scoped
-     * reading, and the agent id keeps a push from a previous agent off the next one.
-     */
-    const [pushedAccountUsage, setPushedAccountUsage] = createSignal<{
-      agentId: string;
-      usage: AccountUsage;
-    } | null>(null);
     let accountUsageRequestGeneration = 0;
     let authSuccessTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -205,18 +193,6 @@ const Auth = createSimpleContext({
       });
     }
 
-    /** The runtime reports plan windows for the agent it runs, so the reader has to name that agent. */
-    function accountUsageFor(agentId: string | undefined): AccountUsage | null {
-      const pushed = pushedAccountUsage();
-      const dockUsage = accountUsageState.data;
-      if (dockUsage) return dockUsage;
-      return pushed && agentId && pushed.agentId === agentId ? pushed.usage : null;
-    }
-
-    function applyPushedAccountUsage(agentId: string, usage: AccountUsage): void {
-      setPushedAccountUsage({ agentId, usage });
-    }
-
     function invalidateAccountUsage(): void {
       accountUsageRequestGeneration += 1;
       setAccountUsageState((state) => {
@@ -261,8 +237,6 @@ const Auth = createSimpleContext({
       signedInAccount,
       visibleSignedInAccount,
       accountUsage,
-      accountUsageFor,
-      applyPushedAccountUsage,
       accountUsageRefreshRevision,
       selectAccountUsageTarget,
       invalidateAccountUsage,

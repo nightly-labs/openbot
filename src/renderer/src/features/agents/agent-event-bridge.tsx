@@ -52,10 +52,9 @@ export function AgentEventBridge() {
   const channels = useChannels();
   const platform = usePlatform();
   const { activeServerId } = useServers();
-  const { invalidateAccountUsage, applyPushedAccountUsage } = useAuth();
+  const { invalidateAccountUsage } = useAuth();
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
-  const { activeAgent, agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents, appendUiError } =
-    useAgents();
+  const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents, appendUiError } = useAgents();
   const {
     applyRuntimeMessages,
     conversations,
@@ -98,15 +97,13 @@ export function AgentEventBridge() {
             .catch(() => undefined);
         }
         return;
-      case "usage-changed": {
-        // The runtime reads the plan windows for the agent it runs, which is the active one, the
-        // same way it reports one `status`. Keeping the payload is what lets the composer say the
-        // limit is spent without a second request for what main has already sent.
-        const agentId = activeAgent()?.id;
-        if (agentId) applyPushedAccountUsage(agentId, event.usage);
+      case "usage-changed":
+        // The payload is dropped on purpose. A broadcast read carries no model scope and comes from
+        // the Codex client whatever agent is active, so it cannot say whose limit it is. The dock's
+        // own reading is scoped to the active agent's provider and model, so it is the only one the
+        // composer can name a provider from.
         invalidateAccountUsage();
         return;
-      }
       case "agents-changed":
         applyStoredAgents(event.agents);
         return;

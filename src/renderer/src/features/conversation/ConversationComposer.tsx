@@ -4,7 +4,7 @@ import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
-import { createMemo, createSignal, For, Loading, lazy, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Loading, lazy, onCleanup, Show } from "solid-js";
 import {
   ArrowUp,
   Button,
@@ -86,19 +86,36 @@ export function ConversationComposer() {
     return status?.state === "sign-in-required" ? status : null;
   });
   /**
-   * The first plan window that is spent. `usedPercent` is what the provider reports, so it can pass
-   * 100 slightly; anything at or over the line refuses the next turn either way.
+   * A window that ended gives the quota back, and the reading that named it stays as it was until
+   * something asks the provider again. So the clock is part of the state, not only the percentage.
+   */
+  const [now, setNow] = createSignal(Date.now());
+  /**
+   * The first plan window that is spent and has not ended yet. `usedPercent` is what the provider
+   * reports, so it can pass 100 slightly; anything at or over the line refuses the next turn.
    */
   const usageExhausted = createMemo(() => {
     const provider = props.agent?.provider;
     if (!provider || signInRequired()) return null;
     for (const limit of props.accountUsage?.limits ?? []) {
-      for (const window of [limit.primary, limit.secondary]) {
-        if (window && window.usedPercent >= 100) return { provider, resetsAt: window.resetsAt };
+      for (const plan of [limit.primary, limit.secondary]) {
+        if (!plan || plan.usedPercent < 100) continue;
+        if (plan.resetsAt !== null && plan.resetsAt * 1_000 <= now()) continue;
+        return { provider, resetsAt: plan.resetsAt };
       }
     }
     return null;
   });
+  // The card has to leave on its own. Nothing else reads usage again until the next turn, and the
+  // user waiting for the reset is the one least likely to send one.
+  createEffect(
+    () => usageExhausted()?.resetsAt ?? null,
+    (resetsAt) => {
+      if (resetsAt === null) return;
+      const timer = window.setTimeout(() => setNow(Date.now()), Math.max(0, resetsAt * 1_000 - Date.now()));
+      onCleanup(() => window.clearTimeout(timer));
+    },
+  );
   const attachmentAccept = () => {
     const server = props.server;
     const local = server?.kind !== "remote";

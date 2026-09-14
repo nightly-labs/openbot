@@ -84,9 +84,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   } = useBrowserTabs();
   const { activeRemoteDesktopSession, remoteDesktopWorkspaceVisible, openRemoteDesktopWorkspace } = useRemoteDesktop();
   const usage = useUsage();
-  // The composer never asks for usage itself: the dock's model-scoped reading when the user has
-  // opened it, and otherwise the windows the runtime pushes after a turn. Both already exist, and a
-  // third request would hit the provider's rate-limit endpoint for a card the user may never see.
+  // The composer never asks for usage itself. It reads the dock's reading, which is scoped to the
+  // active agent's provider and model and cleared on a switch, because a second request would hit
+  // the provider's rate-limit endpoint for a card the user may never see.
   const auth = useAuth();
   const { teamPresence } = usePresence();
   const { selectAgent, openAgentMessage, messageFocusRequest, globalSearchOpen } = useNavigation();
@@ -119,7 +119,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   return (
     <Conversation
       agentStatus={agentStatus()}
-      accountUsage={auth.accountUsageFor(activeAgent()?.id)}
+      accountUsage={auth.accountUsage()}
       providerRuntimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
       customProviders={customProviders()}
       onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
