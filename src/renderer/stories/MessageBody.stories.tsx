@@ -57,6 +57,29 @@ function MessageBodySurface(props: {
 
 export const RichMessage: Story = {};
 
+/**
+ * A signed-out provider. The bubble names the state and nothing else: the raw 401 exchange the
+ * provider returned is replaced upstream, and the Sign in action lives on the composer notice, so
+ * one stale bubble cannot offer a second, competing way in.
+ */
+export const AuthError: Story = {
+  args: {
+    message: {
+      ...message,
+      id: "message-auth-error",
+      kind: "error",
+      status: "Sign in required",
+      body: "Authentication failed. Check your account or server connection, then try again.",
+      attachments: [],
+    },
+  },
+  render: (storyArgs) => <MessageBodySurface args={storyArgs} width="420px" />,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText("Sign in required")).toBeInTheDocument();
+    await expect(canvas.queryByText(/AppServerError|chatgpt\.com/u)).not.toBeInTheDocument();
+  },
+};
+
 export const WithReplyContext: Story = {
   args: {
     referencedMessage: {

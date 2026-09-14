@@ -4,6 +4,7 @@ import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
 import { useTurns } from "../../turns";
+import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { useCustomProviders } from "../custom-providers/custom-providers-context";
@@ -39,6 +40,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     downloadProviderRuntime,
     cancelProviderRuntimeDownload,
     connectProvider,
+    openProviderSignInGuide,
   } = useProviders();
   // Not gated on the server: the picker needs these IDs to label a model it is already showing, and
   // a remote server's OpenCode has its own catalogue. Only the write paths are local-only.
@@ -82,6 +84,10 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   } = useBrowserTabs();
   const { activeRemoteDesktopSession, remoteDesktopWorkspaceVisible, openRemoteDesktopWorkspace } = useRemoteDesktop();
   const usage = useUsage();
+  // The composer never asks for usage itself: the dock's model-scoped reading when the user has
+  // opened it, and otherwise the windows the runtime pushes after a turn. Both already exist, and a
+  // third request would hit the provider's rate-limit endpoint for a card the user may never see.
+  const auth = useAuth();
   const { teamPresence } = usePresence();
   const { selectAgent, openAgentMessage, messageFocusRequest, globalSearchOpen } = useNavigation();
 
@@ -113,11 +119,13 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   return (
     <Conversation
       agentStatus={agentStatus()}
+      accountUsage={auth.accountUsageFor(activeAgent()?.id)}
       providerRuntimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
       customProviders={customProviders()}
       onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
       onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
       onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
+      onSignInProvider={activeServer()?.kind === "local" ? openProviderSignInGuide : undefined}
       agent={activeAgent()}
       agents={agentList()}
       availableRoutineIds={activeRoutineIds()}

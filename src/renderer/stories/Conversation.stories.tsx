@@ -249,6 +249,14 @@ const completedImageGenerationPresence = {
 
 const agentMessageGalleryMessages: RendererAgentMessage[] = [
   {
+    id: "agent-gallery-error",
+    author: "agent",
+    body: "Authentication failed. Check your account or server connection, then try again.",
+    time: "09:59",
+    kind: "error",
+    status: "Sign in required",
+  },
+  {
     id: "agent-gallery-user",
     author: "you",
     body: "Show every message surface and interaction in one thread.",
@@ -1065,6 +1073,48 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const RichConversation: Story = {};
+
+/** The real composer with a signed-out provider: the notice takes the queue's place above the input. */
+export const ProviderSignInRequired: Story = {
+  name: "Provider sign in required",
+  args: {
+    agentStatus: {
+      ...STORY_AGENT_STATUS,
+      providers: STORY_AGENT_STATUS.providers?.map((provider) =>
+        provider.id === "codex" ? { ...provider, state: "sign-in-required" as const, email: null } : provider,
+      ),
+    },
+    onSignInProvider: fn(),
+  },
+  play: async ({ args, canvas, userEvent }) => {
+    const signIn = await canvas.findByRole("button", { name: "Sign in to ChatGPT" });
+    // The composer still takes a draft, so signing in never costs the user their message.
+    await expect(canvas.getByRole("textbox", { name: "Message Chief" })).toBeInTheDocument();
+    await userEvent.click(signIn);
+    await expect(args.onSignInProvider).toHaveBeenCalledWith("codex");
+  },
+};
+
+/** The real composer with the plan window spent: the card states the reset and offers no button. */
+export const UsageLimitReached: Story = {
+  name: "Usage limit reached",
+  args: {
+    accountUsage: {
+      limits: [
+        {
+          id: "codex-primary",
+          primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: Date.UTC(2026, 8, 21, 9, 0) / 1_000 },
+          secondary: { usedPercent: 62, windowDurationMins: 10_080, resetsAt: Date.UTC(2026, 8, 26, 9, 0) / 1_000 },
+        },
+      ],
+    },
+  },
+  play: async ({ canvas }) => {
+    await expect(await canvas.findByText("Usage limit reached")).toBeInTheDocument();
+    // The composer still takes a draft, so the user can write while they wait for the reset.
+    await expect(canvas.getByRole("textbox", { name: "Message Chief" })).toBeInTheDocument();
+  },
+};
 
 export const AllAgentMessageTypes: Story = {
   name: "All agent message types",

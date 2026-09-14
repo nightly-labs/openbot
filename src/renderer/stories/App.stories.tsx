@@ -517,3 +517,40 @@ export const MarketplaceSkillPreviewDraft: Story = {
     await expect(await canvas.findByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Keep Chief's draft");
   },
 };
+
+/**
+ * The signed-out provider in the real shell. `sign-in-required` is the only input: the notice, the
+ * model picker's label and the suppressed usage chip all read that one field, so this story is the
+ * check that they agree.
+ */
+export const ProviderSignInRequired: Story = {
+  render: () => (
+    <OpenBotPlayground
+      options={{
+        agentStatus: {
+          ...STORY_AGENT_STATUS,
+          auth: { kind: "signed-out" },
+          providers: STORY_AGENT_STATUS.providers?.map((provider) =>
+            provider.id === "codex"
+              ? {
+                  ...provider,
+                  state: "sign-in-required" as const,
+                  email: null,
+                  message: "Connect ChatGPT to continue.",
+                }
+              : provider,
+          ),
+        },
+      }}
+    />
+  ),
+  play: async ({ canvas, userEvent }) => {
+    await canvas.findByRole("heading", { name: "Chief" });
+    const signIn = await canvas.findByRole("button", { name: "Sign in to ChatGPT" });
+    await expect(canvas.getByText("Sign in required")).toBeInTheDocument();
+    await expect(canvas.getByText("Sign in to ChatGPT to send messages.")).toBeInTheDocument();
+    // The composer still takes a draft, so signing in never costs the user their message.
+    await expect(canvas.getByRole("textbox", { name: /^Message / })).toBeInTheDocument();
+    await userEvent.click(signIn);
+  },
+};

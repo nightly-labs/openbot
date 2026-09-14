@@ -4,7 +4,7 @@ import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
-import { createSignal, For, Loading, lazy, Show } from "solid-js";
+import { createMemo, createSignal, For, Loading, lazy, Show } from "solid-js";
 import {
   ArrowUp,
   Button,
@@ -22,6 +22,7 @@ import { usePlatform } from "../../platform";
 import { fileBadge, formatFileSize } from "./AttachmentCards";
 import { attachmentReferenceTone } from "./AttachmentReference";
 import { ComposerEditor } from "./ComposerEditor";
+import { ComposerSignInNotice, ComposerUsageLimitNotice } from "./ComposerNotice";
 import { CloseIcon, MoreIcon, StopIcon } from "./ConversationIcons";
 import { useConversationViewScope } from "./conversation-scope";
 import { RichMessageText } from "./RichMessageText";
@@ -73,6 +74,31 @@ export function ConversationComposer() {
   // The mention picker grows out of the same edge as the queue, so only one of them holds it.
   const queueVisible = () => queuePanelVisible() && !pickerOpen();
   const voiceAvailable = () => voiceSupported(platform.appInfo()?.platform);
+  /**
+   * The provider status is the only source of truth for a signed-out provider, so the notice and the
+   * model picker's "Sign in required" label can never disagree, and the notice is shown before the
+   * user sends rather than only after a request comes back 401.
+   */
+  const signInRequired = createMemo(() => {
+    const provider = props.agent?.provider;
+    if (!provider || !props.onSignInProvider) return null;
+    const status = props.agentStatus.providers?.find((item) => item.id === provider);
+    return status?.state === "sign-in-required" ? status : null;
+  });
+  /**
+   * The first plan window that is spent. `usedPercent` is what the provider reports, so it can pass
+   * 100 slightly; anything at or over the line refuses the next turn either way.
+   */
+  const usageExhausted = createMemo(() => {
+    const provider = props.agent?.provider;
+    if (!provider || signInRequired()) return null;
+    for (const limit of props.accountUsage?.limits ?? []) {
+      for (const window of [limit.primary, limit.secondary]) {
+        if (window && window.usedPercent >= 100) return { provider, resetsAt: window.resetsAt };
+      }
+    }
+    return null;
+  });
   const attachmentAccept = () => {
     const server = props.server;
     const local = server?.kind !== "remote";
@@ -139,6 +165,18 @@ export function ConversationComposer() {
               </Button>
             </div>
           )}
+        </Show>
+        <Show when={signInRequired()}>
+          {(status) => (
+            <ComposerSignInNotice
+              provider={status().id}
+              signingIn={status().connectionState === "connecting"}
+              onSignIn={(provider) => props.onSignInProvider?.(provider)}
+            />
+          )}
+        </Show>
+        <Show when={usageExhausted()}>
+          {(spent) => <ComposerUsageLimitNotice provider={spent().provider} resetsAt={spent().resetsAt} />}
         </Show>
         <Show when={composerError() ?? currentConversationError()}>
           <div class="composer-error" role="alert">

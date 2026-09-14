@@ -1,4 +1,10 @@
-import type { AgentSummary, ConversationPage, ConversationSnapshot, ServerSummary } from "@openbot/contracts/ipc";
+import type {
+  AgentStatus,
+  AgentSummary,
+  ConversationPage,
+  ConversationSnapshot,
+  ServerSummary,
+} from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal, Show } from "solid-js";
 import { expect, it, vi } from "vitest";
@@ -1327,5 +1333,89 @@ describe("OpenBot connected desktop shell", () => {
 
     expect(await screen.findByText("Provider error")).toBeVisible();
     expect(await screen.findByText("OpenCode could not start.")).toBeVisible();
+  });
+
+  /** The exchange a provider returns for a lapsed account, quoted from issue #423. */
+  const CODEX_401 =
+    'AppServerError: failed to fetch codex rate limits: GET https://chatgpt.com/backend-api/wham/usage failed: 401 Unauthorized; content-type=text/plain; body={ "error": { "message": "Could not parse your authentication token. Please try signing in again.", "code": "unauthorized_unknown" }, "status": 401 }';
+
+  function signedOutCodexStatus(): AgentStatus {
+    return {
+      phase: "ready" as const,
+      cliVersion: "0.144.1",
+      auth: { kind: "signed-out" as const },
+      providers: [{ id: "codex" as const, state: "sign-in-required" as const, version: "0.144.1", message: null }],
+      capabilities: { chat: "ready" as const, browser: "ready" as const, computerUse: "ready" as const },
+      message: null,
+      fullAccess: true,
+    };
+  }
+
+  it("offers a provider sign-in above the composer before the user sends", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+
+    emitAgentEvent?.({ type: "status", status: signedOutCodexStatus() });
+
+    const signIn = await screen.findByRole("button", { name: "Sign in to ChatGPT" });
+    expect(screen.getByText("Sign in to ChatGPT to send messages.")).toBeVisible();
+    // The draft survives the sign-in, so the notice never costs the user their message.
+    expect(screen.getByRole("textbox", { name: "Message Chief" })).toBeInTheDocument();
+
+    await fireEvent.click(signIn);
+    await waitFor(() => expect(window.openbot.connectProvider).toHaveBeenCalledWith("codex"));
+  });
+
+  it("names a lapsed provider account instead of quoting its 401 response", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+
+    emitAgentEvent?.({ type: "error", agentId: "chief", code: "agent_error", message: CODEX_401 });
+
+    await screen.findAllByText("Authentication failed. Check your account or server connection, then try again.");
+    expect(await screen.findByText("Sign in required")).toBeVisible();
+    expect(screen.queryByText(/AppServerError|chatgpt\.com|unauthorized_unknown/u)).not.toBeInTheDocument();
+  });
+
+  it("re-probes the provider after an authentication failure so the composer offers a way in", async () => {
+    vi.mocked(window.openbot.refreshAgentProviders).mockResolvedValue(signedOutCodexStatus());
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+
+    emitAgentEvent?.({ type: "error", agentId: "chief", code: "agent_error", message: CODEX_401 });
+
+    await waitFor(() => expect(window.openbot.refreshAgentProviders).toHaveBeenCalled());
+    expect(await screen.findByRole("button", { name: "Sign in to ChatGPT" })).toBeVisible();
+  });
+
+  it("states a spent plan window above the composer when the runtime reports one", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+
+    emitAgentEvent?.({
+      type: "usage-changed",
+      usage: {
+        limits: [
+          { id: "codex", primary: { usedPercent: 64, windowDurationMins: 300, resetsAt: null }, secondary: null },
+        ],
+      },
+    });
+    // Below the line the provider still takes the turn, so nothing stands above the composer yet.
+    expect(screen.queryByText("Usage limit reached")).not.toBeInTheDocument();
+
+    emitAgentEvent?.({
+      type: "usage-changed",
+      usage: {
+        limits: [
+          { id: "codex", primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: null }, secondary: null },
+        ],
+      },
+    });
+
+    expect(await screen.findByText("Usage limit reached")).toBeVisible();
+    // The window carries no reset, so the card names the way out the model picker gives instead.
+    expect(screen.getByText("You used all of your ChatGPT limit. Select a different model to continue.")).toBeVisible();
+    // The composer still takes a draft, so the user can write while they wait for the reset.
+    expect(screen.getByRole("textbox", { name: "Message Chief" })).toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { userErrorMessage } from "./index";
+import { classifyUserError, userErrorMessage } from "./index";
 
 const fallback = "Could not save your changes. Try again.";
 
@@ -94,5 +94,51 @@ describe("user-facing errors", () => {
     expect(userErrorMessage(new Error("Could not connect with apiKey=example-secret-value."), fallback)).toBe(
       "Could not connect with apiKey=[redacted]",
     );
+  });
+});
+
+describe("provider authentication failures", () => {
+  const codexRateLimit401 =
+    'AppServerError: failed to fetch codex rate limits: GET https://chatgpt.com/backend-api/wham/usage failed: 401 Unauthorized; content-type=text/plain; body={ "error": { "message": "Could not parse your authentication token. Please try signing in again.", "type": null, "code": "unauthorized_unknown", "param": null }, "status": 401 }';
+
+  it("classifies a provider 401 quoted inside a longer exchange", () => {
+    expect(classifyUserError(new Error(codexRateLimit401))).toBe("auth");
+  });
+
+  it("does not show the raw exchange to the user", () => {
+    const shown = userErrorMessage(new Error(codexRateLimit401), fallback);
+    expect(shown).toBe("Authentication failed. Check your account or server connection, then try again.");
+    expect(shown).not.toContain("chatgpt.com");
+    expect(shown).not.toContain("AppServerError");
+    expect(shown).not.toContain("401");
+  });
+
+  it.each([
+    'body={ "code": "unauthorized_unknown" }',
+    "The provider replied: Please try signing in again.",
+    "Request rejected: invalid_api_key",
+    "GET /v1/models failed: 401 Unauthorized",
+  ])("classifies %s as an authentication failure", (message) => {
+    expect(classifyUserError(new Error(message))).toBe("auth");
+  });
+
+  it("keeps a rate limit a rate limit even when its body mentions a token", () => {
+    expect(classifyUserError(new Error('HTTP 429: token quota exhausted; body={ "status": 401 }'))).toBe("rate-limit");
+  });
+
+  it.each(["Listening on port 401.", "Uploaded 401 files.", "x".repeat(401)])(
+    "does not read a bare 401 as an authentication failure: %s",
+    (message) => {
+      expect(classifyUserError(new Error(message))).toBe("unknown");
+    },
+  );
+
+  it.each([
+    ["ECONNREFUSED 127.0.0.1:1234", "network"],
+    ["HTTP 503: upstream failed", "service"],
+    ["ENOENT: realpath '/tmp/x'", "not-found"],
+    ["Choose a photo smaller than 512 KB.", "unknown"],
+  ] as const)("classifies %s as %s", (message, kind) => {
+    expect(classifyUserError(new Error(message))).toBe(kind);
   });
 });

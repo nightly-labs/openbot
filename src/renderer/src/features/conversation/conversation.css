@@ -7108,6 +7108,102 @@ button.chat-action-target:active,
   pointer-events: none;
 }
 
+/*
+ * The same slab the queue panel uses, in a warning tone: it sits on 12px side margins, keeps the
+ * large radius, and tucks its lower edge under the composer so the two read as one control. The
+ * tinted fill carries the warning on its own, so there is no outline to draw a second edge next to
+ * the composer's.
+ */
+.composer-notice {
+  --notice-composer-overlap: 14px;
+  /* The clearance around the button on its three free sides; see the radius note below. */
+  --notice-inset: 6px;
+  /* The warning tone is the default because a notice the user can clear themselves is the common
+     one. `data-tone="danger"` below is for a state only time or another model ends. */
+  --notice-accent: var(--openbot-warning);
+  --notice-surface: var(--openbot-warning-soft);
+
+  position: relative;
+  z-index: 10;
+  display: flex;
+  margin: 0 12px calc(-1 * var(--notice-composer-overlap));
+  /* The trailing button carries its own side padding, so the end inset is smaller than the start. */
+  padding: var(--notice-inset) var(--notice-inset) calc(var(--notice-inset) + var(--notice-composer-overlap)) 12px;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  /*
+   * Concentric with the button it holds: the card radius is the button's 8px plus the 6px inset.
+   * A smaller card radius makes its arc cut inside the button's corner, and the even clearance
+   * stops looking even.
+   */
+  border-radius: var(--openbot-radius-card);
+  background: var(--notice-surface);
+  animation: queue-panel-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* The tone the account dock already gives a spent plan window, so one state keeps one colour. The
+   text token, not the fill token, because this colour carries words on a dark surface. */
+.composer-notice[data-tone="danger"] {
+  --notice-accent: var(--openbot-danger-text);
+  --notice-surface: var(--openbot-danger-soft);
+}
+
+/*
+ * A card with no action has no button to hold its height or to stand the end inset off, so the
+ * copy carries both: the same 12px on each side, and a little more above and below than the
+ * clearance a 32px button already gives.
+ */
+.composer-notice:not(:has(.ui-button)) {
+  --notice-inset: 8px;
+
+  padding-right: 12px;
+}
+
+.composer-notice-icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--notice-accent);
+}
+
+/* The button set has no warning variant, so the notice tints the outline button it already uses. */
+.composer-notice .ui-button {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--notice-accent) 14%, transparent);
+  color: var(--notice-accent);
+}
+
+@media (hover: hover) {
+  .composer-notice .ui-button:hover:not(:disabled):not([data-disabled]) {
+    background: color-mix(in srgb, var(--notice-accent) 24%, transparent);
+    color: var(--notice-accent);
+  }
+}
+
+.composer-notice-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0;
+}
+
+.composer-notice-copy strong {
+  color: var(--notice-accent);
+  font-size: var(--openbot-text-sm);
+  font-weight: 600;
+  /* The two lines are tight against each other so the stack costs as little height as one row. */
+  line-height: 1.35;
+}
+
+.composer-notice-copy p {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: 1.35;
+}
+
 .composer-error {
   max-width: 560px;
   margin: 0 auto 6px;

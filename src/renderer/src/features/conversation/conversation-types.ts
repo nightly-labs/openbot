@@ -1,4 +1,5 @@
 import type {
+  AccountUsage,
   AgentEvent,
   AgentModelOption,
   AgentProviderId,
@@ -34,6 +35,12 @@ export interface ConversationTarget {
 
 export interface ConversationProps {
   agentStatus: AgentStatus;
+  /**
+   * The plan windows for the active agent's provider and model, when the account dock has them.
+   * The composer reads them for one thing only: a window at 100% means the next send is refused by
+   * the provider, so the notice has to say so before the user writes the message.
+   */
+  accountUsage?: AccountUsage | null;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
   /**
    * The endpoints the user named, so both model pickers can tell a custom model from an OpenCode
@@ -45,6 +52,12 @@ export interface ConversationProps {
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  /**
+   * Take the user to the provider's sign-in. Separate from `onConnectProvider`, which is the
+   * managed-download path and is withheld when downloads are unavailable: a signed-out provider
+   * needs a way in whether or not OpenBot manages its CLI.
+   */
+  onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
   agent: AgentProfile | undefined;
   agents: AgentProfile[];
   availableRoutineIds?: readonly string[];
