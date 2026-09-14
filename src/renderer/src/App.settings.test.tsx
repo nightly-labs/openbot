@@ -475,6 +475,41 @@ describe("OpenBot connected desktop shell", () => {
     },
   );
 
+  it("states why a check failed in the account menu and recovers when the retry succeeds", async () => {
+    vi.mocked(window.openbot.update.getStatus).mockResolvedValueOnce({
+      phase: "error",
+      currentVersion: "0.9.0",
+      availableVersion: null,
+      progress: null,
+      checkedAt: "2026-09-14T11:40:00.000Z",
+      message: "Could not reach the update service. Check your internet connection, then try again.",
+      errorCode: "check_failed",
+    });
+    vi.mocked(window.openbot.update.check).mockResolvedValueOnce({
+      phase: "up-to-date",
+      currentVersion: "0.9.0",
+      availableVersion: null,
+      progress: null,
+      checkedAt: "2026-09-14T11:41:00.000Z",
+      message: null,
+      errorCode: null,
+    });
+    render(() => <App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open account actions" }));
+    // The whole sentence is on screen, and it names the cause rather than only asking for a retry.
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not reach the update service. Check your internet connection, then try again.",
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /Check for updates/ }));
+
+    await waitFor(() => expect(window.openbot.update.check).toHaveBeenCalledOnce());
+    // A successful retry clears the failure instead of leaving it under a working updater.
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(await screen.findByRole("button", { name: /Check for updates/ })).toBeEnabled();
+  });
+
   it("keeps a toggle made before the stored preference finishes loading", async () => {
     let resolvePreference: ((value: { autoDownload: boolean }) => void) | undefined;
     vi.mocked(window.openbot.update.getPreference).mockReturnValueOnce(

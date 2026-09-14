@@ -11,12 +11,12 @@
   "license": "PolyForm-Noncommercial-1.0.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NorbertBodziony/openbot.git"
+    "url": "git+https://github.com/nightly-labs/openbot.git"
   },
   "bugs": {
-    "url": "https://github.com/NorbertBodziony/openbot/issues"
+    "url": "https://github.com/nightly-labs/openbot/issues"
   },
-  "homepage": "https://github.com/NorbertBodziony/openbot#readme",
+  "homepage": "https://github.com/nightly-labs/openbot#readme",
   "keywords": [
     "ai-agents",
     "bun",

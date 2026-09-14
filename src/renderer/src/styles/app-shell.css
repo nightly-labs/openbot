@@ -2946,10 +2946,12 @@ textarea {
 }
 
 .account-popover-error {
-  margin: 3px 7px 5px;
+  /* A failure message wraps to two or three lines in a 232px menu, so the leading has to hold a
+     descender clear of the popover's clipped edge rather than being tuned for a single line. */
+  margin: var(--openbot-space-1) 7px var(--openbot-space-2);
   color: var(--openbot-danger);
   font-size: var(--openbot-text-sm);
-  line-height: 14px;
+  line-height: 1.4;
 }
 
 @media (prefers-reduced-motion: reduce) {

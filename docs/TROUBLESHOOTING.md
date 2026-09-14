@@ -135,7 +135,7 @@ are independent and are not removed with OpenBot.
 
 ## Report a problem
 
-Use [GitHub Issues](https://github.com/NorbertBodziony/openbot/issues) for reproducible bugs. Include
+Use [GitHub Issues](https://github.com/nightly-labs/openbot/issues) for reproducible bugs. Include
 the OpenBot version, the operating system and its version, the hardware, the provider and CLI
 version, and minimal reproduction steps. Never publish tokens, `~/.codex`, `~/.claude`, conversations, private files,
 Electron user data, or full unreviewed diagnostics.

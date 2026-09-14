@@ -41,7 +41,7 @@ export const OPENBOT_SOFTWARE_APPLICATION = {
     price: "0",
     priceCurrency: "USD",
   },
-  sameAs: ["https://github.com/NorbertBodziony/openbot"],
+  sameAs: ["https://github.com/nightly-labs/openbot"],
 } as const;
 
 export const OPENBOT_SECURITY_HEADERS = {

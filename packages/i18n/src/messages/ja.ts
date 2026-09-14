@@ -38,6 +38,13 @@ export const ja = {
     "アップデートをインストールできませんでした。OpenBot を終了してから開き直し、もう一度お試しください。",
   "update.downloadFailed": "アップデートをダウンロードできませんでした。もう一度お試しください。",
   "update.checkFailed": "アップデートを確認できませんでした。もう一度お試しください。",
+  "update.checkStalled": "アップデートの確認が応答しなくなりました。もう一度お試しください。",
+  "update.checkOffline":
+    "アップデートサービスに接続できませんでした。インターネット接続を確認してから、もう一度お試しください。",
+  "update.checkUnavailable":
+    "アップデートサービスから応答がありませんでした。数分後に OpenBot が自動でもう一度試します。",
+  "update.checkNoRelease":
+    "このプラットフォーム向けに公開されたアップデートは見つかりませんでした。数分後に OpenBot が自動でもう一度試します。",
 
   "settings.language.title": "言語",
   "settings.language.description": "メニュー、ボタン、メッセージをこの言語で表示します。",

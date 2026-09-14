@@ -382,7 +382,15 @@ export function AccountDock(props: AccountDockProps) {
             <span>{loggingOut() ? "Signing out…" : "Sign out"}</span>
           </Button>
         </Show>
-        <Show when={accountMenuError()}>{(message) => <p class="account-popover-error">{message()}</p>}</Show>
+        <Show when={accountMenuError()}>
+          {(message) => (
+            // An update or sign-out failure appears while the menu is already open, so it needs to
+            // be announced rather than only drawn under the action the user just pressed.
+            <p class="account-popover-error" role="alert">
+              {message()}
+            </p>
+          )}
+        </Show>
         <Show when={includeDockActions ? usageError() : null}>
           {(message) => <p class="account-popover-error">{message()}</p>}
         </Show>

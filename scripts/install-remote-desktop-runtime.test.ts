@@ -161,7 +161,7 @@ async function createFixture() {
   const manifest = createReleaseManifest({
     lock: baseLock,
     inputDigest: digest,
-    repository: "NorbertBodziony/openbot",
+    repository: "nightly-labs/openbot",
     tag: createRemoteDesktopReleaseTag(digest),
     artifacts: {
       "darwin-arm64": {
