@@ -92,7 +92,7 @@
     "env:set:smtp": "bun run --cwd apps/auth-api env:set:smtp",
     "env:validate:prod": "bun run --cwd apps/auth-api env:validate:prod",
     "dev:prepare": "bun scripts/prepare-dev-environment.ts",
-    "dev:bootstrap": "bun scripts/bootstrap-dev-worktree.ts",
+    "dev:bootstrap": "bun scripts/prepare-dev-environment.ts",
     "dev": "bun scripts/dev-services.ts app",
     "dev:api": "bun scripts/dev-services.ts api",
     "dev:test-client": "bun scripts/dev-services.ts test-client",

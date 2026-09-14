@@ -72,6 +72,7 @@ export interface DevelopmentSeedOptions {
   appDataRoot?: string;
   homeDirectory?: string;
   dryRun?: boolean;
+  ifMissing?: boolean;
   instanceId?: string | null;
 }
 
@@ -174,6 +175,7 @@ export async function seedDevelopmentState(options: DevelopmentSeedOptions = {})
     ...SEED_SUMMARY,
   };
   if (options.dryRun) return summary;
+  if (options.ifMissing && (await pathExists(targetProfile))) return summary;
   if (profileActive) {
     throw new Error("Quit the OpenBot dev app before you seed its local state.");
   }
@@ -186,6 +188,7 @@ export async function seedDevelopmentState(options: DevelopmentSeedOptions = {})
     if (await isDevelopmentProfileActive(targetProfile)) {
       throw new Error("Quit the OpenBot dev app before you seed its local state.");
     }
+    if (options.ifMissing && (await pathExists(targetProfile))) return summary;
     await replaceDevelopmentProfile(targetProfile, stagingProfile, homeDirectory);
   } catch (error) {
     await Promise.all([
@@ -1290,8 +1293,10 @@ function isMainModule(): boolean {
 
 async function main(): Promise<void> {
   const dryRun = process.argv.slice(2).includes("--dry-run");
+  const ifMissing = process.argv.slice(2).includes("--if-missing");
   const summary = await seedDevelopmentState({
     dryRun,
+    ifMissing,
     instanceId: readDevelopmentInstanceId(process.env.OPENBOT_DEV_INSTANCE_ID),
   });
   logger.info(dryRun ? "OpenBot development seed dry run:" : "OpenBot development state seeded:");
