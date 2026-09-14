@@ -836,7 +836,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
             enabled: true,
             command: "/bin/echo",
             args: [],
-            env: [],
+            env: [{ key: "API_KEY", value: "abcdef123456" }],
             envPassthrough: [],
             workingDirectory: "",
             url: "",
@@ -860,13 +860,14 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
     client.emit("diagnostic", "ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed");
     client.emit("diagnostic", "ERROR the provider failed to reach the model endpoint");
-    // Named in this app's own settings, so the user can act on it and has to be told.
-    client.emit("diagnostic", "Failed to spawn MCP server 'Filesystem': Command not found");
+    // Named in this app's own settings, so the user can act on it and has to be told - and the CLI
+    // reports the failure by quoting what it sent, credential and all.
+    client.emit("diagnostic", "Failed to spawn MCP server 'Filesystem': rejected abcdef123456");
 
     await waitFor(() => events.filter((event) => event.type === "error").length === 2);
     expect(events.filter((event) => event.type === "error")).toEqual([
       expect.objectContaining({ message: "ERROR the provider failed to reach the model endpoint" }),
-      expect.objectContaining({ message: "Failed to spawn MCP server 'Filesystem': Command not found" }),
+      expect.objectContaining({ message: "Failed to spawn MCP server 'Filesystem': rejected •••" }),
     ]);
   });
 

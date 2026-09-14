@@ -192,6 +192,7 @@ function ServerSettings() {
     removeServerMember,
     revokeServerInvite,
     serverSettingsMcp,
+    serverSettingsMcpError,
     refreshMcpServers,
     saveMcpServer,
     removeMcpServer,
@@ -229,7 +230,9 @@ function ServerSettings() {
             onRemoveMember={removeServerMember}
             onRevokeInvite={revokeServerInvite}
             mcpServers={canUseMcp(server()) ? serverSettingsMcp() : undefined}
+            mcpLoadError={serverSettingsMcpError()}
             onMcpSectionShown={() => void refreshMcpServers()}
+            onRetryMcpServers={() => void refreshMcpServers()}
             onSaveMcpServer={saveMcpServer}
             onRemoveMcpServer={removeMcpServer}
             onSetMcpServerEnabled={setMcpServerEnabled}

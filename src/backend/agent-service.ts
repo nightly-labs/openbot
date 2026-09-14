@@ -793,16 +793,28 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   saveMcpServer(input: SaveMcpServerInput): McpServerConfig[] {
     this.#mcpServers.save(input.config);
-    return this.listMcpServers();
+    return this.#mcpServersChanged();
   }
 
   removeMcpServer(input: RemoveMcpServerInput): McpServerConfig[] {
     this.#mcpServers.remove(input.mcpServerId);
-    return this.listMcpServers();
+    return this.#mcpServersChanged();
   }
 
   setMcpServerEnabled(input: SetMcpServerEnabledInput): McpServerConfig[] {
     this.#mcpServers.setEnabled(input.mcpServerId, input.enabled);
+    return this.#mcpServersChanged();
+  }
+
+  /**
+   * The new list, and every agent marked to start a fresh provider session for its next turn.
+   *
+   * Without the mark, a provider session that is already loaded keeps the tools it was given: a
+   * removed server stays callable and an added one is invisible until the app restarts. The public
+   * thread and its history are untouched - only the private provider session is replaced.
+   */
+  #mcpServersChanged(): McpServerConfig[] {
+    this.#threads.refreshAllAgentRuntimes();
     return this.listMcpServers();
   }
 

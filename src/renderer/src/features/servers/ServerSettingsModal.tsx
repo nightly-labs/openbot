@@ -95,6 +95,9 @@ export interface ServerSettingsModalProps {
    * then neither the tab nor the panel exists.
    */
   mcpServers?: McpServerConfig[];
+  /** Why the MCP list is empty, when the read failed rather than found nothing. */
+  mcpLoadError?: string | null;
+  onRetryMcpServers?: () => void;
   onSaveMcpServer?: (config: McpServerConfig) => Promise<void>;
   onRemoveMcpServer?: (id: string) => Promise<void>;
   onSetMcpServerEnabled?: (id: string, enabled: boolean) => Promise<void>;
@@ -211,6 +214,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const configured = () => (local() ? Boolean(props.hostStatus?.configured) : true);
   const canEditIdentity = () => local();
   const canManage = () => configured() && (local() || props.server.role === "admin" || props.server.role === "owner");
+  /**
+   * The same role check without `configured()`. MCP servers belong to this machine and are spawned
+   * by the agents on it, so they are manageable before the user publishes a Team API host at all.
+   */
+  const canManageMcp = () => local() || props.server.role === "admin" || props.server.role === "owner";
   const actionsAvailable = () => local() || props.server.state === "online";
   const published = () => (local() ? props.hostStatus?.phase === "online" : props.server.state === "online");
   const address = () => (local() ? props.hostStatus?.apiUrl : props.server.apiUrl);
@@ -715,8 +723,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             <Tabs.Content value="mcp" class="settings-modal-tab-panel server-settings-panel" data-tab="mcp">
               <ServerMcpPanel
                 servers={servers()}
-                canManage={canManage()}
+                canManage={canManageMcp()}
                 menuMount={modalElement()}
+                loadError={props.mcpLoadError}
+                onRetryLoad={props.onRetryMcpServers}
                 onDetailChange={setMcpDetail}
                 onSave={(config) => props.onSaveMcpServer?.(config) ?? Promise.resolve()}
                 onRemove={(id) => props.onRemoveMcpServer?.(id) ?? Promise.resolve()}

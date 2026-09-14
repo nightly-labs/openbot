@@ -206,6 +206,33 @@ describe("ServerSettingsModal", () => {
     await waitFor(() => expect(onMcpSectionShown).toHaveBeenCalledTimes(2));
   });
 
+  // MCP servers belong to this machine and are started by the agents on it, so they are manageable
+  // before the user publishes a Team API host at all - unlike members, invites and the identity.
+  it("manages MCP servers on a local server with no host configured", async () => {
+    render(() => <ServerSettingsModal {...props({ hostStatus: unconfiguredHost, mcpServers: [] })} />);
+
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    expect(await screen.findByRole("button", { name: "Connect a custom MCP" })).toBeEnabled();
+  });
+
+  // "No MCP servers yet." says the server holds none. A failed read holds no such statement, and
+  // the user needs a way out of it that is not closing the dialog.
+  it("explains a failed MCP list read and offers a retry", async () => {
+    const onRetryMcpServers = vi.fn();
+    render(() => (
+      <ServerSettingsModal
+        {...props({ mcpServers: [], mcpLoadError: "The host is not reachable.", onRetryMcpServers })}
+      />
+    ));
+
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    expect(await screen.findByText("The host is not reachable.")).toBeInTheDocument();
+    expect(screen.queryByText("No MCP servers yet.")).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(onRetryMcpServers).toHaveBeenCalledTimes(1);
+  });
+
   it("saves the first local identity without publishing it", async () => {
     const onSaveIdentity = vi.fn(async () => undefined);
     const onSetPublished = vi.fn(async () => undefined);

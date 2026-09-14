@@ -340,6 +340,46 @@ describe.sequential("AgentService: providers", () => {
     });
   });
 
+  // Save, remove and toggle all go through the same refresh, so one of them proves the mechanism.
+  // Without it a loaded session keeps the tools it was given until the app restarts: the reason the
+  // test above had to stop and start the service to see its new server.
+  it("starts a fresh provider session for the next turn after an MCP server changes", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["ready"],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    const starts = client.requests.filter((request) => request.method === "thread/start");
+    expect(starts).toHaveLength(2);
+    expect(paramsRecord(starts[1]?.params)?.config).toEqual({
+      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: {} } },
+    });
+  });
+
   it("deletes unloaded pending handoffs for active and retired sessions with their agent", async () => {
     const { store, mailbox } = stores(root);
     let rejectTurn = false;

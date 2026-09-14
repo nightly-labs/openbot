@@ -72,6 +72,13 @@ export interface ServerMcpPanelProps {
   menuMount?: HTMLElement;
   /** Reports the form view, so the header shows a breadcrumb instead of the panel holding a back row. */
   onDetailChange?: (detail: McpPanelDetail | null) => void;
+  /**
+   * Why the list is empty, when the read failed rather than found nothing. The panel must not
+   * answer a failed read with "No MCP servers yet.": that sentence says the server holds none.
+   */
+  loadError?: string | null;
+  /** Reads the list again. Without it the error has no way out except closing the dialog. */
+  onRetryLoad?: () => void;
   onSave: (config: McpServerConfig) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onSetEnabled: (id: string, enabled: boolean) => Promise<void>;
@@ -289,13 +296,33 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
           when={props.servers.length > 0}
           fallback={
             <div class="server-mcp-empty">
-              <Text variant="caption" tone="muted">
-                No MCP servers yet.
-              </Text>
-              <Button type="button" variant="outline" disabled={disabled()} onClick={() => openForm(null)}>
-                <Plus aria-hidden="true" />
-                Connect a custom MCP
-              </Button>
+              <Show
+                when={props.loadError}
+                fallback={
+                  <>
+                    <Text variant="caption" tone="muted">
+                      No MCP servers yet.
+                    </Text>
+                    <Button type="button" variant="outline" disabled={disabled()} onClick={() => openForm(null)}>
+                      <Plus aria-hidden="true" />
+                      Connect a custom MCP
+                    </Button>
+                  </>
+                }
+              >
+                {(message) => (
+                  <>
+                    <Text variant="caption" tone="danger" role="alert">
+                      {message()}
+                    </Text>
+                    <Show when={props.onRetryLoad}>
+                      <Button type="button" variant="outline" onClick={() => props.onRetryLoad?.()}>
+                        Retry
+                      </Button>
+                    </Show>
+                  </>
+                )}
+              </Show>
             </div>
           }
         >
@@ -557,7 +584,13 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                 </For>
               </McpRowList>
 
-              <Field label="Working directory">
+              {/* The limit is named here, before the save, because it cannot be fixed afterwards:
+                  the ACP protocol carries no working directory and the Codex configuration shape
+                  for one is unconfirmed, so only Claude and the test can honour this field. */}
+              <Field
+                label="Working directory"
+                description="Claude agents and the connection test start the server here. The other providers start it in their own directory."
+              >
                 <Input
                   size="md"
                   placeholder="~/code"
@@ -574,7 +607,11 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
           </SlidingTabs.Content>
 
           <SlidingTabs.Content value="http" class="server-mcp-transport-panel">
-            <SettingsSection class="server-mcp-section" title="Endpoint">
+            <SettingsSection
+              class="server-mcp-section"
+              title="Endpoint"
+              description="Codex agents cannot use an HTTP MCP server. Every other provider can."
+            >
               <Field label="Server URL" error={visible("url")}>
                 <Input
                   size="md"

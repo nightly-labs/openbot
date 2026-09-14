@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { isAbsolute } from "node:path";
 import { promisify } from "node:util";
 import { isReservedMcpServerName, type McpServerConfig } from "@openbot/contracts/ipc";
@@ -164,15 +165,37 @@ export function codexMcpServers(servers: readonly UsableMcpServer[]): Record<str
 }
 
 /**
- * What the Codex tool manifest records about the MCP set: names and transports, never a command,
- * an environment value or a header. The manifest is a file on disk, and a changed set has to force
- * a replacement session because Codex ignores the configuration on resume.
+ * What the Codex tool manifest records about the MCP set.
+ *
+ * Every field that changes what the server is, because Codex ignores the configuration on resume:
+ * an edited command, argument, working directory or credential leaves a loaded session running the
+ * old server, so it has to force a replacement session in the same way an added server does. The
+ * manifest is a file on disk, so the secret values go in as a digest and never as themselves.
  */
 export function mcpFingerprintValues(configs: readonly McpServerConfig[]): string[] {
   return configs
     .filter((config) => config.enabled && !isReservedMcpServerName(config.name))
-    .map((config) => `${config.name}:${config.transport}`)
+    .map((config) =>
+      [
+        config.name,
+        config.transport,
+        config.command,
+        config.args.join("\u0000"),
+        config.envPassthrough.join("\u0000"),
+        config.env.map((pair) => pair.key).join("\u0000"),
+        config.workingDirectory,
+        config.url,
+        config.headers.map((pair) => pair.key).join("\u0000"),
+        secretDigest(config),
+      ].join("\u0001"),
+    )
     .sort();
+}
+
+/** The values reduced to one digest, so a changed credential is visible without being readable. */
+function secretDigest(config: McpServerConfig): string {
+  const values = [...config.env, ...config.headers].map((pair) => `${pair.key}=${pair.value}`).join("\u0000");
+  return createHash("sha256").update(values).digest("hex");
 }
 
 function headerRecord(config: McpServerConfig): Record<string, string> {

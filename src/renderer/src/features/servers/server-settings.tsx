@@ -42,8 +42,15 @@ const ServerSettings = createSimpleContext({
     const [serverSettingsLoading, setServerSettingsLoading] = createSignal(false);
     const [serverSettingsError, setServerSettingsError] = createSignal<string | null>(null);
     const [serverSettingsMcp, setServerSettingsMcp] = createSignal<McpServerConfig[]>([]);
+    const [serverSettingsMcpError, setServerSettingsMcpError] = createSignal<string | null>(null);
     /** Bumped by every open and refresh, so a slower earlier load cannot paint over a newer one. */
     let serverSettingsRequest = 0;
+    /**
+     * The same guard for the MCP list, counted separately. The two loads start from different
+     * events - a presence update refreshes the settings, opening the section reads the MCP list -
+     * so one counter would let either one discard the other's reply and its cleanup.
+     */
+    let serverSettingsMcpRequest = 0;
     let serverSettingsRestoreTarget: HTMLElement | null = null;
 
     const serverSettingsTarget = createMemo(() => servers().find((server) => server.id === serverSettingsTargetId()));
@@ -123,12 +130,14 @@ const ServerSettings = createSimpleContext({
 
     function openServerSettings(serverId: string, trigger: HTMLElement | null): void {
       serverSettingsRequest += 1;
+      serverSettingsMcpRequest += 1;
       serverSettingsRestoreTarget = trigger;
       setServerSettingsTargetId(serverId);
       setServerSettingsOpen(true);
       setServerSettingsMembers([]);
       setServerSettingsInvites([]);
       setServerSettingsMcp([]);
+      setServerSettingsMcpError(null);
       setServerSettingsError(null);
       void refreshServerSettings(serverId);
     }
@@ -308,10 +317,19 @@ const ServerSettings = createSimpleContext({
     async function refreshMcpServers(): Promise<void> {
       const server = serverSettingsTarget();
       if (!server) return;
-      const request = ++serverSettingsRequest;
-      const configs = await window.openbot.agent.listMcpServers(server.id);
-      if (request !== serverSettingsRequest || serverSettingsTargetId() !== server.id) return;
-      setServerSettingsMcp(configs);
+      const request = ++serverSettingsMcpRequest;
+      const current = (): boolean => request === serverSettingsMcpRequest && serverSettingsTargetId() === server.id;
+      try {
+        const configs = await window.openbot.agent.listMcpServers(server.id);
+        if (!current()) return;
+        setServerSettingsMcp(configs);
+        setServerSettingsMcpError(null);
+      } catch (error) {
+        // Reported in the panel rather than thrown: the callers ask for this list on a section
+        // change, where nothing is waiting for the promise and an unreported failure would leave
+        // the panel saying the server has no MCP servers at all.
+        if (current()) setServerSettingsMcpError(errorMessage(error, "The MCP servers could not load."));
+      }
     }
 
     /**
@@ -400,6 +418,7 @@ const ServerSettings = createSimpleContext({
       removeServerMember,
       revokeServerInvite,
       serverSettingsMcp,
+      serverSettingsMcpError,
       refreshMcpServers,
       saveMcpServer,
       removeMcpServer,

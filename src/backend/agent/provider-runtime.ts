@@ -21,6 +21,7 @@ import {
   type CodexCliInfo,
   resolveCodexCli,
 } from "./../cli";
+import { redactAllMcpSecrets } from "./../mcp-redaction";
 import { openCodeSignInMessage } from "./../opencode-config";
 import {
   type AccountLoginCompletedResult,
@@ -1438,12 +1439,17 @@ export class ProviderRuntime implements ProviderPort {
     // Taken before `start()`, which is where the CLI reads the endpoint files.
     this.#configRevisions.set(client, this.#hooks.captureConfigRevision());
     this.#hooks.bindClient(client);
-    client.on("diagnostic", (message) => {
-      if (!/error|failed|warning/i.test(message)) return;
+    client.on("diagnostic", (raw) => {
+      if (!/error|failed|warning/i.test(raw)) return;
+      const configs = this.#credentials.mcpServers();
+      // Redacted before the first use, not at each one. A CLI reports an MCP failure by quoting
+      // what it sent, so an API key or an inherited credential is in the line that is about to be
+      // logged or turned into a renderer error event.
+      const message = redactAllMcpSecrets(raw, configs);
       if (
         isMcpSubsystemDiagnostic(
           message,
-          this.#credentials.mcpServers().map((config) => config.name),
+          configs.map((config) => config.name),
         )
       ) {
         logger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });

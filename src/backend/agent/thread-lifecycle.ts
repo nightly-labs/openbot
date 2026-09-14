@@ -80,6 +80,23 @@ export class ThreadLifecycle {
     this.applyPendingRuntimeRefresh(agent);
   }
 
+  /**
+   * Marks every agent's provider session for refresh, after a change to the MCP set.
+   *
+   * The set belongs to the machine, not to one agent, so a change to it reaches all of them.
+   * Claude and the ACP clients read the list when they start a session and a loaded one keeps what
+   * it was given; Codex reads it in the thread configuration and ignores a change on resume. A
+   * runtime refresh is what applies the new set before the next turn without losing the public
+   * thread or its history - the same mechanism an installed skill uses. An agent that is mid-turn
+   * keeps its mark, and the drain scheduler spends it when that turn ends.
+   */
+  refreshAllAgentRuntimes(): void {
+    for (const agent of this.#store.list()) {
+      this.#pendingRuntimeRefreshes.add(agent.id);
+      this.applyPendingRuntimeRefresh(agent);
+    }
+  }
+
   consumePendingHandoff(threadId: string): string | undefined {
     return this.#pendingHandoffs.get(threadId);
   }
@@ -241,9 +258,10 @@ export class ThreadLifecycle {
   }
 
   /**
-   * What a stored manifest is compared against. The MCP set is folded in by name and transport
-   * only: Codex ignores a changed configuration on resume, so a changed set has to force a
-   * replacement session, and this string is written to a file on disk.
+   * What a stored manifest is compared against. The whole MCP set is folded in, because Codex
+   * ignores a changed configuration on resume: an edited command, argument or credential has to
+   * force a replacement session as surely as an added server. `mcpFingerprintValues` reduces the
+   * secret values to a digest first, so the file this string is written to holds none of them.
    */
   private toolFingerprint(): string {
     return createHash("sha256")

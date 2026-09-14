@@ -79,6 +79,45 @@ describe("server settings MCP", () => {
     expect(store.serverSettingsMcp()).toHaveLength(before);
   });
 
+  // Nothing waits for this promise - the modal asks for the list when its MCP section appears - so
+  // an unreported failure would leave the panel saying the server holds no MCP servers at all.
+  it("reports a failed list read instead of showing an empty list", async () => {
+    mock = createMockOpenBot();
+    let failing = true;
+    const list: typeof mock.api.agent.listMcpServers = async (serverId) => {
+      if (failing) throw new Error("The host is not reachable.");
+      const answer = await mock?.api.agent.listMcpServers(serverId);
+      if (!answer) throw new Error("The list did not answer.");
+      return answer;
+    };
+    window.openbot = { ...mock.api, agent: { ...mock.api.agent, listMcpServers: list } };
+
+    const store = await openLocalSettings();
+    await store.refreshMcpServers();
+    expect(store.serverSettingsMcpError()).toBe("The host is not reachable.");
+    expect(store.serverSettingsMcp()).toEqual([]);
+
+    failing = false;
+    await store.refreshMcpServers();
+    expect(store.serverSettingsMcpError()).toBeNull();
+    expect(store.serverSettingsMcp().length).toBeGreaterThan(0);
+  });
+
+  // The two loads start from different events, so one counter would let either one discard the
+  // other's reply: the MCP list would stay empty with no second request to fill it.
+  it("keeps the MCP list when a settings refresh runs beside it", async () => {
+    mock = createMockOpenBot();
+    window.openbot = mock.api;
+
+    const store = await openLocalSettings();
+    const mcp = store.refreshMcpServers();
+    await store.refreshServerSettings("local");
+    await mcp;
+
+    expect(store.serverSettingsMcp().length).toBeGreaterThan(0);
+    expect(store.serverSettingsLoading()).toBe(false);
+  });
+
   it("takes the whole list from a save reply", async () => {
     mock = createMockOpenBot();
     window.openbot = mock.api;

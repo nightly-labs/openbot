@@ -185,6 +185,22 @@ export const McpEmpty: Story = {
   },
 };
 
+/** A read that failed, which is not the same statement as a server that holds no MCP servers. */
+export const McpLoadFailed: Story = {
+  args: {
+    mcpServers: [],
+    mcpLoadError: "The MCP servers could not load.",
+    onRetryMcpServers: fn(),
+  },
+  play: async ({ args, userEvent }) => {
+    const body = await openMcp(userEvent);
+    await expectVisible(await body.findByText("The MCP servers could not load."));
+    await expect(body.queryByText("No MCP servers yet.")).toBeNull();
+    await userEvent.click(body.getByRole("button", { name: "Retry" }));
+    await expect(args.onRetryMcpServers).toHaveBeenCalled();
+  },
+};
+
 export const ToggleServer: Story = {
   play: async ({ args, userEvent }) => {
     const body = await openMcp(userEvent);
