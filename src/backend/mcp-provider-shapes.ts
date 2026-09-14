@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { isAbsolute } from "node:path";
+import { homedir } from "node:os";
+import { isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
 import { isReservedMcpServerName, type McpServerConfig } from "@openbot/contracts/ipc";
 import { loginShellCommand } from "./cli";
@@ -10,10 +11,10 @@ const execFileAsync = promisify(execFile);
 /** Where a provider client reads the enabled configurations at spawn. */
 export type McpServerSource = () => readonly McpServerConfig[];
 
-/** A configuration with its stdio command resolved, or the reason it cannot start. */
+/** A configuration with its stdio command and directory resolved, or the reason it cannot start. */
 export type UsableMcpServer =
-  | { config: McpServerConfig; command: string; error?: undefined }
-  | { config: McpServerConfig; command?: undefined; error: string };
+  | { config: McpServerConfig; command: string; workingDirectory: string; error?: undefined }
+  | { config: McpServerConfig; command?: undefined; workingDirectory?: undefined; error: string };
 
 /**
  * The enabled configurations a provider can actually be given.
@@ -39,10 +40,29 @@ export async function usableMcpServers(configs: readonly McpServerConfig[]): Pro
  * before turning it on - so this one, unlike `usableMcpServers`, does not filter.
  */
 export async function usableMcpServer(config: McpServerConfig): Promise<UsableMcpServer> {
-  if (config.transport !== "stdio") return { config, command: "" };
+  if (config.transport !== "stdio") return { config, command: "", workingDirectory: "" };
   const command = await resolveMcpCommand(config.command);
   if (!command) return { config, error: `Command not found: ${config.command}` };
-  return { config, command };
+  return { config, command, workingDirectory: resolveMcpWorkingDirectory(config.workingDirectory) };
+}
+
+/**
+ * The directory a stdio server starts in, with a leading `~` replaced by this user's home.
+ *
+ * The form offers `~/code` as its example, and a shell is what usually expands that: process
+ * creation takes the value as written, so a literal `~` would be a directory that does not exist
+ * and the spawn would fail. Expanding it here, once, keeps the probe and every provider on the same
+ * directory. Anything else is passed through untouched, including a relative path, which a user
+ * writes against the agent's own workspace.
+ */
+export function resolveMcpWorkingDirectory(value: string): string {
+  const trimmed = value.trim();
+  // A backslash separates only on Windows. On the other systems it is an ordinary character of a
+  // file name, so `~\project` there names a directory called `~\project`.
+  const homeRelative = process.platform === "win32" ? /^~[/\\]/u : /^~\//u;
+  if (trimmed !== "~" && !homeRelative.test(trimmed)) return trimmed;
+  const rest = trimmed.slice(2);
+  return rest ? join(homedir(), rest) : homedir();
 }
 
 /**
@@ -105,7 +125,7 @@ export function claudeMcpServers(servers: readonly UsableMcpServer[]): Record<st
             command: server.command,
             args: [...config.args],
             env: mcpEnvironment(config),
-            ...(config.workingDirectory ? { cwd: config.workingDirectory } : {}),
+            ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
           }
         : { type: "http", url: config.url, headers: headerRecord(config) };
   }

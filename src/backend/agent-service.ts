@@ -125,6 +125,7 @@ import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
 import { McpHandoffLog } from "./mcp-handoff-log";
 import { testMcpServer } from "./mcp-probe";
+import { mcpSecretValues, redactMcpValues } from "./mcp-redaction";
 import { McpServerStore } from "./mcp-server-store";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
@@ -251,6 +252,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ) {
     super();
     this.#store = store;
+    // First of the sub-objects, because `#emitError` reads it to redact and every one of them is
+    // given that callback.
+    this.#mcpServers = new McpServerStore(store.database);
     this.#sidebarLayout = sidebarLayout;
     this.#profileSave = new ProfileSave(store, {
       create: (input, configure) =>
@@ -572,7 +576,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         excludedChannels: () => new Set(),
       },
     });
-    this.#mcpServers = new McpServerStore(store.database);
     this.#drain = new DrainScheduler({
       channels: this.channels,
       store,
@@ -2071,8 +2074,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       code,
       // Redacted, because every error from a provider CLI arrives here on its way to the renderer
       // and the log, and a CLI quotes what it was given: a failure against a custom endpoint can
-      // carry that endpoint's API key or a header value.
-      message: redactText(error instanceof Error ? error.message : String(error)),
+      // carry that endpoint's API key or a header value. The MCP values come from the store and
+      // from the hand-off log together, so a credential a running process still holds stays
+      // covered after the user edits or removes the server that named it. `redactMcpValues` ends
+      // with `redactText`, which covers the patterns shared across the app.
+      message: redactMcpValues(error instanceof Error ? error.message : String(error), [
+        ...mcpSecretValues(this.#mcpServers.list()),
+        ...this.#mcpHandoff.values(),
+      ]),
     });
   }
 

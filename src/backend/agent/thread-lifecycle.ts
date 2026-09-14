@@ -342,6 +342,11 @@ export class ThreadLifecycle {
 
   applyPendingRuntimeRefresh(agent: AgentSummary): void {
     if (!this.#pendingRuntimeRefreshes.has(agent.id)) return;
+    // A compaction is a provider turn that deliberately keeps no conversation turn id, so the busy
+    // check below reads its thread as idle. Its completion arrives on the routing this refresh
+    // removes, and the agent would stay marked as compacting and hold its queue for good. The mark
+    // stays, and the drain that `ContextCompaction.finish` schedules refreshes the thread then.
+    if (!this.#compaction.mayDrain(agent.id)) return;
     // Every thread of this agent, not only `agent.threadId`: a channel turn runs on an execution
     // thread of its own, and its provider session holds the same stale runtime as the agent's.
     const threadIds = this.#store.database.activeProviderSessionThreads(agent.id);

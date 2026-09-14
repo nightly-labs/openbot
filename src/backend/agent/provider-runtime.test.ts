@@ -912,6 +912,48 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     ]);
   });
 
+  it("redacts an MCP credential a provider error quotes, not only a diagnostic", async () => {
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+      const client = new FakeAgentClient(provider);
+      clients.set(provider, client);
+      return client;
+    });
+    await service.initialize();
+    const client = clients.get("codex");
+    if (!client) throw new Error("The fake provider did not start.");
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: [],
+        env: [{ key: "API_KEY", value: "abcdef123456" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+
+    // A provider error notification, which takes its own path to the shared error boundary rather
+    // than the diagnostic handler. It reaches the renderer, so the value has to go first.
+    client.emit("notification", {
+      method: "error",
+      params: { message: "Filesystem MCP failed: rejected abcdef123456" },
+    });
+
+    await waitFor(() => events.filter((event) => event.type === "error").length === 1);
+    expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({ message: "Filesystem MCP failed: rejected •••" }),
+    ]);
+  });
+
   it("keeps Grok's telemetry export failure out of the chat it was switched into", async () => {
     process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
     const { store, mailbox } = stores(root);

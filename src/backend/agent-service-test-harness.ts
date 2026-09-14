@@ -47,6 +47,7 @@ const FAKE_RUNTIME_ENV_VARS = [
   "OPENBOT_FAKE_AUTO_COMPLETE",
   "OPENBOT_FAKE_CONTEXT_USAGE",
   "OPENBOT_FAKE_COMPACTION_ERROR",
+  "OPENBOT_FAKE_COMPACTION_DELAY",
   "OPENBOT_FAKE_ARCHIVED_THREAD",
   "OPENBOT_FAKE_TURN_START_RESPONSE_DELAY",
   "OPENBOT_FAKE_WARNING",
@@ -452,6 +453,9 @@ process.stdin.on("data", (chunk) => {
         if (archivedThread) write({ id: message.id, error: { code: -32600, message: "session " + message.params.threadId + " is archived. Run codex unarchive " + message.params.threadId + " to unarchive it first." } });
         else write({ id: message.id, result: { thread: { id: message.params.threadId, turns: [] } } });
       }
+      if (message.method === "thread/unsubscribe") {
+        write({ id: message.id, result: { status: "Unsubscribed" } });
+      }
       if (message.method === "thread/unarchive") {
         archivedThread = false;
         write({ id: message.id, result: { thread: { id: message.params.threadId, turns: [] } } });
@@ -523,7 +527,10 @@ process.stdin.on("data", (chunk) => {
         write({ method: "turn/started", params: { threadId: message.params.threadId, turn: { id: turnId } } });
         write({ method: "item/started", params: { threadId: message.params.threadId, turnId, item } });
         write({ method: "item/completed", params: { threadId: message.params.threadId, turnId, item } });
-        write({ method: "turn/completed", params: { threadId: message.params.threadId, turn: { id: turnId, status: "completed" } } });
+        const finish = () => write({ method: "turn/completed", params: { threadId: message.params.threadId, turn: { id: turnId, status: "completed" } } });
+        const compactionDelay = Number(process.env.OPENBOT_FAKE_COMPACTION_DELAY || 0);
+        if (compactionDelay > 0) setTimeout(finish, compactionDelay);
+        else finish();
       }
       if (message.method === "turn/interrupt") {
         write({ id: message.id, result: {} });

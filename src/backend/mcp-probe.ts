@@ -76,7 +76,9 @@ function createTransport(server: UsableMcpServer): Transport {
   return new StdioClientTransport({
     command: server.command ?? config.command,
     args: config.args,
-    ...(config.workingDirectory ? { cwd: config.workingDirectory } : {}),
+    // The resolved directory, not the stored one: process creation does not expand a leading `~`,
+    // which the form's own example uses.
+    ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
     // The SDK default first, then the names the user asked to pass through, then the user's own
     // pairs. `envPassthrough` has no other meaning anywhere in OpenBot; this is where it is spent.
     env: {

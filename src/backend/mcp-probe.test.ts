@@ -74,6 +74,15 @@ describe("testMcpServer", () => {
     });
   });
 
+  // The form offers `~/code` as its example. Process creation takes the value as written, so a
+  // literal `~` names a directory this machine does not have and the server never starts.
+  it("starts a server in a home-relative working directory", async () => {
+    expect(await testMcpServer(await scriptConfig(FAKE_SERVER, { workingDirectory: "~" }))).toEqual({
+      toolCount: 2,
+      error: null,
+    });
+  });
+
   it("names the command that this machine does not have", async () => {
     expect(await testMcpServer(config({ command: "openbot-no-such-command" }))).toEqual({
       toolCount: 0,

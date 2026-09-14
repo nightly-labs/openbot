@@ -6,6 +6,7 @@ import { JsonLineDecoder } from "./jsonl";
 import {
   type AppServerNotification,
   type AppServerRequest,
+  decodeRecordResponse,
   isRecord,
   type RequestId,
   type ResponseDecoder,
@@ -122,6 +123,23 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       });
       child.kill("SIGTERM");
     });
+  }
+
+  /**
+   * Drops this connection's hold on one thread and keeps the app server for the others.
+   *
+   * `thread/unsubscribe` is the non-destructive end of a thread: the app server keeps the thread and
+   * its history, stops the thread's MCP event streams at once, and unloads the thread - with the
+   * MCP servers it started - once nothing is subscribed to it and it is idle. It does not archive
+   * or delete. A refresh after an MCP change starts a replacement session for the same public
+   * thread, so without this the old session stays loaded there with the servers the user turned off.
+   *
+   * A thread this connection never subscribed to answers `NotSubscribed`, which is not an error
+   * here: either way this side has stopped using it.
+   */
+  async releaseThread(threadId: string): Promise<void> {
+    if (!this.running) return;
+    await this.request("thread/unsubscribe", { threadId }, decodeRecordResponse);
   }
 
   request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T>;
