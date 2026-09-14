@@ -153,6 +153,13 @@ export const WithDraft: Story = {
   args: { value: "Prepare a concise update for tomorrow." },
 };
 
+export const LongMultilineDraft: Story = {
+  args: {
+    value: Array.from({ length: 30 }, (_, index) => `Line ${index + 1}: Edit this part of the draft.`).join("\n"),
+  },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
+};
+
 export const WithAgentAndSkillTags: Story = {
   args: {
     skills: installedSkills,

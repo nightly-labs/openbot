@@ -280,7 +280,19 @@ export function ComposerEditor(props: ComposerEditorProps) {
     insertPlainText(editor, key);
     emitValue();
     updateMention();
-    editor.scrollTop = editor.scrollHeight;
+    scrollToEndIfCaretAtEnd();
+  }
+
+  function scrollToEndIfCaretAtEnd() {
+    if (!editor) return;
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    if (!range?.collapsed || !editor.contains(range.commonAncestorContainer)) return;
+    const afterCaret = range.cloneRange();
+    afterCaret.selectNodeContents(editor);
+    afterCaret.setStart(range.endContainer, range.endOffset);
+    // Keep earlier edits in view; only follow the bottom when appending to the draft.
+    if (!afterCaret.toString()) editor.scrollTop = editor.scrollHeight;
   }
 
   function updateMention() {
@@ -484,7 +496,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
       insertPlainText(editor, "\n");
       emitValue();
       updateMention();
-      editor.scrollTop = editor.scrollHeight;
+      scrollToEndIfCaretAtEnd();
       return;
     }
     if (event.key === "Enter") {
