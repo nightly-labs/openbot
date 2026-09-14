@@ -217,6 +217,9 @@ function mockFilePreview(path: string, fallbackName: string): FilePreview {
   );
 }
 
+/** What each story server answers with when it is tested, so a story reads the same way twice. */
+const MOCK_MCP_TOOL_COUNTS: Record<string, number> = { "Local SQLite": 12, Linear: 1, Figma: 6 };
+
 function clone<T>(value: T): T {
   return structuredClone(value);
 }
@@ -397,14 +400,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const memories = new Map<string, AgentMemory[]>(Object.entries(clone(options.memories ?? {})));
   const routines = new Map<string, Routine[]>(Object.entries(clone(options.routines ?? {})));
   const routineRuns = new Map<string, RoutineRun[]>();
-
-  /** The panel keeps its list live from this event, so the mock has to push it after each change. */
-  function publishMcpStatuses(): void {
-    emitAgentEvent({
-      type: "mcp-servers-changed",
-      statuses: mcpServers.map(({ config, state, toolCount, error }) => ({ id: config.id, state, toolCount, error })),
-    });
-  }
 
   function emitAgentEvent(event: AgentEvent): void {
     emit(agentListeners, event);
@@ -1187,37 +1182,30 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listMcpServers: async () => clone(mcpServers),
       saveMcpServer: async ({ config }) => {
         const normalized = normalizeMcpConfig(config);
-        const existing = mcpServers.findIndex((entry) => entry.config.id === normalized.id);
-        if (existing < 0) {
-          const id = normalized.id || createMcpServerId();
-          mcpServers = [
-            ...mcpServers,
-            { config: { ...normalized, id }, state: "connecting", toolCount: 0, error: null },
-          ];
-        } else {
-          mcpServers = mcpServers.map((entry, index) =>
-            index === existing ? { ...entry, config: normalized } : entry,
-          );
-        }
-        publishMcpStatuses();
+        const existing = mcpServers.findIndex((server) => server.id === normalized.id);
+        if (existing < 0) mcpServers = [...mcpServers, { ...normalized, id: normalized.id || createMcpServerId() }];
+        else mcpServers = mcpServers.map((server, index) => (index === existing ? normalized : server));
         return clone(mcpServers);
       },
       removeMcpServer: async ({ mcpServerId }) => {
-        mcpServers = mcpServers.filter((entry) => entry.config.id !== mcpServerId);
-        publishMcpStatuses();
+        mcpServers = mcpServers.filter((server) => server.id !== mcpServerId);
         return clone(mcpServers);
       },
       setMcpServerEnabled: async ({ mcpServerId, enabled }) => {
-        mcpServers = mcpServers.map((entry) =>
-          entry.config.id === mcpServerId
-            ? { ...entry, config: { ...entry.config, enabled }, state: enabled ? "connected" : "disabled" }
-            : entry,
-        );
-        publishMcpStatuses();
+        mcpServers = mcpServers.map((server) => (server.id === mcpServerId ? { ...server, enabled } : server));
         return clone(mcpServers);
       },
-      openMcpStatus: async () => clone(mcpServers),
-      closeMcpStatus: async () => {},
+      /**
+       * A test takes a moment, so the panel shows its connecting state before the answer lands. A
+       * command that is not on this machine fails, the way the real probe reports a missing one.
+       */
+      testMcpServer: async ({ config }) => {
+        await new Promise((resolve) => schedule(() => resolve(null), 400));
+        const command = config.command.split(" ")[0] ?? "";
+        if (config.transport === "stdio" && command.startsWith("bunx"))
+          return { toolCount: 0, error: `Command not found: ${command}` };
+        return { toolCount: MOCK_MCP_TOOL_COUNTS[config.name] ?? 4, error: null };
+      },
       getSidebarLayout: async () => clone(sidebarLayout),
       mutateSidebarLayout: async (action) => {
         sidebarLayout = applySidebarLayoutAction(sidebarLayout, action);

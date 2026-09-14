@@ -33,7 +33,7 @@ import {
   TEAM_CURRENT_CAPABILITIES,
   type TeamCurrentCapability,
 } from "@openbot/contracts/team-protocol/current";
-import { isMcpRoute, mcpEvent, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
+import { isMcpRoute, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_PROTOCOL_V1,
@@ -653,13 +653,9 @@ export class TeamApiServer {
       let queueInvalidation: string | undefined;
       let outgoing: string;
       const channel = channelEvent(event);
-      const mcp = mcpEvent(event);
       if (channel) {
         if (!connection.capabilities.has("channel-chats-v1")) continue;
         outgoing = JSON.stringify(channel);
-      } else if (mcp) {
-        if (!connection.capabilities.has(MCP_SERVERS_CAPABILITY)) continue;
-        outgoing = JSON.stringify(mcp);
       } else if (event.type === "conversation" && supportsRuntimeSnapshots) {
         conversationInvalidation ??=
           encodeEvent({
@@ -1180,8 +1176,6 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
     event.type === "channel-routines-changed"
   )
     return "channel-chats-v1";
-  // Without this arm the event would reach every peer: `null` means "send to everyone".
-  if (event.type === "mcp-servers-changed") return MCP_SERVERS_CAPABILITY;
   if (event.type === "turn-progress") return TEAM_AGENT_ACTIVITY_CAPABILITY;
   if (event.type === "runtime-snapshot") return "agent-runtime-snapshots";
   if (event.type === "sidebar-layout-changed") return "sidebar-layout";

@@ -29,10 +29,8 @@ export const MCP_SERVERS_CAPABILITY = "mcp-servers-v1";
 export const RESERVED_MCP_SERVER_NAMES = ["openbot", "openbot_browser"] as const;
 
 export const MCP_TRANSPORTS = ["stdio", "http"] as const;
-export const MCP_CONNECTION_STATES = ["connected", "connecting", "failed", "disabled"] as const;
 
 export type McpTransport = (typeof MCP_TRANSPORTS)[number];
-export type McpConnectionState = (typeof MCP_CONNECTION_STATES)[number];
 
 /** One key/value pair the form edits as a row. An array of these keeps the row order stable. */
 export interface McpKeyValue {
@@ -61,21 +59,16 @@ export interface McpServerConfig {
   headers: McpKeyValue[];
 }
 
-/** A configuration plus the connection the app last made with it. The reply to an invoke. */
-export interface McpServerEntry {
-  config: McpServerConfig;
-  state: McpConnectionState;
-  toolCount: number;
-  error: string | null;
-}
-
 /**
- * What a status push carries. Deliberately no config: an `AgentEvent` is broadcast, and `env`
- * values and header values are secrets. This type existing is the reason they cannot ride one.
+ * What one test connection found: the tools the server offered, or the sentence that says why it
+ * did not answer.
+ *
+ * Nothing stores this. OpenBot connects only when the user asks it to, because a connection is not
+ * free - an http server can want an OAuth sign-in, a cold `npx` can take a minute, and a server can
+ * do real work at startup. A stored result would also be a claim about right now that nothing keeps
+ * true. The providers make their own connections when an agent starts.
  */
-export interface McpServerStatus {
-  id: string;
-  state: McpConnectionState;
+export interface McpTestResult {
   toolCount: number;
   error: string | null;
 }
@@ -97,6 +90,11 @@ export interface RemoveMcpServerInput {
 export interface SetMcpServerEnabledInput {
   mcpServerId: string;
   enabled: boolean;
+}
+
+/** The configuration to test. It carries no id, because a draft is testable before it is saved. */
+export interface TestMcpServerInput {
+  config: McpServerConfig;
 }
 
 export function createMcpServerId(): string {
@@ -166,34 +164,18 @@ export function isMcpServerConfig(value: unknown): value is McpServerConfig {
   );
 }
 
-export function isMcpServerStatus(value: unknown): value is McpServerStatus {
-  return (
-    isDynamicRecord(value) &&
-    isBounded(value.id, INPUT_LIMITS.identifier) &&
-    isOneOf(MCP_CONNECTION_STATES, value.state) &&
-    isToolCount(value.toolCount) &&
-    isErrorText(value.error)
-  );
+export function isMcpTestResult(value: unknown): value is McpTestResult {
+  return isDynamicRecord(value) && isToolCount(value.toolCount) && isErrorText(value.error);
 }
 
-export function isMcpServerEntry(value: unknown): value is McpServerEntry {
-  return (
-    isDynamicRecord(value) &&
-    isMcpServerConfig(value.config) &&
-    isOneOf(MCP_CONNECTION_STATES, value.state) &&
-    isToolCount(value.toolCount) &&
-    isErrorText(value.error)
-  );
-}
-
-export function decodeMcpServerEntries(value: unknown): McpServerEntry[] {
-  if (!Array.isArray(value) || value.length > INPUT_LIMITS.mcpServers || !value.every(isMcpServerEntry))
+export function decodeMcpServerConfigs(value: unknown): McpServerConfig[] {
+  if (!Array.isArray(value) || value.length > INPUT_LIMITS.mcpServers || !value.every(isMcpServerConfig))
     throw new Error("Invalid MCP server response.");
   return value;
 }
 
-export function decodeMcpServerEntry(value: unknown): McpServerEntry {
-  if (!isMcpServerEntry(value)) throw new Error("Invalid MCP server response.");
+export function decodeMcpTestResult(value: unknown): McpTestResult {
+  if (!isMcpTestResult(value)) throw new Error("Invalid MCP server response.");
   return value;
 }
 

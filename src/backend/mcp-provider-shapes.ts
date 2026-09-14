@@ -28,14 +28,20 @@ export type UsableMcpServer =
  */
 export async function usableMcpServers(configs: readonly McpServerConfig[]): Promise<UsableMcpServer[]> {
   const candidates = configs.filter((config) => config.enabled && !isReservedMcpServerName(config.name));
-  return Promise.all(
-    candidates.map(async (config) => {
-      if (config.transport !== "stdio") return { config, command: "" };
-      const command = await resolveMcpCommand(config.command);
-      if (!command) return { config, error: `Command not found: ${config.command}` };
-      return { config, command };
-    }),
-  );
+  return Promise.all(candidates.map(usableMcpServer));
+}
+
+/**
+ * One configuration made usable, whether or not it is enabled.
+ *
+ * A test answers for the configuration in front of the user, and a user may well test a server
+ * before turning it on - so this one, unlike `usableMcpServers`, does not filter.
+ */
+export async function usableMcpServer(config: McpServerConfig): Promise<UsableMcpServer> {
+  if (config.transport !== "stdio") return { config, command: "" };
+  const command = await resolveMcpCommand(config.command);
+  if (!command) return { config, error: `Command not found: ${config.command}` };
+  return { config, command };
 }
 
 /**

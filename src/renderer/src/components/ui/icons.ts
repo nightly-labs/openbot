@@ -62,6 +62,7 @@ export { default as PictureInPicture2 } from "lucide-solid/icons/picture-in-pict
 export { default as Pin } from "lucide-solid/icons/pin";
 export { default as PinOff } from "lucide-solid/icons/pin-off";
 export { default as Play } from "lucide-solid/icons/play";
+export { default as Plug } from "lucide-solid/icons/plug";
 export { default as Plus } from "lucide-solid/icons/plus";
 export { default as Puzzle } from "lucide-solid/icons/puzzle";
 export { default as RefreshCw } from "lucide-solid/icons/refresh-cw";

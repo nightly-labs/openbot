@@ -105,7 +105,7 @@ export type TeamApiAgents = TeamApiAgentMethods & {
  */
 export type TeamApiMcpServers = Pick<
   AgentService,
-  "listMcpServers" | "saveMcpServer" | "removeMcpServer" | "setMcpServerEnabled"
+  "listMcpServers" | "saveMcpServer" | "removeMcpServer" | "setMcpServerEnabled" | "testMcpServer"
 >;
 
 export type TeamApiMailbox = Pick<MailboxStore, "resolveAttachment">;

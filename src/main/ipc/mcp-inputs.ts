@@ -11,11 +11,18 @@ import type {
   RemoveMcpServerInput,
   SaveMcpServerInput,
   SetMcpServerEnabledInput,
+  TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { isObject, requireString } from "./validation";
 
 export function parseSaveMcpServer(value: unknown): SaveMcpServerInput {
+  if (!isObject(value)) throw new Error("An MCP server is required.");
+  return { config: parseMcpServerConfig(value.config) };
+}
+
+/** The same shape as a save, because a test answers for exactly what a save would store. */
+export function parseTestMcpServer(value: unknown): TestMcpServerInput {
   if (!isObject(value)) throw new Error("An MCP server is required.");
   return { config: parseMcpServerConfig(value.config) };
 }

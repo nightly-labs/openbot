@@ -10,7 +10,7 @@ import {
   isChannelRoute,
 } from "@openbot/contracts/team-protocol/channels-v1";
 import { supportsTeamSemanticTags, TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
-import { isMcpRoute, mcpEvent, mcpRequest, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
+import { isMcpRoute, mcpRequest, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
 import { encodeTeamProtocolV1ClientEvent } from "@openbot/contracts/team-protocol/v1";
 import {
   decodeTeamProtocolV2AuthFrame,
@@ -518,14 +518,13 @@ export class TeamWebRtcHostPeer {
         // protocol validates and envelopes its own event, exactly as the request path does.
         const event = JSON.parse(data.toString());
         const channel = channelEvent(event);
-        const mcp = mcpEvent(event);
         frame = encodeTeamProtocolV2Frame(
-          channel || mcp
+          channel
             ? decodeTeamProtocolV2EventFrame({
                 version: 2,
                 type: "event",
                 sequence: this.#nextEventSequence,
-                payload: channel ?? mcp,
+                payload: channel,
               })
             : (this.#peerCapabilities.has("opencode") ? createTeamProtocolV4Event : createTeamProtocolV2Event)(
                 this.#nextEventSequence,

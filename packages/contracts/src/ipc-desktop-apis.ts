@@ -118,10 +118,12 @@ import type {
   SubmitMarketplaceAgentInput,
 } from "./ipc-marketplace-agents";
 import type {
-  McpServerEntry,
+  McpServerConfig,
+  McpTestResult,
   RemoveMcpServerInput,
   SaveMcpServerInput,
   SetMcpServerEnabledInput,
+  TestMcpServerInput,
 } from "./ipc-mcp-servers";
 import type {
   AcknowledgeFailedTurnInput,
@@ -237,12 +239,12 @@ export interface AgentDesktopApi {
   listChannelRoutineRuns: (input: ListChannelRoutineRunsInput) => Promise<ChannelRoutineRun[]>;
   // Every MCP method names its server, because the settings modal can be open for a server the user
   // has not switched to. Each mutation answers with the whole list, so the panel never merges.
-  listMcpServers: (serverId: string) => Promise<McpServerEntry[]>;
-  saveMcpServer: (input: SaveMcpServerInput, serverId: string) => Promise<McpServerEntry[]>;
-  removeMcpServer: (input: RemoveMcpServerInput, serverId: string) => Promise<McpServerEntry[]>;
-  setMcpServerEnabled: (input: SetMcpServerEnabledInput, serverId: string) => Promise<McpServerEntry[]>;
-  openMcpStatus: (serverId: string) => Promise<McpServerEntry[]>;
-  closeMcpStatus: (serverId: string) => Promise<void>;
+  listMcpServers: (serverId: string) => Promise<McpServerConfig[]>;
+  saveMcpServer: (input: SaveMcpServerInput, serverId: string) => Promise<McpServerConfig[]>;
+  removeMcpServer: (input: RemoveMcpServerInput, serverId: string) => Promise<McpServerConfig[]>;
+  setMcpServerEnabled: (input: SetMcpServerEnabledInput, serverId: string) => Promise<McpServerConfig[]>;
+  /** A test connects once and reports what it found. Nothing is stored, and no agent uses it. */
+  testMcpServer: (input: TestMcpServerInput, serverId: string) => Promise<McpTestResult>;
   readConversation: (agentId: string) => Promise<ConversationWithReadState>;
   readConversationPage: (input: ReadConversationPageInput, serverId?: string) => Promise<ConversationPage>;
   searchConversationMessages: (input: SearchConversationMessagesInput) => Promise<ConversationSearchPage>;

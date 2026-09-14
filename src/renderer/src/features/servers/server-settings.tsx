@@ -2,8 +2,7 @@ import type {
   AvatarImageInput,
   InviteSummary,
   McpServerConfig,
-  McpServerEntry,
-  McpServerStatus,
+  McpTestResult,
   TeamInviteSummary,
   TeamPresenceMember,
   UpdateTeamMemberInput,
@@ -42,17 +41,7 @@ const ServerSettings = createSimpleContext({
     const [serverSettingsInvites, setServerSettingsInvites] = createSignal<TeamInviteSummary[]>([]);
     const [serverSettingsLoading, setServerSettingsLoading] = createSignal(false);
     const [serverSettingsError, setServerSettingsError] = createSignal<string | null>(null);
-    const [serverSettingsMcp, setServerSettingsMcp] = createSignal<McpServerEntry[]>([]);
-    const [serverSettingsMcpWatching, setServerSettingsMcpWatching] = createSignal(false);
-    /**
-     * The last states main published, kept beside the list rather than only inside it.
-     *
-     * A list reply is built before it is sent, so a state that settles while it is in flight would
-     * be painted over by the older snapshot it carries - the row would then read `Connecting…`
-     * until the next state change, which for a settled server never comes. The event order is main's
-     * own, so these win over any reply.
-     */
-    let serverSettingsMcpStatuses = new Map<string, McpServerStatus>();
+    const [serverSettingsMcp, setServerSettingsMcp] = createSignal<McpServerConfig[]>([]);
     /** Bumped by every open and refresh, so a slower earlier load cannot paint over a newer one. */
     let serverSettingsRequest = 0;
     let serverSettingsRestoreTarget: HTMLElement | null = null;
@@ -75,23 +64,6 @@ const ServerSettings = createSimpleContext({
           flush(() => setServerSettingsMembers(presence.members));
           void refreshServerSettings(id);
         }, id);
-      },
-    );
-
-    /**
-     * While the MCP tab is open, the monitor probes each server and pushes the states as they
-     * settle. Only the states ride the event - a configuration carries `env` values and headers -
-     * so the rows are patched here rather than replaced.
-     */
-    createEffect(
-      () => ({ watching: serverSettingsMcpWatching(), id: serverSettingsTargetId() }),
-      ({ watching, id }) => {
-        if (!watching || !id) return;
-        return window.openbot.agent.onScopedEvent(({ serverId, event }) => {
-          if (serverId !== id || event.type !== "mcp-servers-changed") return;
-          serverSettingsMcpStatuses = new Map(event.statuses.map((status) => [status.id, status]));
-          setServerSettingsMcp(withMcpStatuses);
-        });
       },
     );
 
@@ -157,7 +129,6 @@ const ServerSettings = createSimpleContext({
       setServerSettingsMembers([]);
       setServerSettingsInvites([]);
       setServerSettingsMcp([]);
-      serverSettingsMcpStatuses = new Map();
       setServerSettingsError(null);
       void refreshServerSettings(serverId);
     }
@@ -328,45 +299,38 @@ const ServerSettings = createSimpleContext({
     }
 
     /**
-     * The MCP list, and the connections behind it.
+     * The MCP list.
      *
-     * `watchMcpServers` is what "connect while the modal is open" means: opening the tab asks main
-     * to handshake each enabled server, and leaving it asks main to disconnect. Nothing here keeps a
-     * connection an agent uses - the providers make their own when an agent starts.
+     * It is read when the MCP section opens, not when the dialog opens, because most visits to this
+     * dialog never reach that section. Nothing connects here: OpenBot connects only when the user
+     * asks for a test, and the providers make their own connections when an agent starts.
      */
-    async function watchMcpServers(visible: boolean): Promise<void> {
-      const server = serverSettingsTarget();
-      if (!server) return;
-      if (!visible) {
-        setServerSettingsMcpWatching(false);
-        // A closed panel holds no connection, so main drops its states: keeping them here would
-        // report a connection that no longer exists the next time the panel opens.
-        serverSettingsMcpStatuses = new Map();
-        await window.openbot.agent.closeMcpStatus(server.id);
-        return;
-      }
-      const request = ++serverSettingsRequest;
-      const entries = await window.openbot.agent.openMcpStatus(server.id);
-      if (request !== serverSettingsRequest || serverSettingsTargetId() !== server.id) return;
-      setServerSettingsMcp(withMcpStatuses(entries));
-      setServerSettingsMcpWatching(true);
-    }
-
     async function refreshMcpServers(): Promise<void> {
       const server = serverSettingsTarget();
       if (!server) return;
       const request = ++serverSettingsRequest;
-      const entries = await window.openbot.agent.listMcpServers(server.id);
+      const configs = await window.openbot.agent.listMcpServers(server.id);
       if (request !== serverSettingsRequest || serverSettingsTargetId() !== server.id) return;
-      setServerSettingsMcp(withMcpStatuses(entries));
+      setServerSettingsMcp(configs);
     }
 
-    /** The rows a reply carries, with any state that has arrived since it was built. */
-    function withMcpStatuses(entries: McpServerEntry[]): McpServerEntry[] {
-      return entries.map((entry) => {
-        const status = serverSettingsMcpStatuses.get(entry.config.id);
-        return status ? { ...entry, state: status.state, toolCount: status.toolCount, error: status.error } : entry;
+    /**
+     * One test connection, for the configuration the user is looking at. The configuration is sent
+     * whole rather than by id, so the form can test a draft that was never saved. The answer is not
+     * stored: the panel holds it while it is open, and it says nothing about any later moment.
+     */
+    async function testMcpServer(config: McpServerConfig): Promise<McpTestResult> {
+      const server = serverSettingsTarget();
+      if (!server) throw new Error("This server is not available.");
+      const analytics = desktopAnalytics.scope();
+      const result = await window.openbot.agent.testMcpServer({ config }, server.id);
+      analytics.track("team_action", {
+        action: "mcp_server_tested",
+        result: result.error ? "failed" : "succeeded",
+        server_kind: server.kind,
+        ...(result.error ? { failure_code: "mcp_server_test_failed" } : {}),
       });
+      return result;
     }
 
     async function saveMcpServer(config: McpServerConfig): Promise<void> {
@@ -395,17 +359,17 @@ const ServerSettings = createSimpleContext({
     async function runMcpMutation(
       action: "mcp_server_saved" | "mcp_server_removed" | "mcp_server_toggled",
       failureCode: string,
-      mutate: (serverId: string) => Promise<McpServerEntry[]>,
+      mutate: (serverId: string) => Promise<McpServerConfig[]>,
     ): Promise<void> {
       const server = serverSettingsTarget();
       if (!server) throw new Error("This server is not available.");
       const analytics = desktopAnalytics.scope();
       let operationSucceeded = false;
       try {
-        const entries = await mutate(server.id);
+        const configs = await mutate(server.id);
         analytics.track("team_action", { action, result: "succeeded", server_kind: server.kind });
         operationSucceeded = true;
-        if (serverSettingsTargetId() === server.id) setServerSettingsMcp(withMcpStatuses(entries));
+        if (serverSettingsTargetId() === server.id) setServerSettingsMcp(configs);
       } catch (error) {
         if (!operationSucceeded) {
           analytics.track("team_action", {
@@ -436,11 +400,11 @@ const ServerSettings = createSimpleContext({
       removeServerMember,
       revokeServerInvite,
       serverSettingsMcp,
-      watchMcpServers,
       refreshMcpServers,
       saveMcpServer,
       removeMcpServer,
       setMcpServerEnabled,
+      testMcpServer,
     };
   },
 });

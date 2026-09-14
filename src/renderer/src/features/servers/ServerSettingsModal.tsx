@@ -67,7 +67,7 @@ import { truncateMiddle } from "../../components/ui/utils";
 import { errorMessage } from "../../error-message";
 import { SaveBarDock, SettingsDialogShell } from "../settings/SettingsDialogShell";
 import { teamMemberName } from "../team/TeamPersonAvatar";
-import type { McpServerConfig, McpServerEntry } from "./mcp-servers";
+import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { type McpPanelDetail, ServerMcpPanel } from "./ServerMcpPanel";
 import { serverSupportsCapability } from "./server-capabilities";
 
@@ -94,16 +94,16 @@ export interface ServerSettingsModalProps {
    * servers - a remote host without the capability, or a `member` account - passes nothing, and
    * then neither the tab nor the panel exists.
    */
-  mcpServers?: McpServerEntry[];
+  mcpServers?: McpServerConfig[];
   onSaveMcpServer?: (config: McpServerConfig) => Promise<void>;
   onRemoveMcpServer?: (id: string) => Promise<void>;
   onSetMcpServerEnabled?: (id: string, enabled: boolean) => Promise<void>;
+  onTestMcpServer?: (config: McpServerConfig) => Promise<McpTestResult>;
   /**
-   * Fired when the MCP section becomes visible, and again when it stops being visible, including
-   * on close. MCP connections live only while the section is open, so this is what opens and
-   * closes them.
+   * Fired when the MCP section becomes visible. The list is read then, not when the dialog opens,
+   * because most visits to this dialog never reach that section.
    */
-  onMcpVisibilityChange?: (visible: boolean) => void;
+  onMcpSectionShown?: () => void;
 }
 
 type Section = "general" | "members" | "desktop" | "mcp";
@@ -294,17 +294,14 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     },
   );
 
-  /**
-   * The latch keeps the first run from reporting a section nobody has left yet, so a close is
-   * only ever reported after an open.
-   */
+  /** The latch keeps a section the user is already in from being reported again on every change. */
   let mcpSectionVisible = false;
   createEffect(
     () => props.open && section() === "mcp" && Boolean(props.mcpServers),
     (visible) => {
       if (visible === mcpSectionVisible) return;
       mcpSectionVisible = visible;
-      props.onMcpVisibilityChange?.(visible);
+      if (visible) props.onMcpSectionShown?.();
     },
   );
 
@@ -700,6 +697,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 onSave={(config) => props.onSaveMcpServer?.(config) ?? Promise.resolve()}
                 onRemove={(id) => props.onRemoveMcpServer?.(id) ?? Promise.resolve()}
                 onSetEnabled={(id, enabled) => props.onSetMcpServerEnabled?.(id, enabled) ?? Promise.resolve()}
+                onTest={(config) =>
+                  props.onTestMcpServer?.(config) ??
+                  Promise.resolve({ toolCount: 0, error: "This server cannot be tested here." })
+                }
               />
             </Tabs.Content>
           )}

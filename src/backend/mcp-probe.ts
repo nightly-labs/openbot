@@ -4,7 +4,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { mcpEnvironment, type UsableMcpServer } from "./mcp-provider-shapes";
+import { mcpEnvironment, type UsableMcpServer, usableMcpServer } from "./mcp-provider-shapes";
 import { redactMcpSecrets } from "./mcp-redaction";
 
 export const MCP_PROBE_TIMEOUT_MS = 10_000;
@@ -15,10 +15,28 @@ export interface McpProbeResult {
 }
 
 /**
- * Connects to one MCP server once, counts its tools, and disconnects.
+ * Tests one configuration, saved or not: connects, counts the tools, and disconnects.
  *
- * This is what the settings panel reports, and nothing else uses it. The providers make their own
- * connections when an agent starts; a probe never becomes the connection an agent talks to.
+ * Only a user asking for it starts this. OpenBot does not test by itself, because a connection is
+ * not free - an http server can want an OAuth sign-in, a cold `npx` can take longer than the
+ * deadline below, and a server can do real work at startup. The answer is reported once and not
+ * stored.
+ */
+export async function testMcpServer(
+  config: McpServerConfig,
+  timeoutMs = MCP_PROBE_TIMEOUT_MS,
+): Promise<McpProbeResult> {
+  // Nothing cancels a test from outside: it ends on its own within the deadline, and a child that
+  // outlives its transport is killed below either way.
+  const controller = new AbortController();
+  return probeMcpServer(await usableMcpServer(config), controller.signal, timeoutMs);
+}
+
+/**
+ * Connects to one already-resolved MCP server once, counts its tools, and disconnects.
+ *
+ * The providers make their own connections when an agent starts; a probe never becomes the
+ * connection an agent talks to.
  */
 export async function probeMcpServer(
   server: UsableMcpServer,

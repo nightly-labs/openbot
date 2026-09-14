@@ -8,7 +8,7 @@ const MASK = "•••";
  *
  * Storing the values was a product decision; showing them again was not. A transport reports a
  * failure by quoting what it sent, so a header value or an API key reaches an error message, a log
- * line, and an `McpServerStatus.error` unless this runs first. `redactText` covers the patterns
+ * line, and an `McpTestResult.error` unless this runs first. `redactText` covers the patterns
  * shared across the app; this covers the values only this configuration knows.
  */
 export function redactMcpSecrets(text: string, config: McpServerConfig): string {

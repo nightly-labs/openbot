@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isMcpRoute, MCP_ROUTES, mcpEvent, mcpRequest, mcpResponse } from "./mcp-v1";
+import { isMcpRoute, MCP_ROUTES, mcpRequest, mcpResponse } from "./mcp-v1";
 
 const config = {
   id: "mcp-1",
@@ -14,7 +14,6 @@ const config = {
   url: "",
   headers: [],
 };
-const entry = { config, state: "connected", toolCount: 4, error: null };
 
 describe("mcp-v1", () => {
   it("matches only its own routes", () => {
@@ -31,6 +30,7 @@ describe("mcp-v1", () => {
       mcpServerId: "mcp-1",
       enabled: false,
     });
+    expect(mcpRequest(MCP_ROUTES.test, { config })).toEqual({ config });
   });
 
   // A create sends the same shape as an edit, with an id that is not written yet.
@@ -46,30 +46,27 @@ describe("mcp-v1", () => {
     expect(() => mcpRequest("/v1/channels", {})).toThrow();
   });
 
-  // Every route answers with the whole list, so the panel never merges a partial result.
+  // Every route but the test answers with the whole list, so the panel never merges a partial result.
   it("round-trips the list answer of every route", () => {
-    for (const route of Object.values(MCP_ROUTES)) expect(mcpResponse(route, 200, [entry])).toEqual([entry]);
+    for (const route of Object.values(MCP_ROUTES)) {
+      if (route === MCP_ROUTES.test) continue;
+      expect(mcpResponse(route, 200, [config])).toEqual([config]);
+    }
     expect(mcpResponse(MCP_ROUTES.list, 403, { error: "Only an admin can do this." })).toEqual({
       error: "Only an admin can do this.",
     });
-    expect(() => mcpResponse(MCP_ROUTES.list, 200, [{ ...entry, state: "ready" }])).toThrow();
-    expect(() => mcpResponse(MCP_ROUTES.list, 200, entry)).toThrow();
+    expect(() => mcpResponse(MCP_ROUTES.list, 200, [{ ...config, transport: "websocket" }])).toThrow();
+    expect(() => mcpResponse(MCP_ROUTES.list, 200, config)).toThrow();
   });
 
-  it("decodes a status event and nothing else", () => {
-    const statuses = [{ id: "mcp-1", state: "failed", toolCount: 0, error: "Command not found: npx" }];
-    expect(mcpEvent({ type: "mcp-servers-changed", statuses })).toEqual({ type: "mcp-servers-changed", statuses });
-    expect(mcpEvent({ type: "channels-changed", channels: [] })).toBeNull();
-    expect(() => mcpEvent({ type: "mcp-servers-changed", statuses: [{ ...statuses[0], state: "ready" }] })).toThrow();
-  });
-
-  // The event carries statuses only. A configuration holds env values and headers, and an event is
-  // broadcast, so a decoder that let one through would send secrets to every peer.
-  it("drops a configuration smuggled onto a status", () => {
-    const event = mcpEvent({
-      type: "mcp-servers-changed",
-      statuses: [{ id: "mcp-1", state: "connected", toolCount: 4, error: null, config }],
+  // A test answers what one connection found and nothing else. A configuration in the answer would
+  // be the host sending back env values and headers no one asked for.
+  it("round-trips a test answer and drops anything else on it", () => {
+    expect(mcpResponse(MCP_ROUTES.test, 200, { toolCount: 4, error: null })).toEqual({ toolCount: 4, error: null });
+    expect(mcpResponse(MCP_ROUTES.test, 200, { toolCount: 0, error: "Command not found: npx", config })).toEqual({
+      toolCount: 0,
+      error: "Command not found: npx",
     });
-    expect(event?.statuses[0]).toEqual({ id: "mcp-1", state: "connected", toolCount: 4, error: null });
+    expect(() => mcpResponse(MCP_ROUTES.test, 200, { toolCount: -1, error: null })).toThrow();
   });
 });

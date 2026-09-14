@@ -143,12 +143,16 @@ export async function exportDiagnostics(
       agentCount: agents.length,
       queues: queueCounts,
     },
-    // Ids and connection states only. A name is user text and a configuration holds `env` values and
-    // headers, so neither one belongs in a report the user mails to somebody else.
+    // Ids, transports and whether each one is enabled. A name is user text and a configuration holds
+    // `env` values and headers, so neither one belongs in a report the user mails to somebody else.
     mcpServers: {
       count: mcpServers.length,
-      enabledCount: mcpServers.filter((entry) => entry.config.enabled).length,
-      states: mcpServers.map((entry) => ({ mcpServerId: entry.config.id, state: entry.state })),
+      enabledCount: mcpServers.filter((config) => config.enabled).length,
+      servers: mcpServers.map((config) => ({
+        mcpServerId: config.id,
+        transport: config.transport,
+        enabled: config.enabled,
+      })),
     },
     browser: {
       tabCount: context.browser.listTabs().length,

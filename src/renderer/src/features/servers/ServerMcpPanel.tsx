@@ -19,6 +19,7 @@ import {
   ItemMedia,
   ItemTitle,
   Pencil,
+  Plug,
   Plus,
   SettingsSection,
   SlidingTabs,
@@ -29,13 +30,15 @@ import {
 import {
   emptyMcpConfig,
   type McpServerConfig,
-  type McpServerEntry,
+  type McpTestResult,
+  type McpTestState,
   mcpConfigChanged,
   mcpConfigDraft,
   mcpConfigErrors,
   mcpConfigIsValid,
   mcpStatusLabel,
   mcpStatusVariant,
+  mcpTestMessage,
   normalizeMcpConfig,
 } from "./mcp-servers";
 
@@ -63,7 +66,7 @@ export interface McpPanelDetail {
 }
 
 export interface ServerMcpPanelProps {
-  servers: McpServerEntry[];
+  servers: McpServerConfig[];
   canManage: boolean;
   /** The dialog element the row menus portal into, so a menu is not clipped by the modal. */
   menuMount?: HTMLElement;
@@ -72,6 +75,11 @@ export interface ServerMcpPanelProps {
   onSave: (config: McpServerConfig) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onSetEnabled: (id: string, enabled: boolean) => Promise<void>;
+  /**
+   * Connects once with the configuration given and answers what it found. The configuration is
+   * passed whole, not by id, so the form can test a draft that was never saved.
+   */
+  onTest: (config: McpServerConfig) => Promise<McpTestResult>;
 }
 
 /**
@@ -91,6 +99,10 @@ interface McpPanelState {
   /** The key of the one action in flight, gating the whole panel rather than any one row. */
   busy: string | null;
   error: string;
+  /** What each row's test found, keyed by MCP server id. A row with no entry was never tested. */
+  tests: Record<string, McpTestState>;
+  /** The form's own test, which answers for the draft on screen and not for any stored row. */
+  formTest: McpTestState | null;
 }
 
 const CONNECT_TITLE = "Connect to a custom MCP";
@@ -106,12 +118,16 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     removeId: null,
     busy: null,
     error: "",
+    tests: {},
+    formTest: null,
   });
   let removeTrigger: HTMLElement | undefined;
+  // Counts the form's tests, so an answer that arrives after the user left is dropped.
+  let draftTestRun = 0;
 
   const errors = createMemo(() => mcpConfigErrors(state.draft));
   const visible = (key: "name" | "command" | "url") => (state.touched ? errors()[key] : undefined);
-  const removeEntry = createMemo(() => props.servers.find((entry) => entry.config.id === state.removeId) ?? null);
+  const removeTarget = createMemo(() => props.servers.find((config) => config.id === state.removeId) ?? null);
   const disabled = () => !props.canManage || state.busy !== null;
 
   async function run(key: string, action: () => Promise<void>): Promise<boolean> {
@@ -135,20 +151,62 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     }
   }
 
-  function openForm(entry: McpServerEntry | null): void {
-    const draft = entry ? mcpConfigDraft(entry.config) : emptyMcpConfig();
+  /**
+   * A test takes no `busy` latch: it is a question about one server, it can take as long as the
+   * deadline allows, and a slow server must not stop the user from saving or removing another.
+   */
+  async function runTest(config: McpServerConfig): Promise<McpTestState> {
+    try {
+      const result = await props.onTest(config);
+      if (result.error) return { status: "failed", error: result.error };
+      return { status: "passed", toolCount: result.toolCount };
+    } catch (error) {
+      return { status: "failed", error: error instanceof Error ? error.message : "That server did not answer." };
+    }
+  }
+
+  async function testRow(config: McpServerConfig): Promise<void> {
+    setState((current) => {
+      current.tests[config.id] = { status: "testing" };
+    });
+    const test = await runTest(config);
+    setState((current) => {
+      current.tests[config.id] = test;
+    });
+  }
+
+  async function testDraft(): Promise<void> {
+    setState((current) => {
+      current.touched = true;
+    });
+    if (!mcpConfigIsValid(state.draft)) return;
+    const run = ++draftTestRun;
+    setState((current) => {
+      current.formTest = { status: "testing" };
+    });
+    const test = await runTest(normalizeMcpConfig(state.draft));
+    if (run !== draftTestRun) return;
+    setState((current) => {
+      current.formTest = test;
+    });
+  }
+
+  function openForm(config: McpServerConfig | null): void {
+    const draft = config ? mcpConfigDraft(config) : emptyMcpConfig();
     setState((current) => {
       current.view = "form";
-      current.editingId = entry?.config.id ?? null;
+      current.editingId = config?.id ?? null;
       current.draft = draft;
       // A copy, not the same object: the form edits `draft` in place, and the baseline has to hold still.
       current.baseline = mcpConfigDraft(draft);
       current.touched = false;
       current.error = "";
+      current.formTest = null;
     });
-    // Read from the entry, not the store: a store write is not visible to a read in the same tick.
+    draftTestRun += 1;
+    // Read from the argument, not the store: a store write is not visible to a read in the same tick.
     props.onDetailChange?.({
-      title: entry ? EDIT_TITLE : CONNECT_TITLE,
+      title: config ? EDIT_TITLE : CONNECT_TITLE,
       back: backToList,
       saveBar,
       save: () => void save(),
@@ -163,7 +221,9 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       current.editingId = null;
       current.touched = false;
       current.error = "";
+      current.formTest = null;
     });
+    draftTestRun += 1;
   }
 
   async function save(): Promise<void> {
@@ -184,7 +244,9 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       current.draft = mcpConfigDraft(current.baseline);
       current.touched = false;
       current.error = "";
+      current.formTest = null;
     });
+    draftTestRun += 1;
   }
 
   /**
@@ -238,47 +300,51 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
           }
         >
           <ItemGroup class="server-mcp-list">
-            {/* Keyed by id, so a status or enabled change updates the row that is already on screen.
+            {/* Keyed by id, so an enabled or test change updates the row that is already on screen.
                 A row that remounts would drop the switch mid-animation. */}
-            <For each={props.servers} keyed={(entry) => entry.config.id}>
-              {(entry) => (
-                <Item class="server-mcp-row" data-disabled={entry().config.enabled ? undefined : ""}>
-                  <ItemMedia class="server-mcp-row-icon">
-                    <Blocks aria-hidden="true" />
-                  </ItemMedia>
-                  <ItemContent>
-                    <div class="server-mcp-row-title">
-                      <ItemTitle>{entry().config.name}</ItemTitle>
-                      <Badge variant={mcpStatusVariant(entry())}>{mcpStatusLabel(entry())}</Badge>
-                    </div>
-                    <Show when={entry().state === "failed" && entry().error}>
-                      <ItemDescription>{entry().error}</ItemDescription>
-                    </Show>
-                  </ItemContent>
-                  <ItemActions>
-                    <Switch
-                      aria-label={`Enable ${entry().config.name}`}
-                      checked={entry().config.enabled}
-                      disabled={disabled()}
-                      onChange={(enabled) =>
-                        void run(`enable:${entry().config.id}`, () => props.onSetEnabled(entry().config.id, enabled))
-                      }
-                    />
-                    <McpRowMenu
-                      name={entry().config.name}
-                      mount={props.menuMount}
-                      disabled={disabled()}
-                      onEdit={() => openForm(entry())}
-                      onRemove={(trigger) => {
-                        removeTrigger = trigger;
-                        setState((current) => {
-                          current.removeId = entry().config.id;
-                        });
-                      }}
-                    />
-                  </ItemActions>
-                </Item>
-              )}
+            <For each={props.servers} keyed={(config) => config.id}>
+              {(config) => {
+                const test = () => state.tests[config().id];
+                return (
+                  <Item class="server-mcp-row" data-disabled={config().enabled ? undefined : ""}>
+                    <ItemMedia class="server-mcp-row-icon">
+                      <Blocks aria-hidden="true" />
+                    </ItemMedia>
+                    <ItemContent>
+                      <div class="server-mcp-row-title">
+                        <ItemTitle>{config().name}</ItemTitle>
+                        <Badge variant={mcpStatusVariant(test())}>{mcpStatusLabel(config(), test())}</Badge>
+                      </div>
+                      <Show when={test()?.status === "failed" && test()}>
+                        {(failed) => <ItemDescription>{mcpTestMessage(failed())}</ItemDescription>}
+                      </Show>
+                    </ItemContent>
+                    <ItemActions>
+                      <Switch
+                        aria-label={`Enable ${config().name}`}
+                        checked={config().enabled}
+                        disabled={disabled()}
+                        onChange={(enabled) =>
+                          void run(`enable:${config().id}`, () => props.onSetEnabled(config().id, enabled))
+                        }
+                      />
+                      <McpRowMenu
+                        name={config().name}
+                        mount={props.menuMount}
+                        disabled={disabled()}
+                        onTest={() => void testRow(config())}
+                        onEdit={() => openForm(config())}
+                        onRemove={(trigger) => {
+                          removeTrigger = trigger;
+                          setState((current) => {
+                            current.removeId = config().id;
+                          });
+                        }}
+                      />
+                    </ItemActions>
+                  </Item>
+                );
+              }}
             </For>
           </ItemGroup>
         </Show>
@@ -586,6 +652,41 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
             </SettingsSection>
           </SlidingTabs.Content>
         </SlidingTabs.ContentSlot>
+
+        <SettingsSection
+          class="server-mcp-section"
+          title="Test"
+          description="Connects once with these settings and reports the tools it offers. Nothing is saved or kept."
+          actions={
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={!props.canManage || state.formTest?.status === "testing"}
+              loading={state.formTest?.status === "testing"}
+              loadingLabel="Connecting…"
+              onClick={() => void testDraft()}
+            >
+              <Plug aria-hidden="true" />
+              Test connection
+            </Button>
+          }
+        >
+          <Show
+            when={state.formTest}
+            fallback={
+              <Text variant="caption" tone="muted">
+                Not tested yet.
+              </Text>
+            }
+          >
+            {(test) => (
+              <Text class="server-mcp-test-result" variant="caption" tone={mcpTestTone(test())} role="status">
+                {mcpTestMessage(test())}
+              </Text>
+            )}
+          </Show>
+        </SettingsSection>
       </SlidingTabs.Root>
     );
   }
@@ -609,7 +710,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       </Show>
 
       <AlertDialog.Root
-        open={Boolean(removeEntry())}
+        open={Boolean(removeTarget())}
         onOpenChange={(open) => {
           if (!open && state.busy === null)
             setState((current) => {
@@ -617,8 +718,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
             });
         }}
       >
-        <Show when={removeEntry()}>
-          {(entry) => (
+        <Show when={removeTarget()}>
+          {(config) => (
             <AlertDialog.Portal>
               <AlertDialog.Overlay class="server-settings-confirm-backdrop">
                 <AlertDialog.Content
@@ -631,7 +732,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                   <span class="server-settings-confirm-icon" aria-hidden="true">
                     <Trash2 />
                   </span>
-                  <AlertDialog.Title>Remove {entry().config.name}?</AlertDialog.Title>
+                  <AlertDialog.Title>Remove {config().name}?</AlertDialog.Title>
                   <AlertDialog.Description>
                     Its tools stop being offered to this server’s agents. The configuration is not kept.
                   </AlertDialog.Description>
@@ -651,11 +752,11 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                     <Button
                       type="button"
                       variant="destructive"
-                      loading={state.busy === `remove:${entry().config.id}`}
+                      loading={state.busy === `remove:${config().id}`}
                       loadingLabel="Removing…"
                       onClick={() =>
-                        void run(`remove:${entry().config.id}`, async () => {
-                          await props.onRemove(entry().config.id);
+                        void run(`remove:${config().id}`, async () => {
+                          await props.onRemove(config().id);
                           setState((current) => {
                             current.removeId = null;
                           });
@@ -713,6 +814,7 @@ function McpRowMenu(props: {
   name: string;
   mount?: HTMLElement;
   disabled: boolean;
+  onTest: () => void;
   onEdit: () => void;
   onRemove: (trigger: HTMLElement) => void;
 }) {
@@ -729,6 +831,10 @@ function McpRowMenu(props: {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal mount={props.mount}>
         <DropdownMenu.Content class="server-mcp-row-menu">
+          <DropdownMenu.Item onSelect={() => props.onTest()}>
+            <Plug aria-hidden="true" />
+            Test connection
+          </DropdownMenu.Item>
           <DropdownMenu.Item onSelect={() => props.onEdit()}>
             <Pencil aria-hidden="true" />
             Edit
@@ -745,4 +851,10 @@ function McpRowMenu(props: {
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
   );
+}
+
+/** A failed test is the only one that reads as an error; a pass is a plain, quiet sentence. */
+function mcpTestTone(test: McpTestState): "danger" | "success" | "muted" {
+  if (test.status === "failed") return "danger";
+  return test.status === "passed" ? "success" : "muted";
 }

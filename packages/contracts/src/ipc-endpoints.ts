@@ -292,8 +292,7 @@ export const IPC_ENDPOINTS = {
     save: request(IPC_CHANNELS.serversSaveMcpServer),
     remove: request(IPC_CHANNELS.serversRemoveMcpServer),
     setEnabled: request(IPC_CHANNELS.serversSetMcpServerEnabled),
-    openStatus: request(IPC_CHANNELS.serversOpenMcpStatus),
-    closeStatus: request(IPC_CHANNELS.serversCloseMcpStatus),
+    test: request(IPC_CHANNELS.serversTestMcpServer),
   },
   host: {
     getStatus: request(IPC_CHANNELS.hostGetStatus),

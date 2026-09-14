@@ -7,7 +7,7 @@ import {
   type AttachmentSummary,
   canPreviewAttachment,
   decodeChannel,
-  decodeMcpServerEntries,
+  decodeMcpServerConfigs,
   hostedSiteConversationEvent,
   hostedSiteConversationEventItemType,
   hostedSiteConversationEventText,
@@ -28,8 +28,7 @@ import {
   isFilePreviewKind,
   isHostedSiteConversationEventUrl,
   isMcpServerConfig,
-  isMcpServerEntry,
-  isMcpServerStatus,
+  isMcpTestResult,
   isMessageReaction,
   isQueuedMessageReceipt,
   isQueueSnapshot,
@@ -922,14 +921,11 @@ describe("MCP server contracts", () => {
     url: "",
     headers: [],
   };
-  const entry = { config, state: "connected", toolCount: 4, error: null };
 
-  it("accepts a configuration, an entry and a status", () => {
+  it("accepts a configuration and a test result", () => {
     expect(isMcpServerConfig(config)).toBe(true);
-    expect(isMcpServerEntry(entry)).toBe(true);
-    expect(isMcpServerStatus({ id: "mcp-1", state: "failed", toolCount: 0, error: "Command not found: npx" })).toBe(
-      true,
-    );
+    expect(isMcpTestResult({ toolCount: 4, error: null })).toBe(true);
+    expect(isMcpTestResult({ toolCount: 0, error: "Command not found: npx" })).toBe(true);
   });
 
   it("rejects an over-long name, an unknown transport and a non-string env value", () => {
@@ -939,24 +935,17 @@ describe("MCP server contracts", () => {
     expect(isMcpServerConfig({ ...config, args: "npx" })).toBe(false);
   });
 
-  it("rejects an unknown state and a negative tool count on an entry", () => {
-    expect(isMcpServerEntry({ ...entry, state: "ready" })).toBe(false);
-    expect(isMcpServerEntry({ ...entry, toolCount: -1 })).toBe(false);
-    expect(isMcpServerEntry({ config, state: "connected", toolCount: 0 })).toBe(false);
+  it("rejects a negative tool count and a missing error field on a test result", () => {
+    expect(isMcpTestResult({ toolCount: -1, error: null })).toBe(false);
+    expect(isMcpTestResult({ toolCount: 1 })).toBe(false);
   });
 
   // The list decoder is what a remote host's reply goes through, so it has to fail closed rather
   // than hand a malformed row on to the panel.
   it("decodes a list and throws on anything else", () => {
-    expect(decodeMcpServerEntries([entry])).toHaveLength(1);
-    expect(() => decodeMcpServerEntries(entry)).toThrow();
-    expect(() => decodeMcpServerEntries([{ ...entry, state: "ready" }])).toThrow();
-    expect(() => decodeMcpServerEntries(new Array(INPUT_LIMITS.mcpServers + 1).fill(entry))).toThrow();
-  });
-
-  it("carries no configuration on a status", () => {
-    // The reason the two types are separate: a status rides a broadcast event, and a configuration
-    // holds env values and headers.
-    expect(isMcpServerStatus(entry)).toBe(false);
+    expect(decodeMcpServerConfigs([config])).toHaveLength(1);
+    expect(() => decodeMcpServerConfigs(config)).toThrow();
+    expect(() => decodeMcpServerConfigs([{ ...config, transport: "websocket" }])).toThrow();
+    expect(() => decodeMcpServerConfigs(new Array(INPUT_LIMITS.mcpServers + 1).fill(config))).toThrow();
   });
 });

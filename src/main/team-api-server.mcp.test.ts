@@ -2,19 +2,13 @@
 
 // Who may manage the host machine's MCP servers from a joined server, and what leaves the machine.
 // The authority here is deliberate and frozen by `mcp-v1`: an admin can make this machine spawn a
-// process, and every reply carries the `env` and header values the host holds. `requireAdmin` is
-// the whole gate, so these are the cases that prove it is in place.
+// process - a saved one, or one they only described on a test - and every reply carries the `env`
+// and header values the host holds. `requireAdmin` is the whole gate, so these are the cases that
+// prove it is in place.
 
-import { EventEmitter } from "node:events";
-import { decodeMcpServerEntries, type McpServerConfig, type McpServerEntry } from "@openbot/contracts/ipc";
+import { decodeMcpServerConfigs, decodeMcpTestResult, type McpServerConfig } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  createAgents,
-  createTeamApiFixture,
-  nextJsonEvent,
-  stopTeamApiFixtures,
-  type TeamApiOptions,
-} from "./team-api-server-test-harness";
+import { createTeamApiFixture, stopTeamApiFixtures, type TeamApiOptions } from "./team-api-server-test-harness";
 
 afterEach(stopTeamApiFixtures);
 
@@ -32,21 +26,30 @@ const config: McpServerConfig = {
   headers: [],
 };
 
-function createMcpServers(): NonNullable<TeamApiOptions["mcpServers"]> & { saved: McpServerConfig[] } {
-  const entries: McpServerEntry[] = [];
+function createMcpServers(): NonNullable<TeamApiOptions["mcpServers"]> & {
+  saved: McpServerConfig[];
+  tested: McpServerConfig[];
+} {
+  const stored: McpServerConfig[] = [];
   const saved: McpServerConfig[] = [];
+  const tested: McpServerConfig[] = [];
   return {
     saved,
-    listMcpServers: () => entries,
+    tested,
+    listMcpServers: () => stored,
     saveMcpServer: (input) => {
       saved.push(input.config);
-      entries.push({ config: input.config, state: "connecting", toolCount: 0, error: null });
-      return entries;
+      stored.push(input.config);
+      return stored;
     },
-    removeMcpServer: (input) => entries.filter((entry) => entry.config.id !== input.mcpServerId),
+    removeMcpServer: (input) => stored.filter((config) => config.id !== input.mcpServerId),
     setMcpServerEnabled: (input) => {
-      for (const entry of entries) if (entry.config.id === input.mcpServerId) entry.config.enabled = input.enabled;
-      return entries;
+      for (const config of stored) if (config.id === input.mcpServerId) config.enabled = input.enabled;
+      return stored;
+    },
+    testMcpServer: async (input) => {
+      tested.push(input.config);
+      return { toolCount: 3, error: null };
     },
   };
 }
@@ -87,22 +90,42 @@ describe("Team API MCP server access", () => {
     });
     expect(save.status).toBe(200);
     // The decision the wire contract freezes: an admin reads the values the host holds.
-    expect(decodeMcpServerEntries(await save.json())[0]?.config.env).toEqual([{ key: "TOKEN", value: "secret" }]);
+    expect(decodeMcpServerConfigs(await save.json())[0]?.env).toEqual([{ key: "TOKEN", value: "secret" }]);
     expect(mcpServers.saved).toEqual([config]);
+
+    // The other half of that decision: an admin makes this machine connect to a configuration that
+    // was never stored, and reads only what the connection found.
+    const draft = { ...config, id: "", name: "Draft" };
+    const tested = await fetch(`${base}/v1/mcp-servers/test`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ config: draft }),
+    });
+    expect(decodeMcpTestResult(await tested.json())).toEqual({ toolCount: 3, error: null });
+    expect(mcpServers.tested).toEqual([draft]);
+    expect(
+      (
+        await fetch(`${base}/v1/mcp-servers/test`, {
+          method: "POST",
+          headers: { ...headers, Authorization: `Bearer ${member.sessionToken}` },
+          body: JSON.stringify({ config: draft }),
+        })
+      ).status,
+    ).toBe(403);
 
     const toggled = await fetch(`${base}/v1/mcp-servers/toggle`, {
       method: "POST",
       headers,
       body: JSON.stringify({ mcpServerId: "mcp-1", enabled: false }),
     });
-    expect(decodeMcpServerEntries(await toggled.json())[0]?.config.enabled).toBe(false);
+    expect(decodeMcpServerConfigs(await toggled.json())[0]?.enabled).toBe(false);
 
     const removed = await fetch(`${base}/v1/mcp-servers/delete`, {
       method: "POST",
       headers,
       body: JSON.stringify({ mcpServerId: "mcp-1" }),
     });
-    expect(decodeMcpServerEntries(await removed.json())).toEqual([]);
+    expect(decodeMcpServerConfigs(await removed.json())).toEqual([]);
 
     const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
     expect(compatibility).toMatchObject({ capabilities: expect.arrayContaining(["mcp-servers-v1"]) });
@@ -118,49 +141,5 @@ describe("Team API MCP server access", () => {
       headers: { Authorization: `Bearer ${token}`, "OpenBot-Capabilities": "mcp-servers-v1" },
     });
     expect(blocked.status).toBe(400);
-  });
-
-  // `eventCapability` returning `null` means "send to everyone", so an unregistered event would
-  // leave this machine to every connected peer.
-  it("keeps a status push away from a peer that did not negotiate the capability", async () => {
-    const events = new EventEmitter();
-    const fixture = await createTeamApiFixture("mcp-events", { configure: true });
-    const { port } = await fixture.start({ mcpServers: createMcpServers(), agents: createAgents({}, events) });
-    const login = await fixture.store.login("owner", "correct horse battery");
-    const statuses = [{ id: "mcp-1", state: "failed", toolCount: 0, error: "Command not found: npx" }];
-
-    for (const negotiated of [false, true]) {
-      const socket = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
-        "openbot-team-v1",
-        `openbot-token.${login.sessionToken}`,
-      ]);
-      const presence = nextJsonEvent(socket);
-      await new Promise<void>((resolve) => socket.addEventListener("open", () => resolve(), { once: true }));
-      await presence;
-      // The snapshot the scope message asks for is the acknowledgement that the new capability set
-      // is in place, so the emit below cannot race the scope.
-      const scoped = nextJsonEvent(socket);
-      socket.send(
-        JSON.stringify({
-          type: "agent-event-scope",
-          includeConversations: false,
-          capabilities: ["agent-runtime-snapshots", ...(negotiated ? ["mcp-servers-v1"] : [])],
-        }),
-      );
-      await expect(scoped).resolves.toMatchObject({ type: "runtime-snapshot" });
-      const next = new Promise<unknown>((resolve) =>
-        socket.addEventListener("message", (event) => resolve(JSON.parse(String(event.data))), { once: true }),
-      );
-      events.emit("event", { type: "mcp-servers-changed", statuses });
-      events.emit("event", { type: "agents-changed", agents: [] });
-      // The peer without the capability sees the next event instead, which is the proof that the
-      // MCP one was dropped rather than merely late.
-      await expect(next).resolves.toMatchObject(
-        negotiated ? { type: "mcp-servers-changed", statuses } : { type: "bots-changed" },
-      );
-      const closed = new Promise<void>((resolve) => socket.addEventListener("close", () => resolve(), { once: true }));
-      socket.close();
-      await closed;
-    }
   });
 });

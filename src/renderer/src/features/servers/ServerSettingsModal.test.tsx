@@ -168,42 +168,42 @@ describe("ServerSettingsModal", () => {
     expect(screen.queryByRole("tab", { name: "MCP" })).not.toBeInTheDocument();
   });
 
-  it("reports entering and leaving the MCP tab so the connections last only while it is open", async () => {
-    const onMcpVisibilityChange = vi.fn();
+  // The list is read when the section opens, not when the dialog does, because most visits to this
+  // dialog never reach it.
+  it("asks for the MCP list when the section is opened", async () => {
+    const onMcpSectionShown = vi.fn();
     render(() => (
       <ServerSettingsModal
         {...props({
           mcpServers: [
             {
-              config: {
-                id: "mcp-1",
-                name: "Filesystem",
-                transport: "stdio",
-                enabled: true,
-                command: "npx",
-                args: [],
-                env: [],
-                envPassthrough: [],
-                workingDirectory: "",
-                url: "",
-                headers: [],
-              },
-              state: "connected",
-              toolCount: 4,
-              error: null,
+              id: "mcp-1",
+              name: "Filesystem",
+              transport: "stdio",
+              enabled: true,
+              command: "npx",
+              args: [],
+              env: [],
+              envPassthrough: [],
+              workingDirectory: "",
+              url: "",
+              headers: [],
             },
           ],
-          onMcpVisibilityChange,
+          onMcpSectionShown,
         })}
       />
     ));
+    expect(onMcpSectionShown).not.toHaveBeenCalled();
 
     await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
-    await waitFor(() => expect(onMcpVisibilityChange).toHaveBeenCalledWith(true));
+    await waitFor(() => expect(onMcpSectionShown).toHaveBeenCalledTimes(1));
     expect(await screen.findByText("Filesystem")).toBeInTheDocument();
 
+    // Leaving and coming back reads the list again; staying in the section does not.
     await fireEvent.click(screen.getByRole("tab", { name: "General" }));
-    await waitFor(() => expect(onMcpVisibilityChange).toHaveBeenLastCalledWith(false));
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    await waitFor(() => expect(onMcpSectionShown).toHaveBeenCalledTimes(2));
   });
 
   it("saves the first local identity without publishing it", async () => {

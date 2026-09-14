@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import type { McpServerEntry } from "../src/features/servers/mcp-servers";
+import type { McpServerConfig } from "../src/features/servers/mcp-servers";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "../src/features/servers/ServerSettingsModal";
 import {
   STORY_HOST_STATUS,
@@ -16,7 +16,7 @@ import {
  * the list in a signal and still calls the spy args, which is what the play functions assert on.
  */
 function McpSettingsHost(props: ServerSettingsModalProps) {
-  const [servers, setServers] = createSignal<McpServerEntry[]>(props.mcpServers ?? []);
+  const [servers, setServers] = createSignal<McpServerConfig[]>(props.mcpServers ?? []);
 
   return (
     <ServerSettingsModal
@@ -24,34 +24,19 @@ function McpSettingsHost(props: ServerSettingsModalProps) {
       mcpServers={servers()}
       onSaveMcpServer={async (config) => {
         await props.onSaveMcpServer?.(config);
-        setServers((current) => {
-          const saved = current.find((entry) => entry.config.id === config.id);
-          const entry: McpServerEntry = {
-            config,
-            state: config.enabled ? "connected" : "disabled",
-            toolCount: saved?.toolCount ?? 0,
-            error: null,
-          };
-          return saved ? current.map((item) => (item.config.id === config.id ? entry : item)) : [...current, entry];
-        });
+        setServers((current) =>
+          current.some((server) => server.id === config.id)
+            ? current.map((server) => (server.id === config.id ? config : server))
+            : [...current, config],
+        );
       }}
       onRemoveMcpServer={async (id) => {
         await props.onRemoveMcpServer?.(id);
-        setServers((current) => current.filter((entry) => entry.config.id !== id));
+        setServers((current) => current.filter((server) => server.id !== id));
       }}
       onSetMcpServerEnabled={async (id, enabled) => {
         await props.onSetMcpServerEnabled?.(id, enabled);
-        setServers((current) =>
-          current.map((entry) =>
-            entry.config.id === id
-              ? {
-                  ...entry,
-                  config: { ...entry.config, enabled },
-                  state: enabled ? (entry.state === "disabled" ? "connected" : entry.state) : "disabled",
-                }
-              : entry,
-          ),
-        );
+        setServers((current) => current.map((server) => (server.id === id ? { ...server, enabled } : server)));
       }}
     />
   );
@@ -91,6 +76,13 @@ const meta = {
     onSaveMcpServer: fn(async () => undefined),
     onRemoveMcpServer: fn(async () => undefined),
     onSetMcpServerEnabled: fn(async () => undefined),
+    // A test answers for the configuration given, so the one whose command is not on this machine
+    // fails even though every other field is filled in.
+    onTestMcpServer: fn(async (config: McpServerConfig) =>
+      config.command.startsWith("bunx")
+        ? { toolCount: 0, error: "Command not found: bunx" }
+        : { toolCount: 12, error: null },
+    ),
   },
   parameters: {
     layout: "fullscreen",
@@ -136,14 +128,51 @@ async function expectVisible(element: Element) {
   await waitFor(() => expect(element).toBeVisible());
 }
 
+/**
+ * The rows report what the user set, not a connection: OpenBot connects only when the user asks for
+ * a test, so a row that was never tested says only whether its tools are offered to the agents.
+ */
 export const McpList: Story = {
   play: async ({ userEvent }) => {
     const body = await openMcp(userEvent);
-    await expectVisible(await body.findByText("Connected · 12 tools"));
-    await expectVisible(body.getByText("Connected · 1 tool"));
-    await expectVisible(body.getByText("Disabled"));
-    await expectVisible(body.getByText("The command exited before it answered the handshake."));
+    await expectVisible(await body.findByText("Disabled"));
+    await expect(body.getAllByText("Enabled")).toHaveLength(3);
     await expect(body.getByRole("switch", { name: "Enable Figma" })).not.toBeChecked();
+  },
+};
+
+export const TestFromRowMenu: Story = {
+  play: async ({ args, userEvent }) => {
+    const body = await openMcp(userEvent);
+    await userEvent.click(body.getByRole("button", { name: "Actions for Local SQLite" }));
+    await userEvent.click(await body.findByRole("menuitem", { name: "Test connection" }));
+    await expectVisible(await body.findByText("Connected · 12 tools"));
+    await expect(args.onTestMcpServer).toHaveBeenCalledWith(expect.objectContaining({ id: "mcp-sqlite" }));
+  },
+};
+
+/** A failed test says why on the row, and the server stays exactly as it was. */
+export const TestFails: Story = {
+  play: async ({ args, userEvent }) => {
+    const body = await openMcp(userEvent);
+    await userEvent.click(body.getByRole("button", { name: "Actions for Playwright" }));
+    await userEvent.click(await body.findByRole("menuitem", { name: "Test connection" }));
+    await expectVisible(await body.findByText("Command not found: bunx"));
+    await expect(body.getByRole("switch", { name: "Enable Playwright" })).toBeChecked();
+    await expect(args.onSetMcpServerEnabled).not.toHaveBeenCalled();
+  },
+};
+
+/** The form tests the draft on screen, which is the answer a user wants before they save it. */
+export const TestDraftBeforeSaving: Story = {
+  play: async ({ args, userEvent }) => {
+    const body = await openForm(userEvent);
+    await enter(body.getByRole("textbox", { name: "Name" }), "Local SQLite");
+    await enter(body.getByRole("textbox", { name: "Command to launch" }), "openai-dev-mcp serve-sqlite");
+    await userEvent.click(body.getByRole("button", { name: "Test connection" }));
+    await expectVisible(await body.findByText("Connected · 12 tools"));
+    await expect(args.onTestMcpServer).toHaveBeenCalledWith(expect.objectContaining({ id: "", name: "Local SQLite" }));
+    await expect(args.onSaveMcpServer).not.toHaveBeenCalled();
   },
 };
 

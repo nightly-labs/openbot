@@ -9,7 +9,7 @@ import {
   isChannelRoute,
 } from "@openbot/contracts/team-protocol/channels-v1";
 import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
-import { isMcpRoute, mcpEvent, mcpRequest, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
+import { isMcpRoute, mcpRequest, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
 import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
@@ -729,7 +729,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         this.#failProtocol(hostId, "The host event sequence has a gap.");
         return;
       }
-      const optional = frame.type === "event" ? (channelEvent(frame.payload) ?? mcpEvent(frame.payload)) : null;
+      const optional = frame.type === "event" ? channelEvent(frame.payload) : null;
       const decoded = optional
         ? { status: "known" as const, event: optional }
         : decodeTeamProtocolV4CurrentEvent(frame);

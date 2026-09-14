@@ -89,7 +89,8 @@ export interface DesktopAnalyticsEvents {
       | "invite_revoked"
       | "mcp_server_saved"
       | "mcp_server_removed"
-      | "mcp_server_toggled";
+      | "mcp_server_toggled"
+      | "mcp_server_tested";
     result: AnalyticsResult;
     server_kind?: ServerKind;
     role?: "admin" | "member";
@@ -318,6 +319,7 @@ const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
     "mcp_server_saved",
     "mcp_server_removed",
     "mcp_server_toggled",
+    "mcp_server_tested",
   ],
   browser_action: ["open", "activate", "reload", "close"],
   remote_desktop_action: ["connect", "disconnect", "select_display"],

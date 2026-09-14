@@ -34,7 +34,8 @@ import {
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
   decodeChannelSummaries,
-  decodeMcpServerEntries,
+  decodeMcpServerConfigs,
+  decodeMcpTestResult,
   decodeOptionalAgentAnalytics,
   decodeOptionalHostAnalytics,
   decodeSaveAgentProfileResult,
@@ -972,16 +973,15 @@ const openbotApi: OpenBotDesktopApi = {
     // `invokeAgentForServer`, never `invokeAgent`: the settings modal can be open for a server the
     // user has not switched to, and `invokeAgent` would pin the selected one.
     listMcpServers: (serverId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.serversListMcpServers, null, decodeMcpServerEntries),
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversListMcpServers, null, decodeMcpServerConfigs),
     saveMcpServer: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.serversSaveMcpServer, input, decodeMcpServerEntries),
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversSaveMcpServer, input, decodeMcpServerConfigs),
     removeMcpServer: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.serversRemoveMcpServer, input, decodeMcpServerEntries),
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversRemoveMcpServer, input, decodeMcpServerConfigs),
     setMcpServerEnabled: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.serversSetMcpServerEnabled, input, decodeMcpServerEntries),
-    openMcpStatus: (serverId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.serversOpenMcpStatus, null, decodeMcpServerEntries),
-    closeMcpStatus: (serverId) => invokeAgentForServer(serverId, IPC_CHANNELS.serversCloseMcpStatus, null, decodeVoid),
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversSetMcpServerEnabled, input, decodeMcpServerConfigs),
+    testMcpServer: (input, serverId) =>
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversTestMcpServer, input, decodeMcpTestResult),
     readConversation: (agentId) => invokeAgent(IPC_CHANNELS.agentReadConversation, agentId, decodeConversation),
     readConversationPage: (input, serverId = selectedServerId) =>
       invokeAgentForServer(serverId, IPC_CHANNELS.agentReadConversationPage, input, decodeConversationPageFromMain),

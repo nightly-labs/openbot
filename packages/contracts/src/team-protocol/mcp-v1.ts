@@ -4,7 +4,8 @@
 // What this contract grants was a deliberate product decision and is recorded here because freezing
 // it makes it permanent: an admin session on a joined server can save an enabled stdio
 // configuration, which makes the host machine spawn that process, and every response carries the
-// full `env` and header values the host holds. `requireAdmin` on all four routes is the only gate.
+// full `env` and header values the host holds. `test` goes further still - it spawns the process the
+// caller just described, without saving it. `requireAdmin` on all five routes is the only gate.
 // Narrowing that later needs a second capability string, never an edit to this one.
 import { isDynamicRecord, isString } from "../runtime-values";
 import type { TeamProtocolV2Json } from "./v2";
@@ -14,15 +15,14 @@ export const MCP_ROUTES = {
   save: "/v1/mcp-servers/save",
   remove: "/v1/mcp-servers/delete",
   toggle: "/v1/mcp-servers/toggle",
+  test: "/v1/mcp-servers/test",
 } as const;
 
 type Decoder = (value: unknown) => TeamProtocolV2Json;
 type Fields = Record<string, Decoder>;
 
-const MCP_STATES = ["connected", "connecting", "failed", "disabled"] as const;
-
-// The typed primitives come first and the combinators wrap them, so `mcpEvent` can build the event
-// it promises without an assertion.
+// The typed primitives come first and the combinators wrap them, so each route decoder is built
+// from values that are already the type it promises.
 function text(value: unknown, maximum: number): string {
   if (!isString(value) || value.length > maximum) throw new Error("Invalid MCP text.");
   return value;
@@ -36,12 +36,6 @@ function toolCount(value: unknown): number {
     throw new Error("Invalid MCP tool count.");
   return value;
 }
-function connectionState(value: unknown): McpServersChangedEvent["statuses"][number]["state"] {
-  const state = MCP_STATES.find((candidate) => candidate === value);
-  if (!state) throw new Error("Invalid MCP state.");
-  return state;
-}
-
 const string =
   (maximum: number): Decoder =>
   (value) =>
@@ -94,14 +88,9 @@ const configFields: Fields = {
   headers: list(pair, 32),
 };
 const config: Decoder = (value) => record(value, configFields);
-const entry: Decoder = (value) =>
-  record(value, {
-    config,
-    state: oneOf(...MCP_STATES),
-    toolCount: count,
-    error: nullable(string(2_000)),
-  });
-const entries: Decoder = list(entry, 32);
+const configs: Decoder = list(config, 32);
+// A test is a question, not a record: it answers what one connection found and nothing is stored.
+const testResult: Decoder = (value) => record(value, { toolCount: count, error: nullable(string(2_000)) });
 
 const MCP_ROUTE_PATHS: ReadonlySet<string> = new Set(Object.values(MCP_ROUTES));
 
@@ -115,45 +104,15 @@ export function mcpRequest(path: string, value: unknown): TeamProtocolV2Json {
   if (pathname === MCP_ROUTES.save) return record(value, { config });
   if (pathname === MCP_ROUTES.remove) return record(value, { mcpServerId: identifier });
   if (pathname === MCP_ROUTES.toggle) return record(value, { mcpServerId: identifier, enabled: boolean });
+  if (pathname === MCP_ROUTES.test) return record(value, { config });
   throw new Error("Unknown MCP route.");
 }
 
 export function mcpResponse(path: string, status: number, value: unknown): TeamProtocolV2Json {
   if (status >= 400) return record(value, { error: string(100_000) });
   const pathname = new URL(path, "http://openbot.invalid").pathname;
-  // Every route answers with the whole list, so the panel never merges a partial result.
-  if (MCP_ROUTE_PATHS.has(pathname)) return entries(value);
+  if (pathname === MCP_ROUTES.test) return testResult(value);
+  // Every other route answers with the whole list, so the panel never merges a partial result.
+  if (MCP_ROUTE_PATHS.has(pathname)) return configs(value);
   throw new Error("Unknown MCP route.");
-}
-
-/**
- * Statuses only. A configuration carries `env` values and header values, so it must never ride a
- * broadcast event; the separate status shape is the reason it cannot.
- */
-export type McpServersChangedEvent = {
-  type: "mcp-servers-changed";
-  statuses: Array<{
-    id: string;
-    // Written out rather than imported: the states are part of the frozen contract, and a later
-    // state added to the IPC union must not change what a shipped peer is promised here.
-    state: "connected" | "connecting" | "failed" | "disabled";
-    toolCount: number;
-    error: string | null;
-  }>;
-};
-
-export function mcpEvent(value: unknown): McpServersChangedEvent | null {
-  if (!isDynamicRecord(value) || value.type !== "mcp-servers-changed") return null;
-  const raw = value.statuses;
-  if (!Array.isArray(raw) || raw.length > 32) throw new Error("Invalid MCP list.");
-  const statuses = raw.map((item) => {
-    if (!isDynamicRecord(item)) throw new Error("Invalid MCP record.");
-    return {
-      id: identifierText(item.id),
-      state: connectionState(item.state),
-      toolCount: toolCount(item.toolCount),
-      error: item.error === null ? null : text(item.error, 2_000),
-    };
-  });
-  return { type: "mcp-servers-changed", statuses };
 }

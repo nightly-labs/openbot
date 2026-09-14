@@ -42,7 +42,7 @@ import type {
   ListChannelRoutineRunsInput,
   ListRoutineRunsInput,
   McpServerConfig,
-  McpServerEntry,
+  McpTestResult,
   QueuedMessageReceipt,
   QueueSnapshot,
   RemoveMcpServerInput,
@@ -62,6 +62,7 @@ import type {
   SidebarSection,
   SteerQueuedMessageInput,
   TestChannelRoutineInput,
+  TestMcpServerInput,
   TestRoutineInput,
   UpdateAgentInput,
   UpdateAgentMemoryInput,
@@ -74,6 +75,8 @@ import {
   AGENT_RUNTIME_TEXT_LIMIT,
   defaultProviderModel,
   isMessageReaction,
+  mcpConfigErrors,
+  normalizeMcpConfig,
   skillConversationEventItemType,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
@@ -120,8 +123,8 @@ import type { BundledProviderExecutables } from "./cli";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "./conversation-read-store";
 import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
+import { testMcpServer } from "./mcp-probe";
 import { McpServerStore } from "./mcp-server-store";
-import { McpStatusMonitor } from "./mcp-status-monitor";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { RoutineTimer } from "./routine-timer";
@@ -196,7 +199,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #routineTimer: RoutineTimer;
   readonly #channelRoutines: ChannelRoutineScheduler;
   readonly #mcpServers: McpServerStore;
-  readonly #mcpStatus: McpStatusMonitor;
   readonly #providers: ProviderRuntime;
   readonly #prepareAgentWorkspace: (agent: AgentSummary) => Promise<void>;
   readonly #hostedSites: HostedSiteCoordinator;
@@ -555,10 +557,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
     });
     this.#mcpServers = new McpServerStore(store.database);
-    this.#mcpStatus = new McpStatusMonitor({
-      configs: () => this.#mcpServers.list(),
-      emit: (statuses) => this.#emit({ type: "mcp-servers-changed", statuses }),
-    });
     this.#drain = new DrainScheduler({
       channels: this.channels,
       store,
@@ -784,51 +782,46 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
-   * The MCP servers this machine holds, each with the connection the panel last made. When no panel
-   * is watching there is no connection to report, so an enabled server reads as `connecting`.
+   * The MCP servers this machine holds.
+   *
+   * Configurations only: OpenBot holds no connection of its own to report. A connection is made
+   * when the user asks for a test, and when an agent starts - and the second is the provider's own.
    */
-  listMcpServers(): McpServerEntry[] {
-    const statuses = this.#mcpStatus.statuses();
-    return this.#mcpServers.list().map((config) => {
-      const status = statuses.get(config.id);
-      return {
-        config,
-        state: status?.state ?? (config.enabled ? "connecting" : "disabled"),
-        toolCount: status?.toolCount ?? 0,
-        error: status?.error ?? null,
-      };
-    });
+  listMcpServers(): McpServerConfig[] {
+    return this.#mcpServers.list();
   }
 
-  saveMcpServer(input: SaveMcpServerInput): McpServerEntry[] {
-    const saved = this.#mcpServers.save(input.config);
-    this.#mcpStatus.reprobe(saved.id);
+  saveMcpServer(input: SaveMcpServerInput): McpServerConfig[] {
+    this.#mcpServers.save(input.config);
     return this.listMcpServers();
   }
 
-  removeMcpServer(input: RemoveMcpServerInput): McpServerEntry[] {
+  removeMcpServer(input: RemoveMcpServerInput): McpServerConfig[] {
     this.#mcpServers.remove(input.mcpServerId);
-    this.#mcpStatus.reprobe(input.mcpServerId);
     return this.listMcpServers();
   }
 
-  setMcpServerEnabled(input: SetMcpServerEnabledInput): McpServerEntry[] {
+  setMcpServerEnabled(input: SetMcpServerEnabledInput): McpServerConfig[] {
     this.#mcpServers.setEnabled(input.mcpServerId, input.enabled);
-    this.#mcpStatus.reprobe(input.mcpServerId);
     return this.listMcpServers();
   }
 
-  /** The settings panel starts watching. Connections last only as long as the panel is open. */
-  openMcpStatus(): McpServerEntry[] {
-    this.#mcpStatus.open();
-    return this.listMcpServers();
+  /**
+   * Connects to the configuration the user is looking at, once, and reports what it found.
+   *
+   * The configuration comes from the form, not from the table, so a draft can be tested before it
+   * is saved. It is validated here first: a name this machine reserves, or a missing command, is a
+   * sentence rather than a connection attempt.
+   */
+  async testMcpServer(input: TestMcpServerInput): Promise<McpTestResult> {
+    const config = normalizeMcpConfig(input.config);
+    const errors = mcpConfigErrors(config);
+    const firstError = errors.name ?? errors.command ?? errors.url;
+    if (firstError) throw new Error(firstError);
+    return testMcpServer(config);
   }
 
-  closeMcpStatus(): Promise<void> {
-    return this.#mcpStatus.close();
-  }
-
-  /** What the providers are given at spawn. They connect for themselves; the monitor is not used. */
+  /** What the providers are given at spawn. They connect for themselves; a test is not used. */
   enabledMcpServers(): McpServerConfig[] {
     return this.#mcpServers.listEnabled();
   }
@@ -1408,7 +1401,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   async stop(): Promise<void> {
     this.#stopping = true;
     const channelStop = this.channels.stop();
-    const mcpStop = this.#mcpStatus.stop();
     this.#initialized = false;
     this.#routineTimer.dispose();
     this.#hostedSites.dispose();
@@ -1434,7 +1426,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#drain.dispose();
     this.#browser.clearControls();
     await Promise.all(clients.map((client) => client.stop().catch(() => undefined)));
-    await Promise.all([channelStop, mcpStop]);
+    await channelStop;
     await Promise.allSettled(this.#drain.pendingTasks());
     await Promise.allSettled(this.#images.pendingPromises());
     this.#images.dispose();

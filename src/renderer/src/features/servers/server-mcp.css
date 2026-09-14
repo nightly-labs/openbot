@@ -46,6 +46,12 @@
   margin-bottom: var(--openbot-space-2);
 }
 
+/* A test result is one sentence under the Test section's own button, not a field. */
+.server-mcp-test-result {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
 .server-mcp-empty {
   display: flex;
   flex-direction: column;

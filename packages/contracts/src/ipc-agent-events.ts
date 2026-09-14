@@ -21,7 +21,6 @@ import {
   isConversationReadState,
   isConversationSnapshot,
 } from "./ipc-conversations";
-import { isMcpServerStatus, type McpServerStatus } from "./ipc-mcp-servers";
 import { isQueueSnapshot, type QueueSnapshot } from "./ipc-queue";
 import { isSidebarLayoutSnapshot, type SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
@@ -41,9 +40,6 @@ export type AgentEvent =
   | { type: "routines-changed"; agentId: string }
   | { type: "channel-memories-changed"; channelId: string }
   | { type: "channel-routines-changed"; channelId: string }
-  // Statuses only. An agent event is broadcast, and an MCP config carries `env` values and header
-  // values, so a config must never ride one.
-  | { type: "mcp-servers-changed"; statuses: McpServerStatus[] }
   | { type: "sidebar-layout-changed"; layout: SidebarLayoutSnapshot }
   | { type: "conversation"; snapshot: ConversationSnapshot }
   | { type: "conversation-invalidated"; agentId: string; revision: number }
@@ -117,12 +113,6 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
     case "channel-memories-changed":
     case "channel-routines-changed":
       return isIdentifier(value.channelId);
-    case "mcp-servers-changed":
-      return (
-        Array.isArray(value.statuses) &&
-        value.statuses.length <= INPUT_LIMITS.mcpServers &&
-        value.statuses.every(isMcpServerStatus)
-      );
     case "sidebar-layout-changed":
       return isSidebarLayoutSnapshot(value.layout);
     case "conversation":
