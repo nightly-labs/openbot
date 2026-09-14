@@ -112,7 +112,14 @@ export function claudeMcpServers(servers: readonly UsableMcpServer[]): Record<st
   return record;
 }
 
-/** ACP reads an array, and its environment and headers are `{ name, value }` pairs, not records. */
+/**
+ * ACP reads an array, and its environment and headers are `{ name, value }` pairs, not records.
+ *
+ * **No working directory.** `McpServerStdio` in the ACP schema carries only a name, a command,
+ * arguments and an environment, so a server that names a directory is left out rather than started
+ * in the provider's own. A server told to open `./data.db` would otherwise pass its test and then
+ * create a second, empty database beside the agent's workspace. The form says so before the save.
+ */
 export type AcpMcpServer =
   | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }> }
   | { type: "http"; name: string; url: string; headers: Array<{ name: string; value: string }> };
@@ -123,6 +130,7 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): AcpMcpServer
     if (server.error !== undefined) continue;
     const { config } = server;
     if (config.transport === "stdio") {
+      if (config.workingDirectory) continue;
       entries.push({
         name: config.name,
         command: server.command,
@@ -145,9 +153,11 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): AcpMcpServer
  * Codex reads `config.mcp_servers`, a record keyed by name, which `profile-generation.ts` already
  * writes to disable the user's own servers.
  *
- * **stdio only.** The record's http shape could not be confirmed against the pinned Codex
- * app-server, and a guessed key name would fail silently at the next turn, so an http server is
- * left out of the Codex payload instead. Every other provider still gets it.
+ * **stdio only, and no working directory.** Neither the record's http shape nor a key for a working
+ * directory could be confirmed against the pinned Codex app-server, and a guessed key name would
+ * fail silently at the next turn. Both are left out of the Codex payload instead: a directory that
+ * does not arrive would start the server in the wrong place, which a server told to open
+ * `./data.db` answers by creating a second database. Every other capable provider still gets it.
  */
 export type CodexMcpServer = { command: string; args: string[]; env: Record<string, string> };
 
@@ -155,6 +165,7 @@ export function codexMcpServers(servers: readonly UsableMcpServer[]): Record<str
   const record: Record<string, CodexMcpServer> = {};
   for (const server of servers) {
     if (server.error !== undefined || server.config.transport !== "stdio") continue;
+    if (server.config.workingDirectory) continue;
     record[server.config.name] = {
       command: server.command,
       args: [...server.config.args],

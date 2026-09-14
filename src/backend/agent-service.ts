@@ -123,6 +123,7 @@ import type { BundledProviderExecutables } from "./cli";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "./conversation-read-store";
 import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
+import { McpHandoffLog } from "./mcp-handoff-log";
 import { testMcpServer } from "./mcp-probe";
 import { McpServerStore } from "./mcp-server-store";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
@@ -199,6 +200,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #routineTimer: RoutineTimer;
   readonly #channelRoutines: ChannelRoutineScheduler;
   readonly #mcpServers: McpServerStore;
+  /**
+   * What has already been handed to a provider process, kept for redaction. Declared here because
+   * both hand-off paths - the client credentials and `enabledMcpServers` - start in this class.
+   */
+  readonly #mcpHandoff = new McpHandoffLog();
   readonly #providers: ProviderRuntime;
   readonly #prepareAgentWorkspace: (agent: AgentSummary) => Promise<void>;
   readonly #hostedSites: HostedSiteCoordinator;
@@ -362,7 +368,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       bundledExecutables,
       // The exclusion travels with the credentials, so the client that holds a session on a removed
       // endpoint can refuse the prompt itself, after the waits every caller above it makes.
-      credentials: { ...credentials, servesModel: (modelId) => this.#servesModel(modelId) },
+      credentials: {
+        ...credentials,
+        servesModel: (modelId) => this.#servesModel(modelId),
+        // Every MCP set that leaves for a provider is remembered, so its secrets stay redactable
+        // after the user edits them. This is the second of the two ways one leaves; the other is
+        // `enabledMcpServers`, which the Codex thread configuration reads.
+        mcpServers: () => this.#mcpHandoff.record(credentials.mcpServers()),
+      },
+      mcpHandoff: this.#mcpHandoff,
     });
     this.#compaction = new ContextCompaction({
       store,
@@ -835,7 +849,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /** What the providers are given at spawn. They connect for themselves; a test is not used. */
   enabledMcpServers(): McpServerConfig[] {
-    return this.#mcpServers.listEnabled();
+    return this.#mcpHandoff.record(this.#mcpServers.listEnabled());
   }
 
   listModels(): AgentModelOption[] {

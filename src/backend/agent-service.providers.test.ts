@@ -367,6 +367,21 @@ describe.sequential("AgentService: providers", () => {
         headers: [],
       },
     });
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Database",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["--database", "./data.db"],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: root,
+        url: "",
+        headers: [],
+      },
+    });
 
     await service.sendMessage({ agentId: "chief", text: "Continue." });
     await waitFor(() =>
@@ -375,6 +390,8 @@ describe.sequential("AgentService: providers", () => {
     expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
     const starts = client.requests.filter((request) => request.method === "thread/start");
     expect(starts).toHaveLength(2);
+    // `Database` is left out: the Codex configuration shape for a working directory is unconfirmed,
+    // and a server told to open `./data.db` from the wrong place creates a second database.
     expect(paramsRecord(starts[1]?.params)?.config).toEqual({
       mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: {} } },
     });

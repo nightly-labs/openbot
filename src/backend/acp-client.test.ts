@@ -388,6 +388,19 @@ describe("OpenCode ACP MCP servers", () => {
         url: "",
         headers: [],
       },
+      {
+        id: "mcp-3",
+        name: "Database",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["--database", "./data.db"],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: tmpdir(),
+        url: "",
+        headers: [],
+      },
     ];
     const client = startOpencode(fake.cli, () => null, fake.envLog, { mcpServers: () => configs });
     await client.request("initialize", {}, decodeRecordResponse);
@@ -405,7 +418,9 @@ describe("OpenCode ACP MCP servers", () => {
       env: [{ name: "TOKEN", value: "secret" }],
     });
     // A disabled server is not sent, and OpenBot's own bridge entries append after these, so a
-    // user's server can never displace one.
+    // user's server can never displace one. `Database` is not sent either: ACP carries no working
+    // directory, and a server told to open `./data.db` somewhere else creates a second database
+    // rather than reading the one the user named.
     expect(params.mcpServers.map((server: { name: string }) => server.name)).toEqual(["Filesystem"]);
   });
 });

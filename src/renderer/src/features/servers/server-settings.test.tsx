@@ -118,6 +118,37 @@ describe("server settings MCP", () => {
     expect(store.serverSettingsLoading()).toBe(false);
   });
 
+  // The user can leave the MCP section and come back, which starts a read while the rows on screen
+  // are still actionable. A removal that answers first must not be undone by that read.
+  it("keeps a removed server out when an earlier list read answers late", async () => {
+    mock = createMockOpenBot();
+    let gate: Promise<void> | null = null;
+    const list: typeof mock.api.agent.listMcpServers = async (serverId) => {
+      // The list is read before the wait, so this answers with the servers as they were then.
+      const answer = await mock?.api.agent.listMcpServers(serverId);
+      if (!answer) throw new Error("The list did not answer.");
+      if (gate) await gate;
+      return answer;
+    };
+    window.openbot = { ...mock.api, agent: { ...mock.api.agent, listMcpServers: list } };
+
+    const store = await openLocalSettings();
+    await store.refreshMcpServers();
+    const removed = store.serverSettingsMcp().at(0);
+    if (!removed) throw new Error("The mock server has no MCP servers to remove.");
+
+    let open = (): void => undefined;
+    gate = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    const late = store.refreshMcpServers();
+    await store.removeMcpServer(removed.id);
+    open();
+    await late;
+
+    expect(store.serverSettingsMcp().some((config) => config.id === removed.id)).toBe(false);
+  });
+
   it("takes the whole list from a save reply", async () => {
     mock = createMockOpenBot();
     window.openbot = mock.api;

@@ -586,10 +586,11 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
 
               {/* The limit is named here, before the save, because it cannot be fixed afterwards:
                   the ACP protocol carries no working directory and the Codex configuration shape
-                  for one is unconfirmed, so only Claude and the test can honour this field. */}
+                  for one is unconfirmed, so only Claude and the test can honour this field. The
+                  other providers skip such a server rather than start it somewhere else. */}
               <Field
                 label="Working directory"
-                description="Claude agents and the connection test start the server here. The other providers start it in their own directory."
+                description="Claude agents and the connection test start the server here. Leave it empty to give this server to every provider: the other providers cannot set a directory, so they skip a server that names one."
               >
                 <Input
                   size="md"

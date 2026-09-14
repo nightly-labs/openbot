@@ -340,21 +340,43 @@ export class ThreadLifecycle {
 
   applyPendingRuntimeRefresh(agent: AgentSummary): void {
     if (!this.#pendingRuntimeRefreshes.has(agent.id)) return;
-    const session = this.#store.activeProviderSession(agent.id);
-    if (!session || !agent.threadId) {
+    // Every thread of this agent, not only `agent.threadId`: a channel turn runs on an execution
+    // thread of its own, and its provider session holds the same stale runtime as the agent's.
+    const threadIds = this.#store.database.activeProviderSessionThreads(agent.id);
+    if (threadIds.length === 0) {
       this.#pendingRuntimeRefreshes.delete(agent.id);
       return;
     }
-    const activeTurnId =
-      this.#conversation.snapshot(agent.id)?.activeTurnId ??
-      this.#store.database.readConversation(agent.id, agent.threadId).activeTurnId;
-    if (activeTurnId) return;
-    this.#store.database.deactivateProviderSessions(agent.threadId);
-    this.#conversation.unbindThread(session.externalSessionId);
-    this.#conversation.unloadThread(session.externalSessionId);
-    this.#compaction.forgetThread(session.externalSessionId);
-    this.#pendingHandoffs.delete(session.externalSessionId);
-    this.#pendingRuntimeRefreshes.delete(agent.id);
+    let deferred = false;
+    for (const threadId of threadIds) {
+      // A running turn owns its provider session, so the refresh waits for it. The mark stays, and
+      // the next drain of this agent refreshes the thread that was busy this time.
+      if (this.#activeTurnOf(agent.id, threadId)) deferred = true;
+      else this.#refreshThreadRuntime(threadId);
+    }
+    if (!deferred) this.#pendingRuntimeRefreshes.delete(agent.id);
+  }
+
+  #activeTurnOf(agentId: string, threadId: string): string | null {
+    const snapshot = [...this.#conversation.activeSnapshots()].find(
+      ([id, candidate]) => id === agentId && candidate.threadId === threadId,
+    )?.[1];
+    return snapshot?.activeTurnId ?? this.#store.database.readConversation(agentId, threadId).activeTurnId;
+  }
+
+  /**
+   * Drops the provider-side state of one thread and keeps the thread itself. The public thread row
+   * and its messages stay, so the next turn starts a new provider session with the same history.
+   */
+  #refreshThreadRuntime(threadId: string): void {
+    const sessions = this.#store.database.listProviderSessions(threadId).filter((one) => one.state === "active");
+    this.#store.database.deactivateProviderSessions(threadId);
+    for (const session of sessions) {
+      this.#conversation.unbindThread(session.externalSessionId);
+      this.#conversation.unloadThread(session.externalSessionId);
+      this.#compaction.forgetThread(session.externalSessionId);
+      this.#pendingHandoffs.delete(session.externalSessionId);
+    }
   }
 
   buildProviderHandoff(agentId: string, threadId: string): string | null {

@@ -871,6 +871,47 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     ]);
   });
 
+  it("redacts an MCP credential a running provider still holds after the user removes the server", async () => {
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+      const client = new FakeAgentClient(provider);
+      clients.set(provider, client);
+      return client;
+    });
+    await service.initialize();
+    const client = clients.get("codex");
+    if (!client) throw new Error("The fake provider did not start.");
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: [],
+        env: [{ key: "API_KEY", value: "abcdef123456" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    // What a spawn reads. The running process keeps this credential until it stops.
+    expect(service.enabledMcpServers()).toHaveLength(1);
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+
+    // The user removes the server while that process runs, so the store no longer names the value.
+    service.removeMcpServer({ mcpServerId: service.listMcpServers()[0]?.id ?? "" });
+    client.emit("diagnostic", "Failed to spawn MCP server 'Filesystem': rejected abcdef123456");
+
+    await waitFor(() => events.filter((event) => event.type === "error").length === 1);
+    expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({ message: "Failed to spawn MCP server 'Filesystem': rejected •••" }),
+    ]);
+  });
+
   it("keeps Grok's telemetry export failure out of the chat it was switched into", async () => {
     process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
     const { store, mailbox } = stores(root);

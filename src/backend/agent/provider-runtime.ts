@@ -21,7 +21,8 @@ import {
   type CodexCliInfo,
   resolveCodexCli,
 } from "./../cli";
-import { redactAllMcpSecrets } from "./../mcp-redaction";
+import { McpHandoffLog } from "./../mcp-handoff-log";
+import { mcpSecretValues, redactMcpValues } from "./../mcp-redaction";
 import { openCodeSignInMessage } from "./../opencode-config";
 import {
   type AccountLoginCompletedResult,
@@ -330,6 +331,15 @@ export class ProviderRuntime implements ProviderPort {
   readonly #bundledExecutables: BundledProviderExecutables;
   readonly #credentials: ProviderClientContext;
   readonly #clients = new Map<AgentProvider, AgentClient>();
+  /**
+   * What this app has already handed to a provider process.
+   *
+   * A process keeps the configuration it spawned with until it stops, and the user can edit a
+   * credential or disable a server while a turn runs - `applyPendingRuntimeRefresh` waits for that
+   * turn on purpose. Reading only the current configuration when a diagnostic arrives would
+   * therefore miss the value the process is quoting.
+   */
+  readonly #mcpHandoff: McpHandoffLog;
   /** What each client's process read when it spawned, which decides what its catalogue may confirm. */
   readonly #configRevisions = new WeakMap<AgentClient, number>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
@@ -373,6 +383,7 @@ export class ProviderRuntime implements ProviderPort {
     clientFactory: AgentClientFactory | null;
     bundledExecutables: BundledProviderExecutables;
     credentials: ProviderClientContext;
+    mcpHandoff?: McpHandoffLog;
   }) {
     this.#conversation = options.conversation;
     this.#hooks = options.hooks;
@@ -384,6 +395,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#clientFactory = options.clientFactory;
     this.#bundledExecutables = { ...options.bundledExecutables };
     this.#credentials = options.credentials;
+    this.#mcpHandoff = options.mcpHandoff ?? new McpHandoffLog();
   }
 
   /**
@@ -1441,17 +1453,17 @@ export class ProviderRuntime implements ProviderPort {
     this.#hooks.bindClient(client);
     client.on("diagnostic", (raw) => {
       if (!/error|failed|warning/i.test(raw)) return;
+      // The configuration as it stands now, joined with what this client was actually given. The
+      // union covers both directions: a server added since the spawn, and a credential this process
+      // still holds after the user changed it.
       const configs = this.#credentials.mcpServers();
+      const names = new Set([...configs.map((config) => config.name), ...this.#mcpHandoff.names()]);
+      const values = new Set([...mcpSecretValues(configs), ...this.#mcpHandoff.values()]);
       // Redacted before the first use, not at each one. A CLI reports an MCP failure by quoting
       // what it sent, so an API key or an inherited credential is in the line that is about to be
       // logged or turned into a renderer error event.
-      const message = redactAllMcpSecrets(raw, configs);
-      if (
-        isMcpSubsystemDiagnostic(
-          message,
-          configs.map((config) => config.name),
-        )
-      ) {
+      const message = redactMcpValues(raw, values);
+      if (isMcpSubsystemDiagnostic(message, [...names])) {
         logger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });
         return;
       }

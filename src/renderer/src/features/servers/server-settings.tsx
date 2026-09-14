@@ -387,7 +387,13 @@ const ServerSettings = createSimpleContext({
         const configs = await mutate(server.id);
         analytics.track("team_action", { action, result: "succeeded", server_kind: server.kind });
         operationSucceeded = true;
-        if (serverSettingsTargetId() === server.id) setServerSettingsMcp(configs);
+        if (serverSettingsTargetId() !== server.id) return;
+        // A read that is still in flight started before this write and would answer with the list
+        // as it was, putting a removed server back or showing the old enabled state. The reply
+        // carries the whole list, so nothing is lost by dropping that read.
+        serverSettingsMcpRequest += 1;
+        setServerSettingsMcp(configs);
+        setServerSettingsMcpError(null);
       } catch (error) {
         if (!operationSucceeded) {
           analytics.track("team_action", {

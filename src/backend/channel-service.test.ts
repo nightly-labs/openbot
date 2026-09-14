@@ -93,6 +93,28 @@ describe("shared channel coordination", () => {
     expect(execution?.text).toContain(task.instruction);
     expect(data.mailbox.conversationMessages("agent-a")).toEqual([]);
   });
+  it("lists the channel execution thread among the agent provider session threads", async () => {
+    const threadId = await data.store.ensureThreadId("agent-a");
+    data.store.bindProviderSession("agent-a", "normal-provider-session");
+    await send("Prepare the report");
+    const assignment = required(service.store.assignments("channel-1")[0]);
+    const context = required(data.mailbox.getDelivery(required(assignment.deliveryId)));
+    const execution = required(await service.prepare(context));
+    data.store.database.bindProviderSession({
+      threadId: execution.threadId,
+      provider: "codex",
+      externalSessionId: "channel-provider-session",
+      model: "gpt-5",
+      effort: "medium",
+    });
+
+    // Both, and this is the point: a caller that reads `agent.threadId` alone - a refresh after an
+    // MCP or tool change - would leave the channel session running on the old configuration.
+    expect(data.store.database.activeProviderSessionThreads("agent-a").sort()).toEqual(
+      [threadId, execution.threadId].sort(),
+    );
+    expect(data.store.database.activeProviderSessionThreads("agent-b")).toEqual([]);
+  });
   it("saves one visible request when a command is retried", async () => {
     const command = {
       type: "send" as const,

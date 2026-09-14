@@ -85,6 +85,27 @@ export class ProviderSessions {
     ).map((row) => requiredStringColumn(row, "external_session_id"));
   }
 
+  /**
+   * Every thread of one agent that holds an active provider session.
+   *
+   * An agent has more than one: its own thread, and one execution thread for each channel it works
+   * in. A caller that must reach all of a provider's resume state - a refresh after a tool or MCP
+   * change - cannot read `agent.threadId` alone, because a channel turn runs on a thread that field
+   * never names.
+   */
+  activeProviderSessionThreads(agentId: string): string[] {
+    return databaseRows(
+      this.#core.connection
+        .prepare(
+          `SELECT DISTINCT session.thread_id
+           FROM projection_provider_sessions session
+           JOIN projection_threads thread ON thread.thread_id = session.thread_id
+           WHERE thread.agent_id = ? AND session.state = 'active'`,
+        )
+        .all(agentId),
+    ).map((row) => requiredStringColumn(row, "thread_id"));
+  }
+
   bindProviderSession(input: {
     threadId: string;
     provider: AgentProviderId;

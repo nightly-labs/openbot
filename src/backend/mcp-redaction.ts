@@ -13,31 +13,39 @@ const MASK = "•••";
  * shared across the app; this covers the values only this configuration knows.
  */
 export function redactMcpSecrets(text: string, config: McpServerConfig): string {
-  return redactText(maskSecretsOf(text, config));
+  return redactMcpValues(text, mcpSecretValues([config]));
 }
 
 /**
- * The same, for a piece of text that could quote any of several configurations - a provider's
- * stderr, which carries every MCP server that provider was given.
+ * The same against values collected earlier, for a reader that cannot use the configuration as it
+ * stands now.
+ *
+ * A provider process keeps the credentials it was given until it stops, and the user can edit or
+ * disable a server while that process still runs. Its stderr then quotes the old value, which the
+ * new configuration no longer names. The caller retains what it handed over and passes it here.
  */
-export function redactAllMcpSecrets(text: string, configs: readonly McpServerConfig[]): string {
+export function redactMcpValues(text: string, values: Iterable<string>): string {
   let result = text;
-  for (const config of configs) result = maskSecretsOf(result, config);
-  return redactText(result);
-}
-
-/**
- * The values are read from `mcpEnvironment`, not from `config.env`, because that is the environment
- * the server was actually started with: a credential named by `envPassthrough` is inherited from
- * this machine and never appears in `config.env`, so reading the stored pairs alone would let it
- * out. A short value is left alone - masking a two-character value would hide ordinary words.
- */
-function maskSecretsOf(text: string, config: McpServerConfig): string {
-  let result = text;
-  const values = [...Object.values(mcpEnvironment(config)), ...config.headers.map((pair) => pair.value)];
   for (const value of values) {
     if (value.length < 4) continue;
     result = result.split(value).join(MASK);
   }
-  return result;
+  return redactText(result);
+}
+
+/**
+ * Every secret value these configurations carry, without duplicates.
+ *
+ * The environment is read from `mcpEnvironment`, not from `config.env`, because that is what the
+ * server is actually started with: a credential named by `envPassthrough` is inherited from this
+ * machine and never appears in `config.env`, so reading the stored pairs alone would let it out.
+ */
+export function mcpSecretValues(configs: readonly McpServerConfig[]): string[] {
+  const values = new Set<string>();
+  for (const config of configs) {
+    for (const value of Object.values(mcpEnvironment(config))) values.add(value);
+    for (const pair of config.headers) values.add(pair.value);
+  }
+  // A short value is left alone - masking a two-character value would hide ordinary words.
+  return [...values].filter((value) => value.length >= 4);
 }
