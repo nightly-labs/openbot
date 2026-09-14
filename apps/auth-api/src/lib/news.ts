@@ -24,6 +24,14 @@ export const NEWS_COLLECTION: ContentCollection = {
   imageEyebrow: "OPENBOT · NEWS",
   articles: publishedFirst([
     {
+      slug: "introducing-openbot",
+      title: "Introducing OpenBot: A Shared Workspace for AI Agents",
+      description:
+        "Meet OpenBot, a local-first workspace where the AI models you already use can work as a team of agents, alongside you and your coworkers.",
+      publishedAt: "2026-09-14",
+      author: NEWS_AUTHOR,
+    },
+    {
       slug: "your-work-stays-on-your-computer",
       title: "Your work stays on your computer",
       description:
