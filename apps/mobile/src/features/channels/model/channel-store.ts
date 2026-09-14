@@ -1,0 +1,323 @@
+import {
+  CHANNEL_CHATS_CAPABILITY,
+  CHANNEL_DELETE_CAPABILITY,
+  type ChannelCommand,
+  type ChannelPage,
+  type ChannelSummary,
+  type CreateChannelRoutineInput,
+  decodeChannel,
+  decodeChannelMemories,
+  decodeChannelPage,
+  decodeChannelRoutines,
+  decodeChannelSummaries,
+  isAttachmentSummary,
+  type UpdateChannelRoutineInput,
+} from "@openbot/contracts/ipc";
+import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import { userErrorMessage } from "@openbot/user-errors";
+
+export type ChannelRequest = <T>(
+  method: string,
+  path: string,
+  decode: (value: unknown) => T,
+  body: TeamProtocolV2Json | undefined,
+  serverId: string,
+  upload?: RemoteFileUpload,
+) => Promise<T>;
+export interface ChannelState {
+  channels: ChannelSummary[];
+  pages: ReadonlyMap<string, ChannelPage>;
+  supported: boolean;
+  canDelete: boolean;
+  loading: boolean;
+  error: string | null;
+}
+const EMPTY: ChannelState = {
+  channels: [],
+  pages: new Map(),
+  supported: false,
+  canDelete: false,
+  loading: false,
+  error: null,
+};
+interface Entry {
+  state: ChannelState;
+  listeners: Set<() => void>;
+  observed: Map<string, number>;
+  pending: Promise<void> | null;
+  dirty: boolean;
+  valid: boolean;
+  writes: number;
+}
+
+/** Channel events are invalidations. Keep one read in flight and one trailing read per host. */
+export class MobileChannelStore {
+  private entries = new Map<string, Entry>();
+  private listeners = new Map<string, Set<() => void>>();
+  private active = true;
+  setActive(active: boolean) {
+    this.active = active;
+  }
+  retainServers(ids: string[]) {
+    const available = new Set(ids);
+    for (const id of this.entries.keys()) if (!available.has(id)) this.remove(id);
+  }
+  constructor(
+    private request: ChannelRequest,
+    private onList?: (serverId: string, channels: ChannelSummary[]) => void,
+  ) {}
+
+  private entry(serverId: string): Entry {
+    let entry = this.entries.get(serverId);
+    if (!entry) {
+      const listeners = this.listeners.get(serverId) ?? new Set<() => void>();
+      this.listeners.set(serverId, listeners);
+      entry = { state: EMPTY, listeners, observed: new Map(), pending: null, dirty: false, valid: true, writes: 0 };
+      this.entries.set(serverId, entry);
+    }
+    return entry;
+  }
+  get(serverId: string) {
+    return this.entry(serverId).state;
+  }
+  subscribe(serverId: string, listener: () => void) {
+    const entry = this.entry(serverId);
+    entry.listeners.add(listener);
+    return () => {
+      entry.listeners.delete(listener);
+    };
+  }
+  private publish(entry: Entry, patch: Partial<ChannelState>) {
+    if (!entry.valid) return;
+    const next = { ...entry.state, ...patch };
+    if (
+      next.channels === entry.state.channels &&
+      next.pages === entry.state.pages &&
+      next.supported === entry.state.supported &&
+      next.canDelete === entry.state.canDelete &&
+      next.loading === entry.state.loading &&
+      next.error === entry.state.error
+    )
+      return;
+    entry.state = next;
+    for (const listener of entry.listeners) listener();
+  }
+  configure(serverId: string, capabilities: string[]) {
+    const entry = this.entry(serverId);
+    this.publish(entry, {
+      supported: capabilities.includes(CHANNEL_CHATS_CAPABILITY),
+      canDelete: capabilities.includes(CHANNEL_DELETE_CAPABILITY),
+    });
+  }
+  remove(serverId: string) {
+    const entry = this.entries.get(serverId);
+    if (!entry) return;
+    this.publish(entry, EMPTY);
+    entry.valid = false;
+    this.entries.delete(serverId);
+  }
+  dispose() {
+    for (const id of this.entries.keys()) this.remove(id);
+  }
+  observe(serverId: string, channelId: string) {
+    const entry = this.entry(serverId);
+    entry.observed.set(channelId, (entry.observed.get(channelId) ?? 0) + 1);
+    void this.refresh(serverId);
+    return () => {
+      const count = (entry.observed.get(channelId) ?? 1) - 1;
+      if (count) entry.observed.set(channelId, count);
+      else {
+        entry.observed.delete(channelId);
+        // Match single chats: keep short windows for reopening while offline.
+        if ((entry.state.pages.get(channelId)?.messages.length ?? 0) > 50) {
+          const pages = new Map(entry.state.pages);
+          pages.delete(channelId);
+          this.publish(entry, { pages });
+        }
+      }
+    };
+  }
+  refresh(serverId: string): Promise<void> {
+    const entry = this.entry(serverId);
+    if (!this.active || !entry.state.supported) return Promise.resolve();
+    if (entry.pending) {
+      entry.dirty = true;
+      return entry.pending;
+    }
+    const run = async () => {
+      do {
+        entry.dirty = false;
+        this.publish(entry, { loading: true, error: null });
+        try {
+          const writes = entry.writes;
+          const channels = await this.request("GET", CHANNEL_ROUTES.list, decodeChannelSummaries, undefined, serverId);
+          if (!entry.valid || !this.active) return;
+          if (writes !== entry.writes) {
+            entry.dirty = true;
+            continue;
+          }
+          this.onList?.(serverId, channels);
+          const ids = new Set(channels.map((channel) => channel.id));
+          const pages = new Map(entry.state.pages);
+          for (const id of pages.keys()) if (!ids.has(id)) pages.delete(id);
+          this.publish(entry, { channels, pages: pages.size === entry.state.pages.size ? entry.state.pages : pages });
+          for (const id of entry.observed.keys()) {
+            if (!ids.has(id)) continue;
+            const page = await this.request(
+              "POST",
+              CHANNEL_ROUTES.read,
+              decodeChannelPage,
+              { channelId: id },
+              serverId,
+            );
+            if (!entry.valid || !this.active) return;
+            if (writes !== entry.writes) {
+              entry.dirty = true;
+              break;
+            }
+            if (!entry.observed.has(id)) continue;
+            const current = entry.state.pages.get(id);
+            if (current && page.channel.revision < current.channel.revision) continue;
+            const nextPages = new Map(entry.state.pages);
+            nextPages.set(id, mergeLatestChannelPage(current, page));
+            this.publish(entry, { pages: nextPages });
+          }
+        } catch (error) {
+          this.publish(entry, { error: userErrorMessage(error, "Could not load channels. Try again.") });
+        } finally {
+          this.publish(entry, { loading: false });
+        }
+      } while (entry.valid && this.active && entry.dirty);
+    };
+    entry.pending = run().finally(() => {
+      entry.pending = null;
+    });
+    return entry.pending;
+  }
+  async older(serverId: string, channelId: string) {
+    const entry = this.entry(serverId);
+    const current = entry.state.pages.get(channelId);
+    if (current?.olderCursor == null) return;
+    const page = await this.request(
+      "POST",
+      CHANNEL_ROUTES.read,
+      decodeChannelPage,
+      { channelId, beforeSequence: current.olderCursor },
+      serverId,
+    );
+    const latest = entry.state.pages.get(channelId);
+    if (!entry.valid || !latest || latest.olderCursor !== current.olderCursor) return;
+    const messages = new Map(page.messages.map((message) => [message.id, message]));
+    for (const message of latest.messages) messages.set(message.id, message);
+    const pages = new Map(entry.state.pages);
+    pages.set(channelId, {
+      ...latest,
+      messages: [...messages.values()].sort((a, b) => a.sequence - b.sequence),
+      olderCursor: page.olderCursor,
+    });
+    this.publish(entry, { pages });
+  }
+  async command(serverId: string, command: ChannelCommand, options?: { waitForRefresh: boolean }) {
+    const entry = this.entry(serverId);
+    if (!entry.state.supported) throw new Error("Update this desktop server to use channels.");
+    const result = await this.request(
+      "POST",
+      CHANNEL_ROUTES.command,
+      decodeChannel,
+      decodeTeamProtocolV2Json(command),
+      serverId,
+    );
+    if (entry.valid) {
+      entry.writes += 1;
+      const previous = entry.state.channels.find((channel) => channel.id === result.id);
+      if (!previous || result.revision >= previous.revision) {
+        const summary: ChannelSummary = { unreadCount: 0, activeTasks: 0, lastMessage: null, ...previous, ...result };
+        this.publish(entry, {
+          channels: previous
+            ? entry.state.channels.map((channel) => (channel.id === result.id ? summary : channel))
+            : [...entry.state.channels, summary],
+        });
+      }
+      const refresh = this.refresh(serverId);
+      if (options?.waitForRefresh) await refresh;
+    }
+    return result;
+  }
+  memories(serverId: string, channelId: string) {
+    return this.request("POST", CHANNEL_ROUTES.memories, decodeChannelMemories, { channelId }, serverId);
+  }
+  routines(serverId: string, channelId: string) {
+    return this.request("POST", CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId }, serverId);
+  }
+  async saveMemory(serverId: string, channelId: string, text: string, memoryId?: string) {
+    await this.request(
+      "POST",
+      memoryId ? CHANNEL_ROUTES.memoryUpdate : CHANNEL_ROUTES.memoryCreate,
+      () => undefined,
+      { channelId, text, ...(memoryId ? { memoryId } : {}) },
+      serverId,
+    );
+  }
+  async deleteMemory(serverId: string, channelId: string, memoryId: string) {
+    await this.request("POST", CHANNEL_ROUTES.memoryDelete, () => undefined, { channelId, memoryId }, serverId);
+  }
+  async createRoutine(serverId: string, input: CreateChannelRoutineInput) {
+    await this.request(
+      "POST",
+      CHANNEL_ROUTES.routineCreate,
+      () => undefined,
+      decodeTeamProtocolV2Json(input),
+      serverId,
+    );
+  }
+  async updateRoutine(serverId: string, input: UpdateChannelRoutineInput) {
+    await this.request(
+      "POST",
+      CHANNEL_ROUTES.routineUpdate,
+      () => undefined,
+      decodeTeamProtocolV2Json(input),
+      serverId,
+    );
+  }
+  async deleteRoutine(serverId: string, channelId: string, routineId: string) {
+    await this.request("POST", CHANNEL_ROUTES.routineDelete, () => undefined, { channelId, routineId }, serverId);
+  }
+  async upload(serverId: string, input: RemoteFileUpload) {
+    const query = new URLSearchParams({ name: input.name, mime: input.mimeType });
+    return this.request(
+      "POST",
+      `${TEAM_API_ROUTES.attachments}?${query}`,
+      (value) => {
+        if (!isAttachmentSummary(value)) throw new Error("The host returned an invalid attachment.");
+        return value;
+      },
+      undefined,
+      serverId,
+      input,
+    );
+  }
+  async discard(serverId: string, attachmentId: string) {
+    await this.request("DELETE", TEAM_API_ROUTES.attachment(attachmentId), () => undefined, undefined, serverId);
+  }
+  async delete(serverId: string, channelId: string) {
+    const entry = this.entry(serverId);
+    if (!entry.state.canDelete) throw new Error("Update this desktop server to delete channels.");
+    await this.request("POST", CHANNEL_ROUTES.delete, () => undefined, { channelId }, serverId);
+    entry.writes += 1;
+    const pages = new Map(entry.state.pages);
+    pages.delete(channelId);
+    this.publish(entry, { channels: entry.state.channels.filter((channel) => channel.id !== channelId), pages });
+    void this.refresh(serverId);
+  }
+}
+
+export function mergeLatestChannelPage(current: ChannelPage | undefined, page: ChannelPage): ChannelPage {
+  if (!current) return page;
+  const first = page.messages[0]?.sequence ?? 0;
+  const older = current.messages.filter((message) => message.sequence < first);
+  if (!older.length || (older.at(-1)?.sequence ?? 0) + 1 < first) return page;
+  return { ...page, messages: [...older, ...page.messages], olderCursor: current.olderCursor };
+}

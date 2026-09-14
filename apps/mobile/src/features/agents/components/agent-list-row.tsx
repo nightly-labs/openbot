@@ -102,12 +102,12 @@ export function AgentListRow({
 }: AgentListRowProps) {
   const { theme } = useUniwind();
   const [background] = useThemeColor(["background"]);
-  const { unreadAgentIds, pinnedAgentIds } = useMobileWorkspace();
+  const { unreadAgentIds, pinnedAgentIds, pinnedChannelIds } = useMobileWorkspace();
   const { startAgentNavigationAnimated, toggleAgentPinAnimated, transition } = useAgentPinTransition();
   const editMenu = useRef<MenuComponentRef>(null);
   const agentContextMenu = useAgentContextMenu(agent);
   const isUnread = unreadAgentIds.includes(agent.id);
-  const isUnpinTarget = transition?.agentId === agent.id && transition.target === "row";
+  const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
   const avatar = (
     <AgentPinAvatar agentId={agent.id} location={avatarLocation} size={54}>
       <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={54} animateIdle={false} />
@@ -187,7 +187,7 @@ export function AgentListRow({
   return (
     <AgentPinSwipeRow
       agentName={agent.name}
-      pinBlocked={!canToggleAgentPin(pinnedAgentIds, agent.id)}
+      pinBlocked={!canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id)}
       onPin={(withHaptic) => toggleAgentPinAnimated(agent.id, { haptic: withHaptic })}
     >
       {Platform.OS === "android" ? (

@@ -2,15 +2,18 @@ import { GlassView } from "expo-glass-effect";
 import { Link, router } from "expo-router";
 import { Typography } from "heroui-native";
 import { ArrowLeft } from "lucide-react-native";
+import { useMemo } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
-import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
+import type { ChatTarget } from "../model/chat-target";
 
 interface ChatHeaderProps {
-  agent: MobileAgent;
+  target: ChatTarget;
   fallbackBackground: ViewStyle["backgroundColor"];
   foreground: ViewStyle["backgroundColor"];
   liquidGlassAvailable: boolean;
@@ -19,13 +22,19 @@ interface ChatHeaderProps {
 }
 
 export function ChatHeader({
-  agent,
+  target,
   fallbackBackground,
   foreground,
   liquidGlassAvailable,
   topInset,
   onBack,
 }: ChatHeaderProps) {
+  const { servers } = useMobileWorkspace();
+  const disconnected = !servers.some((server) => server.id === target.serverId && server.state === "online");
+  const members = useMemo(
+    () => new Map(target.kind === "channel" ? target.members.map((member) => [member.id, member]) : []),
+    [target],
+  );
   const iconColor = String(foreground);
 
   return (
@@ -60,22 +69,40 @@ export function ChatHeader({
           <Pressable
             className="min-w-0 shrink flex-row items-center gap-2 self-stretch px-3"
             accessibilityRole="button"
-            accessibilityLabel={`Info for ${agent.name}`}
+            accessibilityLabel={`Info for ${target.name}`}
             hitSlop={8}
             onPress={() =>
-              router.push({
-                pathname: "/agent-info/[agentId]",
-                params: { agentId: agent.id, serverId: agent.serverId },
-              })
+              target.kind === "channel"
+                ? router.push({
+                    pathname: "/channel-info/[channelId]",
+                    params: { channelId: target.id, serverId: target.serverId },
+                  })
+                : router.push({
+                    pathname: "/agent-info/[agentId]",
+                    params: { agentId: target.id, serverId: target.serverId },
+                  })
             }
           >
-            <Link.AppleZoomTarget>
-              <AgentPinAvatar agentId={agent.id} location="chat" size={28}>
-                <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={28} />
-              </AgentPinAvatar>
-            </Link.AppleZoomTarget>
+            {target.kind === "channel" ? (
+              <Link.AppleZoomTarget>
+                <View collapsable={false}>
+                  <ChannelAvatar
+                    channel={{ members: target.members.map((member) => ({ agentId: member.id })) }}
+                    agents={members}
+                    size={28}
+                    disconnected={disconnected}
+                  />
+                </View>
+              </Link.AppleZoomTarget>
+            ) : (
+              <Link.AppleZoomTarget>
+                <AgentPinAvatar agentId={target.id} location="chat" size={28}>
+                  <BloubAvatar agentId={target.id} hue={target.avatarHue} seed={target.avatarSeed} size={28} />
+                </AgentPinAvatar>
+              </Link.AppleZoomTarget>
+            )}
             <Typography.Paragraph className="min-w-0 shrink" weight="semibold" numberOfLines={1}>
-              {agent.name}
+              {target.name}
             </Typography.Paragraph>
           </Pressable>
         </GlassView>

@@ -1,6 +1,6 @@
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { Pin } from "lucide-react-native";
+import { Pin, PinOff } from "lucide-react-native";
 import type { PropsWithChildren } from "react";
 import { Pressable, View } from "react-native";
 import { GestureDetector } from "react-native-gesture-handler";
@@ -12,12 +12,14 @@ import { PIN_COMMIT_DISTANCE, PIN_REVEAL_DISTANCE, useAgentPinSwipe } from "./us
 
 function PinAction({
   agentName,
+  pinned = false,
   pinBlocked,
   revealed,
   translation,
   onPress,
 }: {
   agentName: string;
+  pinned?: boolean;
   pinBlocked: boolean;
   revealed: boolean;
   translation: SharedValue<number>;
@@ -49,9 +51,9 @@ function PinAction({
       importantForAccessibility={revealed ? "auto" : "no-hide-descendants"}
     >
       <Pressable
-        accessibilityLabel={`Pin ${agentName}`}
+        accessibilityLabel={`${pinned ? "Unpin" : "Pin"} ${agentName}`}
         accessibilityRole="button"
-        accessibilityHint={pinBlocked ? "Pin limit reached. Unpin an agent first." : undefined}
+        accessibilityHint={pinBlocked ? "Pin limit reached. Unpin a chat first." : undefined}
         className="size-16 items-center justify-center"
         onPress={onPress}
         style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
@@ -61,9 +63,13 @@ function PinAction({
           className="absolute size-16 rounded-full"
           style={[{ backgroundColor: pinBlocked ? danger : accent }, circleStyle]}
         />
-        <Pin color={String(foreground)} fill={String(foreground)} size={22} strokeWidth={1.8} />
+        {pinned ? (
+          <PinOff color={String(foreground)} size={22} strokeWidth={1.8} />
+        ) : (
+          <Pin color={String(foreground)} fill={String(foreground)} size={22} strokeWidth={1.8} />
+        )}
         <Typography.Paragraph type="body-xs" weight="semibold" style={{ color: foreground }}>
-          Pin
+          {pinned ? "Unpin" : "Pin"}
         </Typography.Paragraph>
       </Pressable>
     </Animated.View>
@@ -72,10 +78,16 @@ function PinAction({
 
 export function AgentPinSwipeRow({
   agentName,
+  pinned = false,
   pinBlocked,
   onPin,
   children,
-}: PropsWithChildren<{ agentName: string; pinBlocked: boolean; onPin: (withHaptic: boolean) => void }>) {
+}: PropsWithChildren<{
+  agentName: string;
+  pinned?: boolean;
+  pinBlocked: boolean;
+  onPin: (withHaptic: boolean) => void;
+}>) {
   const [background] = useThemeColor(["background"]);
   const { openingGesture } = useAppDrawer();
   const swipe = useAgentPinSwipe(openingGesture, onPin, pinBlocked);
@@ -101,6 +113,7 @@ export function AgentPinSwipeRow({
           <PinAction
             revealed={swipe.revealed}
             agentName={agentName}
+            pinned={pinned}
             pinBlocked={pinBlocked}
             translation={translation}
             onPress={() => swipe.pin()}

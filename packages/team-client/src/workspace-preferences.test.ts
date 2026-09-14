@@ -22,6 +22,27 @@ describe("remote workspace preferences", () => {
     expect(open().read("host-a")).toEqual({ hidden: [], pinned: [] });
   });
 
+  it("preserves channel pins through restart without changing agent preferences", () => {
+    const values = new Map<string, string>();
+    const storage = {
+      get: (key: string) => values.get(key) ?? null,
+      set: (key: string, value: string) => {
+        values.set(key, value);
+      },
+    };
+    const open = (user = "alice") => createWorkspacePreferences("https://api.example.test", user, storage);
+    open().write("host", { hidden: ["agent-hidden"], pinned: ["agent-one"], pinnedChannels: ["channel-one"] });
+    expect(open().read("host")).toEqual({
+      hidden: ["agent-hidden"],
+      pinned: ["agent-one"],
+      pinnedChannels: ["channel-one"],
+    });
+    expect(open("bob").read("host")).toEqual({ hidden: [], pinned: [] });
+    expect(open().read("other-host")).toEqual({ hidden: [], pinned: [] });
+    open().write("host", { ...open().read("host"), pinnedChannels: [] });
+    expect(open().read("host")).toEqual({ hidden: ["agent-hidden"], pinned: ["agent-one"], pinnedChannels: [] });
+  });
+
   it("reports unreadable preferences and failed writes instead of silently resetting them", () => {
     const preferences = createWorkspacePreferences("https://api.example.test", "alice", {
       get: () => '{"version":1,"hidden":[42],"pinned":[]}',

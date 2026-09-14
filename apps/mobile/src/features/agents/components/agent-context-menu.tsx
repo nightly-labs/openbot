@@ -9,8 +9,16 @@ import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import { haptics } from "@/shared/lib/haptics";
 
 export function useAgentContextMenu(agent: MobileAgent) {
-  const { deleteAgent, duplicateAgent, hideAgent, markAgentRead, markAgentUnread, pinnedAgentIds, unreadAgentIds } =
-    useMobileWorkspace();
+  const {
+    deleteAgent,
+    duplicateAgent,
+    hideAgent,
+    markAgentRead,
+    markAgentUnread,
+    pinnedAgentIds,
+    pinnedChannelIds,
+    unreadAgentIds,
+  } = useMobileWorkspace();
   const { toggleAgentPinAnimated } = useAgentPinTransition();
   const isPinned = pinnedAgentIds.includes(agent.id);
   const isUnread = unreadAgentIds.includes(agent.id);
@@ -74,7 +82,7 @@ export function useAgentContextMenu(agent: MobileAgent) {
         icon={isPinned ? "pin.slash" : "pin"}
         isOn={isPinned}
         onPress={handlePin}
-        disabled={!canToggleAgentPin(pinnedAgentIds, agent.id)}
+        disabled={!canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id)}
       >
         {isPinned ? "Unpin" : "Pin"}
       </Link.MenuAction>

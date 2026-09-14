@@ -1,3 +1,4 @@
+import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import {
   decodeTeamProtocolV2FileChunk,
@@ -8,6 +9,7 @@ import {
   type TeamProtocolV2Json,
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
+import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEd25519Identity, signEd25519 } from "./ed25519";
 import {
@@ -24,7 +26,107 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+const channelFixture = {
+  id: "channel-one",
+  name: "Launch room",
+  title: "",
+  instructions: "Prepare a release",
+  members: [{ agentId: "agent-one" }],
+  leadAgentId: "agent-one",
+  archived: false,
+  revision: 2,
+  createdAt: "2026-09-14T00:00:00Z",
+};
+
 describe("browser remote peer recovery", () => {
+  it.each<{ path: string; method: string; body: TeamProtocolV2Json; response: TeamProtocolV2Json }>([
+    {
+      path: CHANNEL_ROUTES.list,
+      method: "GET",
+      body: {},
+      response: [{ ...channelFixture, unreadCount: 1, activeTasks: 0, lastMessage: null }],
+    },
+    {
+      path: CHANNEL_ROUTES.read,
+      method: "POST",
+      body: { channelId: "channel-one" },
+      response: { channel: channelFixture, messages: [], tasks: [], olderCursor: null, throughSequence: 0 },
+    },
+    {
+      path: CHANNEL_ROUTES.command,
+      method: "POST",
+      body: {
+        type: "save",
+        operationId: "save-one",
+        channelId: "channel-one",
+        draft: {
+          name: "Launch room",
+          title: "",
+          instructions: "Prepare a release",
+          members: [{ agentId: "agent-one" }],
+          leadAgentId: "agent-one",
+        },
+        update: true,
+      },
+      response: channelFixture,
+    },
+    { path: CHANNEL_ROUTES.memories, method: "POST", body: { channelId: "channel-one" }, response: [] },
+  ])("uses the optional channel codec for $path without disconnecting", async ({ path, method, body, response }) => {
+    const network = await setupNetwork({ responseBody: response });
+    await network.connect();
+    const result = await network.runtime.execute({ id: "channel-request", type: "request", method, path, body });
+    expect(result).toMatchObject({ ok: true, status: 200, body: response });
+    expect(network.updates.at(-1)).toMatchObject({ state: "online" });
+    await network.runtime.dispose();
+  });
+  it("still rejects a malformed channel response and closes the peer", async () => {
+    const network = await setupNetwork({ responseBody: [{ id: "channel-one" }] });
+    await network.connect();
+    const result = await network.runtime.execute({
+      id: "bad-channel-response",
+      type: "request",
+      method: "GET",
+      path: CHANNEL_ROUTES.list,
+      body: {},
+    });
+    expect(result).toMatchObject({ ok: false });
+    expect(network.updates.at(-1)).toMatchObject({ state: "offline" });
+    await network.runtime.dispose();
+  });
+
+  it("delivers channel changes through the authenticated event stream", async () => {
+    const received = deferred();
+    const onTeamEvent = vi.fn(async () => {
+      received.resolve();
+    });
+    const network = await setupNetwork({ onTeamEvent });
+    await network.connect();
+    const event = { type: "channels-changed", channelId: "channel-one", revision: 2 };
+    network
+      .connection()
+      .channel(TEAM_PROTOCOL_V2_CHANNELS.events)
+      .receive(encodeTeamProtocolV2Frame({ version: 2, type: "event", sequence: 1, payload: event }));
+    await received.promise;
+    expect(onTeamEvent).toHaveBeenCalledWith("host", event);
+    expect(network.updates.at(-1)).toMatchObject({ state: "online" });
+    await network.runtime.dispose();
+  });
+  it("rejects an invalid outgoing request without leaving a promise to fail on disconnect", async () => {
+    const network = await setupNetwork();
+    await network.connect();
+    const result = await network.runtime.execute({
+      id: "invalid-request",
+      type: "request",
+      method: "GET",
+      path: "/unsupported",
+      body: {},
+    });
+    expect(result).toMatchObject({ ok: false });
+    expect(network.updates.at(-1)).toMatchObject({ state: "online" });
+    // Vitest reports an unhandled rejection here if validation registered an abandoned request.
+    await network.runtime.dispose();
+  });
+
   it("checks healthy foreground returns silently without requesting new session tickets", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     let requested = deferred();
@@ -696,6 +798,7 @@ function deferred() {
 
 async function setupNetwork(
   options: {
+    onTeamEvent?: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => Promise<void>;
     onAccountProfileChanged?: () => Promise<void>;
     endSession?: () => Promise<void>;
     beforeBootstrap?: (hostId: string) => Promise<void>;
@@ -897,7 +1000,7 @@ async function setupNetwork(
       },
       endSession: options.endSession ?? (async () => {}),
       onAccountProfileChanged: options.onAccountProfileChanged,
-      onTeamEvent: async () => {},
+      onTeamEvent: options.onTeamEvent ?? (async () => {}),
       onConnectionUpdate: async (update) => {
         updates.push(update);
         if (update.state === "offline") callbacks.onOffline();

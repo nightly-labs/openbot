@@ -1,6 +1,7 @@
 import type {
   AgentExchangeSummary,
   AttachmentSummary,
+  ChannelMessage,
   ConversationMessage,
   ConversationQuestionPrompt,
 } from "@openbot/contracts/ipc";
@@ -12,6 +13,8 @@ export type ChatMessage =
       id: string;
       kind: "message";
       author: "agent" | "user";
+      speaker?: ChannelMessage["author"];
+      superseded?: boolean;
       body: string;
       streaming: boolean;
       replyToMessageId?: string | null;
@@ -109,4 +112,21 @@ export function latestReadableMessage(messages: ConversationMessage[]) {
       Boolean(message.questionPrompt) ||
       (message.author !== "system" && (message.text.trim().length > 0 || Boolean(message.attachments?.length))),
   );
+}
+
+/** Keep channel authors explicit: another human member is not the current user. */
+export function projectChannelMessages(messages: ChannelMessage[], memberId: string | null): ChatMessage[] {
+  return messages
+    .filter((entry) => entry.message.text.trim() || entry.message.attachments?.length)
+    .map((entry) => ({
+      id: entry.id,
+      kind: "message",
+      author: entry.author.kind === "member" && entry.author.id === memberId ? "user" : "agent",
+      speaker: entry.author,
+      superseded: entry.superseded,
+      body: entry.message.text,
+      streaming: entry.message.status === "streaming",
+      replyToMessageId: entry.message.replyToMessageId,
+      attachments: entry.message.attachments,
+    }));
 }

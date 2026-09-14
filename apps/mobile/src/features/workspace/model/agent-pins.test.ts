@@ -1,6 +1,6 @@
 import { createWorkspacePreferences } from "@openbot/team-client";
 import { describe, expect, it } from "vitest";
-import { canToggleAgentPin, reconcileAgentPins } from "./agent-pins";
+import { canToggleAgentPin, reconcileAgentPins, reconcileChannelPins, setChannelHidden } from "./agent-pins";
 
 describe("mobile agent pin capacity", () => {
   it("allows the sixteenth pin and rejects a seventeenth pin", () => {
@@ -52,4 +52,46 @@ it("keeps saved pins when cleanup cannot be written and skips writes for unchang
   expect(reconcileAgentPins(store, "server", [{ id: "agent-1" }])).toEqual(saved);
   expect(() => reconcileAgentPins(store, "server", [])).toThrow("Storage full");
   expect(saved.pinned).toEqual(["agent-1"]);
+});
+
+it("keeps agent and channel pins independent during cleanup and shares the pin limit", () => {
+  const saved = { hidden: ["agent-hidden"], pinned: ["agent-one"], pinnedChannels: ["channel-one", "channel-deleted"] };
+  const values = new Map<string, string>();
+  const store = createWorkspacePreferences("https://api.example.test", "alice", {
+    get: (key) => values.get(key) ?? null,
+    set: (key, value) => {
+      values.set(key, value);
+    },
+  });
+  store.write("server", saved);
+  reconcileAgentPins(store, "server", []);
+  expect(store.read("server").pinnedChannels).toEqual(saved.pinnedChannels);
+  reconcileChannelPins(store, "server", [{ id: "channel-one" }]);
+  expect(store.read("server")).toEqual({ hidden: ["agent-hidden"], pinned: [], pinnedChannels: ["channel-one"] });
+  const full = [...Array.from({ length: 15 }, (_, index) => `agent-${index}`), "channel-one"];
+  expect(canToggleAgentPin(full, "channel-two")).toBe(false);
+  expect(canToggleAgentPin(full, "channel-one")).toBe(true);
+});
+
+it("hides and restores channels without changing agent preferences or restoring a pin", () => {
+  const values = new Map<string, string>();
+  const open = () =>
+    createWorkspacePreferences("https://api.example.test", "alice", {
+      get: (key) => values.get(key) ?? null,
+      set: (key, value) => {
+        values.set(key, value);
+      },
+    });
+  const original = { hidden: ["agent-hidden"], pinned: ["agent-one"], pinnedChannels: ["channel-one", "channel-two"] };
+  open().write("host", original);
+  open().write("other-host", original);
+  open().write("host", setChannelHidden(open().read("host"), "channel-one", true));
+  expect(open().read("host")).toEqual({
+    ...original,
+    pinnedChannels: ["channel-two"],
+    hiddenChannels: ["channel-one"],
+  });
+  open().write("host", setChannelHidden(open().read("host"), "channel-one", false));
+  expect(open().read("host")).toEqual({ ...original, pinnedChannels: ["channel-two"], hiddenChannels: [] });
+  expect(open().read("other-host")).toEqual(original);
 });

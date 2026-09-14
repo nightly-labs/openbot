@@ -1,6 +1,7 @@
 import Animated, { interpolate, type SharedValue, useAnimatedStyle } from "react-native-reanimated";
 import type { AgentPinTransitionState } from "@/features/agents/components/agent-pin-transition";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
 
 interface AgentPinTransitionOverlayProps {
   progress: SharedValue<number>;
@@ -34,13 +35,22 @@ export function AgentPinTransitionOverlay({ progress, transition }: AgentPinTran
 
   return (
     <Animated.View pointerEvents="none" style={overlayStyle}>
-      <BloubAvatar
-        agentId={transition.agentId}
-        hue={transition.avatarHue}
-        seed={transition.avatarSeed}
-        size={transition.from.width}
-        animateIdle={false}
-      />
+      {transition.avatar.kind === "channel" ? (
+        <ChannelAvatar
+          channel={transition.avatar.channel}
+          agents={transition.avatar.agents}
+          disconnected={transition.avatar.disconnected}
+          size={transition.from.width}
+        />
+      ) : (
+        <BloubAvatar
+          agentId={transition.chatId}
+          hue={transition.avatar.hue}
+          seed={transition.avatar.seed}
+          size={transition.from.width}
+          animateIdle={false}
+        />
+      )}
     </Animated.View>
   );
 }

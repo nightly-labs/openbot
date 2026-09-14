@@ -1,8 +1,15 @@
 import { Host, Picker, Switch } from "@expo/ui";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type AgentMemory, isRoutineSchedule, type Routine, type RoutineSchedule } from "@openbot/contracts/ipc";
+import {
+  type CreateRoutineInput,
+  isRoutineSchedule,
+  type MemoryEntry,
+  type RoutineFields,
+  type RoutineSchedule,
+  type UpdateRoutineInput,
+} from "@openbot/contracts/ipc";
 import { userErrorMessage } from "@openbot/user-errors";
-import { useQueryClient } from "@tanstack/react-query";
+import { type QueryKey, useQueryClient } from "@tanstack/react-query";
 import { router, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
@@ -26,7 +33,7 @@ function useRecordDraftGuard(dirty: boolean, pending: boolean) {
   });
 }
 
-function useRecordAction() {
+function useRecordAction(invalidate: QueryKey = ["agent-info"]) {
   const client = useQueryClient();
   const lock = useRef(false);
   const [pending, setPending] = useState(false);
@@ -39,7 +46,7 @@ function useRecordAction() {
     try {
       await action();
       done?.();
-      void client.invalidateQueries({ queryKey: ["agent-info"] });
+      void client.invalidateQueries({ queryKey: invalidate });
     } catch (cause) {
       setError(userErrorMessage(cause, "Could not save changes. Try again."));
     } finally {
@@ -54,13 +61,19 @@ export function MemoryEditor({
   agent,
   memory,
   available,
+  port,
 }: {
-  agent: MobileAgent;
-  memory?: AgentMemory;
+  agent: Pick<MobileAgent, "id" | "serverId">;
+  memory?: MemoryEntry;
   available: boolean;
+  port?: {
+    save(text: string, id?: string): Promise<void>;
+    delete(id: string): Promise<void>;
+    queryKey: QueryKey;
+  };
 }) {
   const workspace = useMobileWorkspace();
-  const action = useRecordAction();
+  const action = useRecordAction(port?.queryKey);
   const [editedText, setEditedText] = useState<string | undefined>();
   const text = editedText ?? memory?.text ?? "";
   const [savedText, setSavedText] = useState<string | null>(null);
@@ -88,7 +101,10 @@ export function MemoryEditor({
         pending={action.pending}
         onSave={() =>
           void action.run(
-            () => workspace.saveAgentMemory(agent.id, text.trim(), agent.serverId, memory?.id),
+            () =>
+              port
+                ? port.save(text.trim(), memory?.id)
+                : workspace.saveAgentMemory(agent.id, text.trim(), agent.serverId, memory?.id),
             () => {
               setSavedText(text.trim());
               if (memory) setEditedText(undefined);
@@ -110,7 +126,10 @@ export function MemoryEditor({
                   style: "destructive",
                   onPress: () =>
                     void action.run(
-                      () => workspace.deleteAgentMemory(agent.id, memory.id, agent.serverId),
+                      () =>
+                        port
+                          ? port.delete(memory.id)
+                          : workspace.deleteAgentMemory(agent.id, memory.id, agent.serverId),
                       () => setFinished(true),
                     ),
                 },
@@ -134,14 +153,21 @@ export function RoutineEditor({
   agent,
   routine,
   available,
+  port,
 }: {
-  agent: MobileAgent;
-  routine?: Routine;
+  agent: Pick<MobileAgent, "id" | "serverId">;
+  routine?: RoutineFields;
   available: boolean;
+  port?: {
+    create(input: Omit<CreateRoutineInput, "agentId">): Promise<void>;
+    update(input: Omit<UpdateRoutineInput, "agentId">): Promise<void>;
+    delete(id: string): Promise<void>;
+    queryKey: QueryKey;
+  };
 }) {
   const workspace = useMobileWorkspace();
-  const action = useRecordAction();
-  const toggle = useRecordAction();
+  const action = useRecordAction(port?.queryKey);
+  const toggle = useRecordAction(port?.queryKey);
   const [activeOverride, setActiveOverride] = useState<boolean | null>(null);
   useEffect(() => {
     if (routine?.active === activeOverride) setActiveOverride(null);
@@ -151,7 +177,8 @@ export function RoutineEditor({
     setActiveOverride(active);
     void toggle.run(async () => {
       try {
-        await workspace.updateAgentRoutine({ agentId: agent.id, routineId: routine.id, active }, agent.serverId);
+        if (port) await port.update({ routineId: routine.id, active });
+        else await workspace.updateAgentRoutine({ agentId: agent.id, routineId: routine.id, active }, agent.serverId);
       } catch (cause) {
         setActiveOverride(null);
         throw cause;
@@ -192,6 +219,17 @@ export function RoutineEditor({
   const disabled = !available || action.pending || (!routine && savedDraft !== null);
   const validTime = isRoutineSchedule(schedule);
   async function save() {
+    if (port) {
+      if (routine)
+        await port.update({
+          routineId: routine.id,
+          ...(nameChanged ? { name: name.trim() } : {}),
+          ...(instructionChanged ? { instruction: instruction.trim() } : {}),
+          ...(scheduleChanged ? { schedule } : {}),
+        });
+      else await port.create({ name: name.trim(), instruction: instruction.trim(), schedule, timezone, active: true });
+      return;
+    }
     if (routine)
       await workspace.updateAgentRoutine(
         {
@@ -396,7 +434,10 @@ export function RoutineEditor({
                   style: "destructive",
                   onPress: () =>
                     void action.run(
-                      () => workspace.deleteAgentRoutine(agent.id, routine.id, agent.serverId),
+                      () =>
+                        port
+                          ? port.delete(routine.id)
+                          : workspace.deleteAgentRoutine(agent.id, routine.id, agent.serverId),
                       () => setFinished(true),
                     ),
                 },

@@ -1,7 +1,17 @@
 import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { CornerUpRight, X } from "lucide-react-native";
-import { createContext, forwardRef, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  forwardRef,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AccessibilityInfo, type CellRendererProps, FlatList, Pressable, View, type ViewStyle } from "react-native";
 import { KeyboardChatScrollView, type KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import Animated, {
@@ -13,18 +23,19 @@ import Animated, {
   useReducedMotion,
 } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
-import { BloubAvatar, getBloubAvatarColor } from "@/features/agents/components/bloub-avatar";
+import { BloubAvatar, BloubAvatarThumbnail, getBloubAvatarColor } from "@/features/agents/components/bloub-avatar";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
 import type { ChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { type ChatMessage, indexChatMessages } from "@/features/chat/model/chat-messages";
-import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import type { ChatBubbleMessage } from "../context/message-actions-context";
 import { mentionDraft } from "../model/chat-mentions";
+import type { ChatTarget } from "../model/chat-target";
 import { ChatAttachmentView } from "./chat-attachment";
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { StreamingTailText, StreamRevealProvider } from "./streaming-tail-text";
@@ -76,15 +87,18 @@ const USER_MESSAGE_ENTRANCE = FadeInDown.duration(240)
 const AGENT_MESSAGE_ENTRANCE = FadeIn.duration(240).reduceMotion(ReduceMotion.System);
 
 interface ChatMessageListProps {
-  agent: MobileAgent;
+  target: ChatTarget;
+  activity?: MobileAgentActivity;
+  footer?: ReactNode;
   agents: MobileAgent[];
   motion: ChatMotion;
   sending: boolean;
   keyboardOffset: number;
   canSend: boolean;
+  online: boolean;
   appActive: boolean;
   activeTurnId: string | null;
-  questionForm: QuestionPromptController;
+  questionForm?: QuestionPromptController;
   fieldBackground: ViewStyle["backgroundColor"];
   foreground: ViewStyle["backgroundColor"];
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
@@ -107,12 +121,15 @@ interface ChatMessageListProps {
 }
 
 export function ChatMessageList({
-  agent,
+  target,
+  activity,
+  footer,
   agents,
   motion,
   sending,
   keyboardOffset,
   canSend,
+  online,
   appActive,
   activeTurnId,
   questionForm,
@@ -137,6 +154,7 @@ export function ChatMessageList({
   onOpenActions,
 }: ChatMessageListProps) {
   const isFocused = useIsFocused();
+  const agentsById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
   const messagesById = useMemo(
     () => indexChatMessages(messages, messageAliases, referenceMessages),
     [messages, messageAliases, referenceMessages],
@@ -159,9 +177,8 @@ export function ChatMessageList({
     "--openbot-text-muted",
   ]).map(String);
   const reducedMotion = useReducedMotion();
-  const animateMessages = isFocused && canSend && appActive;
-  const arrivals = useMessageArrivals(agent.id, messages, animateMessages && historyState === "ready");
-  const activity = useAgentActivity(agent.id);
+  const animateMessages = isFocused && online && appActive;
+  const arrivals = useMessageArrivals(target.id, messages, animateMessages && historyState === "ready");
   const latestThinking = messages.findLast(
     (message) => message.kind === "thinking" && message.turnId === activity?.turnId,
   );
@@ -184,7 +201,10 @@ export function ChatMessageList({
           : activity?.phase === "responding"
             ? "Responding…"
             : activity?.detail || "Thinking…";
-  const userBubbleColor = getBloubAvatarColor(agent.avatarSeed, agent.avatarHue);
+  const userBubbleColor = getBloubAvatarColor(
+    target.kind === "agent" ? target.avatarSeed : target.id,
+    target.kind === "agent" ? target.avatarHue : null,
+  );
   const appearance = useConnectionAppearance(!canSend);
   const red = Number.parseInt(userBubbleColor.slice(1, 3), 16);
   const green = Number.parseInt(userBubbleColor.slice(3, 5), 16);
@@ -211,6 +231,7 @@ export function ChatMessageList({
     if (tailId && motion.needsSendPosition() && !motion.atLatest) listRef.current?.scrollToEnd({ animated: false });
   }, [tailId, motion.needsSendPosition, motion.atLatest]);
   const renderMessage = (message: (typeof visibleMessages)[number], isTailUser: boolean, isFirstUser: boolean) => {
+    const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
     const rendered =
       message.kind === "exchange" ? (
         <View key={message.id} className="flex-row flex-wrap items-center justify-center gap-2 py-2">
@@ -238,7 +259,7 @@ export function ChatMessageList({
         <ChatQuestionPrompt
           key={message.id}
           prompt={message.prompt}
-          controller={message.id === questionForm.messageId ? questionForm : undefined}
+          controller={message.id === questionForm?.messageId ? questionForm : undefined}
           canSend={canSend}
         />
       ) : (
@@ -258,11 +279,26 @@ export function ChatMessageList({
           }
           style={[{ borderCurve: "circular" }, isFirstUser ? motion.firstMessageStyle : undefined]}
         >
+          {message.speaker && message.author !== "user" ? (
+            <View className="flex-row items-center gap-1 px-1">
+              {message.speaker.kind === "agent" ? (
+                <BloubAvatarThumbnail
+                  seed={speaker?.avatarSeed ?? message.speaker.id}
+                  hue={speaker?.avatarHue ?? null}
+                  size={20}
+                />
+              ) : null}
+              <Typography.Paragraph type="body-xs" className="text-muted">
+                {message.speaker.name}
+                {message.superseded ? " · Superseded" : ""}
+              </Typography.Paragraph>
+            </View>
+          ) : null}
           {message.attachments?.map((attachment) => (
             <ChatAttachmentView
               key={attachment.id}
               attachment={attachment}
-              serverId={agent.serverId}
+              serverId={target.serverId}
               alignment={message.author === "user" ? "right" : "left"}
             />
           ))}
@@ -270,16 +306,19 @@ export function ChatMessageList({
             <Animated.View
               className={
                 message.author === "user"
-                  ? `self-end rounded-[30px] px-4 py-3 ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
+                  ? `self-end rounded-[30px] px-4 py-3 ${target.kind === "channel" ? "bg-control/60" : ""} ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
                   : "max-w-full self-start rounded-[30px] bg-control/60 px-4 py-3"
               }
-              style={[{ borderCurve: "circular" }, message.author === "user" ? userBubbleStyle : undefined]}
+              style={[
+                { borderCurve: "circular" },
+                message.author === "user" && target.kind === "agent" ? userBubbleStyle : undefined,
+              ]}
             >
               <ChatMarkdown
                 agents={agents}
                 body={message.body}
                 selectable={message.author === "user"}
-                color={message.author === "user" ? userForeground : foreground}
+                color={message.author === "user" && target.kind === "agent" ? userForeground : foreground}
                 streaming={message.author === "agent" && message.streaming}
                 animationEnabled={animateMessages && arrivals.has(message.id) && motion.responseVisible}
               />
@@ -288,27 +327,21 @@ export function ChatMessageList({
         </Animated.View>
       );
     if (message.kind !== "message") return rendered;
-    if (message.author === "agent") {
-      return (
-        <ChatMessageGesture
-          key={message.id}
-          screenReaderEnabled={screenReaderEnabled}
-          onReply={onReply ? () => onReply(message) : undefined}
-          onOpenActions={() => onOpenActions(message)}
-        >
-          {rendered}
-        </ChatMessageGesture>
-      );
-    }
     const source = message.replyToMessageId ? messagesById.get(message.replyToMessageId) : undefined;
     return (
       <View
         key={message.id}
-        className={message.attachments?.length ? "max-w-full self-end gap-1" : "max-w-[88%] self-end gap-1"}
+        className={
+          message.author === "agent"
+            ? "max-w-full self-start gap-1"
+            : message.attachments?.length
+              ? "max-w-full self-end gap-1"
+              : "max-w-[88%] self-end gap-1"
+        }
         onLayout={isTailUser ? motion.onUserLayout : undefined}
       >
         {message.replyToMessageId ? (
-          <View className="flex-row items-center gap-1 self-end">
+          <View className={`flex-row items-center gap-1 ${message.author === "user" ? "self-end" : "self-start"}`}>
             <CornerUpRight size={14} color={themeMuted} />
             <Typography.Paragraph
               type="body-xs"
@@ -320,7 +353,17 @@ export function ChatMessageList({
             </Typography.Paragraph>
           </View>
         ) : null}
-        {rendered}
+        {message.author === "agent" ? (
+          <ChatMessageGesture
+            screenReaderEnabled={screenReaderEnabled}
+            onReply={onReply ? () => onReply(message) : undefined}
+            onOpenActions={() => onOpenActions(message)}
+          >
+            {rendered}
+          </ChatMessageGesture>
+        ) : (
+          rendered
+        )}
       </View>
     );
   };
@@ -331,9 +374,11 @@ export function ChatMessageList({
         accessible
         accessibilityLiveRegion="polite"
         accessibilityRole="text"
-        accessibilityLabel={`${agent.name}: ${activityLabel}`}
+        accessibilityLabel={`${target.name}: ${activityLabel}`}
       >
-        <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={36} />
+        {target.kind === "agent" ? (
+          <BloubAvatar agentId={target.id} hue={target.avatarHue} seed={target.avatarSeed} size={36} />
+        ) : null}
         <StreamRevealProvider>
           <ThinkingTextGradient
             text={activityLabel}
@@ -383,7 +428,7 @@ export function ChatMessageList({
           removeClippedSubviews={false}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           onStartReached={() => {
-            if (motion.historyVisible && canSend && hasOlder && !olderLoading && !olderError) onLoadOlder();
+            if (motion.historyVisible && online && hasOlder && !olderLoading && !olderError) onLoadOlder();
           }}
           onStartReachedThreshold={0.5}
           renderItem={({ item, index }) => (
@@ -430,7 +475,7 @@ export function ChatMessageList({
             <>
               {hasOlder ? (
                 <View className="items-center pb-3">
-                  <Button variant="tertiary" isDisabled={!canSend || olderLoading} onPress={onLoadOlder}>
+                  <Button variant="tertiary" isDisabled={!online || olderLoading} onPress={onLoadOlder}>
                     <Button.Label>
                       {olderLoading
                         ? "Loading older messages…"
@@ -469,7 +514,10 @@ export function ChatMessageList({
           }
           ListFooterComponent={
             <>
-              <Animated.View style={motion.responseStyle}>{renderActivity()}</Animated.View>
+              <Animated.View style={motion.responseStyle}>
+                {renderActivity()}
+                {footer}
+              </Animated.View>
               {showStarter ? (
                 <View
                   className="gap-4 rounded-[26px] p-4"

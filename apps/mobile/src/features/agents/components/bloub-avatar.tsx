@@ -8,7 +8,10 @@ import { useBloubActivityFrame } from "@/features/agents/components/use-bloub-ac
 import { type BloubActivityFrame, bloubActivityGeometry } from "@/features/agents/model/bloub-activity";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 
-import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
+import {
+  DISCONNECTED_APPEARANCE,
+  useConnectionAppearance,
+} from "@/features/workspace/components/use-connection-appearance";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 
 interface BloubAvatarProps {
@@ -105,7 +108,8 @@ export const BloubAvatarThumbnail = memo(function BloubAvatarThumbnail({
   seed,
   hue,
   size = 48,
-}: Omit<BloubAvatarProps, "agentId">) {
+  disconnected = false,
+}: Omit<BloubAvatarProps, "agentId"> & { disconnected?: boolean }) {
   const frame = useMemo(() => {
     const geometry = bloubActivityGeometry(seed);
     return new BotEngine(100, "idle", geometry.radii, geometry.expression).sample(0);
@@ -114,12 +118,17 @@ export const BloubAvatarThumbnail = memo(function BloubAvatarThumbnail({
     <Svg
       accessibilityElementsHidden
       accessible={false}
+      opacity={disconnected ? DISCONNECTED_APPEARANCE.opacity : 1}
       height={size}
       pointerEvents="none"
       viewBox="-158 -158 316 316"
       width={size}
     >
-      <Path d={frame.bodyPath} fill={getBloubAvatarColor(seed, hue)} opacity={frame.bodyAlpha} />
+      <Path
+        d={frame.bodyPath}
+        fill={thumbnailColor(getBloubAvatarColor(seed, hue), disconnected)}
+        opacity={frame.bodyAlpha}
+      />
       {(["left", "right"] as const).map((side) => {
         const eye = frame.eyes[side === "left" ? 0 : 1];
         return eye ? (
@@ -133,4 +142,13 @@ export const BloubAvatarThumbnail = memo(function BloubAvatarThumbnail({
 export function getBloubAvatarColor(seed: string, hue: AvatarHue | null): string {
   const profile = bloubAvatarProfile(seed, hue);
   return COLOR_BY_ID.get(profile.color)?.hex ?? "#8b5cf6";
+}
+
+function thumbnailColor(color: string, disconnected: boolean) {
+  if (!disconnected) return color;
+  const r = Number.parseInt(color.slice(1, 3), 16);
+  const g = Number.parseInt(color.slice(3, 5), 16);
+  const b = Number.parseInt(color.slice(5, 7), 16);
+  const gray = r * 0.213 + g * 0.715 + b * 0.072;
+  return `rgb(${[r, g, b].map((value) => Math.round(gray + (value - gray) * DISCONNECTED_APPEARANCE.saturation)).join(",")})`;
 }

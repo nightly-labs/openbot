@@ -5,7 +5,7 @@ import { router, useIsFocused } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ArrowDown } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, AppState, Keyboard, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
@@ -21,27 +21,43 @@ import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import { type ChatAttachment, useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
-import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
+import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { type ChatBubbleMessage, useMessageActions } from "@/features/chat/context/message-actions-context";
-import {
-  latestReadableMessage,
-  type PendingChatMessage,
-  presentChatMessages,
-  projectChatMessages,
-} from "@/features/chat/model/chat-messages";
+import { type ChatMessage, type PendingChatMessage, presentChatMessages } from "@/features/chat/model/chat-messages";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
-import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
-import { retainConfirmedAttachments, uploadChatAttachments } from "../model/upload-chat-attachments";
+import type { ChatTarget } from "../model/chat-target";
+import { retainConfirmedAttachments } from "../model/upload-chat-attachments";
 import { ChatCameraPanel } from "./chat-camera-panel";
 
-interface MobileChatViewProps {
+export interface ChatViewProps {
+  target: ChatTarget;
   animateAvatarOnExit?: boolean;
-  agent: MobileAgent;
+  agents: MobileAgent[];
+  mentionAgents: MobileAgent[];
+  projectedMessages: ChatMessage[];
+  referenceMessages: ChatMessage[];
+  ready: boolean;
+  historyLoadFailed: boolean;
+  canSend: boolean;
+  activity?: MobileAgentActivity;
+  activeTurnId: string | null;
+  questionForm?: QuestionPromptController;
+  readBoundary: string | null;
+  markRead: () => void;
+  fetchHistory: () => void;
+  hasOlder: boolean;
+  olderLoading: boolean;
+  olderError: boolean;
+  loadOlder: () => void;
+  send: (body: string, files: ChatAttachment[], replyToMessageId: string | null) => Promise<string | null>;
+  footer?: ReactNode;
+  notice?: string;
 }
 
 const CHAT_BACK_EDGE_WIDTH = 24;
@@ -51,7 +67,30 @@ function leaveConversation(): void {
   else router.replace("/connected");
 }
 
-export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileChatViewProps) {
+export function ChatView({
+  target,
+  animateAvatarOnExit = false,
+  agents: serverAgents,
+  mentionAgents,
+  projectedMessages,
+  referenceMessages,
+  ready,
+  historyLoadFailed,
+  canSend,
+  activity,
+  activeTurnId,
+  questionForm,
+  readBoundary,
+  markRead,
+  fetchHistory,
+  hasOlder,
+  olderLoading,
+  olderError,
+  loadOlder,
+  send,
+  footer,
+  notice,
+}: ChatViewProps) {
   const isFocused = useIsFocused();
   const foregroundVisit = useAppForeground();
   const [conversationAnalytics] = useState(() => new MobileConversationAnalytics(mobileAnalytics));
@@ -85,40 +124,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   const [messageAliases, setMessageAliases] = useState<ReadonlyMap<string, string>>(new Map());
   const sendSequence = useRef(0);
   const [showStarter, setShowStarter] = useState(true);
-  const [historyLoadFailed, setHistoryLoadFailed] = useState(false);
-  const historyRequestRef = useRef(0);
-  const {
-    agents,
-    conversationStore,
-    loadOlderMessages,
-    loadConversation,
-    markAgentRead,
-    servers,
-    respondToPrompt,
-    sendMessage: sendTeamMessage,
-    uploadAttachment,
-    discardAttachment,
-  } = useMobileWorkspace();
-  const subscribeConversation = useCallback(
-    (notify: () => void) => conversationStore.subscribe(agent.id, notify),
-    [agent.id, conversationStore],
-  );
-  const getConversation = useCallback(() => conversationStore.get(agent.id), [agent.id, conversationStore]);
-  const conversation = useSyncExternalStore(subscribeConversation, getConversation);
-  const serverAgents = useMemo(
-    () => agents.filter((candidate) => candidate.serverId === agent.serverId),
-    [agents, agent.serverId],
-  );
-  const mentionAgents = useMemo(
-    () => serverAgents.filter((candidate) => candidate.id !== agent.id),
-    [serverAgents, agent.id],
-  );
-  const activity = useAgentActivity(agent.id);
-  const projectedMessages = useMemo(() => projectChatMessages(conversation?.messages ?? []), [conversation?.messages]);
-  const referenceMessages = useMemo(
-    () => projectChatMessages(Object.values(conversation?.references ?? {})),
-    [conversation?.references],
-  );
+  const { servers } = useMobileWorkspace();
   const messages = useMemo(
     () => presentChatMessages(projectedMessages, pendingMessage, messageAliases),
     [projectedMessages, pendingMessage, messageAliases],
@@ -127,52 +133,35 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     if (!pendingMessage?.serverId) return;
     if (
       retainConfirmedAttachments(projectedMessages, pendingMessage.serverId, submittedFiles.current, (id, file) => {
-        queryClient.setQueryData(["chat-attachment", agent.serverId, id], file);
+        queryClient.setQueryData(["chat-attachment", target.serverId, id], file);
       })
     ) {
       submittedFiles.current = [];
       setPendingMessage(null);
     }
-  }, [pendingMessage, projectedMessages, queryClient, agent.serverId]);
+  }, [pendingMessage, projectedMessages, queryClient, target.serverId]);
   const lastUserId =
     messages.findLast((message) => message.kind === "message" && message.author === "user")?.id ?? null;
-  const motion = useChatMotion(insets.top + 84, keyboardOffset, Boolean(conversation), lastUserId);
+  const motion = useChatMotion(insets.top + 84, keyboardOffset, ready, lastUserId);
   const atLatest = motion.atLatest;
   const liquidGlassAvailable = isLiquidGlassAvailable() && !reducedTransparency;
-  const latestMessage = latestReadableMessage(conversation?.messages ?? []);
-  const readBoundary = latestMessage?.id;
-  const readBoundaryStatus = latestMessage?.status;
-  const server = servers.find((server) => server.id === agent.serverId);
+  const server = servers.find((server) => server.id === target.serverId);
   const serverOnline = server?.state === "online";
   useEffect(() => {
     conversationAnalytics.update(
       isFocused && foregroundVisit,
-      Boolean(conversation),
+      ready,
       historyLoadFailed || (!serverOnline && server?.initialConnectionPending === false),
     );
   }, [
     conversationAnalytics,
     isFocused,
     foregroundVisit,
-    conversation,
+    ready,
     historyLoadFailed,
     serverOnline,
     server?.initialConnectionPending,
   ]);
-  const activePrompt = messages.findLast(
-    (message) =>
-      message.kind === "question" &&
-      !message.prompt.resolution &&
-      Boolean(conversation?.activeTurnId) &&
-      message.turnId === conversation?.activeTurnId,
-  );
-  const questionForm = useQuestionPrompt(
-    agent.id,
-    activePrompt?.kind === "question" ? activePrompt : undefined,
-    serverOnline,
-    respondToPrompt,
-  );
-
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => setAppActive(state === "active"));
     return () => subscription.remove();
@@ -191,41 +180,13 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   }, []);
 
   useEffect(() => {
-    if (!pendingMessage && isFocused && appActive && atLatest && serverOnline && readBoundary && readBoundaryStatus) {
-      markAgentRead(agent.id, readBoundary);
-    }
-  }, [
-    pendingMessage,
-    isFocused,
-    appActive,
-    atLatest,
-    serverOnline,
-    readBoundary,
-    readBoundaryStatus,
-    agent.id,
-    markAgentRead,
-  ]);
-
-  const fetchHistory = useCallback(() => {
-    if (!serverOnline) return;
-    const requestId = ++historyRequestRef.current;
-    setHistoryLoadFailed(false);
-    void loadConversation(agent.id).catch(() => {
-      if (historyRequestRef.current === requestId) setHistoryLoadFailed(true);
-    });
-  }, [agent.id, loadConversation, serverOnline]);
-
-  useEffect(() => {
-    fetchHistory();
-    return () => {
-      historyRequestRef.current += 1;
-    };
-  }, [fetchHistory]);
+    if (!pendingMessage && isFocused && appActive && atLatest && serverOnline && readBoundary) markRead();
+  }, [pendingMessage, isFocused, appActive, atLatest, serverOnline, readBoundary, markRead]);
 
   const handleLeaveConversation = useCallback(() => {
-    if (animateAvatarOnExit) leaveAgentChatAnimated(agent.id);
+    if (animateAvatarOnExit && target.kind === "agent") leaveAgentChatAnimated(target.id);
     else leaveConversation();
-  }, [animateAvatarOnExit, agent.id, leaveAgentChatAnimated]);
+  }, [animateAvatarOnExit, target.id, target.kind, leaveAgentChatAnimated]);
 
   const edgeBackGesture = useMemo(
     () =>
@@ -242,7 +203,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
   );
 
   function sendMessage(value: string): void {
-    if (!serverOnline || sendingRef.current || pendingMessage) return;
+    if (!serverOnline || !canSend || sendingRef.current || pendingMessage) return;
     const body = value.trim();
     if (!body && attachments.items.length === 0) return;
 
@@ -251,7 +212,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     Keyboard.dismiss();
 
     void haptics.impact();
-    if (questionForm.question) {
+    if (questionForm?.question) {
       questionForm.answer([body]);
       motion.cancelSend();
       motion.scrollToLatest();
@@ -291,13 +252,16 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
     });
     void (async () => {
       try {
-        const serverId = await uploadChatAttachments(files, {
-          upload: (file) => uploadAttachment(agent.id, file),
-          discard: (id) => discardAttachment(agent.id, id),
-          send: (ids) => sendTeamMessage(agent.id, body, ids, submittedReply?.id ?? null),
-        });
-        setMessageAliases((current) => new Map(current).set(serverId, localId));
-        setPendingMessage((current) => (current?.message.id === localId ? { ...current, serverId } : current));
+        const serverId = await send(body, files, submittedReply?.id ?? null);
+        if (serverId) {
+          setMessageAliases((current) => new Map(current).set(serverId, localId));
+          setPendingMessage((current) => (current?.message.id === localId ? { ...current, serverId } : current));
+        } else {
+          // Channel commands acknowledge the operation, without a message ID. Use the
+          // refreshed host transcript; never guess a receipt from matching message text.
+          submittedFiles.current = [];
+          setPendingMessage(null);
+        }
         attachments.clear();
       } catch (error) {
         submittedFiles.current = [];
@@ -307,7 +271,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
         setDraft((current) => (current ? `${body}\n${current}` : body));
         setSendRetryVersion((version) => version + 1);
         setSendError({
-          agentId: agent.id,
+          agentId: target.id,
           message: userErrorMessage(
             error,
             "Could not send the message. Check the conversation before you send it again.",
@@ -337,7 +301,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
             offset={Math.max(0, composerGestureHeight - keyboardOffset)}
           >
             <ChatHeader
-              agent={agent}
+              target={target}
               fallbackBackground={fieldBackground}
               foreground={foreground}
               liquidGlassAvailable={liquidGlassAvailable}
@@ -346,13 +310,16 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
             />
             <ChatMessageList
               agents={serverAgents}
-              agent={agent}
+              target={target}
               motion={motion}
               sending={sending}
               keyboardOffset={keyboardOffset}
-              canSend={serverOnline}
+              canSend={serverOnline && canSend}
+              online={serverOnline}
+              activity={activity}
+              footer={footer}
               historyState={
-                conversation
+                ready
                   ? "ready"
                   : server?.initialConnectionPending
                     ? "connecting"
@@ -363,21 +330,19 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
                         : "loading"
               }
               appActive={appActive}
-              activeTurnId={conversation?.activeTurnId ?? null}
+              activeTurnId={activeTurnId}
               questionForm={questionForm}
               fieldBackground={fieldBackground}
               foreground={foreground}
               messages={messages}
               messageAliases={messageAliases}
               referenceMessages={referenceMessages}
-              hasOlder={conversation?.pageInfo.hasOlder ?? false}
-              olderLoading={conversation?.olderLoading ?? false}
-              olderError={conversation?.olderError ?? false}
-              onLoadOlder={() => {
-                void loadOlderMessages(agent.id);
-              }}
+              hasOlder={hasOlder}
+              olderLoading={olderLoading}
+              olderError={olderError}
+              onLoadOlder={loadOlder}
               onReply={
-                !questionForm.question
+                !questionForm?.question
                   ? (message) => {
                       setReplyTarget(message);
                       setReplyFocusVersion((version) => version + 1);
@@ -388,7 +353,7 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
                 Keyboard.dismiss();
                 selectMessageActions({
                   message,
-                  onReply: !questionForm.question
+                  onReply: !questionForm?.question
                     ? () => {
                         setReplyTarget(message);
                         setReplyFocusVersion((version) => version + 1);
@@ -399,7 +364,9 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
               }}
               muted={muted}
               raised={raised}
-              showStarter={showStarter && serverOnline && !activity && conversation?.messages.length === 0}
+              showStarter={
+                showStarter && serverOnline && canSend && ready && !activity && projectedMessages.length === 0
+              }
               topInset={insets.top}
               onDismissStarter={() => setShowStarter(false)}
               onSelectStarter={sendMessage}
@@ -426,37 +393,40 @@ export function MobileChatView({ animateAvatarOnExit = false, agent }: MobileCha
                 </View>
               ) : null}
               <ConnectionStatus server={server} />
-              {sendError?.agentId === agent.id ? (
+              {sendError?.agentId === target.id ? (
                 <Typography.Paragraph accessibilityRole="alert" className="bg-background px-4 py-2 text-danger-text">
                   {sendError.message}
                 </Typography.Paragraph>
               ) : null}
+              {notice ? (
+                <Typography.Paragraph className="bg-background px-4 py-2 text-muted">{notice}</Typography.Paragraph>
+              ) : null}
               <ChatComposer
                 sendRetryVersion={sendRetryVersion}
-                replyTarget={questionForm.question ? null : replyTarget}
+                replyTarget={questionForm?.question ? null : replyTarget}
                 replyFocusVersion={replyFocusVersion}
                 onCancelReply={() => setReplyTarget(null)}
                 mentionAgents={mentionAgents}
                 key={JSON.stringify([
-                  agent.id,
-                  questionForm.question ? questionForm.messageId : null,
-                  questionForm.question?.id,
+                  target.id,
+                  questionForm?.question ? questionForm.messageId : null,
+                  questionForm?.question?.id,
                 ])}
                 action={action}
                 actionForeground={actionForeground}
-                agentName={agent.name}
+                agentName={target.name}
                 bottomInset={insets.bottom}
-                disabled={!serverOnline || questionForm.pending}
+                disabled={!serverOnline || !canSend || Boolean(questionForm?.pending)}
                 sending={sending || Boolean(pendingMessage)}
                 attachments={attachments}
-                answerQuestion={questionForm.question}
-                draft={questionForm.question ? questionForm.draft : draft}
+                answerQuestion={questionForm?.question}
+                draft={questionForm?.question ? questionForm.draft : draft}
                 fallbackBackground={fieldBackground}
                 foreground={foreground}
                 liquidGlassAvailable={liquidGlassAvailable}
                 muted={muted}
                 raised={raised}
-                onChangeDraft={questionForm.question ? questionForm.setDraft : setDraft}
+                onChangeDraft={questionForm?.question ? questionForm.setDraft : setDraft}
                 onSend={sendMessage}
               />
             </Animated.View>
