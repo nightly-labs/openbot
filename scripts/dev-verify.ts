@@ -1,8 +1,6 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { extname, resolve } from "node:path";
-import { readDevInstanceRecords } from "./dev-automation/instance-registry";
-import { isOrphanedDevStack, isSameWorktree, readDevStackRecords } from "./dev-automation/stack-registry";
 import { supportedBunVersion } from "./prepare-dev-environment";
 
 export type VerificationSurface = "desktop" | "renderer" | "mobile" | "api" | "remote" | "contracts" | "docs";
@@ -250,7 +248,7 @@ export function qaReadinessReasons(
   return reasons;
 }
 
-export function createDevVerificationReport(projectRoot = process.cwd()): DevVerificationReport {
+export async function createDevVerificationReport(projectRoot = process.cwd()): Promise<DevVerificationReport> {
   const files = changedFiles(projectRoot);
   const surfaces = surfacesForFiles(files);
   const bunCurrent = process.versions.bun ?? "unknown";
@@ -261,18 +259,32 @@ export function createDevVerificationReport(projectRoot = process.cwd()): DevVer
   };
   const setupReady = setup.bun.ready && setup.dependencies && setup.developmentEnv;
 
-  const localStacks = readDevStackRecords().filter((stack) => isSameWorktree(stack, projectRoot));
-  const appInstances = readDevInstanceRecords().filter(
-    (instance) => resolve(instance.projectRoot) === resolve(projectRoot) && instance.service === "app",
-  );
-  const isolatedApp = appInstances.length === 1 && appInstances[0]?.instanceId !== "default";
-  const runtime = {
-    stackRunning: localStacks.length > 0,
-    appRunning: appInstances.length === 1,
-    isolatedApp,
-    orphanedStack: localStacks.some((stack) => isOrphanedDevStack(stack)),
-    ambiguousApp: appInstances.length > 1,
+  let runtime: DevVerificationReport["runtime"] = {
+    stackRunning: false,
+    appRunning: false,
+    isolatedApp: false,
+    orphanedStack: false,
+    ambiguousApp: false,
   };
+
+  if (setup.dependencies) {
+    const [{ readDevInstanceRecords }, { isOrphanedDevStack, isSameWorktree, readDevStackRecords }] = await Promise.all(
+      [import("./dev-automation/instance-registry"), import("./dev-automation/stack-registry")],
+    );
+    const localStacks = readDevStackRecords().filter((stack) => isSameWorktree(stack, projectRoot));
+    const appInstances = readDevInstanceRecords().filter(
+      (instance) => resolve(instance.projectRoot) === resolve(projectRoot) && instance.service === "app",
+    );
+    runtime = {
+      stackRunning: localStacks.length > 0,
+      appRunning: appInstances.length === 1,
+      isolatedApp: appInstances.length === 1 && appInstances[0]?.instanceId !== "default",
+      orphanedStack: localStacks.some((stack) => isOrphanedDevStack(stack)),
+      ambiguousApp: appInstances.length > 1,
+    };
+  }
+
+  const isolatedApp = runtime.isolatedApp;
   const reasons = readinessReasons(setup, runtime);
   const plan = verificationCommands(files, surfaces, setupReady, isolatedApp, projectRoot);
   const qaReasons = qaReadinessReasons(surfaces, setupReady, runtime);
@@ -363,7 +375,7 @@ function runRecommendedChecks(report: DevVerificationReport, projectRoot: string
 
 if (import.meta.main) {
   const projectRoot = process.cwd();
-  const report = createDevVerificationReport(projectRoot);
+  const report = await createDevVerificationReport(projectRoot);
   if (process.argv.includes("--run")) runRecommendedChecks(report, projectRoot);
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 }

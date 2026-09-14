@@ -1,8 +1,15 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { qaReadinessReasons, suggestedTestsForFiles, surfacesForFiles, verificationCommands } from "./dev-verify";
+import {
+  createDevVerificationReport,
+  qaReadinessReasons,
+  suggestedTestsForFiles,
+  surfacesForFiles,
+  verificationCommands,
+} from "./dev-verify";
 
 describe("dev verification planning", () => {
   it("maps changed files to affected product surfaces", () => {
@@ -144,5 +151,29 @@ describe("dev verification planning", () => {
         ambiguousApp: false,
       }),
     ).toEqual(["The running app uses the default profile. Start bun run dev --isolated for isolated renderer QA."]);
+  });
+
+  it("reports setup blockers before dependencies are installed", async () => {
+    const root = mkdtempSync(join(tmpdir(), "openbot-dev-verify-fresh-"));
+    mkdirSync(join(root, "apps/auth-api"), { recursive: true });
+    writeFileSync(join(root, "README.md"), "fresh checkout\n");
+    execFileSync("git", ["init"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "dev-verify@example.invalid"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Dev Verify"], { cwd: root });
+    execFileSync("git", ["add", "README.md"], { cwd: root });
+    execFileSync("git", ["commit", "-m", "fixture"], { cwd: root });
+
+    const report = await createDevVerificationReport(root);
+
+    expect(report.setup.dependencies).toBe(false);
+    expect(report.reasons).toContain("node_modules is missing. Run bun run dev:prepare.");
+    expect(report.commands).toContain("bun run dev:prepare");
+    expect(report.runtime).toEqual({
+      stackRunning: false,
+      appRunning: false,
+      isolatedApp: false,
+      orphanedStack: false,
+      ambiguousApp: false,
+    });
   });
 });
