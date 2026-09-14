@@ -8181,6 +8181,12 @@ button.chat-action-target:active,
   font-size: var(--openbot-text-sm);
 }
 
+.browser-preview-header > .ui-button > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
 .browser-preview-list {
   min-height: 0;
   overflow-y: auto;
@@ -8195,11 +8201,16 @@ button.chat-action-target:active,
   padding: var(--openbot-space-8) var(--openbot-space-4);
 }
 
-.browser-preview-list > .browser-empty-state > svg {
-  width: var(--openbot-space-8);
-  height: var(--openbot-space-8);
-  margin-bottom: var(--openbot-space-1);
+.browser-preview-list > .browser-empty-state > svg,
+.browser-preview-image > svg {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
   color: var(--openbot-text-muted);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.browser-preview-list > .browser-empty-state > svg {
+  margin-bottom: var(--openbot-space-1);
 }
 
 .browser-preview-list > .browser-empty-state > strong {
@@ -8261,6 +8272,12 @@ button.chat-action-target:active,
   top: var(--openbot-space-2);
   right: var(--openbot-space-2);
   opacity: 0;
+}
+
+.browser-preview-close > svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .browser-preview-card:hover .browser-preview-close,
