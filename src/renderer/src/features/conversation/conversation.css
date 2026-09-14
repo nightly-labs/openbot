@@ -8170,9 +8170,11 @@ button.chat-action-target:active,
 
 .browser-preview-header {
   display: flex;
+  height: var(--left-header-height, 38px);
+  flex: 0 0 auto;
   align-items: center;
   gap: var(--openbot-space-1);
-  padding: var(--openbot-space-2) var(--openbot-space-3);
+  padding: 0 var(--openbot-space-3);
   color: var(--openbot-text-secondary);
 }
 
