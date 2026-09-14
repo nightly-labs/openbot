@@ -259,12 +259,11 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     deps.setBrowserAddressEditing(false);
     const analytics = desktopAnalytics.scope();
     const url = browserAddressUrl(value);
-    const currentTab = newTab ? undefined : activeBrowserTab();
+    const currentTab = newTab || deps.props.server?.kind === "remote" ? undefined : activeBrowserTab();
     if (currentTab) {
       if (closingBrowserTabIds.has(currentTab.id)) return;
       try {
         await window.openbot.browser.navigate({ tabId: currentTab.id, url });
-        deps.setBrowserAddress(url);
       } catch {
         deps.setComposerError("Could not open the address in this tab.");
       }

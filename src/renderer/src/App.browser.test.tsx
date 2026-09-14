@@ -188,6 +188,79 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.browser.open).not.toHaveBeenCalled();
   });
 
+  it("keeps a new address draft when navigation in another tab completes", async () => {
+    const first: BrowserTab = {
+      id: "slow-tab",
+      title: "Slow page",
+      url: "https://example.com/first",
+      loading: false,
+      ownerAgentId: "chief",
+      ownerThreadId: "thread-chief",
+    };
+    const second = { ...first, id: "draft-tab", title: "Draft page", url: "https://example.com/second" };
+    const navigation = Promise.withResolvers<void>();
+    vi.mocked(window.openbot.browser.navigate).mockReturnValueOnce(navigation.promise);
+    vi.mocked(window.openbot.browser.activate).mockImplementation(async (tabId) => {
+      emitAgentEvent?.({ type: "browser-changed", tabs: [first, second], activeTabId: tabId });
+    });
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs: [first, second], activeTabId: first.id });
+    await fireEvent.click(screen.getByRole("button", { name: "Open computer" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Open Slow page" }));
+    const address = screen.getByRole("textbox", { name: "Browser address" });
+    address.focus();
+    await fireEvent.input(address, { target: { value: "example.com/loading" } });
+    const form = address.closest("form");
+    if (!form) throw new Error("Browser address form was not rendered.");
+    await fireEvent.submit(form);
+    expect(window.openbot.browser.navigate).toHaveBeenCalledWith({
+      tabId: first.id,
+      url: "https://example.com/loading",
+    });
+    await fireEvent.click(screen.getByRole("tab", { name: second.title }));
+    await screen.findByRole("tab", { name: second.title, selected: true });
+    address.focus();
+    await fireEvent.input(address, { target: { value: "Keep this search draft" } });
+    navigation.resolve();
+    await navigation.promise;
+    flush();
+    expect(address).toHaveValue("Keep this search draft");
+  });
+
+  it("opens address searches on a remote host with an existing tab", async () => {
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
+      testServer("local", false),
+      testServer("remote-1", true),
+    ]);
+    const tab: BrowserTab = {
+      id: "remote-address-tab",
+      title: "Remote address page",
+      url: "https://example.com",
+      loading: false,
+      ownerAgentId: "chief",
+      ownerThreadId: "thread-chief",
+    };
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
+    await fireEvent.click(screen.getByRole("button", { name: "Open computer" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Open Remote address page" }));
+    const address = screen.getByRole("textbox", { name: "Browser address" });
+    address.focus();
+    await fireEvent.input(address, { target: { value: "remote search" } });
+    const form = address.closest("form");
+    if (!form) throw new Error("Browser address form was not rendered.");
+    await fireEvent.submit(form);
+    expect(window.openbot.browser.open).toHaveBeenCalledWith({
+      url: "https://www.google.com/search?q=remote%20search",
+      ownerAgentId: "chief",
+      ownerThreadId: "thread-chief",
+      focus: true,
+    });
+    expect(window.openbot.browser.navigate).not.toHaveBeenCalled();
+  });
+
   it("keeps existing previews when a new tab is added", async () => {
     const first: BrowserTab = {
       id: "existing",
