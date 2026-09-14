@@ -834,6 +834,44 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     ]);
   });
 
+  it("keeps Grok's telemetry export failure out of the chat it was switched into", async () => {
+    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+      const client = new FakeAgentClient(provider);
+      clients.set(provider, client);
+      return client;
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
+    const client = clients.get("grok");
+    if (!client) throw new Error("Grok did not start.");
+
+    // Verbatim, with the colour the CLI writes on a pipe already removed by the stderr reader. A
+    // computer that cannot reach the collector writes this on every flush while the turn runs, and
+    // the user met it as a "Provider error" toast right after switching the chat to Grok.
+    client.emit(
+      "diagnostic",
+      '2026-09-14T08:28:39.022673Z ERROR name="BatchSpanProcessor.ExporterError" error="Operation failed: HTTP export failed: network error"',
+    );
+    // Grok's own network failure is not telemetry, and stays visible.
+    client.emit("diagnostic", "ERROR grok: the model endpoint could not be reached");
+
+    await waitFor(() => events.some((event) => event.type === "error"));
+    expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({ message: "ERROR grok: the model endpoint could not be reached" }),
+    ]);
+
+    // The chat is on Grok and still runs a turn: the export failed, the agent's work did not.
+    await service.sendMessage({ agentId: "chief", text: "Continue on Grok." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    expect(service.listAgents().find((agent) => agent.id === "chief")?.provider).toBe("grok");
+  });
+
   it("refuses to replace a CLI that is running a turn", async () => {
     const { store, mailbox } = stores(root);
     service = new AgentService(

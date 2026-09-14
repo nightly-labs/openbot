@@ -71,6 +71,27 @@ export function isMcpSubsystemDiagnostic(message: string): boolean {
   return /\b(mcp|rmcp)\b/i.test(message);
 }
 
+/**
+ * Whether a provider diagnostic is about the CLI's own telemetry export rather than about the
+ * agent's work.
+ *
+ * Grok's CLI carries an OpenTelemetry exporter that reports every failed flush on the same stderr as
+ * the agent, so a computer that cannot reach its collector - one offline, behind a proxy, or with
+ * that host blocked - writes `BatchSpanProcessor.ExporterError` while the turn runs correctly. The
+ * user met it as a "Provider error" toast on switching a chat to Grok, with nothing failing and
+ * nothing to do about it. No turn, model switch, or sign-in reads that export, so it belongs in the
+ * log.
+ *
+ * Only the exporter's own subsystem names count. A message that names OpenBot, or a network failure
+ * that does not name telemetry, is the provider's work and stays visible.
+ */
+export function isTelemetryExportDiagnostic(message: string): boolean {
+  if (/openbot/i.test(message)) return false;
+  return /\b(?:batch(?:span|log|logrecord)processor|(?:span|log|logrecord|metric)exporter|opentelemetry|otlp|otel)\b/i.test(
+    message,
+  );
+}
+
 interface PendingCodexLogin {
   client: AgentClient;
   cli: CodexCliInfo;
@@ -1418,6 +1439,10 @@ export class ProviderRuntime implements ProviderPort {
       if (!/error|failed|warning/i.test(message)) return;
       if (isMcpSubsystemDiagnostic(message)) {
         logger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });
+        return;
+      }
+      if (isTelemetryExportDiagnostic(message)) {
+        logger.warn("A provider reported a telemetry export failure.", { provider: client.provider, message });
         return;
       }
       this.#emitError(`${client.provider}_diagnostic`, message);

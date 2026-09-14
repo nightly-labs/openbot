@@ -114,4 +114,21 @@ describe("stderr diagnostics", () => {
 
     expect(messages).toEqual(["ERROR request failed: [redacted-unscanned]"]);
   });
+
+  // Grok's CLI keeps its colour on a pipe, so a record arrives wrapped in escape sequences. Read as
+  // text they were shown to the user, and they sit between a label and its value where the redactor
+  // looks for a key-value pair.
+  it("removes terminal colour before redacting and before showing a record", () => {
+    const { messages, stream } = collect();
+    const esc = String.fromCharCode(27);
+    stream.push(
+      `${esc}[2m2026-09-14T08:28:39.022673Z${esc}[0m ${esc}[31mERROR${esc}[0m ${esc}[3mname${esc}[0m${esc}[2m=${esc}[0m"BatchSpanProcessor.ExporterError"\n`,
+    );
+    stream.push(`${esc}[3mapiKey${esc}[0m${esc}[2m=${esc}[0mabcdef123456\n`);
+
+    expect(messages).toEqual([
+      '2026-09-14T08:28:39.022673Z ERROR name="BatchSpanProcessor.ExporterError"',
+      "apiKey=[redacted]",
+    ]);
+  });
 });

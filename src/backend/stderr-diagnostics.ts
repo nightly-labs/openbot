@@ -16,6 +16,24 @@
 /** What a record may grow to before it is read anyway. One line of provider stderr is far shorter. */
 const DEFAULT_LIMIT = 64 * 1024;
 
+/**
+ * The colour a CLI writes for a terminal, which no reader of these records is.
+ *
+ * A CLI that keeps colour on a pipe - Grok's does - wraps every field of a record in escape
+ * sequences, and they arrive here as text: the user read `[2m2026-09-14T08:28:39Z[0m [31mERROR[0m`
+ * in a toast. They also sit between a label and its value, where `apiKey=<esc>[0m<secret>` no longer
+ * reads as the key-value pair the redactor looks for, so they are removed before redaction, not
+ * after it.
+ *
+ * Built from a character code because the pattern holds control characters: CSI (`<esc>[…`), OSC
+ * (`<esc>]…` up to a bell or a string terminator), and the two-character escapes.
+ */
+const ESCAPE = String.fromCharCode(27);
+const ANSI_SEQUENCE = new RegExp(
+  `${ESCAPE}(?:\\[[0-9;?]*[ -/]*[@-~]|\\][^${ESCAPE}\\u0007]*(?:\\u0007|${ESCAPE}\\\\)|[@-Z\\\\-_])`,
+  "gu",
+);
+
 export interface DiagnosticStream {
   /** Takes one stderr chunk and emits every record it completes. */
   push: (chunk: string) => void;
@@ -62,7 +80,7 @@ export function createDiagnosticStream(options: {
   }
 
   function emitRecord(record: string): void {
-    const message = options.redact(record.trim());
+    const message = options.redact(record.replace(ANSI_SEQUENCE, "").trim());
     if (message) options.emit(message);
   }
 
