@@ -9,8 +9,8 @@
  */
 
 import type { ChannelMessage, ChannelPage } from "@openbot/contracts/ipc";
-import { SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
-import type { AgentMessage, AgentProfile } from "../../data";
+import { channelRoutingConversationEvent, SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
+import type { AgentMessage, AgentProfile, ChatActionMarkerModel } from "../../data";
 import type { ChatMessageAuthor } from "../conversation/ChatMessageRow";
 import { type DayMarkerOptions, dayMarkerLabel } from "../conversation/chat-day-markers";
 
@@ -38,11 +38,25 @@ function hasContent(entry: ChannelMessage): boolean {
   return Boolean(entry.message.text.trim() || entry.message.attachments?.length || entry.message.questionPrompt);
 }
 
+/**
+ * The routing receipt of a channel as an activity row, or `null` for an ordinary message.
+ *
+ * A receipt reads like the "Messaged" and "Created routine" markers of a one-to-one chat: it is
+ * feedback about how the work was shared, so it carries no bubble, no author face and no message
+ * actions, and it does not count as a new message.
+ */
+export function channelRoutingMarker(entry: ChannelMessage): ChatActionMarkerModel | null {
+  const event = channelRoutingConversationEvent(entry.message);
+  return event ? { ...event, kind: "channel-routing", timestamp: entry.message.createdAt } : null;
+}
+
 function toAgentMessage(entry: ChannelMessage, own: boolean, options: DayMarkerOptions): AgentMessage {
   const message = entry.message;
+  const actionMarker = channelRoutingMarker(entry);
   return {
     id: entry.id,
     author: own ? "you" : "agent",
+    ...(actionMarker ? { kind: "action-marker" as const, actionMarker } : {}),
     body: message.text,
     time: new Date(message.createdAt).toLocaleTimeString(options.locale, { hour: "numeric", minute: "2-digit" }),
     createdAt: message.createdAt,
@@ -98,6 +112,9 @@ export function channelTimelineEntries(
 ): ChannelTimelineEntry[] {
   const entries: ChannelTimelineEntry[] = [];
   let previous: ChannelTimelineEntry | undefined;
+  // A run of one author is broken by an activity row the same way a reply from someone else breaks
+  // it: the marker draws no name, so the message under it has to show its own again.
+  let previousAuthored: ChannelTimelineEntry | undefined;
   for (const source of page.messages) {
     if (!hasContent(source)) continue;
     const own = source.author.kind === "member" && isOwnMessage(source.author.id);
@@ -106,10 +123,12 @@ export function channelTimelineEntries(
       ? { kind: "you", name: "You" }
       : { kind: "agent", name: source.author.name, agent, avatarSeed: agent ? undefined : source.author.id };
     const dayMarker = dayMarkerLabel(previous?.message.createdAt, source.message.createdAt, options);
-    const sameAuthor = previous !== undefined && previous.authorId === source.author.id;
+    const marker = channelRoutingMarker(source);
+    const sameAuthor =
+      previousAuthored !== undefined && previousAuthored === previous && previousAuthored.authorId === source.author.id;
     const withinWindow =
-      previous !== undefined &&
-      new Date(source.message.createdAt).getTime() - new Date(previous.message.createdAt ?? "").getTime() <=
+      previousAuthored !== undefined &&
+      new Date(source.message.createdAt).getTime() - new Date(previousAuthored.message.createdAt ?? "").getTime() <=
         CHANNEL_GROUPING_WINDOW_MS;
     const entry: ChannelTimelineEntry = {
       id: source.id,
@@ -117,12 +136,13 @@ export function channelTimelineEntries(
       authorId: source.author.id,
       author,
       message: toAgentMessage(source, own, options),
-      showAuthor: !(sameAuthor && withinWindow && dayMarker === null),
+      showAuthor: marker === null && !(sameAuthor && withinWindow && dayMarker === null),
       dayMarker,
       source,
     };
     entries.push(entry);
     previous = entry;
+    if (marker === null) previousAuthored = entry;
   }
   return entries;
 }
@@ -139,7 +159,8 @@ export function firstUnreadChannelMessageId(entries: ChannelTimelineEntry[], unr
   let remaining = unreadCount;
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index];
-    if (entry.author.kind === "you") continue;
+    // The count from the channel list leaves out activity rows, so the walk back leaves them out.
+    if (entry.author.kind === "you" || entry.message.actionMarker) continue;
     remaining -= 1;
     if (remaining === 0) return entry.id;
   }

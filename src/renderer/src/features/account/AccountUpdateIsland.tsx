@@ -70,7 +70,13 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
     return formatErrorMessage(message, "Update failed. Try again.");
   });
   const failed = createMemo(() => Boolean(props.errorMessage) || phase() === "error");
-  const open = createMemo(() => failed() || isUpdateActivePhase(phase()));
+  // The island is a single nowrap line that ellipsizes, so it can only carry a failure short enough
+  // to read at a glance. A failed check found no update, which leaves it nothing to offer beyond a
+  // sentence it would cut in half - that belongs in the account menu, where the text wraps. A failed
+  // download or install keeps the island: an update is in play and the action that retries it is here.
+  const open = createMemo(
+    () => isUpdateActivePhase(phase()) || (failed() && props.updateStatus.errorCode !== "check_failed"),
+  );
   const downloading = createMemo(() => phase() === "downloading");
   const busy = createMemo(() => actionPending() || isUpdateBusyPhase(phase()));
   const ready = createMemo(() => !failed() && (phase() === "ready" || phase() === "installing"));

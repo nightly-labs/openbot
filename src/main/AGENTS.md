@@ -3,8 +3,9 @@
 The Electron main process owns the trust boundary, windows, lifecycle and privileged services.
 Check each change for what a compromised renderer could do with it.
 
-For rationale and module history, see
-[main-process design notes](../../docs/main-process-design-notes.md).
+Read [main-process design notes](../../docs/main-process-design-notes.md) when a module boundary
+here looks arbitrary, or before moving a responsibility between the files in the ownership table
+below.
 
 ## IPC endpoints
 

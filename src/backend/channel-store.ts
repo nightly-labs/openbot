@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import {
   CHANNEL_PREVIEW_LIMIT,
+  CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX,
   type Channel,
   type ChannelDraft,
   type ChannelMessage,
@@ -615,16 +616,20 @@ export class ChannelStore {
     const row = databaseRow(
       this.database.connection
         .prepare(
+          // A routing receipt is system activity the channel shows, not a message a member sent, so
+          // it never makes a channel unread or raises the badge of the sidebar.
           `SELECT COUNT(*) AS count FROM projection_channel_messages
            WHERE channel_id = ? AND sequence > ?
              AND json_extract(message_json, '$.author.id') IS NOT ?
-             AND json_extract(message_json, '$.author.id') IS NOT ?`,
+             AND json_extract(message_json, '$.author.id') IS NOT ?
+             AND COALESCE(json_extract(message_json, '$.message.itemType'), '') NOT LIKE ?`,
         )
         .get(
           channelId,
           this.readSequence(channelId, memberId),
           memberId,
           signedOutMessagesAreTheirs ? SIGNED_OUT_CHANNEL_MEMBER_ID : memberId,
+          `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`,
         ),
     );
     return row ? requiredNumberColumn(row, "count") : 0;

@@ -19,6 +19,7 @@ import { useAgents } from "../agents/agents-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { AgentMemoriesModal } from "../conversation/AgentMemoriesModal";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
+import { ChatActionMarker } from "../conversation/ChatActionMarker";
 import { ChatMessageRow } from "../conversation/ChatMessageRow";
 import { ComposerEditor, expandComposerMentions } from "../conversation/ComposerEditor";
 import { ApprovalCard, BrowserTakeoverCard } from "../conversation/ConversationPrompts";
@@ -542,75 +543,89 @@ export function ChannelConversation() {
                             }}
                           />
                         </Show>
-                        <ChatMessageRow
-                          message={entry()?.message ?? initialEntry.message}
-                          author={entry()?.author ?? initialEntry.author}
-                          showAuthor={entry()?.showAuthor ?? initialEntry.showAuthor}
-                          showTime
-                          animate={animate}
-                          agents={agentList()}
-                          referencedMessage={referenced()?.message}
-                          referencedAuthorName={referenced()?.author.name}
-                          onSelectAgent={(id) => {
-                            channels.close();
-                            selectAgent(id);
-                          }}
-                          onOpenLink={(url) => {
-                            void window.openbot.openUrl(url);
-                          }}
-                          onPreview={(attachment) => {
-                            void channels.perform(() =>
-                              window.openbot.agent.openAttachment({ attachmentId: attachment.id, action: "open" }),
-                            );
-                          }}
-                          onAttachmentAction={(attachment, action) => {
-                            void channels.perform(() =>
-                              window.openbot.agent.openAttachment({ attachmentId: attachment.id, action }),
-                            );
-                          }}
-                          actions={
-                            <MessageActions
-                              message={entry()?.message ?? initialEntry.message}
-                              authorName={entry()?.author.name ?? initialEntry.author.name}
-                              reactions={false}
-                              pickerOpen={false}
-                              moreOpen={openMoreMessageId() === initialEntry.id}
-                              expandedEmoji={false}
-                              copied={copiedMessageId() === initialEntry.id}
-                              onTogglePicker={() => {}}
-                              onToggleMore={() =>
-                                setOpenMoreMessageId((current) =>
-                                  current === initialEntry.id ? null : initialEntry.id,
-                                )
-                              }
-                              onExpandEmoji={() => {}}
-                              onReact={() => {}}
-                              onReply={() =>
-                                setComposer((state) => {
-                                  state.reply = initialEntry.id;
-                                })
-                              }
-                              onCopy={() => void copyChannelMessage(entry()?.message ?? initialEntry.message)}
+                        {initialEntry.message.actionMarker ? (
+                          <article class={{ "chat-action-entry-animated": animate }}>
+                            <ChatActionMarker
+                              marker={initialEntry.message.actionMarker}
+                              agents={agentList()}
+                              announce={animate}
+                              onSelectAgent={(id) => {
+                                channels.close();
+                                selectAgent(id);
+                              }}
                             />
-                          }
-                        >
-                          <Show when={entry()?.message.questionPrompt}>
-                            {(prompt) => (
-                              <QuestionPromptBubble
-                                questions={prompt().questions}
-                                resolution={prompt().resolution}
-                                onSubmit={(answers) =>
-                                  channels.perform(() =>
-                                    window.openbot.agent.respondToPrompt({
-                                      requestId: prompt().requestId,
-                                      answers,
-                                    }),
+                          </article>
+                        ) : (
+                          <ChatMessageRow
+                            message={entry()?.message ?? initialEntry.message}
+                            author={entry()?.author ?? initialEntry.author}
+                            showAuthor={entry()?.showAuthor ?? initialEntry.showAuthor}
+                            showTime
+                            animate={animate}
+                            agents={agentList()}
+                            referencedMessage={referenced()?.message}
+                            referencedAuthorName={referenced()?.author.name}
+                            onSelectAgent={(id) => {
+                              channels.close();
+                              selectAgent(id);
+                            }}
+                            onOpenLink={(url) => {
+                              void window.openbot.openUrl(url);
+                            }}
+                            onPreview={(attachment) => {
+                              void channels.perform(() =>
+                                window.openbot.agent.openAttachment({ attachmentId: attachment.id, action: "open" }),
+                              );
+                            }}
+                            onAttachmentAction={(attachment, action) => {
+                              void channels.perform(() =>
+                                window.openbot.agent.openAttachment({ attachmentId: attachment.id, action }),
+                              );
+                            }}
+                            actions={
+                              <MessageActions
+                                message={entry()?.message ?? initialEntry.message}
+                                authorName={entry()?.author.name ?? initialEntry.author.name}
+                                reactions={false}
+                                pickerOpen={false}
+                                moreOpen={openMoreMessageId() === initialEntry.id}
+                                expandedEmoji={false}
+                                copied={copiedMessageId() === initialEntry.id}
+                                onTogglePicker={() => {}}
+                                onToggleMore={() =>
+                                  setOpenMoreMessageId((current) =>
+                                    current === initialEntry.id ? null : initialEntry.id,
                                   )
                                 }
+                                onExpandEmoji={() => {}}
+                                onReact={() => {}}
+                                onReply={() =>
+                                  setComposer((state) => {
+                                    state.reply = initialEntry.id;
+                                  })
+                                }
+                                onCopy={() => void copyChannelMessage(entry()?.message ?? initialEntry.message)}
                               />
-                            )}
-                          </Show>
-                        </ChatMessageRow>
+                            }
+                          >
+                            <Show when={entry()?.message.questionPrompt}>
+                              {(prompt) => (
+                                <QuestionPromptBubble
+                                  questions={prompt().questions}
+                                  resolution={prompt().resolution}
+                                  onSubmit={(answers) =>
+                                    channels.perform(() =>
+                                      window.openbot.agent.respondToPrompt({
+                                        requestId: prompt().requestId,
+                                        answers,
+                                      }),
+                                    )
+                                  }
+                                />
+                              )}
+                            </Show>
+                          </ChatMessageRow>
+                        )}
                       </div>
                     );
                   }}

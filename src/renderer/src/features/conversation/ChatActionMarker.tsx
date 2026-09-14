@@ -82,6 +82,15 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
             />
           )}
         </Show>
+        <Show when={props.marker.kind === "channel-routing" && props.marker}>
+          {(marker) => (
+            <AgentButton
+              agent={props.agents.find((agent) => agent.id === marker().agentId)}
+              fallbackId={marker().agentId}
+              onSelectAgent={props.onSelectAgent}
+            />
+          )}
+        </Show>
         <Show when={props.marker.kind === "hosted-site" && props.marker}>
           {(marker) => <HostedSiteTarget marker={marker()} onOpenHostedSite={props.onOpenHostedSite} />}
         </Show>
@@ -317,6 +326,7 @@ function markerLabel(marker: ChatActionMarkerModel): string {
   if (marker.kind === "skill-lifecycle")
     return { created: "Created skill", revised: "Revised skill", installed: "Installed skill" }[marker.action];
   if (marker.kind === "agent-message") return marker.direction === "outgoing" ? "Messaged" : "Message from";
+  if (marker.kind === "channel-routing") return marker.action === "assigned" ? "Assigned to" : "Continuing with";
   if (marker.kind === "routine-lifecycle") {
     return marker.action === "created"
       ? "Created routine"
@@ -380,6 +390,9 @@ function markerAccessibleLabel(marker: ChatActionMarkerModel, agents: AgentProfi
           ? (agents.find((agent) => agent.id === marker.targetDeliveries[0]?.agentId)?.name ?? "Unavailable agent")
           : `${marker.targetDeliveries.length} agents`;
     return `${label} ${agentLabel}, ${STATUS_LABELS[marker.status]}`;
+  }
+  if (marker.kind === "channel-routing") {
+    return `${label} ${agents.find((agent) => agent.id === marker.agentId)?.name ?? "Unavailable agent"}`;
   }
   if (marker.kind === "hosted-site") return `${label}, ${marker.hostname ?? marker.title}`;
   return `${label}, ${marker.routineName}`;

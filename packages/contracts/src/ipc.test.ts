@@ -6,6 +6,8 @@ import {
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
   type AttachmentSummary,
   canPreviewAttachment,
+  channelRoutingConversationEvent,
+  channelRoutingConversationEventItemType,
   decodeChannel,
   hostedSiteConversationEvent,
   hostedSiteConversationEventItemType,
@@ -29,6 +31,7 @@ import {
   isMessageReaction,
   isQueuedMessageReceipt,
   isQueueSnapshot,
+  parseChannelRoutingConversationEventItemType,
   parseHostedSiteConversationEventItemType,
   parseRoutineConversationEventItemType,
   parseRoutineRunConversationEventItemType,
@@ -398,6 +401,42 @@ describe("routine conversation events", () => {
     expect(parseRoutineConversationEventItemType("routine-event:created:")).toBeNull();
     expect(() => routineConversationEventItemType("created", "x".repeat(128))).toThrow(
       "The routine event item type is too long.",
+    );
+  });
+});
+
+describe("channel routing conversation events", () => {
+  it("encodes and decodes a channel assignment marker", () => {
+    const itemType = channelRoutingConversationEventItemType("assigned", "builder");
+    // A channel writes its rows without a `source`, so the marker is recognised by author and type.
+    const message = {
+      id: "event-1",
+      author: "system",
+      text: "Assigned to Builder.",
+      createdAt: "2026-08-31T12:00:00.000Z",
+      status: "completed",
+      itemType,
+    } as const;
+
+    expect(itemType).toBe("channel-routing-event:assigned:builder");
+    expect(channelRoutingConversationEvent(message)).toEqual({ action: "assigned", agentId: "builder" });
+    expect(isConversationMessage(message)).toBe(true);
+  });
+
+  it("leaves an ordinary channel message and a malformed item type unmarked", () => {
+    expect(
+      channelRoutingConversationEvent({
+        id: "message-1",
+        author: "system",
+        text: "Assigned to Builder.",
+        createdAt: "2026-08-31T12:00:00.000Z",
+        status: "completed",
+      }),
+    ).toBeNull();
+    expect(parseChannelRoutingConversationEventItemType("channel-routing-event:paused:builder")).toBeNull();
+    expect(parseChannelRoutingConversationEventItemType("channel-routing-event:assigned:")).toBeNull();
+    expect(() => channelRoutingConversationEventItemType("assigned", "x".repeat(120))).toThrow(
+      "The channel routing event item type is too long.",
     );
   });
 });

@@ -16,12 +16,12 @@ describe("latest download", () => {
     const response = await latestDownloadResponse(platform, fetcher);
 
     expect(fetcher).toHaveBeenCalledWith(
-      `https://github.com/NorbertBodziony/openbot/releases/latest/download/${manifest}`,
+      `https://github.com/nightly-labs/openbot/releases/latest/download/${manifest}`,
       { headers: { accept: "text/yaml, text/plain" } },
     );
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe(
-      `https://github.com/NorbertBodziony/openbot/releases/latest/download/${installer}`,
+      `https://github.com/nightly-labs/openbot/releases/latest/download/${installer}`,
     );
     expect(response.headers.get("cache-control")).toBe("no-store");
   });

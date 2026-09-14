@@ -271,7 +271,7 @@ Review folders before deleting them and keep a backup of anything you need.
 
 ## Questions
 
-Use [GitHub Discussions](https://github.com/NorbertBodziony/openbot/discussions) for privacy questions.
+Use [GitHub Discussions](https://github.com/nightly-labs/openbot/discussions) for privacy questions.
 Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), without attaching
 credentials, conversations, or unrelated private files.
 

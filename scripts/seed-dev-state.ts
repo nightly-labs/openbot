@@ -13,6 +13,7 @@ import type {
   ConversationMessage,
   Routine,
 } from "@openbot/contracts/ipc";
+import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
 import { agentNamesById, displayMessageReferences } from "../src/backend/agent/delivery-content";
@@ -823,6 +824,7 @@ async function seedLaunchRoom(
       taskId: taskReleaseNote,
       author: agentAuthor("chief"),
       text: "Assigned to Launch.",
+      assignedAgentId: "launch",
       ago: 2 * DAY - 2 * MINUTE,
     }),
     message({
@@ -877,6 +879,7 @@ async function seedLaunchRoom(
       taskId: taskRollback,
       author: agentAuthor("chief"),
       text: "Assigned to Builder.",
+      assignedAgentId: "builder",
       ago: 3 * HOUR - 2 * MINUTE,
     }),
   ];
@@ -973,6 +976,7 @@ function seedBetaFeedbackChannel(store: ChannelStore, agents: Map<string, AgentS
       taskId: taskSummary,
       author: { kind: "agent", id: "launch", name: requireAgent(agents, "launch").name },
       text: "Assigned to Research.",
+      assignedAgentId: "research",
       ago: 8 * DAY - 2 * MINUTE,
     }),
     channelMessage(channelId, clock, {
@@ -1013,6 +1017,8 @@ interface SeedChannelMessage {
   turnId?: string;
   replyToMessageId?: string;
   attachments?: AttachmentSummary[];
+  /** The member a routing receipt names, which makes the row a channel activity marker. */
+  assignedAgentId?: string;
 }
 
 /**
@@ -1037,6 +1043,9 @@ function channelMessage(channelId: string, clock: SeedClock, input: SeedChannelM
       turnId: input.turnId,
       replyToMessageId: input.replyToMessageId,
       attachments: input.attachments,
+      itemType: input.assignedAgentId
+        ? channelRoutingConversationEventItemType("assigned", input.assignedAgentId)
+        : undefined,
     },
   };
 }

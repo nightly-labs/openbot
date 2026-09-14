@@ -2,12 +2,9 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 
 ## Execution and verification limits
 
-- Never run any build, packaging, signing, submission, or deployment command for the mobile app unless the user gives explicit permission for that specific command.
-- Never start an iOS simulator, Android emulator, device run, or native development client unless the user gives explicit permission for that specific run.
-- `bun run lint` and `bun run typecheck` are the default checks here and need no permission. Each covers the whole app in seconds, so narrowing them to changed files buys nothing and hides a break in one of the packages the app imports.
-- Run both before you call a task done and before a PR. Anything slower than them is a build, a bundle, or a native run, and the two bullets above already govern those.
-- Permission for one command authorizes only that command. It does not authorize another build, another simulator/emulator run, or any subsequent command.
-- If a requested workflow would require a prohibited command, explain the limitation and wait for explicit permission rather than substituting a broader command or running it implicitly.
+- `bun run lint` and `bun run typecheck` are the default checks here and need no permission. Each covers the whole app in seconds, so narrowing them to changed files buys nothing and hides a break in one of the packages the app imports. Run both before you call a task done and before a PR.
+- Everything slower than those two needs explicit user permission for that exact command: builds, packaging, signing, submission, deployment, EAS commands, iOS simulator or Android emulator runs, device runs, and native development clients. One permission authorizes one command and nothing that follows it.
+- If a requested workflow needs a command from that list, explain the limitation and wait for permission. Never substitute a broader command or run one implicitly.
 
 ## Design system and native chrome
 
@@ -24,41 +21,23 @@ Read and follow [`DESIGN.md`](./DESIGN.md) before changing mobile UI.
 
 ## Sheets
 
-Follow [DESIGN.md — Sheets](./DESIGN.md#sheets) and inspect the current route options in
-`src/app/(app)/_layout.tsx` before adding or changing a sheet.
+Follow [DESIGN.md — Sheets](./DESIGN.md#sheets) for presentation options, tokens and header styling,
+and inspect the current route options in `src/app/(app)/_layout.tsx`, when adding or changing a
+sheet. Four rules decide the shape of the screen before any of that detail applies:
 
-- Use native `formSheet`, `sheetAllowedDetents: "fitToContents"`, and a visible grabber for ordinary
-  standalone forms. Settings and other multi-page flows use ONE outer sheet with a nested native
-  stack: inner routes use `presentation: "card"` and the native back button, never another sheet.
-  Use stable detents (`[0.85]` for settings) for that navigator; it cannot measure intrinsic
-  content height. Do not put a navigator or `flex: 1` wrapper inside a fit-to-content sheet.
-- Use `SheetScrollView` as the screen's scroll container. It owns header clearance, safe-area
-  behavior and scroll-edge effects. Do not add screen-local header padding or another inset layer.
-- Content that fits must stay still: `SheetScrollView` disables bounce/overscroll, and the route
-  stack disables `sheetExpandsWhenScrolledToEdge`. Settings uses a single detent; longer content
-  scrolls inside it. Do not add an expansion detent just to handle overflow.
-- On iOS, native sheet headers use transparent backgrounds, `headerTransparent: true`,
-  `headerBlurEffect: "none"`, and `scrollEdgeEffects: { top: "soft" }`. On Android, use the sheet
-  background and a non-transparent header. Do not layer a custom blur beneath a native header.
-- Match the native container to `--openbot-bg-sheet` and the scroll content to `bg-sheet`.
-  Use `bg-grouped`, `rounded-grouped`, `text-grouped-secondary` and `bg-grouped-border` for grouped
-  content. Do not substitute canvas/control colors or desktop radius utilities.
-- Reuse `SettingsContent`/`SettingsSection`/`SettingsRow` for settings and `SheetFormField` for
-  fields. Use HeroUI `Typography` for content and native Expo UI for platform controls.
-  Keep groups flat, separators inset, and chevrons for navigation rather than destructive actions.
-- Save and create actions use `SheetSaveAction`: a checkmark on the right of the native header,
-  visible only for changed input or a pending save. Keep invalid drafts visible with a disabled
-  action. Do not add a Save/Create button in sheet content. Standalone creation forms have a
-  close (`×`) action on the left; nested pages keep native back navigation and draft guards.
-- Do not add a redundant Done/close button to a dismissible sheet. Add explicit actions only when
-  the flow requires them, such as Save or Cancel for unsaved work.
-- Follow [DESIGN.md — Profile and About](./DESIGN.md#profile-and-about) for these settings pages:
-  centered avatar/name/email, inline name editing with an adjacent pencil, and Save only for
-  changed input. Keep the action area compact and stable so editing does not shift the layout.
-  About reuses the interactive `AppLogo` and displays the app version/build without a subtitle.
-- Check initial header clearance, scrolling under the header, the last action, keyboard visibility,
-  and light/dark appearance. Typecheck does not establish visual correctness. Report which device
-  checks actually ran; the execution limits above still apply.
+- A multi-page flow is ONE outer sheet with a nested native stack. Inner routes use
+  `presentation: "card"` and the native back button, never another sheet. A nested navigator cannot
+  measure intrinsic height, so it needs stable detents and no `flex: 1` wrapper.
+- `SheetScrollView` is the screen's scroll container and owns header clearance, safe-area behavior
+  and scroll-edge effects. Do not add screen-local header padding or another inset layer.
+- Save and create actions use `SheetSaveAction` in the native header. Do not add a second
+  Save/Create button in sheet content.
+- Do not add a redundant Done or close button to a dismissible sheet. Add an explicit action only
+  when the flow requires one, such as Save or Cancel for unsaved work.
+
+Check initial header clearance, scrolling under the header, the last action, keyboard visibility,
+and light/dark appearance. Typecheck does not establish visual correctness. Report which device
+checks actually ran; the execution limits above still apply.
 
 ## Expo has changed — do not trust your training data
 
@@ -87,15 +66,15 @@ Both are scoped to this app: `lint` is `biome check --max-diagnostics=none src` 
 
 - Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
 - Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
-- Docs: https://docs.expo.dev/router/introduction.md
+- For a navigator option, route convention or typed-route question, see https://docs.expo.dev/router/introduction.md.
 
-## Building with EAS (explicit authorization only)
+## Building with EAS
 
-EAS build, signing, submission, and update commands are prohibited unless the user explicitly authorizes that exact command. If authorized, use EAS to perform the requested operation in the cloud (`eas build`, `eas submit`, or `eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
-Docs: https://docs.expo.dev/eas/index.md
+Once authorized under "Execution and verification limits", EAS performs the operation in the cloud (`eas build`, `eas submit`, or `eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
+For a build profile, credential or submission option the command needs, see https://docs.expo.dev/eas/index.md.
 
 ## Rules
 
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
-- Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build; do not create or run one without explicit user authorization for the exact build or run command.
-- Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+- Expo Go only includes its bundled native modules, so a library with native code needs a development build. Say so and stop there; creating or running that build is an authorized command under "Execution and verification limits".
+- Prefer recommended Expo modules over third-party libraries. Check `.agents/skills/` for a skill that covers the dependency before adding it, and https://docs.expo.dev/versions/latest/index.md for whether Expo already ships the module you need.

@@ -6,6 +6,7 @@ import type {
   AgentSummary,
   AttachmentSummary,
   AvatarHue,
+  ChannelRoutingConversationEvent,
   ConversationQuestionPrompt,
   ConversationReaction,
   HostedSiteConversationEvent,
@@ -78,6 +79,7 @@ export type ChatActionMarkerModel =
       url: string | null;
       timestamp: string;
     }
+  | (ChannelRoutingConversationEvent & { kind: "channel-routing"; timestamp: string })
   | {
       kind: "unavailable";
       label: string;

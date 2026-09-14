@@ -42,6 +42,11 @@ export const en = {
   "update.installFailed": "Could not install the update. Quit and reopen OpenBot, then try again.",
   "update.downloadFailed": "Could not download the update. Try again.",
   "update.checkFailed": "Could not check for updates. Try again.",
+  "update.checkStalled": "The update check stopped responding. Try again.",
+  "update.checkOffline": "Could not reach the update service. Check your internet connection, then try again.",
+  "update.checkUnavailable": "The update service did not answer. OpenBot tries again on its own in a few minutes.",
+  "update.checkNoRelease":
+    "No published update was found for this platform. OpenBot tries again on its own in a few minutes.",
 
   // The language setting itself.
   "settings.language.title": "Language",

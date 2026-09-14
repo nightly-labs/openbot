@@ -11,9 +11,11 @@ import {
   type ChannelCommand,
   type ChannelMemory,
   type ChannelMessage,
+  type ChannelRoutingConversationEventAction,
   type ChannelTask,
   type ConversationSnapshot,
   type CreateChannelMemoryInput,
+  channelRoutingConversationEventItemType,
   type DeleteChannelMemoryInput,
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
@@ -507,14 +509,33 @@ export class ChannelService {
   }
 
   /**
-   * The lead's routing receipt. It is authored by the lead agent itself, not by the anonymous
-   * `coordinator` identity the failure notice uses: the renderer resolves an `agent` author against
-   * the roster, so the row carries the lead's own avatar, colour and name, and the user can see
-   * which member was chosen and correct it by naming a different one. Only a real model decision
-   * writes one. A deterministic assignment has nothing to audit and stays silent.
+   * The lead's routing receipt: activity the channel shows its reader, not a message a member sent.
+   *
+   * The item type makes it one of the activity markers the renderer already draws for a sent
+   * message or a created routine, so the row carries no bubble, no message actions and no unread
+   * count, and it stays out of the history a member reads. The text stays a readable sentence, so
+   * a client that does not know this item type still shows the user which member was chosen.
+   * It is authored by the lead agent itself, not by the anonymous `coordinator` identity the
+   * failure notice uses. Only a real model decision writes one: a deterministic assignment has
+   * nothing to audit and stays silent.
    */
-  private dispatch(channelId: string, taskId: string, lead: AgentSummary, text: string): ChannelMessage {
-    return this.message(channelId, taskId, { kind: "agent", id: lead.id, name: lead.name }, text);
+  private dispatch(
+    channelId: string,
+    taskId: string,
+    lead: AgentSummary,
+    action: ChannelRoutingConversationEventAction,
+    targetAgentId: string,
+  ): ChannelMessage {
+    const name = this.memberName(targetAgentId);
+    const text = action === "assigned" ? `Assigned to ${name}.` : `Continuing existing work with ${name}.`;
+    return this.message(
+      channelId,
+      taskId,
+      { kind: "agent", id: lead.id, name: lead.name },
+      text,
+      randomUUID(),
+      channelRoutingConversationEventItemType(action, targetAgentId),
+    );
   }
 
   private async pump(channelId: string): Promise<void> {
@@ -632,12 +653,7 @@ export class ChannelService {
               ],
               messages: [
                 ...(source ? [{ ...source, taskId: existing.id }] : []),
-                this.dispatch(
-                  channelId,
-                  existing.id,
-                  lead,
-                  `Continuing existing work with ${this.memberName(existing.ownerAgentId)}.`,
-                ),
+                this.dispatch(channelId, existing.id, lead, "continued", existing.ownerAgentId),
               ],
             });
             this.publish(channelId);
@@ -657,7 +673,7 @@ export class ChannelService {
           task = { ...task, ownerAgentId: decision.agentId };
           this.store.update(channel, {
             tasks: [task],
-            messages: [this.dispatch(channelId, task.id, lead, `Assigned to ${this.memberName(decision.agentId)}.`)],
+            messages: [this.dispatch(channelId, task.id, lead, "assigned", decision.agentId)],
           });
           // The owner used to be stamped without a publish, because nothing the renderer shows had
           // changed. The dispatch message has, so the channel has to be republished here.
@@ -1463,6 +1479,7 @@ export class ChannelService {
     author: ChannelMessage["author"],
     text: string,
     id: string = randomUUID(),
+    itemType?: string,
   ): ChannelMessage {
     return {
       id,
@@ -1477,6 +1494,7 @@ export class ChannelService {
         author: author.kind === "member" ? "user" : "system",
         createdAt: new Date().toISOString(),
         status: "completed",
+        ...(itemType ? { itemType } : {}),
       },
     };
   }

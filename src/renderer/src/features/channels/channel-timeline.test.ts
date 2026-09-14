@@ -1,4 +1,5 @@
 import type { ChannelMessage, ChannelPage } from "@openbot/contracts/ipc";
+import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import type { AgentProfile } from "../../data";
 import { channelTimelineEntries, firstUnreadChannelMessageId, isOwnChannelAuthor } from "./channel-timeline";
@@ -33,6 +34,8 @@ function message(overrides: {
   createdAt: Date;
   text?: string;
   status?: ChannelMessage["message"]["status"];
+  /** Set for a routing receipt, which the service writes as a `system` message with an item type. */
+  assignedAgentId?: string;
 }): ChannelMessage {
   const entry: ChannelMessage = {
     id: overrides.id,
@@ -43,10 +46,13 @@ function message(overrides: {
     superseded: false,
     message: {
       id: overrides.id,
-      author: overrides.author.kind === "member" ? "user" : "assistant",
+      author: overrides.author.kind === "member" ? "user" : overrides.assignedAgentId ? "system" : "assistant",
       text: overrides.text ?? "Hello",
       createdAt: overrides.createdAt.toISOString(),
       status: overrides.status ?? "completed",
+      itemType: overrides.assignedAgentId
+        ? channelRoutingConversationEventItemType("assigned", overrides.assignedAgentId)
+        : undefined,
     },
   };
   return entry;
@@ -113,9 +119,32 @@ describe("channelTimelineEntries", () => {
     expect(entries[0].author).toMatchObject({ kind: "agent", name: "Ada" });
   });
 
-  it("draws the lead routing dispatch as the lead agent", () => {
-    // The lead posts its own choice of owner. It is authored by the lead agent, not by the
-    // anonymous coordinator, so the row has to resolve to that agent's face and colour.
+  it("draws the lead routing dispatch as activity that names the member it went to", () => {
+    const entries = channelTimelineEntries(
+      page([
+        message({
+          id: "m1",
+          sequence: 1,
+          author: { kind: "agent", id: chief.id, name: "Chief" },
+          text: "Assigned to Ada.",
+          assignedAgentId: "ada",
+          createdAt: new Date(2026, 8, 9, 12, 0),
+        }),
+      ]),
+      [chief],
+      () => false,
+      options,
+    );
+    expect(entries[0].message.actionMarker).toMatchObject({
+      kind: "channel-routing",
+      action: "assigned",
+      agentId: "ada",
+    });
+    // Activity carries no author block: the row draws no face and no name of its own.
+    expect(entries[0].showAuthor).toBe(false);
+  });
+
+  it("leaves an ordinary agent message without an activity marker", () => {
     const entries = channelTimelineEntries(
       page([
         message({
@@ -130,7 +159,30 @@ describe("channelTimelineEntries", () => {
       () => false,
       options,
     );
+    expect(entries[0].message.actionMarker).toBeUndefined();
     expect(entries[0].author).toMatchObject({ kind: "agent", name: "Chief", agent: chief, avatarSeed: undefined });
+  });
+
+  it("names the author again under a routing receipt", () => {
+    const author = { kind: "agent" as const, id: chief.id, name: "Chief" };
+    const entries = channelTimelineEntries(
+      page([
+        message({ id: "m1", sequence: 1, author, createdAt: new Date(2026, 8, 9, 12, 0) }),
+        message({
+          id: "m2",
+          sequence: 2,
+          author,
+          text: "Assigned to Ada.",
+          assignedAgentId: "ada",
+          createdAt: new Date(2026, 8, 9, 12, 1),
+        }),
+        message({ id: "m3", sequence: 3, author, createdAt: new Date(2026, 8, 9, 12, 2) }),
+      ]),
+      [chief],
+      () => false,
+      options,
+    );
+    expect(entries.map((entry) => entry.showAuthor)).toEqual([true, false, true]);
   });
 
   it("draws the coordinator as an author, whatever the reader check says of its id", () => {
@@ -241,6 +293,28 @@ describe("channelTimelineEntries", () => {
       ]),
       [chief],
       (id) => id === "local",
+      options,
+    );
+    expect(firstUnreadChannelMessageId(entries, 2)).toBe("m1");
+  });
+
+  it("skips a routing receipt while it counts back, because the channel count leaves it out", () => {
+    const author = { kind: "agent" as const, id: chief.id, name: "Chief" };
+    const entries = channelTimelineEntries(
+      page([
+        message({ id: "m1", sequence: 1, author, createdAt: new Date(2026, 8, 9, 12, 0) }),
+        message({
+          id: "m2",
+          sequence: 2,
+          author,
+          text: "Assigned to Ada.",
+          assignedAgentId: "ada",
+          createdAt: new Date(2026, 8, 9, 12, 1),
+        }),
+        message({ id: "m3", sequence: 3, author, createdAt: new Date(2026, 8, 9, 12, 2) }),
+      ]),
+      [chief],
+      () => false,
       options,
     );
     expect(firstUnreadChannelMessageId(entries, 2)).toBe("m1");

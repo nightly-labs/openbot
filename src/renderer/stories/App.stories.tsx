@@ -170,9 +170,10 @@ export const Channel: Story = {
 
     await expect(within(chat).findByRole("article", { name: "Message from You" })).resolves.toBeInTheDocument();
     // A request that names no recipient is routed by the lead, and the lead posts its choice as an
-    // ordinary channel message. So the newest message of the channel, and the sidebar line that
-    // previews it, is the dispatch rather than the request.
-    await expect(within(chat).findByRole("article", { name: "Message from Chief" })).resolves.toBeInTheDocument();
+    // activity row rather than a message. So the newest row of the channel, and the sidebar line
+    // that previews it, is the dispatch rather than the request.
+    await expect(within(chat).findByLabelText("Assigned to Chief")).resolves.toBeInTheDocument();
+    expect(within(chat).queryByRole("article", { name: "Message from Chief" })).not.toBeInTheDocument();
     await waitFor(() =>
       expect(context.canvas.getByRole("button", { name: /^Project Falcon\./ })).toHaveAccessibleName(
         "Project Falcon. Assigned to Chief.",

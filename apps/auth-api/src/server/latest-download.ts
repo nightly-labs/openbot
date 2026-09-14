@@ -11,7 +11,7 @@ interface DownloadManifestConfig {
   manifest: "latest-linux.yml" | "latest-mac.yml" | "latest.yml";
 }
 
-const RELEASES_BASE_URL = "https://github.com/NorbertBodziony/openbot/releases";
+const RELEASES_BASE_URL = "https://github.com/nightly-labs/openbot/releases";
 
 const DOWNLOAD_MANIFESTS: Record<AvailableDownloadPlatform, DownloadManifestConfig> = {
   linux: { extension: ".appimage", manifest: "latest-linux.yml" },

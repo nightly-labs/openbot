@@ -1,4 +1,9 @@
-import type { AgentSummary, ChannelMessage, ChannelTask } from "@openbot/contracts/ipc";
+import {
+  type AgentSummary,
+  type ChannelMessage,
+  type ChannelTask,
+  channelRoutingConversationEvent,
+} from "@openbot/contracts/ipc";
 import type { ChannelMemoryStore } from "./channel-memory-store";
 import type { ChannelStore } from "./channel-store";
 
@@ -24,6 +29,15 @@ function render(messages: ChannelMessage[]): string {
     .join("\n");
 }
 
+/**
+ * The rows a model reads. A routing receipt ("Assigned to Builder.") is activity the channel shows
+ * its reader, and the packet already carries the owner of every task, so sending it again would
+ * only repeat the routing that the turn instructions tell the member to leave out of its reply.
+ */
+function conversation(messages: ChannelMessage[]): ChannelMessage[] {
+  return messages.filter((message) => channelRoutingConversationEvent(message.message) === null);
+}
+
 /** Cuts one rendered message into inputs the summary model accepts. The source ID stays the same. */
 function parts(text: string, size: number): string[] {
   const values: string[] = [];
@@ -47,7 +61,7 @@ export class ChannelHistory {
   ): Promise<{ text: string; throughSequence: number; summaryVersion: number }> {
     const characterBudget = Math.min(CONTEXT_CHARACTERS, requestedBudget);
     const channel = this.store.get(task.channelId);
-    let messages = this.store.messages(channel.id);
+    let messages = conversation(this.store.messages(channel.id));
     let summary = this.store.summary(channel.id);
     let recent = messages.filter((message) => message.sequence > summary.throughSequence);
     // Reserve half the handoff ceiling for instructions, requested sources, and provider overhead.
@@ -95,7 +109,7 @@ export class ChannelHistory {
         };
         this.store.saveSummary(channel.id, summary);
       }
-      messages = this.store.messages(channel.id);
+      messages = conversation(this.store.messages(channel.id));
       recent = messages.filter((message) => message.sequence > summary.throughSequence);
     }
     const memories = this.memories.list(channel.id);
