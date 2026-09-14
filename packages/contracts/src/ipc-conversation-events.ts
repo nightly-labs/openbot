@@ -247,3 +247,48 @@ export function isHostedSiteConversationEventUrl(value: unknown, hostname: unkno
     return false;
   }
 }
+
+export const CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX = "channel-routing-event:";
+
+/**
+ * `assigned` is the first owner a lead chose for a request. `continued` is the same request handed
+ * to work that is already under way, so the reader sees that nothing new was started.
+ */
+export type ChannelRoutingConversationEventAction = "assigned" | "continued";
+
+export interface ChannelRoutingConversationEvent {
+  action: ChannelRoutingConversationEventAction;
+  /** The member the request went to. The roster resolves the name, avatar and colour of the row. */
+  agentId: string;
+}
+
+export function channelRoutingConversationEventItemType(
+  action: ChannelRoutingConversationEventAction,
+  agentId: string,
+): string {
+  if (!isIdentifier(agentId)) throw new Error("A valid agent id is required.");
+  const itemType = `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}${action}:${agentId}`;
+  if (itemType.length > INPUT_LIMITS.identifier) throw new Error("The channel routing event item type is too long.");
+  return itemType;
+}
+
+export function parseChannelRoutingConversationEventItemType(
+  itemType: string | undefined,
+): ChannelRoutingConversationEvent | null {
+  if (!itemType?.startsWith(CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX)) return null;
+  const [action, agentId, ...extra] = itemType.slice(CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX.length).split(":");
+  if (extra.length > 0 || (action !== "assigned" && action !== "continued") || !isIdentifier(agentId)) return null;
+  return { action, agentId };
+}
+
+/**
+ * A routing receipt of a channel, not a message a member sent.
+ *
+ * Unlike the routine and hosted-site events, this one carries no `source`: a channel writes its
+ * rows through `ChannelService`, which stamps the author alone. The text stays the readable
+ * sentence, so a client that does not know this item type still shows the user what happened.
+ */
+export function channelRoutingConversationEvent(message: ConversationMessage): ChannelRoutingConversationEvent | null {
+  if (message.author !== "system" || message.status !== "completed") return null;
+  return parseChannelRoutingConversationEventItemType(message.itemType);
+}

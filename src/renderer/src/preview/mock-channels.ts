@@ -21,6 +21,7 @@ import type {
   UpdateChannelMemoryInput,
   UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
+import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
 
 export function createMockChannels(emit: (event: AgentEvent) => void, agentName: (agentId: string) => string) {
   const channels = new Map<string, Channel>();
@@ -146,6 +147,7 @@ export function createMockChannels(emit: (event: AgentEvent) => void, agentName:
               text: `Assigned to ${agentName(channel.leadAgentId)}.`,
               createdAt: new Date().toISOString(),
               status: "completed",
+              itemType: channelRoutingConversationEventItemType("assigned", channel.leadAgentId),
             },
           });
         }

@@ -26,6 +26,25 @@ describe("ChatActionMarker", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Open skill Release notes" }));
     expect(onOpenSkill).toHaveBeenCalledWith({ skillId: "local-skill-test" });
   });
+  it("names the member a channel assignment went to and opens their chat", async () => {
+    const onSelectAgent = vi.fn();
+    render(() => (
+      <ChatActionMarker
+        marker={{
+          kind: "channel-routing",
+          action: "assigned",
+          agentId: "research",
+          timestamp: "2026-09-13T12:00:00Z",
+        }}
+        agents={agents}
+        onSelectAgent={onSelectAgent}
+      />
+    ));
+    expect(screen.getByRole("group", { name: "Assigned to Research" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Open chat with Research" }));
+    expect(onSelectAgent).toHaveBeenCalledWith("research");
+  });
+
   it("lists each target state for a multi-agent message", async () => {
     render(() => (
       <ChatActionMarker

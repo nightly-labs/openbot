@@ -69,6 +69,38 @@ it("restores the selected channel after restart and clears it when returning to 
   view.unmount();
 });
 
+it("shows the lead's routing choice as activity, not as a message from the lead", async () => {
+  await window.openbot.agent.channelCommand({
+    type: "save",
+    operationId: "create-routed",
+    channelId: "channel-routed",
+    draft: {
+      name: "Launch room",
+      title: "",
+      instructions: "Ship the launch",
+      members: [{ agentId: "chief" }, { agentId: "sales-outbound" }],
+      leadAgentId: "chief",
+    },
+  });
+  render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+  await fireEvent.click(await screen.findByRole("button", { name: /Launch room/ }));
+  const chat = await screen.findByRole("main", { name: "Channel conversation" });
+  await within(chat).findByRole("heading", { name: "Launch room", level: 1 });
+  const composer = within(chat).getByRole("textbox", { name: "Message to channel" });
+  composer.textContent = "Someone please draft the announcement";
+  await fireEvent.input(composer);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+
+  const receipt = await within(chat).findByLabelText("Assigned to Chief");
+  // Activity carries no bubble, so it offers none of the actions a message row does.
+  expect(within(receipt).queryByRole("button", { name: "Copy" })).toBeNull();
+  expect(within(receipt).queryByRole("button", { name: "Reply" })).toBeNull();
+  expect(within(chat).queryByRole("article", { name: "Message from Chief" })).toBeNull();
+  // The member it names stays reachable from the row.
+  expect(within(receipt).getByRole("button", { name: "Open chat with Chief" })).toBeInTheDocument();
+});
+
 it("opens the agent chat when Edit agent runs while a channel is open", async () => {
   await openSavedChannel();
 
