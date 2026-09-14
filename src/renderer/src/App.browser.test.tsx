@@ -11,6 +11,7 @@ import {
   installOpenbotStub,
   testServer,
 } from "./app-test-harness";
+import { toast } from "./components/ui";
 import BrowserPreviewSidebar, { BrowserPreviewCard } from "./features/conversation/BrowserPreviewSidebar";
 import { TestIntersectionObserver, TestResizeObserver } from "./setupTests";
 
@@ -19,7 +20,40 @@ describe("OpenBot connected desktop shell", () => {
     installOpenbotStub();
   });
 
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    toast.dismiss();
+    vi.useRealTimers();
+  });
+
+  it("keeps notifications above the browser and restores the same tab after dismissal", async () => {
+    const tab: BrowserTab = {
+      id: "notification-tab",
+      title: "Notification test",
+      url: "https://example.com",
+      loading: false,
+      ownerAgentId: "chief",
+      ownerThreadId: "thread-chief",
+    };
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
+    await fireEvent.click(screen.getByRole("button", { name: "Open computer" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Open Notification test" }));
+    await waitFor(() =>
+      expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith(expect.objectContaining({ visible: true })),
+    );
+
+    toast.error("Provider error", { description: "Test notification", duration: Number.POSITIVE_INFINITY });
+    const closeNotification = await screen.findByRole("button", { name: "Close notification" });
+    await waitFor(() => expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith({ visible: false }));
+    await fireEvent.click(closeNotification);
+    await waitFor(() =>
+      expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith(expect.objectContaining({ visible: true })),
+    );
+    expect(screen.queryByRole("button", { name: "Close notification" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: tab.title, selected: true })).toBeInTheDocument();
+    expect(window.openbot.browser.close).not.toHaveBeenCalled();
+  });
 
   it("opens the selected preview and returns to the same card without losing the draft", async () => {
     render(() => <App />);
@@ -78,6 +112,80 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith({ visible: false });
     expect(composer).toHaveTextContent("Keep this draft");
     expect(window.openbot.browser.close).not.toHaveBeenCalled();
+  });
+
+  it("keeps a newly added tab selected while the browser panel is open", async () => {
+    const first: BrowserTab = {
+      id: "first",
+      title: "First page",
+      url: "https://example.com/first",
+      loading: false,
+      ownerAgentId: "chief",
+      ownerThreadId: "thread-chief",
+    };
+    const second: BrowserTab = { ...first, id: "second", title: "Second page", url: "https://example.com/second" };
+    let tabs = [first];
+    vi.mocked(window.openbot.browser.activate).mockImplementation(async (tabId) => {
+      emitAgentEvent?.({ type: "browser-changed", tabs, activeTabId: tabId });
+    });
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs, activeTabId: first.id });
+    await fireEvent.click(screen.getByRole("button", { name: "Open computer" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Open First page" }));
+    await screen.findByRole("tab", { name: "First page", selected: true });
+    vi.mocked(window.openbot.browser.activate).mockClear();
+
+    tabs = [{ ...first }, second];
+    emitAgentEvent?.({ type: "browser-changed", tabs, activeTabId: second.id });
+
+    await screen.findByRole("tab", { name: "Second page", selected: true });
+    expect(window.openbot.browser.activate).not.toHaveBeenCalledWith(first.id);
+    expect(screen.getByRole("textbox", { name: "Browser address" })).toHaveValue(second.url);
+
+    const secondTrigger = screen.getByRole("tab", { name: "Second page" });
+    secondTrigger.focus();
+    tabs = tabs.map((tab) => ({ ...tab, title: `${tab.title} updated` }));
+    emitAgentEvent?.({ type: "browser-changed", tabs, activeTabId: second.id });
+    expect(await screen.findByRole("tab", { name: "Second page updated", selected: true })).toHaveFocus();
+    await fireEvent.keyDown(secondTrigger, { key: "ArrowLeft" });
+    const firstTrigger = await screen.findByRole("tab", { name: "First page updated", selected: true });
+    expect(firstTrigger).toHaveFocus();
+    await fireEvent.keyDown(firstTrigger, { key: "ArrowRight" });
+    expect(await screen.findByRole("tab", { name: "Second page updated", selected: true })).toHaveFocus();
+  });
+
+  it.each([
+    ["whats up", "https://www.google.com/search?q=whats%20up"],
+    ["https://whats up", "https://www.google.com/search?q=whats%20up"],
+    ["weather", "https://www.google.com/search?q=weather"],
+    ["  cats & dogs  ", "https://www.google.com/search?q=cats%20%26%20dogs"],
+    ["example.com/docs", "https://example.com/docs"],
+    ["http://localhost:3100/", "http://localhost:3100/"],
+    ["localhost:5173", "https://localhost:5173"],
+    ["127.0.0.1:3100", "https://127.0.0.1:3100"],
+  ])("opens the address-bar input %s as %s", async (input, url) => {
+    const tab: BrowserTab = {
+      id: "address-tab",
+      title: "Address test",
+      url: "https://example.com",
+      loading: false,
+      ownerAgentId: "chief",
+      ownerThreadId: "thread-chief",
+    };
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
+    await fireEvent.click(screen.getByRole("button", { name: "Open computer" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Open Address test" }));
+    const address = screen.getByRole("textbox", { name: "Browser address" });
+    address.focus();
+    await fireEvent.input(address, { target: { value: input } });
+    const form = address.closest("form");
+    if (!form) throw new Error("Browser address form was not rendered.");
+    await fireEvent.submit(form);
+    expect(window.openbot.browser.navigate).toHaveBeenCalledWith({ tabId: tab.id, url });
+    expect(window.openbot.browser.open).not.toHaveBeenCalled();
   });
 
   it("keeps existing previews when a new tab is added", async () => {
@@ -1177,6 +1285,8 @@ describe("OpenBot connected desktop shell", () => {
     await screen.findByText("Could not select the server");
     expect(await screen.findByRole("complementary", { name: "Browser" })).toBeInTheDocument();
     window.dispatchEvent(new Event("resize"));
+    await waitFor(() => expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith({ visible: false }));
+    await fireEvent.click(screen.getByRole("button", { name: "Close notification" }));
     await waitFor(() =>
       expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith(
         expect.objectContaining({ visible: true, target: "main" }),

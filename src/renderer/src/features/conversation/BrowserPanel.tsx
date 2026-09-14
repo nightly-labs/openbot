@@ -3,7 +3,6 @@ import type {
   BrowserControlAction,
   BrowserControlDetailAction,
   BrowserControlSession,
-  BrowserPreview,
   BrowserTab,
 } from "@openbot/contracts/ipc";
 import { Portal } from "@solidjs/web";
@@ -58,7 +57,6 @@ const BROWSER_ACTION_LABELS: Record<BrowserControlAction | BrowserControlDetailA
 
 interface BrowserPanelProps {
   open: boolean;
-  preview?: BrowserPreview | null;
   tabs: BrowserTab[];
   activeTab: BrowserTab | undefined;
   activeControl: BrowserControlSession | undefined;
@@ -110,9 +108,6 @@ export default function BrowserPanel(props: BrowserPanelProps) {
 
   const surface = () => (
     <div class="browser-surface" ref={(element) => (surfaceElement = element)}>
-      <Show when={props.preview}>
-        {(preview) => <img class="browser-motion-preview" src={preview().dataUrl} alt="" />}
-      </Show>
       <Show when={props.tabs.length === 0}>
         <div class="browser-empty-state">
           <strong>Open a page</strong>
@@ -133,6 +128,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
       <Input
         value={props.address}
         aria-label="Browser address"
+        placeholder="Search Google or enter a URL"
         maxlength={INPUT_LIMITS.browserUrl}
         onValueChange={props.onAddressChange}
         onFocus={() => props.onAddressEditingChange(true)}
@@ -152,20 +148,19 @@ export default function BrowserPanel(props: BrowserPanelProps) {
       class={["browser-panel browser-panel-expanded", { "browser-panel-controlled": Boolean(actingControl()) }]}
       aria-label="Browser"
       value={props.activeTab?.id ?? "__empty"}
-      onChange={props.onActivateTab}
       activationMode="automatic"
     >
       <header class="browser-panel-header window-drag">
         <div class="browser-tabs no-drag">
           <Tabs.List class="browser-tab-strip" aria-label="Browser tabs">
-            <For each={props.tabs}>
+            <For each={props.tabs} keyed={(tab) => tab.id}>
               {(tab) => {
                 const control = () => {
-                  const session = props.controlForTab(tab);
+                  const session = props.controlForTab(tab());
                   return session?.phase === "acting" ? session : undefined;
                 };
-                const controller = () => props.controllerForTab(tab);
-                const title = () => (tab.loading ? "Loading…" : tab.title || tab.url);
+                const controller = () => props.controllerForTab(tab());
+                const title = () => (tab().loading ? "Loading…" : tab().title || tab().url);
                 return (
                   <div
                     role="presentation"
@@ -173,20 +168,24 @@ export default function BrowserPanel(props: BrowserPanelProps) {
                   >
                     <Tabs.Trigger
                       as="button"
-                      value={tab.id}
+                      value={tab().id}
                       aria-label={control() ? `${title()}, controlled by ${controller()?.name ?? "agent"}` : title()}
                       aria-description="Press Delete or Control/Command W to close"
                       class={buttonVariants({ variant: "ghost", class: "browser-tab" })}
+                      // Only user interaction activates a native tab. Collection registration can
+                      // temporarily make the controlled selection absent and suggest the first tab.
+                      onClick={() => props.onActivateTab(tab().id)}
+                      onFocus={() => props.activeTab?.id !== tab().id && props.onActivateTab(tab().id)}
                       onPointerDown={(event) => {
                         if (event.button !== 1) return;
                         event.preventDefault();
                         event.stopPropagation();
-                        props.onCloseTab(tab.id);
+                        props.onCloseTab(tab().id);
                       }}
                       onKeyDown={(event) => {
                         if (event.key !== "Delete") return;
                         event.preventDefault();
-                        props.onCloseTab(tab.id);
+                        props.onCloseTab(tab().id);
                       }}
                     >
                       <Show when={control()}>
@@ -203,16 +202,16 @@ export default function BrowserPanel(props: BrowserPanelProps) {
                       <span
                         class="browser-tab-close"
                         aria-hidden="true"
-                        title={`Close ${tab.title || "browser tab"}`}
+                        title={`Close ${tab().title || "browser tab"}`}
                         onPointerDown={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
-                          if (event.button === 1) props.onCloseTab(tab.id);
+                          if (event.button === 1) props.onCloseTab(tab().id);
                         }}
                         onClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
-                          props.onCloseTab(tab.id);
+                          props.onCloseTab(tab().id);
                         }}
                       >
                         <CloseIcon />

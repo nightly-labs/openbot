@@ -1651,7 +1651,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         activeBrowserTabId = tabId;
         emit(browserDisplayListeners, { tabs: browserTabs, activeTabId: activeBrowserTabId });
       },
-      navigate: async () => undefined,
+      navigate: async (input) => {
+        if (!("url" in input)) return;
+        browserTabs = browserTabs.map((tab) =>
+          tab.id === input.tabId ? { ...tab, url: input.url, title: input.url } : tab,
+        );
+        emit(browserDisplayListeners, { tabs: browserTabs, activeTabId: activeBrowserTabId });
+        emitAgentEvent({ type: "browser-changed", tabs: browserTabs, activeTabId: activeBrowserTabId });
+      },
       reload: async () => undefined,
       close: async (tabId) => {
         browserTabs = browserTabs.filter((tab) => tab.id !== tabId);

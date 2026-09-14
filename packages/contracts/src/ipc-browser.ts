@@ -180,10 +180,9 @@ export interface BrowserOpenInput {
 
 export type BrowserNavigationDirection = "back" | "forward";
 
-export interface BrowserNavigateInput {
-  tabId: string;
-  direction: BrowserNavigationDirection;
-}
+export type BrowserNavigateInput =
+  | { tabId: string; direction: BrowserNavigationDirection }
+  | { tabId: string; url: string };
 
 export interface BrowserVisibilityInput {
   visible: boolean;

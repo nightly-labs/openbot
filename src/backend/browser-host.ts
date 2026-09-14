@@ -364,6 +364,14 @@ export class BrowserHost {
     });
   }
 
+  async loadUrl(tabId: string, url: string): Promise<void> {
+    const normalizedUrl = normalizeBrowserUrl(url);
+    await this.#enqueue(tabId, async (tab) => {
+      await tab.view.webContents.loadURL(normalizedUrl, browserLoadOptions());
+      this.#focusTab(tab);
+    });
+  }
+
   async reload(tabId: string): Promise<void> {
     await this.#enqueue(tabId, async (tab) =>
       navigateAndWait(tab.view.webContents, () => {
@@ -1032,6 +1040,11 @@ export class BrowserHost {
       setImmediate(() => void this.close(tab.id).catch(() => undefined));
     });
     contents.on("did-start-loading", changed);
+    contents.on("dom-ready", () => {
+      // Keep page content at the same width when the viewport scrollbar appears or disappears.
+      // Navigation replaces the document, so each new document needs the stylesheet.
+      void contents.insertCSS(":where(html) { scrollbar-gutter: stable; }").catch(() => undefined);
+    });
     contents.on("did-stop-loading", () => {
       changed();
       void this.#syncViewBackground(tab);
@@ -1392,7 +1405,16 @@ export class BrowserHost {
     }
     // Native views are not clipped by the renderer. Match --openbot-radius-xl.
     tab.view.setBorderRadius(this.#target === "picture-in-picture" ? 0 : 20);
-    tab.view.setBounds(this.#bounds);
+    // Renderer bounds are CSS pixels; native child views use device-independent window pixels.
+    const zoomFactor = targetWindow.webContents.getZoomFactor();
+    tab.view.setBounds(
+      validateBounds({
+        x: this.#bounds.x * zoomFactor,
+        y: this.#bounds.y * zoomFactor,
+        width: this.#bounds.width * zoomFactor,
+        height: this.#bounds.height * zoomFactor,
+      }),
+    );
     tab.view.setVisible(true);
     tab.view.webContents.invalidate();
     this.#raisePictureInPictureOverlay();

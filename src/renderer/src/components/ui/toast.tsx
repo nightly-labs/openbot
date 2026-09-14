@@ -1,4 +1,5 @@
 import type { ComponentProps, JSX } from "@solidjs/web";
+import { createSignal, onSettled } from "solid-js";
 import { Toaster as Sonner, toast } from "solid-sonner";
 import { CircleCheck, Info, LoaderCircle, OctagonX, TriangleAlert } from "./icons";
 import { cx } from "./utils";
@@ -13,9 +14,24 @@ export type ToasterProps = ComponentProps<typeof Sonner>;
  */
 export const TOAST_DURATION = 6_000;
 
+const [hasVisibleToasts, setHasVisibleToasts] = createSignal(false);
+
 export function Toaster(props: ToasterProps): JSX.Element {
+  let layer: HTMLDivElement | undefined;
+  onSettled(() => {
+    if (!layer) return;
+    const updateVisibility = () => setHasVisibleToasts(Boolean(layer?.querySelector("[data-sonner-toast]")));
+    // Track mounted toasts so native content stays behind their exit animation too.
+    const observer = new MutationObserver(updateVisibility);
+    observer.observe(layer, { childList: true, subtree: true });
+    updateVisibility();
+    return () => {
+      observer.disconnect();
+      setHasVisibleToasts(false);
+    };
+  });
   return (
-    <div data-kb-top-layer="" class="ui-toast-layer">
+    <div ref={layer} data-kb-top-layer="" class="ui-toast-layer">
       <Sonner
         {...props}
         class={cx("ui-toaster", (props.closeButton ?? true) && "ui-toaster-closeable", props.class)}
@@ -43,4 +59,4 @@ export function Toaster(props: ToasterProps): JSX.Element {
 }
 
 export type { ExternalToast, ToastT } from "solid-sonner";
-export { toast };
+export { hasVisibleToasts, toast };

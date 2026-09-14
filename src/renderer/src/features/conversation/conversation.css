@@ -8359,16 +8359,6 @@ body:has(.browser-panel-expanded) .app-frame {
   }
 }
 
-.browser-motion-preview {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top;
-  pointer-events: none;
-}
-
 .browser-hide {
   position: fixed;
   top: var(--openbot-space-1);

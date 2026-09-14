@@ -1,5 +1,6 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { createMemo } from "solid-js";
+import { hasVisibleToasts } from "../../components/ui";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
@@ -165,7 +166,12 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}
       skillsMarketplaceOpen={skillsMarketplaceOpen()}
       globalOverlayOpen={
-        globalSearchOpen() || joinServerOpen() || serverSettingsOpen() || appSettingsOpen() || skillsMarketplaceOpen()
+        globalSearchOpen() ||
+        joinServerOpen() ||
+        serverSettingsOpen() ||
+        appSettingsOpen() ||
+        skillsMarketplaceOpen() ||
+        hasVisibleToasts()
       }
       settingsRequest={settingsRequest()}
       messageFocusRequest={messageFocusRequest()}

@@ -10,9 +10,8 @@ const BROWSER_PANEL_MAX = 1600;
 const CONVERSATION_PANEL_MIN = 96;
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
-import type { BrowserPreview } from "@openbot/contracts/ipc";
 import { Portal } from "@solidjs/web";
-import { createEffect, createSignal, Loading, lazy, onSettled, Show } from "solid-js";
+import { createEffect, Loading, lazy, onSettled, Show } from "solid-js";
 
 /** @internal Stable HMR boundary for conversation panels. */
 export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButtonElement) => void }) {
@@ -61,16 +60,6 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
     settingsReasoning,
     updateRuntimeSettings,
   } = useConversationViewScope();
-  const [browserMotionPreview, setBrowserMotionPreview] = createSignal<{
-    tabId: string;
-    preview: BrowserPreview | null;
-  } | null>(null);
-  createEffect(
-    () => JSON.stringify([props.server?.id, props.agent?.id]),
-    () => {
-      setBrowserMotionPreview(null);
-    },
-  );
   let browserPreviewTrigger: HTMLButtonElement | undefined;
   createEffect(
     () => ({ expanded: browserExpandedOpen(), suspended: props.globalOverlayOpen || props.remoteDesktopVisible }),
@@ -136,14 +125,13 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
             )
           }
           onWidthChange={setBrowserPanelWidth}
-          onOpenTab={(tabId, trigger, preview) => {
-            setBrowserMotionPreview({ tabId, preview });
+          onOpenTab={(tabId, trigger) => {
             browserPreviewTrigger = trigger;
             if (activeBrowserTab()?.id !== tabId) activateBrowserTab(tabId);
             setActiveRightPanel("browser-expanded");
           }}
           onCloseTab={(tabId) => void closeBrowserTab(tabId)}
-          onNewTab={() => void openBrowserAddress("https://www.google.com")}
+          onNewTab={() => void openBrowserAddress("https://www.google.com", true)}
           onCollapse={hideBrowserPanel}
         />
       </Show>
@@ -153,7 +141,6 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
           <div class="ui-dialog-overlay browser-expanded-backdrop" hidden={!browserExpandedOpen()} aria-hidden="true" />
           <BrowserPanel
             open={browserExpandedOpen()}
-            preview={browserMotionPreview()?.tabId === activeBrowserTab()?.id ? browserMotionPreview()?.preview : null}
             tabs={browserTabs()}
             activeTab={activeBrowserTab()}
             activeControl={activeBrowserControl()}
@@ -162,7 +149,7 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
             controllerForTab={browserControllerForTab}
             onAddressChange={setBrowserAddress}
             onAddressEditingChange={setBrowserAddressEditing}
-            onOpenAddress={(address) => void openBrowserAddress(address)}
+            onOpenAddress={(address) => void openBrowserAddress(address, address !== undefined)}
             onNavigate={(tabId, direction) => void navigateBrowserTab(tabId, direction)}
             onReload={(tabId) => void reloadBrowserTab(tabId)}
             onActivateTab={activateBrowserTab}

@@ -24,6 +24,24 @@ export function canonicalBrowserUrl(url: string): string {
   }
 }
 
+function browserAddressUrl(value: string): string {
+  const hasProtocol = /^https?:\/\//i.test(value);
+  const candidate = hasProtocol ? value : `https://${value}`;
+  try {
+    const url = new URL(candidate);
+    if (
+      !/\s/.test(value) &&
+      (hasProtocol || url.hostname.includes(".") || url.hostname === "localhost" || url.hostname.startsWith("["))
+    ) {
+      return candidate;
+    }
+  } catch {
+    // Text that is not a web address is a search query.
+  }
+  const query = value.replace(/^https?:\/\//i, "");
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+}
+
 export interface BrowserPanels {
   setActiveRightPanel: (mode: RightPanelMode) => void;
   screenOpen: () => boolean;
@@ -234,13 +252,24 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     return control ? deps.props.agents.find((agent) => agent.threadId === control.threadId) : undefined;
   };
 
-  async function openBrowserAddress(address = deps.browserAddress()) {
+  async function openBrowserAddress(address = deps.browserAddress(), newTab = false) {
     if (!browserInteractionAvailable()) return;
     const value = address.trim();
     if (!value) return;
     deps.setBrowserAddressEditing(false);
     const analytics = desktopAnalytics.scope();
-    const url = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+    const url = browserAddressUrl(value);
+    const currentTab = newTab ? undefined : activeBrowserTab();
+    if (currentTab) {
+      if (closingBrowserTabIds.has(currentTab.id)) return;
+      try {
+        await window.openbot.browser.navigate({ tabId: currentTab.id, url });
+        deps.setBrowserAddress(url);
+      } catch {
+        deps.setComposerError("Could not open the address in this tab.");
+      }
+      return;
+    }
     const serverId = deps.props.server?.id ?? "local";
     const agentId = deps.props.agent?.id ?? null;
     const canonicalUrl = canonicalBrowserUrl(url);
