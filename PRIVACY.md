@@ -66,7 +66,12 @@ has been verified. Landing-page attribution includes an allowlisted source categ
 platform name (or unknown), and the referring domain when available. A recognized utm_source tag
 takes precedence over the referring domain for platform classification; unrecognized tags are not
 sent. Attribution excludes referrer paths, query parameters, fragments, credentials, ports, and
-campaign URLs other than the allowlisted tags described above. Referrals from openbot.run and its subdomains are omitted. OpenPanel can also derive
+campaign URLs other than the allowlisted tags described above. Website page and article events carry
+the path of a news article or guide published on openbot.run, together with the collection name, the
+reading position reached (start, half, or end), and the section of the page a link was clicked in.
+That path is a published article address and nothing else: it is matched against the site's own list
+of articles, so no other part of a visited URL can be reported through it. Reading position is taken
+from where the article sits on screen, never from how long it was open. Referrals from openbot.run and its subdomains are omitted. OpenPanel can also derive
 session, device, browser, operating-system, network, and approximate geographic metadata from a
 request. The analytics service runs on OpenBot's self-hosted infrastructure and receives events
 through `analytics.openbot.run`.

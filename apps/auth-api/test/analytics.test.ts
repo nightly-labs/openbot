@@ -2,15 +2,19 @@ import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { getByRole } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 import {
+  articleFromPath,
   isLikelyAutomation,
   LandingAnalytics,
   landingAttribution,
   landingCampaignPath,
   landingReferrer,
   OPENPANEL_API_URL,
+  safeScreenPath,
   shouldEnableLandingAnalytics,
 } from "../src/lib/analytics";
+import { GUIDES_COLLECTION } from "../src/lib/guides";
 import { OPENBOT_LINKS } from "../src/lib/landing-links";
+import { NEWS_COLLECTION } from "../src/lib/news";
 
 describe("landing analytics", () => {
   it("enables only the production landing hostname", () => {
@@ -53,7 +57,7 @@ describe("landing analytics", () => {
       __referrer: "",
       surface: "landing",
       environment: "production",
-      event_schema_version: 7,
+      event_schema_version: 8,
     });
     const campaignPath = "/?utm_source=twitter&utm_medium=ad&utm_campaign=mutli";
     expect(client.trackScreenView).toHaveBeenCalledOnce();
@@ -317,6 +321,115 @@ describe("landing analytics", () => {
       referrer.mockRestore();
       vi.unstubAllGlobals();
     }
+  });
+
+  it("reports an article by its own path and only for a published slug", () => {
+    const article = NEWS_COLLECTION.articles[0];
+    if (!article) throw new Error("The news registry must publish at least one article");
+    expect(safeScreenPath(`/news/${article.slug}`)).toBe(`/news/${article.slug}`);
+    expect(articleFromPath(`/news/${article.slug}?utm_source=twitter#top`)).toEqual({
+      collection: "news",
+      slug: article.slug,
+    });
+    // An unknown slug is not a path the site can report, so it degrades instead of widening.
+    expect(safeScreenPath("/news/not-a-published-article")).toBe("/");
+    expect(articleFromPath("/news/not-a-published-article")).toBeNull();
+    expect(articleFromPath("/download/macos")).toBeNull();
+    expect(safeScreenPath("/news")).toBe("/news");
+    expect(safeScreenPath("/secret?token=private")).toBe("/");
+  });
+
+  it("sends an article view and its read depth under the article path", () => {
+    const article = GUIDES_COLLECTION.articles[0];
+    if (!article) throw new Error("The guides registry must publish at least one article");
+    const screenPath = `/guides/${article.slug}`;
+    document.body.innerHTML = "";
+    window.history.replaceState({}, "", `${screenPath}?utm_source=Twitter`);
+    const client = { setGlobalProperties: vi.fn(), track: vi.fn(), trackScreenView: vi.fn() };
+    const analytics = new LandingAnalytics(() => client, true);
+    const cleanup = analytics.start(document, "openbot.run", screenPath);
+
+    analytics.trackArticleRead({ collection: "guides", slug: article.slug }, "half");
+    // A slug the registry does not publish must not reach the payload.
+    analytics.trackArticleRead({ collection: "guides", slug: "private-draft" }, "end");
+    cleanup();
+
+    const campaignPath = `${screenPath}?utm_source=twitter`;
+    expect(client.trackScreenView).toHaveBeenCalledWith(campaignPath);
+    expect(client.track).toHaveBeenNthCalledWith(1, "landing_viewed", {}, campaignPath);
+    expect(client.track).toHaveBeenNthCalledWith(
+      2,
+      "content_article_read",
+      { collection: "guides", slug: article.slug, depth: "half" },
+      campaignPath,
+    );
+    expect(client.track).toHaveBeenNthCalledWith(
+      3,
+      "content_article_read",
+      { collection: "guides", depth: "end" },
+      campaignPath,
+    );
+    expect(JSON.stringify(client.track.mock.calls)).not.toContain("private-draft");
+  });
+
+  it("tracks article links that an exact href allowlist cannot match", () => {
+    const featured = NEWS_COLLECTION.articles[0];
+    const related = NEWS_COLLECTION.articles[1];
+    if (!featured || !related) throw new Error("The news registry must publish two articles");
+    document.body.innerHTML = `
+      <div class="post-index"><a id="card" href="/news/${featured.slug}">Featured</a></div>
+      <div class="post-article"><section class="post-more"><a id="related" href="/news/${related.slug}">Related</a></section></div>
+      <div class="post-index"><a id="missing" href="/news/not-a-published-article">Draft</a></div>
+    `;
+    window.history.replaceState({}, "", "/news");
+    const client = { setGlobalProperties: vi.fn(), track: vi.fn(), trackScreenView: vi.fn() };
+    const analytics = new LandingAnalytics(() => client, true);
+    const cleanup = analytics.start(document, "openbot.run", "/news");
+
+    clickWithoutNavigation("#card");
+    clickWithoutNavigation("#related");
+    clickWithoutNavigation("#missing");
+    cleanup();
+
+    expect(client.track.mock.calls.filter(([name]) => name === "content_article_opened")).toEqual([
+      ["content_article_opened", { collection: "news", slug: featured.slug, placement: "content_index" }, "/news"],
+      ["content_article_opened", { collection: "news", slug: related.slug, placement: "content_related" }, "/news"],
+    ]);
+  });
+
+  it("keeps the platform on a Linux download click", () => {
+    document.body.innerHTML = `<section class="landing-download"><a id="linux" href="/download/linux">Linux</a></section>`;
+    window.history.replaceState({}, "", "/");
+    const client = { setGlobalProperties: vi.fn(), track: vi.fn(), trackScreenView: vi.fn() };
+    const analytics = new LandingAnalytics(() => client, true);
+    const cleanup = analytics.start(document, "openbot.run");
+
+    clickWithoutNavigation("#linux");
+    cleanup();
+
+    expect(client.track).toHaveBeenLastCalledWith(
+      "landing_download_clicked",
+      { platform: "linux", placement: "download_section" },
+      "/",
+    );
+  });
+
+  it("reports the detected platform and each manual change, including before the page starts", () => {
+    document.body.innerHTML = "";
+    window.history.replaceState({}, "", "/");
+    const client = { setGlobalProperties: vi.fn(), track: vi.fn(), trackScreenView: vi.fn() };
+    const analytics = new LandingAnalytics(() => client, true);
+
+    // The hero detects its platform before the page component starts analytics.
+    analytics.trackDownloadSelected("macos", true);
+    const cleanup = analytics.start(document, "openbot.run");
+    analytics.trackDownloadSelected("linux", false);
+    cleanup();
+
+    expect(client.track.mock.calls.filter(([name]) => name === "landing_download_selected")).toEqual([
+      ["landing_download_selected", { platform: "macos", detected: true }, "/"],
+      ["landing_download_selected", { platform: "linux", detected: false }, "/"],
+    ]);
   });
 
   it("does not let initialization failures escape", () => {

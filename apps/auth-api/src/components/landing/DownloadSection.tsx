@@ -82,10 +82,13 @@ export function DownloadSection() {
             />
           </a>
 
-          <article
+          {/* The hero selector already offers Linux and /download/linux resolves an AppImage, so the
+              card is the same link the other two are. A non-clickable card here contradicted both. */}
+          <a
             class="landing-download-card"
+            href={linux.href}
             data-download-platform="linux"
-            data-state="coming-soon"
+            data-state="available"
             data-revealed={revealState()}
           >
             <DownloadCardContent
@@ -93,8 +96,9 @@ export function DownloadSection() {
               status={linux.status}
               title={linux.label}
               description={linux.description}
+              action={linux.action}
             />
-          </article>
+          </a>
         </div>
       </div>
     </section>

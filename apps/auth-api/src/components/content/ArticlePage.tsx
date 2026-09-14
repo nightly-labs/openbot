@@ -3,13 +3,19 @@ import { Link } from "@tanstack/solid-router";
 import { For, onSettled, Show } from "solid-js";
 import { ARTICLE_BODIES } from "../../content";
 import { landingAnalytics } from "../../lib/analytics";
-import { type CollectionArticle, type ContentCollection, formatArticleDate } from "../../lib/content-collection";
+import {
+  type CollectionArticle,
+  type ContentCollection,
+  formatArticleDate,
+  reportedArticlePath,
+} from "../../lib/content-collection";
 import { createLandingReveal } from "../landing/createLandingReveal";
 import { LandingFooter } from "../landing/LandingFooter";
 import { ArticleCard } from "./ArticleCard";
 import { ArticleGradient } from "./ArticleGradient";
 import { ContentCallToAction } from "./ContentCallToAction";
 import { ContentHeader } from "./ContentHeader";
+import { createArticleReadDepth } from "./createArticleReadDepth";
 
 export interface ArticlePageProps {
   collection: ContentCollection;
@@ -18,19 +24,33 @@ export interface ArticlePageProps {
 
 export function ArticlePage(props: ArticlePageProps) {
   let more: HTMLElement | undefined;
+  let articleBody: HTMLElement | undefined;
   const revealed = createLandingReveal(() => more);
 
   const body = () => ARTICLE_BODIES[props.collection.id][props.article.slug];
   const others = () => props.collection.articles.filter((article) => article.slug !== props.article.slug);
 
-  onSettled(() => landingAnalytics.start(document, window.location.hostname, props.collection.indexRoute));
+  // The article's own path, so one article can be told from another in the report. An unpublished
+  // slug falls back to the index inside `reportedArticlePath`.
+  onSettled(() =>
+    landingAnalytics.start(
+      document,
+      window.location.hostname,
+      reportedArticlePath(props.collection, props.article.slug),
+    ),
+  );
+
+  createArticleReadDepth(
+    () => articleBody,
+    (depth) => landingAnalytics.trackArticleRead({ collection: props.collection.id, slug: props.article.slug }, depth),
+  );
 
   return (
     <div class="landing-page post-article">
       <ContentHeader />
 
       <main class="post-main">
-        <article class="post-container post-article-body">
+        <article ref={articleBody} class="post-container post-article-body">
           <header class="post-article-header" data-enter="post-copy">
             <Link class="post-article-back" to={props.collection.indexRoute}>
               {props.collection.backLabel}

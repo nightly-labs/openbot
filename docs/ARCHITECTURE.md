@@ -548,6 +548,15 @@ subdomain matches select known platforms; URL paths and substring matches do not
 platforms use `unknown`. No referral signal retains the coarse `direct` category, which does
 not prove a visitor typed the address.
 
+An article reports its own path, so one article can be told from another. `safeScreenPath` and the
+`slug` property check resolve the path against the `src/lib/news.ts` and `src/lib/guides.ts`
+registries, so the reportable set stays closed: an unknown slug reports `/` and is dropped from the
+payload. `articleFromPath` gives the delegated click listener the same lookup, which is what lets it
+track article cards at all; their hrefs carry a slug and cannot be matched by the exact-href
+allowlist the other links use. The hero selector reports its detected platform through
+`trackDownloadSelected` before the page component calls `start`, so a short bounded queue holds
+events until the client exists rather than dropping the first one.
+
 `landingCampaignPath` rebuilds the reported screen path with only the five allowlisted `utm_*` tags,
 lowercased and bounded to 64 safe characters; every other parameter and the hash are dropped by
 construction. The path travels on every event of the page load, not only `screen_view`, because
@@ -557,8 +566,12 @@ See [PRIVACY.md](../PRIVACY.md) for the data boundary.
 
 The OpenPanel Growth dashboard uses a session funnel from `landing_viewed` to
 `landing_download_clicked`. A download click is not a completed download or installation.
-Break down the funnel by `acquisition_source`, then `source_platform` once schema version 7
+Break down the funnel by `acquisition_source`, then `source_platform` once schema version 8
 events reach OpenPanel. Historical events do not contain the new platform property.
+
+The `/download/*` Worker handlers fall back to the releases page when the GitHub manifest cannot be
+read. That fallback is written to the Worker log, not to OpenPanel: a server event has no session,
+and the landing dashboards are defined on sessions.
 
 For download-click reports, `platform` means the requested macOS, Windows, or Linux download;
 `placement` means the button location. These properties exist only on the download step.

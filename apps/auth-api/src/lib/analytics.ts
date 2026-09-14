@@ -1,17 +1,31 @@
 import { isBoolean, isOneOf } from "@openbot/contracts/runtime-values";
 import { OpenPanel, OpenPanelBase, type OpenPanelOptions, type TrackProperties } from "@openpanel/web";
+import { CONTENT_COLLECTIONS } from "./content";
+import { type CollectionId, type ContentCollection, findArticle } from "./content-collection";
 import { OPENBOT_DOWNLOAD_LINKS, OPENBOT_LINKS } from "./landing-links";
 
 export const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
-const ANALYTICS_SCHEMA_VERSION = 7;
+const ANALYTICS_SCHEMA_VERSION = 8;
 
 export type LandingAcquisitionSource = "direct" | "search" | "social" | "github" | "other";
+
+/** How far into an article the reader got. Reported once per depth per article view. */
+export type ArticleReadDepth = "start" | "half" | "end";
+
+/** An article the registries actually publish. Both fields are closed sets, never free text. */
+export interface ArticleReference {
+  collection: CollectionId;
+  slug: string;
+}
 
 interface LandingAnalyticsEvents {
   landing_viewed: Record<string, never>;
   landing_download_clicked: { platform: LandingDownloadPlatform; placement: LandingPlacement };
   landing_link_clicked: { destination: LandingDestination; placement: LandingPlacement };
+  landing_download_selected: { platform: LandingDownloadPlatform; detected: boolean };
+  content_article_opened: ArticleReference & { placement: LandingPlacement };
+  content_article_read: ArticleReference & { depth: ArticleReadDepth };
   join_page_action:
     | { action: "view"; valid_invite: boolean }
     | { action: "open_app" }
@@ -26,6 +40,7 @@ type LandingPlacement =
   | "footer"
   | "content_index"
   | "content_article"
+  | "content_related"
   | "other";
 
 const LANDING_PLACEMENTS = [
@@ -35,6 +50,7 @@ const LANDING_PLACEMENTS = [
   "footer",
   "content_index",
   "content_article",
+  "content_related",
   "other",
 ] as const satisfies readonly LandingPlacement[];
 /** The platforms the landing page can send a visitor to a download for. */
@@ -55,7 +71,44 @@ type LandingDestination =
   | "codex"
   | "claude";
 
-type LandingScreenPath = "/" | "/join" | "/news" | "/guides";
+type CollectionIndexRoute = ContentCollection["indexRoute"];
+/**
+ * The screens a report may name. Article paths carry the slug so one article can be told from
+ * another, and `safeScreenPath` keeps the set closed at runtime as well as in the type.
+ */
+export type LandingScreenPath = "/" | "/join" | CollectionIndexRoute | `${CollectionIndexRoute}/${string}`;
+
+const FIXED_SCREEN_PATHS = ["/", "/join", "/news", "/guides"] as const satisfies readonly LandingScreenPath[];
+
+/**
+ * Any path that is not a fixed screen or a published article reports the landing page instead. A
+ * caller cannot widen what reaches analytics by passing a different string.
+ */
+export function safeScreenPath(path: string): LandingScreenPath {
+  if (isOneOf(FIXED_SCREEN_PATHS, path)) return path;
+  const article = articleFromPath(path);
+  if (!article) return "/";
+  return `/${article.collection}/${article.slug}`;
+}
+
+/**
+ * Resolves a site path to the article it names, or null. The slug is looked up in the registry, so
+ * a link to an article that does not exist reports nothing rather than a new string.
+ */
+export function articleFromPath(path: string): ArticleReference | null {
+  const [pathname = ""] = path.split(/[?#]/u);
+  for (const collection of CONTENT_COLLECTIONS) {
+    const prefix = `${collection.indexRoute}/`;
+    if (!pathname.startsWith(prefix)) continue;
+    const slug = pathname.slice(prefix.length);
+    if (findArticle(collection, slug)) return { collection: collection.id, slug };
+  }
+  return null;
+}
+
+const PUBLISHED_SLUGS = new Set(
+  CONTENT_COLLECTIONS.flatMap((collection) => collection.articles.map((article) => article.slug)),
+);
 
 type OpenPanelClient = Pick<OpenPanel, "setGlobalProperties"> & {
   track: (name: string, properties: TrackProperties, path: string) => ReturnType<OpenPanelBase["track"]>;
@@ -107,9 +160,19 @@ const LINK_DESTINATIONS = new Map<string, LandingDestination>([
 const EVENT_PROPERTY_ALLOWLIST = {
   landing_viewed: [],
   landing_download_clicked: ["platform", "placement"],
+  landing_download_selected: ["platform", "detected"],
   landing_link_clicked: ["destination", "placement"],
+  content_article_opened: ["collection", "slug", "placement"],
+  content_article_read: ["collection", "slug", "depth"],
   join_page_action: ["action", "valid_invite", "platform"],
 } as const satisfies Record<LandingEventName, readonly string[]>;
+
+/**
+ * The hero selector runs its platform detection before the page component starts analytics, so an
+ * event can arrive first. A small queue keeps that first event instead of dropping it; outside
+ * production no client is ever created, so the bound is what stops it growing.
+ */
+const PENDING_EVENT_LIMIT = 4;
 
 export function shouldEnableLandingAnalytics(hostname: string, productionBuild: boolean): boolean {
   return productionBuild && hostname === "openbot.run";
@@ -121,6 +184,7 @@ export class LandingAnalytics {
   #client: OpenPanelClient | null = null;
   #lastScreenPath: LandingScreenPath | null = null;
   #campaignPath = "/";
+  readonly #pending: { name: LandingEventName; properties: TrackProperties }[] = [];
   readonly #clickCleanup = new WeakMap<Document, (replacement: boolean) => void>();
 
   constructor(createClient: ClientFactory = createOpenPanelClient, productionBuild = import.meta.env.PROD) {
@@ -129,20 +193,33 @@ export class LandingAnalytics {
   }
 
   /**
-   * `screenPath` separates the marketing surfaces that share this listener. The
-   * click handling is the same on all of them; only the reported screen differs.
+   * `screenPath` separates the marketing surfaces that share this listener, down to the individual
+   * article. It is passed as a string and narrowed by `safeScreenPath`, so a route that stops
+   * matching the registry degrades to the landing page instead of reporting a new path.
    */
-  start(document: Document, hostname: string, screenPath: LandingScreenPath = "/"): () => void {
+  start(document: Document, hostname: string, screenPath = "/"): () => void {
     if (isLikelyAutomation(document.defaultView?.navigator)) return () => undefined;
     if (!this.#ensureClient(hostname)) return () => undefined;
-    this.#campaignPath = landingCampaignPath(screenPath, document.location.href);
+    const screen = safeScreenPath(screenPath);
+    this.#campaignPath = landingCampaignPath(screen, document.location.href);
     this.#client?.setGlobalProperties({
       ...landingAttribution(document, hostname),
     });
-    this.#screenView(screenPath);
+    this.#flushPending();
+    this.#screenView(screen);
     this.#track("landing_viewed", {});
     const handleClick = (event: MouseEvent) => this.#handleClick(event);
-    return this.#replaceClickListener(document, handleClick, screenPath);
+    return this.#replaceClickListener(document, handleClick, screen);
+  }
+
+  /** The platform the hero offers: once for what was detected, then for each manual change. */
+  trackDownloadSelected(platform: LandingDownloadPlatform, detected: boolean): void {
+    this.#track("landing_download_selected", { platform, detected });
+  }
+
+  /** How far a reader got into an article. The caller reports each depth at most once. */
+  trackArticleRead(article: ArticleReference, depth: ArticleReadDepth): void {
+    this.#track("content_article_read", { ...article, depth });
   }
 
   startJoin(
@@ -156,6 +233,7 @@ export class LandingAnalytics {
     this.#client?.setGlobalProperties({
       ...landingAttribution(document, hostname),
     });
+    this.#flushPending();
     this.#screenView("/join");
     this.#track("join_page_action", { action: "view", valid_invite: options.validInvite });
     const handleClick = (event: MouseEvent) => {
@@ -232,7 +310,14 @@ export class LandingAnalytics {
       return;
     }
     const destination = LINK_DESTINATIONS.get(href);
-    if (destination) this.#track("landing_link_clicked", { destination, placement });
+    if (destination) {
+      this.#track("landing_link_clicked", { destination, placement });
+      return;
+    }
+    // Article links carry the slug in the path, so they cannot be matched by an exact href. Without
+    // this every card on an index page is dropped and the section looks like a dead end.
+    const article = articleFromPath(href);
+    if (article) this.#track("content_article_opened", { ...article, placement });
   }
 
   #screenView(path: LandingScreenPath): void {
@@ -255,18 +340,40 @@ export class LandingAnalytics {
             value !== undefined && allowed.some((item) => item === key) && isSafeLandingProperty(name, key, value),
         ),
       );
-      const result = this.#client?.track(name, sanitized, this.#campaignPath);
-      if (result instanceof Promise) void result.catch(() => undefined);
+      this.#send(name, sanitized);
     } catch {
       // Analytics must never change landing-page behavior.
     }
+  }
+
+  #send(name: LandingEventName, properties: TrackProperties): void {
+    if (!this.#client) {
+      if (this.#pending.length < PENDING_EVENT_LIMIT) this.#pending.push({ name, properties });
+      return;
+    }
+    const result = this.#client.track(name, properties, this.#campaignPath);
+    if (result instanceof Promise) void result.catch(() => undefined);
+  }
+
+  #flushPending(): void {
+    const queued = this.#pending.splice(0, this.#pending.length);
+    for (const event of queued) this.#send(event.name, event.properties);
   }
 }
 
 function isSafeLandingProperty(name: LandingEventName, key: string, value: unknown): boolean {
   if (key === "action") return isOneOf(["view", "open_app", "download"] as const, value);
   if (key === "valid_invite") return name === "join_page_action" && isBoolean(value);
-  if (key === "platform") return value === "macos" || value === "windows";
+  if (key === "detected") return name === "landing_download_selected" && isBoolean(value);
+  if (key === "collection") return isOneOf(["news", "guides"] as const, value);
+  if (key === "slug") return typeof value === "string" && PUBLISHED_SLUGS.has(value);
+  if (key === "depth") return isOneOf(["start", "half", "end"] as const, value);
+  // The invitation page only ever offers the two platforms it can detect; the download events cover
+  // every platform the site links to, Linux included.
+  if (key === "platform") {
+    if (name === "join_page_action") return value === "macos" || value === "windows";
+    return isOneOf(["linux", "macos", "windows"] as const, value);
+  }
   if (key === "placement") return isOneOf(LANDING_PLACEMENTS, value);
   if (key === "destination") return [...LINK_DESTINATIONS.values()].some((destination) => destination === value);
   return false;
@@ -382,6 +489,9 @@ export function landingAttribution(document: Document, hostname: string) {
 
 function landingPlacement(link: HTMLAnchorElement): LandingPlacement {
   if (link.closest(".landing-header")) return "header";
+  // Checked before `.post-article`, which wraps it: a card in the related row is a different
+  // question from a link inside the article body.
+  if (link.closest(".post-more")) return "content_related";
   if (link.closest(".landing-hero")) return "hero";
   if (link.closest(".landing-download")) return "download_section";
   if (link.closest(".landing-footer")) return "footer";

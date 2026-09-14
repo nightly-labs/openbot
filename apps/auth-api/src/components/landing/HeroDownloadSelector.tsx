@@ -1,5 +1,6 @@
 import { PlatformLogo } from "@openbot/brand";
 import { createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
+import { landingAnalytics } from "../../lib/analytics";
 import {
   DOWNLOAD_PLATFORM_ORDER,
   DOWNLOAD_PLATFORMS,
@@ -34,6 +35,7 @@ export function HeroDownloadSelector() {
 
   function selectPlatform(nextPlatform: DownloadPlatform): void {
     setPlatform(nextPlatform);
+    landingAnalytics.trackDownloadSelected(nextPlatform, false);
     closeMenu(true);
   }
 
@@ -66,7 +68,12 @@ export function HeroDownloadSelector() {
 
   onSettled(() => {
     const detected = detectDownloadPlatform(globalThis.navigator);
-    if (detected) setPlatform(detected);
+    if (detected) {
+      setPlatform(detected);
+      // Reported separately from the click, so the offer the visitor was given can be compared with
+      // the one they took.
+      landingAnalytics.trackDownloadSelected(detected, true);
+    }
 
     const handleOutsidePointer = (event: PointerEvent) => {
       if (open() && event.target instanceof Node && !root?.contains(event.target)) closeMenu();

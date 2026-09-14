@@ -38,6 +38,16 @@ function findInstaller(manifest: string, extension: DownloadManifestConfig["exte
   return undefined;
 }
 
+/**
+ * The releases page is a working answer but not the one that was asked for, so each fallback says
+ * why. Written to the Worker log rather than to analytics: a server event has no session, and the
+ * landing reports are defined on sessions. Platform and reason only, never a URL or a response body.
+ */
+function fallbackToReleases(platform: AvailableDownloadPlatform, reason: string): Response {
+  console.warn(`latest-download: serving the releases page for ${platform} (${reason})`);
+  return redirect(OPENBOT_LINKS.releases);
+}
+
 export async function latestDownloadResponse(
   platform: AvailableDownloadPlatform,
   fetcher: typeof fetch = fetch,
@@ -47,13 +57,13 @@ export async function latestDownloadResponse(
 
   try {
     const response = await fetcher(manifestUrl, { headers: { accept: "text/yaml, text/plain" } });
-    if (!response.ok) return redirect(OPENBOT_LINKS.releases);
+    if (!response.ok) return fallbackToReleases(platform, `manifest status ${response.status}`);
 
     const installer = findInstaller(await response.text(), config.extension);
-    if (!installer) return redirect(OPENBOT_LINKS.releases);
+    if (!installer) return fallbackToReleases(platform, `no ${config.extension} asset in the manifest`);
 
     return redirect(`${RELEASES_BASE_URL}/latest/download/${encodeURIComponent(installer)}`);
   } catch {
-    return redirect(OPENBOT_LINKS.releases);
+    return fallbackToReleases(platform, "the manifest request failed");
   }
 }

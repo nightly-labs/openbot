@@ -18,12 +18,14 @@ Every event has these low-cardinality properties:
 
 - `surface`: `desktop`, `desktop_host`, or `landing`;
 - `environment`: currently `production` only;
-- `event_schema_version`: the integer schema generation, currently `7`;
+- `event_schema_version`: the integer schema generation, currently `8`;
 - `app_version` and `platform` on desktop surfaces;
 - `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`;
 - `source_platform` on landing surfaces: an allowlisted platform name, or `unknown`.
 
-Reports must filter to `event_schema_version = 7`. Generation 5 renames the product agent throughout: the
+Reports must filter to `event_schema_version = 8`. Generation 8 adds the article path to website
+`screen_view` and the content and download-selection events below, so generation 7 cannot answer a
+per-article question and must not be combined with generation 8 in one content report. Generation 5 renames the product agent throughout: the
 `origin` property reports `agent` where generation 4 reported `bot`, so the two generations cannot be
 combined in one report. Historical events remain available but must not
 be mixed into current conversion or reliability metrics.
@@ -83,10 +85,13 @@ lifecycle. A malformed preference fails closed; a missing preference uses the do
 | `reaction_action` | Are reactions used? | Reaction operation completed |
 | `maintenance_action` | Can accounts export data and diagnostics? | Export reported a saved artifact |
 | `hosted_site_action` | Can accounts publish, replace, and delete Hosted Sites? | A terminal Hosted Site operation result; site metadata is never sent |
-| `screen_view` | Which public website routes are viewed in a session? | One safe view for `/`, `/join`, `/news`, or `/guides`, with allowlisted campaign tags and no hash |
+| `screen_view` | Which public website routes and articles are viewed in a session? | One safe view for `/`, `/join`, a collection index, or a published article path, with allowlisted campaign tags and no hash |
 | `landing_viewed` | How much qualified landing traffic arrives? | Non-automation production page view |
 | `landing_download_clicked` | Which safe channel/placement drives downloads? | Allowlisted download link clicked |
 | `landing_link_clicked` | Which public resources are useful? | Allowlisted public link clicked |
+| `landing_download_selected` | Does the offered platform match the one taken? | The hero reports its detected platform once, then each manual change; `detected` separates the two |
+| `content_article_opened` | Which news article or guide does a reader choose, and from where? | A link to a published article was clicked; `placement` separates an index card from the related row |
+| `content_article_read` | Is an article read or abandoned? | The body reached `start`, `half`, or `end` in the viewport, at most once each per view. It measures position, not attention, and never elapsed time |
 | `join_page_action` | Does the invitation web flow reach the app? | Anonymous view, download, or app-open action |
 
 ## Privacy and runtime validation
@@ -97,8 +102,11 @@ non-finite, negative, or implausibly large inputs. Failure codes are static and 
 
 Never send message content, prompts, answers, generated content, search terms, arbitrary URLs,
 referrers, file names, local paths, commands, tokens, invitation values, raw errors, or local
-identifiers. Website events use only the fixed paths `/`, `/join`, `/news`, and `/guides`, followed
-by the allowlisted campaign tags `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, and
+identifiers. Website events use only the fixed paths `/`, `/join`, `/news`, and `/guides`, or the
+path of an article published in `src/lib/news.ts` or `src/lib/guides.ts`. Article slugs are an
+editor-authored closed set, not visitor input: `safeScreenPath` and the `slug` property check look
+the slug up in those registries, and a path or slug that is not there reports `/` or is dropped
+rather than passed through. Paths are followed by the allowlisted campaign tags `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, and
 `utm_term`. `landingCampaignPath` lowercases each tag and accepts at most 64 characters from
 `[a-z0-9._-]`; a value outside that shape is dropped, not shortened, and no other query parameter or
 hash is ever included. Session replay and automatic interaction capture remain disabled.
@@ -113,9 +121,13 @@ hash is ever included. Session replay and automatic interaction capture remain d
 4. Growth: landing view to download and invitation view to open/download, plus engaged sessions that
    contain a download click, an allowlisted public-link click, or an invitation open/download action;
    segment only by coarse acquisition source, placement, and platform.
+   Content: article screen views, `content_article_opened` by placement, `content_article_read` at
+   `end` over `start` per article, and the share of sessions that reach a download after an article.
+   Download offer: `landing_download_selected` with `detected = true` against the platform of the
+   following `landing_download_clicked`, which shows how often the detected platform is corrected.
 5. Reliability: failed outcomes, safe failure codes, P90/P99 durations, and update/provider health.
 
-Every dashboard must filter by the intended `surface` and `event_schema_version = 7`. Website bounce
+Every dashboard must filter by the intended `surface` and `event_schema_version = 8`. Website bounce
 uses OpenPanel's standard single-`screen_view` definition. Do not emit synthetic screen views to
 change it; use the engaged-session report for meaningful landing activity.
 

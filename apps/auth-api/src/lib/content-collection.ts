@@ -67,6 +67,14 @@ export function articlePath(collection: ContentCollection, slug: string): string
   return `${collection.indexRoute}/${slug}`;
 }
 
+/**
+ * The path analytics may name for an article. A slug that is not in the registry falls back to the
+ * index, so a report can only ever contain a path an editor wrote here.
+ */
+export function reportedArticlePath(collection: ContentCollection, slug: string): string {
+  return findArticle(collection, slug) ? articlePath(collection, slug) : collection.indexRoute;
+}
+
 // The absolute URLs below take the site they sit on. The head tags pass the site
 // that served the page (see `servingSiteUrl`); the feed and the sitemap keep
 // openbot.run.
