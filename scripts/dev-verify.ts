@@ -115,56 +115,88 @@ export function suggestedTestsForFiles(files: string[], projectRoot = process.cw
   return [...tests].sort();
 }
 
-function testCommands(tests: string[]): string[] {
+interface VerificationCommandPlan {
+  commands: string[];
+  runnableCommands: string[];
+  runnableCommandArgs: string[][];
+  qaCommands: string[];
+  suggestedTests: string[];
+}
+
+function formatBunCommand(args: string[]): string {
+  return `bun ${args.join(" ")}`;
+}
+
+function testCommandArgs(tests: string[]): string[][] {
   const desktop = tests.filter(isDesktopTest);
   const authServer = tests.filter((file) => file.startsWith("apps/auth-api/test/") && !authApiClientTests.has(file));
   const authClient = tests.filter((file) => authApiClientTests.has(file));
   const sites = tests.filter((file) => file.startsWith("apps/site-router/test/"));
   const remote = tests.filter((file) => file.startsWith("remote/api/test/"));
-  const commands: string[] = [];
-  if (desktop.length > 0) commands.push(`bun run test:desktop -- ${desktop.join(" ")}`);
+  const commands: string[][] = [];
+  if (desktop.length > 0) commands.push(["run", "test:desktop", "--", ...desktop]);
   if (authServer.length > 0) {
-    commands.push(
-      `bun run --cwd apps/auth-api test:server -- ${authServer.map((file) => file.slice("apps/auth-api/".length)).join(" ")}`,
-    );
+    commands.push([
+      "run",
+      "--cwd",
+      "apps/auth-api",
+      "test:server",
+      "--",
+      ...authServer.map((file) => file.slice("apps/auth-api/".length)),
+    ]);
   }
   if (authClient.length > 0) {
-    commands.push(
-      `bun run --cwd apps/auth-api test:client -- ${authClient.map((file) => file.slice("apps/auth-api/".length)).join(" ")}`,
-    );
+    commands.push([
+      "run",
+      "--cwd",
+      "apps/auth-api",
+      "test:client",
+      "--",
+      ...authClient.map((file) => file.slice("apps/auth-api/".length)),
+    ]);
   }
   if (sites.length > 0) {
-    commands.push(
-      `bun run --cwd apps/site-router test -- ${sites.map((file) => file.slice("apps/site-router/".length)).join(" ")}`,
-    );
+    commands.push([
+      "run",
+      "--cwd",
+      "apps/site-router",
+      "test",
+      "--",
+      ...sites.map((file) => file.slice("apps/site-router/".length)),
+    ]);
   }
   if (remote.length > 0) {
-    commands.push(
-      `bun run --cwd remote/api test -- ${remote.map((file) => file.slice("remote/api/".length)).join(" ")}`,
-    );
+    commands.push([
+      "run",
+      "--cwd",
+      "remote/api",
+      "test",
+      "--",
+      ...remote.map((file) => file.slice("remote/api/".length)),
+    ]);
   }
   return commands;
 }
 
-function workspaceTestCommands(files: string[], suggestedTests: string[]): string[] {
-  const commands: string[] = [];
+function workspaceTestCommandArgs(files: string[], suggestedTests: string[]): string[][] {
+  const commands: string[][] = [];
   if (
     files.some((file) => file.startsWith("apps/auth-api/")) &&
     !suggestedTests.some((file) => file.startsWith("apps/auth-api/"))
   ) {
-    commands.push("bun run test:api");
+    commands.push(["run", "test:api"]);
   }
   if (
     files.some((file) => file.startsWith("apps/site-router/")) &&
     !suggestedTests.some((file) => file.startsWith("apps/site-router/"))
   ) {
-    commands.push("bun run test:sites");
+    commands.push(["run", "test:sites"]);
   }
   if (
     files.some((file) => file.startsWith("remote/api/")) &&
     !suggestedTests.some((file) => file.startsWith("remote/api/"))
   ) {
-    commands.push("bun run test:remote");
+    commands.push(["run", "test:remote"]);
   }
   return commands;
 }
@@ -175,33 +207,57 @@ export function verificationCommands(
   setupReady: boolean,
   isolatedApp: boolean,
   projectRoot = process.cwd(),
-): { commands: string[]; runnableCommands: string[]; qaCommands: string[]; suggestedTests: string[] } {
+): Omit<VerificationCommandPlan, "runnableCommandArgs"> {
+  const plan = createVerificationCommandPlan(files, surfaces, setupReady, isolatedApp, projectRoot);
+  return {
+    commands: plan.commands,
+    runnableCommands: plan.runnableCommands,
+    qaCommands: plan.qaCommands,
+    suggestedTests: plan.suggestedTests,
+  };
+}
+
+function createVerificationCommandPlan(
+  files: string[],
+  surfaces: VerificationSurface[],
+  setupReady: boolean,
+  isolatedApp: boolean,
+  projectRoot = process.cwd(),
+): VerificationCommandPlan {
   const commands: string[] = [];
-  const runnableCommands: string[] = [];
+  const runnableCommandArgs: string[][] = [];
   const qaCommands: string[] = [];
   if (!setupReady) commands.push("bun run dev:prepare");
 
   const suggestedTests = suggestedTestsForFiles(files, projectRoot);
-  for (const testCommand of testCommands(suggestedTests)) {
-    commands.push(testCommand);
-    runnableCommands.push(testCommand);
+  for (const args of testCommandArgs(suggestedTests)) {
+    commands.push(formatBunCommand(args));
+    runnableCommandArgs.push(args);
   }
 
-  for (const command of ["bun run lint", "bun run typecheck", ...workspaceTestCommands(files, suggestedTests)]) {
+  for (const args of [["run", "lint"], ["run", "typecheck"], ...workspaceTestCommandArgs(files, suggestedTests)]) {
+    const command = formatBunCommand(args);
     if (!commands.includes(command)) commands.push(command);
-    if (!runnableCommands.includes(command)) runnableCommands.push(command);
+    if (!runnableCommandArgs.some((candidate) => formatBunCommand(candidate) === command))
+      runnableCommandArgs.push(args);
   }
   if (surfaces.includes("api")) commands.push("bun run check:api");
   if (surfaces.includes("renderer")) {
     commands.push("bun run check:ui");
-    runnableCommands.push("bun run check:ui");
+    runnableCommandArgs.push(["run", "check:ui"]);
   }
   if (surfaces.includes("renderer") && !isolatedApp) commands.push("bun run dev --isolated");
   if (surfaces.includes("renderer")) {
     qaCommands.push("bun run dev:automation snapshot", "bun run dev:automation screenshot");
     commands.push(...qaCommands);
   }
-  return { commands, runnableCommands, qaCommands, suggestedTests };
+  return {
+    commands,
+    runnableCommands: runnableCommandArgs.map(formatBunCommand),
+    runnableCommandArgs,
+    qaCommands,
+    suggestedTests,
+  };
 }
 
 function changedFiles(projectRoot: string): string[] {
@@ -248,7 +304,9 @@ export function qaReadinessReasons(
   return reasons;
 }
 
-export async function createDevVerificationReport(projectRoot = process.cwd()): Promise<DevVerificationReport> {
+async function createDevVerificationState(
+  projectRoot = process.cwd(),
+): Promise<{ report: DevVerificationReport; runnableCommandArgs: string[][]; setupReady: boolean }> {
   const files = changedFiles(projectRoot);
   const surfaces = surfacesForFiles(files);
   const bunCurrent = process.versions.bun ?? "unknown";
@@ -286,11 +344,11 @@ export async function createDevVerificationReport(projectRoot = process.cwd()): 
 
   const isolatedApp = runtime.isolatedApp;
   const reasons = readinessReasons(setup, runtime);
-  const plan = verificationCommands(files, surfaces, setupReady, isolatedApp, projectRoot);
+  const plan = createVerificationCommandPlan(files, surfaces, setupReady, isolatedApp, projectRoot);
   const qaReasons = qaReadinessReasons(surfaces, setupReady, runtime);
   const qaRequired = surfaces.includes("renderer");
 
-  return {
+  const report = {
     ready: reasons.length === 0,
     reasons,
     setup,
@@ -306,6 +364,11 @@ export async function createDevVerificationReport(projectRoot = process.cwd()): 
     runnableCommands: plan.runnableCommands,
     qaCommands: plan.qaCommands,
   };
+  return { report, runnableCommandArgs: plan.runnableCommandArgs, setupReady };
+}
+
+export async function createDevVerificationReport(projectRoot = process.cwd()): Promise<DevVerificationReport> {
+  return (await createDevVerificationState(projectRoot)).report;
 }
 
 function runBun(projectRoot: string, args: string[]): void {
@@ -314,68 +377,13 @@ function runBun(projectRoot: string, args: string[]): void {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-function runRecommendedChecks(report: DevVerificationReport, projectRoot: string): void {
-  const suggestedTests = report.changes.suggestedTests;
-  const desktop = suggestedTests.filter(isDesktopTest);
-  if (desktop.length > 0) runBun(projectRoot, ["run", "test:desktop", "--", ...desktop]);
-  const authServer = suggestedTests.filter(
-    (file) => file.startsWith("apps/auth-api/test/") && !authApiClientTests.has(file),
-  );
-  if (authServer.length > 0) {
-    runBun(projectRoot, [
-      "run",
-      "--cwd",
-      "apps/auth-api",
-      "test:server",
-      "--",
-      ...authServer.map((file) => file.slice("apps/auth-api/".length)),
-    ]);
-  }
-  const authClient = suggestedTests.filter((file) => authApiClientTests.has(file));
-  if (authClient.length > 0) {
-    runBun(projectRoot, [
-      "run",
-      "--cwd",
-      "apps/auth-api",
-      "test:client",
-      "--",
-      ...authClient.map((file) => file.slice("apps/auth-api/".length)),
-    ]);
-  }
-  const sites = suggestedTests.filter((file) => file.startsWith("apps/site-router/test/"));
-  if (sites.length > 0) {
-    runBun(projectRoot, [
-      "run",
-      "--cwd",
-      "apps/site-router",
-      "test",
-      "--",
-      ...sites.map((file) => file.slice("apps/site-router/".length)),
-    ]);
-  }
-  const remote = suggestedTests.filter((file) => file.startsWith("remote/api/test/"));
-  if (remote.length > 0) {
-    runBun(projectRoot, [
-      "run",
-      "--cwd",
-      "remote/api",
-      "test",
-      "--",
-      ...remote.map((file) => file.slice("remote/api/".length)),
-    ]);
-  }
-  runBun(projectRoot, ["run", "lint"]);
-  runBun(projectRoot, ["run", "typecheck"]);
-  for (const command of workspaceTestCommands(report.changes.files, suggestedTests)) {
-    const [, , script] = command.split(" ");
-    if (script) runBun(projectRoot, ["run", script]);
-  }
-  if (report.changes.surfaces.includes("renderer")) runBun(projectRoot, ["run", "check:ui"]);
+function runRecommendedChecks(commandArgs: string[][], projectRoot: string): void {
+  for (const args of commandArgs) runBun(projectRoot, args);
 }
 
 if (import.meta.main) {
   const projectRoot = process.cwd();
-  const report = await createDevVerificationReport(projectRoot);
-  if (process.argv.includes("--run")) runRecommendedChecks(report, projectRoot);
+  const { report, runnableCommandArgs, setupReady } = await createDevVerificationState(projectRoot);
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  if (process.argv.includes("--run") && setupReady) runRecommendedChecks(runnableCommandArgs, projectRoot);
 }

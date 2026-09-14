@@ -1,7 +1,8 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   createDevVerificationReport,
@@ -174,6 +175,29 @@ describe("dev verification planning", () => {
       isolatedApp: false,
       orphanedStack: false,
       ambiguousApp: false,
+    });
+  });
+
+  it("prints setup blockers and skips --run checks when setup is incomplete", () => {
+    const root = mkdtempSync(join(tmpdir(), "openbot-dev-verify-run-fresh-"));
+    mkdirSync(join(root, "apps/auth-api"), { recursive: true });
+    writeFileSync(join(root, "README.md"), "fresh checkout\n");
+    execFileSync("git", ["init"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "dev-verify@example.invalid"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Dev Verify"], { cwd: root });
+    execFileSync("git", ["add", "README.md"], { cwd: root });
+    execFileSync("git", ["commit", "-m", "fixture"], { cwd: root });
+
+    const result = spawnSync("bun", [join(dirname(fileURLToPath(import.meta.url)), "dev-verify.ts"), "--run"], {
+      cwd: root,
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toContain("dev:verify running:");
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      setup: { dependencies: false },
+      commands: expect.arrayContaining(["bun run dev:prepare"]),
     });
   });
 });
