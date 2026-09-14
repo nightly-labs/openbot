@@ -1,7 +1,8 @@
 import { GlassView } from "expo-glass-effect";
 import { Link, router } from "expo-router";
 import { Typography } from "heroui-native";
-import { ArrowLeft } from "lucide-react-native";
+import { useThemeColor } from "heroui-native/hooks";
+import { ArrowLeft, TriangleAlert } from "lucide-react-native";
 import { useMemo } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
@@ -9,6 +10,7 @@ import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { BlurReveal } from "@/shared/components/blur-reveal";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import type { ChatTarget } from "../model/chat-target";
 
@@ -19,6 +21,7 @@ interface ChatHeaderProps {
   liquidGlassAvailable: boolean;
   topInset: number;
   onBack: () => void;
+  needsAction?: boolean;
 }
 
 export function ChatHeader({
@@ -28,7 +31,9 @@ export function ChatHeader({
   liquidGlassAvailable,
   topInset,
   onBack,
+  needsAction = false,
 }: ChatHeaderProps) {
+  const warning = useThemeColor("warning");
   const { servers } = useMobileWorkspace();
   const disconnected = !servers.some((server) => server.id === target.serverId && server.state === "online");
   const members = useMemo(
@@ -63,6 +68,7 @@ export function ChatHeader({
             borderRadius: 24,
             flexDirection: "row",
             maxWidth: 220,
+            flexShrink: 1,
             overflow: "hidden",
           }}
         >
@@ -108,6 +114,33 @@ export function ChatHeader({
         </GlassView>
 
         <View className="flex-1" />
+        {target.kind === "channel" ? (
+          <View style={{ width: 48, height: 48 }} collapsable={false} pointerEvents={needsAction ? "auto" : "none"}>
+            <BlurReveal
+              value={needsAction ? target : null}
+              interactive
+              collapseOnHide
+              enterDuration={320}
+              exitDuration={240}
+            >
+              {(actionTarget) => (
+                <ChatGlassIconButton
+                  accessibilityLabel="Actions needed"
+                  fallbackBackground={fallbackBackground}
+                  liquidGlassAvailable={liquidGlassAvailable}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/channel-actions/[channelId]",
+                      params: { channelId: actionTarget.id, serverId: actionTarget.serverId },
+                    })
+                  }
+                >
+                  <TriangleAlert color={String(warning)} size={24} strokeWidth={2.5} />
+                </ChatGlassIconButton>
+              )}
+            </BlurReveal>
+          </View>
+        ) : null}
       </View>
       <SheetScrollEdgeEffect
         style={{ height: topInset + 82, left: 0, position: "absolute", right: 0, top: 0, zIndex: 10 }}

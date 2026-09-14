@@ -3,6 +3,7 @@ import {
   CHANNEL_DELETE_CAPABILITY,
   type ChannelPage,
   type ChannelSummary,
+  type ChannelTask,
 } from "@openbot/contracts/ipc";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
@@ -11,6 +12,8 @@ import { projectChannelMessages } from "../../chat/model/chat-messages";
 import { channelRecipient, toggleChannelMember } from "./channel-draft";
 import { ChannelSend } from "./channel-send";
 import { type ChannelRequest, MobileChannelStore, mergeLatestChannelPage } from "./channel-store";
+
+import { channelTaskActivities } from "./channel-task-actions";
 
 const channel: ChannelSummary = {
   id: "channel-one",
@@ -358,4 +361,77 @@ describe("channel data in the shared chat", () => {
     await sender.send("Changed", [], null, channel.members);
     expect(command.mock.calls.map((call) => call[1].operationId)).toEqual(["operation-1", "operation-2"]);
   });
+});
+
+it("uses assignment markers only for host routing receipts and preserves commentary", () => {
+  const entries = page(1, 3).messages;
+  const receipt = entries[0];
+  receipt.author = { kind: "agent", id: "agent-one", name: "Travel" };
+  receipt.taskId = "task-one";
+  receipt.message = { ...receipt.message, author: "system", text: "Assigned to Builder." };
+  const comment = entries[1];
+  comment.author = receipt.author;
+  comment.message = {
+    ...comment.message,
+    author: "assistant",
+    itemType: "commentary",
+    turnId: "turn-one",
+    text: "Checking the routes",
+  };
+  entries[2].message.text = "Assigned to Builder.";
+  expect(projectChannelMessages(entries, null)).toEqual([
+    { id: receipt.id, kind: "assignment", agentName: "Builder" },
+    { id: comment.id, kind: "thinking", turnId: "turn-one", steps: [{ id: comment.id, text: "Checking the routes" }] },
+    expect.objectContaining({ kind: "message", body: "Assigned to Builder." }),
+  ]);
+});
+
+it("shows each active channel task and clears activity when work pauses or finishes", () => {
+  const task: ChannelTask = {
+    id: "task-one",
+    channelId: channel.id,
+    parentTaskId: null,
+    rootTaskId: "task-one",
+    ownerAgentId: "agent-one",
+    requestMessageId: "request",
+    instruction: "Check routes",
+    attachmentDraftIds: [],
+    expectedResult: "",
+    sourceMessageIds: [],
+    dependencies: [],
+    resources: [],
+    state: "running",
+    revision: 1,
+    assignmentCount: 1,
+    error: null,
+  };
+  const entries = page(1, 1).messages;
+  entries[0].taskId = task.id;
+  entries[0].author = { kind: "agent", id: "agent-one", name: "Travel" };
+  entries[0].message = { ...entries[0].message, turnId: "channel-turn", itemType: "commentary" };
+  const queued = { ...task, id: "task-two", ownerAgentId: "agent-two", state: "queued" as const };
+  expect(channelTaskActivities([task, queued], entries, "chief")).toEqual([
+    { agentId: "agent-one", turnId: "channel-turn", phase: "working", detail: "Working on it…" },
+  ]);
+  expect(
+    channelTaskActivities(
+      [
+        { ...task, state: "paused" },
+        { ...queued, state: "completed" },
+      ],
+      entries,
+      "chief",
+    ),
+  ).toEqual([]);
+  const routing = { ...queued, ownerAgentId: null };
+  expect(channelTaskActivities([routing], [], "chief")).toEqual([
+    { agentId: "chief", turnId: null, phase: "working", detail: "Working on it…" },
+  ]);
+  expect(channelTaskActivities([{ ...routing, state: "waiting" }], [], "chief")[0].agentId).toBe("chief");
+  expect(channelTaskActivities([{ ...routing, state: "paused" }], [], "chief")).toEqual([]);
+  expect(channelTaskActivities([routing], [], null)).toEqual([]);
+  entries[0].message.status = "streaming";
+  expect(channelTaskActivities([], entries, "chief")[0].agentId).toBe("agent-one");
+  entries[0].superseded = true;
+  expect(channelTaskActivities([task], entries, "chief")[0].turnId).toBeNull();
 });

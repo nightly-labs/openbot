@@ -5,6 +5,7 @@ import {
   CHANNEL_CHATS_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   type ChannelSummary,
+  type ChannelTask,
   type CreateAgentInput,
   emptyAnalyticsTotals,
   parseChannelCommand,
@@ -15,12 +16,14 @@ import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
-import { act, type PropsWithChildren } from "react";
+import { act, type PropsWithChildren, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { ChatTarget } from "@/features/chat/model/chat-target";
 import { useHapticsPreference } from "@/features/settings/model/haptics";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { MobileChannelStore } from "../../channels/model/channel-store";
+import { ChannelActionsScreen } from "../../channels/screens/channel-actions-screen";
 import { ChannelFormScreen } from "../../channels/screens/channel-form-screen";
 import { ChatHeader } from "../../chat/components/chat-header";
 import { saveAgentRecord } from "../../workspace/model/save-agent-record";
@@ -83,9 +86,12 @@ const channel: ChannelSummary = {
   lastMessage: null,
 };
 let channelRows = [channel];
+let actionTasks: ChannelTask[] = [];
 let failChannelSave = false;
 const channelRequests = vi.fn(async (path: string, body?: TeamProtocolV2Json) => {
   if (path === CHANNEL_ROUTES.list) return channelRows;
+  if (path === CHANNEL_ROUTES.read)
+    return { channel, tasks: actionTasks, messages: [], olderCursor: null, throughSequence: 0 };
   const command = parseChannelCommand(body);
   if (failChannelSave) throw new Error("Could not save this channel.");
   if (command.type === "save") {
@@ -93,6 +99,8 @@ const channelRequests = vi.fn(async (path: string, body?: TeamProtocolV2Json) =>
     channelRows = [saved];
     return saved;
   }
+  if (command.type === "resume" || command.type === "reassign")
+    actionTasks = actionTasks.filter((task) => task.id !== command.taskId);
   return channel;
 });
 function createChannelStore() {
@@ -192,6 +200,7 @@ vi.mock("expo-router/react-navigation", () => ({
 vi.mock("react-native", () => ({
   Alert: { alert: mocks.alert },
   Platform: { OS: "ios" },
+  useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
   View: ({ children }: PropsWithChildren) => <div>{children}</div>,
   Pressable: ({
     children,
@@ -311,7 +320,17 @@ vi.mock("@/features/agents/components/agent-pin-transition", () => ({
   useAgentPinTransition: () => ({ toggleAgentPinAnimated: vi.fn() }),
 }));
 vi.mock("expo-glass-effect", () => ({ GlassView: ({ children }: PropsWithChildren) => <div>{children}</div> }));
-vi.mock("@/features/chat/components/chat-glass-icon-button", () => ({ ChatGlassIconButton: () => null }));
+vi.mock("@/features/chat/components/chat-glass-icon-button", () => ({
+  ChatGlassIconButton: ({
+    children,
+    accessibilityLabel,
+    onPress,
+  }: PropsWithChildren<{ accessibilityLabel: string; onPress: () => void }>) => (
+    <button type="button" aria-label={accessibilityLabel} onClick={onPress}>
+      {children}
+    </button>
+  ),
+}));
 vi.mock("@/shared/components/sheet-scroll-edge-effect", () => ({ SheetScrollEdgeEffect: () => null }));
 vi.mock("@expo/ui/community/datetime-picker", () => ({
   DateTimePicker: ({
@@ -390,7 +409,7 @@ vi.mock("@expo/ui", () => {
 });
 vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn() }));
 vi.mock("@/shared/lib/haptics", () => ({ haptics: { impact: async () => {}, notification: async () => {} } }));
-vi.mock("lucide-react-native", () => ({ ArrowLeft: () => null, Eye: () => null }));
+vi.mock("lucide-react-native", () => ({ ArrowLeft: () => null, Eye: () => null, TriangleAlert: () => null }));
 
 const container = document.createElement("div");
 document.body.append(container);
@@ -431,6 +450,7 @@ beforeEach(() => {
   workspace.loadAgentRoutines.mockReset().mockResolvedValue([]);
   workspace.loadAgentAnalytics.mockReset().mockResolvedValue(null);
   channelRows = [channel];
+  actionTasks = [];
   failChannelSave = false;
   workspace.channelStore = createChannelStore();
   channelRequests.mockClear();
@@ -1185,3 +1205,133 @@ it("restores a channel from Hidden chats and keeps the sheet open if saving fail
   expect(workspace.unhideChannel).toHaveBeenLastCalledWith(channel.id, host.id);
   expect(mocks.back).toHaveBeenCalledTimes(1);
 });
+
+vi.mock("@expo/ui/community/menu", () => ({
+  MenuView: ({
+    actions,
+    onPressAction,
+    shouldOpenOnLongPress,
+  }: {
+    actions: { id: string; title: string; attributes?: { disabled?: boolean } }[];
+    onPressAction: (event: { nativeEvent: { event: string } }) => void;
+    shouldOpenOnLongPress?: boolean;
+  }) => {
+    const [open, setOpen] = useState(false);
+    return (
+      <div>
+        <button
+          type="button"
+          disabled={actions.every((action) => action.attributes?.disabled)}
+          onClick={() => {
+            if (!shouldOpenOnLongPress) setOpen(true);
+          }}
+        >
+          Reassign
+        </button>
+        {open
+          ? actions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                disabled={action.attributes?.disabled}
+                onClick={() => onPressAction({ nativeEvent: { event: action.id } })}
+              >
+                {action.title}
+              </button>
+            ))
+          : null}
+      </div>
+    );
+  },
+}));
+
+it("opens the action sheet from the warning button only when action is needed", async () => {
+  const renderHeader = (needsAction: boolean) =>
+    act(() =>
+      root.render(
+        <ChatHeader
+          target={{ kind: "channel", id: channel.id, serverId: host.id, name: channel.name, members: [original] }}
+          fallbackBackground="white"
+          foreground="black"
+          liquidGlassAvailable={false}
+          topInset={0}
+          onBack={() => {}}
+          needsAction={needsAction}
+        />,
+      ),
+    );
+  await renderHeader(false);
+  expect(screen.queryByRole("button", { name: "Actions needed" })).toBeNull();
+  await renderHeader(true);
+  await click("Actions needed");
+  expect(mocks.push).toHaveBeenCalledWith({
+    pathname: "/channel-actions/[channelId]",
+    params: { channelId: channel.id, serverId: host.id },
+  });
+  await renderHeader(false);
+  expect(screen.queryByRole("button", { name: "Actions needed" })).toBeNull();
+});
+
+const failedAction: ChannelTask = {
+  id: "task-one",
+  channelId: channel.id,
+  parentTaskId: null,
+  rootTaskId: "task-one",
+  ownerAgentId: original.id,
+  requestMessageId: "message-one",
+  instruction: "Ask @[Travel](agent:agent-one) to compare routes.",
+  attachmentDraftIds: [],
+  expectedResult: "A route",
+  sourceMessageIds: [],
+  dependencies: [],
+  resources: [],
+  state: "failed",
+  revision: 1,
+  assignmentCount: 1,
+  error: "Could not complete the task.",
+};
+it("shows recovery actions in the sheet and removes resolved tasks", async () => {
+  actionTasks = [failedAction, { ...failedAction, id: "task-running", state: "running" }];
+  await act(() => root.render(<ChannelActionsScreen />));
+  await waitFor(() => expect(screen.getAllByRole("button", { name: "Resume" })).toHaveLength(1));
+  expect(screen.queryByText("@Travel")).toBeNull();
+  expect(screen.getAllByText("Travel").length).toBeGreaterThan(1);
+  await click("Resume");
+  await waitFor(() => expect(screen.getByText("No actions needed.")).toBeTruthy());
+  expect(channelRequests).toHaveBeenCalledWith(
+    CHANNEL_ROUTES.command,
+    expect.objectContaining({ type: "resume", taskId: failedAction.id, channelId: channel.id }),
+  );
+});
+it("keeps a failed action in the sheet for retry and supports reassign", async () => {
+  actionTasks = [failedAction];
+  await act(() => root.render(<ChannelActionsScreen />));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Resume" })).toBeTruthy());
+  failChannelSave = true;
+  await click("Resume");
+  await waitFor(() => expect(screen.getByText("Could not save this channel.")).toBeTruthy());
+  expect(screen.getByRole("button", { name: "Resume" })).toHaveProperty("disabled", false);
+  failChannelSave = false;
+  await click("Reassign");
+  await click("Travel");
+  await waitFor(() => expect(screen.getByText("No actions needed.")).toBeTruthy());
+  expect(channelRequests).toHaveBeenCalledWith(
+    CHANNEL_ROUTES.command,
+    expect.objectContaining({ type: "reassign", taskId: failedAction.id, recipientAgentId: original.id }),
+  );
+});
+
+vi.mock("expo-linking", () => ({ openURL: vi.fn() }));
+vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn() }));
+vi.mock("react-native-reanimated", () => ({ useReducedMotion: () => true }));
+// This DOM harness checks actions; native blur transitions run on the device.
+vi.mock("@/shared/components/blur-reveal", () => ({
+  BlurReveal: ({ value, children }: { value: ChatTarget | null; children: (value: ChatTarget) => React.ReactNode }) =>
+    value ? children(value) : null,
+}));
+// Render static text while leaving the real markdown and mention renderer in use.
+vi.mock("@/features/chat/components/streaming-tail-text", () => ({
+  StreamRevealProvider: ({ children }: PropsWithChildren) => <>{children}</>,
+  StreamingBlock: ({ children }: PropsWithChildren) => <>{children}</>,
+  StreamingTailText: ({ body }: { body: string }) => <span>{body}</span>,
+}));

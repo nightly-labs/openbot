@@ -5,7 +5,7 @@ import { router, useIsFocused } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ArrowDown } from "lucide-react-native";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, AppState, Keyboard, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
@@ -46,6 +46,7 @@ export interface ChatViewProps {
   historyLoadFailed: boolean;
   canSend: boolean;
   activity?: MobileAgentActivity;
+  activities?: MobileAgentActivity[];
   activeTurnId: string | null;
   questionForm?: QuestionPromptController;
   readBoundary: string | null;
@@ -56,7 +57,7 @@ export interface ChatViewProps {
   olderError: boolean;
   loadOlder: () => void;
   send: (body: string, files: ChatAttachment[], replyToMessageId: string | null) => Promise<string | null>;
-  footer?: ReactNode;
+  needsAction?: boolean;
   notice?: string;
 }
 
@@ -78,6 +79,7 @@ export function ChatView({
   historyLoadFailed,
   canSend,
   activity,
+  activities,
   activeTurnId,
   questionForm,
   readBoundary,
@@ -88,7 +90,7 @@ export function ChatView({
   olderError,
   loadOlder,
   send,
-  footer,
+  needsAction = false,
   notice,
 }: ChatViewProps) {
   const isFocused = useIsFocused();
@@ -302,6 +304,7 @@ export function ChatView({
           >
             <ChatHeader
               target={target}
+              needsAction={needsAction}
               fallbackBackground={fieldBackground}
               foreground={foreground}
               liquidGlassAvailable={liquidGlassAvailable}
@@ -317,7 +320,7 @@ export function ChatView({
               canSend={serverOnline && canSend}
               online={serverOnline}
               activity={activity}
-              footer={footer}
+              activities={activities}
               historyState={
                 ready
                   ? "ready"

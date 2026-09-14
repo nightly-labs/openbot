@@ -77,6 +77,20 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="channel-actions/[channelId]"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerStyle: { backgroundColor: sheetBackground },
+            headerTransparent: false,
+            headerBlurEffect: "none",
+            scrollEdgeEffects: { top: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.6],
+            sheetGrabberVisible: true,
+            title: "Actions needed",
+          }}
+        />
+        <Stack.Screen
           name="add-channel"
           options={{
             contentStyle: { backgroundColor: sheetBackground },

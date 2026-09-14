@@ -1,17 +1,7 @@
 import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { CornerUpRight, X } from "lucide-react-native";
-import {
-  createContext,
-  forwardRef,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { createContext, forwardRef, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, type CellRendererProps, FlatList, Pressable, View, type ViewStyle } from "react-native";
 import { KeyboardChatScrollView, type KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import Animated, {
@@ -89,7 +79,7 @@ const AGENT_MESSAGE_ENTRANCE = FadeIn.duration(240).reduceMotion(ReduceMotion.Sy
 interface ChatMessageListProps {
   target: ChatTarget;
   activity?: MobileAgentActivity;
-  footer?: ReactNode;
+  activities?: MobileAgentActivity[];
   agents: MobileAgent[];
   motion: ChatMotion;
   sending: boolean;
@@ -123,7 +113,7 @@ interface ChatMessageListProps {
 export function ChatMessageList({
   target,
   activity,
-  footer,
+  activities,
   agents,
   motion,
   sending,
@@ -179,28 +169,6 @@ export function ChatMessageList({
   const reducedMotion = useReducedMotion();
   const animateMessages = isFocused && online && appActive;
   const arrivals = useMessageArrivals(target.id, messages, animateMessages && historyState === "ready");
-  const latestThinking = messages.findLast(
-    (message) => message.kind === "thinking" && message.turnId === activity?.turnId,
-  );
-  const thinkingDetail =
-    latestThinking?.kind === "thinking" &&
-    !messages.some((message) => message.kind === "message" && message.author === "agent" && message.streaming)
-      ? latestThinking.steps.at(-1)?.text
-      : null;
-  const activityLabel =
-    sending && !activity
-      ? "Sending…"
-      : activity?.phase === "waiting"
-        ? messages.some(
-            (message) => message.kind === "question" && !message.prompt.resolution && message.turnId === activeTurnId,
-          )
-          ? "Waiting for your answer"
-          : "Waiting for your input on desktop"
-        : thinkingDetail
-          ? thinkingDetail
-          : activity?.phase === "responding"
-            ? "Responding…"
-            : activity?.detail || "Thinking…";
   const userBubbleColor = getBloubAvatarColor(
     target.kind === "agent" ? target.avatarSeed : target.id,
     target.kind === "agent" ? target.avatarHue : null,
@@ -233,14 +201,20 @@ export function ChatMessageList({
   const renderMessage = (message: (typeof visibleMessages)[number], isTailUser: boolean, isFirstUser: boolean) => {
     const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
     const rendered =
-      message.kind === "exchange" ? (
+      message.kind === "exchange" || message.kind === "assignment" ? (
         <View key={message.id} className="flex-row flex-wrap items-center justify-center gap-2 py-2">
           <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-            {message.exchange.direction === "outgoing" ? "Messaged" : "Message from"}
+            {message.kind === "assignment"
+              ? "Assigned to"
+              : message.exchange.direction === "outgoing"
+                ? "Messaged"
+                : "Message from"}
           </Typography.Paragraph>
-          {(message.exchange.direction === "incoming"
-            ? [message.exchange.senderAgentId]
-            : message.exchange.recipientAgentIds
+          {(message.kind === "assignment"
+            ? [agents.find((agent) => agent.name === message.agentName)?.id ?? message.agentName]
+            : message.exchange.direction === "incoming"
+              ? [message.exchange.senderAgentId]
+              : message.exchange.recipientAgentIds
           ).map((id) => {
             const participant = agents.find((candidate) => candidate.id === id);
             return (
@@ -249,7 +223,7 @@ export function ChatMessageList({
                   <BloubAvatar agentId={id} hue={participant.avatarHue} seed={participant.avatarSeed} size={22} />
                 ) : null}
                 <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-                  {participant?.name ?? "Unknown agent"}
+                  {participant?.name ?? (message.kind === "assignment" ? message.agentName : "Unknown agent")}
                 </Typography.Paragraph>
               </View>
             );
@@ -367,17 +341,56 @@ export function ChatMessageList({
       </View>
     );
   };
-  const renderActivity = () =>
-    activity || sending ? (
+  const renderActivity = (activity?: MobileAgentActivity) => {
+    const latestThinking = messages.findLast(
+      (message) => message.kind === "thinking" && message.turnId === activity?.turnId,
+    );
+    const thinkingDetail =
+      latestThinking?.kind === "thinking" &&
+      !messages.some(
+        (message) =>
+          message.kind === "message" &&
+          message.author === "agent" &&
+          message.streaming &&
+          (!activity?.agentId || message.speaker?.id === activity.agentId),
+      )
+        ? latestThinking.steps.at(-1)?.text
+        : null;
+    const activityLabel =
+      sending && !activity
+        ? "Sending…"
+        : activity?.phase === "waiting"
+          ? messages.some(
+              (message) => message.kind === "question" && !message.prompt.resolution && message.turnId === activeTurnId,
+            )
+            ? "Waiting for your answer"
+            : "Waiting for your input on desktop"
+          : thinkingDetail
+            ? thinkingDetail
+            : activity?.phase === "responding"
+              ? "Responding…"
+              : activity?.detail || "Thinking…";
+    const activityAgent = activity?.agentId
+      ? agentsById.get(activity.agentId)
+      : target.kind === "agent"
+        ? target
+        : undefined;
+    return activity || sending ? (
       <View
         className="flex-row items-center gap-2 px-1 py-2"
         accessible
         accessibilityLiveRegion="polite"
         accessibilityRole="text"
-        accessibilityLabel={`${target.name}: ${activityLabel}`}
+        key={activity?.agentId ?? "sending"}
+        accessibilityLabel={`${activityAgent?.name ?? target.name}: ${activityLabel}`}
       >
-        {target.kind === "agent" ? (
-          <BloubAvatar agentId={target.id} hue={target.avatarHue} seed={target.avatarSeed} size={36} />
+        {activityAgent ? (
+          <BloubAvatar
+            agentId={activityAgent.id}
+            hue={activityAgent.avatarHue}
+            seed={activityAgent.avatarSeed}
+            size={36}
+          />
         ) : null}
         <StreamRevealProvider>
           <ThinkingTextGradient
@@ -409,6 +422,7 @@ export function ChatMessageList({
         </StreamRevealProvider>
       </View>
     ) : null;
+  };
 
   return (
     <Animated.View
@@ -515,8 +529,7 @@ export function ChatMessageList({
           ListFooterComponent={
             <>
               <Animated.View style={motion.responseStyle}>
-                {renderActivity()}
-                {footer}
+                {activities?.length ? activities.map(renderActivity) : renderActivity(activity)}
               </Animated.View>
               {showStarter ? (
                 <View

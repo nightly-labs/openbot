@@ -13,6 +13,7 @@ interface SheetScrollViewProps extends PropsWithChildren {
   contentContainerClassName?: string;
   contentInsetAdjustmentBehavior?: ScrollViewProps["contentInsetAdjustmentBehavior"];
   header?: ReactNode;
+  headerOverlaysContent?: boolean;
   scrollEdgeEffect?: boolean;
   keyboardDismissMode?: ScrollViewProps["keyboardDismissMode"];
   keyboardShouldPersistTaps?: ScrollViewProps["keyboardShouldPersistTaps"];
@@ -26,6 +27,7 @@ export function SheetScrollView({
   contentContainerClassName,
   contentInsetAdjustmentBehavior = "automatic",
   header,
+  headerOverlaysContent = true,
   scrollEdgeEffect = true,
   keyboardDismissMode,
   keyboardShouldPersistTaps,
@@ -72,7 +74,7 @@ export function SheetScrollView({
         ) : null}
         {header}
       </View>
-      <View style={nativeHeader ? { paddingTop: headerHeight } : undefined}>
+      <View style={nativeHeader && headerOverlaysContent ? { paddingTop: headerHeight } : undefined}>
         <View className={contentContainerClassName}>{children}</View>
       </View>
     </StyledKeyboardAwareScrollView>

@@ -1,13 +1,12 @@
-import { userErrorMessage } from "@openbot/user-errors";
 import * as Crypto from "expo-crypto";
 import { useLocalSearchParams, usePreventZoomTransitionDismissal } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatView } from "@/features/chat/components/chat-view";
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
-import { ChannelTaskActions } from "../components/channel-task-actions";
 import { useChannels } from "../components/use-channels";
 import { ChannelSend } from "../model/channel-send";
+import { channelTaskActivities, channelTasksNeedingAction } from "../model/channel-task-actions";
 
 export function ChannelChatScreen() {
   usePreventZoomTransitionDismissal({ unstable_dismissalBoundsRect: { minX: 0, maxX: 24 } });
@@ -35,13 +34,17 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     () => projectChannelMessages(page?.messages ?? [], server?.membershipId ?? null),
     [page?.messages, server?.membershipId],
   );
+  const activities = useMemo(
+    () =>
+      online && !channel?.archived
+        ? channelTaskActivities(page?.tasks ?? [], page?.messages ?? [], channel?.leadAgentId ?? null)
+        : [],
+    [online, channel?.archived, channel?.leadAgentId, page?.tasks, page?.messages],
+  );
   const [sender] = useState(() => new ChannelSend(state.store, serverId, channelId, Crypto.randomUUID));
   useEffect(() => () => sender.dispose(), [sender]);
   const [olderLoading, setOlderLoading] = useState(false);
   const [olderError, setOlderError] = useState(false);
-  const [taskPending, setTaskPending] = useState(false);
-  const [taskError, setTaskError] = useState<string | null>(null);
-  const taskLock = useRef(false);
   const readThrough = useRef(0);
   const throughSequence = page?.throughSequence ?? 0;
   const markRead = useCallback(() => {
@@ -54,30 +57,6 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       });
   }, [state.store, serverId, channelId, throughSequence]);
   const canSend = online && Boolean(channel) && !channel?.archived;
-  async function taskCommand(
-    taskId: string,
-    type: "stop" | "resume" | "reassign",
-    recipientAgentId: string | null = null,
-  ) {
-    if (taskLock.current || !canSend) return;
-    taskLock.current = true;
-    setTaskPending(true);
-    setTaskError(null);
-    try {
-      await state.store.command(serverId, {
-        type,
-        operationId: Crypto.randomUUID(),
-        channelId,
-        taskId,
-        recipientAgentId,
-      });
-    } catch (cause) {
-      setTaskError(userErrorMessage(cause, "Could not change this task."));
-    } finally {
-      taskLock.current = false;
-      setTaskPending(false);
-    }
-  }
   return (
     <ChatView
       target={{ kind: "channel", id: channelId, serverId, name: channel?.name ?? "Channel", members }}
@@ -88,6 +67,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       ready={Boolean(page)}
       historyLoadFailed={Boolean(state.error) || (!state.loading && !channel)}
       canSend={canSend}
+      activities={activities}
       activeTurnId={null}
       readBoundary={throughSequence ? String(throughSequence) : null}
       markRead={markRead}
@@ -108,21 +88,9 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       }}
       send={(body, files, replyToMessageId) => sender.send(body, files, replyToMessageId, channel?.members ?? [])}
       notice={
-        taskError ??
-        (channel?.archived ? "This channel is archived. Restore it in channel settings to send messages." : undefined)
+        channel?.archived ? "This channel is archived. Restore it in channel settings to send messages." : undefined
       }
-      footer={
-        <ChannelTaskActions
-          tasks={page?.tasks ?? []}
-          members={members}
-          online={online}
-          pending={taskPending}
-          archived={channel?.archived ?? false}
-          onCommand={(...args) => {
-            void taskCommand(...args);
-          }}
-        />
-      }
+      needsAction={channelTasksNeedingAction(page?.tasks ?? []).length > 0 && !channel?.archived}
     />
   );
 }

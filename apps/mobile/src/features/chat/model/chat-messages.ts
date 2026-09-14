@@ -7,6 +7,7 @@ import type {
 } from "@openbot/contracts/ipc";
 
 export type ChatMessage =
+  | { id: string; kind: "assignment"; agentName: string }
   | { id: string; kind: "exchange"; exchange: AgentExchangeSummary }
   | { id: string; kind: "question"; turnId: string | undefined; prompt: ConversationQuestionPrompt }
   | {
@@ -118,15 +119,29 @@ export function latestReadableMessage(messages: ConversationMessage[]) {
 export function projectChannelMessages(messages: ChannelMessage[], memberId: string | null): ChatMessage[] {
   return messages
     .filter((entry) => entry.message.text.trim() || entry.message.attachments?.length)
-    .map((entry) => ({
-      id: entry.id,
-      kind: "message",
-      author: entry.author.kind === "member" && entry.author.id === memberId ? "user" : "agent",
-      speaker: entry.author,
-      superseded: entry.superseded,
-      body: entry.message.text,
-      streaming: entry.message.status === "streaming",
-      replyToMessageId: entry.message.replyToMessageId,
-      attachments: entry.message.attachments,
-    }));
+    .map((entry): ChatMessage => {
+      if (entry.author.kind === "agent" && entry.message.author === "system" && entry.taskId) {
+        const assignment = /^Assigned to (.+)\.$/.exec(entry.message.text);
+        if (assignment) return { id: entry.id, kind: "assignment", agentName: assignment[1] };
+      }
+      if (entry.author.kind === "agent" && entry.message.itemType === "commentary" && !entry.superseded) {
+        return {
+          id: entry.id,
+          kind: "thinking",
+          turnId: entry.message.turnId,
+          steps: [{ id: entry.id, text: entry.message.text }],
+        };
+      }
+      return {
+        id: entry.id,
+        kind: "message",
+        author: entry.author.kind === "member" && entry.author.id === memberId ? "user" : "agent",
+        speaker: entry.author,
+        superseded: entry.superseded,
+        body: entry.message.text,
+        streaming: entry.message.status === "streaming",
+        replyToMessageId: entry.message.replyToMessageId,
+        attachments: entry.message.attachments,
+      };
+    });
 }
