@@ -168,7 +168,7 @@ export const TestDraftBeforeSaving: Story = {
   play: async ({ args, userEvent }) => {
     const body = await openForm(userEvent);
     await enter(body.getByRole("textbox", { name: "Name" }), "Local SQLite");
-    await enter(body.getByRole("textbox", { name: "Command to launch" }), "openai-dev-mcp serve-sqlite");
+    await enter(body.getByRole("textbox", { name: "Command to launch" }), "openai-dev-mcp");
     await userEvent.click(body.getByRole("button", { name: "Test connection" }));
     await expectVisible(await body.findByText("Connected · 12 tools"));
     await expect(args.onTestMcpServer).toHaveBeenCalledWith(expect.objectContaining({ id: "", name: "Local SQLite" }));
@@ -213,10 +213,14 @@ export const AddCustomStdio: Story = {
   play: async ({ args, userEvent }) => {
     const body = await openForm(userEvent);
     await enter(body.getByRole("textbox", { name: "Name" }), "Local SQLite");
-    await enter(body.getByRole("textbox", { name: "Command to launch" }), "openai-dev-mcp serve-sqlite");
-    await enter(body.getByRole("textbox", { name: "Argument 1" }), "--database");
+    await enter(body.getByRole("textbox", { name: "Command to launch" }), "openai-dev-mcp");
+    // The command names the program alone. Each word after it is an argument of its own, which is
+    // what the launch makes of this configuration.
+    await enter(body.getByRole("textbox", { name: "Argument 1" }), "serve-sqlite");
     await userEvent.click(body.getByRole("button", { name: "Add argument" }));
-    await enter(await body.findByRole("textbox", { name: "Argument 2" }), "./openbot.db");
+    await enter(await body.findByRole("textbox", { name: "Argument 2" }), "--database");
+    await userEvent.click(body.getByRole("button", { name: "Add argument" }));
+    await enter(await body.findByRole("textbox", { name: "Argument 3" }), "./openbot.db");
     await enter(body.getByRole("textbox", { name: "Environment variable 1 key" }), "SQLITE_READONLY");
     await enter(body.getByRole("textbox", { name: "Environment variable 1 value" }), "1");
     await enter(body.getByRole("textbox", { name: "Working directory" }), "~/code");
@@ -231,8 +235,8 @@ export const AddCustomStdio: Story = {
         id: "",
         name: "Local SQLite",
         transport: "stdio",
-        command: "openai-dev-mcp serve-sqlite",
-        args: ["--database", "./openbot.db"],
+        command: "openai-dev-mcp",
+        args: ["serve-sqlite", "--database", "./openbot.db"],
         env: [{ key: "SQLITE_READONLY", value: "1" }],
         workingDirectory: "~/code",
         url: "",
@@ -266,8 +270,9 @@ export const EditExisting: Story = {
     await userEvent.click(body.getByRole("button", { name: "Actions for Local SQLite" }));
     await userEvent.click(await body.findByRole("menuitem", { name: "Edit" }));
     await expect(await body.findByRole("textbox", { name: "Name" })).toHaveValue("Local SQLite");
-    await expect(body.getByRole("textbox", { name: "Command to launch" })).toHaveValue("openai-dev-mcp serve-sqlite");
-    await expect(body.getByRole("textbox", { name: "Argument 2" })).toHaveValue("./openbot.db");
+    await expect(body.getByRole("textbox", { name: "Command to launch" })).toHaveValue("openai-dev-mcp");
+    await expect(body.getByRole("textbox", { name: "Argument 1" })).toHaveValue("serve-sqlite");
+    await expect(body.getByRole("textbox", { name: "Argument 3" })).toHaveValue("./openbot.db");
     await expect(body.getByRole("textbox", { name: "Environment variable 1 key" })).toHaveValue("SQLITE_READONLY");
   },
 };
@@ -277,7 +282,7 @@ export const ValidationErrors: Story = {
   play: async ({ userEvent }) => {
     const body = await openForm(userEvent);
     await expect(body.queryByRole("button", { name: "Save" })).toBeNull();
-    await enter(body.getByRole("textbox", { name: "Command to launch" }), "openai-dev-mcp serve-sqlite");
+    await enter(body.getByRole("textbox", { name: "Command to launch" }), "openai-dev-mcp");
     await userEvent.click(await body.findByRole("button", { name: "Save" }));
     await expectVisible(await body.findByText("Enter a name for this MCP server."));
     await expect(body.getByRole("button", { name: "Save" })).toBeDisabled();
@@ -321,7 +326,7 @@ export const McpFormNarrowViewport: Story = {
   play: async ({ userEvent }) => {
     const body = await openForm(userEvent);
     await enter(body.getByRole("textbox", { name: "Name" }), "Local SQLite");
-    await enter(body.getByRole("textbox", { name: "Command to launch" }), "openai-dev-mcp serve-sqlite");
+    await enter(body.getByRole("textbox", { name: "Command to launch" }), "openai-dev-mcp");
     await enter(body.getByRole("textbox", { name: "Argument 1" }), "--database");
     await enter(body.getByRole("textbox", { name: "Environment variable 1 key" }), "SQLITE_READONLY");
     await enter(body.getByRole("textbox", { name: "Environment variable 1 value" }), "1");

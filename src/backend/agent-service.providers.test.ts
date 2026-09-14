@@ -388,6 +388,9 @@ describe.sequential("AgentService: providers", () => {
       service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
     );
     expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    // The replaced session is closed in the client as well. Left open, it would keep the MCP servers
+    // it started, and every further change would add another set of processes.
+    expect(client.releasedThreads).toEqual([firstSession]);
     const starts = client.requests.filter((request) => request.method === "thread/start");
     expect(starts).toHaveLength(2);
     // `Database` is left out: the Codex configuration shape for a working directory is unconfirmed,

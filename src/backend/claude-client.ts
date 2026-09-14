@@ -165,6 +165,22 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#pendingServerRequests.clear();
   }
 
+  /**
+   * Closes one thread runtime and keeps the rest of the client. The SDK query owns the MCP servers
+   * of that thread, so the close is what ends those child processes. The caller releases an idle
+   * thread: a turn that still runs would end with the query that carries it.
+   */
+  async releaseThread(threadId: string): Promise<void> {
+    const runtime = this.#threads.get(threadId);
+    if (!runtime) return;
+    this.#threads.delete(threadId);
+    runtime.input.close();
+    runtime.query.close();
+    // The consumer rejects when the query ends in the middle of a turn. The runtime is already gone
+    // from the map, so there is nothing left to report it against.
+    await runtime.consume.catch(() => undefined);
+  }
+
   request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T>;
   async request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T> {
     if (!this.#running) throw new Error("Claude Agent SDK is not running.");

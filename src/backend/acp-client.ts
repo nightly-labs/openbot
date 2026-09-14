@@ -209,6 +209,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
+  /**
+   * Closes one session and keeps the agent process for the other threads. The bridge session goes
+   * first, because it is this app's own child; the agent is then told to drop the session, which is
+   * what ends the MCP servers it started for it. An agent that does not answer `session/close` is
+   * ignored: the session is already replaced on this side.
+   */
+  async releaseThread(sessionId: string): Promise<void> {
+    const thread = this.#threads.get(sessionId);
+    if (!thread) return;
+    this.#threads.delete(sessionId);
+    thread.mcp.close();
+    await this.#connection?.closeSession({ sessionId }).catch(() => undefined);
+  }
+
   async request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T> {
     if (!this.running) throw new Error("ACP client is not running.");
     switch (method) {

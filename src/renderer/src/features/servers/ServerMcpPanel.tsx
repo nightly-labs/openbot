@@ -426,10 +426,14 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
         <SlidingTabs.ContentSlot>
           <SlidingTabs.Content value="stdio" class="server-mcp-transport-panel">
             <SettingsSection class="server-mcp-section" title="Launch">
-              <Field label="Command to launch" error={visible("command")}>
+              <Field
+                label="Command to launch"
+                description="The program only. The launch does not read this field as a command line, so a word such as serve-sqlite goes in Arguments below."
+                error={visible("command")}
+              >
                 <Input
                   size="md"
-                  placeholder="openai-dev-mcp serve-sqlite"
+                  placeholder="openai-dev-mcp"
                   value={state.draft.command}
                   disabled={disabled()}
                   onValueChange={(value) =>

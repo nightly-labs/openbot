@@ -99,6 +99,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
   readonly requests: Array<{ method: string; params: unknown }> = [];
   readonly responses: Array<{ id: RequestId; result: unknown }> = [];
   readonly errors: Array<{ id: RequestId; error: RpcError }> = [];
+  readonly releasedThreads: string[] = [];
   #threadCounter = 0;
   running = false;
   responseError: Error | null = null;
@@ -123,6 +124,10 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
 
   async stop(): Promise<void> {
     this.running = false;
+  }
+
+  async releaseThread(externalThreadId: string): Promise<void> {
+    this.releasedThreads.push(externalThreadId);
   }
 
   async request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>): Promise<T> {

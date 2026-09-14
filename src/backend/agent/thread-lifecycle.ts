@@ -26,6 +26,8 @@ import { isArchivedThreadError, isMissingProviderSessionError } from "./thread-i
 export interface ThreadLifecycleHooks {
   /** Keeps the `agent-service` logger (and its prefix) as the single writer. */
   logRecovery(agentId: string, provider: AgentProvider, outcome: "resumed" | "replaced"): void;
+  /** A provider session that would not close. Its client keeps it, and the app stops using it. */
+  logReleaseFailure(provider: AgentProvider, error: unknown): void;
 }
 
 export interface ThreadLifecycleOptions {
@@ -372,11 +374,28 @@ export class ThreadLifecycle {
     const sessions = this.#store.database.listProviderSessions(threadId).filter((one) => one.state === "active");
     this.#store.database.deactivateProviderSessions(threadId);
     for (const session of sessions) {
+      // The client first, while the routing entry below still names it. Dropping the entry alone
+      // would leave the old session open inside the client with the MCP servers it spawned, so each
+      // further change would add a set of processes the user can no longer reach.
+      this.#releaseProviderSession(session.externalSessionId);
       this.#conversation.unbindThread(session.externalSessionId);
       this.#conversation.unloadThread(session.externalSessionId);
       this.#compaction.forgetThread(session.externalSessionId);
       this.#pendingHandoffs.delete(session.externalSessionId);
     }
+  }
+
+  /**
+   * Tells the client to close one provider session, and does not wait for it. The callers are the
+   * synchronous settings paths, and the close talks to a child process; the routing entries are
+   * dropped either way, so the next turn starts a new session whatever the old one answers.
+   */
+  #releaseProviderSession(externalThreadId: string): void {
+    const client = this.#conversation.loadedClientFor(externalThreadId);
+    if (!client?.releaseThread) return;
+    void client.releaseThread(externalThreadId).catch((error: unknown) => {
+      this.#hooks.logReleaseFailure(client.provider, error);
+    });
   }
 
   buildProviderHandoff(agentId: string, threadId: string): string | null {

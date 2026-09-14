@@ -1117,6 +1117,39 @@ it("hands the enabled MCP servers to the spawn and keeps the bridge names", asyn
   }
 });
 
+it("closes the query of a released thread, with the MCP servers it started, and keeps the others", async () => {
+  const queries = [
+    new TestQuery(new TestQueue<TestStreamMessage>()),
+    new TestQuery(new TestQueue<TestStreamMessage>()),
+  ];
+  const spawned: TestQuery[] = [];
+  const client = new ClaudeAgentClient(
+    { executable: "/bin/true", version: "2.1.251" },
+    () => {
+      const next = queries.shift();
+      if (!next) throw new Error("Unexpected Claude query.");
+      spawned.push(next);
+      return next;
+    },
+    undefined,
+    undefined,
+    () => [mcpConfig({ id: "mcp-1", name: "Filesystem", command: "/bin/echo" })],
+  );
+  client.start();
+  try {
+    const released = await client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse);
+    await client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse);
+
+    await client.releaseThread(released.thread.id);
+
+    // The query owns the MCP servers of its thread, so this close is what ends those processes.
+    expect(spawned[0]?.closed).toBe(true);
+    expect(spawned[1]?.closed).toBe(false);
+  } finally {
+    await client.stop();
+  }
+});
+
 it("gives a profile-generation thread no MCP servers at all", async () => {
   const query = new TestQuery(new TestQueue<TestStreamMessage>());
   let options: DynamicRecord | null = null;

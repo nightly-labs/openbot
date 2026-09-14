@@ -478,6 +478,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         logRecovery: (agentId, provider, outcome) =>
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
+        logReleaseFailure: (provider, error) =>
+          logger.warn("Could not close a replaced provider session.", { provider, error }),
       },
     });
     this.channels = new ChannelService(store.database, mailbox, {
