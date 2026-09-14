@@ -425,6 +425,29 @@
 .channel-title .agent-avatar + .agent-avatar {
   margin-left: -8px;
 }
+.channel-header-copy {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--openbot-space-2);
+}
+.channel-header-copy h1 {
+  min-width: 0;
+  overflow: hidden;
+  flex: 0 1 auto;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channel-header-title {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* Keep the working faces in one stack at the message avatars' left edge. The face itself takes the
    agent chat's size and optical offset, so the two indicators only differ in how many faces they

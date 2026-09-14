@@ -264,6 +264,25 @@ describe("Sidebar pinned chats", () => {
     expect(pinned.onUnpin).toHaveBeenCalledWith({ kind: "channel", id: "channel-1" });
   });
 
+  it("shows a channel title in the list and pinned strip while empty titles keep the name fallback", () => {
+    const channel = { ...storyChannel(), title: "Ship OpenBot 1.0" };
+    const props = sidebarProps();
+    const view = render(() => <Sidebar {...props} channels={[channel]} onSelectChannel={vi.fn()} />);
+
+    const row = screen.getByRole("button", { name: "Project room, Ship OpenBot 1.0. No messages yet" });
+    expect(within(row).getByText("Ship OpenBot 1.0")).toBeVisible();
+    view.unmount();
+
+    const pinned = sidebarProps([{ kind: "channel", id: "channel-1" }]);
+    const pinnedView = render(() => <Sidebar {...pinned} channels={[channel]} onSelectChannel={vi.fn()} />);
+    const tile = screen.getByRole("button", { name: "Project room, pinned channel" });
+    expect(within(tile).getByText("Ship OpenBot 1.0")).toBeVisible();
+    pinnedView.unmount();
+
+    render(() => <Sidebar {...props} channels={[storyChannel()]} onSelectChannel={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Project room. No messages yet" })).toBeVisible();
+  });
+
   it("offers channel edit and delete without duplication", async () => {
     const props = sidebarProps();
     const onEditChannel = vi.fn();
