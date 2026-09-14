@@ -34,6 +34,28 @@ describe("AccountUpdateIsland", () => {
     expect(screen.queryByText("New update available")).not.toBeInTheDocument();
   });
 
+  it.each([
+    ["a failed check, which found no update to offer", "check_failed" as const, false],
+    ["a failed download, which still has an update to retry", "download_failed" as const, true],
+    ["a failed install, which still has an update to retry", "install_failed" as const, true],
+  ])("carries %s", (_label, errorCode, expected) => {
+    // The island is one nowrap line that ellipsizes, so a sentence it would cut in half has to reach
+    // the user through the account menu instead.
+    render(() => (
+      <AccountUpdateIsland
+        updateStatus={{
+          ...updateStatus("error"),
+          errorCode,
+          message: "Could not reach the update service. Check your internet connection, then try again.",
+        }}
+        onUpdateAction={async () => {}}
+      />
+    ));
+
+    const shown = screen.queryByRole("button", { name: /Retry update/ }) !== null;
+    expect(shown).toBe(expected);
+  });
+
   it("leaves the document once the update is gone and the slide-out has run", async () => {
     vi.useFakeTimers();
     try {
