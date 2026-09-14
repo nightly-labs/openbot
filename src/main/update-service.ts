@@ -150,7 +150,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #installGeneration = 0;
   #activeDownload: number | null = null;
   #activeInstall: number | null = null;
-  #checkInFlight = false;
+  #checkRequest: Promise<UpdateCheckOutcome | null> | null = null;
   #downloadInFlight = false;
   #teardownCommitted = false;
 
@@ -249,25 +249,34 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     if (enabled && this.#options.enabled && this.#status.phase === "available") void this.downloadUpdate();
   }
 
+  /**
+   * The user-facing check. Unlike the periodic loop this one always reports: it moves into
+   * "checking" and settles on a real outcome even when an earlier call is still unsettled, because
+   * an action that answers a press by leaving the same error on screen reads as a dead button.
+   */
   async checkForUpdates(): Promise<UpdateStatus> {
+    return this.#check(true);
+  }
+
+  async #check(joinOutstandingRequest: boolean): Promise<UpdateStatus> {
     if (!this.#options.enabled || this.#teardownCommitted) return this.getStatus();
     if (["checking", "downloading", "ready", "installing"].includes(this.#status.phase)) {
       return this.getStatus();
     }
-    // electron-updater returns the outstanding promise when a check is already running, so entering
-    // "checking" again would only re-await the call this service has already given up on and time
-    // out a second time. Wait for it to settle; the next scheduled check then issues a real request.
-    if (this.#checkInFlight) {
+    // electron-updater returns the outstanding promise when a check is already running, so issuing
+    // another one here would only re-await the call this service has already given up on. The
+    // periodic loop waits quietly for it rather than spinning the UI once every interval; a user
+    // who asked for an answer joins that call instead, and gets progress and its real outcome.
+    if (this.#checkRequest && !joinOutstandingRequest) {
       // Keep the periodic loop alive, or refusing here would be the last check of the session.
       this.#scheduleCheck(this.#options.checkIntervalMs);
       return this.getStatus();
     }
-    this.#checkInFlight = true;
     const generation = ++this.#checkGeneration;
     this.#operation = "check";
     this.#setStatus({ phase: "checking", progress: null, message: null, errorCode: null });
     try {
-      const result = await this.#updater.checkForUpdates();
+      const result = await (this.#checkRequest ?? this.#issueCheck());
       if (this.#checkGeneration !== generation) return this.getStatus();
       this.#cancellationToken = result?.cancellationToken ?? null;
       if (result?.isUpdateAvailable) {
@@ -291,10 +300,9 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
           checkedAt: new Date().toISOString(),
         });
       }
-    } catch {
-      if (this.#checkGeneration === generation) this.#setError("check_failed");
+    } catch (error) {
+      if (this.#checkGeneration === generation) this.#setError("check_failed", describeCheckFailure(error));
     } finally {
-      this.#checkInFlight = false;
       // A late completion must not push out the schedule the timeout branch already set.
       if (this.#checkGeneration === generation) this.#scheduleCheck(this.#options.checkIntervalMs);
     }
@@ -377,6 +385,19 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     if (this.#status.phase !== "installing") this.#clearPhaseTimer();
   }
 
+  /**
+   * Issues the one outstanding request every caller shares. The handle is cleared when the call
+   * settles, so `#checkRequest` answers exactly the question the join above asks: is electron-updater
+   * still holding a promise that a fresh call would be answered by?
+   */
+  #issueCheck(): Promise<UpdateCheckOutcome | null> {
+    const request = this.#updater.checkForUpdates().finally(() => {
+      if (this.#checkRequest === request) this.#checkRequest = null;
+    });
+    this.#checkRequest = request;
+    return request;
+  }
+
   /** True while the download the service still believes in is the one events are reporting on. */
   #isDownloadLive(): boolean {
     return this.#activeDownload !== null && this.#activeDownload === this.#downloadGeneration;
@@ -435,7 +456,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
 
   #scheduleCheck(delayMs: number): void {
     if (this.#checkTimer) clearTimeout(this.#checkTimer);
-    this.#checkTimer = setTimeout(() => void this.checkForUpdates(), delayMs);
+    this.#checkTimer = setTimeout(() => void this.#check(false), delayMs);
     this.#checkTimer.unref?.();
   }
 
@@ -468,7 +489,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #failStalledPhase(): void {
     if (this.#status.phase === "checking") {
       this.#checkGeneration += 1;
-      this.#setError("check_failed");
+      this.#setError("check_failed", CHECK_STALLED_MESSAGE);
       // The pending call never settles, so its finally block will not run. Without rescheduling
       // here the app would silently stop checking for updates until it restarts.
       this.#scheduleCheck(this.#options.checkIntervalMs);
@@ -519,6 +540,58 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
 }
 
 const INSTALL_FAILED_MESSAGE = "Could not install the update. Quit and reopen OpenBot, then try again.";
+const CHECK_STALLED_MESSAGE = "The update check stopped responding. Try again.";
+const CHECK_OFFLINE_MESSAGE = "Could not reach the update service. Check your internet connection, then try again.";
+const CHECK_SERVICE_MESSAGE = "The update service did not answer. OpenBot tries again on its own in a few minutes.";
+const CHECK_NO_RELEASE_MESSAGE =
+  "No published update was found for this platform. OpenBot tries again on its own in a few minutes.";
+
+/**
+ * Node reports a link that never carried the request through `error.code`. electron-updater wraps
+ * its own failures with a code of its own and keeps the original stack in the message, so the raw
+ * text is searched as well: a wrapped `ENOTFOUND` is still a connectivity problem to the user, and
+ * telling them to check the network is the one instruction that helps.
+ */
+const OFFLINE_ERROR_CODES = [
+  "EAI_AGAIN",
+  "ECONNABORTED",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTUNREACH",
+  "ENETDOWN",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "EPIPE",
+  "ETIMEDOUT",
+  "ERR_INTERNET_DISCONNECTED",
+  "ERR_NAME_NOT_RESOLVED",
+];
+
+/** electron-updater codes that mean the feed answered but carried no release this build can use. */
+const NO_RELEASE_ERROR_CODES = [
+  "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND",
+  "ERR_UPDATER_NO_PUBLISHED_VERSIONS",
+  "ERR_UPDATER_INVALID_RELEASE_FEED",
+];
+
+/**
+ * What the user is told after a failed check. The three recoverable causes need different
+ * instructions - a dropped link is theirs to fix, a refusing or unpublished feed is not - and
+ * "Try again." on its own tells someone with no network to repeat the action that cannot work.
+ */
+function describeCheckFailure(error: unknown) {
+  const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+  const text = `${code} ${error instanceof Error ? error.message : String(error ?? "")}`;
+  if (OFFLINE_ERROR_CODES.some((candidate) => text.includes(candidate))) return CHECK_OFFLINE_MESSAGE;
+  if (NO_RELEASE_ERROR_CODES.includes(code)) return CHECK_NO_RELEASE_MESSAGE;
+  const status =
+    typeof error === "object" && error !== null && "statusCode" in error ? Number(error.statusCode) : Number.NaN;
+  if (status === 429 || status >= 500) return CHECK_SERVICE_MESSAGE;
+  // ERR_UPDATER_LATEST_VERSION_NOT_FOUND wraps whatever the release lookup threw, so it only lands
+  // here once the causes above have been ruled out of its message.
+  if (code === "ERR_UPDATER_LATEST_VERSION_NOT_FOUND") return CHECK_SERVICE_MESSAGE;
+  return errorMessage("check_failed");
+}
 
 function errorMessage(code: UpdateFailureCode) {
   if (code === "download_failed") return "Could not download the update. Try again.";

@@ -443,6 +443,99 @@ describe("UpdateService", () => {
     expect(service.getStatus().phase).toBe("up-to-date");
   });
 
+  it("joins an outstanding check when the user asks again, instead of leaving the failure on screen", async () => {
+    vi.useFakeTimers();
+    const updater = new FakeUpdater();
+    let settleStalledCheck: (() => void) | undefined;
+    updater.checkForUpdates.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          settleStalledCheck = () => resolve({ isUpdateAvailable: false, updateInfo: { version: "0.1.0" } });
+        }),
+    );
+    const service = createService(updater);
+    service.start(false);
+    void service.checkForUpdates();
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(CHECK_TIMEOUT);
+    expect(service.getStatus().errorCode).toBe("check_failed");
+
+    void service.checkForUpdates();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The press is answered with progress, and electron-updater is not asked a second question it
+    // would answer with the same outstanding promise.
+    expect(service.getStatus().phase).toBe("checking");
+    expect(updater.checkForUpdates).toHaveBeenCalledOnce();
+
+    settleStalledCheck?.();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(service.getStatus()).toMatchObject({ phase: "up-to-date", errorCode: null });
+  });
+
+  it("does not start a second check while one is already reported as running", async () => {
+    vi.useFakeTimers();
+    const updater = new FakeUpdater();
+    updater.checkForUpdates.mockImplementation(() => new Promise<never>(() => undefined));
+    const service = createService(updater);
+    service.start(false);
+    void service.checkForUpdates();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(service.getStatus().phase).toBe("checking");
+
+    void service.checkForUpdates();
+    void service.checkForUpdates();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(updater.checkForUpdates).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["a dropped link", Object.assign(new Error("request failed"), { code: "ENOTFOUND" }), /internet connection/iu],
+    [
+      "a wrapped dropped link",
+      Object.assign(new Error("Unable to find latest version on GitHub: Error: getaddrinfo EAI_AGAIN github.com"), {
+        code: "ERR_UPDATER_LATEST_VERSION_NOT_FOUND",
+      }),
+      /internet connection/iu,
+    ],
+    [
+      "a refusing service",
+      Object.assign(new Error("502 Bad Gateway"), { code: "HTTP_ERROR_502", statusCode: 502 }),
+      /did not answer/iu,
+    ],
+    [
+      "a release with no artifact for this platform",
+      Object.assign(new Error("Cannot find latest-mac.yml"), { code: "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND" }),
+      /no published update/iu,
+    ],
+  ])("explains %s rather than only asking for a retry", async (_label, failure, expected) => {
+    const updater = new FakeUpdater();
+    updater.checkForUpdates.mockRejectedValueOnce(failure);
+    const service = createService(updater);
+    service.start(false);
+
+    const status = await service.checkForUpdates();
+
+    expect(status).toMatchObject({ phase: "error", errorCode: "check_failed" });
+    expect(status.message).toMatch(expected);
+  });
+
+  it("says the check stopped responding when its deadline passes", async () => {
+    vi.useFakeTimers();
+    const updater = new FakeUpdater();
+    updater.checkForUpdates.mockImplementation(() => new Promise<never>(() => undefined));
+    const service = createService(updater);
+    service.start(false);
+    void service.checkForUpdates();
+    await vi.advanceTimersByTimeAsync(0);
+
+    await vi.advanceTimersByTimeAsync(CHECK_TIMEOUT);
+
+    expect(service.getStatus().message).toMatch(/stopped responding/iu);
+  });
+
   it("fails a check that never answers", async () => {
     vi.useFakeTimers();
     const updater = new FakeUpdater();
