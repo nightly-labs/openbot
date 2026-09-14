@@ -1214,13 +1214,24 @@ async function main(): Promise<void> {
       preset: "fill",
     });
     const narrowFillSnapshot = toolTextPayload(narrowFillEnvironment);
+    // The snapshot reports usable page space, excluding reserved scrollbar gutters.
+    const narrowFillViewport = await v2Contents.executeJavaScript(
+      "({ width: innerWidth, height: innerHeight, contentWidth: document.documentElement.getBoundingClientRect().width, contentHeight: document.documentElement.clientHeight })",
+      true,
+    );
     if (
       !narrowFillEnvironment.success ||
+      !isDynamicRecord(narrowFillViewport) ||
+      narrowFillViewport.width !== 220 ||
+      narrowFillViewport.height !== 560 ||
       !isDynamicRecord(narrowFillSnapshot?.viewport) ||
       narrowFillSnapshot.viewport.mode !== "fill" ||
-      narrowFillSnapshot.viewport.width !== 220
+      narrowFillSnapshot.viewport.width !== narrowFillViewport.contentWidth ||
+      narrowFillSnapshot.viewport.height !== narrowFillViewport.contentHeight
     ) {
-      throw new Error("V2 fill environment rejected a supported narrow panel.");
+      throw new Error(
+        `V2 fill environment rejected a supported narrow panel: ${JSON.stringify({ reported: narrowFillSnapshot?.viewport, measured: narrowFillViewport })}`,
+      );
     }
     await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
     const scaledFillEnvironment = await callBrowserTool(browser, "set_environment", {
@@ -1244,19 +1255,19 @@ async function main(): Promise<void> {
       reducedMotion: true,
     });
     const environmentSnapshot = toolTextPayload(environment);
-    if (
-      !environment.success ||
-      !isDynamicRecord(environmentSnapshot?.viewport) ||
-      environmentSnapshot.viewport.width !== 390
-    ) {
-      throw new Error(`V2 environment emulation failed: ${toolError(environment)}`);
-    }
-    const persistentEnvironment = await v2Contents?.executeJavaScript(
-      "({ width: innerWidth, dark: matchMedia('(prefers-color-scheme: dark)').matches, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches })",
+    const persistentEnvironment = await v2Contents.executeJavaScript(
+      "({ width: innerWidth, contentWidth: document.documentElement.getBoundingClientRect().width, dark: matchMedia('(prefers-color-scheme: dark)').matches, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches })",
       true,
     );
     if (
+      !environment.success ||
       !isDynamicRecord(persistentEnvironment) ||
+      !isDynamicRecord(environmentSnapshot?.viewport) ||
+      environmentSnapshot.viewport.width !== persistentEnvironment.contentWidth
+    ) {
+      throw new Error(`V2 environment emulation failed: ${toolError(environment)}`);
+    }
+    if (
       persistentEnvironment.width !== 390 ||
       persistentEnvironment.dark !== true ||
       persistentEnvironment.reduced !== true
