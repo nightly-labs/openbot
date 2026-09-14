@@ -22,7 +22,7 @@ SHA-256 and version only.
 
 ## One-time GitHub setup
 
-Create the `release` environment in `NorbertBodziony/openbot`, then add these environment secrets:
+Create the `release` environment in `nightly-labs/openbot`, then add these environment secrets:
 
 - `CSC_LINK` — a base64-encoded Developer ID Application `.p12` file.
 - `MAC_PROVISIONING_PROFILE` — the base64-encoded Developer ID provisioning profile for
@@ -171,7 +171,7 @@ The workflow:
 9. publishes one non-draft GitHub Release only after all three platform jobs pass.
 
 Users can verify a downloaded artifact with
-`gh attestation verify <file> --repo NorbertBodziony/openbot`.
+`gh attestation verify <file> --repo nightly-labs/openbot`.
 
 Installed OpenBot builds check for updates shortly after launch and every four minutes. New versions
 download automatically while **Automatically download updates** is on, which is the default and is

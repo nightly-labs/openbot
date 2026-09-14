@@ -1,6 +1,6 @@
 # OpenBot
 
-[![CI](https://github.com/NorbertBodziony/openbot/actions/workflows/ci.yml/badge.svg)](https://github.com/NorbertBodziony/openbot/actions/workflows/ci.yml)
+[![CI](https://github.com/nightly-labs/openbot/actions/workflows/ci.yml/badge.svg)](https://github.com/nightly-labs/openbot/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-PolyForm_Noncommercial_1.0.0-blue.svg)](LICENSE)
 
 OpenBot is a local-first desktop workspace for persistent AI teammates. It supports the local
@@ -41,17 +41,17 @@ Linux as an AppImage.
 
 ### macOS
 
-1. Download the latest `OpenBot-*.dmg` from [GitHub Releases](https://github.com/NorbertBodziony/openbot/releases).
+1. Download the latest `OpenBot-*.dmg` from [GitHub Releases](https://github.com/nightly-labs/openbot/releases).
 2. Drag OpenBot to Applications and open it.
 
 ### Windows
 
-1. Download the latest `OpenBot-*-x64.exe` from [GitHub Releases](https://github.com/NorbertBodziony/openbot/releases).
+1. Download the latest `OpenBot-*-x64.exe` from [GitHub Releases](https://github.com/nightly-labs/openbot/releases).
 2. Run the installer and open OpenBot.
 
 ### Linux
 
-1. Download the latest `OpenBot-*-x86_64.AppImage` from [GitHub Releases](https://github.com/NorbertBodziony/openbot/releases).
+1. Download the latest `OpenBot-*-x86_64.AppImage` from [GitHub Releases](https://github.com/nightly-labs/openbot/releases).
 2. Make it executable with `chmod +x OpenBot-*-x86_64.AppImage`, then run it.
 
 On Ubuntu 23.10 or newer and on Debian 13, unprivileged user namespaces are restricted by AppArmor
@@ -142,7 +142,7 @@ iex "& {$(irm https://bun.com/install.ps1)} -Version 1.4.0"
 ```
 
 ```bash
-git clone https://github.com/NorbertBodziony/openbot.git
+git clone https://github.com/nightly-labs/openbot.git
 cd openbot
 bun install --frozen-lockfile
 bun run codex:doctor

@@ -14,7 +14,7 @@ review.
 ## Development setup
 
 ```bash
-git clone https://github.com/NorbertBodziony/openbot.git
+git clone https://github.com/nightly-labs/openbot.git
 cd openbot
 bun install --frozen-lockfile
 bun run check

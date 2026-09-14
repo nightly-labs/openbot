@@ -110,7 +110,7 @@ async function releaseLockValue() {
     remoteDesktop: {
       ...structuredClone(lock.remoteDesktop),
       artifactRelease: {
-        repository: "NorbertBodziony/openbot",
+        repository: "nightly-labs/openbot",
         tag: createRemoteDesktopReleaseTag(digest),
         inputDigest: digest,
         manifestAsset: "remote-desktop-runtime-manifest.json" as const,

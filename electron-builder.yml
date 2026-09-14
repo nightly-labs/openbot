@@ -19,7 +19,7 @@ electronFuses:
   grantFileProtocolExtraPrivileges: false
 publish:
   provider: github
-  owner: NorbertBodziony
+  owner: nightly-labs
   repo: openbot
 files:
   - out/**/*
