@@ -449,7 +449,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
       if (removedServers.current.has(serverId)) return;
       if (event.type === "channels-changed") {
-        void channelStore.refresh(serverId);
+        void channelStore.refresh(serverId, event.channelId);
         void queryClient.invalidateQueries({
           queryKey: ["channel-info", session.apiUrl, session.user.id, sessionScope, serverId, event.channelId],
           refetchType: "none",

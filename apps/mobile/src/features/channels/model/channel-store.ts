@@ -18,6 +18,7 @@ import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { userErrorMessage } from "@openbot/user-errors";
+import { replaceEqualDeep } from "@tanstack/react-query";
 
 export type ChannelRequest = <T>(
   method: string,
@@ -49,6 +50,7 @@ interface Entry {
   observed: Map<string, number>;
   pending: Promise<void> | null;
   dirty: boolean;
+  readChannels: Set<string>;
   valid: boolean;
   writes: number;
 }
@@ -75,7 +77,16 @@ export class MobileChannelStore {
     if (!entry) {
       const listeners = this.listeners.get(serverId) ?? new Set<() => void>();
       this.listeners.set(serverId, listeners);
-      entry = { state: EMPTY, listeners, observed: new Map(), pending: null, dirty: false, valid: true, writes: 0 };
+      entry = {
+        state: EMPTY,
+        listeners,
+        observed: new Map(),
+        pending: null,
+        dirty: false,
+        readChannels: new Set(),
+        valid: true,
+        writes: 0,
+      };
       this.entries.set(serverId, entry);
     }
     return entry;
@@ -125,7 +136,7 @@ export class MobileChannelStore {
   observe(serverId: string, channelId: string) {
     const entry = this.entry(serverId);
     entry.observed.set(channelId, (entry.observed.get(channelId) ?? 0) + 1);
-    void this.refresh(serverId);
+    if (entry.observed.get(channelId) === 1) void this.refresh(serverId);
     return () => {
       const count = (entry.observed.get(channelId) ?? 1) - 1;
       if (count) entry.observed.set(channelId, count);
@@ -134,15 +145,22 @@ export class MobileChannelStore {
         // Match single chats: keep short windows for reopening while offline.
         if ((entry.state.pages.get(channelId)?.messages.length ?? 0) > 50) {
           const pages = new Map(entry.state.pages);
-          pages.delete(channelId);
+          const current = entry.state.pages.get(channelId);
+          if (current) {
+            const messages = current.messages.slice(-50);
+            pages.set(channelId, { ...current, messages, olderCursor: messages[0].sequence });
+          }
           this.publish(entry, { pages });
         }
       }
     };
   }
-  refresh(serverId: string): Promise<void> {
+  refresh(serverId: string, channelId?: string): Promise<void> {
     const entry = this.entry(serverId);
     if (!this.active || !entry.state.supported) return Promise.resolve();
+    for (const id of entry.observed.keys()) {
+      if (!channelId || channelId === id) entry.readChannels.add(id);
+    }
     if (entry.pending) {
       entry.dirty = true;
       return entry.pending;
@@ -150,22 +168,40 @@ export class MobileChannelStore {
     const run = async () => {
       do {
         entry.dirty = false;
-        this.publish(entry, { loading: true, error: null });
+        const readChannels = [...entry.readChannels];
+        entry.readChannels.clear();
+        this.publish(entry, {
+          loading: entry.state.channels.length === 0 && entry.state.pages.size === 0,
+          error: null,
+        });
         try {
           const writes = entry.writes;
-          const channels = await this.request("GET", CHANNEL_ROUTES.list, decodeChannelSummaries, undefined, serverId);
-          if (!entry.valid || !this.active) return;
-          if (writes !== entry.writes) {
-            entry.dirty = true;
-            continue;
-          }
-          this.onList?.(serverId, channels);
-          const ids = new Set(channels.map((channel) => channel.id));
-          const pages = new Map(entry.state.pages);
-          for (const id of pages.keys()) if (!ids.has(id)) pages.delete(id);
-          this.publish(entry, { channels, pages: pages.size === entry.state.pages.size ? entry.state.pages : pages });
-          for (const id of entry.observed.keys()) {
-            if (!ids.has(id)) continue;
+          let listedIds: Set<string> | undefined;
+          const list = async () => {
+            const channels = await this.request(
+              "GET",
+              CHANNEL_ROUTES.list,
+              decodeChannelSummaries,
+              undefined,
+              serverId,
+            );
+            if (!entry.valid || !this.active) return;
+            if (writes !== entry.writes) {
+              entry.dirty = true;
+              return;
+            }
+            const stableChannels = replaceEqualDeep(entry.state.channels, channels);
+            if (stableChannels !== entry.state.channels) this.onList?.(serverId, stableChannels);
+            const ids = new Set(channels.map((channel) => channel.id));
+            listedIds = ids;
+            const pages = new Map(entry.state.pages);
+            for (const id of pages.keys()) if (!ids.has(id)) pages.delete(id);
+            this.publish(entry, {
+              channels: stableChannels,
+              pages: pages.size === entry.state.pages.size ? entry.state.pages : pages,
+            });
+          };
+          const read = async (id: string) => {
             const page = await this.request(
               "POST",
               CHANNEL_ROUTES.read,
@@ -176,15 +212,20 @@ export class MobileChannelStore {
             if (!entry.valid || !this.active) return;
             if (writes !== entry.writes) {
               entry.dirty = true;
-              break;
+              return;
             }
-            if (!entry.observed.has(id)) continue;
+            if (!entry.observed.has(id) || (listedIds && !listedIds.has(id))) return;
             const current = entry.state.pages.get(id);
-            if (current && page.channel.revision < current.channel.revision) continue;
+            if (current && page.channel.revision < current.channel.revision) return;
+            const merged = mergeLatestChannelPage(current, page);
+            if (merged === current) return;
             const nextPages = new Map(entry.state.pages);
-            nextPages.set(id, mergeLatestChannelPage(current, page));
+            nextPages.set(id, merged);
             this.publish(entry, { pages: nextPages });
-          }
+          };
+          // Publish history as soon as it arrives; a slow sidebar request must not block opening a chat.
+          const results = await Promise.allSettled([list(), ...readChannels.map(read)]);
+          for (const result of results) if (result.status === "rejected") throw result.reason;
         } catch (error) {
           this.publish(entry, { error: userErrorMessage(error, "Could not load channels. Try again.") });
         } finally {
@@ -223,6 +264,8 @@ export class MobileChannelStore {
   async command(serverId: string, command: ChannelCommand, options?: { waitForRefresh: boolean }) {
     const entry = this.entry(serverId);
     if (!entry.state.supported) throw new Error("Update this desktop server to use channels.");
+    const unreadChannel =
+      command.type === "read" ? entry.state.channels.find((channel) => channel.id === command.channelId) : undefined;
     const result = await this.request(
       "POST",
       CHANNEL_ROUTES.command,
@@ -230,6 +273,18 @@ export class MobileChannelStore {
       decodeTeamProtocolV2Json(command),
       serverId,
     );
+    if (entry.valid && command.type === "read") {
+      // A read receipt changes unread state, not channel history or its revision.
+      const channels = entry.state.channels.map((channel) =>
+        channel === unreadChannel &&
+        channel.unreadCount !== 0 &&
+        command.throughSequence >= (entry.state.pages.get(channel.id)?.throughSequence ?? Infinity)
+          ? { ...channel, unreadCount: 0 }
+          : channel,
+      );
+      if (channels.some((channel, index) => channel !== entry.state.channels[index])) this.publish(entry, { channels });
+      return result;
+    }
     if (entry.valid) {
       entry.writes += 1;
       const previous = entry.state.channels.find((channel) => channel.id === result.id);
@@ -318,6 +373,9 @@ export function mergeLatestChannelPage(current: ChannelPage | undefined, page: C
   if (!current) return page;
   const first = page.messages[0]?.sequence ?? 0;
   const older = current.messages.filter((message) => message.sequence < first);
-  if (!older.length || (older.at(-1)?.sequence ?? 0) + 1 < first) return page;
-  return { ...page, messages: [...older, ...page.messages], olderCursor: current.olderCursor };
+  const merged =
+    !older.length || (older.at(-1)?.sequence ?? 0) + 1 < first
+      ? page
+      : { ...page, messages: [...older, ...page.messages], olderCursor: current.olderCursor };
+  return replaceEqualDeep(current, merged);
 }

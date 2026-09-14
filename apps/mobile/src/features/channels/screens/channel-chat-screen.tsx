@@ -20,7 +20,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   // only when this route unmounts; the workspace pauses network reads in the background.
   const state = useChannels(serverId, channelId);
   const page = state.pages.get(channelId);
-  const channel = state.channels.find((item) => item.id === channelId);
+  const channel = state.channels.find((item) => item.id === channelId) ?? page?.channel;
   const server = servers.find((item) => item.id === serverId);
   const online = server?.state === "online";
   const members = useMemo(

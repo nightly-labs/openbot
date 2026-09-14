@@ -13,7 +13,11 @@ import Animated, {
   useReducedMotion,
 } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
-import { BloubAvatar, BloubAvatarThumbnail, getBloubAvatarColor } from "@/features/agents/components/bloub-avatar";
+import {
+  BloubAvatarPreview,
+  BloubAvatarThumbnail,
+  getBloubAvatarColor,
+} from "@/features/agents/components/bloub-avatar";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
 import type { ChatMotion } from "@/features/chat/components/use-chat-motion";
@@ -220,7 +224,7 @@ export function ChatMessageList({
             return (
               <View key={id} className="flex-row items-center gap-1">
                 {participant ? (
-                  <BloubAvatar agentId={id} hue={participant.avatarHue} seed={participant.avatarSeed} size={22} />
+                  <BloubAvatarThumbnail hue={participant.avatarHue} seed={participant.avatarSeed} size={22} />
                 ) : null}
                 <Typography.Paragraph type="body-sm" style={{ color: muted }}>
                   {participant?.name ?? (message.kind === "assignment" ? message.agentName : "Unknown agent")}
@@ -385,11 +389,13 @@ export function ChatMessageList({
         accessibilityLabel={`${activityAgent?.name ?? target.name}: ${activityLabel}`}
       >
         {activityAgent ? (
-          <BloubAvatar
-            agentId={activityAgent.id}
+          <BloubAvatarPreview
             hue={activityAgent.avatarHue}
             seed={activityAgent.avatarSeed}
             size={36}
+            disconnected={!online}
+            working={animateMessages && Boolean(activity && activity.phase !== "waiting")}
+            animateIdle={animateMessages}
           />
         ) : null}
         <StreamRevealProvider>

@@ -134,7 +134,7 @@ describe("mobile channels", () => {
     const stop = store.observe("host-one", channel.id);
     const refresh = store.refresh("host-one");
     for (let index = 0; index < 40; index++) void store.refresh("host-one");
-    expect(calls).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveBeenCalledTimes(2);
     first.resolve([channel]);
     await refresh;
     expect(lists).toBe(2);
@@ -145,7 +145,7 @@ describe("mobile channels", () => {
     expect(calls.mock.calls.map(([path]) => path)).toEqual([CHANNEL_ROUTES.list]);
     expect(store.get("host-one").pages.get(channel.id)?.messages).toHaveLength(2);
   });
-  it("retains a short history while offline and releases larger windows on exit", async () => {
+  it("retains the latest history window while offline and trims older messages on exit", async () => {
     const { store, calls } = fixture(async (path) => (path === CHANNEL_ROUTES.list ? [channel] : page(1, 50)));
     const close = store.observe("host-one", channel.id);
     await store.refresh("host-one");
@@ -163,7 +163,104 @@ describe("mobile channels", () => {
     const closeLarge = large.store.observe("host-one", channel.id);
     await large.store.refresh("host-one");
     closeLarge();
-    expect(large.store.get("host-one").pages.size).toBe(0);
+    expect(large.store.get("host-one").pages.get(channel.id)?.messages).toHaveLength(50);
+    expect(large.store.get("host-one").pages.get(channel.id)?.olderCursor).toBe(2);
+    large.store.setActive(false);
+    const reopen = large.store.observe("host-one", channel.id);
+    expect(large.store.get("host-one").pages.get(channel.id)?.messages.at(-1)?.sequence).toBe(51);
+    reopen();
+  });
+  it("publishes history before the sidebar list completes and shares reads with a sheet", async () => {
+    const list = deferred<unknown>();
+    const { store, calls } = fixture(async (path) => (path === CHANNEL_ROUTES.list ? list.promise : page(1, 2)));
+    const closeChat = store.observe("host-one", channel.id);
+    const closeSheet = store.observe("host-one", channel.id);
+    await vi.waitFor(() => expect(store.get("host-one").pages.get(channel.id)?.messages).toHaveLength(2));
+    expect(store.get("host-one").channels).toEqual([]);
+    closeSheet();
+    list.resolve([channel]);
+    await vi.waitFor(() => expect(store.get("host-one").loading).toBe(false));
+    expect(calls.mock.calls.map(([path]) => path)).toEqual([CHANNEL_ROUTES.list, CHANNEL_ROUTES.read]);
+    closeChat();
+  });
+  it("does not restore a deleted channel from a late history response", async () => {
+    const history = deferred<unknown>();
+    const { store } = fixture(async (path) => (path === CHANNEL_ROUTES.list ? [] : history.promise));
+    const close = store.observe("host-one", channel.id);
+    const done = store.refresh("host-one");
+    history.resolve(page(1, 2));
+    await done;
+    expect(store.get("host-one").pages.size).toBe(0);
+    close();
+  });
+  it("does not reload the open chat for an event in another channel", async () => {
+    const { store, calls } = fixture(async (path) => (path === CHANNEL_ROUTES.list ? [channel] : page(1, 2)));
+    const close = store.observe("host-one", channel.id);
+    await store.refresh("host-one");
+    calls.mockClear();
+    await store.refresh("host-one", "another-channel");
+    expect(calls.mock.calls.map(([path]) => path)).toEqual([CHANNEL_ROUTES.list]);
+    close();
+  });
+  it("does not notify subscribers or replace history when a refresh has no changes", async () => {
+    const { store } = fixture(async (path) => (path === CHANNEL_ROUTES.list ? [channel] : page(1, 2)));
+    const close = store.observe("host-one", channel.id);
+    await store.refresh("host-one");
+    const current = store.get("host-one");
+    const listener = vi.fn();
+    const unsubscribe = store.subscribe("host-one", listener);
+    await store.refresh("host-one");
+    expect(store.get("host-one")).toBe(current);
+    expect(listener).not.toHaveBeenCalled();
+    unsubscribe();
+    close();
+  });
+  it("acknowledges read messages without an extra history refresh", async () => {
+    const { store, calls } = fixture(async (path) =>
+      path === CHANNEL_ROUTES.list ? [channel] : path === CHANNEL_ROUTES.command ? channel : page(1, 2),
+    );
+    const close = store.observe("host-one", channel.id);
+    await store.refresh("host-one");
+    const current = store.get("host-one").pages.get(channel.id);
+    calls.mockClear();
+    await store.command("host-one", { type: "read", operationId: "read", channelId: channel.id, throughSequence: 2 });
+    expect(calls.mock.calls.map(([path]) => path)).toEqual([CHANNEL_ROUTES.command]);
+    expect(store.get("host-one").channels[0]?.unreadCount).toBe(0);
+    expect(store.get("host-one").pages.get(channel.id)).toBe(current);
+    close();
+  });
+  it("does not clear a newer unread message when an earlier read receipt completes", async () => {
+    const receipt = deferred<unknown>();
+    let latest = page(1, 2);
+    const { store } = fixture(async (path) =>
+      path === CHANNEL_ROUTES.list ? [channel] : path === CHANNEL_ROUTES.command ? receipt.promise : latest,
+    );
+    const close = store.observe("host-one", channel.id);
+    await store.refresh("host-one");
+    const read = store.command("host-one", {
+      type: "read",
+      operationId: "read",
+      channelId: channel.id,
+      throughSequence: 2,
+    });
+    latest = page(1, 3);
+    await store.refresh("host-one");
+    receipt.resolve(channel);
+    await read;
+    expect(store.get("host-one").channels[0]?.unreadCount).toBe(1);
+    close();
+  });
+  it("keeps unchanged bubbles during streaming and projects authors for the current member", () => {
+    const current = page(1, 2);
+    const update = page(1, 2);
+    update.messages[1].message.text = "Updated";
+    const merged = mergeLatestChannelPage(current, update);
+    expect(merged.messages[0]).toBe(current.messages[0]);
+    const before = projectChannelMessages(current.messages, "user-one");
+    const after = projectChannelMessages(merged.messages, "user-one");
+    expect(after[0]).toBe(before[0]);
+    expect(after[1]).toMatchObject({ kind: "message", body: "Updated", author: "user" });
+    expect(projectChannelMessages(merged.messages, "other-user")[0]).toMatchObject({ author: "agent" });
   });
   it("does not request channels from unsupported hosts or while in the background", async () => {
     const { store, calls } = fixture(async () => []);
