@@ -110,6 +110,7 @@
     "dev:seed": "tsx scripts/seed-dev-state.ts",
     "dev:automation": "bun scripts/dev-automation/cli.ts",
     "dev:status": "bun scripts/dev-stack.ts status",
+    "dev:verify": "bun scripts/dev-verify.ts",
     "dev:stop": "bun scripts/dev-stack.ts stop",
     "dev:forget": "bun scripts/dev-stack.ts forget",
     "dev:reset": "tsx scripts/reset-dev-state.ts",
