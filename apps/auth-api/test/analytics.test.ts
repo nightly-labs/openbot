@@ -432,6 +432,29 @@ describe("landing analytics", () => {
     ]);
   });
 
+  it("holds an early event for the page that starts next, not the one that just left", () => {
+    const article = NEWS_COLLECTION.articles[0];
+    if (!article) throw new Error("The news registry must publish at least one article");
+    document.body.innerHTML = "";
+    window.history.replaceState({}, "", `/news/${article.slug}`);
+    const client = { setGlobalProperties: vi.fn(), track: vi.fn(), trackScreenView: vi.fn() };
+    const analytics = new LandingAnalytics(() => client, true);
+
+    // The visitor reads an article, then follows the header link home. The client outlives that
+    // navigation and still holds the article path, so the hero's detection must not be sent under it.
+    analytics.start(document, "openbot.run", `/news/${article.slug}`)();
+    analytics.trackDownloadSelected("windows", true);
+    expect(client.track.mock.calls.filter(([name]) => name === "landing_download_selected")).toEqual([]);
+
+    window.history.replaceState({}, "", "/");
+    const cleanup = analytics.start(document, "openbot.run");
+    cleanup();
+
+    expect(client.track.mock.calls.filter(([name]) => name === "landing_download_selected")).toEqual([
+      ["landing_download_selected", { platform: "windows", detected: true }, "/"],
+    ]);
+  });
+
   it("does not let initialization failures escape", () => {
     const analytics = new LandingAnalytics(() => {
       throw new Error("unavailable");

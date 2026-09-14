@@ -1,12 +1,14 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import type { JSX } from "@solidjs/web";
 import { createRootRoute, createRoute, createRouter, isNotFound, RouterContextProvider } from "@tanstack/solid-router";
+import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArticleGradient } from "../src/components/content/ArticleGradient";
 import { ArticleClip, ArticleGif } from "../src/components/content/ArticleMedia";
 import { ArticlePage } from "../src/components/content/ArticlePage";
 import { CollectionIndexPage } from "../src/components/content/CollectionIndexPage";
 import { LandingPage } from "../src/components/landing/LandingPage";
+import { landingAnalytics } from "../src/lib/analytics";
 import { articleGradient } from "../src/lib/article-gradient";
 import { CONTENT_COLLECTIONS } from "../src/lib/content";
 import {
@@ -124,6 +126,32 @@ describe.each(CONTENT_COLLECTIONS.map((collection) => [collection.name, collecti
         expect(body.getAllByRole("heading", { level: 2 }).length).toBeGreaterThan(0);
 
         cleanup();
+      }
+    });
+
+    // A related-article link stays on this route and only changes the parameter, so the page is
+    // reused rather than mounted again. Reporting has to follow the article, not the mount.
+    it("reports the article it is showing after a related link is followed", () => {
+      const [first, second] = collection.articles;
+      if (!first || !second) return;
+      const start = vi.spyOn(landingAnalytics, "start").mockReturnValue(() => undefined);
+      const read = vi.spyOn(landingAnalytics, "trackArticleRead").mockReturnValue(undefined);
+      const [article, setArticle] = createSignal(first);
+      try {
+        renderPage(() => <ArticlePage collection={collection} article={article()} />);
+        setArticle(second);
+        flush();
+
+        expect(start.mock.calls.map((call) => call[2])).toEqual([
+          articlePath(collection, first.slug),
+          articlePath(collection, second.slug),
+        ]);
+        // The depths already reached for the first article must not suppress the second's, and the
+        // depth must be reported against the article actually on screen.
+        expect(read.mock.calls.map(([reference]) => reference.slug)).toContain(second.slug);
+      } finally {
+        start.mockRestore();
+        read.mockRestore();
       }
     });
 

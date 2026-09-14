@@ -169,8 +169,10 @@ const EVENT_PROPERTY_ALLOWLIST = {
 
 /**
  * The hero selector runs its platform detection before the page component starts analytics, so an
- * event can arrive first. A small queue keeps that first event instead of dropping it; outside
- * production no client is ever created, so the bound is what stops it growing.
+ * event can arrive first. A small queue keeps that first event instead of dropping it. The wait is
+ * for the current page to start, not merely for a client to exist: a visitor who opens an article
+ * and then navigates home still has a client, and it holds the article's path and attribution.
+ * Nothing flushes until no page has started, so the bound is what stops the queue growing.
  */
 const PENDING_EVENT_LIMIT = 4;
 
@@ -184,6 +186,7 @@ export class LandingAnalytics {
   #client: OpenPanelClient | null = null;
   #lastScreenPath: LandingScreenPath | null = null;
   #campaignPath = "/";
+  #pageStarted = false;
   readonly #pending: { name: LandingEventName; properties: TrackProperties }[] = [];
   readonly #clickCleanup = new WeakMap<Document, (replacement: boolean) => void>();
 
@@ -205,6 +208,7 @@ export class LandingAnalytics {
     this.#client?.setGlobalProperties({
       ...landingAttribution(document, hostname),
     });
+    this.#pageStarted = true;
     this.#flushPending();
     this.#screenView(screen);
     this.#track("landing_viewed", {});
@@ -233,6 +237,7 @@ export class LandingAnalytics {
     this.#client?.setGlobalProperties({
       ...landingAttribution(document, hostname),
     });
+    this.#pageStarted = true;
     this.#flushPending();
     this.#screenView("/join");
     this.#track("join_page_action", { action: "view", valid_invite: options.validInvite });
@@ -267,7 +272,11 @@ export class LandingAnalytics {
       cleaned = true;
       document.removeEventListener("click", listener);
       if (this.#clickCleanup.get(document) === cleanup) this.#clickCleanup.delete(document);
-      if (!replacement && this.#lastScreenPath === screenPath) this.#lastScreenPath = null;
+      if (replacement) return;
+      // The page this listener belonged to is gone. Its path must not be reused by an event that
+      // the next page's components send before that page calls `start`.
+      this.#pageStarted = false;
+      if (this.#lastScreenPath === screenPath) this.#lastScreenPath = null;
     };
     this.#clickCleanup.set(document, cleanup);
     return () => cleanup(false);
@@ -347,7 +356,7 @@ export class LandingAnalytics {
   }
 
   #send(name: LandingEventName, properties: TrackProperties): void {
-    if (!this.#client) {
+    if (!this.#client || !this.#pageStarted) {
       if (this.#pending.length < PENDING_EVENT_LIMIT) this.#pending.push({ name, properties });
       return;
     }

@@ -1,20 +1,25 @@
-import { onSettled } from "solid-js";
-import type { ArticleReadDepth } from "../../lib/analytics";
+import { createTrackedEffect } from "solid-js";
+import type { ArticleReadDepth, ArticleReference } from "../../lib/analytics";
 
 /**
- * Reports how far a reader got into an article body, once per depth. `start` is the body coming
- * into view, `half` its midpoint passing the foot of the viewport, and `end` its last line.
+ * Reports how far a reader got into an article body, once per depth per article.
  *
  * An IntersectionObserver answers "is it visible", not "how much of it has been read", and a body
  * that is taller than the viewport never reaches a high ratio at all. The position is read from the
  * element instead, on scroll and resize, coalesced into one animation frame. Nothing here is timed:
  * a reader who never scrolls reports only the depths that were on screen from the start.
+ *
+ * `getArticle` is read as a tracked dependency. A link to a related article keeps this component
+ * mounted and only changes the route parameter, so without that read the depths already reported
+ * for the previous article would stay suppressed for the new one.
  */
 export function createArticleReadDepth(
   getElement: () => Element | undefined,
-  report: (depth: ArticleReadDepth) => void,
+  getArticle: () => ArticleReference,
+  report: (article: ArticleReference, depth: ArticleReadDepth) => void,
 ): void {
-  onSettled(() => {
+  createTrackedEffect(() => {
+    const article = getArticle();
     const element = getElement();
     if (!element) return;
 
@@ -22,7 +27,7 @@ export function createArticleReadDepth(
     const reach = (depth: ArticleReadDepth) => {
       if (reported.has(depth)) return;
       reported.add(depth);
-      report(depth);
+      report(article, depth);
     };
 
     let frame = 0;
