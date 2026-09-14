@@ -94,17 +94,33 @@ Work through all seven. A gate no path triggered is reported as **not triggered*
 silently, because "I did not look" and "I looked and it was clean" are different verdicts and only
 one of them is a release gate.
 
-Load a gate's reference when its trigger fires, not before:
+Load a gate's reference when its trigger fires, not before. The trigger sets are complete here, so
+a gate can be selected without opening anything:
 
-| Gate | Triggered by | Reference |
-| --- | --- | --- |
-| A. SQLite schema | `src/backend/openbot-database-schema.ts`, `src/backend/database/` | [gate-a-sqlite.md](references/gate-a-sqlite.md) |
-| B. On-disk state outside SQLite | any decoder of a versioned file, and `src/renderer/**` for `localStorage` | [gate-b-on-disk-state.md](references/gate-b-on-disk-state.md) |
-| C. Team API wire | `packages/contracts/src/team-protocol/`, `docs/RELEASING.md` | [gate-c-team-api.md](references/gate-c-team-api.md) |
-| D. IPC channels | `packages/contracts/src/ipc-channels.ts` and its mirrors | [gate-d-ipc.md](references/gate-d-ipc.md) |
-| E. Account Worker | `apps/auth-api/` | [gate-e-account-worker.md](references/gate-e-account-worker.md) |
-| F. The updater itself | `electron-builder.yml`, `src/main/update-service.ts`, `package.json` | [gate-f-updater.md](references/gate-f-updater.md) |
-| G. Reverse states and the changelog | always triggered | [gate-g-reverse-states.md](references/gate-g-reverse-states.md) |
+- **A. SQLite schema** → [gate-a-sqlite.md](references/gate-a-sqlite.md)
+  `src/backend/openbot-database-schema.ts`, `src/backend/database/`.
+- **B. On-disk state outside SQLite** → [gate-b-on-disk-state.md](references/gate-b-on-disk-state.md)
+  `src/main/index.ts`, `src/backend/workspace-paths.ts`, `src/main/sunshine-moonlight-runtime.ts`,
+  `electron-builder.yml`, **any file that decodes a versioned payload** (the reference derives that
+  set with `git grep`; do not trust a hand-written list), and `src/renderer/**` for `localStorage`.
+- **C. Team API wire** → [gate-c-team-api.md](references/gate-c-team-api.md)
+  anything under `packages/contracts/src/team-protocol/`, plus `docs/RELEASING.md`, which this
+  audit defers its compatibility matrix to.
+- **D. IPC channels** → [gate-d-ipc.md](references/gate-d-ipc.md)
+  `packages/contracts/src/ipc-channels.ts` **or any of its mirrors** — `src/main/index.ts`,
+  `src/main/ipc/`, `src/preload/index.ts`, `src/renderer/src/preview/mock-openbot.ts`. Deleting a
+  handler or an `invoke` breaks a live channel without touching the list at all.
+- **E. Account Worker** → [gate-e-account-worker.md](references/gate-e-account-worker.md)
+  any change under `apps/auth-api/migrations/`, any non-UI file under `apps/auth-api/src/`, and the
+  four files that decide deploy order: `.github/workflows/ci.yml`, `scripts/deploy-auth-api.ts`,
+  `apps/auth-api/package.json`, `apps/auth-api/wrangler.jsonc`.
+- **F. The updater itself** → [gate-f-updater.md](references/gate-f-updater.md)
+  `electron-builder.yml`, `src/main/update-service.ts`, `package.json` (including its dependencies),
+  and the two files that enforce the gate at release time: `scripts/verify-update-artifacts.ts` and
+  `.github/workflows/release.yml`. Weakening a size limit or a manifest check lives only in those
+  two, so omitting them makes the weakening read as "not triggered".
+- **G. Reverse states and the changelog** → [gate-g-reverse-states.md](references/gate-g-reverse-states.md)
+  always triggered; no path exempts a release.
 
 `references/surfaces.md` holds the exhaustive path inventory. Load it when a gate fires and you
 need the exact file, not before.
