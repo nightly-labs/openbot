@@ -57,31 +57,117 @@ export function surfacesForFiles(files: string[]): VerificationSurface[] {
   return [...surfaces].sort();
 }
 
+const authApiClientTests = new Set([
+  "apps/auth-api/test/analytics.test.ts",
+  "apps/auth-api/test/content.test.tsx",
+  "apps/auth-api/test/hero-download-selector.test.tsx",
+  "apps/auth-api/test/join-page.test.tsx",
+  "apps/auth-api/test/landing-app-preview.test.tsx",
+  "apps/auth-api/test/landing-glow.test.tsx",
+  "apps/auth-api/test/landing-reveal.test.tsx",
+  "apps/auth-api/test/page-error.test.tsx",
+]);
+
+function isTestFile(file: string): boolean {
+  return /\.(test|dom\.test)\.tsx?$/u.test(file);
+}
+
 function isDesktopTest(file: string): boolean {
-  return /\.(test|dom\.test)\.tsx?$/u.test(file) && !file.startsWith("apps/mobile/");
+  if (!isTestFile(file)) return false;
+  return [
+    "src/backend/",
+    "src/main/",
+    "src/preload/",
+    "src/renderer/",
+    "scripts/",
+    "packages/contracts/",
+    "packages/i18n/",
+    "packages/logging/",
+    "packages/user-errors/",
+    "packages/team-client/",
+    "apps/mobile/src/",
+  ].some((prefix) => file.startsWith(prefix));
+}
+
+function isDelegatedTest(file: string): boolean {
+  return (
+    (file.startsWith("apps/auth-api/test/") ||
+      file.startsWith("apps/site-router/test/") ||
+      file.startsWith("remote/api/test/")) &&
+    isTestFile(file)
+  );
+}
+
+function isSupportedTest(file: string): boolean {
+  return isDesktopTest(file) || isDelegatedTest(file);
 }
 
 export function suggestedTestsForFiles(files: string[], projectRoot = process.cwd()): string[] {
-  const tests = new Set(files.filter(isDesktopTest));
+  const tests = new Set(files.filter((file) => isSupportedTest(file) && existsSync(resolve(projectRoot, file))));
   for (const file of files) {
-    if (isDesktopTest(file)) continue;
+    if (isTestFile(file)) continue;
     const extension = extname(file);
     if (extension !== ".ts" && extension !== ".tsx") continue;
     const stem = file.slice(0, -extension.length);
     for (const suffix of [`.test${extension}`, `.dom.test${extension}`]) {
       const candidate = `${stem}${suffix}`;
-      if (existsSync(resolve(projectRoot, candidate))) tests.add(candidate);
+      if (isSupportedTest(candidate) && existsSync(resolve(projectRoot, candidate))) tests.add(candidate);
     }
   }
   return [...tests].sort();
 }
 
-function surfaceCommands(surfaces: VerificationSurface[]): string[] {
+function testCommands(tests: string[]): string[] {
+  const desktop = tests.filter(isDesktopTest);
+  const authServer = tests.filter((file) => file.startsWith("apps/auth-api/test/") && !authApiClientTests.has(file));
+  const authClient = tests.filter((file) => authApiClientTests.has(file));
+  const sites = tests.filter((file) => file.startsWith("apps/site-router/test/"));
+  const remote = tests.filter((file) => file.startsWith("remote/api/test/"));
   const commands: string[] = [];
-  if (surfaces.includes("mobile")) commands.push("bun run typecheck:mobile");
-  if (surfaces.includes("api")) commands.push("bun run check:api");
-  if (surfaces.includes("remote")) commands.push("bun run test:remote", "bun run typecheck:remote");
-  if (surfaces.includes("contracts")) commands.push("bun run typecheck:contracts");
+  if (desktop.length > 0) commands.push(`bun run test:desktop -- ${desktop.join(" ")}`);
+  if (authServer.length > 0) {
+    commands.push(
+      `bun run --cwd apps/auth-api test:server -- ${authServer.map((file) => file.slice("apps/auth-api/".length)).join(" ")}`,
+    );
+  }
+  if (authClient.length > 0) {
+    commands.push(
+      `bun run --cwd apps/auth-api test:client -- ${authClient.map((file) => file.slice("apps/auth-api/".length)).join(" ")}`,
+    );
+  }
+  if (sites.length > 0) {
+    commands.push(
+      `bun run --cwd apps/site-router test -- ${sites.map((file) => file.slice("apps/site-router/".length)).join(" ")}`,
+    );
+  }
+  if (remote.length > 0) {
+    commands.push(
+      `bun run --cwd remote/api test -- ${remote.map((file) => file.slice("remote/api/".length)).join(" ")}`,
+    );
+  }
+  return commands;
+}
+
+function workspaceTestCommands(files: string[], suggestedTests: string[]): string[] {
+  const commands: string[] = [];
+  if (
+    files.some((file) => file.startsWith("apps/auth-api/")) &&
+    !suggestedTests.some((file) => file.startsWith("apps/auth-api/"))
+  ) {
+    commands.push("bun run test:api");
+  }
+  if (
+    files.some((file) => file.startsWith("apps/site-router/")) &&
+    !suggestedTests.some((file) => file.startsWith("apps/site-router/"))
+  ) {
+    commands.push("bun run test:sites");
+  }
+  if (
+    files.some((file) => file.startsWith("remote/api/")) &&
+    !suggestedTests.some((file) => file.startsWith("remote/api/"))
+  ) {
+    commands.push("bun run test:remote");
+  }
   return commands;
 }
 
@@ -98,16 +184,16 @@ export function verificationCommands(
   if (!setupReady) commands.push("bun run dev:prepare");
 
   const suggestedTests = suggestedTestsForFiles(files, projectRoot);
-  if (suggestedTests.length > 0) {
-    const testCommand = `bun run test:desktop -- ${suggestedTests.join(" ")}`;
+  for (const testCommand of testCommands(suggestedTests)) {
     commands.push(testCommand);
     runnableCommands.push(testCommand);
   }
 
-  for (const command of ["bun run lint", "bun run typecheck", ...surfaceCommands(surfaces)]) {
+  for (const command of ["bun run lint", "bun run typecheck", ...workspaceTestCommands(files, suggestedTests)]) {
     if (!commands.includes(command)) commands.push(command);
     if (!runnableCommands.includes(command)) runnableCommands.push(command);
   }
+  if (surfaces.includes("api")) commands.push("bun run check:api");
   if (surfaces.includes("renderer")) {
     commands.push("bun run check:ui");
     runnableCommands.push("bun run check:ui");
@@ -217,18 +303,61 @@ function runBun(projectRoot: string, args: string[]): void {
 }
 
 function runRecommendedChecks(report: DevVerificationReport, projectRoot: string): void {
-  if (report.changes.suggestedTests.length > 0) {
-    runBun(projectRoot, ["run", "test:desktop", "--", ...report.changes.suggestedTests]);
+  const suggestedTests = report.changes.suggestedTests;
+  const desktop = suggestedTests.filter(isDesktopTest);
+  if (desktop.length > 0) runBun(projectRoot, ["run", "test:desktop", "--", ...desktop]);
+  const authServer = suggestedTests.filter(
+    (file) => file.startsWith("apps/auth-api/test/") && !authApiClientTests.has(file),
+  );
+  if (authServer.length > 0) {
+    runBun(projectRoot, [
+      "run",
+      "--cwd",
+      "apps/auth-api",
+      "test:server",
+      "--",
+      ...authServer.map((file) => file.slice("apps/auth-api/".length)),
+    ]);
+  }
+  const authClient = suggestedTests.filter((file) => authApiClientTests.has(file));
+  if (authClient.length > 0) {
+    runBun(projectRoot, [
+      "run",
+      "--cwd",
+      "apps/auth-api",
+      "test:client",
+      "--",
+      ...authClient.map((file) => file.slice("apps/auth-api/".length)),
+    ]);
+  }
+  const sites = suggestedTests.filter((file) => file.startsWith("apps/site-router/test/"));
+  if (sites.length > 0) {
+    runBun(projectRoot, [
+      "run",
+      "--cwd",
+      "apps/site-router",
+      "test",
+      "--",
+      ...sites.map((file) => file.slice("apps/site-router/".length)),
+    ]);
+  }
+  const remote = suggestedTests.filter((file) => file.startsWith("remote/api/test/"));
+  if (remote.length > 0) {
+    runBun(projectRoot, [
+      "run",
+      "--cwd",
+      "remote/api",
+      "test",
+      "--",
+      ...remote.map((file) => file.slice("remote/api/".length)),
+    ]);
   }
   runBun(projectRoot, ["run", "lint"]);
   runBun(projectRoot, ["run", "typecheck"]);
-  if (report.changes.surfaces.includes("mobile")) runBun(projectRoot, ["run", "typecheck:mobile"]);
-  if (report.changes.surfaces.includes("api")) runBun(projectRoot, ["run", "check:api"]);
-  if (report.changes.surfaces.includes("remote")) {
-    runBun(projectRoot, ["run", "test:remote"]);
-    runBun(projectRoot, ["run", "typecheck:remote"]);
+  for (const command of workspaceTestCommands(report.changes.files, suggestedTests)) {
+    const [, , script] = command.split(" ");
+    if (script) runBun(projectRoot, ["run", script]);
   }
-  if (report.changes.surfaces.includes("contracts")) runBun(projectRoot, ["run", "typecheck:contracts"]);
   if (report.changes.surfaces.includes("renderer")) runBun(projectRoot, ["run", "check:ui"]);
 }
 

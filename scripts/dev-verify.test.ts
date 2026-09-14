@@ -20,7 +20,10 @@ describe("dev verification planning", () => {
   });
 
   it("builds the narrow renderer verification loop", () => {
-    expect(verificationCommands(["src/renderer/src/App.test.tsx"], ["renderer"], true, false)).toEqual({
+    const root = mkdtempSync(join(tmpdir(), "openbot-dev-verify-"));
+    mkdirSync(join(root, "src/renderer/src"), { recursive: true });
+    writeFileSync(join(root, "src/renderer/src/App.test.tsx"), "export {};\n");
+    expect(verificationCommands(["src/renderer/src/App.test.tsx"], ["renderer"], true, false, root)).toEqual({
       commands: [
         "bun run test:desktop -- src/renderer/src/App.test.tsx",
         "bun run lint",
@@ -49,16 +52,60 @@ describe("dev verification planning", () => {
     expect(suggestedTestsForFiles(["src/main/example.ts"], root)).toEqual(["src/main/example.test.ts"]);
   });
 
-  it("adds checks for changed non-desktop surfaces", () => {
-    expect(verificationCommands([], ["api", "contracts", "mobile", "remote"], true, true).runnableCommands).toEqual([
+  it("routes delegated tests to their workspace runners", () => {
+    const root = mkdtempSync(join(tmpdir(), "openbot-dev-verify-"));
+    const files = [
+      "apps/auth-api/test/auth-service.test.ts",
+      "apps/auth-api/test/content.test.tsx",
+      "apps/site-router/test/router.test.ts",
+      "remote/api/test/tokens.test.ts",
+    ];
+    for (const file of files) {
+      mkdirSync(join(root, file, ".."), { recursive: true });
+      writeFileSync(join(root, file), "export {};\n");
+    }
+
+    expect(verificationCommands(files, ["api", "remote"], true, true, root).runnableCommands).toEqual([
+      "bun run --cwd apps/auth-api test:server -- test/auth-service.test.ts",
+      "bun run --cwd apps/auth-api test:client -- test/content.test.tsx",
+      "bun run --cwd apps/site-router test -- test/router.test.ts",
+      "bun run --cwd remote/api test -- test/tokens.test.ts",
       "bun run lint",
       "bun run typecheck",
-      "bun run typecheck:mobile",
-      "bun run check:api",
-      "bun run test:remote",
-      "bun run typecheck:remote",
-      "bun run typecheck:contracts",
     ]);
+  });
+
+  it("does not suggest a deleted test", () => {
+    const root = mkdtempSync(join(tmpdir(), "openbot-dev-verify-"));
+    expect(suggestedTestsForFiles(["src/main/deleted.test.ts"], root)).toEqual([]);
+  });
+
+  it("keeps API builds out of safe execution and avoids repeated typechecks", () => {
+    const root = mkdtempSync(join(tmpdir(), "openbot-dev-verify-"));
+    const plan = verificationCommands(
+      [
+        "apps/auth-api/src/index.ts",
+        "apps/site-router/src/index.ts",
+        "remote/api/src/index.ts",
+        "apps/mobile/app/index.tsx",
+      ],
+      ["api", "contracts", "mobile", "remote"],
+      true,
+      true,
+      root,
+    );
+    expect(plan.runnableCommands).toEqual([
+      "bun run lint",
+      "bun run typecheck",
+      "bun run test:api",
+      "bun run test:sites",
+      "bun run test:remote",
+    ]);
+    expect(plan.commands).toContain("bun run check:api");
+    expect(plan.runnableCommands).not.toContain("bun run check:api");
+    expect(plan.runnableCommands).not.toContain("bun run typecheck:mobile");
+    expect(plan.runnableCommands).not.toContain("bun run typecheck:remote");
+    expect(plan.runnableCommands).not.toContain("bun run typecheck:contracts");
   });
 
   it("reports renderer QA blockers before automation starts", () => {
