@@ -367,7 +367,9 @@ export class BrowserHost {
   async loadUrl(tabId: string, url: string): Promise<void> {
     const normalizedUrl = normalizeBrowserUrl(url);
     await this.#enqueue(tabId, async (tab) => {
-      await tab.view.webContents.loadURL(normalizedUrl, browserLoadOptions());
+      await navigateAndWait(tab.view.webContents, () =>
+        tab.view.webContents.loadURL(normalizedUrl, browserLoadOptions()),
+      );
       this.#focusTab(tab);
     });
   }

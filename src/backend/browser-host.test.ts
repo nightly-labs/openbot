@@ -31,6 +31,9 @@ vi.mock("electron", async () => {
       this.emit("did-start-navigation", {}, this.url, false, true);
       this.emit("did-stop-loading");
     }
+    stop() {
+      this.emit("did-stop-loading");
+    }
     close() {}
     setAudioMuted() {}
     invalidate() {}
@@ -106,6 +109,7 @@ afterEach(async () => {
   await host.destroy();
   await rm(directory, { recursive: true, force: true });
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe.each(["main", "picture-in-picture"] as const)("%s browser view bounds", (target) => {
@@ -129,6 +133,39 @@ describe.each(["main", "picture-in-picture"] as const)("%s browser view bounds",
 });
 
 describe("browser address navigation", () => {
+  it("releases the tab queue after an address navigation times out", async () => {
+    const tab = await host.open("https://example.com/timeout-test");
+    const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL() === tab.url);
+    if (!contents) throw new Error("Browser contents were not created.");
+    let signalStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      signalStarted = resolve;
+    });
+    let rejectLoading: ((error: Error) => void) | undefined;
+    const loading = new Promise<void>((_resolve, reject) => {
+      rejectLoading = reject;
+    });
+    const load = vi.spyOn(contents, "loadURL").mockImplementationOnce((url) => {
+      contents.emit("did-start-navigation", {}, url, false, true);
+      signalStarted?.();
+      return loading;
+    });
+    const stop = vi.spyOn(contents, "stop").mockImplementation(() => {
+      contents.emit("did-stop-loading");
+      rejectLoading?.(new Error("Navigation stopped."));
+    });
+    vi.useFakeTimers();
+    const failure = expect(host.loadUrl(tab.id, "https://example.com/slow")).rejects.toThrow("Navigation timed out.");
+    await started;
+    const recovery = host.loadUrl(tab.id, "https://example.com/recovered");
+    await vi.advanceTimersByTimeAsync(10_000);
+    await failure;
+    await recovery;
+    expect(stop).toHaveBeenCalledOnce();
+    expect(load).toHaveBeenLastCalledWith("https://example.com/recovered", expect.any(Object));
+    expect(host.listTabs()).toEqual([expect.objectContaining({ id: tab.id, url: "https://example.com/recovered" })]);
+  });
+
   it("loads an address in the selected tab without adding a tab or changing its owner", async () => {
     const first = await host.open("https://example.com/first", "thread-a", "agent-a");
     const second = await host.open("https://example.com/second", "thread-a", "agent-a");
