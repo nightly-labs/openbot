@@ -188,13 +188,13 @@ export async function seedDevelopmentState(options: DevelopmentSeedOptions = {})
     if (await isDevelopmentProfileActive(targetProfile)) {
       throw new Error("Quit the OpenBot dev app before you seed its local state.");
     }
-    if (options.ifMissing && (await pathExists(targetProfile))) return summary;
+    if (options.ifMissing && (await pathExists(targetProfile))) {
+      await cleanupStagedSeed(stagingProfile, homeDirectory, newTransferDirectories);
+      return summary;
+    }
     await replaceDevelopmentProfile(targetProfile, stagingProfile, homeDirectory);
   } catch (error) {
-    await Promise.all([
-      rm(stagingProfile, { recursive: true, force: true }),
-      removeTransferDirectories(homeDirectory, newTransferDirectories),
-    ]);
+    await cleanupStagedSeed(stagingProfile, homeDirectory, newTransferDirectories);
     throw error;
   }
 
@@ -1215,6 +1215,17 @@ async function removeTransferDirectories(homeDirectory: string, directories: str
     removed.push(target);
   }
   return removed;
+}
+
+async function cleanupStagedSeed(
+  stagingProfile: string,
+  homeDirectory: string,
+  transferDirectories: string[],
+): Promise<void> {
+  await Promise.all([
+    rm(stagingProfile, { recursive: true, force: true }),
+    removeTransferDirectories(homeDirectory, transferDirectories),
+  ]);
 }
 
 /**
