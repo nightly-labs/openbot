@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type ChatLayout, chatBlankSpace, chatContentIsVisible, chatEndOffset, chatSendOffset } from "./chat-layout";
+import {
+  CHAT_HISTORY_BATCH,
+  type ChatLayout,
+  chatBlankSpace,
+  chatContentIsVisible,
+  chatEndOffset,
+  chatHistoryStart,
+  chatSendOffset,
+} from "./chat-layout";
 import { largePastedText } from "./composer-paste";
 import { createStreamRevealPool, streamRevealWindow } from "./stream-reveal-pool";
 
@@ -89,4 +97,47 @@ it("bounds the reveal tail and retains all text when words finish or the stream 
     { prefix: "replacement", words: [] },
     { prefix: body, words: [] },
   ]);
+});
+
+describe("chat history window", () => {
+  const messages = Array.from({ length: 50 }, (_, index) => ({ id: String(index) }));
+  const empty = { firstId: null, headId: null };
+
+  it("opens the recent messages and retains the latest user-message anchor", () => {
+    expect(messages.slice(chatHistoryStart(messages, 48, empty))).toEqual(messages.slice(-CHAT_HISTORY_BATCH));
+    expect(chatHistoryStart(messages, 10, empty)).toBe(10);
+    expect(chatHistoryStart(messages, -1, empty)).toBe(34);
+    expect(chatHistoryStart([], -1, empty)).toBe(0);
+  });
+
+  it("keeps the first visible message when new messages arrive", () => {
+    const updated = [...messages, { id: "new" }];
+    const start = chatHistoryStart(updated, 50, { firstId: "34", headId: "0" });
+    expect(updated[start]?.id).toBe("34");
+    expect(updated.slice(start).at(-1)?.id).toBe("new");
+  });
+
+  it("reveals every cached message in batches without a server page", () => {
+    let start = chatHistoryStart(messages, 48, empty);
+    const revealed = messages.slice(start);
+    while (start > 0) {
+      const firstId = messages[Math.max(0, start - CHAT_HISTORY_BATCH)].id;
+      const next = chatHistoryStart(messages, 48, { firstId, headId: "0" });
+      revealed.unshift(...messages.slice(next, start));
+      start = next;
+    }
+    expect(revealed).toEqual(messages);
+  });
+
+  it("shows the nearest part of a newly fetched older page and keeps a scrolled window stable", () => {
+    const older = Array.from({ length: 50 }, (_, index) => ({ id: `old-${index}` }));
+    const updated = [...older, ...messages];
+    expect(chatHistoryStart(updated, 98, { firstId: "0", headId: "0" })).toBe(34);
+    expect(chatHistoryStart(updated, 98, { firstId: "34", headId: "0" })).toBe(84);
+  });
+
+  it("resets to recent messages if a reconnect replaces the history window", () => {
+    const replaced = messages.map((message) => ({ id: `replacement-${message.id}` }));
+    expect(chatHistoryStart(replaced, 48, { firstId: "34", headId: "0" })).toBe(34);
+  });
 });

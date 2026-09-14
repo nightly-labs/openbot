@@ -28,6 +28,7 @@ import { useConnectionAppearance } from "@/features/workspace/components/use-con
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import type { ChatBubbleMessage } from "../context/message-actions-context";
+import { CHAT_HISTORY_BATCH, type ChatHistoryBoundary, chatHistoryStart } from "../model/chat-layout";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
 import { ChatAttachmentView } from "./chat-attachment";
@@ -194,6 +195,19 @@ export function ChatMessageList({
   const visibleMessages = useMemo(() => messages.filter((message) => message.kind !== "thinking"), [messages]);
   const tailIndex = visibleMessages.findLastIndex((message) => message.kind === "message" && message.author === "user");
   const tailId = visibleMessages[tailIndex]?.id ?? null;
+  const [boundary, setBoundary] = useState<ChatHistoryBoundary>({ firstId: null, headId: null });
+  const windowStart = chatHistoryStart(visibleMessages, tailIndex, boundary);
+  const firstId = visibleMessages[windowStart]?.id ?? null;
+  const headId = visibleMessages[0]?.id ?? null;
+  if (boundary.firstId !== firstId || boundary.headId !== headId) setBoundary({ firstId, headId });
+  const windowMessages = useMemo(() => visibleMessages.slice(windowStart), [visibleMessages, windowStart]);
+  const hasCachedOlder = windowStart > 0;
+  const canLoadOlder = hasCachedOlder || (online && hasOlder && !olderLoading);
+  const loadPrevious = () => {
+    if (hasCachedOlder) {
+      setBoundary({ firstId: visibleMessages[Math.max(0, windowStart - CHAT_HISTORY_BATCH)].id, headId });
+    } else if (canLoadOlder) onLoadOlder();
+  };
   const listRef = useRef<FlatList<VisibleMessage>>(null);
   const tailLayout = useMemo(() => ({ id: tailId, motion }), [tailId, motion]);
   const seekLatest = useCallback(() => {
@@ -439,25 +453,27 @@ export function ChatMessageList({
       <TailLayoutContext.Provider value={tailLayout}>
         <FlatList
           ref={listRef}
-          data={visibleMessages}
+          data={windowMessages}
           keyExtractor={(message) => message.id}
           CellRendererComponent={MessageCell}
-          initialNumToRender={50}
+          initialNumToRender={CHAT_HISTORY_BATCH}
           maxToRenderPerBatch={8}
           windowSize={7}
           removeClippedSubviews={false}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           onStartReached={() => {
-            if (motion.historyVisible && online && hasOlder && !olderLoading && !olderError) onLoadOlder();
+            if (motion.historyVisible && canLoadOlder && (hasCachedOlder || !olderError)) loadPrevious();
           }}
           onStartReachedThreshold={0.5}
           renderItem={({ item, index }) => (
             <Animated.View
-              style={[{ paddingBottom: 10 }, index > tailIndex ? motion.responseStyle : undefined]}
-              accessibilityElementsHidden={index > tailIndex && !motion.responseVisible}
-              importantForAccessibility={index > tailIndex && !motion.responseVisible ? "no-hide-descendants" : "auto"}
+              style={[{ paddingBottom: 10 }, index + windowStart > tailIndex ? motion.responseStyle : undefined]}
+              accessibilityElementsHidden={index + windowStart > tailIndex && !motion.responseVisible}
+              importantForAccessibility={
+                index + windowStart > tailIndex && !motion.responseVisible ? "no-hide-descendants" : "auto"
+              }
             >
-              {renderMessage(item, index === tailIndex, index === 0 && !hasOlder)}
+              {renderMessage(item, index + windowStart === tailIndex, index === 0 && !hasOlder && !hasCachedOlder)}
             </Animated.View>
           )}
           renderScrollComponent={(props) => (
@@ -493,13 +509,13 @@ export function ChatMessageList({
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <>
-              {hasOlder ? (
+              {hasOlder || hasCachedOlder ? (
                 <View className="items-center pb-3">
-                  <Button variant="tertiary" isDisabled={!online || olderLoading} onPress={onLoadOlder}>
+                  <Button variant="tertiary" isDisabled={!canLoadOlder} onPress={loadPrevious}>
                     <Button.Label>
-                      {olderLoading
+                      {!hasCachedOlder && olderLoading
                         ? "Loading older messages…"
-                        : olderError
+                        : !hasCachedOlder && olderError
                           ? "Try loading older messages again"
                           : "Load older messages"}
                     </Button.Label>
