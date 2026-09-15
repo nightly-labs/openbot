@@ -1,7 +1,7 @@
 import type { DraftAttachment, QueueDelivery } from "@openbot/contracts/ipc";
 import { errorMessage } from "../../../error-message";
 import { expandComposerMentions } from "../ComposerEditor";
-import { copyComposerDraft, EMPTY_DRAFT } from "../composer-draft";
+import { copyComposerDraft, EMPTY_DRAFT, QUEUE_EDIT_STORAGE_KEY } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
 
@@ -14,6 +14,8 @@ export interface ComposerActionsDeps {
   setEditingAgentId: (id: string | null) => void;
   editingServerId: () => string | null;
   setEditingServerId: (id: string | null) => void;
+  editingEditId: () => string | null;
+  setEditingEditId: (id: string | null) => void;
   editingDeliveryId: () => string | null;
   setEditingDeliveryId: (id: string | null) => void;
   editingDraftBackup: () => ComposerDraft | null;
@@ -111,19 +113,49 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     if (event.key === "Enter" || event.key === " ") openAttachmentPicker(filter);
   }
 
-  function editQueuedMessage(delivery: QueueDelivery) {
+  async function editQueuedMessage(delivery: QueueDelivery) {
     const agentId = deps.props.agent?.id;
     const serverId = deps.props.server?.id ?? "local";
-    if (!agentId || delivery.status !== "queued") return;
-    if (deps.editingDeliveryId()) cancelQueuedMessageEdit();
+    if (!agentId || delivery.status !== "queued" || deps.submitting()) return;
+    if (deps.editingDeliveryId() && !(await cancelQueuedMessageEdit())) return;
+    const backup = copyComposerDraft(deps.currentDraft());
+    const editId = crypto.randomUUID();
+    deps.setSubmitting(true);
+    try {
+      window.localStorage.setItem(
+        QUEUE_EDIT_STORAGE_KEY,
+        JSON.stringify({
+          agentId,
+          serverId,
+          deliveryId: delivery.id,
+          editId,
+          originalAttachmentIds: delivery.attachments.map((item) => item.id),
+          backup,
+          draft: {
+            text: delivery.text,
+            attachments: delivery.attachments,
+            replyToMessageId: delivery.replyToMessageId,
+          },
+        }),
+      );
+      const held = await window.openbot.agent.editQueuedMessage(
+        { agentId, action: "begin", deliveryId: delivery.id, editId },
+        serverId,
+      );
+      const original = held.deliveries.find((item) => item.id === delivery.id);
+      if (!original) throw new Error("This queued message is no longer available.");
+      delivery = original;
+      deps.setEditingEditId(editId);
+    } catch (error) {
+      deps.setComposerError(errorMessage(error, "Could not hold the queued message for editing."));
+      return;
+    } finally {
+      deps.setSubmitting(false);
+    }
     deps.clearConversationError({ agentId, serverId });
     deps.setEditingAgentId(agentId);
     deps.setEditingServerId(serverId);
-    deps.setEditingDraftBackup({
-      text: deps.currentDraft().text,
-      attachments: [...deps.currentDraft().attachments],
-      replyToMessageId: deps.currentDraft().replyToMessageId,
-    });
+    deps.setEditingDraftBackup(backup);
     deps.setEditingOriginalAttachmentIds(delivery.attachments.map((attachment) => attachment.id));
     deps.setEditingDeliveryId(delivery.id);
     deps.setDrafts((current) => ({
@@ -139,10 +171,27 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     deps.setComposerError(null);
   }
 
-  function cancelQueuedMessageEdit() {
+  async function cancelQueuedMessageEdit() {
+    if (deps.submitting()) return false;
     const agentId = deps.editingAgentId() ?? deps.props.agent?.id;
     const serverId = deps.editingServerId() ?? deps.props.server?.id ?? "local";
     const target = agentId ? { agentId, serverId } : undefined;
+    const editId = deps.editingEditId();
+    const deliveryId = deps.editingDeliveryId();
+    if (target && editId && deliveryId) {
+      deps.setSubmitting(true);
+      try {
+        await window.openbot.agent.editQueuedMessage(
+          { agentId: target.agentId, action: "cancel", deliveryId, editId },
+          serverId,
+        );
+      } catch (error) {
+        deps.setComposerError(errorMessage(error, "Could not cancel the queue edit. Try again."));
+        return false;
+      } finally {
+        deps.setSubmitting(false);
+      }
+    }
     const backup = deps.editingDraftBackup();
     const draft = target ? (deps.drafts()[composerDraftKey(target)] ?? EMPTY_DRAFT) : EMPTY_DRAFT;
     const preservedAttachmentIds = new Set([
@@ -160,8 +209,11 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     deps.setEditingAgentId(null);
     deps.setEditingServerId(null);
     deps.setEditingDeliveryId(null);
+    deps.setEditingEditId(null);
+    window.localStorage.removeItem(QUEUE_EDIT_STORAGE_KEY);
     deps.setEditingDraftBackup(null);
     deps.setEditingOriginalAttachmentIds([]);
+    return true;
   }
 
   async function saveQueuedMessageEdit(
@@ -174,16 +226,10 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const deliveryId = target?.deliveryId ?? deps.editingDeliveryId();
     const draft = draftOverride ?? deps.currentDraft();
     if (!agentId || !deliveryId || deps.submitting()) return false;
-    const delivery = target ? undefined : deps.props.queue?.deliveries.find((item) => item.id === deliveryId);
-    if (!target && delivery?.status !== "queued") {
-      deps.setComposerError("This queued message is no longer available.");
-      cancelQueuedMessageEdit();
-      return false;
-    }
+    const editId = deps.editingEditId();
+    if (!editId) return false;
     const text = expandComposerMentions(draft.text);
-    const originalAttachmentIds = new Set(
-      target?.originalAttachmentIds ?? delivery?.attachments.map((attachment) => attachment.id) ?? [],
-    );
+    const originalAttachmentIds = new Set(target?.originalAttachmentIds ?? deps.editingOriginalAttachmentIds());
     const keepAttachmentIds = draft.attachments
       .filter((attachment) => originalAttachmentIds.has(attachment.id))
       .map((attachment) => attachment.id);
@@ -197,13 +243,11 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     deps.setComposerError(null);
     let saved = false;
     try {
-      saved = await deps.props.onUpdateQueuedMessage(
-        deliveryId,
-        text,
-        keepAttachmentIds,
-        attachmentDraftIds,
-        target ?? (agentId ? { agentId, serverId } : undefined),
+      await window.openbot.agent.editQueuedMessage(
+        { agentId, action: "save", deliveryId, editId, text, keepAttachmentIds, attachmentDraftIds },
+        serverId,
       );
+      saved = true;
     } catch (error) {
       deps.setComposerError(errorMessage(error, "Could not update the queued message. Try again."));
     } finally {
@@ -222,6 +266,8 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       deps.setEditingAgentId(null);
       deps.setEditingServerId(null);
       deps.setEditingDeliveryId(null);
+      deps.setEditingEditId(null);
+      window.localStorage.removeItem(QUEUE_EDIT_STORAGE_KEY);
       deps.setEditingDraftBackup(null);
       deps.setEditingOriginalAttachmentIds([]);
     }
@@ -296,7 +342,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       const targetIsActive = activeTarget?.agentId === target.agentId && activeTarget.serverId === target.serverId;
       const delivery =
         deliveryId && targetIsActive ? deps.props.queue?.deliveries.find((item) => item.id === deliveryId) : undefined;
-      if (deliveryId && targetIsActive && delivery?.status !== "queued") {
+      if (deliveryId && targetIsActive && !deps.editingEditId()) {
         deps.setComposerError("This queued message is no longer available.");
         cancelQueuedMessageEdit();
         return;

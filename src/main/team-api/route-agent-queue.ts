@@ -1,3 +1,5 @@
+import { decodeQueueEditRequest, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { HttpError } from "./http-error";
 // One agent's outgoing queue, and the ways a member can change their mind about it.
 //
 // Cancel, steer, update and reorder all name the delivery they mean, and `steer` also names the
@@ -18,6 +20,7 @@ export interface AgentQueueRouteDependencies {
     | "cancelQueuedMessage"
     | "steerQueuedMessage"
     | "updateQueuedMessage"
+    | "editQueuedMessage"
     | "reorderQueue"
     | "interrupt"
   >;
@@ -30,6 +33,11 @@ export async function routeAgentQueue(
 ): Promise<RouteOutcome> {
   const { method, request, json, empty } = context;
 
+  if (method === "POST" && action === "queue/edit") {
+    if (context.protocol < 3 || !context.capabilities.has(TEAM_QUEUE_EDIT_CAPABILITY))
+      throw new HttpError(400, "This client does not support queue editing.");
+    return json(200, await agents.editQueuedMessage(agentId, decodeQueueEditRequest(await readJson(request))));
+  }
   if (method === "GET" && action === "queue") {
     return json(200, agents.listQueue(agentId));
   }

@@ -25,6 +25,7 @@ import {
   parseOpenSharedFile,
   parseOpenWorkspaceFile,
   parsePromptResponse,
+  parseQueueEdit,
   parseReorderQueue,
   parseSendMessage,
   parseSidebarLayoutAction,
@@ -874,4 +875,14 @@ it("validates the server mute request", () => {
   ]) {
     expect(() => parseSetServerMuted(input)).toThrow();
   }
+});
+
+it("validates the queue editor identity and host-scoped agent before a hold can be acquired", () => {
+  const input = { agentId: "chief", deliveryId: "delivery", editId: "editor", action: "begin" };
+  expect(parseQueueEdit(input)).toEqual(input);
+  expect(() => parseQueueEdit({ ...input, agentId: "" })).toThrow();
+  expect(() => parseQueueEdit({ ...input, editId: null })).toThrow();
+  expect(() =>
+    parseQueueEdit({ ...input, action: "save", text: "Edit", keepAttachmentIds: [42], attachmentDraftIds: [] }),
+  ).toThrow();
 });

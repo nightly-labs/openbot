@@ -87,6 +87,7 @@ type TeamApiAgentMethods = Pick<
   | "cancelQueuedMessage"
   | "steerQueuedMessage"
   | "updateQueuedMessage"
+  | "editQueuedMessage"
   | "reorderQueue"
   | "interrupt"
   | "respondToPrompt"

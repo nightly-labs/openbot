@@ -57,6 +57,8 @@ interface StoredMessage {
 }
 
 interface StoredDelivery {
+  editId?: string;
+  finishedEditId?: string;
   id: string;
   messageId: string;
   recipientAgentId: string;
@@ -117,6 +119,7 @@ export class MailboxStore {
   readonly #statePath: string;
   readonly #files: AttachmentFiles;
   readonly #database: OpenBotDatabase;
+  readonly #queueUpdates = new Set<string>();
   readonly #deliveryGate = new MailboxDeliveryGate();
   readonly #stagedGeneratedAttachments = new Map<string, StoredGeneratedAttachment>();
   #state: StoredState = structuredClone(EMPTY_STATE);
@@ -360,13 +363,18 @@ export class MailboxStore {
     return { text: message.text, attachments: attachments.map(toAttachmentSummary) };
   }
 
-  listQueue(agentId: string): QueueSnapshot {
+  listQueue(agentId: string, editId?: string): QueueSnapshot {
     const channelMessageIds = this.#channelMessageIds();
-    const positions = this.#queuedPositions();
+    const positions = this.#queuedPositions(editId);
     return {
       agentId,
       deliveries: this.#state.deliveries
-        .filter((delivery) => delivery.recipientAgentId === agentId && !channelMessageIds.has(delivery.messageId))
+        .filter(
+          (delivery) =>
+            delivery.recipientAgentId === agentId &&
+            !channelMessageIds.has(delivery.messageId) &&
+            (delivery.status !== "queued" || !delivery.editId || delivery.editId === editId),
+        )
         .map((delivery) => this.#publicDelivery(delivery, positions)),
     };
   }
@@ -630,7 +638,7 @@ export class MailboxStore {
     const delivery = this.#state.deliveries
       .filter((candidate) => candidate.recipientAgentId === agentId && candidate.status === "queued")
       .sort(compareQueueOrder)[0];
-    return delivery ? this.#context(delivery) : null;
+    return delivery && !delivery.editId && !this.#queueUpdates.has(delivery.id) ? this.#context(delivery) : null;
   }
 
   queuedDeliveryIds(agentId: string): string[] {
@@ -810,6 +818,7 @@ export class MailboxStore {
   }
 
   async markStarting(deliveryId: string): Promise<void> {
+    this.#assertQueueNotEditing(deliveryId);
     await this.#updateDelivery(deliveryId, ["queued"], { status: "starting", error: null });
   }
 
@@ -840,6 +849,7 @@ export class MailboxStore {
   }
 
   cancelNow(agentId: string, deliveryId: string): void {
+    this.#assertQueueNotUpdating(deliveryId);
     const delivery = this.#state.deliveries.find(
       (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
     );
@@ -860,18 +870,86 @@ export class MailboxStore {
     this.#state = normalizeStoredState(persisted);
   }
 
+  #assertQueueNotEditing(deliveryId: string): void {
+    this.#assertQueueNotUpdating(deliveryId);
+    if (this.#state.deliveries.find((item) => item.id === deliveryId)?.editId)
+      throw new Error("This message is being edited. Save or cancel the edit first.");
+  }
+
+  beginQueueEdit(agentId: string, deliveryId: string, editId: string): void {
+    this.#assertQueueNotUpdating(deliveryId);
+    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
+    if (delivery?.status !== "queued") throw new Error("This queued message is no longer available.");
+    if (delivery.editId && delivery.editId !== editId)
+      throw new Error("This message is being edited on another device.");
+    const previous = delivery.editId;
+    delivery.editId = editId;
+    try {
+      this.#persist("delivery.edit-started");
+    } catch (error) {
+      delivery.editId = previous;
+      throw error;
+    }
+  }
+
+  queueEditFinished(agentId: string, deliveryId: string, editId: string): boolean {
+    return this.#state.deliveries.some(
+      (item) => item.id === deliveryId && item.recipientAgentId === agentId && item.finishedEditId === editId,
+    );
+  }
+
+  finishQueueEdit(agentId: string, deliveryId: string, editId: string): void {
+    this.#assertQueueNotUpdating(deliveryId);
+    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
+    if (!delivery || delivery.editId !== editId) throw new Error("This edit is no longer available.");
+    const previousFinished = delivery.finishedEditId;
+    delivery.finishedEditId = editId;
+    delete delivery.editId;
+    try {
+      this.#persist("delivery.edit-finished");
+    } catch (error) {
+      delivery.editId = editId;
+      delivery.finishedEditId = previousFinished;
+      throw error;
+    }
+  }
+
+  #assertQueueNotUpdating(deliveryId: string): void {
+    if (this.#queueUpdates.has(deliveryId))
+      throw new Error("This message is being saved. Try again after it finishes.");
+  }
+
   async updateQueuedMessage(
     agentId: string,
     deliveryId: string,
     text: string,
     keepAttachmentIds: string[],
     attachmentDraftIds: string[],
+    editId?: string,
+  ): Promise<void> {
+    this.#assertQueueNotUpdating(deliveryId);
+    this.#queueUpdates.add(deliveryId);
+    try {
+      await this.#updateQueuedMessage(agentId, deliveryId, text, keepAttachmentIds, attachmentDraftIds, editId);
+    } finally {
+      this.#queueUpdates.delete(deliveryId);
+    }
+  }
+
+  async #updateQueuedMessage(
+    agentId: string,
+    deliveryId: string,
+    text: string,
+    keepAttachmentIds: string[],
+    attachmentDraftIds: string[],
+    editId?: string,
   ): Promise<void> {
     const delivery = this.#state.deliveries.find(
       (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
     );
     if (!delivery) throw new Error("Queued message was not found.");
     if (delivery.status !== "queued") throw new Error("Only queued messages can be edited.");
+    if (delivery.editId !== editId) throw new Error("This message is being edited on another device.");
 
     const message = this.#requireMessage(delivery.messageId);
     const keepIds = new Set(keepAttachmentIds);
@@ -897,13 +975,16 @@ export class MailboxStore {
     }
 
     const previous = structuredClone(message);
+    const previousFinishedEditId = delivery.finishedEditId;
     const oldAttachmentPaths = message.attachments
       .filter((attachment) => !keepIds.has(attachment.id))
       .map((attachment) => attachment.path);
     const draftAttachmentPaths = drafts.map((draft) => draft.path);
     let newAttachmentPaths: string[] = [];
     try {
-      const keptAttachments = message.attachments.filter((attachment) => keepIds.has(attachment.id));
+      const keptAttachments = keepAttachmentIds.flatMap((id) =>
+        message.attachments.filter((attachment) => attachment.id === id),
+      );
       const committedDrafts = draftAttachmentPaths.length
         ? await this.#files.commitMessageTransfer(
             `${message.id}-edit-${randomUUID()}`,
@@ -929,6 +1010,10 @@ export class MailboxStore {
         return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
       });
       message.attachments = replacementAttachments;
+      if (editId) {
+        delete delivery.editId;
+        delivery.finishedEditId = editId;
+      }
       this.#state.drafts = this.#state.drafts.filter((draft) => !draftIds.has(draft.id));
       await this.#persist(
         "message.updated",
@@ -938,6 +1023,10 @@ export class MailboxStore {
     } catch (error) {
       message.text = previous.text;
       message.attachments = previous.attachments;
+      if (editId) {
+        delivery.editId = editId;
+        delivery.finishedEditId = previousFinishedEditId;
+      }
       for (const draft of drafts) {
         if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) {
           this.#state.drafts.push(draft);
@@ -951,9 +1040,10 @@ export class MailboxStore {
   }
 
   async reorderQueue(agentId: string, deliveryIds: string[]): Promise<void> {
-    const queued = this.#state.deliveries.filter(
+    const allQueued = this.#state.deliveries.filter(
       (delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued",
     );
+    const queued = allQueued.filter((delivery) => !delivery.editId);
     const expected = new Set(queued.map((delivery) => delivery.id));
     if (
       deliveryIds.length !== queued.length ||
@@ -962,14 +1052,19 @@ export class MailboxStore {
     ) {
       throw new Error("Queue order is stale. Refresh the queue and try again.");
     }
-    const orders = new Map(deliveryIds.map((deliveryId, index) => [deliveryId, index]));
-    for (const delivery of queued) {
+    let nextVisible = 0;
+    const orderedIds = [...allQueued]
+      .sort(compareQueueOrder)
+      .map((delivery) => (delivery.editId ? delivery.id : deliveryIds[nextVisible++]));
+    const orders = new Map(orderedIds.map((deliveryId, index) => [deliveryId, index]));
+    for (const delivery of allQueued) {
       delivery.queueOrder = orders.get(delivery.id) ?? delivery.queueOrder;
     }
     await this.#persist("queue.reordered");
   }
 
   async markSteering(deliveryId: string, turnId: string): Promise<void> {
+    this.#assertQueueNotEditing(deliveryId);
     await this.#updateDelivery(deliveryId, ["queued"], {
       status: "starting",
       turnId,
@@ -1145,8 +1240,9 @@ export class MailboxStore {
     positions = this.#queuedPositions(),
     message = this.#requireMessage(delivery.messageId),
   ): QueueDelivery {
+    const { editId: _editId, finishedEditId: _finishedEditId, ...publicDelivery } = delivery;
     return {
-      ...delivery,
+      ...publicDelivery,
       sender: structuredClone(message.sender),
       text: message.text,
       attachments: message.attachments.map(toAttachmentSummary),
@@ -1155,11 +1251,11 @@ export class MailboxStore {
     };
   }
 
-  #queuedPositions(): Map<string, number> {
+  #queuedPositions(editId?: string): Map<string, number> {
     const counts = new Map<string, number>();
     const positions = new Map<string, number>();
     const queued = [...this.#state.deliveries]
-      .filter((delivery) => delivery.status === "queued")
+      .filter((delivery) => delivery.status === "queued" && (!delivery.editId || delivery.editId === editId))
       .sort(compareQueueOrder);
     for (const delivery of queued) {
       const position = (counts.get(delivery.recipientAgentId) ?? 0) + 1;
@@ -1404,6 +1500,8 @@ function isStoredDelivery(value: unknown): value is StoredDelivery {
     isString(value.id) &&
     isString(value.messageId) &&
     isString(value.recipientAgentId) &&
+    (value.editId === undefined || isString(value.editId)) &&
+    (value.finishedEditId === undefined || isString(value.finishedEditId)) &&
     (value.queueOrder === undefined || (isNumber(value.queueOrder) && Number.isFinite(value.queueOrder))) &&
     (value.status === "queued" ||
       value.status === "starting" ||

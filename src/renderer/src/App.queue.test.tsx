@@ -30,6 +30,10 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("keeps a queued-message edit through Escape while the Usage report covers the conversation", async () => {
+    vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({
+      agentId: "chief",
+      deliveries: [queuedDelivery("delivery-covered-edit", "Queued draft", 1)],
+    });
     vi.mocked(window.openbot.agent.listQueue).mockResolvedValueOnce({
       agentId: "chief",
       deliveries: [
@@ -62,6 +66,11 @@ describe("OpenBot connected desktop shell", () => {
     ));
     const composer = await screen.findByRole("textbox", { name: "Message Chief" });
     await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+    await screen.findByRole("button", { name: "Save queued message" });
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: "chief", action: "begin", deliveryId: "delivery-covered-edit" }),
+      "local",
+    );
     composer.textContent = "Queued draft with more to say";
     await fireEvent.input(composer);
 
@@ -1187,4 +1196,50 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Local server" }));
     expect(await screen.findByRole("group", { name: "Queued message 1: Next work" })).toBeInTheDocument();
   });
+});
+
+it("acquires a host hold before editing and uses its identity for save and cancel", async () => {
+  installOpenbotStub();
+  const delivery = queuedDelivery("shared-edit", "Original queue message", 1);
+  const snapshot = {
+    agentId: "chief",
+    deliveries: [queuedDelivery("running", "Running", null, { status: "running", turnId: "turn-running" }), delivery],
+  };
+  vi.mocked(window.openbot.agent.listQueue).mockResolvedValue(snapshot);
+  vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({ agentId: "chief", deliveries: [delivery] });
+  render(() => <App />);
+  const composer = await screen.findByRole("textbox", { name: "Message Chief" });
+  await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+  await screen.findByRole("button", { name: "Save queued message" });
+  const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+  expect(begin).toMatchObject({ action: "begin", agentId: "chief", deliveryId: delivery.id });
+  composer.textContent = "Changed safely";
+  await fireEvent.input(composer);
+  await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
+      {
+        agentId: "chief",
+        deliveryId: delivery.id,
+        editId: begin.editId,
+        action: "save",
+        text: "Changed safely",
+        keepAttachmentIds: [],
+        attachmentDraftIds: [],
+      },
+      "local",
+    ),
+  );
+  expect(window.openbot.agent.updateQueuedMessage).not.toHaveBeenCalled();
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Save queued message" })).not.toBeInTheDocument());
+  await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+  await screen.findByRole("button", { name: "Save queued message" });
+  const secondBegin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[2][0];
+  await fireEvent.keyDown(document, { key: "Escape" });
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
+      { agentId: "chief", deliveryId: delivery.id, editId: secondBegin.editId, action: "cancel" },
+      "local",
+    ),
+  );
 });

@@ -32,6 +32,39 @@ import {
 afterEach(stopTeamApiFixtures);
 
 describe("TeamApiServer agents", () => {
+  it("requires authentication, capability and valid input for a queue edit", async () => {
+    const { start, signIn } = await createTeamApiFixture("queue-edit", { configure: true });
+    const editQueuedMessage = vi.fn(async () => ({ agentId: "chief", deliveries: [] }));
+    const { base } = await start({ agents: createAgents({ editQueuedMessage }) });
+    const token = await signIn();
+    const input = { action: "begin", deliveryId: "delivery-1", editId: "edit-1" };
+    const path = `${base}/v1/agents/chief/queue/edit`;
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      [TEAM_PROTOCOL_VERSION_HEADER]: "3",
+      [TEAM_CAPABILITIES_HEADER]: "queue-edit-v1",
+    };
+    const unauthorized = await fetch(path, {
+      method: "POST",
+      body: JSON.stringify(input),
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(unauthorized.ok).toBe(false);
+    const unsupported = await fetch(path, {
+      method: "POST",
+      body: JSON.stringify(input),
+      headers: { ...headers, [TEAM_CAPABILITIES_HEADER]: "" },
+    });
+    expect(unsupported.ok).toBe(false);
+    const malformed = await fetch(path, { method: "POST", body: JSON.stringify({ ...input, editId: 7 }), headers });
+    expect(malformed.ok).toBe(false);
+    expect(editQueuedMessage).not.toHaveBeenCalled();
+    const accepted = await fetch(path, { method: "POST", body: JSON.stringify(input), headers });
+    expect(accepted.status).toBe(200);
+    expect(editQueuedMessage).toHaveBeenCalledExactlyOnceWith("chief", input);
+  });
+
   it.each(["", "   ", "Plan trips"])("creates an agent through the API with description %j", async (description) => {
     const { root, start, signIn } = await createTeamApiFixture("agent-create", { configure: true });
     const store = new AgentStore(join(root, "agents"), join(root, "home"));

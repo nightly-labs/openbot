@@ -1,3 +1,5 @@
+import { TEAM_ATTACHMENT_THUMBNAILS_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { attachmentThumbnail } from "./attachment-thumbnail";
 // Bytes leaving the machine: draft attachments, shared files and workspace files.
 //
 // These four routes are the only ones that write a body themselves instead of going through
@@ -57,9 +59,15 @@ export async function routeFiles(
     if (method === "GET") {
       const attachment = await mailbox.resolveAttachment(attachmentId);
       if (!attachment) throw new HttpError(404, "Attachment not found.");
-      const bytes = await readFile(attachment.path);
+      const thumbnail = url.searchParams.get("thumbnail");
+      if (
+        thumbnail !== null &&
+        (thumbnail !== "64" || !context.capabilities.has(TEAM_ATTACHMENT_THUMBNAILS_CAPABILITY))
+      )
+        throw new HttpError(400, "This thumbnail request is not supported.");
+      const bytes = thumbnail ? await attachmentThumbnail(attachment.path) : await readFile(attachment.path);
       response.writeHead(200, {
-        "Content-Type": attachment.mimeType || "application/octet-stream",
+        "Content-Type": thumbnail ? "image/png" : attachment.mimeType || "application/octet-stream",
         "Content-Length": String(bytes.length),
         "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(basename(attachment.path))}`,
       });

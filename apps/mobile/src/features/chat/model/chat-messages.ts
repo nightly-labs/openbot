@@ -80,6 +80,7 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
   const result: ChatMessage[] = [];
   const thinkingByTurn = new Map<string, Extract<ChatMessage, { kind: "thinking" }>>();
   for (const message of messages) {
+    if (message.delivery?.status === "queued" || message.delivery?.status === "cancelled") continue;
     if (message.exchange) {
       result.push({ id: `exchange:${message.id}`, kind: "exchange", exchange: message.exchange });
       // Match desktop: exchanges have markers, not another agent's text bubble.

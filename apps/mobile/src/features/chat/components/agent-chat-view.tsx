@@ -4,6 +4,7 @@ import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/conte
 import { latestReadableMessage, projectChatMessages } from "../model/chat-messages";
 import { uploadChatAttachments } from "../model/upload-chat-attachments";
 import { ChatView } from "./chat-view";
+import { useChatQueue } from "./use-chat-queue";
 import { useQuestionPrompt } from "./use-question-prompt";
 
 export function MobileChatView({
@@ -43,6 +44,7 @@ export function MobileChatView({
   );
   const activity = useAgentActivity(agent.id);
   const online = servers.find((item) => item.id === agent.serverId)?.state === "online";
+  const queue = useChatQueue(agent.id, agent.serverId, online, conversation?.activeTurnId ?? null);
   const [historyLoadFailed, setHistoryLoadFailed] = useState(false);
   const request = useRef(0);
   const fetchHistory = useCallback(() => {
@@ -80,6 +82,7 @@ export function MobileChatView({
   return (
     <ChatView
       target={{ ...agent, kind: "agent" }}
+      queue={queue}
       animateAvatarOnExit={animateAvatarOnExit}
       agents={serverAgents}
       mentionAgents={mentionAgents}
@@ -100,11 +103,12 @@ export function MobileChatView({
       loadOlder={() => {
         void loadOlderMessages(agent.id);
       }}
-      send={(body, files, replyToMessageId) =>
+      send={(body, files, replyToMessageId, upload) =>
         uploadChatAttachments(files, {
-          upload: (file) => uploadAttachment(agent.id, file),
-          discard: (id) => discardAttachment(agent.id, id),
-          send: (ids) => sendMessage(agent.id, body, ids, replyToMessageId),
+          ...upload,
+          upload: (file) => uploadAttachment(agent.id, file, agent.serverId),
+          discard: (id) => discardAttachment(agent.id, id, agent.serverId),
+          send: (ids) => sendMessage(agent.id, body, ids, replyToMessageId, agent.serverId),
         })
       }
     />

@@ -203,6 +203,7 @@ const ROUTE_METHODS: Record<string, string> = {
   "agent.queueCancel": "POST",
   "agent.queueSteer": "POST",
   "agent.queueUpdate": "POST",
+  "agent.queueEdit": "POST",
   "agent.queueReorder": "POST",
   "agent.memories": "GET",
   "agent.memory": "PATCH",

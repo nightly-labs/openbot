@@ -850,3 +850,31 @@ No account API, Signal, IPC contract, or database migration changes are required
 The shared package validator handles local and marketplace bundles. The existing installer owns per-agent files, hashes, disabled storage, and both provider directories. Local installations skip marketplace downloads and receipt requests. Installation operations are serialized per agent; a library revision does not update installed copies.
 
 The backend local skill tools derive the agent from the calling provider session. Main-process IPC validates local library inputs independently of sender validation. The renderer reads local previews through that bridge. The released Team API adapters are unchanged; local creation and revision are not exposed as remote operations.
+
+### Mobile chat queue
+
+Mobile reads the host queue, applies `queue-changed` snapshots, and refreshes active queue
+queries on `queue-invalidated` events. Both events cancel earlier reads before they update the cache. It does not
+run a second delivery loop. Queued and cancelled deliveries stay outside the chat transcript.
+The panel uses a bounded virtualized list and one glass surface with a bottom-anchored
+transition that respects reduced motion. Its fixed list viewport stays mounted, and the
+composer inset changes once per toggle. Streaming does not change the panel's inputs.
+
+The optional `queue-edit-v1` capability and desktop edit IPC provide the same host edit hold.
+Held deliveries are omitted from public queue snapshots, including on older connected clients.
+The edit response returns the original delivery only to the editor with the matching identity.
+Desktop and mobile write the edit identity before requesting the hold. Each client enables
+its editor only after confirmation. The mailbox stores
+the hold in the existing delivery JSON. The first held delivery blocks automatic queue dispatch;
+steer and an update without that edit identity are rejected. Saving commits the replacement
+message and releases the hold in one mailbox transaction. Cancel restores normal dispatch without
+changing the message. Delete cancels the delivery. A finished edit identity makes a repeated save
+or cancel safe after a lost response. Holds and locally saved edit drafts survive host restart and client navigation; they have
+no timeout that could send a message while someone is still editing it. Older hosts retain queue
+view, steer, delete and reorder, but mobile disables editing without the capability.
+
+The optional `attachment-thumbnails-v1` capability adds `thumbnail=64` to attachment reads. The
+host first resolves the managed attachment, then creates a native thumbnail. It serializes native
+thumbnail work and keeps at most 64 cached results. Mobile requests previews only for mounted
+queue rows and uses local cached image URIs when available. Unsupported thumbnail formats or
+host platforms use a file-type icon; they never trigger a full-file download for the queue.

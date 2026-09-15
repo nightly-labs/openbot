@@ -1,17 +1,21 @@
 import { CHANNEL_DELETE_CAPABILITY } from "../ipc-chat-channels";
 import { MCP_SERVERS_CAPABILITY } from "../ipc-mcp-servers";
+import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
 import { TEAM_PROTOCOL_V4_CAPABILITIES } from "./v4";
 
 export const TEAM_SEMANTIC_TAGS_CAPABILITY = "installed-skills";
 export const TEAM_AGENT_ACTIVITY_CAPABILITY = "agent-activity";
 export const TEAM_CONVERSATION_UNREAD_CAPABILITY = "conversation-unread";
 export const TEAM_MODEL_SCOPED_USAGE_CAPABILITY = "model-scoped-usage";
+export const TEAM_ATTACHMENT_THUMBNAILS_CAPABILITY = "attachment-thumbnails-v1";
 export const TEAM_MEDIA_ATTACHMENTS_CAPABILITY = "media-attachments";
 export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
 export { CHANNEL_DELETE_CAPABILITY, MCP_SERVERS_CAPABILITY };
 
 export const TEAM_CURRENT_CAPABILITIES = [
   ...TEAM_PROTOCOL_V4_CAPABILITIES,
+  TEAM_QUEUE_EDIT_CAPABILITY,
+  TEAM_ATTACHMENT_THUMBNAILS_CAPABILITY,
   "agent-profile-generation",
   "agent-analytics",
   "host-analytics",

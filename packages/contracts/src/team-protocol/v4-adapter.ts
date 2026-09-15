@@ -12,6 +12,7 @@ import { isAgentAnalyticsRoute, isAgentProfileRoute, isConversationUnreadRoute, 
 import { toCurrentAgentKeys, toCurrentAgentKeysObjectForPath, toWireAgentKeys } from "./current-agent-keys";
 import { decodeHostAnalyticsV1Response } from "./host-analytics-v1";
 import { decodeProfileV4Request, decodeProfileV4Response } from "./profile-v4";
+import { decodeQueueEditRequest, isQueueEditRoute } from "./queue-edit-v1";
 import { decodeTeamProtocolV4HttpRequest, decodeTeamProtocolV4HttpResponse } from "./v4";
 import type { TeamProtocolV4BaseJsonObject, TeamProtocolV4BaseJsonValue } from "./v4-base";
 import {
@@ -27,6 +28,7 @@ export function encodeTeamProtocolV4CurrentHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ): string {
+  if (isQueueEditRoute(method, path)) return JSON.stringify(decodeQueueEditRequest(value));
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path))
     return JSON.stringify(decodeScopedUsageRequest(value));
   if (isAgentProfileRoute(method, path)) return JSON.stringify(encodeProfileRequest(path, value));
@@ -46,6 +48,7 @@ export function decodeTeamProtocolV4CurrentHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ): TeamProtocolV4BaseJsonObject {
+  if (isQueueEditRoute(method, path)) return { ...decodeQueueEditRequest(value) };
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path)) return decodeScopedUsageRequest(value);
   if (isAgentProfileRoute(method, path))
     return profileRequest(path, decodeProfileV4Request(profileGeneration(path), value));
@@ -78,6 +81,9 @@ export function encodeTeamProtocolV4CurrentHttpResponse(
   if (isAgentAnalyticsRoute(method, path) && status < 400)
     return JSON.stringify(decodeAnalyticsV1Response(decodeAgentAnalytics(value)));
   if (isAgentProfileRoute(method, path) && status < 400) return JSON.stringify(encodeProfileResponse(path, value));
+  if (isQueueEditRoute(method, path) && status === 204) return "{}";
+  if (isQueueEditRoute(method, path))
+    return encodeTeamProtocolV4BaseCurrentHttpResponse("GET", "/v1/agents/queue/queue", status, value, options);
   if (isConversationUnreadRoute(method, path))
     return encodeTeamProtocolV4BaseCurrentHttpResponse(method, readPath(path), status, value, options);
   if (scopedUsageRoute(method, path) || isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path)) {
@@ -102,6 +108,9 @@ export function decodeTeamProtocolV4CurrentHttpResponse(
   if (isAgentAnalyticsRoute(method, path) && status < 400)
     return JSON.parse(JSON.stringify(decodeAgentAnalytics(decodeAnalyticsV1Response(value))));
   if (isAgentProfileRoute(method, path) && status < 400) return decodeProfileResponse(path, value);
+  if (isQueueEditRoute(method, path) && status === 204) return {};
+  if (isQueueEditRoute(method, path))
+    return decodeTeamProtocolV4BaseCurrentHttpResponse("GET", "/v1/agents/queue/queue", status, value);
   if (isConversationUnreadRoute(method, path))
     return decodeTeamProtocolV4BaseCurrentHttpResponse(method, readPath(path), status, value);
   if (scopedUsageRoute(method, path) || isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path)) {
