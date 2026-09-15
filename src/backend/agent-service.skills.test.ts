@@ -39,25 +39,25 @@ describe.sequential("local skill provider tools", () => {
         get: vi.fn<LocalSkillTools["get"]>(),
         install: vi.fn<LocalSkillTools["install"]>(),
       };
-      service = new AgentService(
+      service = new AgentService({
         store,
         mailbox,
-        fakeBrowser(),
-        30_000,
-        provider,
-        (selected) => {
+        browser: fakeBrowser(),
+        requestTimeoutMs: 30_000,
+        preferredProvider: provider,
+        clientFactory: (selected) => {
           const client = new FakeAgentClient(selected);
           clients.set(selected, client);
           return client;
         },
-        undefined,
-        undefined,
-        null,
-        null,
-        null,
-        undefined,
-        () => api,
-      );
+        bundledExecutables: undefined,
+        prepareAgentWorkspace: undefined,
+        hostedSites: null,
+        sidebarLayout: null,
+        preferredModel: null,
+        credentials: undefined,
+        localSkillTools: () => api,
+      });
       await service.initialize();
       await store.getOrCreate("chief");
       await service.updateAgent({

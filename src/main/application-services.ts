@@ -419,22 +419,22 @@ export async function createApplicationServices({
   if (credentialLoadError) {
     logger.warn(`OpenBot could not read the provider key file (${credentialLoadError.name}). It was left unchanged.`);
   }
-  const service: AgentService = new AgentService(
+  const service: AgentService = new AgentService({
     store,
     mailbox,
     browser,
-    30_000,
-    setupState.preferredProvider ?? "codex",
-    null,
-    providerRuntimes.bundledExecutables(),
-    async (agent) => {
+    requestTimeoutMs: 30_000,
+    preferredProvider: setupState.preferredProvider ?? "codex",
+    clientFactory: null,
+    bundledExecutables: providerRuntimes.bundledExecutables(),
+    prepareAgentWorkspace: async (agent) => {
       await managedSkills.syncAgent(agent);
       await skillCreator.syncAgent(agent);
     },
     hostedSites,
     sidebarLayout,
-    setupState.preferredModel,
-    {
+    preferredModel: setupState.preferredModel,
+    credentials: {
       apiKey: (provider) => providerCredentials.get(provider),
       // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
       // spawned provider process. The IPC handlers are given `list()`.
@@ -443,8 +443,8 @@ export async function createApplicationServices({
       // into the object being constructed; nothing calls it before the constructor returns.
       mcpServers: () => service.enabledMcpServers(),
     },
-    () => localSkillTools(skills),
-  );
+    localSkillTools: () => localSkillTools(skills),
+  });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
   // reconciling against the agents alone would read every channel as gone and drop where it sits.

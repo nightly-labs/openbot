@@ -30,10 +30,17 @@ describe.sequential("AgentService: questions", () => {
   it("does not use a question prompt summary as the completed assistant reply", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "DONE", false);
-      clients.set(provider, client);
-      return client;
+    service = new AgentService({
+      store,
+      mailbox,
+      browser: fakeBrowser(),
+      requestTimeoutMs: 30_000,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", false);
+        clients.set(provider, client);
+        return client;
+      },
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
@@ -79,10 +86,17 @@ describe.sequential("AgentService: questions", () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "DONE", false);
-      clients.set(provider, client);
-      return client;
+    service = new AgentService({
+      store,
+      mailbox,
+      browser: fakeBrowser(),
+      requestTimeoutMs: 30_000,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", false);
+        clients.set(provider, client);
+        return client;
+      },
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
