@@ -474,6 +474,8 @@
   border-radius: var(--openbot-radius-lg) var(--openbot-radius-lg) var(--openbot-radius-md) var(--openbot-radius-md);
   background: var(--openbot-accent-strong);
   box-shadow: 0 0 0 1px var(--openbot-accent-soft);
+  -webkit-backdrop-filter: blur(var(--openbot-space-3));
+  backdrop-filter: blur(var(--openbot-space-3));
   padding-bottom: var(--openbot-radius-lg);
   color: var(--openbot-accent-text);
 }
