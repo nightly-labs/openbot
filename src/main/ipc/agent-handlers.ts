@@ -60,6 +60,7 @@ import {
   parseMarkConversationRead,
   parseMessageReaction,
   parsePromptResponse,
+  parseQueueEdit,
   parseReadConversationPage,
   parseReorderQueue,
   parseSearchConversationMessages,
@@ -353,6 +354,17 @@ export function agentIpcHandlers({
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueSteer(parsed.agentId), decodeVoid, {
               method: "POST",
               body: { deliveryId: parsed.deliveryId, expectedTurnId: parsed.expectedTurnId },
+            }),
+        });
+      }),
+      editQueuedMessage: payloadHandler(parseAgentRequest, (scoped) => {
+        const { agentId, ...input } = parseQueueEdit(scoped.payload);
+        return routeToServer(scoped.serverId, {
+          local: () => service.editQueuedMessage(agentId, input),
+          remote: (serverId) =>
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueEdit(agentId), decodeQueueSnapshot, {
+              method: "POST",
+              body: { ...input },
             }),
         });
       }),

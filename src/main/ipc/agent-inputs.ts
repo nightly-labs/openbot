@@ -49,6 +49,7 @@ import {
   type UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { decodeQueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { parseAvatarImage } from "./avatar-inputs";
 import { isObject, requireString } from "./validation";
 
@@ -654,4 +655,9 @@ export function parseBrowserTakeoverResponse(value: unknown): RespondToBrowserTa
     throw new Error("Invalid browser takeover response.");
   }
   return { requestId: value.requestId, decision: value.decision };
+}
+
+export function parseQueueEdit(value: unknown) {
+  if (!isObject(value)) throw new Error("Invalid queue edit request.");
+  return { agentId: parseAgentId(value.agentId), ...decodeQueueEditRequest(value) };
 }

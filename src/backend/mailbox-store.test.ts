@@ -10,8 +10,9 @@ import {
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
   isAttachmentSummary,
 } from "@openbot/contracts/ipc";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MailboxStore } from "./mailbox-store";
+import { OpenBotDatabase } from "./openbot-database";
 
 let root: string;
 let store: MailboxStore;
@@ -27,6 +28,141 @@ afterEach(async () => {
 });
 
 describe("MailboxStore", () => {
+  it("preserves edit attachment bytes across restart and clears unrelated drafts", async () => {
+    const file = join(root, "pasted.txt");
+    await writeFile(file, "Pasted bytes");
+    const receipt = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
+    const id = receipt.deliveries[0].id;
+    store.beginQueueEdit("chief", id, "edit-files");
+    const [kept] = await store.prepareImportedAttachments([file], []);
+    const [unrelated] = await store.prepareImportedAttachments([file], []);
+    store.retainQueueEditAttachments("chief", id, "edit-files", [kept.id]);
+    await expect(
+      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Other", draftIds: [kept.id] }),
+    ).rejects.toThrow("belongs to a queue edit");
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    await expect(restored.updateQueuedMessage("chief", id, "Edited", [], [unrelated.id], "edit-files")).rejects.toThrow(
+      "no longer exists",
+    );
+    await restored.updateQueuedMessage("chief", id, "Edited", [], [kept.id], "edit-files");
+    const next = restored.nextQueued("chief");
+    expect(next?.delivery.text).toBe("Edited");
+    expect(next?.delivery.attachments).toHaveLength(1);
+    const saved = await restored.resolveAttachment(next?.delivery.attachments[0].id ?? "");
+    await expect(readFile(saved?.path ?? "", "utf8")).resolves.toBe("Pasted bytes");
+  });
+
+  it("rolls back failed hold, save and release writes without changing the message", async () => {
+    const database = new OpenBotDatabase(join(root, "user-data"));
+    const mailbox = new MailboxStore(join(root, "user-data"), join(root, "Shared"), database);
+    await mailbox.initialize();
+    const receipt = await mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
+    const id = receipt.deliveries[0].id;
+    const failWrite = () =>
+      vi.spyOn(database, "replaceMailboxState").mockImplementationOnce(() => {
+        throw new Error("Disk full");
+      });
+    failWrite();
+    expect(() => mailbox.beginQueueEdit("chief", id, "edit-rollback")).toThrow("Disk full");
+    expect(mailbox.nextQueued("chief")?.delivery.text).toBe("Original");
+    mailbox.beginQueueEdit("chief", id, "edit-rollback");
+    failWrite();
+    await expect(mailbox.updateQueuedMessage("chief", id, "Changed", [], [], "edit-rollback")).rejects.toThrow(
+      "Disk full",
+    );
+    expect(mailbox.nextQueued("chief")).toBeNull();
+    expect(mailbox.listQueue("chief", "edit-rollback").deliveries[0].text).toBe("Original");
+    failWrite();
+    expect(() => mailbox.finishQueueEdit("chief", id, "edit-rollback")).toThrow("Disk full");
+    expect(mailbox.nextQueued("chief")).toBeNull();
+    await mailbox.updateQueuedMessage("chief", id, "Changed", [], [], "edit-rollback");
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    expect(restored.nextQueued("chief")?.delivery).toMatchObject({ id, text: "Changed", position: 1 });
+    expect(restored.queueEditFinished("chief", id, "edit-rollback")).toBe(true);
+  });
+
+  it("holds an edit across a restart and rejects dispatch, steer and a second editor", async () => {
+    const first = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
+    const second = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Next" });
+    const id = first.deliveries[0].id;
+    store.beginQueueEdit("chief", id, "phone-edit");
+    store.beginQueueEdit("chief", id, "phone-edit");
+    expect(() => store.beginQueueEdit("chief", id, "other-edit")).toThrow("another device");
+    expect(() => store.beginQueueEdit("other-agent", id, "phone-edit")).toThrow("no longer available");
+    expect(store.nextQueued("chief")).toBeNull();
+    await expect(store.markStarting(id)).rejects.toThrow("being edited");
+    await expect(store.markSteering(id, "turn-1")).rejects.toThrow("being edited");
+    await expect(store.updateQueuedMessage("chief", id, "Desktop edit", [], [])).rejects.toThrow("another device");
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    expect(restored.nextQueued("chief")).toBeNull();
+    expect(restored.listQueue("chief").deliveries.map((item) => item.id)).toEqual([second.deliveries[0].id]);
+    expect(restored.listQueue("chief").deliveries[0]).not.toHaveProperty("editId");
+    expect(restored.listQueue("chief").deliveries[0].position).toBe(1);
+    await restored.reorderQueue("chief", [second.deliveries[0].id]);
+    await restored.updateQueuedMessage("chief", id, "Edited", [], [], "phone-edit");
+    expect(restored.queueEditFinished("chief", id, "phone-edit")).toBe(true);
+    expect(restored.nextQueued("chief")?.delivery).toMatchObject({ id, text: "Edited", position: 1 });
+    expect(restored.queueEditFinished("chief", id, "phone-edit")).toBe(true);
+    expect(restored.listQueue("chief").deliveries[0]).not.toHaveProperty("finishedEditId");
+    await restored.markStarting(id);
+    expect(restored.nextQueued("chief")).toBeNull();
+  });
+
+  it("keeps files and order through edit cancellation and permits remote deletion of a held item", async () => {
+    const file = join(root, "notes.txt");
+    await writeFile(file, "Preserve these bytes");
+    const drafts = await store.prepareImportedAttachments([file], []);
+    const receipt = await store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Original",
+      draftIds: drafts.map((item) => item.id),
+    });
+    const id = receipt.deliveries[0].id;
+    const before = store.listQueue("chief").deliveries[0];
+    store.beginQueueEdit("chief", id, "edit-cancel");
+    await expect(store.updateQueuedMessage("chief", id, "", [], [], "edit-cancel")).rejects.toThrow("empty");
+    expect(store.nextQueued("chief")).toBeNull();
+    store.finishQueueEdit("chief", id, "edit-cancel");
+    expect(store.listQueue("chief").deliveries[0]).toEqual(before);
+    store.beginQueueEdit("chief", id, "edit-delete");
+    await store.cancel("chief", id);
+    await expect(store.updateQueuedMessage("chief", id, "Must not return", [], [], "edit-delete")).rejects.toThrow(
+      "Only queued messages",
+    );
+    store.finishQueueEdit("chief", id, "edit-delete");
+    expect(store.listQueue("chief").deliveries[0].status).toBe("cancelled");
+    expect(store.nextQueued("chief")).toBeNull();
+  });
+
+  it("rejects cancel and steer during an attachment save, then returns the edited files in order", async () => {
+    const receipt = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
+    const id = receipt.deliveries[0].id;
+    const file = join(root, "added.txt");
+    await writeFile(file, "Added file");
+    const drafts = await store.prepareImportedAttachments([file], []);
+    store.beginQueueEdit("chief", id, "edit-files");
+    const save = store.updateQueuedMessage(
+      "chief",
+      id,
+      "Updated",
+      [],
+      drafts.map((item) => item.id),
+      "edit-files",
+    );
+    expect(() => store.cancelNow("chief", id)).toThrow("being saved");
+    expect(() => store.finishQueueEdit("chief", id, "edit-files")).toThrow("being saved");
+    await expect(store.markSteering(id, "turn-1")).rejects.toThrow("being saved");
+    await save;
+    const delivery = store.nextQueued("chief")?.delivery;
+    expect(delivery?.text).toBe("Updated");
+    expect(delivery?.attachments.map((item) => item.name)).toEqual(["added.txt"]);
+    expect(delivery?.id).toBe(id);
+  });
+
   it("keeps staged generated attachments out of unrelated mailbox writes", async () => {
     const sourcePath = join(root, "staged-screenshot.png");
     await writeFile(sourcePath, "image bytes");

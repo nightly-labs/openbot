@@ -80,6 +80,7 @@ import {
   skillConversationEventItemType,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import { QueueEditRejectedError, type QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
 import { AttachmentGateway } from "./agent/attachment-gateway";
@@ -570,7 +571,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // moves. Without this its panel keeps naming the channel task that has already ended.
       queueHoldChanged: () => {
         for (const agent of this.#store.list())
-          if (this.#mailbox.nextQueued(agent.id)) this.#mailboxSync.emitQueue(agent.id);
+          if (this.#mailbox.queuedDeliveryIds(agent.id).length) this.#mailboxSync.emitQueue(agent.id);
       },
       error: (error) => this.#emitError("channel_coordination_failed", error),
     });
@@ -1575,6 +1576,45 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       throw new Error("Use the channel task controls for this assignment.");
     await this.#mailbox.cancel(agentId, deliveryId);
     this.#mailboxSync.emitQueue(agentId);
+    this.#drain.scheduleDrain(agentId);
+  }
+
+  async editQueuedMessage(agentId: string, input: QueueEditRequest): Promise<QueueSnapshot> {
+    if (this.#mailbox.queueEditFinished(agentId, input.deliveryId, input.editId)) {
+      if (input.action === "begin" || input.action === "retain-attachments")
+        throw new QueueEditRejectedError("This edit has already finished.");
+      if (input.action === "save")
+        await Promise.all(input.attachmentDraftIds.map((id) => this.#mailbox.discardDraft(id)));
+      this.#drain.scheduleDrain(agentId);
+      this.#mailboxSync.emitQueue(agentId);
+      return this.listQueue(agentId);
+    }
+    if (this.channels.store.assignmentForDelivery(input.deliveryId))
+      throw new Error("Use the channel task controls for this assignment.");
+    if (input.action === "begin") this.#mailbox.beginQueueEdit(agentId, input.deliveryId, input.editId);
+    else {
+      if (input.action === "retain-attachments")
+        this.#mailbox.retainQueueEditAttachments(agentId, input.deliveryId, input.editId, input.attachmentDraftIds);
+      if (input.action === "save") {
+        await this.#mailbox.updateQueuedMessage(
+          agentId,
+          input.deliveryId,
+          input.text,
+          input.keepAttachmentIds,
+          input.attachmentDraftIds,
+          input.editId,
+        );
+        const snapshot = this.#conversation.snapshot(agentId);
+        if (snapshot) {
+          this.#mailboxSync.syncMailboxMessages(snapshot);
+          this.#conversation.emitConversation(snapshot, "queue.message-updated");
+        }
+      }
+      if (input.action === "cancel") this.#mailbox.finishQueueEdit(agentId, input.deliveryId, input.editId);
+      this.#drain.scheduleDrain(agentId);
+    }
+    this.#mailboxSync.emitQueue(agentId);
+    return this.#mailbox.listQueue(agentId, input.action === "begin" ? input.editId : undefined);
   }
 
   async updateQueuedMessage(input: UpdateQueuedMessageInput): Promise<void> {
@@ -1591,6 +1631,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (snapshot) this.#mailboxSync.syncMailboxMessages(snapshot);
     this.#mailboxSync.emitQueue(input.agentId);
     if (snapshot) this.#conversation.emitConversation(snapshot, "queue.message-updated");
+    this.#drain.scheduleDrain(input.agentId);
   }
 
   async reorderQueue(input: ReorderQueueInput): Promise<void> {

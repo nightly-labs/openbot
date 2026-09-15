@@ -396,6 +396,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     timers.add(timer);
   };
   const emptyQueue = (agentId: string): QueueSnapshot => ({ agentId, deliveries: [] });
+  const queueEdits = new Map<string, { agentId: string; delivery: QueueDelivery }>();
   const queues = new Map<string, QueueSnapshot>(agents.map((agent) => [agent.id, emptyQueue(agent.id)]));
   const memories = new Map<string, AgentMemory[]>(Object.entries(clone(options.memories ?? {})));
   const routines = new Map<string, Routine[]>(Object.entries(clone(options.routines ?? {})));
@@ -1613,6 +1614,39 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         );
         queues.set(input.agentId, queue);
         emitAgentEvent({ type: "queue-changed", snapshot: queue });
+      },
+      editQueuedMessage: async (input) => {
+        const queue = queues.get(input.agentId) ?? emptyQueue(input.agentId);
+        if (input.action === "begin") {
+          const existing = queueEdits.get(input.editId);
+          const delivery =
+            existing?.delivery ??
+            queue.deliveries.find((item) => item.id === input.deliveryId && item.status === "queued");
+          if (!delivery || (existing && existing.agentId !== input.agentId))
+            throw new Error("This queued message is no longer available.");
+          queueEdits.set(input.editId, { agentId: input.agentId, delivery });
+          queue.deliveries = queue.deliveries.filter((item) => item.id !== delivery.id);
+          queues.set(input.agentId, queue);
+          emitAgentEvent({ type: "queue-changed", snapshot: structuredClone(queue) });
+          return { agentId: input.agentId, deliveries: [structuredClone(delivery)] };
+        }
+        const held = queueEdits.get(input.editId);
+        if (!held || held.agentId !== input.agentId || held.delivery.id !== input.deliveryId)
+          throw new Error("This edit is no longer available.");
+        if (input.action === "retain-attachments") return structuredClone(queue);
+        queueEdits.delete(input.editId);
+        const delivery =
+          input.action === "save"
+            ? {
+                ...held.delivery,
+                text: input.text,
+                attachments: held.delivery.attachments.filter((item) => input.keepAttachmentIds.includes(item.id)),
+              }
+            : held.delivery;
+        queue.deliveries.push(delivery);
+        queues.set(input.agentId, queue);
+        emitAgentEvent({ type: "queue-changed", snapshot: structuredClone(queue) });
+        return structuredClone(queue);
       },
       updateQueuedMessage: async (input: UpdateQueuedMessageInput) => {
         const queue = queues.get(input.agentId) ?? emptyQueue(input.agentId);

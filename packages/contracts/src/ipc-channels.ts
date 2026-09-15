@@ -150,6 +150,7 @@ export const IPC_CHANNELS = {
   agentAcknowledgeFailedTurn: "agent:acknowledge-failed-turn",
   agentCancelQueuedMessage: "agent:cancel-queued-message",
   agentSteerQueuedMessage: "agent:steer-queued-message",
+  agentEditQueuedMessage: "agent:edit-queued-message",
   agentUpdateQueuedMessage: "agent:update-queued-message",
   agentReorderQueue: "agent:reorder-queue",
   agentInterrupt: "agent:interrupt",

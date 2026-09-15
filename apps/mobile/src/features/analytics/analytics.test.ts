@@ -348,6 +348,11 @@ it("instruments message commands without sending their contents or changing the 
   };
   const sendMessage = vi.fn(async () => "message-receipt");
   const workspace: MobileWorkspaceContextValue = {
+    loadAttachmentThumbnail: async () => null,
+    loadQueue: async (agentId) => ({ agentId, deliveries: [] }),
+    canEditQueue: () => false,
+    changeQueue: async () => {},
+    editQueue: async (agentId) => ({ agentId, deliveries: [] }),
     channelStore: new MobileChannelStore(async () => {
       throw new Error("Unexpected channel request");
     }),

@@ -361,10 +361,15 @@ describe("OpenBot connected desktop shell", () => {
         queuedDelivery("delivery-voice-edit", "Queued draft", 1),
       ],
     });
+    vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({
+      agentId: "chief",
+      deliveries: [queuedDelivery("delivery-voice-edit", "Queued draft", 1)],
+    });
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
 
     await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save queued message" })).toBeEnabled());
     await fireEvent.click(screen.getByRole("button", { name: "Create prompt with voice" }));
     await screen.findByRole("group", { name: "Voice recording" });
     await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
@@ -377,8 +382,10 @@ describe("OpenBot connected desktop shell", () => {
 
     resolveTranscription?.({ text: "Voice transcript" });
     await waitFor(() =>
-      expect(window.openbot.agent.updateQueuedMessage).toHaveBeenCalledWith(
+      expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
         {
+          action: "save",
+          editId: expect.any(String),
           agentId: "chief",
           deliveryId: "delivery-voice-edit",
           text: "Queued draft Voice transcript",
@@ -406,13 +413,17 @@ describe("OpenBot connected desktop shell", () => {
         queuedDelivery("delivery-edit", "Queued draft", 1),
       ],
     });
+    vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({
+      agentId: "chief",
+      deliveries: [queuedDelivery("delivery-edit", "Queued draft", 1)],
+    });
     render(() => <App />);
 
     const composer = await screen.findByRole("textbox", { name: "Message Chief" });
     composer.textContent = "Personal draft";
     await fireEvent.input(composer);
     await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
-    expect(composer).toHaveTextContent("Queued draft");
+    await waitFor(() => expect(composer).toHaveTextContent("Queued draft"));
 
     await fireEvent.click(screen.getByRole("button", { name: "Studio Mac server" }));
     await waitFor(() =>
@@ -424,7 +435,9 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Queued draft");
 
     await fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Personal draft");
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Personal draft"),
+    );
     expect(window.openbot.agent.updateQueuedMessage).not.toHaveBeenCalled();
   });
 

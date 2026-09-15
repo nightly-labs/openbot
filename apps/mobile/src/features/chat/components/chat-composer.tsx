@@ -29,6 +29,9 @@ import { createComposerSendGate } from "../model/composer-send";
 import type { ChatAttachments } from "./use-chat-attachments";
 
 interface ChatComposerProps {
+  editFocusId?: string;
+  retainedAttachmentCount?: number;
+  sendLabel?: string;
   action: ViewStyle["backgroundColor"];
   actionForeground: ViewStyle["backgroundColor"];
   agentName: string;
@@ -53,6 +56,9 @@ interface ChatComposerProps {
 }
 
 export function ChatComposer({
+  editFocusId,
+  retainedAttachmentCount = 0,
+  sendLabel = "Send message",
   action,
   actionForeground,
   agentName,
@@ -86,11 +92,18 @@ export function ChatComposer({
         )
         .slice(0, 8)
     : [];
-  const hasDraft = Boolean(draft.trim()) || attachments.items.length > 0;
+  const hasDraft = Boolean(draft.trim()) || attachments.items.length > 0 || retainedAttachmentCount > 0;
   const inputRef = useRef<TextInput>(null);
   const attachmentButton = useRef<View>(null);
   const isFocused = useIsFocused();
   const focusedReplyVersion = useRef(0);
+  const focusedEdit = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (editFocusId && isFocused && !disabled && focusedEdit.current !== editFocusId) {
+      focusedEdit.current = editFocusId;
+      inputRef.current?.focus();
+    }
+  }, [editFocusId, isFocused, disabled]);
   useEffect(() => {
     if (isFocused && !disabled && !answerQuestion && replyTarget && focusedReplyVersion.current !== replyFocusVersion) {
       focusedReplyVersion.current = replyFocusVersion;
@@ -471,7 +484,7 @@ export function ChatComposer({
               </TextInput>
             </View>
             <Pressable
-              accessibilityLabel={hasDraft ? (answerQuestion ? "Send answer" : "Send message") : "Start voice message"}
+              accessibilityLabel={hasDraft ? (answerQuestion ? "Send answer" : sendLabel) : "Start voice message"}
               accessibilityRole="button"
               accessibilityState={{ disabled: disabled || sending || attachments.preparing }}
               disabled={disabled || sending || attachments.preparing}

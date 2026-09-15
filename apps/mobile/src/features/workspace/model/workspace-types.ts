@@ -11,11 +11,13 @@ import type {
   CreateAgentInput,
   CreateRoutineInput,
   DraftAttachment,
+  QueueSnapshot,
   RespondToPromptInput,
   Routine,
   UpdateAgentInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
+import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import type { MobileChannelStore } from "@/features/channels/model/channel-store";
@@ -64,6 +66,16 @@ interface AddRemoteServerInput {
 }
 
 export interface MobileWorkspaceContextValue {
+  loadAttachmentThumbnail: (serverId: string, attachmentId: string) => Promise<string | null>;
+  loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
+  canEditQueue: (serverId: string) => boolean;
+  changeQueue: (
+    agentId: string,
+    serverId: string,
+    action: "cancel" | "steer" | "reorder",
+    input: { deliveryId?: string; expectedTurnId?: string; deliveryIds?: string[] },
+  ) => Promise<void>;
+  editQueue: (agentId: string, serverId: string, input: QueueEditRequest) => Promise<QueueSnapshot>;
   channelStore: MobileChannelStore;
   servers: MobileServer[];
   teamDirectory: RemoteTeamDirectoryClient;
@@ -110,10 +122,11 @@ export interface MobileWorkspaceContextValue {
     text: string,
     attachmentDraftIds?: string[],
     replyToMessageId?: string | null,
+    serverId?: string,
   ) => Promise<string>;
-  uploadAttachment: (agentId: string, input: RemoteFileUpload) => Promise<DraftAttachment>;
+  uploadAttachment: (agentId: string, input: RemoteFileUpload, serverId?: string) => Promise<DraftAttachment>;
   downloadAttachment: (serverId: string, attachmentId: string) => Promise<RemoteFileUpload>;
-  discardAttachment: (agentId: string, attachmentId: string) => Promise<void>;
+  discardAttachment: (agentId: string, attachmentId: string, serverId?: string) => Promise<void>;
   hideAgent: (agentId: string) => void;
   unhideAgent: (agentId: string) => void;
   markAgentRead: (agentId: string, throughMessageId?: string) => void;

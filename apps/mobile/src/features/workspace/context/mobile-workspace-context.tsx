@@ -10,6 +10,7 @@ import {
   isAttachmentSummary,
   isAvatarHue,
   isQueuedMessageReceipt,
+  isQueueSnapshot,
   isReasoningEffort,
   isRoutine,
   type TeamRealtimeEvent,
@@ -17,7 +18,11 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  TEAM_ATTACHMENT_THUMBNAILS_CAPABILITY,
+  TEAM_CONVERSATION_UNREAD_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
+import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -68,6 +73,7 @@ import {
 } from "@/features/workspace/model/agent-pins";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
+import { applyMobileQueueEvent } from "@/features/workspace/model/queue-cache";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
 import { applyServerRecovery, serverKind } from "@/features/workspace/model/server-status";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
@@ -118,6 +124,16 @@ const MobileWorkspaceContext = createContext<MobileWorkspaceContextValue | null>
 export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const { session, sessionScope } = useMobileSession();
   const queryClient = useQueryClient();
+  useEffect(
+    () => () => {
+      for (const kind of ["chat-queue", "queue-thumbnail", "queue-edit-attachments"])
+        queryClient.removeQueries({ queryKey: [kind] });
+    },
+    [queryClient],
+  );
+  useEffect(() => {
+    queryClient.setQueryDefaults(["queue-edit-attachments"], { gcTime: Infinity });
+  }, [queryClient]);
   const presenceSignatures = useRef(new Map<string, string>());
   if (!session) throw new Error("MobileWorkspaceProvider requires a signed-in mobile session.");
 
@@ -190,6 +206,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         for (const id of serverAgentIds.current.get(server.id) ?? []) removedAgentIds.add(id);
         serverAgentIds.current.delete(server.id);
         presenceSignatures.current.delete(server.id);
+        for (const kind of ["chat-queue", "queue-thumbnail", "queue-edit-attachments"])
+          queryClient.removeQueries({ queryKey: [kind, server.id] });
         for (const kind of ["server-members", "server-invites", "agent-avatar"]) {
           queryClient.removeQueries({ queryKey: [kind, session.apiUrl, session.user.id, sessionScope, server.id] });
         }
@@ -449,6 +467,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const handleTeamEvent = useCallback(
     (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
       if (removedServers.current.has(serverId)) return;
+      if (event.type === "queue-changed" || event.type === "queue-invalidated") {
+        void applyMobileQueueEvent(queryClient, serverId, event);
+      }
       if (
         event.type === "channels-changed" ||
         event.type === "channel-memories-changed" ||
@@ -913,10 +934,65 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           operationId: Crypto.randomUUID(),
         });
       },
+      loadAttachmentThumbnail: async (serverId, attachmentId) => {
+        if (!serverCapabilities.current.get(serverId)?.includes(TEAM_ATTACHMENT_THUMBNAILS_CAPABILITY)) return null;
+        return request(
+          "GET",
+          `${TEAM_API_ROUTES.attachment(attachmentId)}?thumbnail=64`,
+          (value) => {
+            if (
+              !isDynamicRecord(value) ||
+              value.mimeType !== "image/png" ||
+              !isString(value.base64) ||
+              value.base64.length > 86_000
+            )
+              throw new Error("The host returned an invalid thumbnail.");
+            return `data:image/png;base64,${value.base64}`;
+          },
+          undefined,
+          serverId,
+        );
+      },
+      loadQueue: (agentId, serverId) =>
+        request(
+          "GET",
+          TEAM_API_ROUTES.agent.queue(agentId),
+          (value) => {
+            if (!isQueueSnapshot(value) || value.agentId !== agentId)
+              throw new Error("The host returned an invalid queue.");
+            return value;
+          },
+          undefined,
+          serverId,
+        ),
+      canEditQueue: (serverId) =>
+        serverCapabilities.current.get(serverId)?.includes(TEAM_QUEUE_EDIT_CAPABILITY) ?? false,
+      editQueue: async (agentId, serverId, input) => {
+        return request(
+          "POST",
+          TEAM_API_ROUTES.agent.queueEdit(agentId),
+          (value) => {
+            if (!isQueueSnapshot(value) || value.agentId !== agentId)
+              throw new Error("The host returned an invalid queue edit.");
+            return value;
+          },
+          { ...input },
+          serverId,
+        );
+      },
+      changeQueue: async (agentId, serverId, action, input) => {
+        const route =
+          action === "cancel"
+            ? TEAM_API_ROUTES.agent.queueCancel
+            : action === "steer"
+              ? TEAM_API_ROUTES.agent.queueSteer
+              : TEAM_API_ROUTES.agent.queueReorder;
+        await request("POST", route(agentId), ignoreResponse, input, serverId);
+      },
       loadConversation,
       loadOlderMessages,
-      uploadAttachment: async (agentId, input) => {
-        const serverId = agents.find((candidate) => candidate.id === agentId)?.serverId;
+      uploadAttachment: async (agentId, input, targetServerId) => {
+        const serverId = targetServerId ?? agents.find((candidate) => candidate.id === agentId)?.serverId;
         if (!serverId) throw new Error("The agent is unavailable.");
         const query = new URLSearchParams({ name: input.name, mime: input.mimeType });
         return request(
@@ -958,13 +1034,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return result;
       },
 
-      discardAttachment: async (agentId, attachmentId) => {
-        const serverId = agents.find((candidate) => candidate.id === agentId)?.serverId;
+      discardAttachment: async (agentId, attachmentId, targetServerId) => {
+        const serverId = targetServerId ?? agents.find((candidate) => candidate.id === agentId)?.serverId;
         if (!serverId) throw new Error("The agent is unavailable.");
         await request("DELETE", TEAM_API_ROUTES.attachment(attachmentId), ignoreResponse, undefined, serverId);
       },
-      sendMessage: async (agentId, text, attachmentDraftIds = [], replyToMessageId = null) => {
-        const serverId = agents.find((candidate) => candidate.id === agentId)?.serverId;
+      sendMessage: async (agentId, text, attachmentDraftIds = [], replyToMessageId = null, targetServerId) => {
+        const serverId = targetServerId ?? agents.find((candidate) => candidate.id === agentId)?.serverId;
         if (!serverId) throw new Error("The agent is unavailable.");
         const receipt = await request(
           "POST",

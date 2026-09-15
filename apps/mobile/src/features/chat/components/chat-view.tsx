@@ -33,11 +33,15 @@ import { isIOS } from "@/shared/lib/platform";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import type { ChatHistoryReceipt } from "../model/chat-messages";
 import type { ChatTarget } from "../model/chat-target";
+import { queueReceiptMessages } from "../model/queue-edit-draft";
 import { retainConfirmedAttachments } from "../model/upload-chat-attachments";
 import { ChatCameraPanel } from "./chat-camera-panel";
+import { ChatQueuePanel } from "./chat-queue-panel";
+import type { ChatQueueController } from "./use-chat-queue";
 
 export interface ChatViewProps {
   target: ChatTarget;
+  queue?: ChatQueueController;
   animateAvatarOnExit?: boolean;
   agents: MobileAgent[];
   mentionAgents: MobileAgent[];
@@ -63,6 +67,7 @@ export interface ChatViewProps {
     body: string,
     files: ChatAttachment[],
     replyToMessageId: string | null,
+    upload?: { cancelled: () => boolean; progress: (completed: number) => void },
   ) => Promise<string | null | ChatHistoryReceipt>;
   needsAction?: boolean;
   notice?: string;
@@ -77,6 +82,7 @@ function leaveConversation(): void {
 
 export function ChatView({
   target,
+  queue,
   animateAvatarOnExit = false,
   agents: serverAgents,
   mentionAgents,
@@ -130,29 +136,81 @@ export function ChatView({
   const [sendRetryVersion, setSendRetryVersion] = useState(0);
   const [composerGestureHeight, setComposerGestureHeight] = useState(0);
   const sendingRef = useRef(false);
-  const attachments = useChatAttachments();
+  const uploadCancelled = useRef(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [pendingInQueue, setPendingInQueue] = useState(false);
   const queryClient = useQueryClient();
+  const composerAttachments = useChatAttachments();
+  const editAttachments = useChatAttachments(
+    queue?.edit
+      ? queryClient.getQueryData<ChatAttachment[]>([
+          "queue-edit-attachments",
+          target.serverId,
+          target.id,
+          queue.edit.editId,
+        ])
+      : undefined,
+  );
+  const attachments = queue?.edit ? editAttachments : composerAttachments;
+  useEffect(() => {
+    if (queue?.edit)
+      queryClient.setQueryData(
+        ["queue-edit-attachments", target.serverId, target.id, queue.edit.editId],
+        editAttachments.items,
+      );
+  }, [queue?.edit, editAttachments.items, queryClient, target.serverId, target.id]);
+  const previousEditId = useRef(queue?.edit?.editId);
+  useEffect(() => {
+    if (previousEditId.current && !queue?.edit) {
+      queryClient.removeQueries({
+        queryKey: ["queue-edit-attachments", target.serverId, target.id, previousEditId.current],
+      });
+      editAttachments.clear();
+    }
+    previousEditId.current = queue?.edit?.editId;
+  }, [queue?.edit, editAttachments.clear, queryClient, target.serverId, target.id]);
   const submittedFiles = useRef<ChatAttachment[]>([]);
   const [pendingMessage, setPendingMessage] = useState<PendingChatMessage | null>(null);
   const [messageAliases, setMessageAliases] = useState<ReadonlyMap<string, string>>(new Map());
   const sendSequence = useRef(0);
   const [showStarter, setShowStarter] = useState(true);
   const { servers } = useMobileWorkspace();
+  const queuedMessageIds = useMemo(
+    () =>
+      new Set(
+        queue?.deliveries
+          .filter((item) => item.status === "queued" || item.status === "cancelled")
+          .map((item) => item.id) ?? [],
+      ),
+    [queue?.deliveries],
+  );
   const messages = useMemo(
-    () => presentChatMessages(projectedMessages, pendingMessage, messageAliases),
-    [projectedMessages, pendingMessage, messageAliases],
+    () =>
+      presentChatMessages(
+        projectedMessages.filter((item) => !queuedMessageIds.has(item.id)),
+        pendingInQueue || (pendingMessage?.serverId && queuedMessageIds.has(pendingMessage.serverId))
+          ? null
+          : pendingMessage,
+        messageAliases,
+      ),
+    [projectedMessages, pendingMessage, pendingInQueue, messageAliases, queuedMessageIds],
   );
   useEffect(() => {
     if (!pendingMessage?.serverId) return;
     if (
-      retainConfirmedAttachments(projectedMessages, pendingMessage.serverId, submittedFiles.current, (id, file) => {
-        queryClient.setQueryData(["chat-attachment", target.serverId, id], file);
-      })
+      retainConfirmedAttachments(
+        [...projectedMessages, ...queueReceiptMessages(queue?.deliveries ?? [])],
+        pendingMessage.serverId,
+        submittedFiles.current,
+        (id, file) => {
+          queryClient.setQueryData(["chat-attachment", target.serverId, id], file);
+        },
+      )
     ) {
       submittedFiles.current = [];
       setPendingMessage(null);
     }
-  }, [pendingMessage, projectedMessages, queryClient, target.serverId]);
+  }, [pendingMessage, projectedMessages, queue?.deliveries, queryClient, target.serverId]);
   const lastUserId =
     messages.findLast((message) => message.kind === "message" && message.author === "user")?.id ?? null;
   const motion = useChatMotion(insets.top + 84, keyboardOffset, ready, lastUserId);
@@ -234,10 +292,20 @@ export function ChatView({
   function sendMessage(value: string): void {
     if (!serverOnline || !canSend || sendingRef.current || pendingMessage) return;
     const body = value.trim();
+    if (queue?.edit) {
+      if (!queue.confirmed || queue.busy || queue.editUnavailable) return;
+      void queue.save(body, attachments.items).then((saved) => {
+        if (saved) attachments.clear();
+        else setSendRetryVersion((version) => version + 1);
+      });
+      return;
+    }
     if (!body && attachments.items.length === 0) return;
 
     setSendError(null);
-    motion.beginSend();
+    const queueSend = Boolean(queue && (activeTurnId || queue.queued.length));
+    setPendingInQueue(queueSend);
+    if (!queueSend) motion.beginSend();
     Keyboard.dismiss();
 
     void haptics.impact();
@@ -255,6 +323,8 @@ export function ChatView({
     setReplyTarget(null);
     const files = attachments.items;
     submittedFiles.current = files;
+    uploadCancelled.current = false;
+    setUploadProgress(0);
     const localId = `local-message-${++sendSequence.current}`;
     setPendingMessage({
       message: {
@@ -281,7 +351,10 @@ export function ChatView({
     });
     void (async () => {
       try {
-        const serverId = await send(body, files, submittedReply?.id ?? null);
+        const serverId = await send(body, files, submittedReply?.id ?? null, {
+          cancelled: () => uploadCancelled.current,
+          progress: setUploadProgress,
+        });
         if (serverId && typeof serverId === "object") {
           setHistoryReceipt(serverId);
         } else if (serverId) {
@@ -447,15 +520,39 @@ export function ChatView({
                   {notice}
                 </Typography.Paragraph>
               ) : null}
+              {queue ? (
+                <ChatQueuePanel
+                  queue={queue}
+                  pending={
+                    pendingInQueue && sending && pendingMessage
+                      ? {
+                          message: pendingMessage.message,
+                          progress: uploadProgress,
+                          total: submittedFiles.current.length,
+                          cancel: () => {
+                            uploadCancelled.current = true;
+                          },
+                        }
+                      : undefined
+                  }
+                  liquidGlassAvailable={liquidGlassAvailable}
+                  fallbackBackground={fieldBackground}
+                  disabled={sending || attachments.preparing || Boolean(questionForm?.question)}
+                />
+              ) : null}
               {!readOnly ? (
                 <ChatComposer
                   sendRetryVersion={sendRetryVersion}
-                  replyTarget={questionForm?.question ? null : replyTarget}
+                  editFocusId={queue?.confirmed ? queue.edit?.editId : undefined}
+                  retainedAttachmentCount={queue?.edit?.keepAttachmentIds.length ?? 0}
+                  sendLabel={queue?.edit ? "Save queued message" : "Send message"}
+                  replyTarget={queue?.edit || questionForm?.question ? null : replyTarget}
                   replyFocusVersion={replyFocusVersion}
                   onCancelReply={() => setReplyTarget(null)}
                   mentionAgents={mentionAgents}
                   key={JSON.stringify([
                     target.id,
+                    queue?.edit?.editId,
                     questionForm?.question ? questionForm.messageId : null,
                     questionForm?.question?.id,
                   ])}
@@ -463,17 +560,24 @@ export function ChatView({
                   actionForeground={actionForeground}
                   agentName={target.name}
                   bottomInset={insets.bottom}
-                  disabled={!serverOnline || !canSend || Boolean(questionForm?.pending)}
-                  sending={sending || Boolean(pendingMessage)}
+                  disabled={
+                    !serverOnline ||
+                    !canSend ||
+                    Boolean(questionForm?.pending) ||
+                    Boolean(queue?.edit && (!queue.confirmed || queue.editUnavailable))
+                  }
+                  sending={sending || Boolean(pendingMessage) || Boolean(queue?.busy)}
                   attachments={attachments}
-                  answerQuestion={questionForm?.question}
-                  draft={questionForm?.question ? questionForm.draft : draft}
+                  answerQuestion={queue?.edit ? undefined : questionForm?.question}
+                  draft={queue?.edit ? queue.edit.text : questionForm?.question ? questionForm.draft : draft}
                   fallbackBackground={fieldBackground}
                   foreground={foreground}
                   liquidGlassAvailable={liquidGlassAvailable}
                   muted={muted}
                   raised={raised}
-                  onChangeDraft={questionForm?.question ? questionForm.setDraft : setDraft}
+                  onChangeDraft={
+                    queue?.edit ? queue.changeText : questionForm?.question ? questionForm.setDraft : setDraft
+                  }
                   onSend={sendMessage}
                 />
               ) : null}

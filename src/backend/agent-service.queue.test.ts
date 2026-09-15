@@ -41,6 +41,54 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentService: queue", () => {
+  it("sends an edited delivery once after a repeated save and drains past a deleted hold", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    await store.getOrCreate("chief");
+    const first = await mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
+    const deliveryId = first.deliveries[0].id;
+    const editing = await service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "phone-edit" });
+    expect(editing.deliveries[0]).toMatchObject({ id: deliveryId, text: "Original" });
+    expect(service.listQueue("chief").deliveries).toEqual([]);
+    expect(mailbox.nextQueued("chief")).toBeNull();
+    const save = {
+      action: "save" as const,
+      deliveryId,
+      editId: "phone-edit",
+      text: "Edited on phone",
+      keepAttachmentIds: [],
+      attachmentDraftIds: [],
+    };
+    await service.editQueuedMessage("chief", save);
+    await service.editQueuedMessage("chief", save);
+    await waitFor(() => mailbox.listQueue("chief").deliveries[0]?.status === "completed");
+    const starts = client.requests.filter((request) => request.method === "turn/start");
+    expect(starts).toHaveLength(1);
+    expect(firstInputText(starts[0].params)).toContain("Edited on phone");
+    const removed = await mailbox.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Never send this",
+    });
+    await service.editQueuedMessage("chief", {
+      action: "begin",
+      deliveryId: removed.deliveries[0].id,
+      editId: "removed-edit",
+    });
+    const next = await mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Continue" });
+    await service.cancelQueuedMessage("chief", removed.deliveries[0].id);
+    await waitFor(
+      () =>
+        mailbox.listQueue("chief").deliveries.find((item) => item.id === next.deliveries[0].id)?.status === "completed",
+    );
+    expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(2);
+    expect(mailbox.listQueue("chief").deliveries.find((item) => item.id === removed.deliveries[0].id)?.status).toBe(
+      "cancelled",
+    );
+  });
+
   it("updates the active account and new-agent defaults with the preferred provider", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
@@ -1156,8 +1204,22 @@ describe.sequential("AgentService: queue", () => {
     // Waiting, not failed: a message to a busy agent always queues.
     expect(held.deliveries.map((delivery) => delivery.status)).toEqual(["queued"]);
 
+    const deliveryId = held.deliveries[0].id;
+    await service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "channel-wait-edit" });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+
     const turnId = service.channels.store.assignments("channel-1")[0]?.turnId ?? "";
     await service.interrupt("chief", turnId, service.channels.store.context("channel-1", "chief").threadId);
+
+    await waitFor(() =>
+      events.some(
+        (event) => event.type === "queue-changed" && event.snapshot.agentId === "chief" && !event.snapshot.hold,
+      ),
+    );
+    expect(service.listQueue("chief").deliveries).toEqual([]);
+    expect(mailbox.nextQueued("chief")).toBeNull();
+    await service.editQueuedMessage("chief", { action: "cancel", deliveryId, editId: "channel-wait-edit" });
 
     await waitFor(() => {
       const queue = service?.listQueue("chief");

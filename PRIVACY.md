@@ -318,3 +318,18 @@ Archiving a channel stops its work and retains its transcript. Restore makes the
 These actions do not remove agents, their memories, or linked conversations. Channel traffic between
 desktop clients and a host uses the existing host transport. The account API and Signal service do
 not store channel chats or make routing decisions. This feature adds no mobile chat interface.
+
+## Mobile queue previews and drafts
+
+When a connected phone shows the message queue, it can request small attachment thumbnails from
+the host. These requests use the existing authenticated attachment connection. They do not send
+files to a new service. The host keeps a bounded thumbnail cache in memory. Platforms that cannot
+create a thumbnail return a file-type fallback.
+
+A phone stores the text and attachment references of an active queue edit in its secure local
+storage so it can recover the edit after navigation or restart. The host keeps the original
+message and a persistent edit hold until the edit is saved, cancelled, or the message is deleted.
+
+The desktop editor also keeps its active queue edit, attachment references, and edit identity in
+local application storage. This lets it recover the held draft after restart. Neither client
+releases the host hold merely because the editor closes or disconnects.

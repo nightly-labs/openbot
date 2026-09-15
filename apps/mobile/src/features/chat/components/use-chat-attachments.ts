@@ -33,12 +33,12 @@ function base64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
-export function useChatAttachments() {
+export function useChatAttachments(initialItems: ChatAttachment[] = []) {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraOrigin, setCameraOrigin] = useState<ChatCameraOrigin>();
-  const [items, setItems] = useState<ChatAttachment[]>([]);
-  const itemsRef = useRef<ChatAttachment[]>([]);
-  const sequence = useRef(0);
+  const [items, setItems] = useState<ChatAttachment[]>(initialItems);
+  const itemsRef = useRef<ChatAttachment[]>(initialItems);
+  const sequence = useRef(initialItems.reduce((max, item) => Math.max(max, Number(item.id.split("-").at(-1)) || 0), 0));
   function replace(next: ChatAttachment[]) {
     itemsRef.current = next;
     setItems(next);
