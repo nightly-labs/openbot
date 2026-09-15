@@ -691,6 +691,7 @@ export async function createApplicationServices({
     logger.warn(`OpenBot updates are disabled because the application version is not valid SemVer: ${currentVersion}`);
   }
   let updateAdapter: UpdateAdapter = createDisabledUpdateAdapter();
+  let updaterEnabled = updatesEnabled;
   if (updatesEnabled) {
     try {
       const updaterModule = await import("electron-updater");
@@ -698,15 +699,17 @@ export async function createApplicationServices({
       if (realAdapter) {
         updateAdapter = realAdapter;
       } else {
+        updaterEnabled = false;
         logger.warn("OpenBot updates are disabled: electron-updater did not export autoUpdater");
       }
     } catch {
+      updaterEnabled = false;
       logger.warn("OpenBot updates are disabled: electron-updater failed to load");
     }
   }
   const updater = new UpdateService(updateAdapter, {
     currentVersion,
-    enabled: updatesEnabled,
+    enabled: updaterEnabled,
     autoDownload: updatePreference.autoDownload,
     beforeInstall: prepareForUpdateInstall,
     platform: process.platform,
