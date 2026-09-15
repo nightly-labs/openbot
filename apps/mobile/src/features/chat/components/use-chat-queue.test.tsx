@@ -144,6 +144,40 @@ it("keeps edit identity and text on navigation and never releases a hold on unmo
   });
   expect(restored.state().edit).toBeNull();
 });
+it("keeps the finished notice hidden while an edit request is in flight", async () => {
+  boundary.storage.set(
+    "queue-edit.member.host.agent",
+    JSON.stringify({
+      editId: "edit-phone",
+      initialized: true,
+      delivery,
+      text: "Work in progress",
+      keepAttachmentIds: [],
+    }),
+  );
+  boundary.loadQueue
+    .mockResolvedValueOnce({ agentId: "agent", deliveries: [{ ...delivery, status: "running", position: null }] })
+    .mockResolvedValue({ agentId: "agent", deliveries: [delivery] });
+  let release = () => {};
+  boundary.editQueue.mockImplementationOnce(
+    () =>
+      new Promise<QueueSnapshot>((resolve) => {
+        release = () => resolve({ agentId: "agent", deliveries: [delivery] });
+      }),
+  );
+  const view = mount();
+  await waitFor(() => expect(view.state().editUnavailable).toBe(true));
+  act(() => {
+    void view.state().begin(delivery);
+  });
+  expect(view.state().busy).toBe(true);
+  expect(view.state().editUnavailable).toBe(false);
+  await act(async () => {
+    release();
+  });
+  await waitFor(() => expect(view.state().confirmed).toBe(true));
+  await waitFor(() => expect(view.state().editUnavailable).toBe(false));
+});
 it("routes steer, delete and reorder to the original host and expected turn", async () => {
   const view = mount();
   await waitFor(() => expect(view.state().queued).toHaveLength(1));

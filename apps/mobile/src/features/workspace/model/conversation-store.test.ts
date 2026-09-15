@@ -164,6 +164,88 @@ describe("mobile conversation windows", () => {
     });
   });
 
+  it("keeps a streamed reply with its turn ahead of later queued messages", () => {
+    const { store, frame } = setup();
+    const user = (id: string, createdAt: string, turnId?: string): ConversationMessage => ({
+      id,
+      text: id,
+      author: "user",
+      source: "user",
+      createdAt,
+      status: "completed",
+      ...(turnId ? { turnId } : {}),
+    });
+    store.applyPage({
+      agentId: "agent",
+      threadId: "thread",
+      activeTurnId: "turn-1",
+      revision: 10,
+      messages: [
+        user("test-1", "2026-09-10T10:00:00Z", "turn-1"),
+        user("test-2", "2026-09-10T10:00:01Z"),
+        user("test-3", "2026-09-10T10:00:02Z"),
+      ],
+      references: {},
+      pageInfo: { hasOlder: false, olderCursor: null },
+    });
+    store.enqueue({
+      type: "conversation-delta",
+      agentId: "agent",
+      threadId: "thread",
+      turnId: "turn-1",
+      messageId: "reply-1",
+      revision: 11,
+      delta: "ok",
+      createdAt: "2026-09-10T10:00:03Z",
+    });
+    frame();
+    expect(store.get("agent")?.messages.map((item) => item.id)).toEqual(["test-1", "reply-1", "test-2", "test-3"]);
+  });
+
+  it("sorts a loaded page by turn so late answers stay with their question", () => {
+    const { store } = setup();
+    const row = (
+      id: string,
+      author: "user" | "assistant",
+      createdAt: string,
+      turnId?: string,
+    ): ConversationMessage => ({
+      id,
+      text: id,
+      author,
+      source: author,
+      createdAt,
+      status: "completed",
+      ...(turnId ? { turnId } : {}),
+    });
+    // Storage order: answers are stored when their first token arrives,
+    // after questions queued behind them.
+    store.applyPage({
+      agentId: "agent",
+      threadId: "thread",
+      activeTurnId: null,
+      revision: 20,
+      messages: [
+        row("hej", "user", "2026-09-10T10:00:00Z", "turn-1"),
+        row("hej-2", "user", "2026-09-10T10:00:01Z", "turn-2"),
+        row("hej-3", "user", "2026-09-10T10:00:02Z"),
+        row("reply-1", "assistant", "2026-09-10T10:00:03Z", "turn-1"),
+        row("hej-4", "user", "2026-09-10T10:00:04Z"),
+        row("reply-2", "assistant", "2026-09-10T10:00:05Z", "turn-2"),
+      ],
+      references: {},
+      pageInfo: { hasOlder: false, olderCursor: null },
+    });
+    expect(store.get("agent")?.messages.map((item) => item.id)).toEqual([
+      "hej",
+      "reply-1",
+      "hej-2",
+      "reply-2",
+      "hej-3",
+      "hej-4",
+    ]);
+  });
+
   it("shares a pending page request and refreshes again when invalidated during the request", async () => {
     const { store } = setup();
     const first = Promise.withResolvers<ConversationPage>();

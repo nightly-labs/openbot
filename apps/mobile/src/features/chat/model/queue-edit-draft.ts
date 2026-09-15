@@ -40,17 +40,27 @@ function parseQueueEditDraft(value: unknown): QueueEditDraft {
 export function orderedQueue(deliveries: QueueDelivery[]): QueueDelivery[] {
   return deliveries
     .filter((item) => item.status === "queued")
-    .sort((a, b) => (a.position ?? Infinity) - (b.position ?? Infinity));
+    .sort(
+      (a, b) =>
+        (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER) ||
+        a.createdAt.localeCompare(b.createdAt),
+    );
 }
 
 /** Conversation rows and send receipts use delivery IDs, not the shared mailbox message ID. */
 export function queueReceiptMessages(deliveries: QueueDelivery[]): ChatMessage[] {
-  return deliveries.map((delivery) => ({
-    kind: "message",
-    id: delivery.id,
-    author: delivery.sender.kind === "user" ? "user" : "agent",
-    body: delivery.text,
-    streaming: false,
-    attachments: delivery.attachments,
-  }));
+  return [...deliveries]
+    .sort(
+      (a, b) =>
+        (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER) ||
+        a.createdAt.localeCompare(b.createdAt),
+    )
+    .map((delivery) => ({
+      kind: "message",
+      id: delivery.id,
+      author: delivery.sender.kind === "user" ? "user" : "agent",
+      body: delivery.text,
+      streaming: false,
+      attachments: delivery.attachments,
+    }));
 }

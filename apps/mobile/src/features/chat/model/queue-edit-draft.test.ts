@@ -48,6 +48,14 @@ it("orders queued deliveries by host position without mutating the received snap
   expect(orderedQueue(rows).map((item) => item.id)).toEqual(["delivery-1", "second"]);
   expect(rows[0].id).toBe("second");
 });
+it("breaks queue ties by arrival so receipts keep the host order", () => {
+  const rows = [
+    { ...delivery, id: "later", position: null, createdAt: "2026-09-15T00:00:02Z" },
+    { ...delivery, id: "earlier", position: null, createdAt: "2026-09-15T00:00:01Z" },
+  ];
+  expect(orderedQueue(rows).map((item) => item.id)).toEqual(["earlier", "later"]);
+  expect(queueReceiptMessages(rows).map((item) => item.id)).toEqual(["earlier", "later"]);
+});
 it("keeps queued and cancelled messages out of chat while a streamed response updates", () => {
   const message: ConversationMessage = {
     id: "message-1",

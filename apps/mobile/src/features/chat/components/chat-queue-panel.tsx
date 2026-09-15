@@ -311,71 +311,64 @@ export const ChatQueuePanel = memo(function ChatQueuePanel({
             ) : null}
             {queue.edit ? (
               <View className="gap-1 px-4 pb-2">
-                <View className="flex-row items-center">
-                  <Typography className="flex-1 text-muted">
-                    {queue.editUnavailable
-                      ? "This message is no longer queued"
-                      : queue.confirmed
-                        ? "Editing queued message"
-                        : "Confirm edit to continue"}
-                  </Typography>
-                  <Button
-                    isIconOnly
-                    variant="ghost"
-                    isDisabled={locked}
-                    accessibilityLabel="Cancel queue edit"
-                    onPress={() => void queue.cancelEdit()}
-                  >
-                    <X size={18} color={muted} />
-                  </Button>
-                </View>
                 {queue.editUnavailable ? (
-                  <Button variant="secondary" isDisabled={locked} onPress={() => void queue.discardFinishedEdit()}>
-                    <Button.Label>Close edit</Button.Label>
-                  </Button>
-                ) : !queue.confirmed ? (
-                  <Button
-                    variant="secondary"
-                    isDisabled={locked}
-                    onPress={() => queue.edit && void queue.begin(queue.edit.delivery)}
-                  >
-                    <Button.Label>Resume edit</Button.Label>
-                  </Button>
-                ) : null}
-                {queue.edit.delivery.attachments
-                  .filter((file) => queue.edit?.keepAttachmentIds.includes(file.id))
-                  .map((file) => (
-                    <View key={file.id} className="flex-row items-center gap-2">
-                      <FileText size={16} color={muted} />
-                      <Typography numberOfLines={1} className="flex-1 text-muted">
-                        {file.name}
+                  <View className="flex-row items-center">
+                    <Typography className="flex-1 text-muted">This message is no longer queued</Typography>
+                    <Button variant="ghost" isDisabled={locked} onPress={() => void queue.discardFinishedEdit()}>
+                      <Button.Label>Close edit</Button.Label>
+                    </Button>
+                  </View>
+                ) : (
+                  <>
+                    <View className="flex-row items-center">
+                      <Typography className="flex-1 text-muted">
+                        {queue.confirmed ? "Editing queued message" : "Confirm edit to continue"}
                       </Typography>
                       <Button
                         isIconOnly
                         variant="ghost"
                         isDisabled={locked}
-                        accessibilityLabel={`Remove ${file.name} from edit`}
-                        onPress={() => queue.removeAttachment(file.id)}
+                        accessibilityLabel="Cancel queue edit"
+                        onPress={() => void queue.cancelEdit()}
                       >
-                        <X size={16} color={muted} />
+                        <X size={18} color={muted} />
                       </Button>
                     </View>
-                  ))}
-                {queue.progress !== null ? (
-                  <Button variant="ghost" onPress={queue.cancelUpload}>
-                    <Button.Label>Cancel upload ({queue.progress} uploaded)</Button.Label>
-                  </Button>
-                ) : null}
-              </View>
-            ) : null}
-            {queue.error ? (
-              <View className="px-4 pb-2">
-                <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-                  {queue.error}
-                </Typography.Paragraph>
-                <Button variant="ghost" onPress={queue.refresh}>
-                  <Button.Label>Refresh queue</Button.Label>
-                </Button>
+                    {!queue.confirmed ? (
+                      <Button
+                        variant="secondary"
+                        isDisabled={locked}
+                        onPress={() => queue.edit && void queue.begin(queue.edit.delivery)}
+                      >
+                        <Button.Label>Resume edit</Button.Label>
+                      </Button>
+                    ) : null}
+                    {queue.edit.delivery.attachments
+                      .filter((file) => queue.edit?.keepAttachmentIds.includes(file.id))
+                      .map((file) => (
+                        <View key={file.id} className="flex-row items-center gap-2">
+                          <FileText size={16} color={muted} />
+                          <Typography numberOfLines={1} className="flex-1 text-muted">
+                            {file.name}
+                          </Typography>
+                          <Button
+                            isIconOnly
+                            variant="ghost"
+                            isDisabled={locked}
+                            accessibilityLabel={`Remove ${file.name} from edit`}
+                            onPress={() => queue.removeAttachment(file.id)}
+                          >
+                            <X size={16} color={muted} />
+                          </Button>
+                        </View>
+                      ))}
+                    {queue.progress !== null ? (
+                      <Button variant="ghost" onPress={queue.cancelUpload}>
+                        <Button.Label>Cancel upload ({queue.progress} uploaded)</Button.Label>
+                      </Button>
+                    ) : null}
+                  </>
+                )}
               </View>
             ) : null}
             {queue.loading ? <Typography className="px-4 pb-2 text-muted">Loading queue…</Typography> : null}

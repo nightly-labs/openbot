@@ -113,6 +113,10 @@ export class MobileConversationStore {
     else {
       messages = [...oldMessages.slice(0, first).filter((message) => !fetchedIds.has(message.id)), ...fetched];
     }
+    // History pages arrive in storage order, while the chat reads turns: an
+    // answer streamed after later queued questions still belongs to its turn.
+    // Sort the merged window the same way live updates are sorted.
+    sortConversationMessages(messages);
     const next = replaceEqualDeep(current, {
       ...page,
       ...(cursor && current ? { revision: current.revision, activeTurnId: current.activeTurnId } : {}),
@@ -210,11 +214,12 @@ export class MobileConversationStore {
       }
       if (!updates.size) continue;
       const messages = [...current.messages];
+      let added = false;
       for (const [messageId, { event, parts }] of updates) {
         const text = parts.join("");
         const index = indices.get(messageId);
         if (index === undefined) {
-          indices.set(messageId, messages.length);
+          added = true;
           messages.push({
             id: messageId,
             turnId: event.turnId,
@@ -229,7 +234,63 @@ export class MobileConversationStore {
           messages[index] = { ...message, text: message.text + text, status: "streaming" };
         }
       }
-      this.#publish(agentId, { ...current, messages, revision, activeTurnId, threadId }, false);
+      // A streamed reply belongs to its turn, ahead of messages queued behind
+      // it. Appending would group every answer after every question, so keep
+      // the host order: turns by their first message, then user before answer.
+      // Matches `sortConversationMessages` in `src/backend/conversation-snapshots.ts`.
+      if (added) {
+        sortConversationMessages(messages);
+        this.#publish(agentId, { ...current, messages, revision, activeTurnId, threadId });
+      } else {
+        this.#publish(agentId, { ...current, messages, revision, activeTurnId, threadId }, false);
+      }
     }
   }
+}
+
+/** Host order for one chat window. Keep in sync with the backend sorter. */
+function sortConversationMessages(messages: ConversationMessage[]): void {
+  const originalIndexes = new Map(messages.map((message, index) => [message, index]));
+  const groupKeys = new Map<ConversationMessage, string>();
+  const groups = new Map<string, { startedAt: number; firstIndex: number }>();
+  for (const [index, message] of messages.entries()) {
+    const groupKey = message.turnId ? `turn:${message.turnId}` : `message:${index}`;
+    const createdAt = messageTime(message);
+    groupKeys.set(message, groupKey);
+    const group = groups.get(groupKey);
+    if (group) {
+      group.startedAt = Math.min(group.startedAt, createdAt);
+      group.firstIndex = Math.min(group.firstIndex, index);
+    } else {
+      groups.set(groupKey, { startedAt: createdAt, firstIndex: index });
+    }
+  }
+  messages.sort((left, right) => {
+    const leftGroup = groups.get(groupKeys.get(left) ?? "");
+    const rightGroup = groups.get(groupKeys.get(right) ?? "");
+    if (leftGroup && rightGroup && leftGroup !== rightGroup) {
+      if (leftGroup.startedAt !== rightGroup.startedAt) return leftGroup.startedAt - rightGroup.startedAt;
+      if (leftGroup.firstIndex !== rightGroup.firstIndex) return leftGroup.firstIndex - rightGroup.firstIndex;
+    }
+    if (left.turnId && left.turnId === right.turnId) {
+      const rankDifference = turnMessageRank(left) - turnMessageRank(right);
+      if (rankDifference !== 0) return rankDifference;
+    }
+    const timeDifference = messageTime(left) - messageTime(right);
+    if (timeDifference !== 0) return timeDifference;
+    return (originalIndexes.get(left) ?? 0) - (originalIndexes.get(right) ?? 0);
+  });
+}
+
+function messageTime(message: ConversationMessage): number {
+  const timestamp = Date.parse(message.createdAt);
+  return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
+}
+
+function turnMessageRank(message: ConversationMessage): 0 | 1 | 2 | 3 {
+  if (message.exchange?.direction === "incoming" || message.author === "user") return 0;
+  if (message.author === "assistant" && message.itemType === "commentary") return 1;
+  if (message.exchange?.direction === "outgoing") return 2;
+  if (message.author === "assistant") return 3;
+  return 2;
 }

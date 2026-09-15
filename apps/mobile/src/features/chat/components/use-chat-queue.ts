@@ -35,8 +35,13 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
   const busyRef = useRef(false);
   const [progress, setProgress] = useState<number | null>(null);
   const cancelled = useRef(false);
+  // An edit request in flight still owns the outcome: the queue can report the
+  // delivery as started before the host answers, which flashes the finished
+  // notice on every edit. Settle the request first; a genuinely gone delivery
+  // shows the notice (with the request error) right after.
   const editUnavailable = Boolean(
     edit &&
+      !busy &&
       query.data &&
       query.data.deliveries.some((item) => item.id === edit.delivery.id && item.status !== "queued"),
   );

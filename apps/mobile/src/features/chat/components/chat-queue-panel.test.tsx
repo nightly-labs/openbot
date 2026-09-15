@@ -120,7 +120,7 @@ const first: QueueDelivery = {
   error: null,
   createdAt: "2026-09-15T00:00:00Z",
 };
-function mount() {
+function mount(overrides: Partial<ChatQueueController> = {}) {
   const queued = [first, { ...first, id: "two", messageId: "message-two", text: "Second request", position: 2 }];
   const queue: ChatQueueController = {
     serverId: "host",
@@ -147,6 +147,7 @@ function mount() {
     steer: vi.fn(async () => true),
     moveFirst: vi.fn(async () => true),
     discardFinishedEdit: vi.fn(async () => true),
+    ...overrides,
   };
   const container = document.createElement("div");
   document.body.append(container);
@@ -187,4 +188,16 @@ it("keeps collapse accessible, restores row actions and sends the selected deliv
   expect(view.queue.steer).toHaveBeenCalledWith(first);
   expect(view.queue.remove).toHaveBeenCalledWith(first);
   expect(native.thumbnail).not.toHaveBeenCalled();
+});
+it("shows only a text Close edit when the queued message is gone", () => {
+  const view = mount({
+    edit: { editId: "edit-1", initialized: true, delivery: first, text: "First request", keepAttachmentIds: [] },
+    editUnavailable: true,
+  });
+  expect(screen.getByText("This message is no longer queued")).toBeTruthy();
+  const close = screen.getByRole("button", { name: "Close edit" });
+  expect(screen.queryByRole("button", { name: "Cancel queue edit" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Resume edit" })).toBeNull();
+  act(() => fireEvent.click(close));
+  expect(view.queue.discardFinishedEdit).toHaveBeenCalled();
 });
