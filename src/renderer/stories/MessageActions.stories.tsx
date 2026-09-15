@@ -64,3 +64,7 @@ export const MoreMenu: Story = {
     await expect(item.querySelector("svg")?.getBoundingClientRect().width).toBe(16);
   },
 };
+
+export const PreviewOnly: Story = {
+  args: { reactions: false, onReply: undefined },
+};

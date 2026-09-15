@@ -41,7 +41,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary }) {
       ]}
       style={`--sidebar-drag-y: ${dragOffset(rowProps.channel.id).y}px;`}
       data-chat-id={rowProps.channel.id}
-      draggable={!layoutMutable() || props.compact ? "false" : "true"}
+      draggable={rowProps.channel.archived || !layoutMutable() || props.compact ? "false" : "true"}
       onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) => startChatDragging(event, rowProps.channel.id)}
       onDragEnd={endChatDragging}
     >
@@ -82,7 +82,9 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary }) {
             <span class="sr-only">{rowProps.channel.unreadCount} unread messages</span>
           </Show>
         </ContextMenu.Trigger>
-        <SidebarChannelContextMenu channel={rowProps.channel} pinned={false} />
+        <Show when={!rowProps.channel.archived}>
+          <SidebarChannelContextMenu channel={rowProps.channel} pinned={false} />
+        </Show>
       </ContextMenu.Root>
     </div>
   );

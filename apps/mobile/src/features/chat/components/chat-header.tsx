@@ -22,6 +22,7 @@ interface ChatHeaderProps {
   topInset: number;
   onBack: () => void;
   needsAction?: boolean;
+  readOnly?: boolean;
 }
 
 export function ChatHeader({
@@ -32,6 +33,7 @@ export function ChatHeader({
   topInset,
   onBack,
   needsAction = false,
+  readOnly = false,
 }: ChatHeaderProps) {
   const warning = useThemeColor("warning");
   const { servers } = useMobileWorkspace();
@@ -75,7 +77,8 @@ export function ChatHeader({
           <Pressable
             className="min-w-0 shrink flex-row items-center gap-2 self-stretch px-3"
             accessibilityRole="button"
-            accessibilityLabel={`Info for ${target.name}`}
+            accessibilityLabel={readOnly ? target.name : `Info for ${target.name}`}
+            disabled={readOnly}
             hitSlop={8}
             onPress={() =>
               target.kind === "channel"

@@ -394,7 +394,7 @@ export function MessageActions(props: {
   onToggleMore: () => void;
   onExpandEmoji: () => void;
   onReact: (emoji: MessageReaction | null) => void;
-  onReply: () => void;
+  onReply?: () => void;
   onCopy: () => void;
 }) {
   return (
@@ -465,15 +465,17 @@ export function MessageActions(props: {
           </DropdownMenu.Root>
         </div>
       </Show>
-      <Button
-        variant="ghost"
-        type="button"
-        class="message-action-button"
-        aria-label={`Reply to ${props.message.author === "you" ? "User" : (props.authorName ?? "Agent")} message`}
-        onClick={props.onReply}
-      >
-        <ReplyIcon />
-      </Button>
+      <Show when={props.onReply}>
+        <Button
+          variant="ghost"
+          type="button"
+          class="message-action-button"
+          aria-label={`Reply to ${props.message.author === "you" ? "User" : (props.authorName ?? "Agent")} message`}
+          onClick={props.onReply}
+        >
+          <ReplyIcon />
+        </Button>
+      </Show>
       <div class="message-action-popover-anchor">
         <DropdownMenu.Root
           open={props.moreOpen}

@@ -98,8 +98,8 @@ export function SidebarDialogs() {
                   <ChannelAvatar members={channel().members} agents={props.agents} layout="cluster" />
                   <AlertDialog.Title>Delete {channel().name}?</AlertDialog.Title>
                   <AlertDialog.Description>
-                    This removes the channel, its messages, tasks, memories, and routines from the app and stops its
-                    work. Member agents are kept. This action cannot be undone.
+                    This stops the channel. Its history stays in Deleted channels for preview only. You cannot restore
+                    it. Member agents are kept.
                   </AlertDialog.Description>
                   <Show when={deleteError()}>{(message) => <p class="agent-delete-error">{message()}</p>}</Show>
                   <div class="agent-delete-actions">

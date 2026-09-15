@@ -464,3 +464,13 @@
   gap: var(--openbot-space-2);
   align-items: center;
 }
+
+.channel-preview-notice {
+  flex-shrink: 0;
+  margin: 0;
+  padding: var(--openbot-space-4);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-align: center;
+}

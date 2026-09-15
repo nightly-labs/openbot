@@ -1,6 +1,5 @@
 import {
   CHANNEL_CHATS_CAPABILITY,
-  CHANNEL_DELETE_CAPABILITY,
   type ChannelCommand,
   type ChannelPage,
   type ChannelSummary,
@@ -331,7 +330,7 @@ const Channels = createSimpleContext({
       state,
       supported,
       deletionSupported: () =>
-        activeServerSupportsCapability(CHANNEL_DELETE_CAPABILITY) &&
+        supported() &&
         (activeServer()?.kind !== "remote" || activeServer()?.role === "owner" || activeServer()?.role === "admin"),
       refresh,
       retry: async () => {
@@ -343,31 +342,15 @@ const Channels = createSimpleContext({
       open,
       editChannel: async (channelId: string) => {
         if (state.selectedId !== channelId) await open(channelId);
-        if (state.page?.channel.id !== channelId) return;
+        if (state.page?.channel.id !== channelId || state.page.channel.archived) return;
         setState((state) => {
           state.editing = "settings";
         });
       },
       remove: async (channelId: string) => {
-        const account = accountKey();
-        await window.openbot.agent.deleteChannel(channelId);
-        if (disposed || account !== accountKey()) return;
-        readThrough.delete(channelId);
-        if (failedCommand?.channelId === channelId) failedCommand = null;
-        const selected = state.selectedId === channelId;
-        if (selected) persistChannelSelection(null);
-        flush(() =>
-          setState((state) => {
-            state.channels = state.channels.filter((channel) => channel.id !== channelId);
-            if (selected) {
-              Object.assign(state, { selectedId: null, page: null, editing: null, loading: false, error: null });
-            }
-          }),
-        );
-        await refreshAfter();
-      },
-      restore: async (channelId: string) => {
-        await command({ type: "restore", channelId, operationId: crypto.randomUUID() });
+        if (!(await command({ type: "archive", channelId, operationId: crypto.randomUUID() }))) {
+          throw new Error(state.error ?? "Could not delete this channel.");
+        }
       },
       command,
       perform,
@@ -380,7 +363,7 @@ const Channels = createSimpleContext({
       },
       edit: () =>
         setState((state) => {
-          Object.assign(state, { editing: "settings" });
+          if (!state.page?.channel.archived) Object.assign(state, { editing: "settings" });
         }),
       closeEditor: () =>
         setState((state) => {

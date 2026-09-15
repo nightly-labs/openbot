@@ -655,17 +655,34 @@ it("retries a lost response once and keeps a focused draft through incoming mess
   expect(composer).toHaveTextContent("Keep this draft");
 });
 
-it("deletes a channel from the sidebar and keeps its member agents", async () => {
-  await openSavedChannel();
+it("keeps deleted channel history for preview below active chats", async () => {
+  const chat = await openSavedChannel();
+  const composer = within(chat).getByRole("textbox", { name: "Message to channel" });
+  composer.textContent = "Keep this history";
+  await fireEvent.input(composer);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  await within(chat).findByText("Keep this history");
+  await waitFor(() => expect(composer).toHaveTextContent(""));
+  await waitFor(() => expect(channelRow("Project room")).toHaveAccessibleName("Project room. Keep this history"));
   await openChannelMenuItem("Delete channel");
   const dialog = await screen.findByRole("alertdialog", { name: "Delete Project room?" });
   await fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
   await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
-  await waitFor(() => expect(screen.queryByRole("main", { name: "Channel conversation" })).not.toBeInTheDocument());
   expect(screen.queryByRole("button", { name: /^Project room\./ })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: /^Chief, Chief of staff/ })).toBeInTheDocument();
-  expect(window.localStorage.getItem(CHANNEL_SELECTION_STORAGE_KEY)).toBe("{}");
-  expect((await window.openbot.agent.listChannels()).some((channel) => channel.id === "channel-test")).toBe(false);
+  expect((await window.openbot.agent.listChannels()).find((channel) => channel.id === "channel-test")?.archived).toBe(
+    true,
+  );
+  await within(chat).findByText("Deleted channel. Preview only.");
+  expect(within(chat).queryByRole("textbox")).not.toBeInTheDocument();
+  expect(within(chat).queryByRole("button", { name: /Reply to/ })).not.toBeInTheDocument();
+  expect(within(chat).getByRole("button", { name: "Channel settings" })).toBeDisabled();
+  expect(within(chat).getByText("Keep this history")).toBeInTheDocument();
+  await fireEvent.contextMenu(screen.getByLabelText("Sidebar free area"));
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Deleted channels" }), { button: 0 });
+  const deleted = await screen.findByRole("region", { name: "Deleted channels" });
+  expect(within(deleted).getByRole("button", { name: /^Project room\./ })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /^Chief, Chief of staff/ })).toBeInTheDocument();
 });
 
 it("closes a channel deleted from another connection", async () => {

@@ -4,8 +4,9 @@
  * the scroll fades in that order.
  */
 
-import { Show } from "solid-js";
+import { For, Show } from "solid-js";
 import { ContextMenu, FolderPlus } from "../../components/ui";
+import { SidebarChannelRow } from "./SidebarChannelRow";
 import { SidebarEmptyState } from "./SidebarEmptyState";
 import { SidebarPinnedGroup } from "./SidebarPinnedGroup";
 import { SidebarSectionList } from "./SidebarSectionList";
@@ -52,6 +53,14 @@ export function SidebarNav() {
         </Show>
         <SidebarPinnedGroup />
         <SidebarSectionList />
+        <Show when={props.showingArchivedChannels}>
+          <section class="sidebar-chat-group sidebar-section" aria-label="Deleted channels">
+            <h2 class="sidebar-section-name">Deleted channels</h2>
+            <For each={props.deletedChannels} fallback={<p>No deleted channels.</p>}>
+              {(channel) => <SidebarChannelRow channel={channel} />}
+            </For>
+          </section>
+        </Show>
         <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
           {reorderAnnouncement()}
         </span>
@@ -69,7 +78,7 @@ export function SidebarNav() {
               </Show>
               <Show when={props.onToggleArchivedChannels}>
                 <ContextMenu.Item onSelect={() => props.onToggleArchivedChannels?.()}>
-                  {props.showingArchivedChannels ? "Show active chats" : "Archived chats"}
+                  {props.showingArchivedChannels ? "Hide deleted channels" : "Deleted channels"}
                 </ContextMenu.Item>
               </Show>
             </ContextMenu.Content>

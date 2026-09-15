@@ -25,6 +25,7 @@ import {
 export interface QuestionPromptBubbleProps {
   questions: AgentPromptQuestion[];
   pending?: boolean;
+  readOnly?: boolean;
   resolution?: AgentPromptResolution | null;
   onSubmit: (answers: Record<string, string[]>) => Promise<boolean>;
   onResolutionPresented?: () => void;
@@ -133,7 +134,8 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
 
   const questionCount = () => props.questions.length;
   const showingResolution = () => slotPages()[activeSlot()]?.kind === "resolution";
-  const interactionDisabled = () => Boolean(props.pending || submitting() || props.resolution || showingResolution());
+  const interactionDisabled = () =>
+    Boolean(props.readOnly || props.pending || submitting() || props.resolution || showingResolution());
   const busy = () => Boolean(interactionDisabled() || transitioning());
 
   onCleanup(() => {

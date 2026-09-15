@@ -78,6 +78,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       ready={Boolean(page)}
       historyLoadFailed={Boolean(state.error) || (!state.loading && !channel)}
       canSend={canSend}
+      readOnly={Boolean(channel?.archived)}
       activities={activities}
       activeTurnId={null}
       questionForm={questionForm}
@@ -100,9 +101,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
           .finally(() => setOlderLoading(false));
       }}
       send={(body, files, replyToMessageId) => sender.send(body, files, replyToMessageId, channel?.members ?? [])}
-      notice={
-        channel?.archived ? "This channel is archived. Restore it in channel settings to send messages." : undefined
-      }
+      notice={channel?.archived ? "Deleted channel. Preview only." : undefined}
       needsAction={channelTasksNeedingAction(page?.tasks ?? []).length > 0 && !channel?.archived}
     />
   );

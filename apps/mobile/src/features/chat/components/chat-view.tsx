@@ -46,6 +46,7 @@ export interface ChatViewProps {
   ready: boolean;
   historyLoadFailed: boolean;
   canSend: boolean;
+  readOnly?: boolean;
   activity?: MobileAgentActivity;
   activities?: MobileAgentActivity[];
   activeTurnId: string | null;
@@ -84,6 +85,7 @@ export function ChatView({
   ready,
   historyLoadFailed,
   canSend,
+  readOnly = false,
   activity,
   activities,
   activeTurnId,
@@ -331,6 +333,7 @@ export function ChatView({
           >
             <ChatHeader
               target={target}
+              readOnly={readOnly}
               needsAction={needsAction}
               fallbackBackground={fieldBackground}
               foreground={foreground}
@@ -373,7 +376,7 @@ export function ChatView({
               olderError={olderError}
               onLoadOlder={loadOlder}
               onReply={
-                !questionForm?.question
+                !readOnly && !questionForm?.question
                   ? (message) => {
                       setReplyTarget(message);
                       setReplyFocusVersion((version) => version + 1);
@@ -444,36 +447,40 @@ export function ChatView({
                 </View>
               ) : null}
               {notice ? (
-                <Typography.Paragraph className="bg-background px-4 py-2 text-muted">{notice}</Typography.Paragraph>
+                <Typography.Paragraph align="center" className="bg-background px-4 py-2 text-muted">
+                  {notice}
+                </Typography.Paragraph>
               ) : null}
-              <ChatComposer
-                sendRetryVersion={sendRetryVersion}
-                replyTarget={questionForm?.question ? null : replyTarget}
-                replyFocusVersion={replyFocusVersion}
-                onCancelReply={() => setReplyTarget(null)}
-                mentionAgents={mentionAgents}
-                key={JSON.stringify([
-                  target.id,
-                  questionForm?.question ? questionForm.messageId : null,
-                  questionForm?.question?.id,
-                ])}
-                action={action}
-                actionForeground={actionForeground}
-                agentName={target.name}
-                bottomInset={insets.bottom}
-                disabled={!serverOnline || !canSend || Boolean(questionForm?.pending)}
-                sending={sending || Boolean(pendingMessage)}
-                attachments={attachments}
-                answerQuestion={questionForm?.question}
-                draft={questionForm?.question ? questionForm.draft : draft}
-                fallbackBackground={fieldBackground}
-                foreground={foreground}
-                liquidGlassAvailable={liquidGlassAvailable}
-                muted={muted}
-                raised={raised}
-                onChangeDraft={questionForm?.question ? questionForm.setDraft : setDraft}
-                onSend={sendMessage}
-              />
+              {!readOnly ? (
+                <ChatComposer
+                  sendRetryVersion={sendRetryVersion}
+                  replyTarget={questionForm?.question ? null : replyTarget}
+                  replyFocusVersion={replyFocusVersion}
+                  onCancelReply={() => setReplyTarget(null)}
+                  mentionAgents={mentionAgents}
+                  key={JSON.stringify([
+                    target.id,
+                    questionForm?.question ? questionForm.messageId : null,
+                    questionForm?.question?.id,
+                  ])}
+                  action={action}
+                  actionForeground={actionForeground}
+                  agentName={target.name}
+                  bottomInset={insets.bottom}
+                  disabled={!serverOnline || !canSend || Boolean(questionForm?.pending)}
+                  sending={sending || Boolean(pendingMessage)}
+                  attachments={attachments}
+                  answerQuestion={questionForm?.question}
+                  draft={questionForm?.question ? questionForm.draft : draft}
+                  fallbackBackground={fieldBackground}
+                  foreground={foreground}
+                  liquidGlassAvailable={liquidGlassAvailable}
+                  muted={muted}
+                  raised={raised}
+                  onChangeDraft={questionForm?.question ? questionForm.setDraft : setDraft}
+                  onSend={sendMessage}
+                />
+              ) : null}
             </Animated.View>
           </KeyboardGestureArea>
         </View>

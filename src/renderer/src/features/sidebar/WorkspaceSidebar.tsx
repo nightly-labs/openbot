@@ -55,9 +55,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   /* Channels reach the sidebar as data, not as a list of their own: they sit in the layout's
    * sections beside the agents, so the sidebar has to be able to order and group them. */
   const visibleChannels = createMemo(() =>
-    channels.supported()
-      ? channels.state.channels.filter((channel) => channel.archived === channels.state.archived)
-      : [],
+    channels.supported() ? channels.state.channels.filter((channel) => !channel.archived) : [],
   );
 
   const sidebarAgentStates = createMemo(() =>
@@ -73,11 +71,11 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   return (
     <Sidebar
       channels={visibleChannels()}
+      deletedChannels={channels.supported() ? channels.state.channels.filter((channel) => channel.archived) : []}
       activeChannelId={channels.state.selectedId}
       onSelectChannel={(id) => void channels.open(id)}
       onEditChannel={(id) => void channels.editChannel(id)}
       onDeleteChannel={channels.deletionSupported() ? channels.remove : undefined}
-      onRestoreChannel={channels.restore}
       showingArchivedChannels={channels.state.archived}
       onToggleArchivedChannels={channels.supported() ? channels.toggleArchived : undefined}
       onCreateChannel={channels.supported() ? channels.create : undefined}

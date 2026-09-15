@@ -83,7 +83,6 @@ export function ChannelFormScreen({ create = false }: { create?: boolean }) {
       channel={create ? undefined : (current ?? last.current)}
       available={available}
       store={state.store}
-      canDelete={state.canDelete}
     />
   );
 }
@@ -95,7 +94,6 @@ function ChannelForm({
   channel,
   available,
   store,
-  canDelete,
 }: {
   create: boolean;
   serverId: string;
@@ -103,7 +101,6 @@ function ChannelForm({
   channel?: ChannelSummary;
   available: boolean;
   store: MobileChannelStore;
-  canDelete: boolean;
 }) {
   const { agents, servers } = useMobileWorkspace();
   const canManage = servers.find((server) => server.id === serverId)?.role !== "member";
@@ -132,7 +129,7 @@ function ChannelForm({
   const choices = useMemo(() => agents.filter((agent) => agent.serverId === serverId), [agents, serverId]);
   const availableIds = useMemo(() => new Set(choices.map((agent) => agent.id)), [choices]);
   const selectedIds = useMemo(() => new Set(draft.members.map((member) => member.agentId)), [draft.members]);
-  const disabled = saving || !available || finished;
+  const disabled = saving || !available || finished || Boolean(channel?.archived);
   usePreventRemove(!finished && (dirty || saving), ({ data }) => {
     if (lock.current) return;
     Alert.alert("Discard changes?", "Your changes have not been saved.", [
@@ -286,7 +283,7 @@ function ChannelForm({
             ))}
         </SettingsSection>
       ) : null}
-      {!create ? (
+      {!create && !channel?.archived ? (
         <SettingsSection>
           <SettingsRow
             disabled={saving}
@@ -306,39 +303,27 @@ function ChannelForm({
           </SettingsRow>
         </SettingsSection>
       ) : null}
-      {!create ? (
+      {!create && !channel?.archived ? (
         <SettingsSection>
-          <SettingsRow
-            disabled={disabled || dirty || (!canManage && !channel?.archived)}
-            disclosure={false}
-            onPress={() =>
-              void run(
-                () =>
-                  store.command(serverId, {
-                    type: channel?.archived ? "restore" : "archive",
-                    operationId: Crypto.randomUUID(),
-                    channelId,
-                  }),
-                true,
-              )
-            }
-          >
-            <Typography.Paragraph>{channel?.archived ? "Restore channel" : "Archive channel"}</Typography.Paragraph>
-          </SettingsRow>
-          {canDelete && canManage ? (
+          {canManage ? (
             <SettingsRow
               disabled={disabled || dirty}
               disclosure={false}
               onPress={() =>
                 Alert.alert(
                   "Delete channel?",
-                  "This permanently deletes the channel and its messages. Agents are kept.",
+                  "This stops the channel. Its history stays in Deleted channels for preview only. You cannot restore it. Agents are kept.",
                   [
                     { text: "Cancel", style: "cancel" },
                     {
                       text: "Delete",
                       style: "destructive",
-                      onPress: () => void run(() => store.delete(serverId, channelId), true),
+                      onPress: () =>
+                        void run(
+                          () =>
+                            store.command(serverId, { type: "archive", operationId: Crypto.randomUUID(), channelId }),
+                          true,
+                        ),
                     },
                   ],
                 )

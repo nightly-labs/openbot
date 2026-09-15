@@ -302,16 +302,25 @@ describe("Sidebar pinned chats", () => {
     expect(onDeleteChannel).toHaveBeenCalledWith("channel-1");
   });
 
-  it("offers restore for archived channels", async () => {
+  it("shows deleted channels below active chats with no context actions", async () => {
     const props = sidebarProps();
-    const onRestoreChannel = vi.fn(async () => undefined);
-    const archivedChannel = { ...storyChannel(), archived: true };
-    render(() => <Sidebar {...props} channels={[archivedChannel]} onRestoreChannel={onRestoreChannel} />);
-
-    await fireEvent.contextMenu(screen.getByRole("button", { name: "Project room. No messages yet" }));
-    const channelMenu = await screen.findByRole("menu", { name: "Channel actions" });
-    await fireEvent.pointerUp(within(channelMenu).getByRole("menuitem", { name: "Restore channel" }), { button: 0 });
-    expect(onRestoreChannel).toHaveBeenCalledWith("channel-1");
+    const onSelectChannel = vi.fn();
+    render(() => (
+      <Sidebar
+        {...props}
+        channels={[storyChannel()]}
+        deletedChannels={[{ ...storyChannel(), id: "deleted", name: "Deleted room", archived: true }]}
+        showingArchivedChannels
+        onSelectChannel={onSelectChannel}
+      />
+    ));
+    expect(screen.getByRole("button", { name: "Project room. No messages yet" })).toBeInTheDocument();
+    const deleted = screen.getByRole("region", { name: "Deleted channels" });
+    const row = within(deleted).getByRole("button", { name: "Deleted room. No messages yet" });
+    await fireEvent.click(row);
+    expect(onSelectChannel).toHaveBeenCalledWith("deleted");
+    await fireEvent.contextMenu(row);
+    expect(screen.queryByRole("menu", { name: "Channel actions" })).not.toBeInTheDocument();
   });
 
   it("reorders pinned chats by keyboard and constrained horizontal drag", async () => {

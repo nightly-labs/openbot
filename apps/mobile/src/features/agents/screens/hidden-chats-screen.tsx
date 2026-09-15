@@ -14,7 +14,9 @@ import { haptics } from "@/shared/lib/haptics";
 export function HiddenChatsScreen() {
   const { hiddenAgents, unhideAgent, agents, activeServer, hiddenChannelIds, unhideChannel } = useMobileWorkspace();
   const channels = useChannels(activeServer.id);
-  const hiddenChannels = channels.channels.filter((channel) => hiddenChannelIds.includes(channel.id));
+  const hiddenChannels = channels.channels.filter(
+    (channel) => !channel.archived && hiddenChannelIds.includes(channel.id),
+  );
   const members = useMemo(
     () => new Map(agents.filter((agent) => agent.serverId === activeServer.id).map((agent) => [agent.id, agent])),
     [agents, activeServer.id],

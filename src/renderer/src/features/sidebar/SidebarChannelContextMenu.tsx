@@ -25,16 +25,6 @@ export function SidebarChannelContextMenu(menuProps: { channel: ChannelSummary; 
           <EditIcon />
           <span>Edit channel</span>
         </ContextMenu.Item>
-        <Show when={menuProps.channel.archived && props.onRestoreChannel}>
-          <ContextMenu.Item
-            onSelect={() => {
-              const restore = props.onRestoreChannel;
-              if (restore) void restore(menuProps.channel.id).catch(() => undefined);
-            }}
-          >
-            <span>Restore channel</span>
-          </ContextMenu.Item>
-        </Show>
         <Show when={props.onDeleteChannel}>
           <ContextMenu.Separator />
           <ContextMenu.Item

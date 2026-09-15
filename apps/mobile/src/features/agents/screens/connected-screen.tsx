@@ -4,7 +4,7 @@ import { router, Stack, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Bot, Layers3, Plus, Search, WifiOff } from "lucide-react-native";
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo } from "react";
 import { FlatList, Pressable, View } from "react-native";
 import Animated, { Easing, FadeIn, FadeOut, ReduceMotion } from "react-native-reanimated";
 import {
@@ -98,8 +98,6 @@ export function ConnectedScreen() {
     () => new Map(agents.filter((agent) => agent.serverId === activeServer.id).map((agent) => [agent.id, agent])),
     [agents, activeServer.id],
   );
-  const [archivedServerId, setArchivedServerId] = useState<string | null>(null);
-  const archivedChannels = archivedServerId === activeServer.id;
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   const iconColor = String(foreground);
   const mutedColor = String(muted);
@@ -117,7 +115,8 @@ export function ConnectedScreen() {
     .map((agentId) => activeAgents.find((agent) => agent.id === agentId))
     .filter((agent): agent is (typeof activeAgents)[number] => Boolean(agent));
   const hasHiddenChats =
-    hiddenAgents.length > 0 || channels.channels.some((channel) => hiddenChannelIds.includes(channel.id));
+    hiddenAgents.length > 0 ||
+    channels.channels.some((channel) => !channel.archived && hiddenChannelIds.includes(channel.id));
   const pinnedChannels = channels.channels.filter(
     (channel) => !channel.archived && !hiddenChannelIds.includes(channel.id) && pinnedChannelIds.includes(channel.id),
   );
@@ -127,9 +126,7 @@ export function ConnectedScreen() {
     ...channels.channels
       .filter(
         (channel) =>
-          !hiddenChannelIds.includes(channel.id) &&
-          channel.archived === archivedChannels &&
-          (archivedChannels || !pinnedChannelIds.includes(channel.id)),
+          !hiddenChannelIds.includes(channel.id) && !channel.archived && !pinnedChannelIds.includes(channel.id),
       )
       .map((channel) => ({ kind: "channel" as const, channel })),
     ...unpinnedAgents.map((agent) => ({ kind: "agent" as const, agent })),
@@ -139,12 +136,9 @@ export function ConnectedScreen() {
     () => [
       { id: "add-agent", title: "Add agent" },
       ...(channels.supported ? [{ id: "add-channel", title: "New channel" }] : []),
-      ...(channels.channels.some((channel) => channel.archived) || archivedChannels
-        ? [{ id: "archived-channels", title: archivedChannels ? "Show active channels" : "Archived channels" }]
-        : []),
       ...(hasHiddenChats ? [{ id: "hidden-chats", title: "Hidden chats" }] : []),
     ],
-    [hasHiddenChats, channels.supported, channels.channels, archivedChannels],
+    [hasHiddenChats, channels.supported],
   );
 
   return (
@@ -280,14 +274,12 @@ export function ConnectedScreen() {
                       if (event.nativeEvent.event === "add-agent") router.push("/add-agent");
                       if (event.nativeEvent.event === "add-channel")
                         router.push({ pathname: "/add-channel", params: { serverId: activeServer.id } });
-                      if (event.nativeEvent.event === "archived-channels")
-                        setArchivedServerId(archivedChannels ? null : activeServer.id);
                       if (event.nativeEvent.event === "hidden-chats") router.push("/hidden-chats");
                     }}
                     style={{ height: 44, width: 44 }}
                   >
                     <View
-                      accessibilityLabel="Add chat"
+                      accessibilityLabel="Chat options"
                       accessibilityRole="button"
                       accessible
                       className="size-11 items-center justify-center rounded-full"
@@ -315,7 +307,7 @@ export function ConnectedScreen() {
             {IS_AGENT_SEARCH_ENABLED ? (
               <Stack.Toolbar.Button icon="magnifyingglass" onPress={() => router.push("/search-agents")} />
             ) : null}
-            <Stack.Toolbar.Menu icon="plus">
+            <Stack.Toolbar.Menu icon="plus" accessibilityLabel="Chat options">
               <Stack.Toolbar.MenuAction icon="plus.circle" onPress={() => router.push("/add-agent")}>
                 Add agent
               </Stack.Toolbar.MenuAction>
@@ -325,14 +317,6 @@ export function ConnectedScreen() {
                   onPress={() => router.push({ pathname: "/add-channel", params: { serverId: activeServer.id } })}
                 >
                   New channel
-                </Stack.Toolbar.MenuAction>
-              ) : null}
-              {channels.channels.some((channel) => channel.archived) || archivedChannels ? (
-                <Stack.Toolbar.MenuAction
-                  icon="archivebox"
-                  onPress={() => setArchivedServerId(archivedChannels ? null : activeServer.id)}
-                >
-                  {archivedChannels ? "Show active channels" : "Archived channels"}
                 </Stack.Toolbar.MenuAction>
               ) : null}
               {hasHiddenChats ? (
