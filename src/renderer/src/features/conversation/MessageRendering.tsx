@@ -4,7 +4,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack }
 import { type BubbleVariant, Button, DropdownMenu } from "../../components/ui";
 import { prefersReducedMotion } from "../../components/ui/utils";
 import type { AgentMessage, AgentProfile } from "../../data";
-import { AttachmentCards } from "./AttachmentCards";
+import { AttachmentCards, AttachmentDownloadAll } from "./AttachmentCards";
 import { CodeBlock } from "./CodeBlock";
 import { ComparisonTable } from "./ComparisonTable";
 import { CheckIcon, CopyIcon, MoreIcon, PlusIcon, ReactionIcon, ReplyIcon } from "./ConversationIcons";
@@ -358,30 +358,27 @@ export function MessageBody(props: {
           </For>
         </div>
       </Show>
-      <Show when={(props.message.attachments?.length ?? 0) > 2 && props.onDownloadAttachments}>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={downloadingAttachments()}
-          onClick={async () => {
-            if (downloadingAttachments()) return;
-            setDownloadingAttachments(true);
-            try {
-              await props.onDownloadAttachments?.(props.message.attachments ?? []);
-            } finally {
-              setDownloadingAttachments(false);
-            }
-          }}
-        >
-          {downloadingAttachments() ? "Downloading ZIP…" : "Download all as ZIP"}
-        </Button>
-      </Show>
       <Show when={standaloneFileAttachments().length > 0}>
-        <AttachmentCards
-          attachments={standaloneFileAttachments()}
-          onPreview={props.onPreview}
-          onAction={props.onAttachmentAction}
-        />
+        <div class="message-attachments-group">
+          <Show when={(props.message.attachments?.length ?? 0) > 2 && props.onDownloadAttachments}>
+            <AttachmentDownloadAll
+              count={props.message.attachments?.length ?? 0}
+              pending={downloadingAttachments()}
+              onDownload={() => {
+                if (downloadingAttachments()) return;
+                setDownloadingAttachments(true);
+                void props
+                  .onDownloadAttachments?.(props.message.attachments ?? [])
+                  .finally(() => setDownloadingAttachments(false));
+              }}
+            />
+          </Show>
+          <AttachmentCards
+            attachments={standaloneFileAttachments()}
+            onPreview={props.onPreview}
+            onAction={props.onAttachmentAction}
+          />
+        </div>
       </Show>
     </>
   );

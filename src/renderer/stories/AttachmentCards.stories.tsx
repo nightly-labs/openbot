@@ -1,6 +1,6 @@
 import { expect, fn, userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { AttachmentCards } from "../src/features/conversation/AttachmentCards";
+import { AttachmentCards, AttachmentDownloadAll } from "../src/features/conversation/AttachmentCards";
 import { STORY_ATTACHMENTS } from "./fixtures";
 
 const compactFile = {
@@ -108,4 +108,36 @@ export const NarrowLongNames: Story = {
 
 export const Empty: Story = {
   args: { attachments: [] },
+};
+
+export const WithDownloadAll: Story = {
+  name: "With download all as ZIP",
+  render: (storyArgs) => (
+    <div class="message-attachments-group">
+      <AttachmentDownloadAll count={storyArgs.attachments.length} pending={false} onDownload={fn()} />
+      <AttachmentCards {...storyArgs} />
+    </div>
+  ),
+  play: async ({ canvas }) => {
+    const download = canvas.getByRole("button", { name: "Download all as ZIP" });
+    const firstCard = canvas.getByRole("button", { name: `Preview ${STORY_ATTACHMENTS[0].name}` });
+    const downloadBounds = download.getBoundingClientRect();
+    const cardBounds = firstCard.getBoundingClientRect();
+
+    await expect(downloadBounds.bottom).toBeLessThanOrEqual(cardBounds.top);
+    await expect(downloadBounds.width).toBeLessThan(cardBounds.width);
+  },
+};
+
+export const DownloadingZip: Story = {
+  name: "Downloading ZIP",
+  render: (storyArgs) => (
+    <div class="message-attachments-group">
+      <AttachmentDownloadAll count={storyArgs.attachments.length} pending onDownload={fn()} />
+      <AttachmentCards {...storyArgs} />
+    </div>
+  ),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("button", { name: "Downloading ZIP…" })).toBeDisabled();
+  },
 };
