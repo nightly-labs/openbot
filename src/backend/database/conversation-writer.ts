@@ -19,13 +19,18 @@ export interface ConversationWriterOptions {
 }
 
 /**
- * The write side of a thread's conversation: a whole snapshot, or one appended message.
+ * The write side of a thread's conversation: a whole snapshot, one appended message, or one message
+ * of a run of streamed text.
  *
  * Owns `projection_thread_messages` and `projection_thread_activities`, and compacts the thread
- * aggregate so the log keeps only the newest full snapshot. Both entry points run inside a single
- * dispatch, so a caller already in a transaction has these writes pulled into it, and neither opens
- * a transaction of its own. The agent lookup and the thread projection row come from the roster.
- * The class never imports the facade.
+ * aggregate so the log keeps only the newest full snapshot and the streamed messages after it. Each
+ * entry point runs inside a single dispatch, so a caller already in a transaction has these writes
+ * pulled into it, and none of them opens a transaction of its own. The agent lookup and the thread
+ * projection row come from the roster. The class never imports the facade.
+ *
+ * Pick by how much is known to have changed, not by convenience: `persistConversation` costs as
+ * much as the thread is long, so a caller on a hot path that changed one message must use
+ * `persistStreamingMessage` instead.
  */
 export class ConversationWriter {
   readonly #core: DatabaseCore;
@@ -173,6 +178,105 @@ export class ConversationWriter {
     return { ...structuredClone(snapshot), revision: result.revision };
   }
 
+  /**
+   * The write behind one flushed run of streamed text.
+   *
+   * `persistConversation` rewrites the whole thread: it puts the entire snapshot in the event
+   * payload, re-upserts every message, and clones the snapshot back out. A streaming flush arrives
+   * ten times a second per streaming message, so that cost - which grows with the thread's whole
+   * history - was paid ten times a second per agent, on the main process, inside a write
+   * transaction that every other agent then queued behind. A six-agent channel on mature threads
+   * saturated the main process with it.
+   *
+   * Only one message changes, so only that message is written. The event carries the message
+   * whole rather than the delta, because the text is not always an append: `item/completed`
+   * replaces it outright, so summing deltas would not rebuild it. A whole message also makes each
+   * event idempotent and order-independent, which is what keeps a replay correct after a prune
+   * removes some of the run.
+   *
+   * The previous unsuperseded event for the same message is deleted in the same transaction, so a
+   * streaming message holds one event rather than one per flush and the log grows with the text,
+   * not with the square of it.
+   *
+   * Returns the new revision alone. Returning the snapshot would clone the whole history back to a
+   * caller that only reads `revision` from it.
+   */
+  persistStreamingMessage(input: {
+    snapshot: ConversationSnapshot;
+    messageId: string;
+    eventType: string;
+    detail?: unknown;
+    commandId?: string;
+  }): number {
+    const { snapshot, messageId } = input;
+    const threadId = snapshot.threadId;
+    // A thread is required to address a projection row, and the message has to be in the snapshot
+    // for its ordinal to be known. Neither holds for a flush that races a thread reset, so fall
+    // back to the whole-snapshot write rather than drop the text.
+    const ordinal = threadId ? snapshot.messages.findIndex((message) => message.id === messageId) : -1;
+    if (!threadId || ordinal < 0) {
+      return this.persistConversation(snapshot, input.eventType, input.detail ?? {}, input.commandId).revision;
+    }
+    const message = snapshot.messages[ordinal];
+    if (!message) throw new Error(`Streamed message is missing from the snapshot: ${messageId}`);
+    return this.#core.dispatch(
+      input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
+      [
+        {
+          aggregateType: "thread",
+          aggregateId: threadId,
+          eventType: input.eventType,
+          payload: {
+            detail: input.detail ?? {},
+            streamedMessage: message,
+            activeTurnId: snapshot.activeTurnId,
+          },
+        },
+      ],
+      (db, sequences) => {
+        const sequence = sequences[0] ?? snapshot.revision;
+        const agent = this.#roster.listAgents().find((candidate) => candidate.id === snapshot.agentId);
+        if (!agent) throw new Error(`Unknown agent for conversation: ${snapshot.agentId}`);
+        this.#roster.ensureThreadProjection(db, agent, sequence);
+        supersedeStreamedMessageEvents(db, threadId, messageId, input.eventType, sequence);
+        db.prepare(`
+          INSERT INTO projection_thread_messages (
+            thread_id, message_id, turn_id, author, status, item_type, created_at,
+            ordinal, message_json, last_event_sequence
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(thread_id, message_id) DO UPDATE SET
+            turn_id = excluded.turn_id,
+            author = excluded.author,
+            status = excluded.status,
+            item_type = excluded.item_type,
+            created_at = excluded.created_at,
+            ordinal = excluded.ordinal,
+            message_json = excluded.message_json,
+            last_event_sequence = excluded.last_event_sequence
+        `).run(
+          threadId,
+          message.id,
+          message.turnId ?? null,
+          message.author,
+          message.status,
+          message.itemType ?? null,
+          message.createdAt,
+          ordinal,
+          JSON.stringify(message),
+          sequence,
+        );
+        // A no-op while the message streams - the helper ignores anything but a settled message -
+        // and the one call that matters if a flush ever lands on a completed one.
+        recordUsageMessage(db, agent.id, message, agent.provider, agent.model);
+        db.prepare(
+          `UPDATE projection_threads
+           SET active_turn_id = ?, updated_at = ?, last_event_sequence = ? WHERE thread_id = ?`,
+        ).run(snapshot.activeTurnId, new Date().toISOString(), sequence, threadId);
+        return { revision: sequence };
+      },
+    ).revision;
+  }
+
   appendConversationMessage(input: {
     agentId: string;
     threadId: string;
@@ -296,19 +400,63 @@ function conversationRecoveryState(
   return { turnProviderSessionIds };
 }
 
+/**
+ * Drops the earlier events for a message that is still streaming, so the log holds one event per
+ * streaming message instead of one per 100 ms flush.
+ *
+ * The receipt of each dropped event goes with it. `deleteOrphanReceipts` would find the same rows,
+ * but it scans the whole receipts table to do it, and this runs on the flush path - the cost this
+ * write path exists to remove. The command ids are read first so each receipt is deleted by key,
+ * and the `NOT EXISTS` guard keeps a receipt whose command wrote more than the one event.
+ */
+function supersedeStreamedMessageEvents(
+  db: DatabaseSync,
+  threadId: string,
+  messageId: string,
+  eventType: string,
+  retainedSequence: number,
+): void {
+  // `event_type` is matched before the payload is read on purpose. A thread keeps one whole
+  // snapshot, whose payload holds every message, and `json_extract` over it costs as much as the
+  // history is long - the very cost this path exists to avoid. The type match rejects that row
+  // without parsing it, and leaves only the short streamed-message payloads to read.
+  const matchSuperseded = `
+    aggregate_type = 'thread' AND aggregate_id = ? AND event_type = ? AND sequence < ?
+      AND json_extract(payload_json, '$.streamedMessage.id') = ?`;
+  const supersededCommandIds = databaseRows(
+    db
+      .prepare(`SELECT command_id FROM orchestration_events WHERE ${matchSuperseded}`)
+      .all(threadId, eventType, retainedSequence, messageId),
+  ).map((row) => requiredStringColumn(row, "command_id"));
+  if (supersededCommandIds.length === 0) return;
+  db.prepare(`DELETE FROM orchestration_events WHERE ${matchSuperseded}`).run(
+    threadId,
+    eventType,
+    retainedSequence,
+    messageId,
+  );
+  const deleteReceipt = db.prepare(
+    `DELETE FROM orchestration_command_receipts
+     WHERE command_id = ?
+       AND NOT EXISTS (SELECT 1 FROM orchestration_events WHERE command_id = ?)`,
+  );
+  for (const commandId of supersededCommandIds) deleteReceipt.run(commandId, commandId);
+}
+
 function pruneConversationSnapshots(db: DatabaseSync, threadId: string, retainedSequence: number): void {
+  // A streamed-message event is superseded by any later whole snapshot exactly as an older snapshot
+  // is: the snapshot carries that message's text too. Leaving them would let the flushes of an
+  // interrupted turn stay in the log for the life of the thread.
+  const supersededEvents = `
+    aggregate_type = 'thread' AND aggregate_id = ? AND sequence < ?
+      AND (json_type(payload_json, '$.snapshot') = 'object'
+        OR json_type(payload_json, '$.streamedMessage') = 'object')`;
   db.prepare(
     `DELETE FROM projection_thread_activities
      WHERE thread_id = ? AND last_event_sequence IN (
-       SELECT sequence FROM orchestration_events
-       WHERE aggregate_type = 'thread' AND aggregate_id = ? AND sequence < ?
-         AND json_type(payload_json, '$.snapshot') = 'object'
+       SELECT sequence FROM orchestration_events WHERE ${supersededEvents}
      )`,
   ).run(threadId, threadId, retainedSequence);
-  db.prepare(
-    `DELETE FROM orchestration_events
-     WHERE aggregate_type = 'thread' AND aggregate_id = ? AND sequence < ?
-       AND json_type(payload_json, '$.snapshot') = 'object'`,
-  ).run(threadId, retainedSequence);
+  db.prepare(`DELETE FROM orchestration_events WHERE ${supersededEvents}`).run(threadId, retainedSequence);
   deleteOrphanReceipts(db);
 }
