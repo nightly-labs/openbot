@@ -50,11 +50,31 @@ export function AccountLogin(props: AccountLoginProps) {
   let emailRevertTimer: number | undefined;
   let emailMessageTimer: number | undefined;
 
-  const clock = window.setInterval(() => setNow(Date.now()), 1_000);
-  onCleanup(() => {
-    window.clearInterval(clock);
-    clearEmailErrorTimers();
+  onCleanup(clearEmailErrorTimers);
+
+  // `now()` exists for the two countdowns below and nothing else, so the clock
+  // runs only while one of them is on screen. Arming it at creation instead
+  // woke the view once a second for its whole life, including the ordinary case
+  // where there is nothing to count down.
+  const countdownUntil = createMemo(() => {
+    const resendAt = props.state.status === "code_sent" ? props.state.resendAvailableAt : 0;
+    return Math.max(resendAt, issueBlockedUntil());
   });
+
+  createEffect(
+    () => countdownUntil(),
+    (until) => {
+      setNow(Date.now());
+      if (until <= Date.now()) return;
+      const clock = window.setInterval(() => {
+        setNow(Date.now());
+        // Stop at the deadline rather than wait for the next state change: the
+        // label has reached zero and no later tick can change it.
+        if (Date.now() >= until) window.clearInterval(clock);
+      }, 1_000);
+      return () => window.clearInterval(clock);
+    },
+  );
 
   const codeSent = () => props.state.status === "code_sent";
   const verified = () => props.state.status === "signed_in";
