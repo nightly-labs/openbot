@@ -2136,7 +2136,7 @@ textarea {
 
 .agent-row-time,
 .person-row .agent-row-heading > span,
-.channel-row .agent-row-heading > span {
+.channel-row .agent-row-time {
   min-width: 0;
   flex: 0 0 auto;
   color: var(--openbot-text-readable);

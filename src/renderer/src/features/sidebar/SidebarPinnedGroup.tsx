@@ -137,6 +137,13 @@ export function SidebarPinnedGroup() {
                                 <strong class="sidebar-pinned-name" title={name()}>
                                   {name()}
                                 </strong>
+                                <Show when={channel().title.trim()}>
+                                  {(label) => (
+                                    <Badge class="sidebar-pinned-title" size="sm" title={label()}>
+                                      <span>{label()}</span>
+                                    </Badge>
+                                  )}
+                                </Show>
                               </span>
                               <Show when={channel().unreadCount > 0}>
                                 <span class="sr-only">{channel().unreadCount} unread messages</span>

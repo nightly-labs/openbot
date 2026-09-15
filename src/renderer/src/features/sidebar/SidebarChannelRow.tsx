@@ -23,6 +23,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary }) {
     startChatDragging,
   } = useSidebarScope();
   const active = () => props.activeChannelId === rowProps.channel.id;
+  const title = () => rowProps.channel.title.trim();
   /* Running work is a prefix on the preview line rather than a word beside the name: one line
    * carries both and the row keeps the height every other row in the list has. */
   const preview = () => {
@@ -57,7 +58,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary }) {
               "sidebar-agent-row-dragging": draggedChatId() === rowProps.channel.id,
             },
           ]}
-          aria-label={`${rowProps.channel.name}. ${preview()}`}
+          aria-label={`${rowProps.channel.name}${title() ? `, ${title()}` : ""}. ${preview()}`}
           aria-pressed={active() ? "true" : "false"}
           onClick={(event: MouseEvent) => {
             if (!sidebarClickIsSuppressed(event)) props.onSelectChannel?.(rowProps.channel.id);
@@ -73,8 +74,19 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary }) {
           </span>
           <span class="agent-row-copy">
             <span class="agent-row-heading">
-              <strong>{rowProps.channel.name}</strong>
-              <span>{sidebarMessageTime(rowProps.channel.lastMessage?.at ?? rowProps.channel.createdAt)}</span>
+              <span class="agent-row-title">
+                <strong>{rowProps.channel.name}</strong>
+                <Show when={title()}>
+                  {(label) => (
+                    <Badge class="agent-role-badge" size="sm" title={label()}>
+                      <span>{label()}</span>
+                    </Badge>
+                  )}
+                </Show>
+              </span>
+              <span class="agent-row-time">
+                {sidebarMessageTime(rowProps.channel.lastMessage?.at ?? rowProps.channel.createdAt)}
+              </span>
             </span>
             <span class="agent-row-preview">{preview()}</span>
           </span>
