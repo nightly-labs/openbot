@@ -9,9 +9,9 @@ export default defineConfig({
     execArgv: ["--disable-warning=ExperimentalWarning"],
     globals: true,
     // The worker count is left to vitest, which uses one less than the machine
-    // reports. Asking a four-vCPU runner for a fourth worker was measured and is
-    // slower, not faster: it took the run from 100.6s to 125.7s, and every phase
-    // with it, because the workers then contend with the main process.
+    // reports: the CI runner reports four vCPUs, so it runs three. Asking that
+    // runner for a fourth was measured and is slower, not faster - 125.7s
+    // against 100.6s - because the workers then contend with the main process.
     // Every spy, global patch and fake timer a test file installs is undone
     // after each test, in both projects, so nothing depends on file order.
     restoreMocks: true,

@@ -86,11 +86,19 @@ per-process globals, so they fail on `threads` whether or not isolation is on, a
 they fail on the filesystem; it also spends its time in the tests themselves rather than in
 environment setup, so it has little to gain.
 
-The worker count is left to vitest, which uses one less than the machine reports. A four-vCPU
-runner given a fourth worker is slower, not faster: the run went from 100.6s to 125.7s, and every
-phase with it, because the workers then contend with the main process. `deps.optimizer` is also
-not enabled: it left `import` unchanged, at 26.1s against 26.2s, because that phase is this
-repository's own module graph re-executing per file rather than dependency resolution.
+The worker count is left to vitest. It uses one less than the machine reports, and the runner
+reports four vCPUs, so it runs three. Asking for a fourth is slower, not faster - 125.7s against
+100.6s - because the workers then contend with the main process.
+
+Compare pool settings with the summed `tests` phase divided by the wall clock, not the wall clock
+alone. That ratio is how many workers were actually busy, and it is stable where the wall clock is
+not: three workers give 2.00, 2.07 and 1.99 across three runs whose durations were 100.6s, 101.7s
+and 134.1s, while four workers give 2.64. The 134.1s run was a slow runner, and reading it as a
+worker-count change cost a wrong commit here. Runner speed varies by about 30% between runs, so no
+single pair of runs supports a conclusion about a config change.
+
+`deps.optimizer` is not enabled: it left `import` unchanged, at 26.1s against 26.2s, because that
+phase is this repository's own module graph re-executing per file rather than dependency resolution.
 
 ### The `App.*.test.tsx` files are not at the wrong boundary
 
