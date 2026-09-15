@@ -291,6 +291,35 @@ describe("development state seed", () => {
     await expect(readFile(sentinel, "utf8")).resolves.toBe("keep");
   });
 
+  it("keeps an existing isolated profile when seeding only if missing", async () => {
+    const { appDataRoot, homeDirectory } = await createRoots();
+    const profilePath = join(appDataRoot, developmentUserDataName("app", "5197"));
+    const sentinel = join(profilePath, "keep.txt");
+    await writeSentinel(sentinel, "keep");
+
+    await expect(
+      seedDevelopmentState({ appDataRoot, homeDirectory, ifMissing: true, instanceId: "5197" }),
+    ).resolves.toMatchObject({ targetProfile: profilePath });
+    await expect(readFile(sentinel, "utf8")).resolves.toBe("keep");
+  });
+
+  it("removes staged data when an isolated profile appears during seeding", async () => {
+    const { appDataRoot, homeDirectory } = await createRoots();
+    const profilePath = join(appDataRoot, developmentUserDataName("app", "5197"));
+    const sentinel = join(profilePath, "keep.txt");
+
+    const seeding = seedDevelopmentState({ appDataRoot, homeDirectory, ifMissing: true, instanceId: "5197" });
+    while (!(await readdir(appDataRoot)).some((entry) => entry.startsWith(".openbot-dev-seed-"))) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    await writeSentinel(sentinel, "keep");
+    await expect(seeding).resolves.toMatchObject({ targetProfile: profilePath });
+
+    await expect(readFile(sentinel, "utf8")).resolves.toBe("keep");
+    expect((await readdir(appDataRoot)).filter((entry) => entry.startsWith(".openbot-dev-seed-"))).toEqual([]);
+    await expect(readdir(join(homeDirectory, "OpenBot", "Shared", "Transfers", "generated"))).resolves.toEqual([]);
+  });
+
   it("seeds an isolated development instance without changing the default profile", async () => {
     const { appDataRoot, homeDirectory } = await createRoots();
     const defaultSentinel = join(appDataRoot, developmentUserDataName("app"), "keep.txt");

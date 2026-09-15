@@ -26,6 +26,14 @@ export function parseBrowserOpen(value: unknown): BrowserOpenInput {
 }
 
 export function parseBrowserNavigate(value: unknown): BrowserNavigateInput {
+  if (isObject(value) && value.direction !== undefined && value.url !== undefined) {
+    throw new Error("Invalid browser navigation request.");
+  }
+  if (isObject(value) && value.direction === undefined && value.url !== undefined) {
+    const url = requireString(value.url, "url", INPUT_LIMITS.browserUrl);
+    if (!/^https?:\/\//i.test(url)) throw new Error("Only HTTP(S) browser URLs are allowed.");
+    return { tabId: requireString(value.tabId, "tabId"), url };
+  }
   if (!isObject(value) || (value.direction !== "back" && value.direction !== "forward")) {
     throw new Error("Invalid browser navigation request.");
   }

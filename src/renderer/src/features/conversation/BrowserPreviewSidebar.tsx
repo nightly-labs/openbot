@@ -1,7 +1,7 @@
 import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show } from "solid-js";
 import { PanelResizer, readPanelWidth, savePanelWidth } from "../../components/PanelResizer";
-import { Button, ChevronRight, Monitor, Plus, Skeleton, X } from "../../components/ui";
+import { Button, ChevronRight, Maximize2, Monitor, Plus, Skeleton, X } from "../../components/ui";
 
 const BROWSER_PANEL_STORAGE_KEY = "openbot:browser-preview-panel-width";
 const BROWSER_PANEL_MIN = 220;
@@ -15,7 +15,7 @@ interface BrowserPreviewSidebarProps {
   defaultWidth: () => number;
   maxWidth: () => number;
   onWidthChange: (width: number) => void;
-  onOpenTab: (tabId: string, trigger: HTMLButtonElement, preview: BrowserPreview | null) => void;
+  onOpenTab: (tabId: string, trigger: HTMLButtonElement) => void;
   onCloseTab: (tabId: string) => void;
   onNewTab: () => void;
   onCollapse: () => void;
@@ -121,7 +121,7 @@ export function BrowserPreviewCard(props: {
   tab: BrowserTab;
   contextKey: string;
   enabled: boolean;
-  onOpen: (tabId: string, trigger: HTMLButtonElement, preview: BrowserPreview | null) => void;
+  onOpen: (tabId: string, trigger: HTMLButtonElement) => void;
   onClose: (tabId: string) => void;
 }) {
   const [state, setState] = createStore<{ preview: BrowserPreview | null; failed: boolean }>({
@@ -187,7 +187,7 @@ export function BrowserPreviewCard(props: {
         variant="ghost"
         class="browser-preview-open"
         aria-label={`Open ${title()}`}
-        onClick={(event) => props.onOpen(props.tab.id, event.currentTarget, state.preview)}
+        onClick={(event) => props.onOpen(props.tab.id, event.currentTarget)}
       >
         <span class="browser-preview-image">
           <Show
@@ -203,6 +203,10 @@ export function BrowserPreviewCard(props: {
               />
             )}
           </Show>
+          <span class="browser-preview-open-label" aria-hidden="true">
+            <Maximize2 />
+            Open
+          </span>
         </span>
         <span class="browser-preview-title" title={title()}>
           {title()}
@@ -210,7 +214,7 @@ export function BrowserPreviewCard(props: {
       </Button>
       <Button
         variant="secondary"
-        size="icon-sm"
+        size="icon-xs"
         class="browser-preview-close"
         aria-label={`Close ${title()}`}
         onClick={() => props.onClose(props.tab.id)}

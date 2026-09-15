@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { developmentInstanceIdForWorktree } from "../src/main/development-profile";
 import { type DevelopmentEnvOutcome, ensureDevelopmentEnvFile } from "./development-secrets";
 
 const scriptsRoot = dirname(fileURLToPath(import.meta.url));
@@ -9,7 +10,7 @@ export const developmentProjectRoot = dirname(scriptsRoot);
 export type DevelopmentCommandRunner = (
   executable: string,
   args: string[],
-  options: { cwd: string; stdio: "inherit" },
+  options: { cwd: string; stdio: "inherit"; env?: NodeJS.ProcessEnv },
 ) => void;
 
 export const supportedBunVersion = "1.4.0";
@@ -32,6 +33,24 @@ export function prepareDevelopmentEnvironment(
   return envFile;
 }
 
+export function prepareDevelopmentWorktree(
+  input: { projectRoot?: string; executable?: string; bunVersion?: string; run?: DevelopmentCommandRunner } = {},
+): DevelopmentEnvOutcome {
+  const projectRoot = input.projectRoot ?? developmentProjectRoot;
+  const envFile = prepareDevelopmentEnvironment({ ...input, projectRoot });
+  const executable = input.executable ?? process.execPath;
+  const run = input.run ?? execDevelopmentCommand;
+  const options = { cwd: projectRoot, stdio: "inherit" as const };
+  const instanceId = developmentInstanceIdForWorktree(projectRoot);
+
+  run(executable, ["run", "dev:seed", "--if-missing"], {
+    ...options,
+    env: { ...process.env, OPENBOT_DEV_INSTANCE_ID: instanceId },
+  });
+  run(executable, ["run", "marketplace:seed:local"], options);
+  return envFile;
+}
+
 export function assertSupportedBunVersion(version: string): void {
   if (version === supportedBunVersion) return;
 
@@ -40,14 +59,18 @@ export function assertSupportedBunVersion(version: string): void {
   );
 }
 
-function execDevelopmentCommand(executable: string, args: string[], options: { cwd: string; stdio: "inherit" }): void {
+function execDevelopmentCommand(
+  executable: string,
+  args: string[],
+  options: { cwd: string; stdio: "inherit"; env?: NodeJS.ProcessEnv },
+): void {
   execFileSync(executable, args, options);
 }
 
 if (import.meta.main) {
   // Generating secrets without saying so leaves a contributor guessing where the file came from.
   // stdout rather than a logger, because this runs before `bun install` on a fresh clone.
-  if (prepareDevelopmentEnvironment() === "created") {
+  if (prepareDevelopmentWorktree() === "created") {
     process.stdout.write("Generated apps/auth-api/.env.dev for local development.\n");
   }
 }

@@ -10,7 +10,7 @@ bun scripts/prepare-dev-environment.ts
 [[actions]]
 name = "Run"
 icon = "run"
-command = "bun run dev"
+command = "bun run dev --isolated"
 
 [[actions]]
 name = "Storybook"

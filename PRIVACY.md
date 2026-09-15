@@ -231,6 +231,7 @@ Network traffic can also occur when:
 - the local Codex App Server connects to OpenAI;
 - the local Claude Agent SDK connects to Anthropic through Claude CLI;
 - a user or an agent visits a page in the embedded browser;
+- a user submits text that is not a web address in the browser address bar, which sends the query to Google Search;
 - a locally installed Codex plugin connects to its service;
 - an installed build checks GitHub Releases for updates;
 - a user opens an explicitly labeled external support or setup link.

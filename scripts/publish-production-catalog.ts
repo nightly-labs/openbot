@@ -11,7 +11,8 @@ const logger = createOpenBotLogger("publish-production-catalog");
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const authApiRoot = join(projectRoot, "apps", "auth-api");
-const wrangler = join(authApiRoot, "node_modules", ".bin", "wrangler");
+const executableSuffix = process.platform === "win32" ? ".exe" : "";
+const wrangler = join(projectRoot, "node_modules", ".bin", `wrangler${executableSuffix}`);
 const productionApiUrl = "https://api.openbot.run";
 const productionDatabase = "openbot-auth";
 const productionBucket = "openbot-skills";
