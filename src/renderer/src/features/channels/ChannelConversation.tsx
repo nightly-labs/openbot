@@ -584,6 +584,13 @@ export function ChannelConversation() {
                                 window.openbot.agent.openAttachment({ attachmentId: attachment.id, action: "open" }),
                               );
                             }}
+                            onDownloadAttachments={async (attachments) => {
+                              await channels.perform(() =>
+                                window.openbot.agent.downloadAttachments({
+                                  attachments: attachments.map(({ id, name }) => ({ id, name })),
+                                }),
+                              );
+                            }}
                             onAttachmentAction={(attachment, action) => {
                               void channels.perform(() =>
                                 window.openbot.agent.openAttachment({ attachmentId: attachment.id, action }),

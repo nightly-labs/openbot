@@ -1,3 +1,4 @@
+import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -891,4 +892,49 @@ it("drops the working indicator when routing ends without an owner", async () =>
   const chat = await openChannelWhileRouting("paused");
   await within(chat).findByRole("article", { name: "Message from You" });
   expect(within(chat).queryByRole("status", { name: / is working: / })).not.toBeInTheDocument();
+});
+
+it("downloads all group-message attachments and allows retry after an error", async () => {
+  const attachments: AttachmentSummary[] = ["notes.txt", "report.csv", "diagram.png"].map((name, index) => ({
+    id: `attachment-${index}`,
+    name,
+    size: 20,
+    kind: index === 2 ? "image" : "file",
+    mimeType: index === 2 ? "image/png" : "text/plain",
+    previewKind: index === 2 ? "image" : "text",
+    previewUrl: null,
+  }));
+  const read = window.openbot.agent.readChannel;
+  vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => ({
+    ...(await read(input)),
+    messages: [
+      {
+        id: "files",
+        channelId: input.channelId,
+        sequence: 1,
+        author: { kind: "agent", id: "chief", name: "Chief" },
+        taskId: null,
+        superseded: false,
+        message: {
+          id: "files",
+          author: "assistant",
+          text: "The files are ready.",
+          createdAt: new Date().toISOString(),
+          status: "completed",
+          attachments,
+        },
+      },
+    ],
+  }));
+  const download = vi
+    .spyOn(window.openbot.agent, "downloadAttachments")
+    .mockRejectedValueOnce(new Error("The attachment could not be downloaded."))
+    .mockResolvedValue(undefined);
+  const chat = await openSavedChannel();
+  await fireEvent.click(await within(chat).findByRole("button", { name: "Download all as ZIP" }));
+  expect(await within(chat).findByText("The attachment could not be downloaded.")).toBeVisible();
+  expect(download).toHaveBeenCalledExactlyOnceWith({ attachments: attachments.map(({ id, name }) => ({ id, name })) });
+  await fireEvent.click(await within(chat).findByRole("button", { name: "Download all as ZIP" }));
+  await waitFor(() => expect(download).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(within(chat).getByRole("button", { name: "Download all as ZIP" })).toBeEnabled());
 });

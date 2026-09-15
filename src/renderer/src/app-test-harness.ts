@@ -698,6 +698,7 @@ export function installOpenbotStub(): void {
         chooseAttachments: vi.fn().mockResolvedValue([]),
         onAttachmentImport: vi.fn(attachmentImportBridge.subscribe),
         discardDraftAttachment: vi.fn().mockResolvedValue(undefined),
+        downloadAttachments: vi.fn().mockResolvedValue(undefined),
         openAttachment: vi.fn().mockResolvedValue(undefined),
         openSharedFile: vi.fn().mockResolvedValue(undefined),
         openWorkspaceFile: vi.fn().mockResolvedValue(undefined),
