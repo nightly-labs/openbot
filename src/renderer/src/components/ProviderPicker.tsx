@@ -485,13 +485,17 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       </Button>
                     </Show>
                     {/* Claude's sign-in is a browser round trip it only needs while signed out.
-                      OpenCode's key dialog opens from its runtime Reconnect, so this standalone
-                      Sign in is only the fallback for a row that reports no runtime at all. */}
+                      OpenCode reconnects through its runtime Reconnect, so Sign in stays only where
+                      the row cannot offer it: with no runtime action at all, or a Connect or Restart
+                      that retries the same credentials. A saved key that blocks startup must stay
+                      replaceable and removable, so those actions never take the dialog away. */}
                     <Show
                       when={
                         props.onSignInProvider &&
                         (option().id === "opencode"
-                          ? !runtimeAction()
+                          ? runtimeAction() === undefined ||
+                            runtimeAction() === "connect" ||
+                            runtimeAction() === "restart"
                           : option().id === "claude" &&
                             !runtimeStatus() &&
                             state() === "sign-in-required" &&
