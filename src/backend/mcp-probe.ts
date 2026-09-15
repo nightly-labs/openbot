@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { mcpEnvironment, type UsableMcpServer, usableMcpServer } from "./mcp-provider-shapes";
@@ -44,7 +45,7 @@ export async function probeMcpServer(
   timeoutMs = MCP_PROBE_TIMEOUT_MS,
 ): Promise<McpProbeResult> {
   const { config } = server;
-  if (server.error) return { toolCount: 0, error: server.error };
+  if (server.error) return { toolCount: 0, error: boundedError(server.error) };
 
   const client = new Client({ name: "openbot-probe", version: "1" }, { capabilities: {} });
   const transport = createTransport(server);
@@ -52,18 +53,50 @@ export async function probeMcpServer(
     const count = await withDeadline(
       (async () => {
         await client.connect(transport);
-        const { tools } = await client.listTools();
-        return tools.length;
+        return await countTools(client);
       })(),
       signal,
       timeoutMs,
     );
     return { toolCount: count, error: null };
   } catch (error) {
-    return { toolCount: 0, error: describeMcpError(error, config, timeoutMs) };
+    return { toolCount: 0, error: boundedError(describeMcpError(error, config, timeoutMs)) };
   } finally {
     await closeQuietly(client, transport);
   }
+}
+
+/**
+ * Every tool the server offers, not the first page of them.
+ *
+ * A server with many tools answers `tools/list` one page at a time, and the number on the row is an
+ * answer to "what would an agent get". The deadline around this call bounds the walk; a cursor that
+ * repeats, and the count the panel can carry, end it as well.
+ */
+async function countTools(client: Client): Promise<number> {
+  const seen = new Set<string>();
+  let count = 0;
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await client.listTools(cursor === undefined ? undefined : { cursor });
+    count += page.tools.length;
+    if (count >= INPUT_LIMITS.mcpToolCount) return INPUT_LIMITS.mcpToolCount;
+    cursor = page.nextCursor;
+    if (cursor === undefined || seen.has(cursor)) return count;
+    seen.add(cursor);
+  }
+}
+
+/**
+ * The failure text, held to the length the IPC decoder and the remote codec accept.
+ *
+ * A server can answer with a whole diagnostic, and a command name is allowed to be longer than this
+ * on its own. An over-long text is rejected on the way to the panel, which would replace the
+ * connection failure the user asked about with a decoding failure.
+ */
+function boundedError(text: string): string {
+  if (text.length <= INPUT_LIMITS.mcpErrorText) return text;
+  return `${text.slice(0, INPUT_LIMITS.mcpErrorText - 1)}…`;
 }
 
 function createTransport(server: UsableMcpServer): Transport {

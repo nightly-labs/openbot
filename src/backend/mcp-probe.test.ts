@@ -1,7 +1,7 @@
 import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { decodeMcpTestResult, type McpServerConfig } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
 import { describeMcpError, testMcpServer } from "./mcp-probe";
 
@@ -29,6 +29,14 @@ process.stdin.on("data", (chunk) => {
   }
 });
 `;
+
+// The same wire, answering `tools/list` in two pages, which is what a server with many tools does.
+const PAGED_SERVER = FAKE_SERVER.replace(
+  ': { tools: [{ name: "one", inputSchema: { type: "object" } }, { name: "two", inputSchema: { type: "object" } }] };',
+  `: message.params?.cursor === "page-2"
+            ? { tools: [{ name: "three", inputSchema: { type: "object" } }] }
+            : { tools: [{ name: "one", inputSchema: { type: "object" } }, { name: "two", inputSchema: { type: "object" } }], nextCursor: "page-2" };`,
+);
 
 const roots: string[] = [];
 
@@ -66,6 +74,11 @@ describe("testMcpServer", () => {
     expect(await testMcpServer(await scriptConfig(FAKE_SERVER))).toEqual({ toolCount: 2, error: null });
   });
 
+  // The count answers "what would an agent get", and an agent is given every tool, not a first page.
+  it("counts the tools on every page a server answers with", async () => {
+    expect(await testMcpServer(await scriptConfig(PAGED_SERVER))).toEqual({ toolCount: 3, error: null });
+  });
+
   // A test answers for the configuration in front of the user, which they may not have enabled yet.
   it("tests a server that is turned off", async () => {
     expect(await testMcpServer(await scriptConfig(FAKE_SERVER, { enabled: false }))).toEqual({
@@ -88,6 +101,15 @@ describe("testMcpServer", () => {
       toolCount: 0,
       error: "Command not found: openbot-no-such-command",
     });
+  });
+
+  // The IPC decoder and the remote codec both reject a longer text, so an unbounded failure would
+  // reach the panel as "Invalid MCP server response." instead of the failure the user asked about.
+  it("holds a long failure to the length the panel can be given", async () => {
+    const result = await testMcpServer(config({ command: `openbot-${"long".repeat(1_000)}` }));
+    expect(result.toolCount).toBe(0);
+    expect(result.error).toMatch(/^Command not found: /u);
+    expect(decodeMcpTestResult(result)).toBe(result);
   });
 
   // The lookup of a bare command name needs a login shell, and the name is written by the user -
