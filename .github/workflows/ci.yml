@@ -35,9 +35,11 @@ jobs:
         run: bun run check:desktop
 
   tests:
-    # ubuntu-latest gives 4 vCPUs and vitest uses 3 workers, so this job is
-    # CPU-bound at ~2 minutes. Splitting it across runners saved wall clock but
-    # paid for it with a checkout and an install per shard, so it runs as one.
+    # ubuntu-latest gives 4 vCPUs, and `vitest.config.ts` asks for all four under
+    # CI, because the main process is idle while the workers run. The job is
+    # CPU-bound. Splitting it across runners buys wall clock with a checkout and
+    # an install per shard; making the run itself faster was the better trade,
+    # so it stays one job.
     name: Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
