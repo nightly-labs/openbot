@@ -893,10 +893,11 @@ export function createConversationViewScope(props: ConversationProps) {
   });
 
   async function openExternalMessageUrl(url: string) {
+    const target = currentTarget();
     try {
       await window.openbot.openUrl(url);
     } catch {
-      setScopedComposerError("Could not open the link in the external browser.");
+      setScopedComposerError("Could not open the link in the external browser.", target);
     }
   }
 

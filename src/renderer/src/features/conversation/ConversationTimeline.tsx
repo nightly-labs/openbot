@@ -177,13 +177,15 @@ export function ConversationTimeline() {
                 <Button
                   variant="outline"
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    const agentId = props.agent?.id;
+                    const target = agentId ? { agentId, serverId: props.server?.id ?? "local" } : undefined;
                     void props
                       .onOpenAgentSetup()
                       .catch((error) =>
-                        setComposerError(errorMessage(error, "Could not open the setup guide. Try again.")),
-                      )
-                  }
+                        setComposerError(errorMessage(error, "Could not open the setup guide. Try again."), target),
+                      );
+                  }}
                 >
                   Setup guide
                 </Button>
