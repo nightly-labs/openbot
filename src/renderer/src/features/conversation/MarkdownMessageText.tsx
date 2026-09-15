@@ -79,7 +79,8 @@ const LEXER_CACHE_LIMIT = 200;
 const lexerCache = new Map<string, Token[]>();
 const inlineLexerCache = new Map<string, Token[]>();
 
-function lexBlockTokens(body: string): Token[] {
+function lexBlockTokens(body: string, cache: boolean): Token[] {
+  if (!cache) return marked.lexer(body, { breaks: true, gfm: true });
   const cached = lexerCache.get(body);
   if (cached) return cached;
   const tokens = marked.lexer(body, { breaks: true, gfm: true });
@@ -104,7 +105,10 @@ function lexInlineTokens(body: string): Token[] {
 }
 
 export function MarkdownMessageText(props: MarkdownMessageTextProps) {
-  const tokens = createMemo(() => lexBlockTokens(props.body));
+  // A streaming reply passes each growing prefix here. Caching those would
+  // retain up to 200 obsolete token trees and evict completed messages, so
+  // only a settled body enters the shared cache.
+  const tokens = createMemo(() => lexBlockTokens(props.body, props.streaming !== true));
   const contentProps = (): MarkdownContentProps => ({
     imagesAsLinks: props.imagesAsLinks,
     agents: props.agents,
