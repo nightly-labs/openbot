@@ -537,6 +537,62 @@ describe("channel data in the shared chat", () => {
     expect(calls.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.list)).toHaveLength(1);
     expect(store.get("host-one").channels).toEqual([channel]);
   });
+  it("completes a send after its history read while the list and trailing refresh remain pending", async () => {
+    const historyRead = deferred<ChannelPage>();
+    const listRead = deferred<ChannelSummary[]>();
+    const trailingRead = deferred<ChannelPage>();
+    let sending = false;
+    let reads = 0;
+    const { store, calls } = fixture(async (path) => {
+      if (path === CHANNEL_ROUTES.command) {
+        sending = true;
+        return channel;
+      }
+      if (path === CHANNEL_ROUTES.list) return sending ? listRead.promise : [channel];
+      if (!sending) return page(1, 1);
+      return ++reads === 1 ? historyRead.promise : trailingRead.promise;
+    });
+    const stop = store.observe("host-one", channel.id);
+    await store.refresh("host-one");
+    const sender = new ChannelSend(store, "host-one", channel.id, () => "send-one");
+    const sent = sender.send("Hello", [], null, channel.members);
+    await vi.waitFor(() => expect(reads).toBe(1));
+    // A streaming event queues another pass before the send's read finishes.
+    let refreshed = false;
+    const refresh = store.refresh("host-one", channel.id).then(() => {
+      refreshed = true;
+    });
+    historyRead.resolve(page(1, 2));
+    expect(await sent).toBeNull();
+    expect(store.get("host-one").pages.get(channel.id)?.throughSequence).toBe(2);
+    expect(refreshed).toBe(false);
+    listRead.resolve([channel]);
+    await vi.waitFor(() => expect(reads).toBe(2));
+    expect(refreshed).toBe(false);
+    trailingRead.resolve(page(1, 3));
+    await refresh;
+    expect(store.get("host-one").pages.get(channel.id)?.throughSequence).toBe(3);
+    expect(calls.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.command)).toHaveLength(1);
+    stop();
+  });
+
+  it("completes an unchanged history read without waiting for the sidebar", async () => {
+    const listRead = deferred<ChannelSummary[]>();
+    let waiting = false;
+    const { store } = fixture(async (path) =>
+      path === CHANNEL_ROUTES.list ? (waiting ? listRead.promise : [channel]) : page(1, 1),
+    );
+    const stop = store.observe("host-one", channel.id);
+    await store.refresh("host-one");
+    const previous = store.get("host-one").pages.get(channel.id);
+    waiting = true;
+    await store.refreshHistory("host-one", channel.id);
+    expect(store.get("host-one").pages.get(channel.id)).toBe(previous);
+    listRead.resolve([channel]);
+    await store.refresh("host-one");
+    stop();
+  });
+
   it("keeps other members, agents, and coordinator messages distinct from the reader", () => {
     const messages = page(1, 4).messages;
     messages[0].author = { kind: "member", id: "membership-current", name: "Me" };

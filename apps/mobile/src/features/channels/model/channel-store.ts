@@ -55,7 +55,7 @@ interface Entry {
   readChannels: Set<string>;
   valid: boolean;
   writes: number;
-  historyReads: Map<string, number>;
+  historyWaiters: Map<string, Set<(success: boolean) => void>>;
 }
 
 export class ChannelHistoryRefreshError extends Error {}
@@ -91,7 +91,7 @@ export class MobileChannelStore {
         readChannels: new Set(),
         valid: true,
         writes: 0,
-        historyReads: new Map(),
+        historyWaiters: new Map(),
       };
       this.entries.set(serverId, entry);
     }
@@ -134,6 +134,7 @@ export class MobileChannelStore {
     if (!entry) return;
     this.publish(entry, EMPTY);
     entry.valid = false;
+    for (const id of entry.historyWaiters.keys()) this.finishHistory(entry, id, false);
     this.entries.delete(serverId);
   }
   dispose() {
@@ -224,15 +225,24 @@ export class MobileChannelStore {
             if (!entry.observed.has(id) || (listedIds && !listedIds.has(id))) return;
             const current = entry.state.pages.get(id);
             if (current && page.channel.revision < current.channel.revision) return;
-            entry.historyReads.set(id, (entry.historyReads.get(id) ?? 0) + 1);
             const merged = mergeLatestChannelPage(current, page);
-            if (merged === current) return;
-            const nextPages = new Map(entry.state.pages);
-            nextPages.set(id, merged);
-            this.publish(entry, { pages: nextPages });
+            if (merged !== current) {
+              const nextPages = new Map(entry.state.pages);
+              nextPages.set(id, merged);
+              this.publish(entry, { pages: nextPages });
+            }
+            this.finishHistory(entry, id, true);
           };
           // Publish history as soon as it arrives; a slow sidebar request must not block opening a chat.
-          const results = await Promise.allSettled([list(), ...readChannels.map(read)]);
+          const results = await Promise.allSettled([
+            list(),
+            ...readChannels.map((id) =>
+              read(id).catch((error) => {
+                if (writes === entry.writes) this.finishHistory(entry, id, false);
+                throw error;
+              }),
+            ),
+          ]);
           for (const result of results) if (result.status === "rejected") throw result.reason;
         } catch (error) {
           this.publish(entry, { error: userErrorMessage(error, "Could not load channels. Try again.") });
@@ -246,12 +256,31 @@ export class MobileChannelStore {
     });
     return entry.pending;
   }
-  async refreshHistory(serverId: string, channelId: string) {
+  private finishHistory(entry: Entry, channelId: string, success: boolean) {
+    const waiters = entry.historyWaiters.get(channelId);
+    if (!waiters) return;
+    entry.historyWaiters.delete(channelId);
+    for (const finish of waiters) finish(success);
+  }
+  refreshHistory(serverId: string, channelId: string): Promise<void> {
     const entry = this.entry(serverId);
-    const before = entry.historyReads.get(channelId) ?? 0;
-    await this.refresh(serverId, channelId);
-    if (!entry.valid || !entry.state.pages.has(channelId) || (entry.historyReads.get(channelId) ?? 0) <= before)
-      throw new ChannelHistoryRefreshError("The message was sent, but chat history could not refresh.");
+    return new Promise((resolve, reject) => {
+      const finish = (success: boolean) => {
+        const waiters = entry.historyWaiters.get(channelId);
+        waiters?.delete(finish);
+        if (!waiters?.size) entry.historyWaiters.delete(channelId);
+        if (success) resolve();
+        else reject(new ChannelHistoryRefreshError("The message was sent, but chat history could not refresh."));
+      };
+      const waiters = entry.historyWaiters.get(channelId) ?? new Set();
+      waiters.add(finish);
+      entry.historyWaiters.set(channelId, waiters);
+      // Only the required history read holds up a send, not the list or trailing event refreshes.
+      void this.refresh(serverId, channelId).then(
+        () => finish(false),
+        () => finish(false),
+      );
+    });
   }
   async older(serverId: string, channelId: string) {
     const entry = this.entry(serverId);
