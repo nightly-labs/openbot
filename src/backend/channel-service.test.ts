@@ -107,7 +107,7 @@ describe("shared channel coordination", () => {
     // An agent held by this work drains nothing, so its queue has no event of its own. The hold it
     // shows is only as new as the last one reported here.
     await vi.waitFor(() => expect(queueHoldChanged).toHaveBeenCalledTimes(1));
-    expect(service.queueHold()).toEqual({
+    expect(service.queueHold("agent-b")).toEqual({
       reason: "channel-task",
       channelId: "channel-1",
       channelName: "Release coordination",
@@ -119,9 +119,17 @@ describe("shared channel coordination", () => {
     service.accepted(deliveryId, "session-1", "turn-1");
     expect(queueHoldChanged).toHaveBeenCalledTimes(1);
 
+    // Two tasks that reserve nothing run at the same time. The queue of agent-b waits behind the
+    // host as well, but the work it waits for is its own, and its chat has to show that.
+    service.store.update(service.store.get("channel-1"), {
+      assignments: [{ ...assignment, id: "assignment-b", agentId: "agent-b", deliveryId: null, turnId: null }],
+    });
+    expect(service.queueHold("agent-b")?.agentId).toBe("agent-b");
+    expect(service.queueHold("agent-a")?.agentId).toBe("agent-a");
+
     service.deliveryFailed(deliveryId, "The provider stopped.");
     expect(queueHoldChanged).toHaveBeenCalledTimes(2);
-    expect(service.queueHold()).toBeNull();
+    expect(service.queueHold("agent-a")?.agentId).toBe("agent-b");
   });
 
   it("saves one visible request when a command is retried", async () => {

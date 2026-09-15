@@ -91,9 +91,8 @@ export class ChannelService {
   readonly #wakeAgain = new Set<string>();
   readonly #deletedChannels = new Set<string>();
   readonly #assignmentTerminalWaiters = new Map<string, Set<() => void>>();
-  /** The active assignments last seen per channel, and the hold last reported for all of them. */
+  /** The active assignments last seen per channel, so turn traffic reports no new hold. */
   readonly #activeAssignments = new Map<string, string>();
-  #reportedHold = "";
 
   constructor(
     database: OpenBotDatabase,
@@ -850,15 +849,18 @@ export class ChannelService {
   }
 
   /**
-   * The channel work every queue is waiting behind, or null when no channel holds the host.
+   * The channel work the queue of `agentId` is waiting behind, or null when no channel holds the
+   * host.
    *
-   * Takes no agent: the reservation is host-wide, and an agent whose own channel delivery is at the
-   * head of its queue still keeps anything the user sends it waiting behind that turn. The channel
-   * turn runs on another thread, so an agent held here has no turn of its own to show, and this is
-   * the only way the chat can say why a message the user just sent has not started.
+   * The reservation is host-wide: an agent whose own channel delivery is at the head of its queue
+   * still keeps anything the user sends it waiting behind that turn. The channel turn runs on
+   * another thread, so an agent held here has no turn of its own to show, and this is the only way
+   * the chat can say why a message the user just sent has not started. When that agent runs
+   * channel work of its own, that assignment is the one reported: its chat then shows it working
+   * instead of waiting for another member.
    */
-  queueHold(): QueueHold | null {
-    const reserving = this.store.reservingAssignment(ACTIVE_ASSIGNMENT_STATES);
+  queueHold(agentId: string): QueueHold | null {
+    const reserving = this.store.reservingAssignment(ACTIVE_ASSIGNMENT_STATES, agentId);
     if (!reserving) return null;
     return {
       reason: "channel-task",
@@ -1567,24 +1569,21 @@ export class ChannelService {
    * A queue snapshot names the channel work it waits behind, read at the moment the queue is
    * emitted. A held agent drains nothing, so no queue event of its own follows: when the
    * reservation moves to another channel or another agent, every held queue keeps naming work that
-   * has ended. This reports the new hold instead.
+   * has ended. This reports the change instead.
    *
-   * The gate is the channel's own active assignments. Each message batch of a running channel turn
-   * publishes, and the hold lookup reads the whole assignment projection, so only an assignment
-   * change is allowed to ask for it.
+   * The gate is which agent holds which assignment in this channel. Every message batch of a
+   * running channel turn publishes as well, and no queue names a turn of work that is already
+   * reported, so only a new or ended assignment is allowed through.
    */
   #syncQueueHolds(channelId: string): void {
     const active = this.store
       .assignments(channelId)
       .filter(activeAssignment)
-      .map((assignment) => `${assignment.id}:${assignment.state}`)
+      .map((assignment) => `${assignment.id}:${assignment.agentId}`)
       .join(",");
-    if (this.#activeAssignments.get(channelId) === active) return;
+    // A channel with no assignment has nothing to report, so an unseen channel counts as empty.
+    if ((this.#activeAssignments.get(channelId) ?? "") === active) return;
     this.#activeAssignments.set(channelId, active);
-    const hold = this.queueHold();
-    const signature = hold ? `${hold.agentId}\u0000${hold.channelId}\u0000${hold.channelName}` : "";
-    if (signature === this.#reportedHold) return;
-    this.#reportedHold = signature;
     this.hooks.queueHoldChanged?.();
   }
 

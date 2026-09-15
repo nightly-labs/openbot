@@ -10,7 +10,7 @@ export interface MailboxSyncHooks {
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
   /** What holds the queue back, when the reason is not this agent's own running turn. */
-  queueHold(): QueueHold | null;
+  queueHold(agentId: string): QueueHold | null;
 }
 
 export interface MailboxSyncOptions {
@@ -97,7 +97,7 @@ export class MailboxSync {
   queueSnapshot(agentId: string): QueueSnapshot {
     const queue = this.#mailbox.listQueue(agentId);
     if (!queue.deliveries.some((delivery) => delivery.status === "queued")) return queue;
-    const hold = this.#hooks.queueHold();
+    const hold = this.#hooks.queueHold(agentId);
     return hold ? { ...queue, hold } : queue;
   }
 

@@ -411,7 +411,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         // Read late: `channels` is built after this.
-        queueHold: () => this.channels.queueHold(),
+        queueHold: (agentId) => this.channels.queueHold(agentId),
       },
     });
     this.#boot = new BootRecovery({
