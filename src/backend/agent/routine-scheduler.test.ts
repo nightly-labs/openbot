@@ -313,6 +313,69 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       "routine no longer exists",
     );
   });
+  it("creates folder-listening routines with short polling and rejects intervals below 3 minutes", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "", false);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Watch the inbox folder." });
+    await waitFor(() => Boolean(store.activeProviderSession("chief")));
+
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!client || !threadId) throw new Error("The folder listening test thread did not start.");
+
+    const folderInstruction =
+      "Watch /Users/kamicyrek/Desktop/OpenBot/INBOX for new invoice files and create a notification for each new file.";
+    const created = await callOpenBotTool(client, threadId, "create_routine", {
+      name: "Inbox watcher",
+      instruction: folderInstruction,
+      schedule: { kind: "interval", amount: 5, unit: "minutes", anchorAt: new Date().toISOString() },
+    });
+    expect(created.error).toBeUndefined();
+    const folderRoutine = openBotToolPayload(created.result);
+    expect(folderRoutine).toMatchObject({
+      name: "Inbox watcher",
+      trigger: { schedule: { kind: "interval", amount: 5, unit: "minutes" } },
+    });
+    expect(folderRoutine.instruction).toContain("/Users/kamicyrek/Desktop/OpenBot/INBOX");
+
+    await expectOpenBotToolError(
+      client,
+      threadId,
+      "create_routine",
+      {
+        name: "Too frequent watcher",
+        instruction: folderInstruction,
+        schedule: { kind: "interval", amount: 2, unit: "minutes", anchorAt: new Date().toISOString() },
+      },
+      "at least 3 minutes",
+    );
+    await expectOpenBotToolError(
+      client,
+      threadId,
+      "update_routine",
+      {
+        routineId: folderRoutine.id,
+        schedule: { kind: "interval", amount: 1, unit: "minutes", anchorAt: new Date().toISOString() },
+      },
+      "at least 3 minutes",
+    );
+    // The failed updates must not drop the folder path or the monitoring instructions.
+    expect(service?.listRoutines("chief").find((routine) => routine.id === folderRoutine.id)).toMatchObject({
+      instruction: expect.stringContaining("/Users/kamicyrek/Desktop/OpenBot/INBOX"),
+      trigger: { schedule: { kind: "interval", amount: 5, unit: "minutes" } },
+    });
+  });
   it("rolls back a routine mutation when its transcript marker cannot persist", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });

@@ -3,6 +3,9 @@ import { integerInRange } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
 export type RoutineIntervalUnit = "minutes" | "hours" | "days";
+
+/** Minimum polling frequency for interval, advanced-every, and custom routine schedules. */
+export const ROUTINE_MINIMUM_INTERVAL_MINUTES = 3;
 export type RoutineDaySelection =
   | { kind: "every-day" }
   | { kind: "days-of-week"; days: number[] }

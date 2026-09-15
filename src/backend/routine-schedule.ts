@@ -1,7 +1,11 @@
-import type { RoutineIntervalUnit, RoutineSchedule } from "@openbot/contracts/ipc";
-import { isRoutineSchedule } from "@openbot/contracts/ipc";
+import {
+  isRoutineSchedule,
+  ROUTINE_MINIMUM_INTERVAL_MINUTES,
+  type RoutineIntervalUnit,
+  type RoutineSchedule,
+} from "@openbot/contracts/ipc";
 
-const MINIMUM_INTERVAL_MS = 15 * 60_000;
+const MINIMUM_INTERVAL_MS = ROUTINE_MINIMUM_INTERVAL_MINUTES * 60_000;
 const MAX_SEARCH_DAYS = 366 * 5;
 const formatterCache = new Map<string, Intl.DateTimeFormat>();
 
@@ -33,13 +37,17 @@ export function validateRoutineSchedule(schedule: RoutineSchedule, timezone: str
   validateTimezone(timezone);
   if (schedule.kind === "interval") {
     if (intervalMilliseconds(schedule.amount, schedule.unit) < MINIMUM_INTERVAL_MS) {
-      throw new Error("Routine intervals must be at least 15 minutes.");
+      throw new Error(
+        `Routine intervals must be at least ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes. Use ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes or more, or a daily, weekly, or cron schedule.`,
+      );
     }
     return;
   }
   if (schedule.kind === "advanced" && schedule.time.kind === "every") {
     if (intervalMilliseconds(schedule.time.amount, schedule.time.unit) < MINIMUM_INTERVAL_MS) {
-      throw new Error("Routine intervals must be at least 15 minutes.");
+      throw new Error(
+        `Routine intervals must be at least ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes. Use ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes or more, or a fixed time.`,
+      );
     }
   }
   if (schedule.kind !== "custom") return;
@@ -49,7 +57,9 @@ export function validateRoutineSchedule(schedule: RoutineSchedule, timezone: str
   for (let index = 0; index < 200; index += 1) {
     const next = nextCronOccurrence(spec, timezone, previous);
     if (next.getTime() - previous.getTime() < MINIMUM_INTERVAL_MS) {
-      throw new Error("Custom schedules must run no more often than every 15 minutes.");
+      throw new Error(
+        `Custom schedules must run no more often than every ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes.`,
+      );
     }
     previous = next;
   }

@@ -1542,6 +1542,12 @@
   gap: 10px;
 }
 
+.agent-routine-schedule-hint {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
 .agent-routine-field {
   display: grid;
   min-width: 0;

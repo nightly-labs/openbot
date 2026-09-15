@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { RoutineSchedule } from "@openbot/contracts/ipc";
+import { ROUTINE_MINIMUM_INTERVAL_MINUTES, type RoutineSchedule } from "@openbot/contracts/ipc";
 import { Show } from "solid-js";
 import { Button, Clock3, Input } from "../../components/ui";
 import { RoutineSelect, TimeSelect } from "./RoutineSelect";
@@ -131,26 +131,31 @@ function ScheduleFields(props: { schedule: RoutineSchedule; onChange: (schedule:
       </Show>
       <Show when={scheduleOfKind(props.schedule, "interval")}>
         {(schedule) => (
-          <div class="agent-routine-inline-fields">
-            <label class="agent-routine-field">
-              <span>Every</span>
-              <Input
-                size="sm"
-                type="number"
-                min="1"
-                value={String(schedule().amount)}
-                onValueChange={(value) => props.onChange({ ...schedule(), amount: routineIntegerValue(value, 1) })}
-              />
-            </label>
-            <div class="agent-routine-field">
-              <span>Unit</span>
-              <RoutineSelect
-                ariaLabel="Unit"
-                options={ROUTINE_INTERVAL_UNIT_OPTIONS}
-                value={schedule().unit}
-                onChange={(unit) => props.onChange({ ...schedule(), unit: routineIntervalUnit(unit) })}
-              />
+          <div class="agent-routine-schedule-fields">
+            <div class="agent-routine-inline-fields">
+              <label class="agent-routine-field">
+                <span>Every</span>
+                <Input
+                  size="sm"
+                  type="number"
+                  min="1"
+                  value={String(schedule().amount)}
+                  onValueChange={(value) => props.onChange({ ...schedule(), amount: routineIntegerValue(value, 1) })}
+                />
+              </label>
+              <div class="agent-routine-field">
+                <span>Unit</span>
+                <RoutineSelect
+                  ariaLabel="Unit"
+                  options={ROUTINE_INTERVAL_UNIT_OPTIONS}
+                  value={schedule().unit}
+                  onChange={(unit) => props.onChange({ ...schedule(), unit: routineIntervalUnit(unit) })}
+                />
+              </div>
             </div>
+            <p class="agent-routine-schedule-hint">
+              Intervals must be {ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes or more.
+            </p>
           </div>
         )}
       </Show>
@@ -294,6 +299,11 @@ function AdvancedScheduleFields(props: {
           )}
         </Show>
       </div>
+      <Show when={props.schedule.time.kind === "every"}>
+        <p class="agent-routine-schedule-hint">
+          Repeated times must be {ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes or more apart.
+        </p>
+      </Show>
     </div>
   );
 }

@@ -40,27 +40,51 @@ describe("routine schedules", () => {
     ).toBe("2026-10-25T01:30:00.000Z");
   });
 
-  it("enforces the 15 minute limit", () => {
+  it("enforces the 3 minute limit", () => {
     expect(() =>
       validateRoutineSchedule(
-        { kind: "interval", amount: 14, unit: "minutes", anchorAt: "2026-01-01T00:00:00.000Z" },
+        { kind: "interval", amount: 2, unit: "minutes", anchorAt: "2026-01-01T00:00:00.000Z" },
         "Europe/Warsaw",
       ),
-    ).toThrow("at least 15 minutes");
-    expect(() => validateRoutineSchedule({ kind: "custom", expression: "0,10 * * * *" }, "Europe/Warsaw")).toThrow(
-      "no more often than every 15 minutes",
+    ).toThrow("at least 3 minutes");
+    expect(() =>
+      validateRoutineSchedule(
+        { kind: "interval", amount: 3, unit: "minutes", anchorAt: "2026-01-01T00:00:00.000Z" },
+        "Europe/Warsaw",
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateRoutineSchedule(
+        { kind: "interval", amount: 5, unit: "minutes", anchorAt: "2026-01-01T00:00:00.000Z" },
+        "Europe/Warsaw",
+      ),
+    ).not.toThrow();
+    expect(() => validateRoutineSchedule({ kind: "custom", expression: "*/2 * * * *" }, "Europe/Warsaw")).toThrow(
+      "no more often than every 3 minutes",
     );
+    expect(() => validateRoutineSchedule({ kind: "custom", expression: "*/5 * * * *" }, "Europe/Warsaw")).not.toThrow();
     expect(() =>
       validateRoutineSchedule(
         {
           kind: "advanced",
           months: [1],
           days: { kind: "every-day" },
-          time: { kind: "every", amount: 10, unit: "minutes" },
+          time: { kind: "every", amount: 2, unit: "minutes" },
         },
         "Europe/Warsaw",
       ),
-    ).toThrow("at least 15 minutes");
+    ).toThrow("at least 3 minutes");
+    expect(() =>
+      validateRoutineSchedule(
+        {
+          kind: "advanced",
+          months: [1],
+          days: { kind: "every-day" },
+          time: { kind: "every", amount: 3, unit: "minutes" },
+        },
+        "Europe/Warsaw",
+      ),
+    ).not.toThrow();
   });
 
   it("validates five-field cron and accepts Sunday as 7", () => {

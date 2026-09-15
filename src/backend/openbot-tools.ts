@@ -113,12 +113,14 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "create_routine",
     description:
-      "Create a scheduled routine for this agent, or for another local agent when agentId is provided. It is active by default and uses the host timezone by default.",
+      "Create a scheduled routine for this agent, or for another local agent when agentId is provided. It is active by default and uses the host timezone by default. Interval, advanced-every, and custom schedules must not run more often than every 3 minutes. When watching a folder for new files and no interval was requested, use a 15 minute interval and keep the folder path plus handling instructions in the routine instruction.",
     shape: {
       agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
       name: z.string().min(1).max(INPUT_LIMITS.routineName),
       instruction: z.string().min(1).max(INPUT_LIMITS.routineInstruction),
-      schedule: routineScheduleZodSchema,
+      schedule: routineScheduleZodSchema.describe(
+        "Routine schedule. Interval, advanced-every, and custom schedules must not run more often than every 3 minutes.",
+      ),
       active: z.boolean().optional(),
       timezone: z.string().min(1).max(128).describe("IANA timezone such as Europe/Warsaw.").optional(),
     },
@@ -126,13 +128,15 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "update_routine",
     description:
-      "Update, pause, or resume an existing routine for this agent, or for another local agent when agentId is provided.",
+      "Update, pause, or resume an existing routine for this agent, or for another local agent when agentId is provided. Replacement schedules must not run more often than every 3 minutes.",
     shape: {
       agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
       routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
       name: z.string().min(1).max(INPUT_LIMITS.routineName).optional(),
       instruction: z.string().min(1).max(INPUT_LIMITS.routineInstruction).optional(),
-      schedule: routineScheduleZodSchema.optional(),
+      schedule: routineScheduleZodSchema
+        .describe("Routine schedule. Must not run more often than every 3 minutes.")
+        .optional(),
       active: z.boolean().optional(),
     },
   },
