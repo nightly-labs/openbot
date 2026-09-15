@@ -43,6 +43,21 @@ describe("McpServerStore", () => {
     reopened.close();
   });
 
+  // A value is a credential. A password with a leading or trailing space is a different password,
+  // and the form's change check runs the same normalization, so a stored one could not be corrected.
+  it("keeps a credential's own spaces and drops a row with no name", async () => {
+    const { store } = await setup();
+    const saved = store.save(
+      stdioConfig({
+        env: [
+          { key: " TOKEN ", value: " padded secret " },
+          { key: "   ", value: "no name" },
+        ],
+      }),
+    );
+    expect(saved.env).toEqual([{ key: "TOKEN", value: " padded secret " }]);
+  });
+
   it("clears the fields of the transport that is not in use", async () => {
     const { store } = await setup();
     const saved = store.save({

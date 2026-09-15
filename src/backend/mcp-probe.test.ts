@@ -1,4 +1,4 @@
-import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decodeMcpTestResult, type McpServerConfig } from "@openbot/contracts/ipc";
@@ -88,6 +88,27 @@ describe("testMcpServer", () => {
   // Nothing reads the child's stderr, so a piped one fills and holds the server before it answers.
   it("answers for a server that writes a long startup log to stderr", async () => {
     expect(await testMcpServer(await scriptConfig(NOISY_SERVER), 2_000)).toEqual({ toolCount: 2, error: null });
+  });
+
+  // A `PATH` in the configuration is what the server runs with - a virtual environment, a version
+  // manager's shim directory - so the command has to be looked up in that list and not in the login
+  // shell's, which holds another build of the same name or none at all.
+  it("finds a command on the PATH the configuration carries", async () => {
+    const config = await scriptConfig(FAKE_SERVER);
+    const [script] = config.args;
+    const root = await mkdtemp(join(tmpdir(), "openbot-mcp-bin-"));
+    roots.push(root);
+    const launcher = join(root, "openbot-fake-mcp");
+    await writeFile(
+      launcher,
+      `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(script)}\n`,
+      "utf8",
+    );
+    await chmod(launcher, 0o755);
+
+    expect(
+      await testMcpServer({ ...config, command: "openbot-fake-mcp", args: [], env: [{ key: "PATH", value: root }] }),
+    ).toEqual({ toolCount: 2, error: null });
   });
 
   // A test answers for the configuration in front of the user, which they may not have enabled yet.

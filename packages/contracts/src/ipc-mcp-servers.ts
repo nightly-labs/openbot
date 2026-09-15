@@ -125,8 +125,9 @@ export function isReservedMcpServerName(name: string): boolean {
 }
 
 /**
- * What a save sends: trimmed values, the empty rows the form shows dropped, and the transport the
- * user did not choose cleared, so a stored configuration never carries a half-typed alternative.
+ * What a save sends: the surrounding spaces of each name taken off, the empty rows the form shows
+ * dropped, and the transport the user did not choose cleared, so a stored configuration never
+ * carries a half-typed alternative. A credential's own value is kept as written - see below.
  */
 export function normalizeMcpConfig(config: McpServerConfig): McpServerConfig {
   const stdio = config.transport === "stdio";
@@ -179,10 +180,16 @@ export function decodeMcpTestResult(value: unknown): McpTestResult {
   return value;
 }
 
+/**
+ * The rows a save keeps: a name without its surrounding spaces, and the value exactly as written.
+ *
+ * A value is a credential. A password or a token may hold a leading or trailing space, and a save
+ * that takes it off stores a credential the server rejects - with no way to put it back, because
+ * the form's own change check runs this same normalization and would read the retyped space as no
+ * change at all.
+ */
 function normalizePairs(pairs: McpKeyValue[]): McpKeyValue[] {
-  return pairs
-    .map((pair) => ({ key: pair.key.trim(), value: pair.value.trim() }))
-    .filter((pair) => pair.key.length > 0);
+  return pairs.map((pair) => ({ key: pair.key.trim(), value: pair.value })).filter((pair) => pair.key.length > 0);
 }
 
 /** Empty is allowed everywhere here: an unused transport's fields are cleared, not absent. */

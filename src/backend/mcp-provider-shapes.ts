@@ -11,7 +11,12 @@ const execFileAsync = promisify(execFile);
 /** Where a provider client reads the enabled configurations at spawn. */
 export type McpServerSource = () => readonly McpServerConfig[];
 
-/** A configuration with its stdio command, directory and `PATH` resolved, or why it cannot start. */
+/**
+ * A configuration with its stdio command, directory and `PATH` resolved, or why it cannot start.
+ *
+ * `path` is both the `PATH` the command was looked up in and the one the server is launched with.
+ * The two have to be the same: a lookup in another `PATH` answers for another build of the command.
+ */
 export type UsableMcpServer =
   | { config: McpServerConfig; command: string; workingDirectory: string; path: string | null; error?: undefined }
   | { config: McpServerConfig; command?: undefined; workingDirectory?: undefined; path?: undefined; error: string };
@@ -42,7 +47,12 @@ export async function usableMcpServers(configs: readonly McpServerConfig[]): Pro
 export async function usableMcpServer(config: McpServerConfig): Promise<UsableMcpServer> {
   // An http server starts no process, so it needs neither a command nor a `PATH`.
   if (config.transport !== "stdio") return { config, command: "", workingDirectory: "", path: null };
-  const [command, path] = await Promise.all([resolveMcpCommand(config.command), loginShellPath()]);
+  // A `PATH` the configuration carries is the one the server runs with, so it is the one the command
+  // is looked up in: `python` with a virtual environment's `PATH` names that interpreter, and the
+  // absolute path a login shell answered with would silently be a different one.
+  const configured = mcpEnvironment(config).PATH;
+  const path = configured ?? (await loginShellPath());
+  const command = await resolveMcpCommand(config.command, path);
   if (!command) return { config, error: `Command not found: ${config.command}` };
   return { config, command, workingDirectory: resolveMcpWorkingDirectory(config.workingDirectory), path };
 }
@@ -78,25 +88,35 @@ function shellWord(value: string): string {
 }
 
 /**
- * An absolute path for a command name, or `null` when the machine has none. A command the user
- * already wrote as a path is taken as written: it is their statement of which build to run.
+ * An absolute path for a command name, or `null` when the given `PATH` holds none. A command the
+ * user already wrote as a path is taken as written: it is their statement of which build to run.
+ *
+ * `path` is the list to search, which is the list the server will be launched with. Without one the
+ * login shell's own is used, because a packaged app starts with a restricted `PATH` - the same
+ * reason `collectCandidates` in `cli.ts` uses a login shell.
  */
-export async function resolveMcpCommand(command: string): Promise<string | null> {
+export async function resolveMcpCommand(command: string, path: string | null = null): Promise<string | null> {
   const trimmed = command.trim();
   if (!trimmed) return null;
   if (isAbsolute(trimmed) || trimmed.startsWith(".")) return trimmed;
   try {
     if (process.platform === "win32") {
-      const { stdout } = await execFileAsync("where.exe", [trimmed], { timeout: 5_000, maxBuffer: 64 * 1024 });
+      const { stdout } = await execFileAsync("where.exe", [trimmed], {
+        timeout: 5_000,
+        maxBuffer: 64 * 1024,
+        ...(path === null ? {} : { env: { ...process.env, PATH: path } }),
+      });
       return stdout.split(/\r?\n/u)[0]?.trim() || null;
     }
-    // A login shell, because a packaged app starts with a restricted PATH - the same reason
-    // `collectCandidates` in `cli.ts` uses one.
+    // The assignment goes inside the command, not into the shell's environment: a login shell reads
+    // the user's profile first, and a profile that appends to `PATH` would undo an inherited one.
+    const search = path === null ? "" : `PATH=${shellWord(path)} `;
     const shell = loginShellCommand();
-    const { stdout } = await execFileAsync(shell.command, [...shell.args, `command -v -- ${shellWord(trimmed)}`], {
-      timeout: 5_000,
-      maxBuffer: 64 * 1024,
-    });
+    const { stdout } = await execFileAsync(
+      shell.command,
+      [...shell.args, `${search}command -v -- ${shellWord(trimmed)}`],
+      { timeout: 5_000, maxBuffer: 64 * 1024 },
+    );
     return stdout.trim() || null;
   } catch {
     return null;
