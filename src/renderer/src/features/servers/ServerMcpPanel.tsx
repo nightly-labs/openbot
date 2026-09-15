@@ -110,6 +110,14 @@ interface McpPanelState {
   tests: Record<string, McpTestState>;
   /** The form's own test, which answers for the draft on screen and not for any stored row. */
   formTest: McpTestState | null;
+  /**
+   * The configuration that test was run with.
+   *
+   * A test is a question about one set of settings, and the user can edit a field while it is
+   * answered. Kept beside the answer so the panel can tell whether the answer still describes what
+   * the form shows, rather than reporting a working connection for settings nobody tried.
+   */
+  formTestConfig: McpServerConfig | null;
 }
 
 const CONNECT_TITLE = "Connect to a custom MCP";
@@ -127,12 +135,23 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     error: "",
     tests: {},
     formTest: null,
+    formTestConfig: null,
   });
   let removeTrigger: HTMLElement | undefined;
   // Counts the form's tests, so an answer that arrives after the user left is dropped.
   let draftTestRun = 0;
 
   const errors = createMemo(() => mcpConfigErrors(state.draft));
+  /**
+   * The form's test result while it still describes the form.
+   *
+   * An edit to any field answers the question again, so a result measured before it says nothing
+   * about what is on screen now. Compared rather than cleared on each keystroke: typing a value
+   * back as it was leaves the answer that was measured for it true.
+   */
+  const formTest = createMemo(() =>
+    state.formTestConfig && !mcpConfigChanged(state.draft, state.formTestConfig) ? state.formTest : null,
+  );
   const visible = (key: "name" | "command" | "url") => (state.touched ? errors()[key] : undefined);
   const removeTarget = createMemo(() => props.servers.find((config) => config.id === state.removeId) ?? null);
   const disabled = () => !props.canManage || state.busy !== null;
@@ -188,10 +207,12 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     });
     if (!mcpConfigIsValid(state.draft)) return;
     const run = ++draftTestRun;
+    const tested = normalizeMcpConfig(state.draft);
     setState((current) => {
       current.formTest = { status: "testing" };
+      current.formTestConfig = tested;
     });
-    const test = await runTest(normalizeMcpConfig(state.draft));
+    const test = await runTest(tested);
     if (run !== draftTestRun) return;
     setState((current) => {
       current.formTest = test;
@@ -209,6 +230,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       current.touched = false;
       current.error = "";
       current.formTest = null;
+      current.formTestConfig = null;
     });
     draftTestRun += 1;
     // Read from the argument, not the store: a store write is not visible to a read in the same tick.
@@ -229,6 +251,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       current.touched = false;
       current.error = "";
       current.formTest = null;
+      current.formTestConfig = null;
     });
     draftTestRun += 1;
   }
@@ -252,6 +275,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       current.touched = false;
       current.error = "";
       current.formTest = null;
+      current.formTestConfig = null;
     });
     draftTestRun += 1;
   }
@@ -704,8 +728,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
               type="button"
               size="sm"
               variant="outline"
-              disabled={!props.canManage || state.formTest?.status === "testing"}
-              loading={state.formTest?.status === "testing"}
+              disabled={!props.canManage || formTest()?.status === "testing"}
+              loading={formTest()?.status === "testing"}
               loadingLabel="Connecting…"
               onClick={() => void testDraft()}
             >
@@ -715,7 +739,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
           }
         >
           <Show
-            when={state.formTest}
+            when={formTest()}
             fallback={
               <Text variant="caption" tone="muted">
                 Not tested yet.

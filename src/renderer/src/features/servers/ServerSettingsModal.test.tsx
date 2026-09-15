@@ -233,6 +233,25 @@ describe("ServerSettingsModal", () => {
     expect(onRetryMcpServers).toHaveBeenCalledTimes(1);
   });
 
+  // A test answers for the settings it was given. Left on screen after an edit it would report a
+  // working connection for a command nobody tried.
+  it("drops the MCP test result when the draft changes", async () => {
+    const onTestMcpServer = vi.fn(async () => ({ toolCount: 3, error: null }));
+    render(() => <ServerSettingsModal {...props({ mcpServers: [], onTestMcpServer })} />);
+
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Connect a custom MCP" }));
+    await fireEvent.input(screen.getByPlaceholderText("MCP server name"), { target: { value: "Filesystem" } });
+    await fireEvent.input(screen.getByPlaceholderText("openai-dev-mcp"), { target: { value: "/bin/echo" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    expect(await screen.findByText("Connected · 3 tools")).toBeInTheDocument();
+
+    await fireEvent.input(screen.getByPlaceholderText("openai-dev-mcp"), { target: { value: "/bin/other" } });
+    await waitFor(() => expect(screen.queryByText("Connected · 3 tools")).not.toBeInTheDocument());
+    expect(screen.getByText("Not tested yet.")).toBeInTheDocument();
+    expect(onTestMcpServer).toHaveBeenCalledTimes(1);
+  });
+
   it("saves the first local identity without publishing it", async () => {
     const onSaveIdentity = vi.fn(async () => undefined);
     const onSetPublished = vi.fn(async () => undefined);

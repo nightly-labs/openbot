@@ -65,13 +65,14 @@ export class ThreadLifecycle {
   readonly #pendingHandoffs = new Map<string, string>();
   readonly #pendingRuntimeRefreshes = new Set<string>();
   /**
-   * How many provider sessions are being started per agent.
+   * How many starts of each agent are in flight: a provider session, or a turn on one.
    *
-   * A session that is starting is not in the provider session table yet, and it read the MCP set
-   * before the change that is being applied. Counted rather than flagged: an agent can start its
-   * own thread and a channel execution thread at the same time.
+   * Neither is visible to the checks `applyPendingRuntimeRefresh` makes. A session that is starting
+   * is not in the provider session table yet, and a turn that is starting owns no turn id until the
+   * provider answers, so its thread reads as idle. Counted rather than flagged: an agent can start
+   * its own thread and a channel execution thread at the same time.
    */
-  readonly #startingSessions = new Map<string, number>();
+  readonly #pendingStarts = new Map<string, number>();
 
   constructor(options: ThreadLifecycleOptions) {
     this.#store = options.store;
@@ -145,7 +146,7 @@ export class ThreadLifecycle {
   dispose(): void {
     this.#pendingHandoffs.clear();
     this.#pendingRuntimeRefreshes.clear();
-    this.#startingSessions.clear();
+    this.#pendingStarts.clear();
   }
 
   async ensureThread(agent: AgentSummary, client: AgentClient, executionThreadId?: string): Promise<string> {
@@ -187,14 +188,32 @@ export class ThreadLifecycle {
     return this.startProviderThread(currentAgent, client, publicThreadId);
   }
 
+  /**
+   * Holds this agent's runtime refresh until the returned function is called.
+   *
+   * For the callers that await the provider between reading the session and using it. The refresh
+   * closes the session in the client and drops the routing to it, so one spent in that wait leaves
+   * a live start on a session whose events reach nobody. The mark is kept, and the next drain of
+   * this agent applies it. Calling the returned function twice counts once.
+   */
+  holdRuntimeRefresh(agentId: string): () => void {
+    this.#pendingStarts.set(agentId, (this.#pendingStarts.get(agentId) ?? 0) + 1);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const remaining = (this.#pendingStarts.get(agentId) ?? 1) - 1;
+      if (remaining > 0) this.#pendingStarts.set(agentId, remaining);
+      else this.#pendingStarts.delete(agentId);
+    };
+  }
+
   async startProviderThread(agent: AgentSummary, client: AgentClient, publicThreadId: string): Promise<string> {
-    this.#startingSessions.set(agent.id, (this.#startingSessions.get(agent.id) ?? 0) + 1);
+    const release = this.holdRuntimeRefresh(agent.id);
     try {
       return await this.#startProviderThread(agent, client, publicThreadId);
     } finally {
-      const remaining = (this.#startingSessions.get(agent.id) ?? 1) - 1;
-      if (remaining > 0) this.#startingSessions.set(agent.id, remaining);
-      else this.#startingSessions.delete(agent.id);
+      release();
     }
   }
 
@@ -370,10 +389,13 @@ export class ThreadLifecycle {
     // removes, and the agent would stay marked as compacting and hold its queue for good. The mark
     // stays, and the drain that `ContextCompaction.finish` schedules refreshes the thread then.
     if (!this.#compaction.mayDrain(agent.id)) return;
-    // A session that is starting is not in the table below, and it was given the MCP set as it was
-    // before this change. Spending the mark now would leave that session holding the old set for
-    // the rest of its life, so the mark waits for the session to exist and is spent on it.
-    let deferred = this.#startingSessions.has(agent.id);
+    // A session or a turn that is starting is not visible to the checks below: the session is in no
+    // table, and the turn owns no turn id, so both read as idle. Spending the mark now would leave
+    // a new session holding the old set for the rest of its life, or close the session a turn is
+    // about to run on and drop the routing its completion needs. The mark stays, and the next drain
+    // of this agent - which follows every start - spends it.
+    if (this.#pendingStarts.has(agent.id)) return;
+    let deferred = false;
     // Every thread of this agent, not only `agent.threadId`: a channel turn runs on an execution
     // thread of its own, and its provider session holds the same stale runtime as the agent's.
     const threadIds = this.#store.database.activeProviderSessionThreads(agent.id);

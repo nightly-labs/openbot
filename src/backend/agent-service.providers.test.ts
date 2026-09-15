@@ -478,6 +478,49 @@ describe.sequential("AgentService: providers", () => {
     });
   });
 
+  // The turn start is the second wait a change can land in: the session exists by then, and it has
+  // no turn id until the provider answers. A refresh spent there would close the session the turn
+  // is about to run on, and its completion would reach nobody.
+  it("keeps a session routed when an MCP server changes while a turn starts", async () => {
+    const { store, mailbox } = stores(root);
+    let changed = false;
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
+      if (method !== "turn/start" || changed) return;
+      changed = true;
+      service?.saveMcpServer({
+        config: {
+          id: "",
+          name: "Filesystem",
+          transport: "stdio",
+          enabled: true,
+          command: "/bin/echo",
+          args: ["ready"],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "",
+          headers: [],
+        },
+      });
+    });
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    // Completed, not left running: the turn that was starting still owns its routing.
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+    expect(client.releasedThreads).toEqual([]);
+
+    // The change is not lost either: the next turn is the one that applies it.
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    expect(client.releasedThreads).toEqual([firstSession]);
+  });
+
   // The manifest is the only record that survives a restart, and the in-memory refresh mark does
   // not. A manifest written from the set that arrived during the start would describe a session
   // that never got it, and the resume check would then accept that session for good.
