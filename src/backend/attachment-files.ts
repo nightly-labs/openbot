@@ -12,11 +12,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
-import {
-  attachmentMimeTypeForName,
-  isSupportedAttachmentName,
-  SUPPORTED_ATTACHMENT_DESCRIPTION,
-} from "@openbot/contracts/attachment-files";
+import { assertSupportedAttachmentName, attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AttachmentDataInput,
@@ -510,13 +506,6 @@ function attachmentMetadata(
         ? "text"
         : "none";
   return { kind: previewKind === "image" ? "image" : "file", mimeType, previewKind };
-}
-
-function assertSupportedAttachmentName(name: string): void {
-  if (isSupportedAttachmentName(name)) return;
-  throw new Error(
-    `${name} is not supported. Attach ${SUPPORTED_ATTACHMENT_DESCRIPTION}. For other audio or video formats, export as MP3 or MOV, or attach a text transcript.`,
-  );
 }
 
 function attachmentPreviewUrl(id: string): string {

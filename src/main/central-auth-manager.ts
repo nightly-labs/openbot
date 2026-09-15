@@ -10,6 +10,7 @@ import type {
   MobileConnectedDevice,
   MobileConnectTicket,
 } from "@openbot/contracts/ipc";
+import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { createMobileConnectUrl, type MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import {
   decodeRemoteSession,
@@ -1070,17 +1071,6 @@ function parseRetryAfterSeconds(value: string | null): number | undefined {
   if (!Number.isFinite(retryAt)) return undefined;
   const seconds = Math.ceil((retryAt - Date.now()) / 1_000);
   return seconds > 0 ? seconds : undefined;
-}
-
-function decodeRecord(value: unknown, label: string): DynamicRecord {
-  if (!isDynamicRecord(value)) throw new Error(`Invalid ${label}.`);
-  return value;
-}
-
-function requiredString(record: DynamicRecord, field: string): string {
-  const value = record[field];
-  if (!isString(value)) throw new Error(`Invalid ${field}.`);
-  return value;
 }
 
 function decodeVoid(value: unknown): undefined {
