@@ -165,6 +165,16 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     },
   );
 
+  /**
+   * The load state of the list shown for the selected agent. A list read for another agent is not
+   * an answer about this one, and a failed refresh keeps the failure: the rows on screen are then
+   * older than the agent, and Try must not run on them.
+   */
+  const installedLoadForTarget = (): "idle" | "loading" | "loaded" | "failed" =>
+    market.installedLoad === "loaded" && market.installedForAgentId !== market.browse.targetAgentId
+      ? "idle"
+      : market.installedLoad;
+
   function closeDetail(): void {
     setDetailActive(false);
     setMarket((state) => {
@@ -693,11 +703,7 @@ description: Turn merged work into clear, consistent release notes.
                           <SkillDetailView
                             skill={skill}
                             installed={installedById().get(skill.id)}
-                            installedLoad={
-                              market.installedForAgentId === market.browse.targetAgentId
-                                ? "loaded"
-                                : market.installedLoad
-                            }
+                            installedLoad={installedLoadForTarget()}
                             busy={panel.busy === skill.id}
                             onBack={leaveDetails}
                             onTrySkill={props.onTrySkill}
@@ -1258,6 +1264,7 @@ function SkillDetailView(props: {
   const canTry = () =>
     props.onTrySkill &&
     props.targetAgentId &&
+    props.installedLoad === "loaded" &&
     props.installed &&
     props.installed.enabled !== false &&
     props.installed.installedVersion === props.skill.version &&
@@ -1272,8 +1279,8 @@ function SkillDetailView(props: {
     if (!props.onTrySkill) return "Open this skill from an agent chat to try it.";
     if (!props.targetAgentId) return "Choose an agent to try this skill.";
     if (props.busy) return "Wait for this skill to finish installing, then try it.";
-    if (props.installedLoad === "loading") return "Reading this agent's skills…";
-    if (props.installedLoad !== "loaded") return "OpenBot could not read this agent's skills. Try again.";
+    if (props.installedLoad === "failed") return "OpenBot could not read this agent's skills. Try again.";
+    if (props.installedLoad !== "loaded") return "Reading this agent's skills…";
     if (!props.installed) return "Install this skill for an agent to try it.";
     if (props.installed.enabled === false) return "Enable this skill in agent settings to try it.";
     if (props.installed.state === "needs-repair") return "Repair this skill in agent settings to try it.";

@@ -172,6 +172,48 @@ describe("SkillsMarketplaceModal", () => {
     expect(screen.getByRole("button", { name: "Try skill" })).toBeDisabled();
   });
 
+  it("keeps a failed skills read after an install instead of asking for the install again", async () => {
+    const installed: InstalledSkill = {
+      skillId: "release-notes",
+      slug: "release-notes",
+      name: "Release Notes",
+      installedVersion: 2,
+      availableVersion: 2,
+      state: "installed",
+      enabled: true,
+    };
+    let failRefresh: ((error: Error) => void) | undefined;
+    let reads = 0;
+    vi.spyOn(window.openbot.skills, "listInstalled").mockImplementation(() => {
+      reads += 1;
+      if (reads === 1) return Promise.resolve([]);
+      return new Promise((_resolve, reject) => {
+        failRefresh = reject;
+      });
+    });
+    vi.spyOn(window.openbot.skills, "install").mockResolvedValue(installed);
+    render(() => (
+      <SkillsMarketplaceModal
+        open
+        agents={[{ id: "writer", name: "Writer" }]}
+        activeAgentId="writer"
+        onOpenChange={vi.fn()}
+        onTrySkill={vi.fn()}
+      />
+    ));
+    fireEvent.click(screen.getByRole("button", { name: "Skills" }));
+    fireEvent.click(await screen.findByRole("button", { name: "View Release Notes details" }));
+    expect(await screen.findByText("Install this skill for an agent to try it.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Install skill" }));
+    await waitFor(() => expect(failRefresh).toBeDefined());
+    failRefresh?.(new Error("Skill list unavailable."));
+
+    // The skill is installed, but the list on screen is older than the install. Asking for the
+    // install again would repeat work the agent has already done.
+    expect(await screen.findByText("OpenBot could not read this agent's skills. Try again.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try skill" })).toBeDisabled();
+  });
+
   it("opens the approved skill instructions inside the marketplace modal", async () => {
     render(() => (
       <SkillsMarketplaceModal

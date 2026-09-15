@@ -48,6 +48,8 @@ export interface ChannelHooks {
     text: string,
   ): Promise<"accepted" | "rejected" | "uncertain">;
   changed(channelId: string, revision: number): void;
+  /** The channel work that queues wait behind has changed, so every held queue needs a new hold. */
+  queueHoldChanged?(): void;
   /** A memory is not part of the channel revision, so a tool write needs its own notification. */
   memoriesChanged?(channelId: string): void;
   error(error: unknown): void;
@@ -89,6 +91,9 @@ export class ChannelService {
   readonly #wakeAgain = new Set<string>();
   readonly #deletedChannels = new Set<string>();
   readonly #assignmentTerminalWaiters = new Map<string, Set<() => void>>();
+  /** The active assignments last seen per channel, and the hold last reported for all of them. */
+  readonly #activeAssignments = new Map<string, string>();
+  #reportedHold = "";
 
   constructor(
     database: OpenBotDatabase,
@@ -1555,6 +1560,32 @@ export class ChannelService {
 
   private publish(channelId: string): void {
     this.hooks.changed(channelId, this.store.get(channelId).revision);
+    this.#syncQueueHolds(channelId);
+  }
+
+  /**
+   * A queue snapshot names the channel work it waits behind, read at the moment the queue is
+   * emitted. A held agent drains nothing, so no queue event of its own follows: when the
+   * reservation moves to another channel or another agent, every held queue keeps naming work that
+   * has ended. This reports the new hold instead.
+   *
+   * The gate is the channel's own active assignments. Each message batch of a running channel turn
+   * publishes, and the hold lookup reads the whole assignment projection, so only an assignment
+   * change is allowed to ask for it.
+   */
+  #syncQueueHolds(channelId: string): void {
+    const active = this.store
+      .assignments(channelId)
+      .filter(activeAssignment)
+      .map((assignment) => `${assignment.id}:${assignment.state}`)
+      .join(",");
+    if (this.#activeAssignments.get(channelId) === active) return;
+    this.#activeAssignments.set(channelId, active);
+    const hold = this.queueHold();
+    const signature = hold ? `${hold.agentId}\u0000${hold.channelId}\u0000${hold.channelName}` : "";
+    if (signature === this.#reportedHold) return;
+    this.#reportedHold = signature;
+    this.hooks.queueHoldChanged?.();
   }
 
   async stop(): Promise<void> {

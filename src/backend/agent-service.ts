@@ -532,6 +532,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#emit({ type: "channels-changed", channelId, revision });
       },
       memoriesChanged: (channelId) => this.#emit({ type: "channel-memories-changed", channelId }),
+      // A held agent starts nothing, so its queue has no event of its own while the reservation
+      // moves. Without this its panel keeps naming the channel task that has already ended.
+      queueHoldChanged: () => {
+        for (const agent of this.#store.list())
+          if (this.#mailbox.nextQueued(agent.id)) this.#mailboxSync.emitQueue(agent.id);
+      },
       error: (error) => this.#emitError("channel_coordination_failed", error),
     });
     this.#channelRoutines = new ChannelRoutineScheduler({
