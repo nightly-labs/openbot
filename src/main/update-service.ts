@@ -34,7 +34,7 @@ export type UpdateCheckOutcome = {
  * 4. `BaseUpdater.quitAndInstall` can return without quitting when `install()` fails, so an install
  *    failure has to release the latch or the restart action never becomes available again.
  */
-type UpdateAdapter = {
+export type UpdateAdapter = {
   allowPrerelease: boolean;
   autoDownload: boolean;
   autoInstallOnAppQuit: boolean;
@@ -48,6 +48,24 @@ type UpdateAdapter = {
   on(event: "error", listener: (error: Error) => void): unknown;
   quitAndInstall: (isSilent?: boolean, isForceRunAfter?: boolean) => void;
 };
+
+export function createDisabledUpdateAdapter(): UpdateAdapter {
+  return {
+    allowPrerelease: false,
+    autoDownload: false,
+    autoInstallOnAppQuit: false,
+    checkForUpdates: async () => null,
+    downloadUpdate: async () => [],
+    on: () => undefined,
+    quitAndInstall: () => undefined,
+  };
+}
+
+export function isValidSemver(version: string): boolean {
+  return /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u.test(
+    version,
+  );
+}
 
 type UpdateOperation = "check" | "download" | "install";
 

@@ -38,7 +38,6 @@ import { IPC_CHANNELS } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, safeStorage, screen, shell } from "electron";
-import electronUpdater from "electron-updater";
 import { AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
@@ -93,7 +92,13 @@ import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
 import { readUpdatePreference } from "./update-preference-store";
-import { supportsInstalledUpdates, UpdateService } from "./update-service";
+import {
+  createDisabledUpdateAdapter,
+  isValidSemver,
+  supportsInstalledUpdates,
+  type UpdateAdapter,
+  UpdateService,
+} from "./update-service";
 import { WHISPER_MODEL_NAME, WHISPER_MODEL_URL } from "./voice-model-service";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 
@@ -674,13 +679,34 @@ export async function createApplicationServices({
   });
   teardown.push(TEARDOWN_ORDER.voice, "voice transcription", () => voice.shutdown());
   voice.on("modelStatus", forwardVoiceModelStatus);
-  const { autoUpdater } = electronUpdater;
-  const updater = new UpdateService(autoUpdater, {
-    currentVersion: app.getVersion(),
-    enabled:
-      app.isPackaged &&
-      supportsInstalledUpdates(process.platform) &&
-      existsSync(join(process.resourcesPath, "app-update.yml")),
+  const currentVersion = app.getVersion();
+  // Skip the file check in dev: unpacked runs never enable updates, so avoid touching resourcesPath.
+  const updateMetadataAvailable = app.isPackaged && existsSync(join(process.resourcesPath, "app-update.yml"));
+  const updatesEnabled =
+    app.isPackaged &&
+    supportsInstalledUpdates(process.platform) &&
+    updateMetadataAvailable &&
+    isValidSemver(currentVersion);
+  if (app.isPackaged && updateMetadataAvailable && !isValidSemver(currentVersion)) {
+    logger.warn(`OpenBot updates are disabled because the application version is not valid SemVer: ${currentVersion}`);
+  }
+  let updateAdapter: UpdateAdapter = createDisabledUpdateAdapter();
+  if (updatesEnabled) {
+    try {
+      const updaterModule = await import("electron-updater");
+      const realAdapter = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater ?? updaterModule.default;
+      if (realAdapter) {
+        updateAdapter = realAdapter;
+      } else {
+        logger.warn("OpenBot updates are disabled: electron-updater did not export autoUpdater");
+      }
+    } catch {
+      logger.warn("OpenBot updates are disabled: electron-updater failed to load");
+    }
+  }
+  const updater = new UpdateService(updateAdapter, {
+    currentVersion,
+    enabled: updatesEnabled,
     autoDownload: updatePreference.autoDownload,
     beforeInstall: prepareForUpdateInstall,
     platform: process.platform,
