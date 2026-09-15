@@ -40,6 +40,13 @@ vi.mock("expo-secure-store", () => ({}));
 vi.mock("expo-image", () => ({
   Image: ({ source }: { source: { uri: string } }) => <img alt="Agent avatar" src={source.uri} />,
 }));
+vi.mock("react-native-svg", () => ({
+  default: ({ children }: PropsWithChildren) => <>{children}</>,
+  Defs: () => null,
+  Filter: () => null,
+  FeColorMatrix: () => null,
+  Image: () => null,
+}));
 vi.mock("expo-image-picker", () => ({ launchImageLibraryAsync: (...args: unknown[]) => mocks.choosePhoto(...args) }));
 vi.mock("expo-file-system", () => ({
   File: class {
@@ -1411,7 +1418,11 @@ it("retries only history after a task action was accepted", async () => {
 
 vi.mock("expo-linking", () => ({ openURL: vi.fn() }));
 vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn() }));
-vi.mock("react-native-reanimated", () => ({ useReducedMotion: () => true }));
+vi.mock("react-native-reanimated", () => ({
+  useReducedMotion: () => true,
+  Easing: { bezier: () => (value: number) => value },
+  ReduceMotion: { System: "system" },
+}));
 // This DOM harness checks actions; native blur transitions run on the device.
 vi.mock("@/shared/components/blur-reveal", () => ({
   BlurReveal: ({ value, children }: { value: ChatTarget | null; children: (value: ChatTarget) => React.ReactNode }) =>
@@ -1468,11 +1479,11 @@ it("keeps the form unchanged when photo selection is canceled or the file is too
 
 it("loads desktop avatar revisions from the correct host and returns to the generated face after removal", async () => {
   workspace.agents = [{ ...original, avatarUrl: "openbot-avatar://agent-one?v=desktop" }];
-  const renderPhoto = () =>
+  const renderPhoto = (disconnected = false) =>
     act(() =>
       root.render(
         <QueryClientProvider client={client}>
-          <AgentPhoto agentId={original.id} serverId={host.id} size={48}>
+          <AgentPhoto agentId={original.id} serverId={host.id} size={48} disconnected={disconnected}>
             <span>Generated face</span>
           </AgentPhoto>
         </QueryClientProvider>,
@@ -1485,6 +1496,18 @@ it("loads desktop avatar revisions from the correct host and returns to the gene
     "openbot-avatar://agent-one?v=desktop",
     host.id,
   );
+  workspace.servers = [{ ...host, state: "offline" }];
+  await renderPhoto(true);
+  expect(screen.getByRole("img", { name: "Agent avatar" }).getAttribute("src")).toBe(
+    "data:image/png;base64,iVBORw0KGgo=",
+  );
+  expect(workspace.loadAgentAvatar).toHaveBeenCalledTimes(1);
+  workspace.servers = [{ ...host }];
+  await renderPhoto();
+  expect(screen.getByRole("img", { name: "Agent avatar" }).getAttribute("src")).toBe(
+    "data:image/png;base64,iVBORw0KGgo=",
+  );
+  expect(workspace.loadAgentAvatar).toHaveBeenCalledTimes(1);
   workspace.agents = [{ ...original, avatarUrl: "openbot-avatar://agent-one?v=replaced" }];
   await renderPhoto();
   await waitFor(() =>
