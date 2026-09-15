@@ -278,6 +278,9 @@ describe("OpenBot connected desktop shell", () => {
   it("replies to a message through the composer and keeps the reference in the queued input", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
+    // Wait for the agent list before the message reference resolves. The
+    // heading renders first, so without this the reference button flakes.
+    await screen.findByRole("button", { name: /Sales Outbound, Outbound specialist/ });
     emitAgentEvent?.({
       type: "conversation",
       snapshot: {
