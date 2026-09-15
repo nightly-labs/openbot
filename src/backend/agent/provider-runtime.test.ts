@@ -203,10 +203,16 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       "opencode",
       (provider) => {
         const client = new FakeAgentClient(provider);
-        // Zen and Go reach OpenBot as one catalog, which is what makes the split a decision this
-        // app has to make rather than one it can read off the response.
+        // Zen and Go reach OpenBot as one catalog, and the stored key is a Go key: the Go models
+        // stay while the Zen ones the key does not buy leave, which is what makes the split a
+        // decision this app has to make rather than one it can read off the response.
         if (provider === "opencode") {
-          const ids = catalog ?? ["opencode/big-pickle", "opencode/claude-opus-5", "opencode-go/kimi-k3"];
+          const ids = catalog ?? [
+            "opencode/big-pickle",
+            "opencode/claude-opus-5",
+            "opencode/spark-free",
+            "opencode-go/kimi-k3",
+          ];
           client.modelList = () => ({ data: ids.map((model) => ({ model })) });
         }
         return client;
@@ -225,13 +231,18 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       .map((model) => model.id);
   }
 
-  it("hides the OpenCode Go models that the key OpenBot supplied does not buy", async () => {
-    expect(await opencodeModelIds("zen-key")).toEqual(["opencode/big-pickle", "opencode/claude-opus-5"]);
+  it("keeps the OpenCode Go models the stored key buys, and drops the paid Zen ones it does not", async () => {
+    expect(await opencodeModelIds("go-key")).toEqual([
+      "opencode/big-pickle",
+      "opencode/spark-free",
+      "opencode-go/kimi-k3",
+    ]);
   });
 
-  it("keeps the OpenCode Go models when the user's own OpenCode sign-in is what lists them", async () => {
+  it("keeps the OpenCode Zen models when the user's own OpenCode sign-in is what lists them", async () => {
     expect(await opencodeModelIds(null)).toEqual([
       "opencode/big-pickle",
+      "opencode/spark-free",
       "opencode/claude-opus-5",
       "opencode-go/kimi-k3",
     ]);
@@ -252,9 +263,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       ]),
     ).toEqual([
       "opencode/muse-spark-1.3-contributor-free",
+      "opencode/big-pickle",
       "opencode/nemotron-3.5-lightning-free",
       "opencode/mimo-v2.5-free",
-      "opencode/big-pickle",
       "openai/gpt-5.3-codex-spark",
     ]);
   });
@@ -274,7 +285,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         const client = new FakeAgentClient(provider);
         if (provider === "opencode") {
           client.modelList = () => ({
-            data: ["opencode/big-pickle", "opencode-go/kimi-k3"].map((model) => ({ model })),
+            data: ["opencode/big-pickle", "opencode/claude-opus-5", "opencode-go/kimi-k3"].map((model) => ({
+              model,
+            })),
           });
           clients.push(client);
         }
@@ -290,11 +303,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     await service.initialize();
 
     await service.changeProviderCredential("opencode", async () => {
-      storedKey = "zen-key";
+      storedKey = "go-key";
     });
 
-    // A CLI reads its key at spawn, so only a new process can list what the key buys. The Go
-    // model leaves the catalog only when that process is the one reporting it.
+    // A CLI reads its key at spawn, so only a new process can list what the key buys. The paid
+    // Zen model leaves the catalog only when that process is the one reporting it, while the
+    // free and Go models stay.
     expect(clients).toHaveLength(2);
     expect(clients[0]?.running).toBe(false);
     expect(
@@ -302,7 +316,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         .listModels()
         .filter((model) => model.provider === "opencode")
         .map((model) => model.id),
-    ).toEqual(["opencode/big-pickle"]);
+    ).toEqual(["opencode/big-pickle", "opencode-go/kimi-k3"]);
   });
 
   it("uses startup fallbacks when provider discovery is unavailable", async () => {
@@ -1529,7 +1543,7 @@ describe.sequential("ProviderRuntime: custom provider reload", () => {
         id: "opencode",
         state: "sign-in-required",
         message:
-          "OpenCode could not start a session. Check your custom provider's base URL and API key, or add an OpenCode Zen key if you also use OpenCode's own models.",
+          "OpenCode could not start a session. Check your custom provider's base URL and API key, or add an OpenCode Go key if you also use OpenCode's own models.",
       }),
     );
     // Signed out, OpenCode keeps no client. A save must not read as a failure: the next spawn - the

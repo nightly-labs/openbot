@@ -99,7 +99,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     onboardingDescription: "Free models, no account needed",
     // Only reached when a spawn lists no model at all, which is not the keyless free tier: that
     // one works with no credential. So this asks for the optional key instead of a terminal login.
-    signInMessage: "OpenCode listed no model. Add an OpenCode Zen key to continue.",
+    signInMessage: "OpenCode listed no model. Add an OpenCode Go key to continue.",
     installGuideLink: null,
     defaultModel: "",
     legacyModelPrefix: null,
@@ -153,7 +153,7 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
  * Whether an OpenCode model's display name marks it as one the free tier covers.
  *
  * OpenCode states the price in the name and nowhere else: `model/list` carries no price field, and
- * neither OpenCode Zen endpoint authenticates, so this trailing word is the only thing that
+ * neither OpenCode endpoint authenticates, so this trailing word is the only thing that
  * separates a model any user can run from one that bills. The picker labels a model with it and the
  * catalog order picks the default from it, and those two have to agree -- a "Free" badge on a model
  * OpenBot would never default to, or a default that quietly bills, is the same bug twice.
@@ -163,4 +163,17 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
  */
 export function isFreeOpencodeModelName(name: string): boolean {
   return /\bfree$/i.test(name.trim());
+}
+
+/**
+ * Whether an OpenCode model runs without a paid subscription.
+ *
+ * That is the Free-suffixed tier plus Big Pickle: a keyless `opencode models` lists exactly
+ * `opencode/big-pickle` and the `*-free` ids, and both answer a turn with no key at all. Big
+ * Pickle carries no Free suffix, so the name alone cannot tell it apart from paid Zen. Every
+ * free decision -- the picker badge, the catalog order, the stored-key drop -- goes through
+ * this pair, so the three cannot disagree about what costs money.
+ */
+export function isFreeOpencodeModel(id: string, name: string): boolean {
+  return id.trim().toLowerCase() === "opencode/big-pickle" || isFreeOpencodeModelName(name);
 }

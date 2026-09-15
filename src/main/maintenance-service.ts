@@ -53,7 +53,7 @@ export async function exportOpenBotData(
         includes: ["agent profiles", "agent memories", "conversation snapshots", "queues", "attachments"],
         excludes: [
           "Codex credentials",
-          "OpenCode Zen key",
+          "OpenCode Go key",
           "custom provider API keys",
           "browser cookies",
           "agent workspace files",
